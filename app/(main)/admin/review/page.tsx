@@ -4,6 +4,7 @@ import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
 import { formatDate } from "@/lib/utils";
 import ReviewActions from "./ReviewActions";
+import FeaturePolicyButton from "@/app/(main)/policy/FeaturePolicyButton";
 
 export default async function AdminReviewPage() {
   const supabase = await createClient();
@@ -40,6 +41,26 @@ export default async function AdminReviewPage() {
     ...p,
     profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
   }));
+
+  // Fetch published policy briefs not yet featured
+  const { data: featuredIds } = await supabase
+    .from("policy_briefs_featured")
+    .select("post_id");
+  const alreadyFeatured = new Set((featuredIds ?? []).map((f) => f.post_id));
+
+  const { data: policyBriefsRaw } = await supabase
+    .from("posts")
+    .select(`id, title, excerpt, tags, created_at, profiles!posts_author_id_fkey (full_name, university)`)
+    .eq("status", "published")
+    .eq("type", "policy_brief")
+    .order("created_at", { ascending: false });
+
+  const policyBriefs = (policyBriefsRaw ?? [])
+    .filter((p) => !alreadyFeatured.has(p.id))
+    .map((p) => ({
+      ...p,
+      profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
+    }));
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -106,6 +127,42 @@ export default async function AdminReviewPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {/* Policy briefs available to feature */}
+      {policyBriefs.length > 0 && (
+        <div className="mt-12">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">Policy Briefs — Feature for Institutions</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {policyBriefs.length} published brief{policyBriefs.length !== 1 ? "s" : ""} available to feature
+            </p>
+          </div>
+          <div className="space-y-3">
+            {policyBriefs.map((post) => (
+              <div key={post.id} className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {post.tags?.slice(0, 3).map((tag: string) => (
+                        <Tag key={tag} label={tag} />
+                      ))}
+                    </div>
+                    <h3 className="text-sm font-semibold text-gray-900">{post.title}</h3>
+                    {post.excerpt && (
+                      <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{post.excerpt}</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      By {post.profiles?.full_name} · {post.profiles?.university}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <FeaturePolicyButton postId={post.id} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

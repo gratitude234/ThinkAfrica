@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import SponsorBanner from "@/components/ui/SponsorBanner";
 
 export const revalidate = 120;
 
@@ -21,6 +22,15 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const { data: sponsorRaw } = await supabase
+    .from("sponsor_placements")
+    .select("sponsor_name, content, link_url")
+    .eq("placement_type", "leaderboard")
+    .eq("active", true)
+    .limit(1)
+    .single();
+  const sponsor = sponsorRaw ?? null;
 
   let profiles: {
     id: string;
@@ -100,6 +110,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
 
   return (
     <div className="max-w-2xl mx-auto">
+      <SponsorBanner placement={sponsor} />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Leaderboard</h1>
         <p className="text-gray-500 text-sm mt-1">

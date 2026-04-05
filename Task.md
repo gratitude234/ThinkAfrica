@@ -1,184 +1,251 @@
-Continue building the ThinkAfrica platform. The Phase 1 MVP (auth, profiles, post editor, feed, single post, admin review queue) is already built. Now implement Phase 2 features.
+Continue building the ThinkAfrica platform. Phases 1, 2, and 3 are already built (auth, profiles, posts, debates, gamification, notifications, leaderboard, search, webinars, campus ambassadors, policy hub, onboarding, reading experience, static pages).
+
+Now implement Phase 4: Monetization, Fellowship Programs, Institutional Partnerships Dashboard, and Platform Maturity features.
 
 Tech stack: Next.js 14 (App Router, TypeScript, Tailwind CSS) + Supabase.
 Brand colors: Primary #10B981 (emerald), Secondary #F59E0B (gold), Accent #7C3AED (purple).
 
 ---
 
-## 1. DATABASE — Add to Supabase schema
+## 1. DATABASE — Add to /supabase/schema_phase4.sql
 
-Generate a file at /supabase/schema_phase2.sql with these new tables:
-
-debates (
+fellowships (
   id uuid PK default gen_random_uuid(),
   title text not null,
   description text,
-  moderator_id uuid → profiles,
-  status text default 'open' CHECK IN ('open', 'active', 'closed'),
-  round_duration_minutes int default 5,
-  tags text[],
-  created_at timestamptz default now(),
-  ends_at timestamptz
-)
-
-debate_arguments (
-  id uuid PK default gen_random_uuid(),
-  debate_id uuid → debates,
-  author_id uuid → profiles,
-  content text not null,        -- 200-300 words max
-  round_number int default 1,
-  upvotes int default 0,
+  sponsor_name text,
+  sponsor_logo_url text,
+  amount text,                        -- e.g. "$500 grant" or "Fully funded"
+  eligibility text,
+  deadline timestamptz,
+  application_url text,
+  status text default 'open' CHECK IN ('open', 'closed'),
   created_at timestamptz default now()
 )
 
-debate_votes (
+fellowship_applications (
+  id uuid PK default gen_random_uuid(),
+  fellowship_id uuid → fellowships,
   user_id uuid → profiles,
-  argument_id uuid → debate_arguments,
-  PRIMARY KEY (user_id, argument_id)
+  cover_letter text,
+  status text default 'pending' CHECK IN ('pending', 'shortlisted', 'accepted', 'rejected'),
+  applied_at timestamptz default now()
 )
 
-notifications (
+institutional_partners (
   id uuid PK default gen_random_uuid(),
-  user_id uuid → profiles,
-  type text,                   -- 'like', 'comment', 'follow', 'debate_reply', 'post_approved'
+  name text not null,
+  type text CHECK IN ('university', 'ngo', 'government', 'thinktank', 'media'),
+  country text,
+  logo_url text,
+  description text,
+  website_url text,
+  partnership_since timestamptz default now(),
+  active boolean default true
+)
+
+talent_profiles (
+  id uuid PK default gen_random_uuid(),
+  user_id uuid → profiles unique,
+  open_to_opportunities boolean default false,
+  opportunity_types text[],           -- ['internship', 'research', 'fellowship', 'job']
+  cv_url text,
+  linkedin_url text,
+  skills text[],
+  visibility text default 'public' CHECK IN ('public', 'partners_only', 'private'),
+  updated_at timestamptz default now()
+)
+
+talent_inquiries (
+  id uuid PK default gen_random_uuid(),
+  talent_id uuid → talent_profiles,
+  organization_name text,
+  contact_email text,
   message text,
-  read boolean default false,
-  link text,
   created_at timestamptz default now()
 )
 
-Add RLS policies:
-- Anyone can read open/active debates and arguments
-- Only authenticated users can insert arguments
-- Users can only read their own notifications
-- Users can only update their own notifications (mark as read)
+sponsor_placements (
+  id uuid PK default gen_random_uuid(),
+  sponsor_name text,
+  placement_type text CHECK IN ('fellowship', 'webinar', 'leaderboard', 'policy_hub'),
+  content text,
+  link_url text,
+  active boolean default true,
+  created_at timestamptz default now()
+)
+
+Add RLS:
+- Anyone can read open fellowships and institutional_partners
+- Authenticated users can insert fellowship_applications
+- Users can only read their own fellowship_applications
+- Users can read/update their own talent_profile
+- Public talent_profiles visible to all; partners_only visible only to authenticated users
+- Only admins can insert/update fellowships, institutional_partners, sponsor_placements
 
 ---
 
-## 2. DEBATES FEATURE
+## 2. FELLOWSHIP PROGRAMS
 
-### /app/(main)/debates/page.tsx — Debates Feed
-- Fetch all debates from Supabase ordered by created_at desc
-- Show debate cards: title, tags, status badge (Open/Active/Closed), argument count, time remaining
-- "Start a Debate" button (authenticated users only) → opens modal or redirects to /debates/create
-- Filter by status: All | Open | Active | Closed
+### /app/(main)/fellowships/page.tsx — Fellowships Feed
+- Hero: "Funding Africa's Next Generation of Thinkers"
+- Cards for each open fellowship: title, sponsor name + logo, amount, deadline, eligibility summary, "Apply Now" button
+- Closed fellowships shown in a separate "Past Opportunities" section below
+- Filter by deadline: Closing Soon | All
 
-### /app/(main)/debates/create/page.tsx — Create Debate
-- Protected route (auth required)
-- Fields: Title, Description, Tags (comma separated), Round Duration (minutes selector: 5, 10, 15)
-- On submit: insert into debates table with status 'open'
-- Redirect to the new debate page after creation
+### /app/(main)/fellowships/[id]/page.tsx — Single Fellowship
+- Full fellowship details: title, sponsor, amount, eligibility, description, deadline
+- "Apply for this Fellowship" button (auth required)
+- Opens an inline application form:
+  - Cover letter textarea (min 200 words, live word count)
+  - On submit: insert into fellowship_applications
+  - Show confirmation after applying
+- If user already applied: show application status badge (Pending / Shortlisted / Accepted / Rejected)
 
-### /app/(main)/debates/[id]/page.tsx — Single Debate
-- Fetch debate + all arguments joined with author profile
-- Show debate title, description, status, tags, time remaining if active
-- Arguments list: grouped by round, each showing author avatar, name, university, content, upvote count
-- Upvote button per argument (toggle, auth required) — updates debate_votes table and increments upvotes count
-- Argument submission form at bottom (auth required):
-  - Textarea with live word count (max 300 words, enforced)
-  - Submit adds to debate_arguments with current round number
-  - Disabled if debate status is 'closed'
-- Use Supabase Realtime to subscribe to new arguments so they appear live without page refresh
-
----
-
-## 3. NOTIFICATIONS SYSTEM
-
-### /components/ui/NotificationBell.tsx
-- Bell icon in the navbar showing unread count badge
-- Dropdown on click showing last 10 notifications
-- Each notification shows: message, time ago, link to relevant content
-- "Mark all as read" button
-- Fetches from notifications table filtered by current user
-
-### Trigger notifications automatically when:
-- A post gets approved (status changes to 'published') → notify the author
-- Someone likes your post → notify the post author
-- Someone comments on your post → notify the post author
-- Someone follows you → notify the followed user
-- Someone replies in a debate you participated in → notify participants
-
-Implement these as Supabase database functions / triggers in schema_phase2.sql
+### /app/(main)/admin/fellowships/page.tsx — Admin: Manage Fellowships
+- Admin only
+- List all fellowship applications grouped by fellowship
+- For each application: applicant name, university, cover letter preview, status
+- Update status buttons: Shortlist | Accept | Reject
+- "Add New Fellowship" form at top: all fields from fellowships table
+- On submit: insert new fellowship
 
 ---
 
-## 4. GAMIFICATION — Points System
+## 3. INSTITUTIONAL PARTNERSHIPS
 
-### Points rules (implement as Supabase triggers in schema_phase2.sql):
-- Publishing a blog post → +10 points
-- Publishing an essay → +20 points  
-- Publishing a research paper → +50 points
-- Publishing a policy brief → +30 points
-- Receiving a like → +2 points
-- Winning a debate (most upvotes) → +25 points
-- Comment on a post → +3 points
+### /app/(main)/partners/page.tsx — Partners Page
+- Hero: "Institutions That Believe in African Student Scholarship"
+- Grid of active partner logos + names + country + type badge
+- Partner types color-coded: University (emerald), NGO (gold), Government (purple), Think Tank (gray), Media (blue)
+- "Become a Partner" section at bottom with a contact form (name, organization, email, message) — inserts into a simple contact_requests table
 
-Create a trigger update_user_points() that fires on relevant table inserts/updates and updates profiles.points accordingly.
-
-### /app/(main)/leaderboard/page.tsx — Leaderboard
-- Fetch top 20 profiles ordered by points desc
-- Show rank number, avatar, name, university, points, badge count
-- Weekly tab and All-time tab (weekly requires a weekly_points column or computed from created_at)
-- Highlight the current logged-in user's row
-
-### Auto-award badges (add to schema_phase2.sql as triggers):
-- "First Post" → awarded when user publishes their first post
-- "Researcher" → awarded when user publishes a research paper
-- "Policy Maker" → awarded when user publishes a policy brief
-- "Debate Champion" → awarded when user wins a debate
-- "Rising Star" → awarded when user reaches 100 points
-- "Thought Leader" → awarded when user reaches 500 points
+### /app/(main)/admin/partners/page.tsx — Admin: Manage Partners
+- Admin only
+- List all partners with edit/deactivate buttons
+- "Add Partner" form: all fields from institutional_partners table
+- Toggle active/inactive status
 
 ---
 
-## 5. ENHANCED PROFILE PAGE
+## 4. TALENT PIPELINE
 
-Update /app/(main)/[username]/page.tsx:
-- Add a stats row: Total Posts | Total Likes Received | Points | Followers count
-- Show badges in a visual grid with icons and names (use emoji or lucide icons as badge icons)
-- Add tabs: Posts | Debates | Activity
-  - Posts tab: their published posts (already exists)
-  - Debates tab: debates they've participated in
-  - Activity tab: recent likes, comments, and debate arguments
+### /app/(main)/talent/page.tsx — Talent Directory
+- Hero: "Discover Africa's Brightest Student Minds"
+- Search/filter by: skills, opportunity type, university, country
+- Grid of public talent profiles: avatar, name, university, skills tags, opportunity types badges
+- Each card links to their ThinkAfrica profile /[username]
+- Note: partners_only profiles only visible to authenticated users
 
----
-
-## 6. ENHANCED HOME FEED
-
-Update /app/(main)/page.tsx:
-- Add a sidebar (desktop only):
-  - "Trending This Week" — top 5 posts by view_count in last 7 days
-  - "Active Debates" — 3 most recent open debates with argument count
-  - "Top Contributors" — top 3 profiles by points this week with avatars
-- The sidebar should be sticky on scroll
+### Update /app/(main)/[username]/page.tsx
+- Add "Opportunities" tab to profile page tabs (alongside Posts, Debates, Activity)
+- In the tab: show talent_profile settings if viewing own profile — toggle "Open to Opportunities", select opportunity types, add skills, CV URL, LinkedIn URL
+- If viewing another user's public talent profile: show their opportunity preferences and a "Send Inquiry" button
+- "Send Inquiry" opens a modal: organization name, contact email, message → inserts into talent_inquiries
 
 ---
 
-## 7. SEARCH — /app/(main)/search/page.tsx
-- Search input at the top
-- Searches posts (title, excerpt, tags) and profiles (username, full_name, university) simultaneously using Supabase full-text search or ilike queries
-- Results split into two sections: Articles and People
-- Each result links to the relevant post or profile page
+## 5. MONETIZATION — SPONSOR PLACEMENTS
+
+### Update layout to show sponsor placements contextually:
+- On /leaderboard: show one sponsor banner at the top (from sponsor_placements where placement_type = 'leaderboard')
+- On /policy: show one sponsor banner (placement_type = 'policy_hub')
+- On /webinars: show one sponsor banner (placement_type = 'webinar')
+- Sponsor banners are clean, labeled "Supported by [Sponsor Name]", linking to sponsor URL
+- Only show if an active placement exists for that page
+
+### /app/(main)/admin/sponsors/page.tsx — Admin: Manage Sponsors
+- Admin only
+- List all sponsor placements with active/inactive toggle
+- "Add Sponsor Placement" form: sponsor name, placement type selector, content, link URL
+- On submit: insert into sponsor_placements
 
 ---
 
-## 8. NAVBAR UPDATES
+## 6. ANALYTICS DASHBOARD (ADMIN)
 
-Update the main navbar component to include:
-- ThinkAfrica logo (left)
-- Nav links: Feed | Debates | Leaderboard (center)
-- Search icon → expands inline search or goes to /search
-- Notification bell with unread count (NotificationBell component)
-- User avatar dropdown: Profile | Write | Admin (if admin) | Sign Out (right)
-- Mobile: hamburger menu with all links
+### /app/(main)/admin/analytics/page.tsx
+- Admin only
+- Summary cards at top:
+  - Total registered users
+  - Total published posts (broken down by type)
+  - Total debates created
+  - Total webinars hosted
+  - Total fellowship applications
+  - Total page views (sum of view_count from posts)
+- Charts using recharts library:
+  - Line chart: new user signups over the last 30 days (group profiles.created_at by day)
+  - Bar chart: posts published per content type (blog, essay, research, policy_brief)
+  - Bar chart: top 10 universities by contributor count
+- All data fetched directly from Supabase using aggregate queries
+
+---
+
+## 7. CONTRIBUTOR VERIFICATION BADGES
+
+### Add to /supabase/schema_phase4.sql:
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS verified boolean default false;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS verified_type text CHECK IN ('student', 'researcher', 'faculty', 'institution');
+
+### Update ProfileCard and post author displays:
+- Show a small verified checkmark (✓) badge next to name if verified = true
+- Badge color based on verified_type: student (emerald), researcher (purple), faculty (gold), institution (blue)
+
+### /app/(main)/admin/verification/page.tsx
+- Admin only
+- List users who have published 3+ posts (likely serious contributors)
+- Toggle verified on/off, set verified_type
+- Show their post count, points, university
+
+---
+
+## 8. EMAIL DIGEST (SETUP ONLY — no actual email sending)
+
+### /app/(main)/admin/digest/page.tsx
+- Admin only
+- "Weekly Digest Preview" page
+- Shows what the weekly email digest would contain:
+  - Top 5 posts of the week (by view_count in last 7 days)
+  - Top debate of the week (most arguments)
+  - Upcoming webinars
+  - New fellowship opportunities
+  - Top contributor of the week (highest points gained)
+- "Send Digest" button — for now just shows a success toast (actual email integration left for Phase 5)
+
+---
+
+## 9. PLATFORM POLISH
+
+### Loading States
+- Add skeleton loading components for: PostCard, ProfileCard, DebateCard, WebinarCard
+- Use them in all feed pages while data is fetching
+
+### Empty States
+- Add proper empty state components for all feed pages:
+  - No posts: "No articles yet. Be the first to write."
+  - No debates: "No debates yet. Start one."
+  - No webinars: "No webinars scheduled yet."
+  - No fellowships: "No open fellowships right now. Check back soon."
+- Each empty state includes an icon, message, and a CTA button
+
+### Error Boundary
+- Add a global error boundary component at /components/ui/ErrorBoundary.tsx
+- Shows a friendly error page with a "Try Again" button instead of a blank crash
+
+### /app/not-found.tsx
+- Custom 404 page
+- ThinkAfrica branded with logo
+- Message: "This page doesn't exist — but your ideas do."
+- Links back to Feed and Debates
 
 ---
 
 ## WHAT TO GENERATE
 1. All new page and component files with working code
-2. /supabase/schema_phase2.sql with all new tables, triggers, functions, and RLS policies
-3. Updated navbar component
-4. Supabase Realtime subscription in the debate page for live argument updates
-5. All Supabase queries using typed client
+2. /supabase/schema_phase4.sql with all new tables, columns, and RLS policies
+3. Recharts analytics dashboard with real Supabase aggregate queries
+4. Skeleton and empty state components
+5. Custom 404 page
+6. All Supabase queries using typed client
 
-Make sure everything integrates cleanly with the existing Phase 1 codebase. Do not recreate files that already exist — only add or update what is needed for Phase 2.
+Do not recreate Phase 1, 2, or 3 files. Only add or update what Phase 4 requires. Keep all styling consistent with the existing brand.

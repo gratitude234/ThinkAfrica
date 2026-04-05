@@ -6,6 +6,7 @@ import PostCard from "@/components/post/PostCard";
 import type { PostCardData } from "@/components/post/PostCard";
 import FollowButton from "./FollowButton";
 import { formatDate } from "@/lib/utils";
+import OpportunitiesTab from "./OpportunitiesTab";
 
 interface PageProps {
   params: Promise<{ username: string }>;
@@ -228,10 +229,27 @@ export default async function UserProfilePage({
       .slice(0, 20);
   }
 
+  // Opportunities tab data
+  let talentProfile: {
+    id: string; open_to_opportunities: boolean; opportunity_types: string[] | null;
+    cv_url: string | null; linkedin_url: string | null; skills: string[] | null; visibility: string;
+  } | null = null;
+  if (tab === "opportunities" || (user?.id === profile.id)) {
+    const { data } = await supabase
+      .from("talent_profiles")
+      .select("id, open_to_opportunities, opportunity_types, cv_url, linkedin_url, skills, visibility")
+      .eq("user_id", profile.id)
+      .single();
+    talentProfile = data;
+  }
+
+  const isOwnProfile = user?.id === profile.id;
+
   const tabLinks = [
     { label: "Posts", value: "posts" },
     { label: "Debates", value: "debates" },
     { label: "Activity", value: "activity" },
+    { label: "Opportunities", value: "opportunities" },
   ];
 
   return (
@@ -402,6 +420,15 @@ export default async function UserProfilePage({
               </div>
             )}
           </>
+        )}
+        {/* Opportunities tab */}
+        {tab === "opportunities" && (
+          <OpportunitiesTab
+            profileId={profile.id}
+            isOwnProfile={isOwnProfile}
+            talentProfile={talentProfile}
+            userId={user?.id ?? null}
+          />
         )}
       </div>
     </div>

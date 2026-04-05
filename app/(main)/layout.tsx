@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import NavUserMenu from "./NavUserMenu";
 import MobileNav from "./MobileNav";
 import NotificationBell from "@/components/ui/NotificationBell";
+import Footer from "@/components/ui/Footer";
 
 export default async function MainLayout({
   children,
@@ -60,6 +61,24 @@ export default async function MainLayout({
               >
                 Leaderboard
               </Link>
+              <Link
+                href="/webinars"
+                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Webinars
+              </Link>
+              <Link
+                href="/policy"
+                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Policy
+              </Link>
+              <Link
+                href="/fellowships"
+                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Fellowships
+              </Link>
             </div>
 
             {/* Right side */}
@@ -102,6 +121,8 @@ export default async function MainLayout({
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
+      <Footer />
     </div>
   );
 }

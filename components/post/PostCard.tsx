@@ -1,6 +1,5 @@
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
-import Tag from "@/components/ui/Tag";
 import { formatDate } from "@/lib/utils";
 
 export interface PostCardData {
@@ -56,7 +55,11 @@ export default function PostCard({ post }: PostCardProps) {
           {post.tags && post.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-4">
               {post.tags.slice(0, 4).map((tag) => (
-                <Tag key={tag} label={tag} />
+                <Link key={tag} href={`/topics/${encodeURIComponent(tag)}`}>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                    #{tag}
+                  </span>
+                </Link>
               ))}
             </div>
           )}

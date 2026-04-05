@@ -5,6 +5,13 @@ interface Badge {
   icon: string | null;
 }
 
+const VERIFIED_COLORS: Record<string, string> = {
+  student: "text-emerald-600",
+  researcher: "text-purple-600",
+  faculty: "text-amber-500",
+  institution: "text-blue-600",
+};
+
 interface ProfileCardProps {
   profile: {
     username: string;
@@ -14,6 +21,8 @@ interface ProfileCardProps {
     bio: string | null;
     avatar_url: string | null;
     points: number;
+    verified?: boolean;
+    verified_type?: string | null;
   };
   badges?: Badge[];
   postCount?: number;
@@ -40,8 +49,16 @@ export default function ProfileCard({
             "?"}
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-gray-900">
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-1.5 flex-wrap">
             {profile.full_name ?? profile.username}
+            {profile.verified && (
+              <span
+                title={profile.verified_type ? `Verified ${profile.verified_type}` : "Verified"}
+                className={`inline-flex items-center text-sm font-bold ${VERIFIED_COLORS[profile.verified_type ?? "student"] ?? "text-emerald-600"}`}
+              >
+                ✓
+              </span>
+            )}
           </h1>
           <p className="text-sm text-gray-500">@{profile.username}</p>
           {profile.university && (
