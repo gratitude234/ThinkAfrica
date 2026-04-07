@@ -1,3 +1,5 @@
+// -- Run in Supabase: ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS featured boolean default false;
+
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Badge from "@/components/ui/Badge";
@@ -5,6 +7,7 @@ import Tag from "@/components/ui/Tag";
 import { formatDate } from "@/lib/utils";
 import ReviewActions from "./ReviewActions";
 import FeaturePolicyButton from "@/app/(main)/policy/FeaturePolicyButton";
+import FeaturePostButton from "./FeaturePostButton";
 
 export default async function AdminReviewPage() {
   const supabase = await createClient();
@@ -39,6 +42,23 @@ export default async function AdminReviewPage() {
 
   const posts = (pendingPosts ?? []).map((p) => ({
     ...p,
+    profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
+  }));
+
+  // Fetch published posts for featured toggle
+  const { data: publishedPostsRaw } = await supabase
+    .from("posts")
+    .select(
+      `id, title, excerpt, type, featured, created_at,
+      profiles!posts_author_id_fkey (full_name, university)`
+    )
+    .eq("status", "published")
+    .order("published_at", { ascending: false })
+    .limit(20);
+
+  const publishedPosts = (publishedPostsRaw ?? []).map((p) => ({
+    ...p,
+    featured: (p as { featured?: boolean }).featured ?? false,
     profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
   }));
 
@@ -158,6 +178,47 @@ export default async function AdminReviewPage() {
                   </div>
                   <div className="flex-shrink-0">
                     <FeaturePolicyButton postId={post.id} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Feature a Post */}
+      {publishedPosts.length > 0 && (
+        <div className="mt-12">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">Feature a Post</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              One post can be featured on the home feed at a time. Only one is active.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {publishedPosts.map((post) => (
+              <div
+                key={post.id}
+                className={`bg-white rounded-xl border p-5 ${post.featured ? "border-amber-300 bg-amber-50/40" : "border-gray-200"}`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge type={post.type} />
+                      {post.featured && (
+                        <span className="text-xs text-amber-600 font-medium">⭐ Currently featured</span>
+                      )}
+                    </div>
+                    <h3 className="text-sm font-semibold text-gray-900">{post.title}</h3>
+                    {post.excerpt && (
+                      <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{post.excerpt}</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      By {post.profiles?.full_name} · {post.profiles?.university}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <FeaturePostButton postId={post.id} initialFeatured={post.featured} />
                   </div>
                 </div>
               </div>

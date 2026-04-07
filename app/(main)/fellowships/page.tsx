@@ -131,9 +131,9 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
                 </p>
               )}
 
-              <span className="mt-auto inline-flex items-center text-sm font-medium text-emerald-brand">
-                View &amp; Apply
-                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span className="mt-auto inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors self-start">
+                Apply Now
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </span>

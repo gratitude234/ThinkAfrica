@@ -3,7 +3,7 @@
 import { ButtonHTMLAttributes, forwardRef } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+  variant?: "primary" | "secondary" | "danger" | "ghost" | "gold";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
 }
@@ -29,10 +29,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         "bg-emerald-brand text-white hover:bg-emerald-600 focus:ring-emerald-500",
       secondary:
         "border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-emerald-500",
-      danger:
-        "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
+      danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
       ghost:
         "text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:ring-emerald-500",
+      gold: "bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-400",
     };
 
     const sizes = {

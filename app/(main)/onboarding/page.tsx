@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import UniversitySelect from "@/components/ui/UniversitySelect";
 
 const INTEREST_OPTIONS = [
   "Law", "Economics", "Tech", "Health",
@@ -25,6 +26,24 @@ export default function OnboardingPage() {
     bio: "",
   });
   const [interests, setInterests] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<
+    Array<{ id: string; username: string; full_name: string | null; university: string | null }>
+  >([]);
+
+  // Fetch people to follow when reaching step 3
+  useEffect(() => {
+    if (step !== 3 || !userId) return;
+    const supabase = createClient();
+    let q = supabase
+      .from("profiles")
+      .select("id, username, full_name, university")
+      .neq("id", userId)
+      .order("points", { ascending: false })
+      .limit(3);
+    q.then(({ data }) => {
+      setSuggestions(data ?? []);
+    });
+  }, [step, userId]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -174,12 +193,9 @@ export default function OnboardingPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">University</label>
-              <input
-                type="text"
+              <UniversitySelect
                 value={form.university}
-                onChange={(e) => setForm({ ...form, university: e.target.value })}
-                placeholder="e.g. University of Nairobi"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
+                onChange={(v) => setForm({ ...form, university: v })}
               />
             </div>
             <div>
@@ -300,6 +316,36 @@ export default function OnboardingPage() {
           >
             Skip for now
           </button>
+
+          {/* People to follow */}
+          {suggestions.length > 0 && (
+            <div className="mt-6 text-left">
+              <p className="text-sm font-semibold text-gray-900 mb-3">People to follow</p>
+              <div className="space-y-2">
+                {suggestions.map((person) => (
+                  <div key={person.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0">
+                      {person.full_name?.charAt(0)?.toUpperCase() ?? person.username?.charAt(0)?.toUpperCase() ?? "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {person.full_name ?? person.username}
+                      </p>
+                      {person.university && (
+                        <p className="text-xs text-gray-400 truncate">{person.university}</p>
+                      )}
+                    </div>
+                    <a
+                      href={`/${person.username}`}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-brand text-white hover:bg-emerald-600 transition-colors flex-shrink-0"
+                    >
+                      View
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -85,7 +85,7 @@ export default async function PostPage({ params }: PageProps) {
   const { data: commentsRaw } = await supabase
     .from("comments")
     .select(
-      "id, content, created_at, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
+      "id, content, created_at, upvotes, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
     )
     .eq("post_id", post.id)
     .is("parent_id", null)
@@ -93,11 +93,24 @@ export default async function PostPage({ params }: PageProps) {
 
   const comments = (commentsRaw ?? []).map((c) => ({
     ...c,
+    upvotes: (c as { upvotes?: number }).upvotes ?? 0,
     profiles: Array.isArray(c.profiles) ? c.profiles[0] : c.profiles,
   }));
 
   let userProfileId: string | null = null;
   if (user) userProfileId = user.id;
+
+  // Fetch which comments the current user has voted on
+  const commentIds = comments.map((c) => c.id);
+  let userVotedCommentIds: string[] = [];
+  if (user && commentIds.length > 0) {
+    const { data: votes } = await supabase
+      .from("comment_votes")
+      .select("comment_id")
+      .eq("user_id", userProfileId)
+      .in("comment_id", commentIds);
+    userVotedCommentIds = votes?.map((v) => v.comment_id) ?? [];
+  }
 
   // Related posts by matching tags
   let relatedPosts: Array<{
@@ -257,6 +270,7 @@ export default async function PostPage({ params }: PageProps) {
                 initialComments={comments as Parameters<typeof CommentsSection>[0]["initialComments"]}
                 userId={user?.id ?? null}
                 userProfileId={userProfileId}
+                userVotedCommentIds={userVotedCommentIds}
               />
             </div>
           </div>

@@ -6,10 +6,10 @@ interface BadgeProps {
 }
 
 const TYPE_STYLES: Record<string, string> = {
-  blog: "bg-gray-100 text-gray-700",
-  essay: "bg-emerald-100 text-emerald-800",
-  research: "bg-purple-100 text-purple-800",
-  policy_brief: "bg-amber-100 text-amber-800",
+  blog: "bg-emerald-100 text-emerald-800",
+  essay: "bg-amber-100 text-amber-700",
+  research: "bg-purple-100 text-purple-700",
+  policy_brief: "bg-blue-100 text-blue-700",
 };
 
 export default function Badge({ type, className = "" }: BadgeProps) {

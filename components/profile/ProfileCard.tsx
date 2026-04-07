@@ -1,3 +1,5 @@
+import PointsTierBadge from "@/components/ui/PointsTierBadge";
+
 interface Badge {
   id: string;
   name: string;
@@ -94,8 +96,7 @@ export default function ProfileCard({
           <p className="text-gray-400 text-xs">Following</p>
         </div>
         <div className="text-center">
-          <p className="font-semibold text-emerald-brand">{profile.points}</p>
-          <p className="text-gray-400 text-xs">Points</p>
+          <PointsTierBadge points={profile.points} showProgress={true} />
         </div>
       </div>
 

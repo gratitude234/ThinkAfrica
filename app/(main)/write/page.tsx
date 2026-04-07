@@ -23,6 +23,7 @@ export default function WritePage() {
   const router = useRouter();
   const [postType, setPostType] = useState<PostType>("blog");
   const [title, setTitle] = useState("");
+  const [excerpt, setExcerpt] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [content, setContent] = useState("");
   const [wordCount, setWordCount] = useState(0);
@@ -87,13 +88,6 @@ export default function WritePage() {
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean);
 
-    // Generate excerpt from HTML content
-    const excerpt = content
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .substring(0, 200);
-
     const { error: insertError } = await supabase.from("posts").insert({
       author_id: profile.id,
       title: title.trim(),
@@ -135,6 +129,7 @@ export default function WritePage() {
             onClick={() => {
               setSuccess(false);
               setTitle("");
+              setExcerpt("");
               setTagsInput("");
               setContent("");
               setWordCount(0);
@@ -193,6 +188,29 @@ export default function WritePage() {
             required
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-base font-medium focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
           />
+        </div>
+
+        {/* Excerpt / Summary */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Summary
+          </label>
+          <p className="text-xs text-gray-400 mb-1.5">
+            This appears in the feed preview. Keep it under 200 characters.
+          </p>
+          <div className="relative">
+            <textarea
+              value={excerpt}
+              onChange={(e) => setExcerpt(e.target.value)}
+              maxLength={200}
+              rows={2}
+              placeholder="Write a short summary of your post..."
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
+            />
+            <span className="absolute bottom-2 right-2 text-xs text-gray-400">
+              {excerpt.length}/200
+            </span>
+          </div>
         </div>
 
         {/* Tags */}

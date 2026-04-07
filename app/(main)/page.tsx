@@ -1,20 +1,104 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import PostFeed from "@/components/post/PostFeed";
 import type { PostCardData } from "@/components/post/PostCard";
-import { formatDate } from "@/lib/utils";
+import ActivationBanner from "@/components/ui/ActivationBanner";
+import FeaturedPostBanner from "@/components/post/FeaturedPostBanner";
+import DailyBrief from "@/components/ui/DailyBrief";
+import SuggestedPeople from "@/components/ui/SuggestedPeople";
 
 export const revalidate = 60;
 
-export default async function HomePage() {
+interface PageProps {
+  searchParams: Promise<{ guest?: string; tab?: string }>;
+}
+
+export default async function HomePage({ searchParams }: PageProps) {
+  const { guest, tab } = await searchParams;
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Redirect to landing page if not logged in and no guest param
+  if (!user && guest !== "1") {
+    redirect("/landing");
+  }
+
+  // Fetch user profile (interests, points, university, field_of_study)
+  let userInterests: string[] = [];
+  let userPoints = 0;
+  let userUniversity: string | null = null;
+  let userFieldOfStudy: string | null = null;
+  if (user) {
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("interests, points, university, field_of_study")
+      .eq("id", user.id)
+      .single();
+    userInterests = (profileData?.interests as string[] | null) ?? [];
+    userPoints = profileData?.points ?? 0;
+    userUniversity = profileData?.university ?? null;
+    userFieldOfStudy = profileData?.field_of_study ?? null;
+  }
+
+  // Activation queries (task 1) + featured post (task 6) — parallel
+  const [
+    { count: publishedCount },
+    { count: followCount },
+    { count: debateCount },
+    { data: featuredPostRaw },
+  ] = await Promise.all([
+    user
+      ? supabase
+          .from("posts")
+          .select("*", { count: "exact", head: true })
+          .eq("author_id", user.id)
+          .eq("status", "published")
+      : Promise.resolve({ count: 0, data: null, error: null }),
+
+    user
+      ? supabase
+          .from("follows")
+          .select("*", { count: "exact", head: true })
+          .eq("follower_id", user.id)
+      : Promise.resolve({ count: 0, data: null, error: null }),
+
+    user
+      ? supabase
+          .from("debate_arguments")
+          .select("*", { count: "exact", head: true })
+          .eq("author_id", user.id)
+      : Promise.resolve({ count: 0, data: null, error: null }),
+
+    supabase
+      .from("posts")
+      .select(
+        `id, title, slug, excerpt, type, published_at, created_at,
+        profiles!posts_author_id_fkey (username, full_name, university, avatar_url)`
+      )
+      .eq("status", "published")
+      .eq("featured", true)
+      .maybeSingle(),
+  ]);
+
+  const featuredPost = featuredPostRaw
+    ? {
+        ...featuredPostRaw,
+        profiles: Array.isArray(featuredPostRaw.profiles)
+          ? featuredPostRaw.profiles[0]
+          : featuredPostRaw.profiles,
+      }
+    : null;
 
   // Main feed
   const { data: posts, error } = await supabase
     .from("posts")
     .select(
-      `id, title, slug, excerpt, type, tags, created_at, published_at,
-      profiles!posts_author_id_fkey (username, full_name, university, avatar_url)`
+      `id, title, slug, excerpt, type, tags, created_at, published_at, view_count,
+      profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`
     )
     .eq("status", "published")
     .order("published_at", { ascending: false });
@@ -43,6 +127,49 @@ export default async function HomePage() {
     profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
     like_count: likeCounts[post.id] ?? 0,
   }));
+
+  // "For You" posts if user has interests
+  let forYouPosts: PostCardData[] = [];
+  if (userInterests.length > 0) {
+    const { data: forYouRaw } = await supabase
+      .from("posts")
+      .select(
+        `id, title, slug, excerpt, type, tags, created_at, published_at, view_count,
+        profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`
+      )
+      .eq("status", "published")
+      .overlaps("tags", userInterests)
+      .order("published_at", { ascending: false })
+      .limit(10);
+
+    const forYouIds = (forYouRaw ?? []).map((p) => p.id);
+    let forYouLikeCounts: Record<string, number> = {};
+    if (forYouIds.length > 0) {
+      const { data: fyLikes } = await supabase
+        .from("likes")
+        .select("post_id")
+        .in("post_id", forYouIds);
+      if (fyLikes) {
+        forYouLikeCounts = fyLikes.reduce(
+          (acc, like) => {
+            acc[like.post_id] = (acc[like.post_id] ?? 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>
+        );
+      }
+    }
+
+    forYouPosts = (forYouRaw ?? []).map((post) => ({
+      ...post,
+      profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
+      like_count: forYouLikeCounts[post.id] ?? 0,
+    }));
+  }
+
+  const showTabs = userInterests.length > 0 && forYouPosts.length > 0;
+  const activeTab = showTabs && tab === "foryou" ? "foryou" : "latest";
+  const displayPosts = activeTab === "foryou" ? forYouPosts : feedPosts;
 
   // Sidebar: trending posts (last 7 days by view_count)
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -73,7 +200,6 @@ export default async function HomePage() {
     .eq("status", "published")
     .gte("published_at", weekAgo);
 
-  // Aggregate weekly contributors
   const contributorMap: Record<
     string,
     {
@@ -98,6 +224,25 @@ export default async function HomePage() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Mobile trending strip — visible only below lg breakpoint */}
+      {trendingPosts && trendingPosts.length > 0 && (
+        <div className="lg:col-span-3 block lg:hidden">
+          <div className="flex overflow-x-auto gap-2 pb-2 -mx-1 px-1">
+            {trendingPosts.map((post) => (
+              <Link
+                key={post.id}
+                href={`/post/${post.slug}`}
+                className="flex-shrink-0 inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-700 hover:border-emerald-brand hover:text-emerald-brand transition-colors"
+              >
+                {post.title.length > 30
+                  ? post.title.substring(0, 30) + "…"
+                  : post.title}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Main feed */}
       <div className="lg:col-span-2">
         <div className="mb-8">
@@ -105,9 +250,52 @@ export default async function HomePage() {
             Ideas from across Africa
           </h1>
           <p className="text-gray-500">
-            Research, essays, and policy briefs from African university students.
+            Research, essays, and policy briefs from African university
+            students.
           </p>
         </div>
+
+        {/* Task 6: Featured post */}
+        {featuredPost && <FeaturedPostBanner post={featuredPost} />}
+
+        {/* Task 1: Activation banner */}
+        {user && (
+          <ActivationBanner
+            userId={user.id}
+            hasPublished={(publishedCount ?? 0) > 0}
+            hasFollowed={(followCount ?? 0) > 0}
+            hasDebated={(debateCount ?? 0) > 0}
+          />
+        )}
+
+        {/* Task 9: Daily brief */}
+        {user && <DailyBrief userId={user.id} points={userPoints} />}
+
+        {/* For You / Latest tabs */}
+        {showTabs && (
+          <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+            <Link
+              href="/"
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                activeTab === "latest"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Latest
+            </Link>
+            <Link
+              href="/?tab=foryou"
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                activeTab === "foryou"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              For You
+            </Link>
+          </div>
+        )}
 
         {error && (
           <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6">
@@ -115,11 +303,11 @@ export default async function HomePage() {
           </div>
         )}
 
-        <PostFeed posts={feedPosts} />
+        <PostFeed posts={displayPosts} />
       </div>
 
-      {/* Sidebar */}
-      <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24 self-start">
+      {/* Sidebar — hidden on mobile, shown on desktop */}
+      <div className="hidden lg:block lg:col-span-1 space-y-6 lg:sticky lg:top-24 self-start">
         {/* Trending This Week */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -244,6 +432,15 @@ export default async function HomePage() {
             </div>
           )}
         </div>
+
+        {/* Task 5: Suggested people to follow */}
+        {user && (
+          <SuggestedPeople
+            currentUserId={user.id}
+            university={userUniversity}
+            fieldOfStudy={userFieldOfStudy}
+          />
+        )}
       </div>
     </div>
   );
