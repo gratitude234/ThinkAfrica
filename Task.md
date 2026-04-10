@@ -1,541 +1,475 @@
-# ThinkAfrika — Product Improvement Prompt for Claude Code
+# ThinkAfrika — Full Systems Implementation Prompt for Claude Code
 
-## Project Context
-
-You are working on **ThinkAfrika**, an intellectual social network for African university students.
-Built with **Next.js 14 (App Router), TypeScript, Tailwind CSS, Supabase (PostgreSQL + Auth)**.
-
-Brand colors:
-- Primary: `#10B981` (emerald) — `bg-emerald-brand` / `text-emerald-brand` via Tailwind config
-- Secondary: `#F59E0B` (gold/amber)
-- Accent: `#7C3AED` (purple)
-
-Key conventions:
-- `@/lib/supabase/server` → server component client (`await createClient()`)
-- `@/lib/supabase/client` → client component client (`createClient()`)
-- `@/lib/utils` → `formatDate`, `MIN_WORD_COUNTS`, `POST_TYPE_LABELS`
-- Pages live under `app/(main)/`, auth under `app/(auth)/`
-- All new client components need `"use client"` at top
-- Tailwind only — no inline styles, no CSS modules
-- Never use `any` TypeScript types
-
-**Known database columns (do not alter schema unless a task explicitly says to):**
-- `profiles`: id, username, full_name, university, field_of_study, bio, avatar_url, points, interests text[], onboarding_completed, verified boolean, verified_type text
-- `posts`: id, author_id, title, slug, content, excerpt, type, status, tags, view_count, created_at, published_at
-- `comments`: id, post_id, author_id, parent_id, content, created_at
-- `likes`: user_id, post_id
-
-Only create or modify files each task requires. After each task state which files were changed.
+Paste this entire prompt into Claude Code from the root of the `think-africa` project.
 
 ---
 
-## Tasks — Implement All 10 in Order
+## Context
+
+You are working on **ThinkAfrika** — an intellectual social network for African university students built with **Next.js 14 (App Router), TypeScript, Tailwind CSS, and Supabase**. The stack is:
+- Auth & DB: Supabase (server client at `@/lib/supabase/server`, browser client at `@/lib/supabase/client`)
+- Editor: TipTap (already installed via `@tiptap/react`, `@tiptap/starter-kit`, etc.)
+- Styling: Tailwind CSS with a custom `emerald-brand` color
+- Post types: `blog`, `essay`, `research`, `policy_brief`
+- Post statuses: `draft`, `pending`, `published`, `rejected`
+- All server components use `async/await` with `createClient()` from `@/lib/supabase/server`
+- All client components are marked `"use client"` and use `createClient()` from `@/lib/supabase/client`
+- The main layout lives at `app/(main)/layout.tsx` with a max-w-6xl container
+- User profiles table: `profiles` (id, username, full_name, university, field_of_study, bio, avatar_url, points, interests, verified, verified_type)
+- Posts table: `posts` (id, author_id, title, slug, content, excerpt, type, status, tags, pdf_url, view_count, created_at, published_at, featured)
+
+Your job is to implement **11 missing systems** described below. Work through them in order. For each system, make all necessary file changes: new pages, updated components, SQL migrations, and any new npm packages needed.
 
 ---
 
-### TASK 1 — Activation Loop: First Milestone Tracker
+## SYSTEM 1 — Draft Saving + Autosave on Write Page
 
-**Goal:** New users who do one meaningful thing in their first session retain at 3–5× the rate of those who don't. Give them a visible progress nudge until they hit the activation milestone.
+### Goal
+The write page (`app/(main)/write/page.tsx`) currently submits directly to `status: "pending"`. We need:
+1. A "Save draft" button that saves to `status: "draft"` in the DB
+2. Autosave that fires 3 seconds after the user stops typing (debounced)
+3. If a draft `id` exists in the URL (`/write?draft=<uuid>`), load that draft on mount
+4. A localStorage fallback that saves `{title, excerpt, content, tags, type}` every 5 seconds as `thinkafrika_draft_backup`
+5. A subtle "Saving…" / "Saved" / "Save failed" indicator in the top-right of the write page
 
-**Define activation milestone:** A user is "activated" when they have done ALL THREE of:
-1. Published at least 1 post (`posts` where `author_id = user.id AND status = 'published'`)
-2. Followed at least 1 person (`follows` where `follower_id = user.id`)
-3. Joined at least 1 debate (`debate_arguments` where `author_id = user.id`)
-
-**File to create:** `components/ui/ActivationBanner.tsx`
-
-Build this as a server component that accepts:
-```ts
-interface Props {
-  userId: string;
-  hasPublished: boolean;
-  hasFollowed: boolean;
-  hasDebated: boolean;
-}
-```
-
-Render a horizontal progress banner with 3 checklist items. Each item shows a checkmark (✓ in emerald) if done, or an unfilled circle if not. Include a CTA link per item:
-- "Write your first post" → `/write`
-- "Follow someone" → `/leaderboard`
-- "Join a debate" → `/debates`
-
-When all 3 are complete, show a celebration row: "🎉 You're activated! You've earned your first 10 bonus points." and do NOT show the banner again (add a `hidden` condition when all 3 are true — you can check `hasPublished && hasFollowed && hasDebated`).
-
-Style: white card with emerald left border (`border-l-4 border-emerald-500`), subtle background `bg-emerald-50/40`, shown below the page heading on the home feed.
-
-**File to modify:** `app/(main)/page.tsx`
-
-After fetching the current user, run these 3 parallel queries (only if user is logged in):
-```ts
-const [
-  { count: publishedCount },
-  { count: followCount },
-  { count: debateCount },
-] = await Promise.all([
-  supabase.from('posts').select('*', { count: 'exact', head: true })
-    .eq('author_id', user.id).eq('status', 'published'),
-  supabase.from('follows').select('*', { count: 'exact', head: true })
-    .eq('follower_id', user.id),
-  supabase.from('debate_arguments').select('*', { count: 'exact', head: true })
-    .eq('author_id', user.id),
-]);
-```
-
-Render `<ActivationBanner>` above the feed (below the "Ideas from across Africa" heading) only when user is logged in AND not all 3 are complete.
-
----
-
-### TASK 2 — University Dropdown: Curated African Universities
-
-**Goal:** Replace the free-text university field with a searchable dropdown so "Unilag", "University of Lagos", "UNILAG" all become one normalized value.
-
-**File to create:** `components/ui/UniversitySelect.tsx`
-
-Build a client component:
-```ts
-interface Props {
-  value: string;
-  onChange: (value: string) => void;
-  className?: string;
-}
-```
-
-Internally define a `AFRICAN_UNIVERSITIES` constant array (top 60 African universities — include at minimum these, in alphabetical order):
-```
-University of Lagos, University of Ibadan, Obafemi Awolowo University,
-Ahmadu Bello University, University of Benin, University of Nigeria Nsukka,
-Lagos State University, Covenant University, Babcock University,
-Joseph Ayo Babalola University, University of Cape Town, Stellenbosch University,
-University of Witwatersrand, University of Pretoria, University of Ghana,
-Kwame Nkrumah University of Science and Technology, University of Nairobi,
-Makerere University, University of Dar es Salaam, Cairo University,
-University of Alexandria, Addis Ababa University, University of Khartoum,
-Cheikh Anta Diop University, University of Tunis, Mohammed V University,
-University of Algiers, Ain Shams University, Assiut University,
-University of Zambia, University of Zimbabwe, University of Botswana,
-National University of Rwanda, University of Mauritius, University of Abuja,
-Federal University of Technology Akure, Nnamdi Azikiwe University,
-University of Port Harcourt, Delta State University, Rivers State University,
-Kenyatta University, Strathmore University, USIU Africa,
-Moi University, Egerton University, University of Limpopo,
-Rhodes University, University of KwaZulu-Natal, Nelson Mandela University,
-University of the Western Cape, Tshwane University of Technology,
-Durban University of Technology, University of Johannesburg,
-North-West University, University of the Free State,
-Pan-African University, African Leadership University, Other
-```
-
-Behavior:
-- Renders a `<input type="text">` that filters the list as the user types
-- Dropdown appears below the input showing matching universities (max 8 shown)
-- Clicking a result sets the value and closes the dropdown
-- If the user types something not in the list and blurs, keep their typed value (allow custom entry as fallback)
-- Keyboard navigation: arrow keys move selection, Enter confirms, Escape closes
-- Close dropdown on outside click
-
-**Files to modify:**
-- `app/(main)/onboarding/page.tsx` — replace the university `<input type="text">` with `<UniversitySelect value={form.university} onChange={(v) => setForm({...form, university: v})} />`
-- `app/(main)/[username]/page.tsx` — if there's a profile edit form, replace university input there too (check if an edit form exists; if not, skip)
-
----
-
-### TASK 3 — Author Stats Page
-
-**Goal:** Writers need a feedback loop. Show them how their content is performing.
-
-**File to create:** `app/(main)/stats/page.tsx`
-
-This is a server component. Auth-gate it: if no user, redirect to `/login`.
-
-Fetch for the logged-in user's profile ID, then run these queries in parallel:
-```ts
-// All their published posts
-supabase.from('posts').select('id, title, slug, type, view_count, created_at, published_at')
-  .eq('author_id', profileId).eq('status', 'published').order('view_count', { ascending: false })
-
-// Total likes received across all their posts
-supabase.from('likes').select('post_id').in('post_id', theirPostIds)
-
-// Follower count
-supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileId)
-
-// Follower count 7 days ago (approximate: followers gained in last 7 days)
-supabase.from('follows').select('*', { count: 'exact', head: true })
-  .eq('following_id', profileId)
-  .gte('created_at', weekAgo)  // new followers this week
-```
-
-Render:
-1. **4 stat cards at top** (same `StatCard` pattern used in `admin/analytics/page.tsx`):
-   - Total views (sum of `view_count` across all posts)
-   - Total likes received
-   - Total followers
-   - New followers this week (show `+N this week` in green if > 0)
-
-2. **Top Posts table** — list all published posts sorted by `view_count` descending:
-   - Columns: Title (link to `/post/[slug]`), Type (Badge), Views, Published date
-   - Max 10 rows
-
-3. **Points breakdown card** — show current `points` from profile with a tier label:
-   - 0–99 → "Contributor"
-   - 100–499 → "Scholar"
-   - 500–1999 → "Fellow"
-   - 2000+ → "Thought Leader"
-   Show a progress bar toward the next tier threshold.
-
-**File to modify:** `app/(main)/NavUserMenu.tsx`
-
-Add a "My Stats" link to the dropdown menu (between profile link and sign out), pointing to `/stats`.
-
-Also update `middleware.ts` to add `/stats` to the `protectedPaths` array.
-
----
-
-### TASK 4 — Points Tiers with Visible Progression
-
-**Goal:** Make points feel meaningful by giving them named tiers with visible progress.
-
-Define the tiers in `@/lib/utils.ts` (add to existing file):
-```ts
-export const POINT_TIERS = [
-  { name: 'Contributor', min: 0, max: 99, color: 'text-gray-600', bg: 'bg-gray-100' },
-  { name: 'Scholar', min: 100, max: 499, color: 'text-blue-700', bg: 'bg-blue-100' },
-  { name: 'Fellow', min: 500, max: 1999, color: 'text-purple-700', bg: 'bg-purple-100' },
-  { name: 'Thought Leader', min: 2000, max: Infinity, color: 'text-amber-700', bg: 'bg-amber-100' },
-] as const;
-
-export function getPointTier(points: number) {
-  return POINT_TIERS.find(t => points >= t.min && points <= t.max) ?? POINT_TIERS[0];
-}
-
-export function getNextTier(points: number) {
-  const idx = POINT_TIERS.findIndex(t => points >= t.min && points <= t.max);
-  return idx < POINT_TIERS.length - 1 ? POINT_TIERS[idx + 1] : null;
-}
-```
-
-**File to create:** `components/ui/PointsTierBadge.tsx`
-
-A small inline badge component:
-```ts
-interface Props { points: number; showProgress?: boolean; }
-```
-- Renders tier name in a pill badge using the tier's `color` and `bg`
-- If `showProgress={true}`, also renders a small progress bar below the badge showing % toward next tier (don't show if at Thought Leader)
-- Example: Scholar (340/500 pts) → progress bar at 48%
-
-**Files to modify:**
-- `components/profile/ProfileCard.tsx` — replace the raw points display (`{profile.points} pts`) with `<PointsTierBadge points={profile.points} showProgress={true} />`
-- `app/(main)/leaderboard/page.tsx` — on each leaderboard row, replace the `{displayPoints.toLocaleString()} pts` text with a compact tier badge + raw number: `<PointsTierBadge points={displayPoints} /> {displayPoints.toLocaleString()}`
-- `app/(main)/stats/page.tsx` — already uses this in the points breakdown card (created in Task 3)
-
----
-
-### TASK 5 — People to Follow: Same University/Field Suggestions
-
-**Goal:** An empty social graph kills engagement. Suggest people worth following immediately after onboarding and on the feed.
-
-**File to create:** `components/ui/SuggestedPeople.tsx`
-
-Server component. Props:
-```ts
-interface Props {
-  currentUserId: string;
-  university: string | null;
-  fieldOfStudy: string | null;
-  limit?: number; // default 3
-}
-```
-
-Query logic (try in order, take the first that returns results):
-1. Same university AND same field: `profiles` where `university = X AND field_of_study = Y AND id != currentUserId`
-2. Same university only: `profiles` where `university = X AND id != currentUserId`
-3. Fallback: top 3 by points who the current user doesn't already follow
-
-Exclude users the current user already follows:
-```ts
-const { data: alreadyFollowing } = await supabase
-  .from('follows').select('following_id').eq('follower_id', currentUserId);
-const excludeIds = [currentUserId, ...(alreadyFollowing?.map(f => f.following_id) ?? [])];
-```
-
-Then fetch suggestions excluding those IDs, limit to `props.limit ?? 3`.
-
-Render as a compact card:
-- Heading: "People to Follow" with a sub-label showing why ("From your university" or "Top contributors")
-- Each person: avatar initial circle, full name, university, follow button
-- The follow button is a client component that calls `supabase.from('follows').insert(...)` on click and toggles to "Following ✓" optimistically
-
-**File to modify:** `app/(main)/page.tsx`
-
-Add `<SuggestedPeople>` to the sidebar, between "Top Contributors" and the end of the sidebar div, only when the user is logged in. Fetch the user's `university` and `field_of_study` from their profile (already available in the page if you add it to the profile select).
-
-**File to modify:** `app/(main)/onboarding/page.tsx`
-
-On Step 3 (Welcome screen), below the 3 CTA buttons, add a `<SuggestedPeople>` section. Since this is a client component page, fetch suggestions via a separate client-side `useEffect` call to Supabase after the step renders.
-
----
-
-### TASK 6 — Featured Post: Editorial Slot
-
-**Goal:** A weekly editorially-picked post gives writers something to aspire to and signals that the platform has a point of view.
-
-**Database:** Add one boolean column. Run this in Supabase SQL Editor (include as a comment block at the top of the file, not in a schema file):
+### SQL migration needed
 ```sql
--- Run in Supabase: ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS featured boolean default false;
-```
-Assume this column exists.
-
-**File to modify:** `app/(main)/page.tsx`
-
-Add a featured post query:
-```ts
-const { data: featuredPost } = await supabase
-  .from('posts')
-  .select('id, title, slug, excerpt, type, published_at, profiles!posts_author_id_fkey(username, full_name, university, avatar_url)')
-  .eq('status', 'published')
-  .eq('featured', true)
-  .order('published_at', { ascending: false })
-  .limit(1)
-  .single();
+-- drafts already use status='draft' in the existing posts table, no schema change needed
+-- Just ensure the posts table allows status='draft' (it already does per schema.sql)
 ```
 
-If `featuredPost` exists, render a `FeaturedPostBanner` above the main feed (above the ActivationBanner). 
-
-**File to create:** `components/post/FeaturedPostBanner.tsx`
-
-Style it distinctively — this should stand out from regular PostCards:
-- Gold left border (`border-l-4 border-amber-400`)
-- Light amber background (`bg-amber-50`)
-- A small "⭐ Featured by ThinkAfrika" label in amber at the top
-- Post title as a large link, excerpt below, author info at bottom
-- No border-radius removal — keep `rounded-xl`
-
-**File to modify:** `app/(main)/admin/review/page.tsx`
-
-Add a "Feature this post" toggle button next to each approved post in the admin review queue. On click, it updates `posts.featured = true` (and sets all other posts' `featured = false` first, since only one post is featured at a time). This is a server action or a client-side Supabase call — use whichever pattern the existing `ReviewActions.tsx` uses.
+### Implementation notes
+- Create `app/(main)/write/DraftManager.tsx` — a client component that exports a `useDraftManager` hook
+- The hook manages: `draftId`, `lastSaved`, `saveStatus ('idle'|'saving'|'saved'|'error')`
+- On mount: check URL param `?draft=<id>`, if present fetch that draft from Supabase and pre-populate the form
+- Debounce function: use `useRef` with `setTimeout`/`clearTimeout`, 3000ms delay
+- Autosave calls an `async function saveDraft(data)` that does an upsert into `posts` with `status: 'draft'`
+- After first save, update the URL to `/write?draft=<id>` using `router.replace` (no page reload)
+- The "Submit for review" button changes the saved draft's status from `draft` to `pending` (update, not insert)
+- Show a small status pill: gray "Saving…", green "Saved", red "Save failed" — top right of the page header
 
 ---
 
-### TASK 7 — WhatsApp Share: Prominent and First
+## SYSTEM 2 — Author Dashboard (`/dashboard`)
 
-**Goal:** WhatsApp is the dominant sharing channel in Nigeria and across sub-Saharan Africa. It should be the first and most prominent share option, not missing entirely.
+### Goal
+A private `/dashboard` page (redirect to `/login` if not authenticated) that gives writers:
+1. **Stats bar** — total views, total likes, total posts published, follower count
+2. **Posts table** — all the user's posts (draft, pending, published, rejected) with title, type, status badge, view count, like count, date, and action buttons
+3. **Quick actions** — "New post" button, "Edit" button per post (links to `/write?draft=<id>` for drafts, `/edit/<slug>` for published)
+4. **Status filter tabs** — All | Published | Pending | Drafts | Rejected
 
-**File to modify:** `app/(main)/post/[slug]/ShareButtons.tsx`
+### Files to create
+- `app/(main)/dashboard/page.tsx` — server component, fetches all user's posts + stats
+- `app/(main)/dashboard/PostsTable.tsx` — client component for the table with filter tabs
+- `app/(main)/dashboard/StatsBar.tsx` — server component showing 4 metric cards
 
-Add WhatsApp as the FIRST button before Twitter/X:
-```ts
-const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${title} — ${url}`)}`;
-```
-
-Style the WhatsApp button with a green background to make it recognizable:
-```tsx
-<a
-  href={whatsappUrl}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors"
-  aria-label="Share on WhatsApp"
->
-  {/* WhatsApp SVG icon */}
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-  </svg>
-  WhatsApp
-</a>
-```
-
-Also make the existing Twitter and LinkedIn buttons show their platform name as text alongside the icon (same pattern as WhatsApp button above — `flex items-center gap-1.5 px-3 py-2`), and move the "Copy link" button to the end. Rename the share section label from "Share:" to "Share this post".
+### Implementation notes
+- Fetch posts with like counts (join `likes` table, group by post_id)
+- Fetch follower count from `follows` table where `following_id = user.id`
+- Status badge colors: `draft` = gray, `pending` = amber, `published` = green, `rejected` = red
+- "Edit" on a published post → `/edit/[slug]`
+- "Edit" on a draft → `/write?draft=<id>`
+- "Delete" on a draft → confirm dialog, then delete from DB
+- Add `/dashboard` link to the nav (in `NavClient.tsx` and `NavUserMenu.tsx`) — visible only when logged in
 
 ---
 
-### TASK 8 — Comment Upvotes: Surface the Best Responses
+## SYSTEM 3 — Post Editing After Submission (`/edit/[slug]`)
 
-**Goal:** On an intellectual platform, the best comment should rise to the top. Add upvotes to comments.
+### Goal
+Writers can edit their own published or pending posts.
 
-**Database:** Add to Supabase SQL (include as comment at top of file):
+### Files to create
+- `app/(main)/edit/[slug]/page.tsx` — server component: fetch the post, verify `author_id === user.id`, render the edit form
+- `app/(main)/edit/[slug]/EditForm.tsx` — client component: same form as write page but pre-populated, with a "Save changes" button
+
+### Implementation notes
+- The edit form is identical to the write page form (post type selector, title, excerpt, tags, TipTap editor) but pre-populated with existing values
+- "Save changes" does a Supabase `update` on the post by `id` — it does NOT change the status (a published post stays published, a pending post stays pending)
+- After saving, show a toast/success message and redirect back to `/dashboard`
+- If `user.id !== post.author_id`, show a 403 "You don't own this post" message
+- Re-use the `Editor` component from `@/components/editor/Editor.tsx` — pass in `content={post.content}` as initial value (the editor already accepts a `content` prop)
+- Add autosave here too (every 5 seconds, silently)
+
+---
+
+## SYSTEM 4 — Image Upload in TipTap Editor
+
+### Goal
+Add image embedding support to the TipTap editor. Writers can click an image button in the toolbar, select a file, and it uploads to Supabase Storage then embeds in the article.
+
+### Files to modify
+- `components/editor/Editor.tsx` — add Image extension + toolbar button
+- `app/api/upload-image/route.ts` — new API route that handles the upload
+
+### npm packages needed
+```bash
+npm install @tiptap/extension-image
+```
+
+### Implementation notes
+
+**API route** (`app/api/upload-image/route.ts`):
+```typescript
+// POST: receives a FormData with field "file"
+// Validates: file is image/*, max 5MB
+// Uploads to Supabase Storage bucket "post-images" (create this bucket in your Supabase dashboard — set it to public)
+// Returns: { url: string }
+// Use the service role key via process.env.SUPABASE_SERVICE_ROLE_KEY for the upload
+```
+
+**Editor changes**:
+- Import `Image` from `@tiptap/extension-image` and add to extensions array
+- Add an image toolbar button (use a simple image icon SVG — a rectangle with a mountain/sun inside)
+- On click: open a hidden `<input type="file" accept="image/*">`, on file select: show "Uploading…" state, POST to `/api/upload-image`, on success: call `editor.chain().focus().setImage({ src: url }).run()`
+- Also support paste: TipTap's Image extension handles `<img>` in pasted HTML automatically
+
+**Supabase Storage**:
+- Create a bucket named `post-images` (public read, authenticated write)
+- File path pattern: `posts/{userId}/{timestamp}-{filename}`
+
+---
+
+## SYSTEM 5 — Cover Image on Posts
+
+### Goal
+Add a cover image field to posts. Writers upload a cover image on the write/edit page. It shows as a header image on the post page and as a thumbnail in PostCard.
+
+### SQL migration needed
 ```sql
--- Run in Supabase:
--- ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS upvotes integer default 0;
--- CREATE TABLE IF NOT EXISTS public.comment_votes (
---   user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
---   comment_id uuid NOT NULL REFERENCES public.comments(id) ON DELETE CASCADE,
---   PRIMARY KEY (user_id, comment_id)
--- );
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS cover_image_url text;
 ```
-Assume both exist.
 
-**File to modify:** `app/(main)/post/[slug]/CommentsSection.tsx`
+### Files to modify
+- `app/(main)/write/page.tsx` — add cover image upload section above the title field
+- `app/(main)/edit/[slug]/EditForm.tsx` — same, pre-populated with existing cover_image_url
+- `app/(main)/post/[slug]/page.tsx` — render cover image below the title in the header area
+- `components/post/PostCard.tsx` — render cover image as a 16:9 thumbnail at the top of the card
+- `components/post/PostCardData` interface — add `cover_image_url?: string | null`
 
-1. Update the `Comment` interface to include `upvotes: number` and `userVoted?: boolean`
+### Implementation notes
 
-2. In the `initialComments` prop fetch (in `post/[slug]/page.tsx`), also fetch `upvotes` field from comments. If user is logged in, fetch their votes:
-   ```ts
-   // In page.tsx, after fetching comments:
-   const commentIds = comments?.map(c => c.id) ?? [];
-   let userVotedCommentIds: string[] = [];
-   if (user && commentIds.length > 0) {
-     const { data: votes } = await supabase
-       .from('comment_votes').select('comment_id')
-       .eq('user_id', userProfileId).in('comment_id', commentIds);
-     userVotedCommentIds = votes?.map(v => v.comment_id) ?? [];
-   }
-   ```
-   Pass `userVotedCommentIds` down to `CommentsSection`.
+**Cover image uploader component** — create `components/ui/CoverImageUploader.tsx`:
+- A drag-and-drop area that says "Add a cover image" with a dashed border
+- On file select: preview the image immediately (using `URL.createObjectURL`)
+- Upload to Supabase Storage bucket `post-images` at path `covers/{userId}/{timestamp}-{filename}`
+- Expose `onUpload: (url: string) => void` callback
+- Show a "Remove" button if an image is already set
 
-3. In `CommentsSection.tsx`, for each comment render an upvote button:
-   - A small `▲` (upward triangle) button + vote count
-   - On click: optimistically increment count + mark as voted, then call:
-     ```ts
-     // Insert vote
-     await supabase.from('comment_votes').insert({ user_id: userId, comment_id: commentId });
-     await supabase.from('comments').update({ upvotes: comment.upvotes + 1 }).eq('id', commentId);
-     ```
-   - If already voted, clicking again removes the vote (toggle behavior)
-   - Style voted state: `text-emerald-600` for the arrow, unvoted: `text-gray-400`
+**Post page** (`app/(main)/post/[slug]/page.tsx`):
+- If `post.cover_image_url` exists, render it as a full-width `<img>` with `object-fit: cover`, max-height 400px, above the title
 
-4. Sort comments by `upvotes` descending before rendering (keep the existing time-sorted new comments at the bottom).
-
-5. If a comment has `upvotes >= 3`, show a small "Top response" badge next to the author name in amber.
+**PostCard** (`components/post/PostCard.tsx`):
+- If `post.cover_image_url` exists, render a 16:9 `<img>` at the top of the card (above the badge/title)
+- The card layout shifts: image → badge → title → excerpt → author footer
+- Update the Supabase query in `app/(main)/page.tsx` and all other places that query posts to include `cover_image_url` in the select
 
 ---
 
-### TASK 9 — Daily Brief Widget
+## SYSTEM 6 — OG / SEO Meta Tags
 
-**Goal:** Give users a reason to open the app on days they don't write. A lightweight "what's happening today" widget.
+### Goal
+Add dynamic `generateMetadata` to every major page so social shares on WhatsApp, Twitter, and LinkedIn show rich previews.
 
-**File to create:** `components/ui/DailyBrief.tsx`
+### Files to modify
+- `app/(main)/post/[slug]/page.tsx` — most important
+- `app/(main)/[username]/page.tsx`
+- `app/(main)/debates/[id]/page.tsx`
+- `app/layout.tsx` — update the default metadata
 
-Server component. Props:
-```ts
-interface Props {
-  userId: string;
-  points: number;
+### Implementation notes
+
+**Post page** — add before the default export:
+```typescript
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createClient();
+  const { data: post } = await supabase
+    .from('posts')
+    .select('title, excerpt, cover_image_url, slug, profiles!posts_author_id_fkey(full_name)')
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .single();
+
+  if (!post) return { title: 'Post not found — ThinkAfrika' };
+
+  const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+
+  return {
+    title: `${post.title} — ThinkAfrika`,
+    description: post.excerpt ?? `Read this post by ${author?.full_name} on ThinkAfrika`,
+    openGraph: {
+      title: post.title,
+      description: post.excerpt ?? '',
+      url: `https://thinkafrika.com/post/${post.slug}`,
+      siteName: 'ThinkAfrika',
+      images: post.cover_image_url ? [{ url: post.cover_image_url, width: 1200, height: 630 }] : [],
+      type: 'article',
+    },
+    twitter: {
+      card: post.cover_image_url ? 'summary_large_image' : 'summary',
+      title: post.title,
+      description: post.excerpt ?? '',
+      images: post.cover_image_url ? [post.cover_image_url] : [],
+    },
+  };
 }
 ```
 
-Fetch in parallel:
-```ts
-const [
-  { data: topPost },       // Most viewed post published today
-  { data: hotDebate },     // Debate with most arguments in last 24h
-  { data: nextBadge },     // User's points + what next tier needs
-] = await Promise.all([
-  supabase.from('posts')
-    .select('title, slug, view_count, profiles!posts_author_id_fkey(full_name)')
-    .eq('status', 'published')
-    .gte('published_at', todayStart)
-    .order('view_count', { ascending: false })
-    .limit(1).single(),
+**Profile page** — similar pattern using `full_name`, `bio`, `avatar_url`
 
-  supabase.from('debates')
-    .select('id, title, debate_arguments(count)')
-    .in('status', ['open', 'active'])
-    .order('created_at', { ascending: false })
-    .limit(1).single(),
-
-  // No query needed — use points prop + getPointTier() from utils
-]);
+**Root layout** (`app/layout.tsx`) — set default metadata:
+```typescript
+export const metadata: Metadata = {
+  title: 'ThinkAfrika — Africa\'s Intellectual Social Network',
+  description: 'Research, essays, and policy briefs from African university students.',
+  openGraph: {
+    siteName: 'ThinkAfrika',
+    images: ['/og-default.png'], // add a default OG image to /public
+  },
+};
 ```
-
-Render as a compact horizontal card (`flex gap-6`) with 3 sections separated by vertical dividers:
-- **Today's Top** — post title (truncated 50 chars) + "X views" + link
-- **Hot Debate** — debate title (truncated 40 chars) + "Join →" link
-- **Your Progress** — tier name + points + "X pts to [next tier]"
-
-If any section has no data, hide it (don't show an empty slot).
-
-On mobile, stack vertically (`flex-col lg:flex-row`).
-
-**File to modify:** `app/(main)/page.tsx`
-
-Render `<DailyBrief userId={user.id} points={userPoints} />` below the ActivationBanner (or below the page heading if activation is complete), only when user is logged in. Fetch `points` from the user's profile (add `points` to the profile select if not already there).
 
 ---
 
-### TASK 10 — Admin Health Metrics
+## SYSTEM 7 — Profile Settings Page (`/settings`)
 
-**Goal:** The existing analytics dashboard shows totals. Add a "Product Health" section that shows actionable week-over-week metrics.
+### Goal
+A `/settings` page where users can edit their profile information and manage their account.
 
-**File to modify:** `app/(main)/admin/analytics/page.tsx`
+### Files to create
+- `app/(main)/settings/page.tsx` — server component, fetches current profile, renders the form
+- `app/(main)/settings/ProfileForm.tsx` — client component for the editable form
+- `app/(main)/settings/AvatarUploader.tsx` — client component for avatar upload
 
-Add a new section at the TOP of the page, above the existing summary cards, titled **"Platform Health"**.
+### Form fields
+1. **Avatar** — current avatar (initials circle if no image), "Change photo" button → upload to Supabase Storage bucket `avatars/{userId}`
+2. **Full name** — text input
+3. **Username** — text input (check uniqueness on blur via Supabase query)
+4. **Bio** — textarea, max 300 chars with counter
+5. **University** — text input (or re-use the existing `UniversitySelect` component at `components/ui/UniversitySelect.tsx`)
+6. **Field of study** — text input
+7. **Interests** — multi-select tag input (use the existing interests/tags from the onboarding flow for consistency — common African academic topics)
+8. **Save changes** button — does a Supabase `update` on `profiles` table
 
-Add these parallel queries (alongside existing ones):
-
-```ts
-const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-
-const [
-  // 7-day active users (users who published, liked, or commented in last 7 days)
-  { data: activeUsersThisWeek },
-  // Previous week active users (for comparison)
-  { data: activeUsersPrevWeek },
-  // Users who published at least 1 post (all time)
-  { data: publishedOnce },
-  // Total users (already fetched)
-  // Avg posts per active user this week
-  { data: postsThisWeek },
-  // Top 3 universities by contributor count this month
-  { data: uniContributors },
-] = await Promise.all([
-  supabase.from('posts').select('author_id')
-    .eq('status', 'published').gte('published_at', sevenDaysAgo),
-
-  supabase.from('posts').select('author_id')
-    .eq('status', 'published')
-    .gte('published_at', fourteenDaysAgo)
-    .lt('published_at', sevenDaysAgo),
-
-  supabase.from('posts').select('author_id')
-    .eq('status', 'published'),
-
-  supabase.from('posts').select('author_id, type')
-    .eq('status', 'published').gte('published_at', sevenDaysAgo),
-
-  supabase.from('profiles').select('university')
-    .not('university', 'is', null),
-]);
-```
-
-Compute:
-- `weeklyActiveUsers` = unique `author_id` count from `activeUsersThisWeek`
-- `prevWeekActiveUsers` = unique count from `activeUsersPrevWeek`
-- `wowChange` = weeklyActiveUsers - prevWeekActiveUsers (show as +N or -N with color)
-- `publishedOncePercent` = (unique authors who ever published / totalUsers * 100).toFixed(1) + "%"
-- `avgPostsPerActiveUser` = (postsThisWeek.length / weeklyActiveUsers).toFixed(1)
-- `topUniversities` = aggregate `uniContributors` by university, sort desc, take top 3
-
-Render a 4-card health row using a variant of `StatCard` with a trend indicator:
-
-**HealthCard** (create inline in the file):
-```tsx
-function HealthCard({ label, value, trend, trendLabel }: {
-  label: string; value: string | number;
-  trend?: 'up' | 'down' | 'neutral'; trendLabel?: string;
-}) { ... }
-```
-- `trend='up'` → green arrow + trendLabel
-- `trend='down'` → red arrow + trendLabel
-- `trend='neutral'` → gray
-
-4 health cards:
-1. **7-Day Active Users** — `weeklyActiveUsers` — trend vs prev week
-2. **Published ≥1 Post** — `publishedOncePercent` of all users — no trend needed
-3. **Avg Posts / Active User** — `avgPostsPerActiveUser` this week — no trend
-4. **Top University** — name of #1 university by contributors — sub-label shows count
-
-Below the health cards, add a **"Top Universities This Month"** mini-table (3 rows): rank, university name, contributor count. Fetch fresh with `gte('created_at', thirtyDaysAgo)` on the `posts` table grouped by author's university.
+### Implementation notes
+- Show a success toast on save
+- Username uniqueness check: query `profiles` where `username = newValue AND id != user.id`, if row exists show "Username already taken"
+- For interests: render them as clickable pills (similar to the onboarding page) — toggle on/off, save as an array
+- Avatar upload: use the same `/api/upload-image` route or a dedicated `/api/upload-avatar` route that uploads to the `avatars` Supabase Storage bucket (public)
+- After avatar upload, update `profiles.avatar_url` immediately
+- Add `/settings` link to `NavUserMenu.tsx` (the dropdown menu)
 
 ---
 
-## General Rules
+## SYSTEM 8 — Bookmarks / Save for Later
 
-- Never use `any` TypeScript types
-- All client components: `"use client"` at top
-- All server components: `async/await` with `createClient` from `@/lib/supabase/server`
-- Tailwind only — no inline styles
-- Accessibility: all interactive elements need `aria-label` or visible text
-- After each task, state which files were created or modified
-- Do not alter any existing Supabase schema files — SQL notes go as comments in the component file
+### Goal
+Users can bookmark any post. A `/bookmarks` page shows all their saved posts.
+
+### SQL migration needed
+```sql
+CREATE TABLE IF NOT EXISTS public.bookmarks (
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  post_id uuid NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, post_id)
+);
+
+CREATE INDEX IF NOT EXISTS bookmarks_user_id_idx ON public.bookmarks(user_id);
+
+-- RLS
+ALTER TABLE public.bookmarks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own bookmarks" ON public.bookmarks
+  FOR ALL USING (auth.uid() = user_id);
+```
+
+### Files to create
+- `app/(main)/post/[slug]/BookmarkButton.tsx` — client component, bookmark toggle (filled/outline bookmark icon), similar pattern to `LikeButton.tsx`
+- `app/(main)/bookmarks/page.tsx` — server component: fetch all bookmarked posts for the current user, render using `PostFeed`
+
+### Files to modify
+- `app/(main)/post/[slug]/page.tsx` — query whether user has bookmarked this post, pass to `BookmarkButton`; render `BookmarkButton` next to `LikeButton` in the post header
+
+### Implementation notes
+- `BookmarkButton`: on click, toggle bookmark in DB (insert or delete from `bookmarks` table); show count optionally; use a bookmark SVG icon (unfilled = not saved, filled = saved)
+- Bookmarks page: if not logged in, redirect to `/login`; if no bookmarks, show empty state "Your saved posts will appear here"
+- Add "Bookmarks" link to `NavUserMenu.tsx`
+
+---
+
+## SYSTEM 9 — Full Notifications Page (`/notifications`)
+
+### Goal
+The `NotificationBell` component exists but clicking it goes nowhere. Build the full notifications system.
+
+### SQL migration needed
+```sql
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  type text NOT NULL CHECK (type IN ('like', 'comment', 'follow', 'debate_reply', 'post_published', 'post_rejected')),
+  actor_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  post_id uuid REFERENCES public.posts(id) ON DELETE CASCADE,
+  comment_id uuid REFERENCES public.comments(id) ON DELETE CASCADE,
+  read boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS notifications_user_unread_idx ON public.notifications(user_id, read) WHERE read = false;
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users see own notifications" ON public.notifications
+  FOR ALL USING (auth.uid() = user_id);
+```
+
+### Database triggers to create
+```sql
+-- Trigger: create notification when a post is liked
+CREATE OR REPLACE FUNCTION notify_on_like()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE author_id uuid;
+BEGIN
+  SELECT p.author_id INTO author_id FROM public.posts p WHERE p.id = NEW.post_id;
+  IF author_id IS NOT NULL AND author_id != NEW.user_id THEN
+    INSERT INTO public.notifications (user_id, type, actor_id, post_id)
+    VALUES (author_id, 'like', NEW.user_id, NEW.post_id)
+    ON CONFLICT DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER on_like_insert AFTER INSERT ON public.likes
+  FOR EACH ROW EXECUTE FUNCTION notify_on_like();
+
+-- Trigger: create notification when someone follows a user
+CREATE OR REPLACE FUNCTION notify_on_follow()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO public.notifications (user_id, type, actor_id)
+  VALUES (NEW.following_id, 'follow', NEW.follower_id)
+  ON CONFLICT DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER on_follow_insert AFTER INSERT ON public.follows
+  FOR EACH ROW EXECUTE FUNCTION notify_on_follow();
+
+-- Trigger: create notification when a comment is posted
+CREATE OR REPLACE FUNCTION notify_on_comment()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE author_id uuid;
+BEGIN
+  SELECT p.author_id INTO author_id FROM public.posts p WHERE p.id = NEW.post_id;
+  IF author_id IS NOT NULL AND author_id != NEW.author_id THEN
+    INSERT INTO public.notifications (user_id, type, actor_id, post_id, comment_id)
+    VALUES (author_id, 'comment', NEW.author_id, NEW.post_id, NEW.id);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER on_comment_insert AFTER INSERT ON public.comments
+  FOR EACH ROW EXECUTE FUNCTION notify_on_comment();
+```
+
+### Files to create
+- `app/(main)/notifications/page.tsx` — server component: fetch all notifications for user, grouped by date (Today, This week, Earlier), mark all as read on page load
+- `app/(main)/notifications/NotificationItem.tsx` — client component: renders one notification row with actor avatar, message text, timestamp, unread dot
+
+### Files to modify
+- `components/ui/NotificationBell.tsx` — update to link to `/notifications` and show unread count badge (query `notifications` where `user_id = user.id AND read = false`, count)
+
+### Notification message templates
+```
+like: "{actor_name} liked your post "{post_title}""
+comment: "{actor_name} commented on "{post_title}""
+follow: "{actor_name} started following you"
+post_published: "Your post "{post_title}" has been published"
+post_rejected: "Your post "{post_title}" was not approved"
+```
+
+---
+
+## SYSTEM 10 — Subscriber / Follower Count on Profiles
+
+### Goal
+Profile pages should show follower and following counts prominently, styled like Substack/Twitter.
+
+### Files to modify
+- `app/(main)/[username]/page.tsx` — already fetches `followerCount` and `followingCount`, but they may not be rendered prominently
+- `components/profile/ProfileCard.tsx` — update to show follower/following counts as clickable numbers
+
+### Implementation notes
+- The profile page already queries `followerCount` and `followingCount` — verify these are passed to `ProfileCard` as props
+- In `ProfileCard`, add a row: `**{followerCount}** Followers · **{followingCount}** Following · **{publishedPostCount}** Posts`
+- Style these as medium-weight numbers with muted labels (like Twitter's profile stats)
+- Make "Followers" and "Following" clickable — link to `/[username]/followers` and `/[username]/following` pages (create simple server components that list the users)
+- Also show total view count: sum of `view_count` across all the user's published posts — add to the stats row
+
+---
+
+## SYSTEM 11 — Mobile Experience: Bottom Nav + Mobile Sidebar
+
+### Goal
+On mobile, the sidebar (suggested people, trending, debates) is hidden with `hidden lg:block`. Nigerian students use mobile primarily. We need a proper mobile experience.
+
+### Solution A — Bottom navigation bar (most important)
+Create a persistent bottom navigation bar visible only on mobile (`block lg:hidden`).
+
+**Files to create**
+- `app/(main)/BottomNav.tsx` — client component
+
+**Navigation items** (5 icons in a row):
+1. Home (`/`) — house icon
+2. Search (`/search`) — magnifying glass
+3. Write (`/write`) — pencil/compose icon (center, slightly larger, emerald background circle)
+4. Notifications (`/notifications`) — bell icon (with unread badge if applicable)
+5. Profile (`/{username}`) — avatar circle (user's initials)
+
+**Styling**:
+- Fixed at bottom: `fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200`
+- Safe area padding for iOS: `pb-safe` (add `env(safe-area-inset-bottom)` padding)
+- Active item gets emerald color
+- Add to `app/(main)/layout.tsx` below `<main>` and above `<Footer />`
+
+### Solution B — Mobile feed sidebar as a collapsible section
+On the home page, replace the `hidden lg:block` sidebar with a mobile-friendly accordion/tab strip above the feed on small screens.
+
+**Files to modify**
+- `app/(main)/page.tsx` — add a `<MobileSidebarStrip>` component above `<PostFeed>` on mobile
+
+**Files to create**
+- `app/(main)/MobileSidebarStrip.tsx` — client component:
+  - Renders 3 horizontal scroll pills: "🔥 Trending", "⚡ Debates", "🏆 Top Writers"
+  - Tapping a pill expands a compact list below it (collapsible, one open at a time)
+  - Receives the same data as the desktop sidebar (trending posts, active debates, top contributors)
+  - Only visible below `lg` breakpoint
+
+---
+
+## Final checklist — after implementing all systems
+
+1. Run `npm run build` — fix any TypeScript errors
+2. Confirm all new Supabase tables have RLS enabled
+3. Add all SQL migrations to a new file `supabase/schema_phase5.sql`
+4. Update `middleware.ts` to protect: `/dashboard`, `/settings`, `/bookmarks`, `/notifications`, `/write`, `/edit/*`
+5. Test the autosave flow: open `/write`, type something, wait 3 seconds, check the `posts` table in Supabase for a `draft` row
+6. Test OG tags: use https://opengraph.xyz to verify a published post URL renders correctly
+7. Verify the bottom nav renders on mobile viewport (375px width) and doesn't obscure content (add `pb-16 lg:pb-0` to the `<main>` tag in the layout)
+
+---
+
+## Code style rules to follow throughout
+
+- All server components: `export default async function` — no `"use client"` at the top
+- All client components: `"use client"` at the very top, before imports
+- Supabase server: `const supabase = await createClient()` from `@/lib/supabase/server`
+- Supabase client: `const supabase = createClient()` (no await) from `@/lib/supabase/client`
+- Always handle the `Array.isArray(post.profiles) ? post.profiles[0] : post.profiles` pattern for Supabase join results
+- Use `tailwind` classes only — no inline styles except where unavoidable (e.g. `env(safe-area-inset-bottom)`)
+- Loading states: use the existing `SkeletonCard` component at `components/ui/SkeletonCard.tsx`
+- Empty states: use the existing `EmptyState` component at `components/ui/EmptyState.tsx`
+- Buttons: use the existing `Button` component at `components/ui/Button.tsx`
+- Match the existing color palette: primary action color is `emerald-brand` (defined in `tailwind.config.ts`)

@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
 import { formatDate } from "@/lib/utils";
 import LikeButton from "./LikeButton";
+import BookmarkButton from "./BookmarkButton";
 import CommentsSection from "./CommentsSection";
 import ViewTracker from "./ViewTracker";
 import ReadingProgressBar from "./ReadingProgressBar";
@@ -41,6 +43,41 @@ function injectHeadingIds(content: string): string {
   });
 }
 
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createClient();
+  const { data: post } = await supabase
+    .from("posts")
+    .select("title, excerpt, cover_image_url, slug, profiles!posts_author_id_fkey(full_name)")
+    .eq("slug", slug)
+    .eq("status", "published")
+    .single();
+
+  if (!post) return { title: "Post not found — ThinkAfrica" };
+
+  const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+  const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
+
+  return {
+    title: `${post.title} — ThinkAfrica`,
+    description: post.excerpt ?? `Read this post by ${author?.full_name} on ThinkAfrica`,
+    openGraph: {
+      title: post.title,
+      description: post.excerpt ?? "",
+      url: `https://thinkafrika.com/post/${post.slug}`,
+      siteName: "ThinkAfrica",
+      images: coverUrl ? [{ url: coverUrl, width: 1200, height: 630 }] : [],
+      type: "article",
+    },
+    twitter: {
+      card: coverUrl ? "summary_large_image" : "summary",
+      title: post.title,
+      description: post.excerpt ?? "",
+      images: coverUrl ? [coverUrl] : [],
+    },
+  };
+}
+
 export default async function PostPage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
@@ -50,7 +87,7 @@ export default async function PostPage({ params }: PageProps) {
     .select(
       `
       id, title, slug, content, excerpt, type, tags, status,
-      created_at, published_at, view_count,
+      created_at, published_at, view_count, cover_image_url,
       profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url)
     `
     )
@@ -61,6 +98,7 @@ export default async function PostPage({ params }: PageProps) {
   if (!post) notFound();
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+  const coverImageUrl = (post as { cover_image_url?: string | null }).cover_image_url;
 
   const {
     data: { user },
@@ -72,14 +110,24 @@ export default async function PostPage({ params }: PageProps) {
     .eq("post_id", post.id);
 
   let userLiked = false;
+  let userBookmarked = false;
   if (user) {
-    const { data: existingLike } = await supabase
-      .from("likes")
-      .select("user_id")
-      .eq("post_id", post.id)
-      .eq("user_id", user.id)
-      .single();
+    const [{ data: existingLike }, { data: existingBookmark }] = await Promise.all([
+      supabase
+        .from("likes")
+        .select("user_id")
+        .eq("post_id", post.id)
+        .eq("user_id", user.id)
+        .single(),
+      supabase
+        .from("bookmarks")
+        .select("user_id")
+        .eq("post_id", post.id)
+        .eq("user_id", user.id)
+        .single(),
+    ]);
     userLiked = !!existingLike;
+    userBookmarked = !!existingBookmark;
   }
 
   const { data: commentsRaw } = await supabase
@@ -100,7 +148,6 @@ export default async function PostPage({ params }: PageProps) {
   let userProfileId: string | null = null;
   if (user) userProfileId = user.id;
 
-  // Fetch which comments the current user has voted on
   const commentIds = comments.map((c) => c.id);
   let userVotedCommentIds: string[] = [];
   if (user && commentIds.length > 0) {
@@ -112,7 +159,6 @@ export default async function PostPage({ params }: PageProps) {
     userVotedCommentIds = votes?.map((v) => v.comment_id) ?? [];
   }
 
-  // Related posts by matching tags
   let relatedPosts: Array<{
     id: string; title: string; slug: string; type: string; published_at: string | null; created_at: string;
     profiles: { full_name: string; username: string } | null;
@@ -133,7 +179,6 @@ export default async function PostPage({ params }: PageProps) {
     }));
   }
 
-  // Check if user follows author
   let userFollowsAuthor = false;
   if (user && author) {
     const { data: followData } = await supabase
@@ -159,6 +204,18 @@ export default async function PostPage({ params }: PageProps) {
           {/* Main content */}
           <div className="lg:col-span-3">
             <div className="max-w-3xl">
+              {/* Cover image */}
+              {coverImageUrl && (
+                <div className="mb-8 rounded-xl overflow-hidden">
+                  <img
+                    src={coverImageUrl}
+                    alt={post.title}
+                    className="w-full object-cover"
+                    style={{ maxHeight: "400px" }}
+                  />
+                </div>
+              )}
+
               {/* Header */}
               <header className="mb-8">
                 <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -195,12 +252,19 @@ export default async function PostPage({ params }: PageProps) {
                         </p>
                       </div>
                     </Link>
-                    <LikeButton
-                      postId={post.id}
-                      initialLiked={userLiked}
-                      initialCount={likeCount ?? 0}
-                      userId={user?.id ?? null}
-                    />
+                    <div className="flex items-center gap-2">
+                      <BookmarkButton
+                        postId={post.id}
+                        initialBookmarked={userBookmarked}
+                        userId={user?.id ?? null}
+                      />
+                      <LikeButton
+                        postId={post.id}
+                        initialLiked={userLiked}
+                        initialCount={likeCount ?? 0}
+                        userId={user?.id ?? null}
+                      />
+                    </div>
                   </div>
                 )}
               </header>
@@ -303,4 +367,3 @@ export default async function PostPage({ params }: PageProps) {
     </div>
   );
 }
-

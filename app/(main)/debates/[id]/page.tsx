@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import LiveArguments from "./LiveArguments";
@@ -24,6 +25,28 @@ function timeRemaining(endsAt: string | null): string | null {
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: debate } = await supabase
+    .from("debates")
+    .select("title, description")
+    .eq("id", id)
+    .single();
+
+  if (!debate) return { title: "Debate not found — ThinkAfrica" };
+
+  return {
+    title: `${debate.title} — ThinkAfrica Debates`,
+    description: (debate as { description?: string | null }).description ?? `Join this debate on ThinkAfrica`,
+    openGraph: {
+      title: debate.title,
+      description: (debate as { description?: string | null }).description ?? "",
+      siteName: "ThinkAfrica",
+    },
+  };
 }
 
 export default async function DebatePage({ params }: PageProps) {

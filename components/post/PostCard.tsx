@@ -13,6 +13,7 @@ export interface PostCardData {
   published_at: string | null;
   like_count?: number;
   view_count?: number;
+  cover_image_url?: string | null;
   profiles: {
     username: string;
     full_name: string;
@@ -63,8 +64,21 @@ export default function PostCard({ post }: PostCardProps) {
 
   return (
     <article
-      className={`bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow ${borderClass}`}
+      className={`bg-white rounded-xl border border-gray-200 hover:shadow-md transition-shadow overflow-hidden ${borderClass}`}
     >
+      {/* Cover image */}
+      {post.cover_image_url && (
+        <Link href={`/post/${post.slug}`}>
+          <div className="aspect-video w-full overflow-hidden">
+            <img
+              src={post.cover_image_url}
+              alt={post.title}
+              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            />
+          </div>
+        </Link>
+      )}
+      <div className="p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* Type badge */}
@@ -157,6 +171,7 @@ export default function PostCard({ post }: PostCardProps) {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </article>
   );

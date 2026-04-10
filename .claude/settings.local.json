@@ -5,7 +5,10 @@
       "Bash(npm install:*)",
       "Bash(npm run:*)",
       "Bash(grep -E '\\\\.\\(ts|tsx|js|jsx|json|sql|css|md\\)$')",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(xargs grep:*)",
+      "Bash(mkdir -p \"C:/dev/Think_Africa/app/\\(main\\)/[username]/followers\")",
+      "Bash(mkdir -p \"C:/dev/Think_Africa/app/\\(main\\)/[username]/following\")"
     ]
   }
 }

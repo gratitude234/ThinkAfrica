@@ -1,3 +1,4 @@
+import Link from "next/link";
 import PointsTierBadge from "@/components/ui/PointsTierBadge";
 
 interface Badge {
@@ -30,6 +31,7 @@ interface ProfileCardProps {
   postCount?: number;
   followerCount?: number;
   followingCount?: number;
+  totalViews?: number;
   children?: React.ReactNode;
 }
 
@@ -39,6 +41,7 @@ export default function ProfileCard({
   postCount = 0,
   followerCount = 0,
   followingCount = 0,
+  totalViews = 0,
   children,
 }: ProfileCardProps) {
   return (
@@ -82,19 +85,25 @@ export default function ProfileCard({
       )}
 
       {/* Stats */}
-      <div className="flex items-center gap-4 text-sm mb-4">
+      <div className="flex items-center gap-4 text-sm mb-4 flex-wrap">
         <div className="text-center">
           <p className="font-semibold text-gray-900">{postCount}</p>
           <p className="text-gray-400 text-xs">Posts</p>
         </div>
-        <div className="text-center">
+        <Link href={`/${profile.username}/followers`} className="text-center hover:opacity-75 transition-opacity">
           <p className="font-semibold text-gray-900">{followerCount}</p>
           <p className="text-gray-400 text-xs">Followers</p>
-        </div>
-        <div className="text-center">
+        </Link>
+        <Link href={`/${profile.username}/following`} className="text-center hover:opacity-75 transition-opacity">
           <p className="font-semibold text-gray-900">{followingCount}</p>
           <p className="text-gray-400 text-xs">Following</p>
-        </div>
+        </Link>
+        {totalViews > 0 && (
+          <div className="text-center">
+            <p className="font-semibold text-gray-900">{totalViews.toLocaleString()}</p>
+            <p className="text-gray-400 text-xs">Views</p>
+          </div>
+        )}
         <div className="text-center">
           <PointsTierBadge points={profile.points} showProgress={true} />
         </div>

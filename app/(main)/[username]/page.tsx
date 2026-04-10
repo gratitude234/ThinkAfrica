@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import ProfileCard from "@/components/profile/ProfileCard";
 import PostCard from "@/components/post/PostCard";
@@ -11,6 +12,34 @@ import OpportunitiesTab from "./OpportunitiesTab";
 interface PageProps {
   params: Promise<{ username: string }>;
   searchParams: Promise<{ tab?: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { username } = await params;
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, bio, avatar_url, username")
+    .eq("username", username)
+    .single();
+
+  if (!profile) return { title: "Profile not found — ThinkAfrica" };
+
+  return {
+    title: `${profile.full_name ?? profile.username} — ThinkAfrica`,
+    description: profile.bio ?? `View ${profile.full_name ?? profile.username}'s profile on ThinkAfrica`,
+    openGraph: {
+      title: `${profile.full_name ?? profile.username} on ThinkAfrica`,
+      description: profile.bio ?? "",
+      images: profile.avatar_url ? [{ url: profile.avatar_url, width: 400, height: 400 }] : [],
+    },
+    twitter: {
+      card: "summary",
+      title: `${profile.full_name ?? profile.username} on ThinkAfrica`,
+      description: profile.bio ?? "",
+      images: profile.avatar_url ? [profile.avatar_url] : [],
+    },
+  };
 }
 
 const ACTIVITY_TYPE_ICONS: Record<string, string> = {
@@ -122,6 +151,12 @@ export default async function UserProfilePage({
     ...p,
     profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
   }));
+
+  // Total view count across published posts
+  const totalViewCount = (posts ?? []).reduce(
+    (sum, p) => sum + ((p as { view_count?: number }).view_count ?? 0),
+    0
+  );
 
   // Debates tab data
   let debateParticipations: {
@@ -262,6 +297,7 @@ export default async function UserProfilePage({
           postCount={feedPosts.length}
           followerCount={followerCount ?? 0}
           followingCount={followingCount ?? 0}
+          totalViews={totalViewCount}
         >
           <FollowButton
             targetUserId={profile.id}

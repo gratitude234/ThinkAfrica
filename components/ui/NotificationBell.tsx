@@ -151,6 +151,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
               </div>
             ) : (
               notifications.map((n) => {
+
                 const inner = (
                   <div className="flex items-start gap-3">
                     <span className="text-base flex-shrink-0 mt-0.5">
@@ -189,6 +190,15 @@ export default function NotificationBell({ userId }: { userId: string }) {
                 );
               })
             )}
+          </div>
+          <div className="border-t border-gray-100 px-4 py-2.5">
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              className="block text-center text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+            >
+              View all notifications →
+            </Link>
           </div>
         </div>
       )}

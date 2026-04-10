@@ -7,6 +7,7 @@ import ActivationBanner from "@/components/ui/ActivationBanner";
 import FeaturedPostBanner from "@/components/post/FeaturedPostBanner";
 import DailyBrief from "@/components/ui/DailyBrief";
 import SuggestedPeople from "@/components/ui/SuggestedPeople";
+import MobileSidebarStrip from "./MobileSidebarStrip";
 
 export const revalidate = 60;
 
@@ -97,7 +98,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   const { data: posts, error } = await supabase
     .from("posts")
     .select(
-      `id, title, slug, excerpt, type, tags, created_at, published_at, view_count,
+      `id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
       profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`
     )
     .eq("status", "published")
@@ -134,7 +135,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     const { data: forYouRaw } = await supabase
       .from("posts")
       .select(
-        `id, title, slug, excerpt, type, tags, created_at, published_at, view_count,
+        `id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
         profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`
       )
       .eq("status", "published")
@@ -224,24 +225,19 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Mobile trending strip — visible only below lg breakpoint */}
-      {trendingPosts && trendingPosts.length > 0 && (
-        <div className="lg:col-span-3 block lg:hidden">
-          <div className="flex overflow-x-auto gap-2 pb-2 -mx-1 px-1">
-            {trendingPosts.map((post) => (
-              <Link
-                key={post.id}
-                href={`/post/${post.slug}`}
-                className="flex-shrink-0 inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-700 hover:border-emerald-brand hover:text-emerald-brand transition-colors"
-              >
-                {post.title.length > 30
-                  ? post.title.substring(0, 30) + "…"
-                  : post.title}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Mobile sidebar strip — visible only below lg breakpoint */}
+      <div className="lg:col-span-3">
+        <MobileSidebarStrip
+          trendingPosts={(trendingPosts ?? []).map((p) => ({
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            view_count: p.view_count ?? null,
+          }))}
+          activeDebates={activeDebates ?? []}
+          topContributors={topContributors}
+        />
+      </div>
 
       {/* Main feed */}
       <div className="lg:col-span-2">
