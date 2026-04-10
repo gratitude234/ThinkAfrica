@@ -8,9 +8,13 @@ export default async function MainLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
+  // getSession reads from the request cookie — no network round-trip.
+  // getUser() would validate the JWT with Supabase's auth server on every page load.
+  // For display-only nav rendering, the session cookie is sufficient.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   let profile = null;
   if (user) {

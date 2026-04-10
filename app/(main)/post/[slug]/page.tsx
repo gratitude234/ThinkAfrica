@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -7,7 +8,7 @@ import Tag from "@/components/ui/Tag";
 import { formatDate } from "@/lib/utils";
 import LikeButton from "./LikeButton";
 import BookmarkButton from "./BookmarkButton";
-import CommentsSection from "./CommentsSection";
+import CommentsLoader from "./CommentsLoader";
 import ViewTracker from "./ViewTracker";
 import ReadingProgressBar from "./ReadingProgressBar";
 import ShareButtons from "./ShareButtons";
@@ -130,34 +131,7 @@ export default async function PostPage({ params }: PageProps) {
     userBookmarked = !!existingBookmark;
   }
 
-  const { data: commentsRaw } = await supabase
-    .from("comments")
-    .select(
-      "id, content, created_at, upvotes, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
-    )
-    .eq("post_id", post.id)
-    .is("parent_id", null)
-    .order("created_at", { ascending: true });
-
-  const comments = (commentsRaw ?? []).map((c) => ({
-    ...c,
-    upvotes: (c as { upvotes?: number }).upvotes ?? 0,
-    profiles: Array.isArray(c.profiles) ? c.profiles[0] : c.profiles,
-  }));
-
-  let userProfileId: string | null = null;
-  if (user) userProfileId = user.id;
-
-  const commentIds = comments.map((c) => c.id);
-  let userVotedCommentIds: string[] = [];
-  if (user && commentIds.length > 0) {
-    const { data: votes } = await supabase
-      .from("comment_votes")
-      .select("comment_id")
-      .eq("user_id", userProfileId)
-      .in("comment_id", commentIds);
-    userVotedCommentIds = votes?.map((v) => v.comment_id) ?? [];
-  }
+  const userProfileId: string | null = user?.id ?? null;
 
   let relatedPosts: Array<{
     id: string; title: string; slug: string; type: string; published_at: string | null; created_at: string;
@@ -328,14 +302,30 @@ export default async function PostPage({ params }: PageProps) {
 
               <hr className="border-gray-200 mb-8" />
 
-              {/* Comments */}
-              <CommentsSection
-                postId={post.id}
-                initialComments={comments as Parameters<typeof CommentsSection>[0]["initialComments"]}
-                userId={user?.id ?? null}
-                userProfileId={userProfileId}
-                userVotedCommentIds={userVotedCommentIds}
-              />
+              {/* Comments — streams in after article renders */}
+              <Suspense
+                fallback={
+                  <div className="space-y-4 animate-pulse">
+                    <div className="h-5 w-24 bg-gray-200 rounded" />
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-3 w-28 bg-gray-200 rounded" />
+                          <div className="h-3 w-full bg-gray-100 rounded" />
+                          <div className="h-3 w-4/5 bg-gray-100 rounded" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                }
+              >
+                <CommentsLoader
+                  postId={post.id}
+                  userId={user?.id ?? null}
+                  userProfileId={userProfileId}
+                />
+              </Suspense>
             </div>
           </div>
 

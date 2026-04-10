@@ -1,18 +1,40 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import PostFeed from "@/components/post/PostFeed";
-import type { PostCardData } from "@/components/post/PostCard";
 import ActivationBanner from "@/components/ui/ActivationBanner";
 import FeaturedPostBanner from "@/components/post/FeaturedPostBanner";
 import DailyBrief from "@/components/ui/DailyBrief";
 import SuggestedPeople from "@/components/ui/SuggestedPeople";
 import MobileSidebarStrip from "./MobileSidebarStrip";
+import PostsFeedSection from "./PostsFeedSection";
 
 export const revalidate = 60;
 
 interface PageProps {
   searchParams: Promise<{ guest?: string; tab?: string }>;
+}
+
+function FeedSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="h-5 w-16 bg-gray-200 rounded-full" />
+            <div className="h-4 w-24 bg-gray-100 rounded" />
+          </div>
+          <div className="h-5 w-4/5 bg-gray-200 rounded" />
+          <div className="h-4 w-full bg-gray-100 rounded" />
+          <div className="h-4 w-3/4 bg-gray-100 rounded" />
+          <div className="flex items-center gap-3 pt-1">
+            <div className="h-7 w-7 rounded-full bg-gray-200" />
+            <div className="h-3 w-32 bg-gray-100 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default async function HomePage({ searchParams }: PageProps) {
@@ -23,7 +45,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Redirect to landing page if not logged in and no guest param
   if (!user && guest !== "1") {
     redirect("/landing");
   }
@@ -45,7 +66,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     userFieldOfStudy = profileData?.field_of_study ?? null;
   }
 
-  // Activation queries (task 1) + featured post (task 6) — parallel
+  // Activation counts + featured post — fast parallel block
   const [
     { count: publishedCount },
     { data: followedUsers },
@@ -99,176 +120,42 @@ export default async function HomePage({ searchParams }: PageProps) {
   );
   const followCount = followedIds.length;
 
-  // Main feed (paginated)
-  const { data: posts, error } = await supabase
-    .from("posts")
-    .select(
-      `id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
-      profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`
-    )
-    .eq("status", "published")
-    .order("published_at", { ascending: false })
-    .limit(30);
-
-  // Like counts
-  const postIds = posts?.map((p) => p.id) ?? [];
-  let likeCounts: Record<string, number> = {};
-  if (postIds.length > 0) {
-    const { data: likes } = await supabase
-      .from("likes")
-      .select("post_id")
-      .in("post_id", postIds);
-    if (likes) {
-      likeCounts = likes.reduce(
-        (acc, like) => {
-          acc[like.post_id] = (acc[like.post_id] ?? 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>
-      );
-    }
-  }
-
-  const feedPosts: PostCardData[] = (posts ?? []).map((post) => ({
-    ...post,
-    profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
-    like_count: likeCounts[post.id] ?? 0,
-  }));
-
-  // "For You" posts if user has interests
-  let forYouPosts: PostCardData[] = [];
-  if (userInterests.length > 0) {
-    const { data: forYouRaw } = await supabase
-      .from("posts")
-      .select(
-        `id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
-        profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`
-      )
-      .eq("status", "published")
-      .overlaps("tags", userInterests)
-      .order("published_at", { ascending: false })
-      .limit(10);
-
-    const forYouIds = (forYouRaw ?? []).map((p) => p.id);
-    let forYouLikeCounts: Record<string, number> = {};
-    if (forYouIds.length > 0) {
-      const { data: fyLikes } = await supabase
-        .from("likes")
-        .select("post_id")
-        .in("post_id", forYouIds);
-      if (fyLikes) {
-        forYouLikeCounts = fyLikes.reduce(
-          (acc, like) => {
-            acc[like.post_id] = (acc[like.post_id] ?? 0) + 1;
-            return acc;
-          },
-          {} as Record<string, number>
-        );
-      }
-    }
-
-    forYouPosts = (forYouRaw ?? []).map((post) => ({
-      ...post,
-      profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
-      like_count: forYouLikeCounts[post.id] ?? 0,
-    }));
-  }
-
-  // "Following" posts — published posts from authors the user follows
-  let followingPosts: PostCardData[] = [];
-  if (user && followedIds.length > 0) {
-    const { data: followingRaw } = await supabase
-      .from("posts")
-      .select(
-        `id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
-        profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`
-      )
-      .eq("status", "published")
-      .in("author_id", followedIds)
-      .order("published_at", { ascending: false })
-      .limit(20);
-
-    const followingPostIds = (followingRaw ?? []).map((p) => p.id);
-    let followingLikeCounts: Record<string, number> = {};
-    if (followingPostIds.length > 0) {
-      const { data: fLikes } = await supabase
-        .from("likes")
-        .select("post_id")
-        .in("post_id", followingPostIds);
-      if (fLikes) {
-        followingLikeCounts = fLikes.reduce(
-          (acc, like) => {
-            acc[like.post_id] = (acc[like.post_id] ?? 0) + 1;
-            return acc;
-          },
-          {} as Record<string, number>
-        );
-      }
-    }
-
-    followingPosts = (followingRaw ?? []).map((post) => ({
-      ...post,
-      profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
-      like_count: followingLikeCounts[post.id] ?? 0,
-    }));
-  }
-
-  const showForYouTab = userInterests.length > 0 && forYouPosts.length > 0;
-  const showFollowingTab = user !== null && followedIds.length > 0;
-  const showTabs = showForYouTab || showFollowingTab;
-
-  const activeTab =
-    tab === "following" && showFollowingTab
-      ? "following"
-      : tab === "foryou" && showForYouTab
-        ? "foryou"
-        : "latest";
-
-  const displayPosts =
-    activeTab === "following"
-      ? followingPosts
-      : activeTab === "foryou"
-        ? forYouPosts
-        : feedPosts;
-
-  // Sidebar: trending posts (last 7 days by view_count)
+  // Sidebar queries — run in parallel
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: trendingPosts } = await supabase
-    .from("posts")
-    .select(
-      "id, title, slug, view_count, type, profiles!posts_author_id_fkey(username, full_name)"
-    )
-    .eq("status", "published")
-    .gte("published_at", weekAgo)
-    .order("view_count", { ascending: false })
-    .limit(5);
+  const [
+    { data: trendingPosts },
+    { data: activeDebates },
+    { data: weeklyPosts },
+  ] = await Promise.all([
+    supabase
+      .from("posts")
+      .select(
+        "id, title, slug, view_count, type, profiles!posts_author_id_fkey(username, full_name)"
+      )
+      .eq("status", "published")
+      .gte("published_at", weekAgo)
+      .order("view_count", { ascending: false })
+      .limit(5),
 
-  // Sidebar: active debates
-  const { data: activeDebates } = await supabase
-    .from("debates")
-    .select("id, title, status, debate_arguments(count)")
-    .in("status", ["open", "active"])
-    .order("created_at", { ascending: false })
-    .limit(3);
+    supabase
+      .from("debates")
+      .select("id, title, status, debate_arguments(count)")
+      .in("status", ["open", "active"])
+      .order("created_at", { ascending: false })
+      .limit(3),
 
-  // Sidebar: top contributors this week
-  const { data: weeklyPosts } = await supabase
-    .from("posts")
-    .select(
-      "author_id, profiles!posts_author_id_fkey(id, username, full_name, avatar_url, points)"
-    )
-    .eq("status", "published")
-    .gte("published_at", weekAgo);
+    supabase
+      .from("posts")
+      .select(
+        "author_id, profiles!posts_author_id_fkey(id, username, full_name, avatar_url, points)"
+      )
+      .eq("status", "published")
+      .gte("published_at", weekAgo),
+  ]);
 
   const contributorMap: Record<
     string,
-    {
-      id: string;
-      username: string;
-      full_name: string | null;
-      points: number;
-      post_count: number;
-    }
+    { id: string; username: string; full_name: string | null; points: number; post_count: number }
   > = {};
   for (const p of weeklyPosts ?? []) {
     const profile = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
@@ -284,7 +171,7 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Mobile sidebar strip — visible only below lg breakpoint */}
+      {/* Mobile sidebar strip */}
       <div className="lg:col-span-3">
         <MobileSidebarStrip
           trendingPosts={(trendingPosts ?? []).map((p) => ({
@@ -305,77 +192,37 @@ export default async function HomePage({ searchParams }: PageProps) {
             Ideas from across Africa
           </h1>
           <p className="text-gray-500">
-            Research, essays, and policy briefs from African university
-            students.
+            Research, essays, and policy briefs from African university students.
           </p>
         </div>
 
-        {/* Task 6: Featured post */}
         {featuredPost && <FeaturedPostBanner post={featuredPost} />}
 
-        {/* Task 1: Activation banner */}
         {user && (
           <ActivationBanner
             userId={user.id}
             hasPublished={(publishedCount ?? 0) > 0}
-            hasFollowed={(followCount ?? 0) > 0}
+            hasFollowed={followCount > 0}
             hasDebated={(debateCount ?? 0) > 0}
           />
         )}
 
-        {/* Task 9: Daily brief */}
         {user && <DailyBrief userId={user.id} points={userPoints} />}
 
-        {/* Feed tabs */}
-        {showTabs && (
-          <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-            <Link
-              href="/"
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "latest"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Latest
-            </Link>
-            {showFollowingTab && (
-              <Link
-                href="/?tab=following"
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === "following"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Following
-              </Link>
-            )}
-            {showForYouTab && (
-              <Link
-                href="/?tab=foryou"
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === "foryou"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                For You
-              </Link>
-            )}
-          </div>
-        )}
-
-        {error && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6">
-            Failed to load posts. Please try again.
-          </div>
-        )}
-
-        <PostFeed posts={displayPosts} />
+        {/* Feed streams in independently — shell above renders immediately */}
+        <Suspense fallback={<FeedSkeleton />}>
+          <PostsFeedSection
+            tab={tab ?? "latest"}
+            userId={user?.id ?? null}
+            userInterests={userInterests}
+            followedIds={followedIds}
+            showForYouEligible={userInterests.length > 0}
+            showFollowingEligible={followedIds.length > 0}
+          />
+        </Suspense>
       </div>
 
-      {/* Sidebar — hidden on mobile, shown on desktop */}
+      {/* Sidebar */}
       <div className="hidden lg:block lg:col-span-1 space-y-6 lg:sticky lg:top-24 self-start">
         {/* Trending This Week */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -469,9 +316,7 @@ export default async function HomePage({ searchParams }: PageProps) {
             </Link>
           </div>
           {topContributors.length === 0 ? (
-            <p className="text-xs text-gray-400">
-              No contributors this week yet.
-            </p>
+            <p className="text-xs text-gray-400">No contributors this week yet.</p>
           ) : (
             <div className="space-y-3">
               {topContributors.map((c, i) => (
@@ -502,7 +347,6 @@ export default async function HomePage({ searchParams }: PageProps) {
           )}
         </div>
 
-        {/* Task 5: Suggested people to follow */}
         {user && (
           <SuggestedPeople
             currentUserId={user.id}
