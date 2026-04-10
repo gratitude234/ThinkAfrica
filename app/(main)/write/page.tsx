@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import { MIN_WORD_COUNTS, POST_TYPE_LABELS } from "@/lib/utils";
 import { useDraftManager } from "./DraftManager";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import MyDrafts from "./MyDrafts";
 
 // Load editor client-side only (no SSR)
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
@@ -228,6 +229,8 @@ export default function WritePage() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      <MyDrafts activeDraftId={draftId} />
+
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Write a post</h1>
@@ -283,13 +286,20 @@ export default function WritePage() {
                   setPostType(type);
                   saveDraft(getCurrentData({ postType: type }));
                 }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border text-left ${
                   postType === type
                     ? "bg-emerald-brand text-white border-emerald-brand"
                     : "bg-white border-gray-200 text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
                 }`}
               >
-                {POST_TYPE_LABELS[type]}
+                <span className="block">{POST_TYPE_LABELS[type]}</span>
+                <span
+                  className={`block text-xs font-normal mt-0.5 ${
+                    postType === type ? "text-emerald-100" : "text-gray-400"
+                  }`}
+                >
+                  {MIN_WORD_COUNTS[type].toLocaleString()}+ words
+                </span>
               </button>
             ))}
           </div>

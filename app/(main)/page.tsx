@@ -48,7 +48,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   // Activation queries (task 1) + featured post (task 6) — parallel
   const [
     { count: publishedCount },
-    { count: followCount },
+    { data: followedUsers },
     { count: debateCount },
     { data: featuredPostRaw },
   ] = await Promise.all([
@@ -63,9 +63,9 @@ export default async function HomePage({ searchParams }: PageProps) {
     user
       ? supabase
           .from("follows")
-          .select("*", { count: "exact", head: true })
+          .select("following_id")
           .eq("follower_id", user.id)
-      : Promise.resolve({ count: 0, data: null, error: null }),
+      : Promise.resolve({ count: 0, data: [], error: null }),
 
     user
       ? supabase
@@ -94,7 +94,12 @@ export default async function HomePage({ searchParams }: PageProps) {
       }
     : null;
 
-  // Main feed
+  const followedIds = (followedUsers ?? []).map(
+    (f: { following_id: string }) => f.following_id
+  );
+  const followCount = followedIds.length;
+
+  // Main feed (paginated)
   const { data: posts, error } = await supabase
     .from("posts")
     .select(
@@ -102,7 +107,8 @@ export default async function HomePage({ searchParams }: PageProps) {
       profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`
     )
     .eq("status", "published")
-    .order("published_at", { ascending: false });
+    .order("published_at", { ascending: false })
+    .limit(30);
 
   // Like counts
   const postIds = posts?.map((p) => p.id) ?? [];
@@ -168,9 +174,62 @@ export default async function HomePage({ searchParams }: PageProps) {
     }));
   }
 
-  const showTabs = userInterests.length > 0 && forYouPosts.length > 0;
-  const activeTab = showTabs && tab === "foryou" ? "foryou" : "latest";
-  const displayPosts = activeTab === "foryou" ? forYouPosts : feedPosts;
+  // "Following" posts — published posts from authors the user follows
+  let followingPosts: PostCardData[] = [];
+  if (user && followedIds.length > 0) {
+    const { data: followingRaw } = await supabase
+      .from("posts")
+      .select(
+        `id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
+        profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`
+      )
+      .eq("status", "published")
+      .in("author_id", followedIds)
+      .order("published_at", { ascending: false })
+      .limit(20);
+
+    const followingPostIds = (followingRaw ?? []).map((p) => p.id);
+    let followingLikeCounts: Record<string, number> = {};
+    if (followingPostIds.length > 0) {
+      const { data: fLikes } = await supabase
+        .from("likes")
+        .select("post_id")
+        .in("post_id", followingPostIds);
+      if (fLikes) {
+        followingLikeCounts = fLikes.reduce(
+          (acc, like) => {
+            acc[like.post_id] = (acc[like.post_id] ?? 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>
+        );
+      }
+    }
+
+    followingPosts = (followingRaw ?? []).map((post) => ({
+      ...post,
+      profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
+      like_count: followingLikeCounts[post.id] ?? 0,
+    }));
+  }
+
+  const showForYouTab = userInterests.length > 0 && forYouPosts.length > 0;
+  const showFollowingTab = user !== null && followedIds.length > 0;
+  const showTabs = showForYouTab || showFollowingTab;
+
+  const activeTab =
+    tab === "following" && showFollowingTab
+      ? "following"
+      : tab === "foryou" && showForYouTab
+        ? "foryou"
+        : "latest";
+
+  const displayPosts =
+    activeTab === "following"
+      ? followingPosts
+      : activeTab === "foryou"
+        ? forYouPosts
+        : feedPosts;
 
   // Sidebar: trending posts (last 7 days by view_count)
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -267,7 +326,7 @@ export default async function HomePage({ searchParams }: PageProps) {
         {/* Task 9: Daily brief */}
         {user && <DailyBrief userId={user.id} points={userPoints} />}
 
-        {/* For You / Latest tabs */}
+        {/* Feed tabs */}
         {showTabs && (
           <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
             <Link
@@ -280,16 +339,30 @@ export default async function HomePage({ searchParams }: PageProps) {
             >
               Latest
             </Link>
-            <Link
-              href="/?tab=foryou"
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "foryou"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              For You
-            </Link>
+            {showFollowingTab && (
+              <Link
+                href="/?tab=following"
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === "following"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Following
+              </Link>
+            )}
+            {showForYouTab && (
+              <Link
+                href="/?tab=foryou"
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === "foryou"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                For You
+              </Link>
+            )}
           </div>
         )}
 

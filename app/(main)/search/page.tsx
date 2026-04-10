@@ -39,7 +39,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
             "id, title, slug, excerpt, type, profiles!posts_author_id_fkey(username, full_name)"
           )
           .eq("status", "published")
-          .or(`title.ilike.%${query}%,excerpt.ilike.%${query}%`)
+          .or(`title.ilike.%${query}%,excerpt.ilike.%${query}%,content.ilike.%${query}%`)
           .limit(20),
 
         supabase

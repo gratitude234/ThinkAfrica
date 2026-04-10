@@ -8,7 +8,10 @@
       "Bash(npx tsc:*)",
       "Bash(xargs grep:*)",
       "Bash(mkdir -p \"C:/dev/Think_Africa/app/\\(main\\)/[username]/followers\")",
-      "Bash(mkdir -p \"C:/dev/Think_Africa/app/\\(main\\)/[username]/following\")"
+      "Bash(mkdir -p \"C:/dev/Think_Africa/app/\\(main\\)/[username]/following\")",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }
