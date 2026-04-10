@@ -36,6 +36,7 @@ export default function WritePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
 
   // Pre-populate from loaded draft
   useEffect(() => {
@@ -104,9 +105,11 @@ export default function WritePage() {
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean);
 
+    const now = new Date().toISOString();
+
     if (draftId) {
-      // Update existing draft to pending
-      const { error: updateError } = await supabase
+      // Publish existing draft immediately
+      const { data: updated, error: updateError } = await supabase
         .from("posts")
         .update({
           title: title.trim(),
@@ -115,16 +118,20 @@ export default function WritePage() {
           tags,
           type: postType,
           cover_image_url: coverImageUrl || null,
-          status: "pending",
+          status: "published",
+          published_at: now,
         })
         .eq("id", draftId)
-        .eq("author_id", user.id);
+        .eq("author_id", user.id)
+        .select("slug")
+        .single();
 
       if (updateError) {
         setError(updateError.message);
         setLoading(false);
         return;
       }
+      setPublishedSlug(updated.slug);
     } else {
       const { data: profile } = await supabase
         .from("profiles")
@@ -141,23 +148,29 @@ export default function WritePage() {
       const baseSlug = slugify(title, { lower: true, strict: true });
       const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
 
-      const { error: insertError } = await supabase.from("posts").insert({
-        author_id: profile.id,
-        title: title.trim(),
-        slug: uniqueSlug,
-        content,
-        excerpt,
-        type: postType,
-        tags,
-        status: "pending",
-        cover_image_url: coverImageUrl || null,
-      });
+      const { data: inserted, error: insertError } = await supabase
+        .from("posts")
+        .insert({
+          author_id: profile.id,
+          title: title.trim(),
+          slug: uniqueSlug,
+          content,
+          excerpt,
+          type: postType,
+          tags,
+          status: "published",
+          published_at: now,
+          cover_image_url: coverImageUrl || null,
+        })
+        .select("slug")
+        .single();
 
-      if (insertError) {
-        setError(insertError.message);
+      if (insertError || !inserted) {
+        setError(insertError?.message ?? "Failed to publish.");
         setLoading(false);
         return;
       }
+      setPublishedSlug(inserted.slug);
     }
 
     setSuccess(true);
@@ -179,18 +192,25 @@ export default function WritePage() {
           ✓
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Submitted for review
+          Your post is live!
         </h2>
         <p className="text-gray-500 mb-6">
-          Your post has been submitted for editorial review. We&apos;ll publish
-          it once approved.
+          Your post has been published and is now visible to the community.
         </p>
         <div className="flex items-center justify-center gap-3">
-          <Button onClick={() => router.push("/")}>Back to home</Button>
+          {publishedSlug && (
+            <Button onClick={() => router.push(`/post/${publishedSlug}`)}>
+              View post
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => router.push("/")}>
+            Back to home
+          </Button>
           <Button
             variant="secondary"
             onClick={() => {
               setSuccess(false);
+              setPublishedSlug(null);
               setTitle("");
               setExcerpt("");
               setTagsInput("");
@@ -386,7 +406,7 @@ export default function WritePage() {
             Save draft
           </Button>
           <Button type="submit" loading={loading} size="lg">
-            Submit for review
+            Publish
           </Button>
         </div>
       </form>

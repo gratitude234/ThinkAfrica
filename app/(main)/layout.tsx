@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import Footer from "@/components/ui/Footer";
 import NavClient from "./NavClient";
 import BottomNav from "./BottomNav";
 
@@ -38,8 +37,6 @@ export default async function MainLayout({
         username={profile?.username ?? null}
         userId={user?.id ?? null}
       />
-
-      <Footer />
     </div>
   );
 }

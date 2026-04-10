@@ -1,7 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import PostCard from "@/components/post/PostCard";
 import type { PostCardData } from "@/components/post/PostCard";
+import Footer from "@/components/ui/Footer";
 
 export default async function LandingPage() {
   const supabase = await createClient();
@@ -25,6 +27,13 @@ export default async function LandingPage() {
     <div>
       {/* Hero */}
       <section className="text-center py-20 px-4">
+        <Image
+          src="/logo.png"
+          alt="ThinkAfrika"
+          width={240}
+          height={72}
+          className="h-16 w-auto mx-auto mb-6"
+        />
         <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4 leading-tight">
           Africa&apos;s Intellectual Social Network
         </h1>
@@ -110,6 +119,8 @@ export default async function LandingPage() {
           Join ThinkAfrica Free
         </Link>
       </section>
+
+      <Footer />
     </div>
   );
 }

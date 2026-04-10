@@ -28,7 +28,7 @@ export default async function AdminReviewPage() {
     );
   }
 
-  // Fetch pending posts
+  // Fetch all published posts for moderation (newest first)
   const { data: pendingPosts } = await supabase
     .from("posts")
     .select(
@@ -37,8 +37,9 @@ export default async function AdminReviewPage() {
       profiles!posts_author_id_fkey (username, full_name, university)
     `
     )
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
+    .eq("status", "published")
+    .order("created_at", { ascending: false })
+    .limit(50);
 
   const posts = (pendingPosts ?? []).map((p) => ({
     ...p,
@@ -85,16 +86,19 @@ export default async function AdminReviewPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Editorial Review Queue</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Moderation Queue</h1>
         <p className="text-gray-500 text-sm mt-1">
-          {posts.length} post{posts.length !== 1 ? "s" : ""} pending review
+          Posts are published instantly. Flagged posts appear here for moderation.
         </p>
+      </div>
+
+      <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+        Review panel repurposed for moderation. Connect a reporting system to filter flagged content.
       </div>
 
       {posts.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          <p className="text-lg font-medium">All clear!</p>
-          <p className="text-sm">No posts pending review.</p>
+          <p className="text-lg font-medium">No published posts yet.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -136,7 +140,7 @@ export default async function AdminReviewPage() {
                       · {post.profiles?.university}
                     </span>
                     <span>·</span>
-                    <span>Submitted {formatDate(post.created_at)}</span>
+                    <span>Published {formatDate(post.created_at)}</span>
                   </div>
                 </div>
 

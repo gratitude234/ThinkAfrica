@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -26,9 +27,14 @@ export default function NavClient({ user, profile, isAdmin }: NavClientProps) {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xl font-bold text-emerald-brand">
-              ThinkAfrica
-            </span>
+            <Image
+              src="/logo.png"
+              alt="ThinkAfrika"
+              width={160}
+              height={48}
+              priority
+              className="h-9 w-auto"
+            />
           </Link>
 
           {/* Center nav links — desktop */}

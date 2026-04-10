@@ -12,6 +12,9 @@ export const metadata: Metadata = {
     siteName: "ThinkAfrica",
     images: ["/og-default.png"],
   },
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({
