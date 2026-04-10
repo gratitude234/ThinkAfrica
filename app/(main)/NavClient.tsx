@@ -33,7 +33,7 @@ export default function NavClient({ user, profile, isAdmin }: NavClientProps) {
               width={160}
               height={48}
               priority
-              className="h-9 w-auto"
+              className="h-14 w-auto"
             />
           </Link>
 
