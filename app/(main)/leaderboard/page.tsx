@@ -2,15 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import SponsorBanner from "@/components/ui/SponsorBanner";
 import PointsTierBadge from "@/components/ui/PointsTierBadge";
+import { POST_POINTS } from "@/lib/utils";
 
 export const revalidate = 120;
-
-const POST_POINTS: Record<string, number> = {
-  blog: 10,
-  essay: 20,
-  research: 50,
-  policy_brief: 30,
-};
 
 interface PageProps {
   searchParams: Promise<{ tab?: string }>;

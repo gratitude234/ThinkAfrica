@@ -16,8 +16,8 @@ export default async function TopicPage({ params }: PageProps) {
   const { data: postsRaw } = await supabase
     .from("posts")
     .select(`
-      id, title, slug, excerpt, type, tags, created_at, published_at, view_count,
-      profiles!posts_author_id_fkey (username, full_name, university, avatar_url)
+      id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
+      profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)
     `)
     .eq("status", "published")
     .contains("tags", [decodedTag])
@@ -85,7 +85,18 @@ export default async function TopicPage({ params }: PageProps) {
                   tags: post.tags,
                   created_at: post.created_at,
                   published_at: post.published_at,
-                  profiles: post.profiles as { username: string; full_name: string; university: string; avatar_url: string | null } | null,
+                  view_count: post.view_count,
+                  cover_image_url:
+                    (post as { cover_image_url?: string | null })
+                      .cover_image_url ?? null,
+                  profiles: post.profiles as {
+                    username: string;
+                    full_name: string | null;
+                    university: string | null;
+                    avatar_url: string | null;
+                    verified?: boolean;
+                    verified_type?: string | null;
+                  } | null,
                 }}
               />
             ))

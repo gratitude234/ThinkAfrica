@@ -9,18 +9,57 @@ import Button from "@/components/ui/Button";
 
 interface NavUserMenuProps {
   user: User | null;
-  profile: { username: string; full_name: string } | null;
+  profile: { username: string; full_name: string | null; points?: number } | null;
+  points: number;
   isAdmin?: boolean;
+}
+
+function getTier(
+  points: number
+): { label: string; color: string; ring: string } {
+  if (points >= 500) {
+    return {
+      label: "Platinum",
+      color: "text-purple-600",
+      ring: "ring-purple-400",
+    };
+  }
+
+  if (points >= 200) {
+    return {
+      label: "Gold",
+      color: "text-amber-500",
+      ring: "ring-amber-400",
+    };
+  }
+
+  if (points >= 50) {
+    return {
+      label: "Silver",
+      color: "text-gray-400",
+      ring: "ring-gray-300",
+    };
+  }
+
+  return {
+    label: "Bronze",
+    color: "text-orange-500",
+    ring: "ring-orange-300",
+  };
 }
 
 export default function NavUserMenu({
   user,
   profile,
+  points,
   isAdmin,
 }: NavUserMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const tier = getTier(points);
+  const displayName =
+    profile?.full_name ?? user?.email?.split("@")[0] ?? "Account";
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -60,10 +99,12 @@ export default function NavUserMenu({
         onClick={() => setOpen((prev) => !prev)}
         className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-emerald-brand transition-colors"
       >
-        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-sm font-bold flex-shrink-0">
-          {profile?.full_name?.charAt(0)?.toUpperCase() ?? "?"}
+        <div
+          className={`w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-sm font-bold flex-shrink-0 ring-2 ${tier.ring} ring-offset-2`}
+        >
+          {displayName.charAt(0).toUpperCase()}
         </div>
-        <span className="hidden sm:block">{profile?.full_name}</span>
+        <span className="hidden sm:block">{displayName}</span>
         <svg
           className="w-4 h-4 text-gray-400 hidden sm:block"
           fill="none"
@@ -81,6 +122,14 @@ export default function NavUserMenu({
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+            <p className="text-sm font-semibold text-gray-900 truncate">
+              {displayName}
+            </p>
+            <span className={`text-xs font-semibold ${tier.color}`}>
+              {tier.label} · {points} pts
+            </span>
+          </div>
           {profile && (
             <Link
               href={`/${profile.username}`}

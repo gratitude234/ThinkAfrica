@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate, POST_TYPE_LABELS } from "@/lib/utils";
+import Toast from "@/components/ui/Toast";
+import { formatDate, POST_POINTS, POST_TYPE_LABELS } from "@/lib/utils";
 
 export interface DashboardPost {
   id: string;
@@ -28,20 +28,136 @@ const STATUS_COLORS: Record<string, string> = {
 const TABS = ["all", "published", "pending", "draft", "rejected"] as const;
 type Tab = (typeof TABS)[number];
 
-export default function PostsTable({ posts }: { posts: DashboardPost[] }) {
-  const router = useRouter();
+function normalizePost(
+  record: Partial<DashboardPost> & { id: string },
+  existing?: DashboardPost
+): DashboardPost {
+  return {
+    id: record.id,
+    title: record.title ?? existing?.title ?? "Untitled",
+    slug: record.slug ?? existing?.slug ?? "",
+    type: record.type ?? existing?.type ?? "blog",
+    status: record.status ?? existing?.status ?? "draft",
+    view_count: record.view_count ?? existing?.view_count ?? 0,
+    like_count: existing?.like_count ?? 0,
+    created_at: record.created_at ?? existing?.created_at ?? new Date().toISOString(),
+    published_at: record.published_at ?? existing?.published_at ?? null,
+  };
+}
+
+export default function PostsTable({
+  posts,
+  userId,
+}: {
+  posts: DashboardPost[];
+  userId: string;
+}) {
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [rows, setRows] = useState<DashboardPost[]>(posts);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const statusMapRef = useRef<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    setRows(posts);
+    statusMapRef.current = new Map(posts.map((post) => [post.id, post.status]));
+  }, [posts]);
 
   const filtered =
-    activeTab === "all" ? posts : posts.filter((p) => p.status === activeTab);
+    activeTab === "all" ? rows : rows.filter((p) => p.status === activeTab);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel(`dashboard-posts:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "posts",
+          filter: `author_id=eq.${userId}`,
+        },
+        (payload) => {
+          const record = payload.new as Partial<DashboardPost> & { id: string };
+          const nextPost = normalizePost(record);
+
+          statusMapRef.current.set(nextPost.id, nextPost.status);
+          setRows((prev) => {
+            if (prev.some((post) => post.id === nextPost.id)) {
+              return prev;
+            }
+
+            return [nextPost, ...prev];
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "posts",
+          filter: `author_id=eq.${userId}`,
+        },
+        (payload) => {
+          const record = payload.new as Partial<DashboardPost> & { id: string };
+          const previousStatus =
+            statusMapRef.current.get(record.id) ??
+            ((payload.old as Partial<DashboardPost>).status ?? null);
+
+          setRows((prev) => {
+            const existing = prev.find((post) => post.id === record.id);
+            const nextPost = normalizePost(record, existing);
+
+            statusMapRef.current.set(nextPost.id, nextPost.status);
+
+            if (!existing) {
+              return [nextPost, ...prev];
+            }
+
+            return prev.map((post) =>
+              post.id === nextPost.id ? nextPost : post
+            );
+          });
+
+          if (previousStatus === "pending" && record.status === "published") {
+            const points = POST_POINTS[record.type ?? "blog"] ?? 0;
+            setToastMessage(
+              `\uD83C\uDF89 Post published! +${points} points earned`
+            );
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "posts",
+          filter: `author_id=eq.${userId}`,
+        },
+        (payload) => {
+          const deletedId = payload.old.id as string;
+          statusMapRef.current.delete(deletedId);
+          setRows((prev) => prev.filter((post) => post.id !== deletedId));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this draft? This cannot be undone.")) return;
     setDeletingId(id);
     const supabase = createClient();
     await supabase.from("posts").delete().eq("id", id);
-    router.refresh();
+    statusMapRef.current.delete(id);
+    setRows((prev) => prev.filter((post) => post.id !== id));
     setDeletingId(null);
   };
 
@@ -158,6 +274,10 @@ export default function PostsTable({ posts }: { posts: DashboardPost[] }) {
           </div>
         </div>
       )}
+
+      {toastMessage ? (
+        <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
+      ) : null}
     </div>
   );
 }

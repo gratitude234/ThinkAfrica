@@ -26,7 +26,8 @@ interface Argument {
 
 interface LiveArgumentsProps {
   debateId: string;
-  initialArguments: Argument[];
+  initialForArguments: Argument[];
+  initialAgainstArguments: Argument[];
   currentUserId: string | null;
   userVotedIds: string[];
   debateStatus: string;
@@ -45,18 +46,137 @@ function timeAgo(dateString: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+function getInitials(name: string | null | undefined) {
+  const cleaned = name?.trim();
+
+  if (!cleaned) return "?";
+
+  return cleaned
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
+function isForArgument(roundNumber: number) {
+  // TODO: add 'side' column to debate_arguments table for proper splitting
+  return roundNumber % 2 === 1;
+}
+
+function sortByUpvotes(argumentsList: Argument[]) {
+  return [...argumentsList].sort((a, b) => b.upvotes - a.upvotes);
+}
+
+function upsertArgument(argumentsList: Argument[], argument: Argument) {
+  if (argumentsList.some((item) => item.id === argument.id)) {
+    return argumentsList;
+  }
+
+  return [...argumentsList, argument];
+}
+
+function updateVoteCount(argumentsList: Argument[], id: string, upvotes: number) {
+  return argumentsList.map((argument) =>
+    argument.id === id ? { ...argument, upvotes } : argument
+  );
+}
+
+function EmptyColumn({
+  message,
+}: {
+  message: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-400">
+      {message}
+    </div>
+  );
+}
+
+function ArgumentCard({
+  argument,
+  hasVoted,
+  currentUserId,
+}: {
+  argument: Argument;
+  hasVoted: boolean;
+  currentUserId: string | null;
+}) {
+  const author = argument.profiles;
+  const authorName = author?.full_name ?? author?.username ?? "Unknown";
+
+  return (
+    <div className="mb-3 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          {author?.avatar_url ? (
+            <img
+              src={author.avatar_url}
+              alt={authorName}
+              className="h-9 w-9 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+              {getInitials(authorName)}
+            </div>
+          )}
+
+          <div className="min-w-0">
+            {author ? (
+              <Link
+                href={`/${author.username}`}
+                className="text-sm font-semibold text-gray-900 transition-colors hover:text-emerald-brand"
+              >
+                {authorName}
+              </Link>
+            ) : (
+              <span className="text-sm font-semibold text-gray-900">
+                Unknown
+              </span>
+            )}
+            {author?.university ? (
+              <p className="truncate text-xs text-gray-400">
+                {author.university}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <span className="flex-shrink-0 text-xs text-gray-400">
+          {timeAgo(argument.created_at)}
+        </span>
+      </div>
+
+      <p className="mb-3 whitespace-pre-line text-sm leading-relaxed text-gray-700">
+        {argument.content}
+      </p>
+
+      <UpvoteButton
+        argumentId={argument.id}
+        initialCount={argument.upvotes}
+        initialVoted={hasVoted}
+        disabled={!currentUserId}
+      />
+    </div>
+  );
+}
+
 export default function LiveArguments({
   debateId,
-  initialArguments,
+  initialForArguments,
+  initialAgainstArguments,
   currentUserId,
   userVotedIds,
   debateStatus,
   currentRound,
 }: LiveArgumentsProps) {
-  const [args, setArgs] = useState<Argument[]>(initialArguments);
-  const [votedIds, setVotedIds] = useState<Set<string>>(
-    new Set(userVotedIds)
+  const [forArguments, setForArguments] = useState<Argument[]>(
+    initialForArguments
   );
+  const [againstArguments, setAgainstArguments] = useState<Argument[]>(
+    initialAgainstArguments
+  );
+  const [votedIds] = useState<Set<string>>(new Set(userVotedIds));
 
   useEffect(() => {
     const supabase = createClient();
@@ -72,7 +192,6 @@ export default function LiveArguments({
           filter: `debate_id=eq.${debateId}`,
         },
         async (payload) => {
-          // Fetch full argument with author profile
           const { data } = await supabase
             .from("debate_arguments")
             .select(
@@ -81,17 +200,19 @@ export default function LiveArguments({
             .eq("id", payload.new.id)
             .single();
 
-          if (data) {
-            const arg = {
-              ...data,
-              profiles: Array.isArray(data.profiles)
-                ? data.profiles[0]
-                : data.profiles,
-            };
-            setArgs((prev) => {
-              if (prev.some((a) => a.id === arg.id)) return prev;
-              return [...prev, arg];
-            });
+          if (!data) return;
+
+          const argument = {
+            ...data,
+            profiles: Array.isArray(data.profiles)
+              ? data.profiles[0]
+              : data.profiles,
+          };
+
+          if (isForArgument(argument.round_number)) {
+            setForArguments((prev) => upsertArgument(prev, argument));
+          } else {
+            setAgainstArguments((prev) => upsertArgument(prev, argument));
           }
         }
       )
@@ -104,12 +225,12 @@ export default function LiveArguments({
           filter: `debate_id=eq.${debateId}`,
         },
         (payload) => {
-          setArgs((prev) =>
-            prev.map((a) =>
-              a.id === payload.new.id
-                ? { ...a, upvotes: payload.new.upvotes }
-                : a
-            )
+          const newId = payload.new.id as string;
+          const newUpvotes = payload.new.upvotes as number;
+
+          setForArguments((prev) => updateVoteCount(prev, newId, newUpvotes));
+          setAgainstArguments((prev) =>
+            updateVoteCount(prev, newId, newUpvotes)
           );
         }
       )
@@ -120,107 +241,99 @@ export default function LiveArguments({
     };
   }, [debateId]);
 
-  // Group arguments by round
-  const rounds = args.reduce(
-    (acc, arg) => {
-      const r = arg.round_number;
-      if (!acc[r]) acc[r] = [];
-      acc[r].push(arg);
-      return acc;
-    },
-    {} as Record<number, Argument[]>
+  const sortedForArguments = sortByUpvotes(forArguments);
+  const sortedAgainstArguments = sortByUpvotes(againstArguments);
+  const latestRound = Math.max(
+    currentRound,
+    ...[...forArguments, ...againstArguments].map((argument) => argument.round_number)
   );
-
-  const roundNumbers = Object.keys(rounds)
-    .map(Number)
-    .sort((a, b) => a - b);
-
+  const forPoints = sortedForArguments.reduce(
+    (sum, argument) => sum + argument.upvotes,
+    0
+  );
+  const againstPoints = sortedAgainstArguments.reduce(
+    (sum, argument) => sum + argument.upvotes,
+    0
+  );
+  const totalPoints = forPoints + againstPoints;
+  const forWidth = totalPoints === 0 ? 50 : (forPoints / totalPoints) * 100;
+  const againstWidth =
+    totalPoints === 0 ? 50 : (againstPoints / totalPoints) * 100;
   const isClosed = debateStatus === "closed";
 
   return (
-    <div className="space-y-8">
-      {/* Arguments grouped by round */}
-      {args.length === 0 ? (
-        <div className="text-center py-10 text-gray-400">
-          <p className="text-base font-medium mb-1">No arguments yet</p>
-          <p className="text-sm">Be the first to submit an argument below.</p>
-        </div>
-      ) : (
-        roundNumbers.map((round) => (
-          <div key={round}>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              Round {round}
-            </h3>
-            <div className="space-y-4">
-              {rounds[round]
-                .sort((a, b) => b.upvotes - a.upvotes)
-                .map((arg) => {
-                  const author = arg.profiles;
-                  const hasVoted = votedIds.has(arg.id);
-                  return (
-                    <div
-                      key={arg.id}
-                      className="bg-white border border-gray-200 rounded-xl p-5"
-                    >
-                      {/* Author */}
-                      <div className="flex items-start justify-between gap-4 mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-sm font-bold flex-shrink-0">
-                            {author?.full_name?.charAt(0)?.toUpperCase() ?? "?"}
-                          </div>
-                          <div>
-                            {author ? (
-                              <Link
-                                href={`/${author.username}`}
-                                className="text-sm font-semibold text-gray-900 hover:text-emerald-brand transition-colors"
-                              >
-                                {author.full_name ?? author.username}
-                              </Link>
-                            ) : (
-                              <span className="text-sm font-semibold text-gray-900">
-                                Unknown
-                              </span>
-                            )}
-                            {author?.university && (
-                              <p className="text-xs text-gray-400">
-                                {author.university}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <span className="text-xs text-gray-400 flex-shrink-0">
-                          {timeAgo(arg.created_at)}
-                        </span>
-                      </div>
-
-                      {/* Content */}
-                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line mb-3">
-                        {arg.content}
-                      </p>
-
-                      {/* Upvote */}
-                      <UpvoteButton
-                        argumentId={arg.id}
-                        initialCount={arg.upvotes}
-                        initialVoted={hasVoted}
-                        disabled={!currentUserId}
-                      />
-                    </div>
-                  );
-                })}
-            </div>
+    <div>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div>
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-emerald-700">
+            FOR
           </div>
-        ))
-      )}
 
-      {/* Submit argument */}
-      <div className="pt-4 border-t border-gray-200">
-        <h3 className="text-base font-semibold text-gray-900 mb-4">
+          {sortedForArguments.length === 0 ? (
+            <EmptyColumn message="No FOR arguments yet." />
+          ) : (
+            sortedForArguments.map((argument) => (
+              <ArgumentCard
+                key={argument.id}
+                argument={argument}
+                hasVoted={votedIds.has(argument.id)}
+                currentUserId={currentUserId}
+              />
+            ))
+          )}
+        </div>
+
+        <div>
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-red-700">
+            AGAINST
+          </div>
+
+          {sortedAgainstArguments.length === 0 ? (
+            <EmptyColumn message="No AGAINST arguments yet." />
+          ) : (
+            sortedAgainstArguments.map((argument) => (
+              <ArgumentCard
+                key={argument.id}
+                argument={argument}
+                hasVoted={votedIds.has(argument.id)}
+                currentUserId={currentUserId}
+              />
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <div className="mb-3 flex items-center justify-between text-sm font-semibold text-gray-700">
+          <span>FOR</span>
+          <span>AGAINST</span>
+        </div>
+        <div className="flex h-3 overflow-hidden rounded-full bg-gray-100">
+          <div
+            className="bg-emerald-400 transition-all duration-300"
+            style={{ width: `${forWidth}%` }}
+          />
+          <div
+            className="bg-red-400 transition-all duration-300"
+            style={{ width: `${againstWidth}%` }}
+          />
+        </div>
+        <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
+          <span>{forPoints} pts</span>
+          <span>{againstPoints} pts</span>
+        </div>
+      </div>
+
+      <div className="mt-8 border-t border-gray-200 pt-6">
+        <h3 className="mb-4 text-base font-semibold text-gray-900">
           {isClosed ? "Debate Closed" : "Submit Your Argument"}
         </h3>
         {!currentUserId && !isClosed ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-500 text-center">
-            <Link href="/login" className="text-emerald-600 font-medium hover:underline">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+            <Link
+              href="/login"
+              className="font-medium text-emerald-600 hover:underline"
+            >
               Sign in
             </Link>{" "}
             to participate in this debate.
@@ -228,7 +341,7 @@ export default function LiveArguments({
         ) : (
           <ArgumentForm
             debateId={debateId}
-            roundNumber={currentRound}
+            roundNumber={latestRound}
             disabled={isClosed}
           />
         )}

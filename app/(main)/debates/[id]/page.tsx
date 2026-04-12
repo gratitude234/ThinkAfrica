@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import LiveArguments from "./LiveArguments";
+import DebateCountdown from "./DebateCountdown";
 
 type DebateStatus = "open" | "active" | "closed";
 
@@ -12,22 +13,18 @@ const STATUS_STYLES: Record<DebateStatus, string> = {
   closed: "bg-gray-100 text-gray-500",
 };
 
-function timeRemaining(endsAt: string | null): string | null {
-  if (!endsAt) return null;
-  const diffMs = new Date(endsAt).getTime() - Date.now();
-  if (diffMs <= 0) return "Ended";
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours >= 24) return `${Math.floor(hours / 24)}d remaining`;
-  if (hours > 0) return `${hours}h ${minutes}m remaining`;
-  return `${minutes}m remaining`;
-}
-
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+function isForArgument(roundNumber: number) {
+  // TODO: add 'side' column to debate_arguments table for proper splitting
+  return roundNumber % 2 === 1;
+}
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { id } = await params;
   const supabase = await createClient();
   const { data: debate } = await supabase
@@ -36,11 +33,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     .eq("id", id)
     .single();
 
-  if (!debate) return { title: "Debate not found — ThinkAfrica" };
+  if (!debate) return { title: "Debate not found - ThinkAfrica" };
 
   return {
-    title: `${debate.title} — ThinkAfrica Debates`,
-    description: (debate as { description?: string | null }).description ?? `Join this debate on ThinkAfrica`,
+    title: `${debate.title} - ThinkAfrica Debates`,
+    description:
+      (debate as { description?: string | null }).description ??
+      "Join this debate on ThinkAfrica",
     openGraph: {
       title: debate.title,
       description: (debate as { description?: string | null }).description ?? "",
@@ -57,7 +56,6 @@ export default async function DebatePage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch debate
   const { data: debate } = await supabase
     .from("debates")
     .select(
@@ -68,7 +66,6 @@ export default async function DebatePage({ params }: PageProps) {
 
   if (!debate) notFound();
 
-  // Fetch all arguments with author profiles
   const { data: rawArgs } = await supabase
     .from("debate_arguments")
     .select(
@@ -77,98 +74,118 @@ export default async function DebatePage({ params }: PageProps) {
     .eq("debate_id", id)
     .order("created_at", { ascending: true });
 
-  const args = (rawArgs ?? []).map((a) => ({
-    ...a,
-    profiles: Array.isArray(a.profiles) ? a.profiles[0] : a.profiles,
+  const argumentsWithProfiles = (rawArgs ?? []).map((argument) => ({
+    ...argument,
+    profiles: Array.isArray(argument.profiles)
+      ? argument.profiles[0]
+      : argument.profiles,
   }));
 
-  // Fetch current user's votes on these arguments
   let userVotedIds: string[] = [];
-  if (user && args.length > 0) {
-    const argIds = args.map((a) => a.id);
+  if (user && argumentsWithProfiles.length > 0) {
+    const argumentIds = argumentsWithProfiles.map((argument) => argument.id);
     const { data: votes } = await supabase
       .from("debate_votes")
       .select("argument_id")
       .eq("user_id", user.id)
-      .in("argument_id", argIds);
-    userVotedIds = (votes ?? []).map((v) => v.argument_id);
+      .in("argument_id", argumentIds);
+    userVotedIds = (votes ?? []).map((vote) => vote.argument_id);
   }
 
   const status = debate.status as DebateStatus;
-  const remaining = timeRemaining(debate.ends_at);
   const moderator = Array.isArray(debate.profiles)
     ? debate.profiles[0]
     : debate.profiles;
-
-  // Determine current round (max round in args, or 1)
   const currentRound =
-    args.length > 0 ? Math.max(...args.map((a) => a.round_number)) : 1;
+    argumentsWithProfiles.length > 0
+      ? Math.max(...argumentsWithProfiles.map((argument) => argument.round_number))
+      : 1;
+  const forArguments = argumentsWithProfiles.filter((argument) =>
+    isForArgument(argument.round_number)
+  );
+  const againstArguments = argumentsWithProfiles.filter(
+    (argument) => !isForArgument(argument.round_number)
+  );
+  const argumentCount = argumentsWithProfiles.length;
 
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <div className="flex items-start gap-3 mb-4">
-          <span
-            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize flex-shrink-0 ${STATUS_STYLES[status]}`}
-          >
-            {status}
-          </span>
-          {remaining && status === "active" && (
-            <span className="text-xs text-amber-600 font-medium mt-0.5">
-              ⏱ {remaining}
-            </span>
-          )}
-        </div>
-
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
-          {debate.title}
-        </h1>
-
-        {debate.description && (
-          <p className="text-gray-600 text-sm leading-relaxed mb-4">
-            {debate.description}
-          </p>
-        )}
-
-        {debate.tags && debate.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {debate.tags.map((tag: string) => (
-              <span
-                key={tag}
-                className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full"
-              >
-                {tag}
-              </span>
-            ))}
+    <div>
+      <div className="sticky top-16 z-40 -mx-4 border-b border-gray-200 bg-white px-6 py-4 sm:-mx-6 lg:-mx-8">
+        <div className="mx-auto flex max-w-5xl flex-col gap-3 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center">
+          <div className="min-w-0">
+            <h1 className="line-clamp-1 text-xl font-bold text-gray-900">
+              {debate.title}
+            </h1>
           </div>
-        )}
 
-        <div className="flex items-center gap-4 text-xs text-gray-400 pt-4 border-t border-gray-100">
-          <span>Started {formatDate(debate.created_at)}</span>
-          {debate.round_duration_minutes && (
-            <span>{debate.round_duration_minutes} min rounds</span>
-          )}
-          {moderator && (
-            <span>
-              Moderated by{" "}
-              <span className="text-gray-600 font-medium">
-                {moderator.full_name ?? moderator.username}
-              </span>
+          <div className="flex items-center justify-start gap-3 md:justify-center">
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_STYLES[status]}`}
+            >
+              {status}
             </span>
-          )}
+            <span className="text-sm text-gray-500">
+              {argumentCount} {argumentCount === 1 ? "argument" : "arguments"}
+            </span>
+          </div>
+
+          <div className="flex justify-start md:justify-end">
+            {debate.ends_at && status !== "closed" ? (
+              <DebateCountdown endsAt={debate.ends_at} />
+            ) : null}
+          </div>
         </div>
       </div>
 
-      {/* Arguments (live) */}
-      <LiveArguments
-        debateId={id}
-        initialArguments={args}
-        currentUserId={user?.id ?? null}
-        userVotedIds={userVotedIds}
-        debateStatus={status}
-        currentRound={currentRound}
-      />
+      <div className="mx-auto max-w-5xl py-8">
+        {(debate.description || (debate.tags && debate.tags.length > 0) || moderator) && (
+          <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5">
+            {debate.description ? (
+              <p className="text-sm leading-relaxed text-gray-600">
+                {debate.description}
+              </p>
+            ) : null}
+
+            {debate.tags && debate.tags.length > 0 ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {debate.tags.map((tag: string) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4 text-xs text-gray-400">
+              <span>Started {formatDate(debate.created_at)}</span>
+              {debate.round_duration_minutes ? (
+                <span>{debate.round_duration_minutes} min rounds</span>
+              ) : null}
+              {moderator ? (
+                <span>
+                  Moderated by{" "}
+                  <span className="font-medium text-gray-600">
+                    {moderator.full_name ?? moderator.username}
+                  </span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        <LiveArguments
+          debateId={id}
+          initialForArguments={forArguments}
+          initialAgainstArguments={againstArguments}
+          currentUserId={user?.id ?? null}
+          userVotedIds={userVotedIds}
+          debateStatus={status}
+          currentRound={currentRound}
+        />
+      </div>
     </div>
   );
 }

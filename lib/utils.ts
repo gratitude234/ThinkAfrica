@@ -20,6 +20,13 @@ export const POST_TYPE_LABELS: Record<string, string> = {
   policy_brief: "Policy Brief",
 };
 
+export const POST_POINTS: Record<string, number> = {
+  blog: 10,
+  essay: 20,
+  research: 50,
+  policy_brief: 30,
+};
+
 export const MIN_WORD_COUNTS: Record<string, number> = {
   blog: 200,
   essay: 800,

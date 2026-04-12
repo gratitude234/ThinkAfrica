@@ -16,29 +16,31 @@ export default async function MainLayout({
   } = await supabase.auth.getSession();
   const user = session?.user ?? null;
 
-  let profile = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("username, full_name")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  }
+  const { data: profileData } = user
+    ? await supabase
+        .from("profiles")
+        .select("points, username, full_name")
+        .eq("id", user.id)
+        .single()
+    : { data: null };
 
   const isAdmin = !!user && user.email === process.env.ADMIN_EMAIL;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavClient user={user} profile={profile} isAdmin={isAdmin} />
+      <NavClient
+        user={user}
+        profile={profileData}
+        isAdmin={isAdmin}
+      />
 
       {/* Page content — extra bottom padding on mobile for BottomNav */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20 lg:pb-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
         {children}
       </main>
 
       <BottomNav
-        username={profile?.username ?? null}
+        username={profileData?.username ?? null}
         userId={user?.id ?? null}
       />
     </div>

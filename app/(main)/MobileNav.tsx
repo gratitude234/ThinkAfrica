@@ -6,7 +6,7 @@ import type { User } from "@supabase/supabase-js";
 
 interface MobileNavProps {
   user: User | null;
-  profile: { username: string; full_name: string } | null;
+  profile: { username: string; full_name: string | null; points?: number } | null;
   isAdmin?: boolean;
 }
 

@@ -92,7 +92,7 @@ export default async function DashboardPage() {
         followerCount={followerCount ?? 0}
       />
 
-      <PostsTable posts={posts} />
+      <PostsTable posts={posts} userId={user.id} />
 
       {applications.length > 0 && (
         <div className="mt-10">

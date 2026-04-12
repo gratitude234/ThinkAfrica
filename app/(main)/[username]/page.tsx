@@ -83,7 +83,7 @@ export default async function UserProfilePage({
     supabase
       .from("posts")
       .select(
-        "id, title, slug, excerpt, type, tags, created_at, published_at, profiles!posts_author_id_fkey (username, full_name, university, avatar_url)"
+        "id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)"
       )
       .eq("author_id", profile.id)
       .eq("status", "published")

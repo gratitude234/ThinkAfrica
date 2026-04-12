@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate } from "@/lib/utils";
+import { formatDate, POST_POINTS } from "@/lib/utils";
 import DigestSendButton from "./DigestSendButton";
 
 export default async function AdminDigestPage() {
@@ -65,7 +65,6 @@ export default async function AdminDigestPage() {
     .sort((a, b) => b.argCount - a.argCount)[0] ?? null;
 
   // Top contributor this week
-  const POST_POINTS: Record<string, number> = { blog: 10, essay: 20, research: 50, policy_brief: 30 };
   const contribMap: Record<string, { full_name: string; username: string; pts: number }> = {};
   for (const p of weeklyPostsForContrib ?? []) {
     const profile = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
