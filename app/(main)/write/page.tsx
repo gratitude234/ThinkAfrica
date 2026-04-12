@@ -11,11 +11,10 @@ import { useDraftManager } from "./DraftManager";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import MyDrafts from "./MyDrafts";
 
-// Load editor client-side only (no SSR)
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
   loading: () => (
-    <div className="border border-gray-200 rounded-lg min-h-[400px] bg-gray-50 animate-pulse" />
+    <div className="min-h-[400px] rounded-lg border border-gray-200 bg-gray-50 animate-pulse" />
   ),
 });
 
@@ -36,10 +35,7 @@ export default function WritePage() {
   const [wordCount, setWordCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
 
-  // Pre-populate from loaded draft
   useEffect(() => {
     if (initialData) {
       setPostType((initialData.postType as PostType) ?? "blog");
@@ -77,10 +73,12 @@ export default function WritePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!title.trim()) {
       setError("Please enter a title.");
       return;
     }
+
     if (!meetsWordCount) {
       setError(
         `${POST_TYPE_LABELS[postType]} posts require at least ${minWords.toLocaleString()} words. Current: ${wordCount.toLocaleString()}`
@@ -97,19 +95,20 @@ export default function WritePage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
+      setLoading(false);
       router.push("/login");
       return;
     }
 
     const tags = tagsInput
       .split(",")
-      .map((t) => t.trim().toLowerCase())
+      .map((tag) => tag.trim().toLowerCase())
       .filter(Boolean);
 
     const now = new Date().toISOString();
+    let publishedPostSlug = "";
 
     if (draftId) {
-      // Publish existing draft immediately
       const { data: updated, error: updateError } = await supabase
         .from("posts")
         .update({
@@ -127,12 +126,13 @@ export default function WritePage() {
         .select("slug")
         .single();
 
-      if (updateError) {
-        setError(updateError.message);
+      if (updateError || !updated) {
+        setError(updateError?.message ?? "Failed to publish.");
         setLoading(false);
         return;
       }
-      setPublishedSlug(updated.slug);
+
+      publishedPostSlug = updated.slug;
     } else {
       const { data: profile } = await supabase
         .from("profiles")
@@ -171,95 +171,56 @@ export default function WritePage() {
         setLoading(false);
         return;
       }
-      setPublishedSlug(inserted.slug);
+
+      publishedPostSlug = inserted.slug;
     }
 
-    setSuccess(true);
-    setLoading(false);
+    router.push(
+      `/submitted?slug=${encodeURIComponent(
+        publishedPostSlug
+      )}&type=${encodeURIComponent(postType)}`
+    );
   };
 
   if (loadingDraft) {
     return (
-      <div className="max-w-3xl mx-auto py-12 text-center text-gray-400">
-        Loading draft…
-      </div>
-    );
-  }
-
-  if (success) {
-    return (
-      <div className="max-w-3xl mx-auto text-center py-20">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-3xl mx-auto mb-4">
-          ✓
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Your post is live!
-        </h2>
-        <p className="text-gray-500 mb-6">
-          Your post has been published and is now visible to the community.
-        </p>
-        <div className="flex items-center justify-center gap-3">
-          {publishedSlug && (
-            <Button onClick={() => router.push(`/post/${publishedSlug}`)}>
-              View post
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => router.push("/")}>
-            Back to home
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setSuccess(false);
-              setPublishedSlug(null);
-              setTitle("");
-              setExcerpt("");
-              setTagsInput("");
-              setContent("");
-              setCoverImageUrl("");
-              setWordCount(0);
-            }}
-          >
-            Write another
-          </Button>
-        </div>
+      <div className="mx-auto max-w-3xl py-12 text-center text-gray-400">
+        Loading draft...
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="mx-auto max-w-3xl">
       <MyDrafts activeDraftId={draftId} />
 
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Write a post</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="mt-1 text-sm text-gray-500">
             Share your ideas with Africa&apos;s intellectual community.
           </p>
         </div>
-        {/* Save status indicator */}
         <div className="flex-shrink-0">
-          {saveStatus === "saving" && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-              Saving…
+          {saveStatus === "saving" ? (
+            <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">
+              Saving...
             </span>
-          )}
-          {saveStatus === "saved" && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-              Saved ✓
+          ) : null}
+          {saveStatus === "saved" ? (
+            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+              Saved
             </span>
-          )}
-          {saveStatus === "error" && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-600">
+          ) : null}
+          {saveStatus === "error" ? (
+            <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-600">
               Save failed
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Cover image */}
         <CoverImageUploader
           initialUrl={coverImageUrl}
           onUpload={(url) => {
@@ -272,9 +233,8 @@ export default function WritePage() {
           }}
         />
 
-        {/* Post type selector */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="mb-2 block text-sm font-medium text-gray-700">
             Post type
           </label>
           <div className="flex flex-wrap gap-2">
@@ -286,15 +246,15 @@ export default function WritePage() {
                   setPostType(type);
                   saveDraft(getCurrentData({ postType: type }));
                 }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border text-left ${
+                className={`rounded-lg border px-4 py-2 text-left text-sm font-medium transition-colors ${
                   postType === type
-                    ? "bg-emerald-brand text-white border-emerald-brand"
-                    : "bg-white border-gray-200 text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
+                    ? "border-emerald-brand bg-emerald-brand text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
                 }`}
               >
                 <span className="block">{POST_TYPE_LABELS[type]}</span>
                 <span
-                  className={`block text-xs font-normal mt-0.5 ${
+                  className={`mt-0.5 block text-xs font-normal ${
                     postType === type ? "text-emerald-100" : "text-gray-400"
                   }`}
                 >
@@ -305,9 +265,8 @@ export default function WritePage() {
           </div>
         </div>
 
-        {/* Title */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Title
           </label>
           <input
@@ -319,16 +278,15 @@ export default function WritePage() {
             }}
             placeholder="Enter your title..."
             required
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-base font-medium focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-base font-medium focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
           />
         </div>
 
-        {/* Excerpt / Summary */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Summary
           </label>
-          <p className="text-xs text-gray-400 mb-1.5">
+          <p className="mb-1.5 text-xs text-gray-400">
             This appears in the feed preview. Keep it under 200 characters.
           </p>
           <div className="relative">
@@ -341,7 +299,7 @@ export default function WritePage() {
               maxLength={200}
               rows={2}
               placeholder="Write a short summary of your post..."
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
+              className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
             />
             <span className="absolute bottom-2 right-2 text-xs text-gray-400">
               {excerpt.length}/200
@@ -349,11 +307,9 @@ export default function WritePage() {
           </div>
         </div>
 
-        {/* Tags */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tags{" "}
-            <span className="text-gray-400 font-normal">(comma separated)</span>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Tags <span className="font-normal text-gray-400">(comma separated)</span>
           </label>
           <input
             type="text"
@@ -363,49 +319,68 @@ export default function WritePage() {
               saveDraft(getCurrentData({ tagsInput: e.target.value }));
             }}
             placeholder="e.g. economics, governance, africa"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
           />
         </div>
 
-        {/* Editor */}
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">
-              Content
-            </label>
-            <div
-              className={`text-xs font-medium ${meetsWordCount ? "text-emerald-brand" : "text-gray-400"}`}
-            >
-              {wordCount.toLocaleString()} /{" "}
-              {minWords.toLocaleString()} words min
-            </div>
-          </div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Content
+          </label>
           <Editor
             key={initialData ? "loaded" : "empty"}
             content={content}
             placeholder={`Start writing your ${POST_TYPE_LABELS[postType].toLowerCase()}...`}
             onUpdate={handleEditorUpdate}
           />
-          {!meetsWordCount && wordCount > 0 && (
-            <p className="text-xs text-amber-600 mt-1">
-              {minWords - wordCount} more words needed for a{" "}
-              {POST_TYPE_LABELS[postType].toLowerCase()}.
-            </p>
-          )}
         </div>
 
-        {error && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        {error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
             {error}
           </div>
-        )}
+        ) : null}
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-600">
+              {wordCount.toLocaleString()} / {minWords.toLocaleString()} words
+            </span>
+            {meetsWordCount ? (
+              <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Ready to submit
+              </span>
+            ) : (
+              <span className="text-xs text-gray-400">
+                {(minWords - wordCount).toLocaleString()} more to go
+              </span>
+            )}
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              className={`h-2 rounded-full transition-all duration-300 ${
+                meetsWordCount
+                  ? "bg-emerald-500"
+                  : wordCount > minWords * 0.6
+                    ? "bg-amber-400"
+                    : "bg-gray-400"
+              }`}
+              style={{
+                width: `${Math.min(100, Math.round((wordCount / minWords) * 100))}%`,
+              }}
+            />
+          </div>
+        </div>
 
         <div className="flex items-center justify-end gap-3 pt-2">
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={() => router.push("/")}
-          >
+          <Button variant="secondary" type="button" onClick={() => router.push("/")}>
             Cancel
           </Button>
           <Button

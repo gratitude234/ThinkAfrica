@@ -13,6 +13,7 @@ import ViewTracker from "./ViewTracker";
 import ReadingProgressBar from "./ReadingProgressBar";
 import ShareButtons from "./ShareButtons";
 import AuthorBioCard from "./AuthorBioCard";
+import TableOfContents from "./TableOfContents";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -329,29 +330,9 @@ export default async function PostPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Table of contents sidebar */}
-          {headings.length > 0 && (
-            <aside className="hidden lg:block lg:col-span-1">
-              <div className="sticky top-24">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  Contents
-                </h3>
-                <nav className="space-y-1">
-                  {headings.map((h) => (
-                    <a
-                      key={h.id}
-                      href={`#${h.id}`}
-                      className={`block text-sm text-gray-500 hover:text-emerald-brand transition-colors leading-snug ${
-                        h.level === 3 ? "pl-3" : ""
-                      }`}
-                    >
-                      {h.text}
-                    </a>
-                  ))}
-                </nav>
-              </div>
-            </aside>
-          )}
+          <aside className="hidden lg:block lg:col-span-1">
+            <TableOfContents headings={headings} />
+          </aside>
         </div>
       </div>
     </div>

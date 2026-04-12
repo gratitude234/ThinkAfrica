@@ -87,8 +87,6 @@ export default function OnboardingPage() {
         full_name: form.full_name,
         username: form.username,
         university: form.university,
-        field_of_study: form.field_of_study,
-        bio: form.bio,
       })
       .eq("id", userId);
     setLoading(false);
@@ -127,95 +125,62 @@ export default function OnboardingPage() {
 
   return (
     <div className="max-w-xl mx-auto py-8">
-      {/* Progress indicator */}
-      <div className="flex items-center justify-center gap-2 mb-8">
-        {STEPS.map((label, i) => {
-          const num = i + 1;
-          const isDone = step > num;
-          const isCurrent = step === num;
-          return (
-            <div key={label} className="flex items-center gap-2">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                  isDone
-                    ? "bg-emerald-brand text-white"
-                    : isCurrent
-                    ? "bg-emerald-brand text-white"
-                    : "bg-gray-200 text-gray-500"
-                }`}
-              >
-                {isDone ? (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                ) : (
-                  num
-                )}
-              </div>
-              <span className={`text-sm ${isCurrent ? "text-gray-900 font-medium" : "text-gray-400"}`}>
-                {label}
-              </span>
-              {i < STEPS.length - 1 && (
-                <div className={`w-8 h-0.5 ${step > num ? "bg-emerald-brand" : "bg-gray-200"}`} />
-              )}
-            </div>
-          );
-        })}
+      <div className="w-full bg-gray-100 rounded-full h-1.5 mb-8">
+        <div
+          className="bg-emerald-brand h-1.5 rounded-full transition-all duration-500"
+          style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }}
+        />
       </div>
+      <p className="text-xs text-gray-400 text-right mb-6">
+        Step {step} of {STEPS.length}
+      </p>
 
       {/* Step 1 */}
       {step === 1 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h1 className="text-xl font-bold text-gray-900 mb-1">Complete your profile</h1>
-          <p className="text-gray-500 text-sm mb-5">Help the community know who you are.</p>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">
+            Let&apos;s set up your profile
+          </h1>
+          <p className="text-sm text-gray-400 mb-6">
+            Just the basics - you can add more later in Settings.
+          </p>
           <form onSubmit={handleStep1} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
-                <input
-                  required
-                  type="text"
-                  value={form.full_name}
-                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Username <span className="text-red-500">*</span></label>
-                <input
-                  required
-                  type="text"
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/\s/g, "") })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
-                />
-              </div>
-            </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">University</label>
-              <UniversitySelect
-                value={form.university}
-                onChange={(v) => setForm({ ...form, university: v })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Field of Study</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Your name <span className="text-red-500">*</span>
+              </label>
               <input
+                required
                 type="text"
-                value={form.field_of_study}
-                onChange={(e) => setForm({ ...form, field_of_study: e.target.value })}
-                placeholder="e.g. Political Science"
+                value={form.full_name}
+                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-              <textarea
-                rows={3}
-                value={form.bio}
-                onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                placeholder="Tell us about yourself..."
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Username <span className="text-red-500">*</span>
+              </label>
+              <input
+                required
+                type="text"
+                value={form.username}
+                onChange={(e) =>
+                  setForm({ ...form, username: e.target.value.toLowerCase().replace(/\s/g, "") })
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                This becomes your public @handle and must be unique.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Your university
+              </label>
+              <UniversitySelect
+                value={form.university}
+                onChange={(v) => setForm({ ...form, university: v })}
               />
             </div>
             <div className="flex justify-end">

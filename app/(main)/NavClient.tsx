@@ -25,7 +25,7 @@ const NAV_PILLARS = [
       { label: "Webinars", href: "/webinars" },
       { label: "Leaderboard", href: "/leaderboard" },
       { label: "People", href: "/talent" },
-      { label: "Topics", href: "/topics/general" },
+      { label: "Topics", href: "/topics" },
     ],
     activePrefixes: ["/", "/debates", "/webinars", "/leaderboard", "/talent", "/topics"],
   },

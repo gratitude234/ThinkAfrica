@@ -172,7 +172,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Mobile sidebar strip */}
-      <div className="lg:col-span-3">
+      <div className="hidden md:block lg:col-span-3">
         <MobileSidebarStrip
           trendingPosts={(trendingPosts ?? []).map((p) => ({
             id: p.id,
