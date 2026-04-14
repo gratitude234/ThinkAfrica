@@ -18,6 +18,14 @@ export default async function SettingsPage() {
 
   if (!profile) redirect("/login");
 
+  const missingFields: string[] = [];
+  if (!profile.bio) missingFields.push("bio");
+  if (!profile.field_of_study) missingFields.push("field of study");
+  if (!profile.avatar_url) missingFields.push("profile photo");
+  if (!((profile.interests as string[] | null)?.length ?? 0)) {
+    missingFields.push("interests");
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-8">
@@ -26,6 +34,16 @@ export default async function SettingsPage() {
           Update your profile information and preferences.
         </p>
       </div>
+
+      {missingFields.length > 0 && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <span className="flex-shrink-0 text-lg text-amber-500">💡</span>
+          <p className="text-sm text-amber-800">
+            Complete your profile to rank higher and attract fellowship opportunities.{" "}
+            <span className="font-medium">Missing: {missingFields.join(", ")}.</span>
+          </p>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <ProfileForm

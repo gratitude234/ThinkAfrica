@@ -6,7 +6,7 @@ import ProfileCard from "@/components/profile/ProfileCard";
 import PostCard from "@/components/post/PostCard";
 import type { PostCardData } from "@/components/post/PostCard";
 import FollowButton from "./FollowButton";
-import { formatDate } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 import OpportunitiesTab from "./OpportunitiesTab";
 
 interface PageProps {
@@ -415,7 +415,7 @@ export default async function UserProfilePage({
                             {debate.status}
                           </span>
                           <span className="text-xs text-gray-400">
-                            {formatDate(d.created_at)}
+                            {formatRelativeTime(d.created_at)}
                           </span>
                         </div>
                       </div>
@@ -448,7 +448,7 @@ export default async function UserProfilePage({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-700">{item.description}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {formatDate(item.created_at)}
+                        {formatRelativeTime(item.created_at)}
                       </p>
                     </div>
                   </Link>

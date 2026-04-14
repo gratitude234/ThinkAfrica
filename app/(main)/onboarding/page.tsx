@@ -29,6 +29,8 @@ export default function OnboardingPage() {
   const [suggestions, setSuggestions] = useState<
     Array<{ id: string; username: string; full_name: string | null; university: string | null }>
   >([]);
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
+  const [followingId, setFollowingId] = useState<string | null>(null);
 
   // Fetch people to follow when reaching step 3
   useEffect(() => {
@@ -121,6 +123,18 @@ export default function OnboardingPage() {
     setInterests((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
+  };
+
+  const handleFollow = async (targetId: string) => {
+    if (!userId || followedIds.has(targetId)) return;
+    setFollowingId(targetId);
+    const supabase = createClient();
+    await supabase.from("follows").insert({
+      follower_id: userId,
+      following_id: targetId,
+    });
+    setFollowedIds((prev) => new Set([...Array.from(prev), targetId]));
+    setFollowingId(null);
   };
 
   return (
@@ -300,12 +314,20 @@ export default function OnboardingPage() {
                         <p className="text-xs text-gray-400 truncate">{person.university}</p>
                       )}
                     </div>
-                    <a
-                      href={`/${person.username}`}
-                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-brand text-white hover:bg-emerald-600 transition-colors flex-shrink-0"
-                    >
-                      View
-                    </a>
+                    {followedIds.has(person.id) ? (
+                      <span className="flex-shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+                        Following ✓
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleFollow(person.id)}
+                        disabled={followingId === person.id}
+                        className="flex-shrink-0 rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-60"
+                      >
+                        {followingId === person.id ? "…" : "Follow"}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

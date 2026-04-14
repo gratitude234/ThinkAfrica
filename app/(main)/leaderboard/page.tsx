@@ -10,6 +10,16 @@ interface PageProps {
   searchParams: Promise<{ tab?: string }>;
 }
 
+interface LeaderboardProfile {
+  id: string;
+  username: string;
+  full_name: string | null;
+  university: string | null;
+  avatar_url: string | null;
+  points: number;
+  weekly_points?: number;
+}
+
 export default async function LeaderboardPage({ searchParams }: PageProps) {
   const { tab = "alltime" } = await searchParams;
   const supabase = await createClient();
@@ -27,20 +37,10 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
     .single();
   const sponsor = sponsorRaw ?? null;
 
-  let profiles: {
-    id: string;
-    username: string;
-    full_name: string | null;
-    university: string | null;
-    avatar_url: string | null;
-    points: number;
-    weekly_points?: number;
-  }[] = [];
+  let profiles: LeaderboardProfile[] = [];
 
   if (tab === "weekly") {
-    const weekAgo = new Date(
-      Date.now() - 7 * 24 * 60 * 60 * 1000
-    ).toISOString();
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: weeklyPosts } = await supabase
       .from("posts")
@@ -50,25 +50,21 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
       .eq("status", "published")
       .gte("published_at", weekAgo);
 
-    const userMap: Record<
-      string,
-      (typeof profiles)[number] & { weekly_points: number }
-    > = {};
+    const userMap: Record<string, LeaderboardProfile & { weekly_points: number }> = {};
 
     for (const post of weeklyPosts ?? []) {
-      const profile = Array.isArray(post.profiles)
-        ? post.profiles[0]
-        : post.profiles;
+      const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
       if (!profile) continue;
-      const pts = POST_POINTS[post.type] ?? 10;
+
+      const points = POST_POINTS[post.type] ?? 10;
       if (!userMap[profile.id]) {
         userMap[profile.id] = { ...profile, weekly_points: 0 };
       }
-      userMap[profile.id].weekly_points += pts;
+      userMap[profile.id].weekly_points += points;
     }
 
     profiles = Object.values(userMap)
-      .sort((a, b) => b.weekly_points - a.weekly_points)
+      .sort((a, b) => (b.weekly_points ?? 0) - (a.weekly_points ?? 0))
       .slice(0, 20);
   } else {
     const { data } = await supabase
@@ -76,30 +72,30 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
       .select("id, username, full_name, university, avatar_url, points")
       .order("points", { ascending: false })
       .limit(20);
+
     profiles = data ?? [];
   }
 
-  // Fetch badge counts for displayed profiles
-  const profileIds = profiles.map((p) => p.id);
+  const profileIds = profiles.map((profile) => profile.id);
   let badgeCounts: Record<string, number> = {};
   if (profileIds.length > 0) {
     const { data: userBadges } = await supabase
       .from("user_badges")
       .select("user_id")
       .in("user_id", profileIds);
+
     badgeCounts = (userBadges ?? []).reduce(
-      (acc, ub) => {
-        acc[ub.user_id] = (acc[ub.user_id] ?? 0) + 1;
+      (acc, badge) => {
+        acc[badge.user_id] = (acc[badge.user_id] ?? 0) + 1;
         return acc;
       },
       {} as Record<string, number>
     );
   }
 
-  // TASK 7: "You Are Here" row — only for alltime tab
-  const isUserInTop20 = user ? profiles.some((p) => p.id === user.id) : false;
+  const isUserInTop20 = user ? profiles.some((profile) => profile.id === user.id) : false;
   let currentUserRow: {
-    profile: { id: string; username: string; full_name: string | null; university: string | null; avatar_url: string | null; points: number };
+    profile: LeaderboardProfile;
     rank: number;
   } | null = null;
 
@@ -133,113 +129,112 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
   return (
     <div className="max-w-2xl mx-auto">
       <SponsorBanner placement={sponsor} />
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Leaderboard</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Top contributors on ThinkAfrica
-        </p>
+        <p className="mt-1 text-sm text-gray-500">Top contributors on ThinkAfrica</p>
       </div>
 
-      {/* Tabs — TASK 10: weekly active tab uses gold/amber */}
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-        {tabs.map((t) => {
-          const active = tab === t.value;
+      <div className="mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
+        {tabs.map((item) => {
+          const active = tab === item.value;
+
           return (
             <Link
-              key={t.value}
-              href={`/leaderboard?tab=${t.value}`}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              key={item.value}
+              href={`/leaderboard?tab=${item.value}`}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
                 active
-                  ? t.value === "weekly"
+                  ? item.value === "weekly"
                     ? "bg-amber-500 text-white shadow-sm"
                     : "bg-white text-gray-900 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              {t.label}
+              {item.label}
             </Link>
           );
         })}
       </div>
 
-      {/* Rankings */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         {profiles.length === 0 ? (
-          <div className="py-12 text-center text-gray-400 text-sm">
-            {tab === "weekly"
-              ? "No activity this week yet."
-              : "No contributors yet."}
+          <div className="py-12 text-center text-sm text-gray-400">
+            {tab === "weekly" ? "No activity this week yet." : "No contributors yet."}
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {profiles.map((profile, i) => {
-              const rank = i + 1;
-              const isCurrentUser = user?.id === profile.id;
+          <div className="divide-y divide-gray-100 p-2">
+            {profiles.map((profile, index) => {
+              const rank = index + 1;
+              const isCurrentUser = profile.id === user?.id;
               const displayPoints =
-                tab === "weekly"
-                  ? (profile.weekly_points ?? 0)
-                  : profile.points;
+                tab === "weekly" ? profile.weekly_points ?? 0 : profile.points;
 
               return (
                 <div
                   key={profile.id}
-                  className={`flex items-center gap-4 px-6 py-4 transition-colors ${
-                    isCurrentUser ? "bg-emerald-50" : "hover:bg-gray-50"
+                  className={`flex items-center gap-4 rounded-xl px-4 py-3 transition-colors ${
+                    isCurrentUser
+                      ? "border border-emerald-200 bg-emerald-50"
+                      : "hover:bg-gray-50"
                   }`}
                 >
-                  {/* Rank */}
                   <div
-                    className={`w-8 text-center font-bold text-lg flex-shrink-0 ${
+                    className={`w-8 flex-shrink-0 text-center text-lg font-bold ${
                       rank <= 3 ? RANK_COLORS[rank - 1] : "text-gray-300"
                     }`}
                   >
                     {rank <= 3 ? (
-                      <span>
-                        {rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉"}
-                      </span>
+                      <span>{rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉"}</span>
                     ) : (
                       <span className="text-sm text-gray-400">{rank}</span>
                     )}
                   </div>
 
-                  {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold flex-shrink-0">
-                    {profile.full_name?.charAt(0)?.toUpperCase() ??
-                      profile.username?.charAt(0)?.toUpperCase() ??
-                      "?"}
-                  </div>
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.full_name ?? profile.username}
+                      className={`h-10 w-10 flex-shrink-0 rounded-full object-cover ${
+                        isCurrentUser ? "border-2 border-emerald-300" : ""
+                      }`}
+                    />
+                  ) : (
+                    <div
+                      className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700 ${
+                        isCurrentUser ? "border-2 border-emerald-300" : ""
+                      }`}
+                    >
+                      {(profile.full_name ?? profile.username ?? "?")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
+                  )}
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <Link
                       href={`/${profile.username}`}
-                      className="text-sm font-semibold text-gray-900 hover:text-emerald-brand transition-colors"
+                      className="text-sm font-semibold text-gray-900 transition-colors hover:text-emerald-brand"
                     >
                       {profile.full_name ?? profile.username}
-                      {isCurrentUser && (
+                      {isCurrentUser ? (
                         <span className="ml-2 text-xs font-normal text-emerald-600">
                           (you)
                         </span>
-                      )}
+                      ) : null}
                     </Link>
-                    {profile.university && (
-                      <p className="text-xs text-gray-400 truncate">
-                        {profile.university}
-                      </p>
-                    )}
+                    {profile.university ? (
+                      <p className="truncate text-xs text-gray-400">{profile.university}</p>
+                    ) : null}
                   </div>
 
-                  {/* Badges */}
-                  <div className="text-xs text-gray-400 text-center flex-shrink-0">
-                    <p className="font-medium text-gray-600">
-                      {badgeCounts[profile.id] ?? 0}
-                    </p>
+                  <div className="flex-shrink-0 text-center text-xs text-gray-400">
+                    <p className="font-medium text-gray-600">{badgeCounts[profile.id] ?? 0}</p>
                     <p>badges</p>
                   </div>
 
-                  {/* Points */}
-                  <div className="text-right flex-shrink-0">
-                    <div className="flex items-center gap-1.5 justify-end">
+                  <div className="flex-shrink-0 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
                       <PointsTierBadge points={displayPoints} />
                       <p className="text-base font-bold text-emerald-brand">
                         {displayPoints.toLocaleString()}
@@ -253,46 +248,47 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
               );
             })}
 
-            {/* TASK 7: "You Are Here" row */}
-            {currentUserRow && (
-              <>
-                <div className="border-t-2 border-dashed border-gray-200 my-1" />
-                <div className="flex items-center gap-4 px-6 py-4 bg-emerald-50">
-                  <div className="w-8 text-center flex-shrink-0">
-                    <span className="text-sm text-gray-400">
-                      {currentUserRow.rank}
-                    </span>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold flex-shrink-0">
-                    {currentUserRow.profile.full_name?.charAt(0)?.toUpperCase() ??
-                      currentUserRow.profile.username?.charAt(0)?.toUpperCase() ??
-                      "?"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">
-                      You — #{currentUserRow.rank}
+            {currentUserRow ? (
+              <div className="mt-4 border-t-2 border-dashed border-gray-200 pt-4">
+                <p className="mb-2 px-4 text-xs text-gray-400">Your ranking</p>
+                <div className="flex items-center gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <span className="w-8 text-center text-sm font-bold text-gray-400">
+                    #{currentUserRow.rank}
+                  </span>
+                  {currentUserRow.profile.avatar_url ? (
+                    <img
+                      src={currentUserRow.profile.avatar_url}
+                      alt={currentUserRow.profile.full_name ?? currentUserRow.profile.username}
+                      className="h-9 w-9 rounded-full border-2 border-emerald-300 object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-300 bg-emerald-100 text-sm font-bold text-emerald-700">
+                      {(currentUserRow.profile.full_name ??
+                        currentUserRow.profile.username)
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-gray-900">
+                      {currentUserRow.profile.full_name ??
+                        currentUserRow.profile.username}{" "}
+                      <span className="text-xs font-normal text-emerald-600">
+                        (you)
+                      </span>
                     </p>
-                    {currentUserRow.profile.university && (
-                      <p className="text-xs text-gray-400 truncate">
+                    {currentUserRow.profile.university ? (
+                      <p className="truncate text-xs text-gray-400">
                         {currentUserRow.profile.university}
                       </p>
-                    )}
+                    ) : null}
                   </div>
-                  <div className="text-xs text-gray-400 text-center flex-shrink-0">
-                    <p className="font-medium text-gray-600">
-                      {badgeCounts[currentUserRow.profile.id] ?? 0}
-                    </p>
-                    <p>badges</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-base font-bold text-emerald-brand">
-                      {currentUserRow.profile.points.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-gray-400">pts</p>
-                  </div>
+                  <span className="text-sm font-bold text-emerald-brand">
+                    {currentUserRow.profile.points} pts
+                  </span>
                 </div>
-              </>
-            )}
+              </div>
+            ) : null}
           </div>
         )}
       </div>

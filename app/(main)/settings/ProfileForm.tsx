@@ -6,10 +6,26 @@ import Button from "@/components/ui/Button";
 import AvatarUploader from "./AvatarUploader";
 
 const COMMON_INTERESTS = [
-  "economics", "governance", "public policy", "climate change", "technology",
-  "health", "education", "agriculture", "fintech", "entrepreneurship",
-  "politics", "history", "philosophy", "law", "human rights",
-  "gender studies", "urbanization", "security", "trade", "diaspora",
+  "economics",
+  "governance",
+  "public policy",
+  "climate change",
+  "technology",
+  "health",
+  "education",
+  "agriculture",
+  "fintech",
+  "entrepreneurship",
+  "politics",
+  "history",
+  "philosophy",
+  "law",
+  "human rights",
+  "gender studies",
+  "urbanization",
+  "security",
+  "trade",
+  "diaspora",
 ];
 
 interface Profile {
@@ -22,6 +38,9 @@ interface Profile {
   avatar_url: string | null;
   interests: string[] | null;
 }
+
+const INPUT_STYLES =
+  "w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 export default function ProfileForm({ profile }: { profile: Profile }) {
   const [fullName, setFullName] = useState(profile.full_name ?? "");
@@ -40,6 +59,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
       setUsernameError(null);
       return;
     }
+
     const supabase = createClient();
     const { data } = await supabase
       .from("profiles")
@@ -47,13 +67,14 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
       .eq("username", username)
       .neq("id", profile.id)
       .single();
+
     setUsernameError(data ? "Username already taken" : null);
   }, [username, profile.username, profile.id]);
 
   const toggleInterest = (interest: string) => {
     setInterests((prev) =>
       prev.includes(interest)
-        ? prev.filter((i) => i !== interest)
+        ? prev.filter((item) => item !== interest)
         : [...prev, interest]
     );
   };
@@ -81,30 +102,30 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
     setSaving(false);
 
     if (error) {
-      setToast("Failed to save: " + error.message);
-    } else {
-      setToast("Profile saved successfully!");
-      setTimeout(() => setToast(null), 3000);
+      setToast(`Failed to save: ${error.message}`);
+      return;
     }
+
+    setToast("Profile saved successfully!");
+    setTimeout(() => setToast(null), 3000);
   };
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 max-w-2xl">
-      {toast && (
+    <form onSubmit={handleSave} className="max-w-2xl space-y-6">
+      {toast ? (
         <div
-          className={`px-4 py-3 rounded-lg text-sm ${
+          className={`rounded-lg border px-4 py-3 text-sm ${
             toast.startsWith("Failed")
-              ? "bg-red-50 text-red-700 border border-red-200"
-              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700"
           }`}
         >
           {toast}
         </div>
-      )}
+      ) : null}
 
-      {/* Avatar */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="mb-2 block text-sm font-medium text-gray-700">
           Profile photo
         </label>
         <AvatarUploader
@@ -115,41 +136,64 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         />
       </div>
 
-      {/* Full name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="mb-1 block text-sm font-medium text-gray-700">
           Full name
         </label>
         <input
           type="text"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
+          className={INPUT_STYLES}
         />
       </div>
 
-      {/* Username */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="mb-1 block text-sm font-medium text-gray-700">
           Username
         </label>
         <input
           type="text"
           value={username}
-          onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ""))}
+          onChange={(e) =>
+            setUsername(e.target.value.toLowerCase().replace(/\s+/g, ""))
+          }
           onBlur={checkUsername}
-          className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent ${
-            usernameError ? "border-red-400" : "border-gray-200"
-          }`}
+          className={`${INPUT_STYLES} ${usernameError ? "border-red-400" : ""}`}
         />
-        {usernameError && (
-          <p className="text-xs text-red-500 mt-1">{usernameError}</p>
-        )}
+        {usernameError ? (
+          <p className="mt-1 text-xs text-red-500">{usernameError}</p>
+        ) : null}
       </div>
 
-      {/* Bio */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          University
+        </label>
+        <input
+          type="text"
+          value={university}
+          onChange={(e) => setUniversity(e.target.value)}
+          placeholder="e.g. University of Lagos"
+          className={INPUT_STYLES}
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Field of study
+        </label>
+        <input
+          type="text"
+          value={fieldOfStudy}
+          onChange={(e) => setFieldOfStudy(e.target.value)}
+          placeholder="e.g. Computer Science, Law, Economics"
+          className={INPUT_STYLES}
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
           Bio
         </label>
         <div className="relative">
@@ -158,8 +202,8 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             onChange={(e) => setBio(e.target.value)}
             maxLength={300}
             rows={3}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
-            placeholder="Tell the community about yourself…"
+            placeholder="Tell the community about your work and research interests"
+            className={`${INPUT_STYLES} resize-none`}
           />
           <span className="absolute bottom-2 right-2 text-xs text-gray-400">
             {bio.length}/300
@@ -167,39 +211,10 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         </div>
       </div>
 
-      {/* University */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          University
-        </label>
-        <input
-          type="text"
-          value={university}
-          onChange={(e) => setUniversity(e.target.value)}
-          placeholder="e.g. University of Lagos"
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
-        />
-      </div>
-
-      {/* Field of study */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Field of study
-        </label>
-        <input
-          type="text"
-          value={fieldOfStudy}
-          onChange={(e) => setFieldOfStudy(e.target.value)}
-          placeholder="e.g. Economics"
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
-        />
-      </div>
-
-      {/* Interests */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Interests
-          <span className="ml-1 text-gray-400 font-normal text-xs">
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          Topics you write about
+          <span className="ml-1 text-xs font-normal text-gray-400">
             (select all that apply)
           </span>
         </label>
@@ -209,10 +224,10 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
               key={interest}
               type="button"
               onClick={() => toggleInterest(interest)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors border capitalize ${
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                 interests.includes(interest)
-                  ? "bg-emerald-brand text-white border-emerald-brand"
-                  : "bg-white border-gray-200 text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
+                  ? "border-emerald-brand bg-emerald-brand text-white"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
               }`}
             >
               {interest}

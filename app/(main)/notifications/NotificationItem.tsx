@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatDate } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface NotificationData {
   id: string;
@@ -70,7 +70,7 @@ export default function NotificationItem({ notification }: { notification: Notif
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-700 leading-snug">{message}</p>
         <p className="text-xs text-gray-400 mt-1">
-          {formatDate(notification.created_at)}
+          {formatRelativeTime(notification.created_at)}
         </p>
       </div>
       {!notification.read && (

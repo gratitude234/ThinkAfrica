@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import NavUserMenu from "./NavUserMenu";
@@ -77,6 +77,21 @@ export default function NavClient({ user, profile, isAdmin }: NavClientProps) {
   const pathname = usePathname();
   const activePillar = getActivePillar(pathname);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+      if (e.key === "Escape") {
+        setIsSearchOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -144,8 +159,9 @@ export default function NavClient({ user, profile, isAdmin }: NavClientProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSearchOpen(true)}
+              title="Search (⌘K)"
+              aria-label="Search (Cmd+K)"
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Search"
             >
               <svg
                 className="w-5 h-5"

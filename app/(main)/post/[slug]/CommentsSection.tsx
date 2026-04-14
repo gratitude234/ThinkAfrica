@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface Comment {
   id: string;
@@ -179,7 +179,7 @@ export default function CommentsSection({
                   </span>
                 )}
                 <span className="text-xs text-gray-400">
-                  {formatDate(comment.created_at)}
+                  {formatRelativeTime(comment.created_at)}
                 </span>
               </div>
               <p className="text-sm text-gray-700 leading-relaxed mb-2">

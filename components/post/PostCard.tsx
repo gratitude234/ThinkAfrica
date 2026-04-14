@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
-import { formatDate, POST_TYPE_LABELS } from "@/lib/utils";
+import { formatRelativeTime, POST_TYPE_LABELS } from "@/lib/utils";
 
 export interface PostCardData {
   id: string;
@@ -179,7 +179,7 @@ export default function PostCard({ post }: PostCardProps) {
           )}
 
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-xs text-gray-400">
-            <span>{formatDate(displayDate)}</span>
+            <span>{formatRelativeTime(displayDate)}</span>
             {post.view_count !== undefined && post.view_count > 0 && (
               <span>{formatViewCount(post.view_count)} views</span>
             )}

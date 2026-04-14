@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import PostFeed from "@/components/post/PostFeed";
 import type { PostCardData } from "@/components/post/PostCard";
+import ForYouEmptyState from "./ForYouEmptyState";
 
 interface Props {
   tab: string;
@@ -57,7 +58,7 @@ export default async function PostsFeedSection({
   const supabase = await createClient();
 
   // Determine which feeds are needed based on tab and eligibility
-  const needsForYou = showForYouEligible;
+  const needsForYou = showForYouEligible && userInterests.length > 0;
   const needsFollowing = showFollowingEligible && followedIds.length > 0;
 
   // Run needed queries in parallel
@@ -105,7 +106,7 @@ export default async function PostsFeedSection({
   const forYouPosts = mapPosts(forYouRaw, likeCounts);
   const followingPosts = mapPosts(followingRaw, likeCounts);
 
-  const showForYouTab = showForYouEligible && forYouPosts.length > 0;
+  const showForYouTab = showForYouEligible;
   const showFollowingTab = showFollowingEligible;
   const showTabs = showForYouTab || showFollowingTab;
 
@@ -163,7 +164,11 @@ export default async function PostsFeedSection({
           )}
         </div>
       )}
-      <PostFeed posts={displayPosts} />
+      {activeTab === "foryou" && displayPosts.length === 0 ? (
+        <ForYouEmptyState />
+      ) : (
+        <PostFeed posts={displayPosts} />
+      )}
     </>
   );
 }

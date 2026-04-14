@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 import LiveArguments from "./LiveArguments";
 import DebateCountdown from "./DebateCountdown";
 
@@ -160,7 +160,7 @@ export default async function DebatePage({ params }: PageProps) {
             ) : null}
 
             <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4 text-xs text-gray-400">
-              <span>Started {formatDate(debate.created_at)}</span>
+              <span>Started {formatRelativeTime(debate.created_at)}</span>
               {debate.round_duration_minutes ? (
                 <span>{debate.round_duration_minutes} min rounds</span>
               ) : null}

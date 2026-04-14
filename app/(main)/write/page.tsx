@@ -6,7 +6,11 @@ import dynamic from "next/dynamic";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
-import { MIN_WORD_COUNTS, POST_TYPE_LABELS } from "@/lib/utils";
+import {
+  MIN_WORD_COUNTS,
+  POST_TYPE_LABELS,
+  generateExcerpt,
+} from "@/lib/utils";
 import { useDraftManager } from "./DraftManager";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import MyDrafts from "./MyDrafts";
@@ -100,12 +104,16 @@ export default function WritePage() {
       return;
     }
 
+    const finalExcerpt = excerpt.trim() || generateExcerpt(content, 220);
     const tags = tagsInput
       .split(",")
       .map((tag) => tag.trim().toLowerCase())
       .filter(Boolean);
 
     const now = new Date().toISOString();
+    const isInstantPublish = postType === "blog" || postType === "essay";
+    const submitStatus = isInstantPublish ? "published" : "pending";
+    const submitPublishedAt = isInstantPublish ? now : null;
     let publishedPostSlug = "";
 
     if (draftId) {
@@ -113,13 +121,13 @@ export default function WritePage() {
         .from("posts")
         .update({
           title: title.trim(),
-          excerpt,
+          excerpt: finalExcerpt,
           content,
           tags,
           type: postType,
           cover_image_url: coverImageUrl || null,
-          status: "published",
-          published_at: now,
+          status: submitStatus,
+          published_at: submitPublishedAt,
         })
         .eq("id", draftId)
         .eq("author_id", user.id)
@@ -156,11 +164,11 @@ export default function WritePage() {
           title: title.trim(),
           slug: uniqueSlug,
           content,
-          excerpt,
+          excerpt: finalExcerpt,
           type: postType,
           tags,
-          status: "published",
-          published_at: now,
+          status: submitStatus,
+          published_at: submitPublishedAt,
           cover_image_url: coverImageUrl || null,
         })
         .select("slug")
@@ -178,7 +186,9 @@ export default function WritePage() {
     router.push(
       `/submitted?slug=${encodeURIComponent(
         publishedPostSlug
-      )}&type=${encodeURIComponent(postType)}`
+      )}&type=${encodeURIComponent(postType)}&live=${
+        isInstantPublish ? "1" : "0"
+      }`
     );
   };
 

@@ -11,6 +11,7 @@ import BookmarkButton from "./BookmarkButton";
 import CommentsLoader from "./CommentsLoader";
 import ViewTracker from "./ViewTracker";
 import ReadingProgressBar from "./ReadingProgressBar";
+import ReadingBar from "./ReadingBar";
 import ShareButtons from "./ShareButtons";
 import AuthorBioCard from "./AuthorBioCard";
 import TableOfContents from "./TableOfContents";
@@ -171,6 +172,15 @@ export default async function PostPage({ params }: PageProps) {
 
   return (
     <div className="relative">
+      <ReadingBar
+        postId={post.id}
+        userId={user?.id ?? null}
+        initialLiked={userLiked}
+        initialLikeCount={likeCount ?? 0}
+        initialBookmarked={userBookmarked}
+        title={post.title}
+        slug={post.slug}
+      />
       <ReadingProgressBar />
       <ViewTracker slug={slug} />
 

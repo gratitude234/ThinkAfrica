@@ -4,7 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import Button from "@/components/ui/Button";
+
+const INPUT_STYLES =
+  "w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
+
+const BRAND_ITEMS = [
+  { icon: "✍️", text: "Publish research, essays & policy briefs" },
+  { icon: "⚡", text: "Debate the issues that shape Africa" },
+  { icon: "🏆", text: "Earn points, badges and fellowships" },
+];
 
 export default function SignupPage() {
   const router = useRouter();
@@ -27,7 +35,7 @@ export default function SignupPage() {
     setError(null);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
@@ -38,8 +46,8 @@ export default function SignupPage() {
       },
     });
 
-    if (error) {
-      setError(error.message);
+    if (signUpError) {
+      setError(signUpError.message);
       setLoading(false);
       return;
     }
@@ -49,91 +57,136 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-1">Create an account</h2>
-      <p className="text-gray-500 text-sm mb-6">
-        Join Africa&apos;s intellectual network
-      </p>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="fixed inset-0 z-10 grid min-h-screen grid-cols-1 bg-white md:grid-cols-2">
+      <div className="hidden flex-col justify-between bg-emerald-brand p-12 text-white md:flex">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Full Name
-          </label>
-          <input
-            type="text"
-            name="fullName"
-            value={form.fullName}
-            onChange={handleChange}
-            required
-            placeholder="e.g. Amara Diallo"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
+          <img
+            src="/logo.png"
+            alt="ThinkAfrica"
+            className="mb-12 h-10 w-auto brightness-0 invert"
           />
+          <blockquote className="mb-6 text-xl font-medium italic leading-relaxed text-white/90">
+            &quot;The pen is mightier than the sword - and the African intellectual is mightier still.&quot;
+          </blockquote>
+          <p className="text-sm text-white/60">
+            ThinkAfrica · Africa&apos;s Intellectual Network
+          </p>
         </div>
+        <div className="space-y-4">
+          {BRAND_ITEMS.map((item) => (
+            <div
+              key={item.text}
+              className="flex items-center gap-3 text-sm text-white/80"
+            >
+              <span className="text-lg">{item.icon}</span>
+              <span>{item.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            University
-          </label>
-          <input
-            type="text"
-            name="university"
-            value={form.university}
-            onChange={handleChange}
-            required
-            placeholder="e.g. University of Lagos"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
+      <div className="flex flex-col justify-center bg-white px-8 py-12 sm:px-16">
+        <div className="mx-auto w-full max-w-md">
+          <img
+            src="/logo.png"
+            alt="ThinkAfrica"
+            className="mb-8 h-8 w-auto md:hidden"
           />
+          <h1 className="mb-1 text-2xl font-bold text-gray-900">
+            Create your account
+          </h1>
+          <p className="mb-8 text-sm text-gray-500">
+            Join Africa&apos;s intellectual network
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Full name
+              </label>
+              <input
+                type="text"
+                name="fullName"
+                value={form.fullName}
+                onChange={handleChange}
+                required
+                placeholder="e.g. Amara Diallo"
+                className={INPUT_STYLES}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                University
+              </label>
+              <input
+                type="text"
+                name="university"
+                value={form.university}
+                onChange={handleChange}
+                required
+                placeholder="e.g. University of Lagos"
+                className={INPUT_STYLES}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Email
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                required
+                placeholder="you@university.edu"
+                className={INPUT_STYLES}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                required
+                minLength={6}
+                placeholder="At least 6 characters"
+                className={INPUT_STYLES}
+              />
+            </div>
+
+            {error ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                {error}
+              </div>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-xl bg-emerald-brand py-3 font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Creating account..." : "Create Account"}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-gray-500">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-medium text-emerald-600 hover:underline"
+            >
+              Sign in
+            </Link>
+          </p>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Email
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={form.email}
-            onChange={handleChange}
-            required
-            placeholder="you@university.edu"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Password
-          </label>
-          <input
-            type="password"
-            name="password"
-            value={form.password}
-            onChange={handleChange}
-            required
-            minLength={6}
-            placeholder="At least 6 characters"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
-          />
-        </div>
-
-        {error && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            {error}
-          </div>
-        )}
-
-        <Button type="submit" loading={loading} className="w-full" size="lg">
-          Create Account
-        </Button>
-      </form>
-
-      <p className="text-center text-sm text-gray-500 mt-6">
-        Already have an account?{" "}
-        <Link href="/login" className="text-emerald-brand font-medium hover:underline">
-          Sign in
-        </Link>
-      </p>
+      </div>
     </div>
   );
 }

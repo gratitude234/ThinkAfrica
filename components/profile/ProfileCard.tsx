@@ -48,11 +48,17 @@ export default function ProfileCard({
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       {/* Avatar & Name */}
       <div className="flex items-start gap-4 mb-4">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-2xl font-bold flex-shrink-0">
-          {profile.full_name?.charAt(0)?.toUpperCase() ??
-            profile.username?.charAt(0)?.toUpperCase() ??
-            "?"}
-        </div>
+        {profile.avatar_url ? (
+          <img
+            src={profile.avatar_url}
+            alt={profile.full_name ?? profile.username}
+            className="w-16 h-16 rounded-full object-cover flex-shrink-0 border border-gray-100"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-2xl font-bold flex-shrink-0">
+            {(profile.full_name ?? profile.username ?? "?").charAt(0).toUpperCase()}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-1.5 flex-wrap">
             {profile.full_name ?? profile.username}
