@@ -5,20 +5,40 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface EditorProps {
   content?: string;
   placeholder?: string;
+  minWords?: number;
   onUpdate?: (html: string, wordCount: number) => void;
+  onAutoSave?: () => void | Promise<void>;
+}
+
+type SaveStatus = "saved" | "saving" | "unsaved";
+
+function countWordsFromHtml(value: string) {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
 }
 
 export default function Editor({
   content = "",
   placeholder = "Start writing your piece...",
+  minWords = 0,
   onUpdate,
+  onAutoSave,
 }: EditorProps) {
   const [imageUploading, setImageUploading] = useState(false);
+  const [rawWordCount, setRawWordCount] = useState(() => countWordsFromHtml(content));
+  const [displayWordCount, setDisplayWordCount] = useState(() =>
+    countWordsFromHtml(content)
+  );
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const [changeTick, setChangeTick] = useState(0);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
@@ -37,6 +57,10 @@ export default function Editor({
     onUpdate({ editor }) {
       const html = editor.getHTML();
       const words = editor.storage.characterCount.words() as number;
+
+      setRawWordCount(words);
+      setSaveStatus("unsaved");
+      setChangeTick((current) => current + 1);
       onUpdate?.(html, words);
     },
     immediatelyRender: false,
@@ -47,6 +71,51 @@ export default function Editor({
       editor?.destroy();
     };
   }, [editor]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDisplayWordCount(rawWordCount);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [rawWordCount]);
+
+  useEffect(() => {
+    if (!onAutoSave || changeTick === 0) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSaveStatus("saving");
+
+      try {
+        await onAutoSave();
+      } catch {
+        // Autosave is intentionally silent.
+      } finally {
+        setTimeout(() => {
+          setSaveStatus("saved");
+        }, 500);
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [changeTick, onAutoSave]);
+
+  const progress = useMemo(() => {
+    if (minWords <= 0) {
+      return 0;
+    }
+
+    return Math.min(100, Math.round((displayWordCount / minWords) * 100));
+  }, [displayWordCount, minWords]);
+
+  const hasMetMinimum = minWords > 0 && displayWordCount >= minWords;
+  const countClasses = hasMetMinimum
+    ? "text-xs font-medium text-emerald-600"
+    : displayWordCount < 100 && minWords > 0
+      ? "text-xs text-amber-500"
+      : "text-xs text-gray-500";
 
   const handleImageFileChange = async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -59,10 +128,11 @@ export default function Editor({
     formData.append("file", file);
 
     try {
-      // Get auth token for the API route
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
       const res = await fetch("/api/upload-image", {
         method: "POST",
@@ -79,15 +149,13 @@ export default function Editor({
       // silently fail
     } finally {
       setImageUploading(false);
-      // Reset input so same file can be re-selected
       if (imageInputRef.current) imageInputRef.current.value = "";
     }
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-1 p-2 border-b border-gray-200 bg-gray-50">
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 p-2">
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleBold().run()}
           active={editor?.isActive("bold")}
@@ -120,13 +188,13 @@ export default function Editor({
         >
           H3
         </ToolbarButton>
-        <div className="w-px h-5 bg-gray-300 mx-1" />
+        <div className="mx-1 h-5 w-px bg-gray-300" />
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
           active={editor?.isActive("bulletList")}
           title="Bullet list"
         >
-          ≡
+          List
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleOrderedList().run()}
@@ -149,17 +217,16 @@ export default function Editor({
         >
           &lt;&gt;
         </ToolbarButton>
-        <div className="w-px h-5 bg-gray-300 mx-1" />
-        {/* Image upload button */}
+        <div className="mx-1 h-5 w-px bg-gray-300" />
         <ToolbarButton
           onClick={() => imageInputRef.current?.click()}
           title="Insert image"
         >
           {imageUploading ? (
-            <span className="text-xs">…</span>
+            <span className="text-xs">...</span>
           ) : (
             <svg
-              className="w-4 h-4"
+              className="h-4 w-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -173,22 +240,84 @@ export default function Editor({
             </svg>
           )}
         </ToolbarButton>
-        <div className="w-px h-5 bg-gray-300 mx-1" />
+        <div className="mx-1 h-5 w-px bg-gray-300" />
         <ToolbarButton
           onClick={() => editor?.chain().focus().undo().run()}
           title="Undo"
         >
-          ↩
+          Undo
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().redo().run()}
           title="Redo"
         >
-          ↪
+          Redo
         </ToolbarButton>
       </div>
 
-      {/* Hidden image file input */}
+      <div className="sticky top-0 z-10 border-b border-gray-100 bg-white px-4 py-1.5">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-center gap-2">
+              <span className={countClasses}>
+                {displayWordCount.toLocaleString()} / {minWords.toLocaleString()}{" "}
+                words
+              </span>
+              {hasMetMinimum ? (
+                <span className="text-xs font-medium text-emerald-600">✓</span>
+              ) : null}
+            </div>
+            <div className="h-1 w-full overflow-hidden bg-gray-100">
+              <div
+                className="h-full bg-emerald-500 transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="ml-auto flex items-center gap-1.5">
+            {saveStatus === "saving" ? (
+              <>
+                <svg
+                  className="h-3.5 w-3.5 animate-spin text-gray-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  />
+                </svg>
+                <span className="text-xs text-gray-400">saving...</span>
+              </>
+            ) : null}
+
+            {saveStatus === "saved" ? (
+              <>
+                <span className="text-xs text-emerald-500">✓</span>
+                <span className="text-xs text-emerald-500">Saved</span>
+              </>
+            ) : null}
+
+            {saveStatus === "unsaved" ? (
+              <>
+                <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                <span className="text-xs text-gray-300">Unsaved</span>
+              </>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
       <input
         ref={imageInputRef}
         type="file"
@@ -197,7 +326,6 @@ export default function Editor({
         onChange={handleImageFileChange}
       />
 
-      {/* Editor area */}
       <EditorContent editor={editor} className="min-h-[400px]" />
     </div>
   );
@@ -219,7 +347,7 @@ function ToolbarButton({
       type="button"
       onClick={onClick}
       title={title}
-      className={`px-2 py-1 rounded text-sm font-medium transition-colors ${
+      className={`rounded px-2 py-1 text-sm font-medium transition-colors ${
         active
           ? "bg-emerald-brand text-white"
           : "text-gray-600 hover:bg-gray-200"

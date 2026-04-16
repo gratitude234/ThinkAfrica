@@ -15,6 +15,7 @@ import ReadingBar from "./ReadingBar";
 import ShareButtons from "./ShareButtons";
 import AuthorBioCard from "./AuthorBioCard";
 import TableOfContents from "./TableOfContents";
+import HighlightShare from "./HighlightShare";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -257,10 +258,14 @@ export default async function PostPage({ params }: PageProps) {
               <hr className="border-gray-200 mb-8" />
 
               {/* Content */}
-              <div
-                className="prose prose-gray max-w-none mb-8 prose-headings:text-gray-900 prose-a:text-emerald-brand"
-                dangerouslySetInnerHTML={{ __html: contentWithIds }}
-              />
+              <div className="relative mb-8">
+                <HighlightShare containerId="post-article-prose" />
+                <div
+                  id="post-article-prose"
+                  className="prose prose-gray max-w-none prose-a:text-emerald-brand prose-headings:text-gray-900"
+                  dangerouslySetInnerHTML={{ __html: contentWithIds }}
+                />
+              </div>
 
               {/* Share + views */}
               <div className="flex items-center justify-between flex-wrap gap-3 mb-8">

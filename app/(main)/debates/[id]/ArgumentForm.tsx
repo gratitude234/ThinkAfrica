@@ -1,5 +1,7 @@
 "use client";
 
+// -- ALTER TABLE debate_arguments ADD COLUMN stance text CHECK (stance IN ('for', 'against'));
+
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
@@ -9,6 +11,8 @@ interface ArgumentFormProps {
   roundNumber: number;
   disabled?: boolean;
 }
+
+type Stance = "for" | "against" | null;
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -22,6 +26,7 @@ export default function ArgumentForm({
   disabled,
 }: ArgumentFormProps) {
   const [content, setContent] = useState("");
+  const [stance, setStance] = useState<Stance>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -31,7 +36,14 @@ export default function ArgumentForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!stance) {
+      setError("Please choose your stance");
+      return;
+    }
+
     if (isOverLimit || !content.trim()) return;
+
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -54,12 +66,14 @@ export default function ArgumentForm({
         author_id: user.id,
         content: content.trim(),
         round_number: roundNumber,
+        stance,
       });
 
     if (insertError) {
       setError(insertError.message);
     } else {
       setContent("");
+      setStance(null);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     }
@@ -69,7 +83,7 @@ export default function ArgumentForm({
 
   if (disabled) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-500 text-center">
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
         This debate is closed. No new arguments can be submitted.
       </div>
     );
@@ -78,7 +92,35 @@ export default function ArgumentForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div>
-        <div className="flex items-center justify-between mb-1.5">
+        <p className="mb-2 text-sm font-medium text-gray-700">Choose your stance</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setStance("for")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              stance === "for"
+                ? "bg-emerald-600 text-white"
+                : "border border-gray-200 bg-gray-100 text-gray-700"
+            }`}
+          >
+            For the motion
+          </button>
+          <button
+            type="button"
+            onClick={() => setStance("against")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              stance === "against"
+                ? "bg-red-600 text-white"
+                : "border border-gray-200 bg-gray-100 text-gray-700"
+            }`}
+          >
+            Against the motion
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
           <label className="text-sm font-medium text-gray-700">
             Your Argument (Round {roundNumber})
           </label>
@@ -87,8 +129,8 @@ export default function ArgumentForm({
               isOverLimit
                 ? "text-red-500"
                 : wordCount > MAX_WORDS * 0.85
-                ? "text-amber-500"
-                : "text-gray-400"
+                  ? "text-amber-500"
+                  : "text-gray-400"
             }`}
           >
             {wordCount} / {MAX_WORDS} words
@@ -99,29 +141,29 @@ export default function ArgumentForm({
           onChange={(e) => setContent(e.target.value)}
           rows={6}
           placeholder="Present your argument clearly and concisely (max 300 words)..."
-          className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent resize-none ${
+          className={`w-full resize-none rounded-lg border px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 ${
             isOverLimit
               ? "border-red-300 focus:ring-red-400"
               : "border-gray-300 focus:ring-emerald-500"
           }`}
         />
-        {isOverLimit && (
-          <p className="text-xs text-red-500 mt-1">
+        {isOverLimit ? (
+          <p className="mt-1 text-xs text-red-500">
             Please shorten your argument to {MAX_WORDS} words or fewer.
           </p>
-        )}
+        ) : null}
       </div>
 
-      {error && (
-        <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
           {error}
         </div>
-      )}
-      {success && (
-        <div className="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
+      ) : null}
+      {success ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           Argument submitted successfully!
         </div>
-      )}
+      ) : null}
 
       <Button
         type="submit"

@@ -1,9 +1,13 @@
 "use client";
 
+// -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cover_image_url text;
+
 import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
+import Toast from "@/components/ui/Toast";
 import AvatarUploader from "./AvatarUploader";
+import CoverImageUploader from "@/components/ui/CoverImageUploader";
 
 const COMMON_INTERESTS = [
   "economics",
@@ -37,6 +41,7 @@ interface Profile {
   field_of_study: string | null;
   avatar_url: string | null;
   interests: string[] | null;
+  cover_image_url: string | null;
 }
 
 const INPUT_STYLES =
@@ -50,6 +55,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const [fieldOfStudy, setFieldOfStudy] = useState(profile.field_of_study ?? "");
   const [interests, setInterests] = useState<string[]>(profile.interests ?? []);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
+  const [coverImageUrl, setCoverImageUrl] = useState(profile.cover_image_url);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -96,6 +102,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         field_of_study: fieldOfStudy,
         interests,
         avatar_url: avatarUrl,
+        cover_image_url: coverImageUrl,
       })
       .eq("id", profile.id);
 
@@ -107,140 +114,148 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
     }
 
     setToast("Profile saved successfully!");
-    setTimeout(() => setToast(null), 3000);
   };
 
   return (
-    <form onSubmit={handleSave} className="max-w-2xl space-y-6">
-      {toast ? (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm ${
-            toast.startsWith("Failed")
-              ? "border-red-200 bg-red-50 text-red-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {toast}
-        </div>
-      ) : null}
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700">
-          Profile photo
-        </label>
-        <AvatarUploader
-          userId={profile.id}
-          currentUrl={avatarUrl}
-          fullName={fullName}
-          onUpload={setAvatarUrl}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Full name
-        </label>
-        <input
-          type="text"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          className={INPUT_STYLES}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Username
-        </label>
-        <input
-          type="text"
-          value={username}
-          onChange={(e) =>
-            setUsername(e.target.value.toLowerCase().replace(/\s+/g, ""))
-          }
-          onBlur={checkUsername}
-          className={`${INPUT_STYLES} ${usernameError ? "border-red-400" : ""}`}
-        />
-        {usernameError ? (
-          <p className="mt-1 text-xs text-red-500">{usernameError}</p>
-        ) : null}
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          University
-        </label>
-        <input
-          type="text"
-          value={university}
-          onChange={(e) => setUniversity(e.target.value)}
-          placeholder="e.g. University of Lagos"
-          className={INPUT_STYLES}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Field of study
-        </label>
-        <input
-          type="text"
-          value={fieldOfStudy}
-          onChange={(e) => setFieldOfStudy(e.target.value)}
-          placeholder="e.g. Computer Science, Law, Economics"
-          className={INPUT_STYLES}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Bio
-        </label>
-        <div className="relative">
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            maxLength={300}
-            rows={3}
-            placeholder="Tell the community about your work and research interests"
-            className={`${INPUT_STYLES} resize-none`}
+    <>
+      <form onSubmit={handleSave} className="max-w-2xl space-y-6">
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Cover photo
+          </label>
+          <CoverImageUploader
+            initialUrl={coverImageUrl ?? undefined}
+            onUpload={setCoverImageUrl}
+            onRemove={() => setCoverImageUrl(null)}
+            bucket="covers"
+            ensureBucket={true}
+            buildPath={(userId) => `${userId}/cover.webp`}
+            emptyTitle="Upload a cover image"
+            emptyHint="This appears at the top of your profile."
+            previewHeightClass="h-40"
           />
-          <span className="absolute bottom-2 right-2 text-xs text-gray-400">
-            {bio.length}/300
-          </span>
         </div>
-      </div>
 
-      <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700">
-          Topics you write about
-          <span className="ml-1 text-xs font-normal text-gray-400">
-            (select all that apply)
-          </span>
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {COMMON_INTERESTS.map((interest) => (
-            <button
-              key={interest}
-              type="button"
-              onClick={() => toggleInterest(interest)}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                interests.includes(interest)
-                  ? "border-emerald-brand bg-emerald-brand text-white"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
-              }`}
-            >
-              {interest}
-            </button>
-          ))}
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Profile photo
+          </label>
+          <AvatarUploader
+            userId={profile.id}
+            currentUrl={avatarUrl}
+            fullName={fullName}
+            onUpload={setAvatarUrl}
+          />
         </div>
-      </div>
 
-      <div className="flex justify-end pt-2">
-        <Button type="submit" loading={saving} disabled={!!usernameError}>
-          Save changes
-        </Button>
-      </div>
-    </form>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Full name
+          </label>
+          <input
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className={INPUT_STYLES}
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Username
+          </label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) =>
+              setUsername(e.target.value.toLowerCase().replace(/\s+/g, ""))
+            }
+            onBlur={checkUsername}
+            className={`${INPUT_STYLES} ${usernameError ? "border-red-400" : ""}`}
+          />
+          {usernameError ? (
+            <p className="mt-1 text-xs text-red-500">{usernameError}</p>
+          ) : null}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            University
+          </label>
+          <input
+            type="text"
+            value={university}
+            onChange={(e) => setUniversity(e.target.value)}
+            placeholder="e.g. University of Lagos"
+            className={INPUT_STYLES}
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Field of study
+          </label>
+          <input
+            type="text"
+            value={fieldOfStudy}
+            onChange={(e) => setFieldOfStudy(e.target.value)}
+            placeholder="e.g. Computer Science, Law, Economics"
+            className={INPUT_STYLES}
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Bio
+          </label>
+          <div className="relative">
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              maxLength={300}
+              rows={3}
+              placeholder="Tell the community about your work and research interests"
+              className={`${INPUT_STYLES} resize-none`}
+            />
+            <span className="absolute bottom-2 right-2 text-xs text-gray-400">
+              {bio.length}/300
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Topics you write about
+            <span className="ml-1 text-xs font-normal text-gray-400">
+              (select all that apply)
+            </span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {COMMON_INTERESTS.map((interest) => (
+              <button
+                key={interest}
+                type="button"
+                onClick={() => toggleInterest(interest)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                  interests.includes(interest)
+                    ? "border-emerald-brand bg-emerald-brand text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
+                }`}
+              >
+                {interest}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button type="submit" loading={saving} disabled={!!usernameError}>
+            Save changes
+          </Button>
+        </div>
+      </form>
+
+      {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
+    </>
   );
 }

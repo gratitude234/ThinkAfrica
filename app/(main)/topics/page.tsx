@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import TopicsClient from "./TopicsClient";
 
 export const revalidate = 3600;
 
@@ -65,11 +65,26 @@ type TagRow = {
 
 export default async function TopicsPage() {
   const supabase = await createClient();
-  const { data: postsRaw } = await supabase
-    .from("posts")
-    .select("tags")
-    .eq("status", "published")
-    .limit(500);
+  const [
+    { data: postsRaw },
+    {
+      data: { user },
+    },
+  ] = await Promise.all([
+    supabase.from("posts").select("tags").eq("status", "published").limit(500),
+    supabase.auth.getUser(),
+  ]);
+
+  let initialInterests: string[] = [];
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("interests")
+      .eq("id", user.id)
+      .single();
+
+    initialInterests = (profile?.interests as string[] | null) ?? [];
+  }
 
   const counts: Record<string, number> = {};
   ((postsRaw ?? []) as TagRow[]).forEach((post) =>
@@ -106,7 +121,12 @@ export default async function TopicsPage() {
   const sections = [
     ...Object.keys(TOPIC_CATEGORIES),
     ...(grouped.Other ? ["Other"] : []),
-  ].filter((category) => (grouped[category] ?? []).length > 0);
+  ]
+    .filter((category) => (grouped[category] ?? []).length > 0)
+    .map((category) => ({
+      category,
+      entries: grouped[category] ?? [],
+    }));
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -120,25 +140,11 @@ export default async function TopicsPage() {
           No topics yet. Published posts with tags will appear here.
         </div>
       ) : (
-        sections.map((category) => (
-          <section key={category} className="mb-10">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-              {category}
-            </h2>
-            <div className="flex flex-wrap">
-              {(grouped[category] ?? []).map((tag) => (
-                <Link
-                  key={tag.tag}
-                  href={`/topics/${encodeURIComponent(tag.tag)}`}
-                  className="mb-2 mr-2 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 shadow-sm transition-colors hover:border-emerald-400 hover:text-emerald-700"
-                >
-                  <span>#{tag.tag}</span>
-                  <span className="text-xs text-gray-400">{tag.count}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ))
+        <TopicsClient
+          sections={sections}
+          initialInterests={initialInterests}
+          userId={user?.id ?? null}
+        />
       )}
     </div>
   );

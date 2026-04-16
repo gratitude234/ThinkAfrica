@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
+import TagInput from "@/components/ui/TagInput";
 import {
   MIN_WORD_COUNTS,
   POST_TYPE_LABELS,
@@ -25,15 +26,31 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
 const POST_TYPES = ["blog", "essay", "research", "policy_brief"] as const;
 type PostType = (typeof POST_TYPES)[number];
 
+interface DraftPayload {
+  title: string;
+  excerpt: string;
+  content: string;
+  tags: string[];
+  postType: PostType;
+  coverImageUrl: string;
+}
+
+function countWords(value: string) {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
 export default function WritePage() {
   const router = useRouter();
-  const { draftId, saveStatus, saveDraft, initialData, loadingDraft } =
-    useDraftManager();
+  const { draftId, saveDraft, initialData, loadingDraft } = useDraftManager();
 
   const [postType, setPostType] = useState<PostType>("blog");
   const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [wordCount, setWordCount] = useState(0);
@@ -45,31 +62,31 @@ export default function WritePage() {
       setPostType((initialData.postType as PostType) ?? "blog");
       setTitle(initialData.title);
       setExcerpt(initialData.excerpt);
-      setTagsInput(initialData.tagsInput);
+      setTags(initialData.tags);
       setContent(initialData.content);
       setCoverImageUrl(initialData.coverImageUrl);
+      setWordCount(countWords(initialData.content));
     }
   }, [initialData]);
 
   const getCurrentData = useCallback(
-    (overrides: Partial<Record<string, string>> = {}) => ({
+    (overrides: Partial<DraftPayload> = {}): DraftPayload => ({
       title: overrides.title ?? title,
       excerpt: overrides.excerpt ?? excerpt,
       content: overrides.content ?? content,
-      tagsInput: overrides.tagsInput ?? tagsInput,
+      tags: overrides.tags ?? tags,
       postType: overrides.postType ?? postType,
       coverImageUrl: overrides.coverImageUrl ?? coverImageUrl,
     }),
-    [title, excerpt, content, tagsInput, postType, coverImageUrl]
+    [title, excerpt, content, tags, postType, coverImageUrl]
   );
 
   const handleEditorUpdate = useCallback(
     (html: string, words: number) => {
       setContent(html);
       setWordCount(words);
-      saveDraft(getCurrentData({ content: html }));
     },
-    [saveDraft, getCurrentData]
+    []
   );
 
   const minWords = MIN_WORD_COUNTS[postType];
@@ -105,8 +122,7 @@ export default function WritePage() {
     }
 
     const finalExcerpt = excerpt.trim() || generateExcerpt(content, 220);
-    const tags = tagsInput
-      .split(",")
+    const normalizedTags = tags
       .map((tag) => tag.trim().toLowerCase())
       .filter(Boolean);
 
@@ -123,7 +139,7 @@ export default function WritePage() {
           title: title.trim(),
           excerpt: finalExcerpt,
           content,
-          tags,
+          tags: normalizedTags,
           type: postType,
           cover_image_url: coverImageUrl || null,
           status: submitStatus,
@@ -166,7 +182,7 @@ export default function WritePage() {
           content,
           excerpt: finalExcerpt,
           type: postType,
-          tags,
+          tags: normalizedTags,
           status: submitStatus,
           published_at: submitPublishedAt,
           cover_image_url: coverImageUrl || null,
@@ -210,23 +226,6 @@ export default function WritePage() {
           <p className="mt-1 text-sm text-gray-500">
             Share your ideas with Africa&apos;s intellectual community.
           </p>
-        </div>
-        <div className="flex-shrink-0">
-          {saveStatus === "saving" ? (
-            <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">
-              Saving...
-            </span>
-          ) : null}
-          {saveStatus === "saved" ? (
-            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-              Saved
-            </span>
-          ) : null}
-          {saveStatus === "error" ? (
-            <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-600">
-              Save failed
-            </span>
-          ) : null}
         </div>
       </div>
 
@@ -300,11 +299,11 @@ export default function WritePage() {
             This appears in the feed preview. Keep it under 200 characters.
           </p>
           <div className="relative">
-            <textarea
-              value={excerpt}
-              onChange={(e) => {
-                setExcerpt(e.target.value);
-                saveDraft(getCurrentData({ excerpt: e.target.value }));
+              <textarea
+                value={excerpt}
+                onChange={(e) => {
+                  setExcerpt(e.target.value);
+                  saveDraft(getCurrentData({ excerpt: e.target.value }));
               }}
               maxLength={200}
               rows={2}
@@ -317,21 +316,19 @@ export default function WritePage() {
           </div>
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Tags <span className="font-normal text-gray-400">(comma separated)</span>
-          </label>
-          <input
-            type="text"
-            value={tagsInput}
-            onChange={(e) => {
-              setTagsInput(e.target.value);
-              saveDraft(getCurrentData({ tagsInput: e.target.value }));
-            }}
-            placeholder="e.g. economics, governance, africa"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-          />
-        </div>
+        <TagInput
+          label="Tags"
+          value={tags}
+          helperText="Add up to five tags to help readers discover your piece."
+          placeholder="e.g. economics"
+          onChange={(nextTags) => {
+            setTags(nextTags);
+            void saveDraft({
+              ...getCurrentData(),
+              tags: nextTags,
+            });
+          }}
+        />
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -340,8 +337,10 @@ export default function WritePage() {
           <Editor
             key={initialData ? "loaded" : "empty"}
             content={content}
+            minWords={minWords}
             placeholder={`Start writing your ${POST_TYPE_LABELS[postType].toLowerCase()}...`}
             onUpdate={handleEditorUpdate}
+            onAutoSave={() => saveDraft(getCurrentData())}
           />
         </div>
 
@@ -350,44 +349,6 @@ export default function WritePage() {
             {error}
           </div>
         ) : null}
-
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-600">
-              {wordCount.toLocaleString()} / {minWords.toLocaleString()} words
-            </span>
-            {meetsWordCount ? (
-              <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Ready to submit
-              </span>
-            ) : (
-              <span className="text-xs text-gray-400">
-                {(minWords - wordCount).toLocaleString()} more to go
-              </span>
-            )}
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
-            <div
-              className={`h-2 rounded-full transition-all duration-300 ${
-                meetsWordCount
-                  ? "bg-emerald-500"
-                  : wordCount > minWords * 0.6
-                    ? "bg-amber-400"
-                    : "bg-gray-400"
-              }`}
-              style={{
-                width: `${Math.min(100, Math.round((wordCount / minWords) * 100))}%`,
-              }}
-            />
-          </div>
-        </div>
 
         <div className="flex items-center justify-end gap-3 pt-2">
           <Button variant="secondary" type="button" onClick={() => router.push("/")}>

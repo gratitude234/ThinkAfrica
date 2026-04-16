@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Badge from "@/components/ui/Badge";
 
@@ -10,6 +11,7 @@ interface SearchResult {
   title: string;
   slug: string;
   type: string;
+  url: string;
   profiles: { full_name: string | null; username: string } | null;
 }
 
@@ -19,9 +21,11 @@ interface SearchOverlayProps {
 }
 
 export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -29,6 +33,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     if (isOpen) {
       setQuery("");
       setResults([]);
+      setFocusedIndex(null);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
@@ -44,6 +49,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   const search = useCallback(async (q: string) => {
     if (!q.trim()) {
       setResults([]);
+      setFocusedIndex(null);
       setLoading(false);
       return;
     }
@@ -58,11 +64,13 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       .ilike("title", `%${q}%`)
       .limit(6);
 
-    const mapped: SearchResult[] = (data ?? []).map((p) => ({
-      ...p,
-      profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
+    const mapped: SearchResult[] = (data ?? []).map((post) => ({
+      ...post,
+      url: `/post/${post.slug}`,
+      profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
     }));
     setResults(mapped);
+    setFocusedIndex(mapped.length > 0 ? 0 : null);
     setLoading(false);
   }, []);
 
@@ -70,24 +78,67 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     const val = e.target.value;
     setQuery(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(val), 300);
+    debounceRef.current = setTimeout(() => {
+      void search(val);
+    }, 300);
+  };
+
+  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape") {
+      onClose();
+      return;
+    }
+
+    if (results.length === 0) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setFocusedIndex((current) => {
+        if (current === null) {
+          return 0;
+        }
+
+        return current === results.length - 1 ? 0 : current + 1;
+      });
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setFocusedIndex((current) => {
+        if (current === null) {
+          return results.length - 1;
+        }
+
+        return current === 0 ? results.length - 1 : current - 1;
+      });
+    }
+
+    if (event.key === "Enter" && focusedIndex !== null) {
+      event.preventDefault();
+      const focusedResult = results[focusedIndex];
+      if (focusedResult) {
+        router.push(focusedResult.url);
+        onClose();
+      }
+    }
   };
 
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-20 px-4"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden">
-        {/* Input */}
-        <div className="p-4 border-b border-gray-100">
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="border-b border-gray-100 p-4">
           <div className="flex items-center gap-3">
             <svg
-              className="w-5 h-5 text-gray-400 flex-shrink-0"
+              className="h-5 w-5 flex-shrink-0 text-gray-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -104,21 +155,23 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               type="text"
               value={query}
               onChange={handleChange}
+              onKeyDown={handleInputKeyDown}
               placeholder="Search posts, essays, research..."
               className="flex-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
               aria-label="Search posts"
             />
-            {query && (
+            {query ? (
               <button
                 onClick={() => {
                   setQuery("");
                   setResults([]);
+                  setFocusedIndex(null);
                 }}
                 aria-label="Clear search"
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 transition-colors hover:text-gray-600"
               >
                 <svg
-                  className="w-4 h-4"
+                  className="h-4 w-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -131,43 +184,46 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   />
                 </svg>
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
-        {/* Results */}
         <div className="max-h-80 overflow-y-auto">
-          {!query && (
+          {!query ? (
             <div className="px-4 py-8 text-center text-sm text-gray-400">
               Search posts, essays, research...
             </div>
-          )}
-          {query && loading && (
+          ) : null}
+          {query && loading ? (
             <div className="px-4 py-6 text-center text-sm text-gray-400">
               Searching...
             </div>
-          )}
-          {query && !loading && results.length === 0 && (
+          ) : null}
+          {query && !loading && results.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-gray-400">
               No posts found for &ldquo;{query}&rdquo;
             </div>
-          )}
-          {results.map((result) => (
+          ) : null}
+          {results.map((result, index) => (
             <Link
               key={result.id}
-              href={`/post/${result.slug}`}
+              href={result.url}
               onClick={onClose}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+              className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                focusedIndex === index
+                  ? "bg-emerald-50 ring-1 ring-emerald-200"
+                  : "hover:bg-gray-50"
+              }`}
             >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-gray-900">
                   {result.title}
                 </p>
-                {result.profiles && (
-                  <p className="text-xs text-gray-400 mt-0.5">
+                {result.profiles ? (
+                  <p className="mt-0.5 text-xs text-gray-400">
                     {result.profiles.full_name ?? result.profiles.username}
                   </p>
-                )}
+                ) : null}
               </div>
               <Badge type={result.type} />
             </Link>

@@ -60,7 +60,7 @@ export default async function UserProfilePage({
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, username, full_name, university, field_of_study, bio, avatar_url, points"
+      "id, username, full_name, university, field_of_study, bio, avatar_url, points, cover_image_url"
     )
     .eq("username", username)
     .single();
@@ -78,7 +78,7 @@ export default async function UserProfilePage({
     { data: userBadges },
     { count: followerCount },
     { count: followingCount },
-    { count: likeCount },
+    _unusedLikeCount,
   ] = await Promise.all([
     supabase
       .from("posts")
@@ -118,11 +118,19 @@ export default async function UserProfilePage({
   // Fetch total likes received (using post ids)
   const postIds = (posts ?? []).map((p) => p.id);
   let totalLikesReceived = 0;
+  const likesByPostId: Record<string, number> = {};
   if (postIds.length > 0) {
-    const { count } = await supabase
-      .from("likes")
-      .select("*", { count: "exact", head: true })
-      .in("post_id", postIds);
+    const [{ count }, { data: likeRows }] = await Promise.all([
+      supabase
+        .from("likes")
+        .select("*", { count: "exact", head: true })
+        .in("post_id", postIds),
+      supabase.from("likes").select("post_id").in("post_id", postIds),
+    ]);
+
+    likeRows?.forEach((row) => {
+      likesByPostId[row.post_id] = (likesByPostId[row.post_id] ?? 0) + 1;
+    });
     totalLikesReceived = count ?? 0;
   }
 
@@ -149,6 +157,7 @@ export default async function UserProfilePage({
 
   const feedPosts: PostCardData[] = (posts ?? []).map((p) => ({
     ...p,
+    like_count: likesByPostId[p.id] ?? 0,
     profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
   }));
 
@@ -287,8 +296,31 @@ export default async function UserProfilePage({
     { label: "Opportunities", value: "opportunities" },
   ];
 
+  const profileInitials = (profile.full_name ?? profile.username ?? "?")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part: string) => part.charAt(0).toUpperCase())
+    .join("");
+
   return (
-    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-8 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-100 to-emerald-50">
+        {profile.cover_image_url ? (
+          <img
+            src={profile.cover_image_url}
+            alt={`${profile.full_name ?? profile.username} cover`}
+            className="h-40 w-full object-cover md:h-56"
+          />
+        ) : (
+          <div className="flex h-40 w-full items-center justify-center bg-gradient-to-r from-emerald-100 to-emerald-50 md:h-56">
+            <span className="text-5xl font-bold tracking-[0.3em] text-emerald-300/70 md:text-7xl">
+              {profileInitials}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
       {/* Sidebar */}
       <div className="lg:col-span-1">
         <ProfileCard
@@ -371,8 +403,20 @@ export default async function UserProfilePage({
               </div>
             ) : (
               <div className="space-y-4">
+                {isOwnProfile ? (
+                  <div className="mb-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
+                    {totalViewCount.toLocaleString()} total views · {totalLikesReceived.toLocaleString()} total likes
+                  </div>
+                ) : null}
                 {feedPosts.map((post) => (
-                  <PostCard key={post.id} post={post} />
+                  <div key={post.id} className="space-y-2">
+                    {isOwnProfile ? (
+                      <div className="ml-auto text-right text-xs text-gray-400">
+                        👁 {(post.view_count ?? 0).toLocaleString()} · ❤ {(post.like_count ?? 0).toLocaleString()}
+                      </div>
+                    ) : null}
+                    <PostCard post={post} />
+                  </div>
                 ))}
               </div>
             )}
@@ -466,6 +510,7 @@ export default async function UserProfilePage({
             userId={user?.id ?? null}
           />
         )}
+      </div>
       </div>
     </div>
   );

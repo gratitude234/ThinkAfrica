@@ -12,7 +12,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, username, full_name, bio, university, field_of_study, avatar_url, interests")
+    .select("id, username, full_name, bio, university, field_of_study, avatar_url, interests, cover_image_url")
     .eq("id", user.id)
     .single();
 
@@ -56,6 +56,7 @@ export default async function SettingsPage() {
             field_of_study: profile.field_of_study ?? null,
             avatar_url: profile.avatar_url ?? null,
             interests: (profile.interests as string[] | null) ?? null,
+            cover_image_url: (profile.cover_image_url as string | null) ?? null,
           }}
         />
       </div>

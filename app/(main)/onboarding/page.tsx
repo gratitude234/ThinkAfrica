@@ -6,8 +6,26 @@ import { createClient } from "@/lib/supabase/client";
 import UniversitySelect from "@/components/ui/UniversitySelect";
 
 const INTEREST_OPTIONS = [
-  "Law", "Economics", "Tech", "Health",
-  "Politics", "Environment", "Education", "Culture",
+  "Law & Justice",
+  "Economics",
+  "Technology",
+  "Public Health",
+  "Politics & Governance",
+  "Environment & Climate",
+  "Education Policy",
+  "African Culture",
+  "Philosophy",
+  "Gender Studies",
+  "Business & Finance",
+  "International Relations",
+  "Computer Science",
+  "Medicine",
+  "Agriculture",
+  "Literature & Writing",
+  "History",
+  "Human Rights",
+  "Social Justice",
+  "Engineering",
 ];
 
 const STEPS = ["Profile", "Interests", "Welcome"];
@@ -121,7 +139,11 @@ export default function OnboardingPage() {
 
   const toggleInterest = (tag: string) => {
     setInterests((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+      prev.includes(tag)
+        ? prev.filter((t) => t !== tag)
+        : prev.length >= 6
+          ? prev
+          : [...prev, tag]
     );
   };
 
@@ -217,16 +239,19 @@ export default function OnboardingPage() {
           <p className="text-gray-500 text-sm mb-5">
             Select topics you care about. We&apos;ll personalize your experience.
           </p>
-          <div className="grid grid-cols-4 gap-2 mb-6">
+          <p className="mb-4 text-xs text-gray-400">
+            Choose up to 6 topics.
+          </p>
+          <div className="mb-6 grid grid-cols-3 gap-2 md:grid-cols-4">
             {INTEREST_OPTIONS.map((tag) => (
               <button
                 key={tag}
                 type="button"
                 onClick={() => toggleInterest(tag)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                   interests.includes(tag)
-                    ? "bg-emerald-brand text-white border-emerald-brand"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-emerald-brand hover:text-emerald-brand"
+                    ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
+                    : "border border-gray-200 bg-gray-50 text-gray-700 hover:border-emerald-300"
                 }`}
               >
                 {tag}

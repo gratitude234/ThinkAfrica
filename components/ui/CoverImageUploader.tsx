@@ -7,12 +7,27 @@ interface CoverImageUploaderProps {
   initialUrl?: string;
   onUpload: (url: string) => void;
   onRemove: () => void;
+  bucket?: string;
+  ensureBucket?: boolean;
+  buildPath?: (userId: string, file: File) => string;
+  emptyTitle?: string;
+  emptyHint?: string;
+  previewHeightClass?: string;
 }
 
 export default function CoverImageUploader({
   initialUrl,
   onUpload,
   onRemove,
+  bucket = "post-images",
+  ensureBucket = false,
+  buildPath = (userId, file) => {
+    const ext = file.name.split(".").pop() ?? "jpg";
+    return `covers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  },
+  emptyTitle = "Add a cover image",
+  emptyHint = "PNG, JPG up to 5MB",
+  previewHeightClass = "h-48",
 }: CoverImageUploaderProps) {
   const [preview, setPreview] = useState<string | null>(initialUrl ?? null);
   const [uploading, setUploading] = useState(false);
@@ -46,27 +61,28 @@ export default function CoverImageUploader({
         return;
       }
 
-      const ext = file.name.split(".").pop() ?? "jpg";
-      const path = `covers/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      if (ensureBucket) {
+        await supabase.storage.createBucket(bucket, { public: true }).catch(() => null);
+      }
+
+      const path = buildPath(user.id, file);
 
       const { error: uploadError } = await supabase.storage
-        .from("post-images")
+        .from(bucket)
         .upload(path, file, { upsert: true });
 
       if (uploadError) {
-        setError("Upload failed: " + uploadError.message);
+        setError(`Upload failed: ${uploadError.message}`);
         setUploading(false);
         return;
       }
 
-      const { data: urlData } = supabase.storage
-        .from("post-images")
-        .getPublicUrl(path);
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
 
       setUploading(false);
       onUpload(urlData.publicUrl);
     },
-    [onUpload]
+    [bucket, buildPath, ensureBucket, onUpload]
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,17 +99,17 @@ export default function CoverImageUploader({
 
   if (preview) {
     return (
-      <div className="relative rounded-lg overflow-hidden">
+      <div className="relative overflow-hidden rounded-lg">
         <img
           src={preview}
           alt="Cover"
-          className="w-full h-48 object-cover rounded-lg"
+          className={`w-full rounded-lg object-cover ${previewHeightClass}`}
         />
-        <div className="absolute inset-0 bg-black/20 flex items-center justify-center gap-2 opacity-0 hover:opacity-100 transition-opacity">
+        <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/20 opacity-0 transition-opacity hover:opacity-100">
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="px-3 py-1.5 bg-white text-gray-800 text-xs font-medium rounded-lg"
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-gray-800"
           >
             Change
           </button>
@@ -103,16 +119,16 @@ export default function CoverImageUploader({
               setPreview(null);
               onRemove();
             }}
-            className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg"
+            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white"
           >
             Remove
           </button>
         </div>
-        {uploading && (
-          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-            <span className="text-sm text-gray-500">Uploading…</span>
+        {uploading ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+            <span className="text-sm text-gray-500">Uploading...</span>
           </div>
-        )}
+        ) : null}
         <input
           ref={inputRef}
           type="file"
@@ -134,18 +150,18 @@ export default function CoverImageUploader({
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+        className={`flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
           dragOver
             ? "border-emerald-brand bg-emerald-50"
-            : "border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400"
+            : "border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100"
         }`}
       >
         {uploading ? (
-          <span className="text-sm text-gray-500">Uploading…</span>
+          <span className="text-sm text-gray-500">Uploading...</span>
         ) : (
           <>
             <svg
-              className="w-8 h-8 text-gray-400 mb-2"
+              className="mb-2 h-8 w-8 text-gray-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -158,16 +174,14 @@ export default function CoverImageUploader({
               />
             </svg>
             <p className="text-sm text-gray-500">
-              <span className="font-medium text-emerald-brand">
-                Add a cover image
-              </span>{" "}
-              or drag and drop
+              <span className="font-medium text-emerald-brand">{emptyTitle}</span> or
+              drag and drop
             </p>
-            <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+            <p className="mt-1 text-xs text-gray-400">{emptyHint}</p>
           </>
         )}
       </div>
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error ? <p className="mt-1 text-xs text-red-500">{error}</p> : null}
       <input
         ref={inputRef}
         type="file"

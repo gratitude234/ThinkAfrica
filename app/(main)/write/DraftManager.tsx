@@ -11,7 +11,7 @@ interface DraftData {
   title: string;
   excerpt: string;
   content: string;
-  tagsInput: string;
+  tags: string[];
   postType: string;
   coverImageUrl: string;
 }
@@ -64,7 +64,7 @@ export function useDraftManager(): UseDraftManagerReturn {
             title: data.title ?? "",
             excerpt: data.excerpt ?? "",
             content: data.content ?? "",
-            tagsInput: (data.tags as string[] | null)?.join(", ") ?? "",
+            tags: (data.tags as string[] | null) ?? [],
             postType: data.type ?? "blog",
             coverImageUrl: (data as { cover_image_url?: string | null }).cover_image_url ?? "",
           });
@@ -109,9 +109,8 @@ export function useDraftManager(): UseDraftManagerReturn {
           return;
         }
 
-        const tags = data.tagsInput
-          .split(",")
-          .map((t) => t.trim().toLowerCase())
+        const tags = data.tags
+          .map((tag) => tag.trim().toLowerCase())
           .filter(Boolean);
 
         const currentDraftId = draftIdRef.current;

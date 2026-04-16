@@ -17,9 +17,12 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-function isForArgument(roundNumber: number) {
-  // TODO: add 'side' column to debate_arguments table for proper splitting
-  return roundNumber % 2 === 1;
+function resolveStance(argument: { stance?: string | null; round_number: number }) {
+  if (argument.stance === "for" || argument.stance === "against") {
+    return argument.stance;
+  }
+
+  return argument.round_number % 2 === 1 ? "for" : "against";
 }
 
 export async function generateMetadata({
@@ -76,9 +79,7 @@ export default async function DebatePage({ params }: PageProps) {
 
   const argumentsWithProfiles = (rawArgs ?? []).map((argument) => ({
     ...argument,
-    profiles: Array.isArray(argument.profiles)
-      ? argument.profiles[0]
-      : argument.profiles,
+    profiles: Array.isArray(argument.profiles) ? argument.profiles[0] : argument.profiles,
   }));
 
   let userVotedIds: string[] = [];
@@ -100,11 +101,11 @@ export default async function DebatePage({ params }: PageProps) {
     argumentsWithProfiles.length > 0
       ? Math.max(...argumentsWithProfiles.map((argument) => argument.round_number))
       : 1;
-  const forArguments = argumentsWithProfiles.filter((argument) =>
-    isForArgument(argument.round_number)
+  const forArguments = argumentsWithProfiles.filter(
+    (argument) => resolveStance(argument) === "for"
   );
   const againstArguments = argumentsWithProfiles.filter(
-    (argument) => !isForArgument(argument.round_number)
+    (argument) => resolveStance(argument) === "against"
   );
   const argumentCount = argumentsWithProfiles.length;
 

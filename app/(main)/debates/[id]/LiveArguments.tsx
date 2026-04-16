@@ -21,6 +21,7 @@ interface Argument {
   round_number: number;
   upvotes: number;
   created_at: string;
+  stance: "for" | "against" | null;
   profiles: ArgumentAuthor | null;
 }
 
@@ -58,9 +59,12 @@ function getInitials(name: string | null | undefined) {
     .join("");
 }
 
-function isForArgument(roundNumber: number) {
-  // TODO: add 'side' column to debate_arguments table for proper splitting
-  return roundNumber % 2 === 1;
+function resolveStance(argument: Pick<Argument, "stance" | "round_number">) {
+  if (argument.stance === "for" || argument.stance === "against") {
+    return argument.stance;
+  }
+
+  return argument.round_number % 2 === 1 ? "for" : "against";
 }
 
 function sortByUpvotes(argumentsList: Argument[]) {
@@ -81,11 +85,7 @@ function updateVoteCount(argumentsList: Argument[], id: string, upvotes: number)
   );
 }
 
-function EmptyColumn({
-  message,
-}: {
-  message: string;
-}) {
+function EmptyColumn({ message }: { message: string }) {
   return (
     <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-400">
       {message}
@@ -104,9 +104,28 @@ function ArgumentCard({
 }) {
   const author = argument.profiles;
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
+  const actualStance = argument.stance;
+  const borderClass =
+    actualStance === "for"
+      ? "border-l-4 border-emerald-500"
+      : actualStance === "against"
+        ? "border-l-4 border-red-400"
+        : "border-l-4 border-gray-200";
+  const badgeClass =
+    actualStance === "for"
+      ? "bg-emerald-100 text-emerald-700"
+      : actualStance === "against"
+        ? "bg-red-100 text-red-600"
+        : "bg-gray-100 text-gray-500";
+  const badgeLabel =
+    actualStance === "for"
+      ? "FOR"
+      : actualStance === "against"
+        ? "AGAINST"
+        : "LEGACY";
 
   return (
-    <div className="mb-3 rounded-xl border border-gray-200 bg-white p-4">
+    <div className={`mb-3 rounded-xl border border-gray-200 bg-white p-4 ${borderClass}`}>
       <div className="mb-3 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           {author?.avatar_url ? (
@@ -122,22 +141,25 @@ function ArgumentCard({
           )}
 
           <div className="min-w-0">
-            {author ? (
-              <Link
-                href={`/${author.username}`}
-                className="text-sm font-semibold text-gray-900 transition-colors hover:text-emerald-brand"
+            <div className="flex items-center gap-2">
+              {author ? (
+                <Link
+                  href={`/${author.username}`}
+                  className="text-sm font-semibold text-gray-900 transition-colors hover:text-emerald-brand"
+                >
+                  {authorName}
+                </Link>
+              ) : (
+                <span className="text-sm font-semibold text-gray-900">Unknown</span>
+              )}
+              <span
+                className={`rounded px-1.5 text-[10px] font-bold ${badgeClass}`}
               >
-                {authorName}
-              </Link>
-            ) : (
-              <span className="text-sm font-semibold text-gray-900">
-                Unknown
+                {badgeLabel}
               </span>
-            )}
+            </div>
             {author?.university ? (
-              <p className="truncate text-xs text-gray-400">
-                {author.university}
-              </p>
+              <p className="truncate text-xs text-gray-400">{author.university}</p>
             ) : null}
           </div>
         </div>
@@ -170,9 +192,7 @@ export default function LiveArguments({
   debateStatus,
   currentRound,
 }: LiveArgumentsProps) {
-  const [forArguments, setForArguments] = useState<Argument[]>(
-    initialForArguments
-  );
+  const [forArguments, setForArguments] = useState<Argument[]>(initialForArguments);
   const [againstArguments, setAgainstArguments] = useState<Argument[]>(
     initialAgainstArguments
   );
@@ -204,12 +224,10 @@ export default function LiveArguments({
 
           const argument = {
             ...data,
-            profiles: Array.isArray(data.profiles)
-              ? data.profiles[0]
-              : data.profiles,
-          };
+            profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles,
+          } as Argument;
 
-          if (isForArgument(argument.round_number)) {
+          if (resolveStance(argument) === "for") {
             setForArguments((prev) => upsertArgument(prev, argument));
           } else {
             setAgainstArguments((prev) => upsertArgument(prev, argument));
@@ -229,9 +247,7 @@ export default function LiveArguments({
           const newUpvotes = payload.new.upvotes as number;
 
           setForArguments((prev) => updateVoteCount(prev, newId, newUpvotes));
-          setAgainstArguments((prev) =>
-            updateVoteCount(prev, newId, newUpvotes)
-          );
+          setAgainstArguments((prev) => updateVoteCount(prev, newId, newUpvotes));
         }
       )
       .subscribe();
@@ -257,12 +273,15 @@ export default function LiveArguments({
   );
   const totalPoints = forPoints + againstPoints;
   const forWidth = totalPoints === 0 ? 50 : (forPoints / totalPoints) * 100;
-  const againstWidth =
-    totalPoints === 0 ? 50 : (againstPoints / totalPoints) * 100;
+  const againstWidth = totalPoints === 0 ? 50 : (againstPoints / totalPoints) * 100;
   const isClosed = debateStatus === "closed";
 
   return (
     <div>
+      <div className="mb-4 text-sm text-gray-500">
+        For: {sortedForArguments.length} · Against: {sortedAgainstArguments.length}
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2">
         <div>
           <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-emerald-700">

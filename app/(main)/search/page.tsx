@@ -28,6 +28,11 @@ interface PersonResult {
   avatar_url: string | null;
 }
 
+interface TopicResult {
+  tag: string;
+  count: number;
+}
+
 type RawPostResult = Omit<PostResult, "profiles"> & {
   profiles: PostResult["profiles"] | PostResult["profiles"][];
 };
@@ -78,61 +83,70 @@ function TrendingButtons({
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"posts" | "people">("posts");
   const [posts, setPosts] = useState<PostResult[]>([]);
   const [people, setPeople] = useState<PersonResult[]>([]);
+  const [topics, setTopics] = useState<TopicResult[]>([]);
+  const [allTopics, setAllTopics] = useState<TopicResult[]>([]);
   const [trending, setTrending] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
 
-  const runSearch = useCallback(async (q: string) => {
-    const trimmed = q.trim();
+  const runSearch = useCallback(
+    async (q: string) => {
+      const trimmed = q.trim();
 
-    if (trimmed.length < 2) {
-      requestIdRef.current += 1;
-      setPosts([]);
-      setPeople([]);
+      if (trimmed.length < 2) {
+        requestIdRef.current += 1;
+        setPosts([]);
+        setPeople([]);
+        setTopics([]);
+        setLoading(false);
+        return;
+      }
+
+      const requestId = ++requestIdRef.current;
+      setLoading(true);
+      const supabase = createClient();
+
+      const [{ data: postResults }, { data: peopleResults }] = await Promise.all([
+        supabase
+          .from("posts")
+          .select(
+            "id, title, slug, excerpt, type, published_at, profiles!posts_author_id_fkey(username, full_name, university)"
+          )
+          .eq("status", "published")
+          .or(`title.ilike.%${trimmed}%,excerpt.ilike.%${trimmed}%`)
+          .order("published_at", { ascending: false })
+          .limit(15),
+        supabase
+          .from("profiles")
+          .select("id, username, full_name, university, points, avatar_url")
+          .or(
+            `username.ilike.%${trimmed}%,full_name.ilike.%${trimmed}%,university.ilike.%${trimmed}%`
+          )
+          .limit(8),
+      ]);
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      const normalizedPosts = ((postResults ?? []) as RawPostResult[]).map((post) => ({
+        ...post,
+        profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
+      }));
+      const normalizedTopics = allTopics
+        .filter((topic) => topic.tag.toLowerCase().includes(trimmed.toLowerCase()))
+        .slice(0, 12);
+
+      setPosts(normalizedPosts);
+      setPeople((peopleResults ?? []) as PersonResult[]);
+      setTopics(normalizedTopics);
       setLoading(false);
-      return;
-    }
-
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    const supabase = createClient();
-
-    const [{ data: postResults }, { data: peopleResults }] = await Promise.all([
-      supabase
-        .from("posts")
-        .select(
-          "id, title, slug, excerpt, type, published_at, profiles!posts_author_id_fkey(username, full_name, university)"
-        )
-        .eq("status", "published")
-        .or(`title.ilike.%${trimmed}%,excerpt.ilike.%${trimmed}%`)
-        .order("published_at", { ascending: false })
-        .limit(15),
-      supabase
-        .from("profiles")
-        .select("id, username, full_name, university, points, avatar_url")
-        .or(
-          `username.ilike.%${trimmed}%,full_name.ilike.%${trimmed}%,university.ilike.%${trimmed}%`
-        )
-        .limit(8),
-    ]);
-
-    if (requestId !== requestIdRef.current) {
-      return;
-    }
-
-    const normalizedPosts = ((postResults ?? []) as RawPostResult[]).map((post) => ({
-      ...post,
-      profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
-    }));
-
-    setPosts(normalizedPosts);
-    setPeople((peopleResults ?? []) as PersonResult[]);
-    setLoading(false);
-  }, []);
+    },
+    [allTopics]
+  );
 
   useEffect(() => {
     if (debounceRef.current) {
@@ -157,7 +171,7 @@ export default function SearchPage() {
       .from("posts")
       .select("tags")
       .eq("status", "published")
-      .limit(100)
+      .limit(500)
       .then(({ data }) => {
         const counts: Record<string, number> = {};
 
@@ -167,23 +181,23 @@ export default function SearchPage() {
           });
         });
 
-        const sorted = Object.entries(counts)
+        const sortedTopics = Object.entries(counts)
           .sort((a, b) => b[1] - a[1])
-          .slice(0, 10)
-          .map(([tag]) => tag);
+          .map(([tag, count]) => ({ tag, count }));
 
-        setTrending(sorted);
+        setAllTopics(sortedTopics);
+        setTrending(sortedTopics.slice(0, 10).map((topic) => topic.tag));
       });
   }, []);
 
   const showResults = query.trim().length >= 2 && !loading;
-  const hasResults = posts.length > 0 || people.length > 0;
+  const totalResults = people.length + posts.length + topics.length;
 
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Search</h1>
 
-      <div className="relative mb-6">
+      <div className="relative mb-3">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -221,6 +235,12 @@ export default function SearchPage() {
         ) : null}
       </div>
 
+      {query.trim().length >= 2 && !loading ? (
+        <p className="mb-4 text-sm text-gray-500">
+          {totalResults} results for &ldquo;{query.trim()}&rdquo;
+        </p>
+      ) : null}
+
       {query.trim().length < 2 && trending.length > 0 ? (
         <div className="mb-8">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -234,29 +254,7 @@ export default function SearchPage() {
 
       {showResults ? (
         <div className="space-y-6">
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                { key: "posts", label: `Posts (${posts.length})` },
-                { key: "people", label: `People (${people.length})` },
-              ] as const
-            ).map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setTab(item.key)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  tab === item.key
-                    ? "bg-emerald-brand text-white"
-                    : "border border-gray-200 bg-white text-gray-600 hover:border-emerald-300"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          {!hasResults ? (
+          {totalResults === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center">
               <p className="text-base font-medium text-gray-700">
                 No results for &ldquo;{query.trim()}&rdquo;
@@ -272,79 +270,109 @@ export default function SearchPage() {
             </div>
           ) : null}
 
-          {hasResults && tab === "posts" ? (
-            <div className="space-y-3">
-              {posts.map((post) => (
-                <Link
-                  key={post.id}
-                  href={`/post/${post.slug}`}
-                  className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
-                >
-                  <div className="flex-shrink-0 pt-0.5">
-                    <Badge type={post.type} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="mt-1 line-clamp-2 text-sm font-semibold text-gray-900">
-                      {post.title}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-400">
-                      {post.profiles
-                        ? `${post.profiles.full_name ?? post.profiles.username}${
-                            post.profiles.university ? ` - ${post.profiles.university}` : ""
-                          }`
-                        : "ThinkAfrica"}
-                    </p>
-                    {post.excerpt ? (
-                      <p className="mt-2 line-clamp-2 text-sm text-gray-500">
-                        {post.excerpt}
-                      </p>
-                    ) : null}
-                  </div>
-                </Link>
-              ))}
-            </div>
+          {people.length > 0 ? (
+            <section>
+              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                People
+              </h2>
+              <div className="space-y-3">
+                {people.map((person) => {
+                  const initials =
+                    person.full_name?.charAt(0)?.toUpperCase() ??
+                    person.username.charAt(0).toUpperCase();
+
+                  return (
+                    <Link
+                      key={person.id}
+                      href={`/${person.username}`}
+                      className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
+                    >
+                      {person.avatar_url ? (
+                        <img
+                          src={person.avatar_url}
+                          alt={person.full_name ?? person.username}
+                          className="h-11 w-11 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+                          {initials}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-gray-900">
+                          {person.full_name ?? person.username}
+                        </p>
+                        <p className="truncate text-xs text-gray-400">
+                          @{person.username}
+                          {person.university ? ` - ${person.university}` : ""}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        {person.points} pts
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
           ) : null}
 
-          {hasResults && tab === "people" ? (
-            <div className="space-y-3">
-              {people.map((person) => {
-                const initials =
-                  person.full_name?.charAt(0)?.toUpperCase() ??
-                  person.username.charAt(0).toUpperCase();
-
-                return (
+          {posts.length > 0 ? (
+            <section>
+              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Posts
+              </h2>
+              <div className="space-y-3">
+                {posts.map((post) => (
                   <Link
-                    key={person.id}
-                    href={`/${person.username}`}
-                    className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
+                    key={post.id}
+                    href={`/post/${post.slug}`}
+                    className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
                   >
-                    {person.avatar_url ? (
-                      <img
-                        src={person.avatar_url}
-                        alt={person.full_name ?? person.username}
-                        className="h-11 w-11 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
-                        {initials}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-gray-900">
-                        {person.full_name ?? person.username}
-                      </p>
-                      <p className="truncate text-xs text-gray-400">
-                        @{person.username}
-                        {person.university ? ` - ${person.university}` : ""}
-                      </p>
+                    <div className="flex-shrink-0 pt-0.5">
+                      <Badge type={post.type} />
                     </div>
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                      {person.points} pts
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="mt-1 line-clamp-2 text-sm font-semibold text-gray-900">
+                        {post.title}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        {post.profiles
+                          ? `${post.profiles.full_name ?? post.profiles.username}${
+                              post.profiles.university ? ` - ${post.profiles.university}` : ""
+                            }`
+                          : "ThinkAfrica"}
+                      </p>
+                      {post.excerpt ? (
+                        <p className="mt-2 line-clamp-2 text-sm text-gray-500">
+                          {post.excerpt}
+                        </p>
+                      ) : null}
+                    </div>
                   </Link>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {topics.length > 0 ? (
+            <section>
+              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Topics
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {topics.map((topic) => (
+                  <Link
+                    key={topic.tag}
+                    href={`/topics/${encodeURIComponent(topic.tag)}`}
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 shadow-sm transition-colors hover:border-emerald-400 hover:text-emerald-700"
+                  >
+                    <span>#{topic.tag}</span>
+                    <span className="text-xs text-gray-400">{topic.count}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
           ) : null}
         </div>
       ) : null}

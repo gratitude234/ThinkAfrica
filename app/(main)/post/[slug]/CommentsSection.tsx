@@ -1,36 +1,43 @@
-// -- Run in Supabase:
-// ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS upvotes integer default 0;
-// CREATE TABLE IF NOT EXISTS public.comment_votes (
-//   user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-//   comment_id uuid NOT NULL REFERENCES public.comments(id) ON DELETE CASCADE,
-//   PRIMARY KEY (user_id, comment_id)
-// );
-
 "use client";
 
-import { useState } from "react";
+// -- ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id uuid REFERENCES comments(id);
+
+import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Toast from "@/components/ui/Toast";
 import { formatRelativeTime } from "@/lib/utils";
 
-interface Comment {
+interface CommentAuthor {
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+export interface ReplyItem {
   id: string;
   content: string;
   created_at: string;
   upvotes: number;
+  parent_id: string | null;
   userVoted?: boolean;
-  profiles: {
-    username: string;
-    full_name: string | null;
-    avatar_url: string | null;
-  } | null;
+  profiles: CommentAuthor | null;
+}
+
+export interface CommentItem extends ReplyItem {
+  replies: ReplyItem[];
+  replyCount: number;
 }
 
 interface CommentsSectionProps {
   postId: string;
-  initialComments: Comment[];
+  initialComments: CommentItem[];
   userId: string | null;
   userProfileId: string | null;
   userVotedCommentIds?: string[];
+}
+
+function sortCommentsByUpvotes<T extends { upvotes: number }>(items: T[]) {
+  return [...items].sort((a, b) => b.upvotes - a.upvotes);
 }
 
 export default function CommentsSection({
@@ -40,55 +47,70 @@ export default function CommentsSection({
   userProfileId,
   userVotedCommentIds = [],
 }: CommentsSectionProps) {
-  const [existingComments, setExistingComments] = useState<Comment[]>(() =>
-    [...initialComments]
-      .map((c) => ({ ...c, userVoted: userVotedCommentIds.includes(c.id) }))
-      .sort((a, b) => b.upvotes - a.upvotes)
+  const [comments, setComments] = useState<CommentItem[]>(() =>
+    sortCommentsByUpvotes(
+      initialComments.map((comment) => ({
+        ...comment,
+        userVoted: userVotedCommentIds.includes(comment.id),
+        replies: comment.replies.map((reply) => ({
+          ...reply,
+          userVoted: userVotedCommentIds.includes(reply.id),
+        })),
+      }))
+    )
   );
-  const [newComments, setNewComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [replyContent, setReplyContent] = useState("");
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [collapsedReplies, setCollapsedReplies] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [replyLoading, setReplyLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const allComments = [...existingComments, ...newComments];
-  const totalCount = allComments.length;
+  const totalCount = useMemo(
+    () => comments.reduce((sum, comment) => sum + 1 + comment.replies.length, 0),
+    [comments]
+  );
+
+  const updateVote = (items: CommentItem[], commentId: string) =>
+    sortCommentsByUpvotes(
+      items.map((comment) => {
+        if (comment.id === commentId) {
+          const wasVoted = comment.userVoted ?? false;
+          return {
+            ...comment,
+            upvotes: wasVoted ? comment.upvotes - 1 : comment.upvotes + 1,
+            userVoted: !wasVoted,
+          };
+        }
+
+        return {
+          ...comment,
+          replies: comment.replies.map((reply) => {
+            if (reply.id !== commentId) return reply;
+            const wasVoted = reply.userVoted ?? false;
+            return {
+              ...reply,
+              upvotes: wasVoted ? reply.upvotes - 1 : reply.upvotes + 1,
+              userVoted: !wasVoted,
+            };
+          }),
+        };
+      })
+    );
 
   const handleVote = async (commentId: string) => {
     if (!userId) return;
 
-    const updateComments = (prev: Comment[]): Comment[] =>
-      prev
-        .map((c) => {
-          if (c.id !== commentId) return c;
-          const wasVoted = c.userVoted ?? false;
-          return {
-            ...c,
-            upvotes: wasVoted ? c.upvotes - 1 : c.upvotes + 1,
-            userVoted: !wasVoted,
-          };
-        })
-        .sort((a, b) => b.upvotes - a.upvotes);
-
-    // Check if it's in existing or new comments
-    const inExisting = existingComments.some((c) => c.id === commentId);
     const target =
-      (inExisting ? existingComments : newComments).find((c) => c.id === commentId);
+      comments.find((comment) => comment.id === commentId) ??
+      comments.flatMap((comment) => comment.replies).find((reply) => reply.id === commentId);
+
     if (!target) return;
 
     const wasVoted = target.userVoted ?? false;
-
-    // Optimistic update
-    if (inExisting) {
-      setExistingComments(updateComments);
-    } else {
-      setNewComments((prev) =>
-        prev.map((c) =>
-          c.id === commentId
-            ? { ...c, upvotes: wasVoted ? c.upvotes - 1 : c.upvotes + 1, userVoted: !wasVoted }
-            : c
-        )
-      );
-    }
+    setComments((prev) => updateVote(prev, commentId));
 
     const supabase = createClient();
     if (wasVoted) {
@@ -112,11 +134,15 @@ export default function CommentsSection({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
+  const handleSubmit = async (parentId: string | null = null) => {
+    const content = parentId ? replyContent : newComment;
+    if (!content.trim()) return;
 
-    setLoading(true);
+    if (parentId) {
+      setReplyLoading(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     const supabase = createClient();
@@ -125,117 +151,238 @@ export default function CommentsSection({
       .insert({
         post_id: postId,
         author_id: userProfileId,
-        content: newComment.trim(),
+        content: content.trim(),
+        parent_id: parentId,
       })
       .select(
-        "id, content, created_at, upvotes, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
+        "id, content, created_at, upvotes, parent_id, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
       )
       .single();
 
     if (insertError) {
-      setError(insertError.message);
+      if (parentId) {
+        setToastMessage(insertError.message);
+      } else {
+        setError(insertError.message);
+      }
     } else if (data) {
-      const comment: Comment = {
+      const commentData = {
         ...data,
         upvotes: data.upvotes ?? 0,
-        userVoted: false,
         profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles,
+        userVoted: false,
       };
-      setNewComments((prev) => [...prev, comment]);
-      setNewComment("");
+
+      if (parentId) {
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment.id === parentId
+              ? {
+                  ...comment,
+                  replies: [...comment.replies, commentData],
+                  replyCount: comment.replyCount + 1,
+                }
+              : comment
+          )
+        );
+        setReplyingToId(null);
+        setReplyContent("");
+        setCollapsedReplies((prev) => {
+          const next = new Set(prev);
+          next.delete(parentId);
+          return next;
+        });
+      } else {
+        setComments((prev) =>
+          sortCommentsByUpvotes([
+            ...prev,
+            {
+              ...commentData,
+              replies: [],
+              replyCount: 0,
+            },
+          ])
+        );
+        setNewComment("");
+      }
     }
 
     setLoading(false);
+    setReplyLoading(false);
   };
+
+  const toggleReplies = (commentId: string) => {
+    setCollapsedReplies((prev) => {
+      const next = new Set(prev);
+      if (next.has(commentId)) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
+    });
+  };
+
+  const renderComment = (comment: ReplyItem, parentId?: string) => (
+    <div key={comment.id} className="flex gap-3">
+      <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
+        {comment.profiles?.full_name?.charAt(0)?.toUpperCase() ??
+          comment.profiles?.username?.charAt(0)?.toUpperCase() ??
+          "?"}
+      </div>
+      <div className="flex-1">
+        <div className="mb-1 flex flex-wrap items-baseline gap-2">
+          <span className="text-sm font-medium text-gray-900">
+            {comment.profiles?.full_name ?? comment.profiles?.username}
+          </span>
+          <span className="text-xs text-gray-400">
+            {formatRelativeTime(comment.created_at)}
+          </span>
+        </div>
+        <p className="mb-2 text-sm leading-relaxed text-gray-700">{comment.content}</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => handleVote(comment.id)}
+            disabled={!userId}
+            aria-label={comment.userVoted ? "Remove upvote" : "Upvote this comment"}
+            className={`flex items-center gap-1 text-xs transition-colors ${
+              comment.userVoted
+                ? "text-emerald-600"
+                : "text-gray-400 hover:text-emerald-600"
+            } disabled:cursor-default disabled:opacity-50`}
+          >
+            <span className="text-base leading-none">▲</span>
+            <span>{comment.upvotes}</span>
+          </button>
+          {parentId ? null : (
+            <button
+              type="button"
+              onClick={() => {
+                setReplyingToId(comment.id);
+                setReplyContent("");
+              }}
+              className="text-xs text-gray-400 transition-colors hover:text-emerald-600"
+            >
+              Reply
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">
+      <h3 className="mb-6 text-lg font-semibold text-gray-900">
         {totalCount} {totalCount === 1 ? "Comment" : "Comments"}
       </h3>
 
-      {/* Comment list */}
-      <div className="space-y-4 mb-8">
-        {totalCount === 0 && (
-          <p className="text-gray-400 text-sm">
+      <div className="mb-8 space-y-6">
+        {totalCount === 0 ? (
+          <p className="text-sm text-gray-400">
             No comments yet. Be the first to respond.
           </p>
-        )}
-        {allComments.map((comment) => (
-          <div key={comment.id} className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0 mt-0.5">
-              {comment.profiles?.full_name?.charAt(0)?.toUpperCase() ??
-                comment.profiles?.username?.charAt(0)?.toUpperCase() ??
-                "?"}
+        ) : null}
+
+        {comments.map((comment) => {
+          const repliesCollapsed = collapsedReplies.has(comment.id);
+
+          return (
+            <div key={comment.id}>
+              {renderComment(comment)}
+
+              {comment.replyCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => toggleReplies(comment.id)}
+                  className="mt-1 cursor-pointer text-xs text-gray-400"
+                >
+                  {comment.replyCount} {comment.replyCount === 1 ? "reply" : "replies"}
+                </button>
+              ) : null}
+
+              {replyingToId === comment.id ? (
+                <div className="ml-10 mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <textarea
+                    value={replyContent}
+                    onChange={(e) => setReplyContent(e.target.value)}
+                    rows={2}
+                    placeholder="Write your reply..."
+                    className="mb-2 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplyingToId(null);
+                        setReplyContent("");
+                      }}
+                      className="rounded-lg px-3 py-1.5 text-xs text-gray-500"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSubmit(comment.id)}
+                      disabled={replyLoading || !replyContent.trim()}
+                      className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                    >
+                      {replyLoading ? "Posting..." : "Post reply"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {comment.replies.length > 0 && !repliesCollapsed ? (
+                <div className="ml-10 mt-4 space-y-4 border-l-2 border-gray-100 pl-4">
+                  {comment.replies.map((reply) => renderComment(reply, comment.id))}
+                </div>
+              ) : null}
             </div>
-            <div className="flex-1">
-              <div className="flex items-baseline gap-2 mb-1 flex-wrap">
-                <span className="text-sm font-medium text-gray-900">
-                  {comment.profiles?.full_name ?? comment.profiles?.username}
-                </span>
-                {comment.upvotes >= 3 && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                    Top response
-                  </span>
-                )}
-                <span className="text-xs text-gray-400">
-                  {formatRelativeTime(comment.created_at)}
-                </span>
-              </div>
-              <p className="text-sm text-gray-700 leading-relaxed mb-2">
-                {comment.content}
-              </p>
-              {/* Upvote button */}
-              <button
-                onClick={() => handleVote(comment.id)}
-                disabled={!userId}
-                aria-label={comment.userVoted ? "Remove upvote" : "Upvote this comment"}
-                className={`flex items-center gap-1 text-xs transition-colors ${
-                  comment.userVoted
-                    ? "text-emerald-600"
-                    : "text-gray-400 hover:text-emerald-600"
-                } disabled:opacity-50 disabled:cursor-default`}
-              >
-                <span className="text-base leading-none">▲</span>
-                <span>{comment.upvotes}</span>
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Add comment */}
       {userId ? (
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSubmit();
+          }}
+        >
           <textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Share your thoughts..."
             rows={3}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none mb-2"
+            className="mb-2 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
           />
-          {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+          {error ? <p className="mb-2 text-sm text-red-600">{error}</p> : null}
           <div className="flex justify-end">
             <button
               type="submit"
               disabled={loading || !newComment.trim()}
-              className="px-4 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Posting..." : "Post comment"}
             </button>
           </div>
         </form>
       ) : (
-        <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
           <a
             href="/login"
-            className="text-emerald-brand font-medium hover:underline"
+            className="font-medium text-emerald-brand hover:underline"
           >
             Sign in
           </a>{" "}
           to leave a comment.
         </div>
       )}
+
+      {toastMessage ? (
+        <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
+      ) : null}
     </div>
   );
 }
