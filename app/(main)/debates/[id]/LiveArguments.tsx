@@ -104,7 +104,7 @@ function ArgumentCard({
 }) {
   const author = argument.profiles;
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
-  const actualStance = argument.stance;
+  const actualStance = resolveStance(argument);
   const borderClass =
     actualStance === "for"
       ? "border-l-4 border-emerald-500"
@@ -129,6 +129,7 @@ function ArgumentCard({
       <div className="mb-3 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           {author?.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={author.avatar_url}
               alt={authorName}
@@ -348,7 +349,7 @@ export default function LiveArguments({
           {isClosed ? "Debate Closed" : "Submit Your Argument"}
         </h3>
         {!currentUserId && !isClosed ? (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+          <div className="rounded-xl border border-gray-200 bg-canvas p-4 text-center text-sm text-gray-500">
             <Link
               href="/login"
               className="font-medium text-emerald-600 hover:underline"

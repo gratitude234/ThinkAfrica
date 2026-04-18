@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
+import { isEnabled } from "@/lib/featureFlags";
 
 interface MobileNavProps {
   user: User | null;
@@ -10,19 +12,55 @@ interface MobileNavProps {
   isAdmin?: boolean;
 }
 
-export default function MobileNav({ user, profile, isAdmin }: MobileNavProps) {
+const PRIMARY_LINKS = [
+  { label: "Home", href: "/" },
+  { label: "Discover", href: "/topics" },
+  { label: "Opportunities", href: "/opportunities" },
+  { label: "Write", href: "/write" },
+] as const;
+
+function itemClass(isActive: boolean) {
+  return `block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+    isActive
+      ? "bg-emerald-50 text-emerald-brand"
+      : "text-gray-700 hover:bg-canvas hover:text-emerald-brand"
+  }`;
+}
+
+export default function MobileNav({
+  user,
+  profile,
+  isAdmin,
+}: MobileNavProps) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const profileHref = profile?.username ? `/${profile.username}` : "/settings";
+  const profileActive = profile?.username
+    ? pathname === profileHref || pathname.startsWith(`${profileHref}/`)
+    : pathname === "/settings" || pathname.startsWith("/settings/");
+
+  const moreLinks = [
+    isEnabled("debates") ? { label: "Debates", href: "/debates" } : null,
+    isEnabled("webinars") ? { label: "Webinars", href: "/webinars" } : null,
+    isEnabled("fellowshipsSection") ? { label: "Fellowships", href: "/fellowships" } : null,
+    isEnabled("ambassadors") ? { label: "Ambassadors", href: "/ambassadors" } : null,
+    { label: "Leaderboard", href: "/leaderboard" },
+    isEnabled("talentMarketplace") ? { label: "People", href: "/talent" } : null,
+    { label: "Bookmarks", href: "/bookmarks" },
+    { label: "Partners", href: "/partners" },
+    { label: "Dashboard", href: "/dashboard" },
+  ].filter(Boolean) as { label: string; href: string }[];
 
   return (
     <>
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="md:hidden p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+        className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 md:hidden"
         aria-label="Toggle menu"
       >
         {open ? (
           <svg
-            className="w-5 h-5"
+            className="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -36,7 +74,7 @@ export default function MobileNav({ user, profile, isAdmin }: MobileNavProps) {
           </svg>
         ) : (
           <svg
-            className="w-5 h-5"
+            className="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -51,70 +89,66 @@ export default function MobileNav({ user, profile, isAdmin }: MobileNavProps) {
         )}
       </button>
 
-      {open && (
-        <div className="md:hidden absolute top-16 left-0 right-0 bg-white border-b border-gray-200 shadow-lg z-40">
-          <nav className="px-4 py-3 space-y-1">
-            <Link
-              href="/"
-              onClick={() => setOpen(false)}
-              className="block px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              Feed
-            </Link>
-            <Link
-              href="/debates"
-              onClick={() => setOpen(false)}
-              className="block px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              Debates
-            </Link>
-            <Link
-              href="/leaderboard"
-              onClick={() => setOpen(false)}
-              className="block px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              Leaderboard
-            </Link>
-            <Link
-              href="/search"
-              onClick={() => setOpen(false)}
-              className="block px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              Search
-            </Link>
-            {user && (
-              <>
-                <div className="border-t border-gray-100 my-1" />
+      {open ? (
+        <div className="absolute left-0 right-0 top-16 z-40 border-b border-gray-200 bg-white shadow-lg md:hidden">
+          <nav className="space-y-1 px-4 py-3">
+            {PRIMARY_LINKS.map((item) => {
+              const isActive =
+                item.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(item.href);
+
+              return (
                 <Link
-                  href="/write"
+                  key={item.href}
+                  href={item.href}
                   onClick={() => setOpen(false)}
-                  className="block px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
+                  className={itemClass(isActive)}
                 >
-                  Write
+                  {item.label}
                 </Link>
-                {profile && (
+              );
+            })}
+
+            <Link
+              href={profileHref}
+              onClick={() => setOpen(false)}
+              className={itemClass(profileActive)}
+            >
+              Me
+            </Link>
+
+            <div className="border-t border-gray-100 pt-3">
+              <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                More
+              </p>
+              <div className="space-y-1">
+                {moreLinks.map((item) => (
                   <Link
-                    href={`/${profile.username}`}
+                    key={item.href}
+                    href={item.href}
                     onClick={() => setOpen(false)}
-                    className="block px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
+                    className={itemClass(
+                      pathname === item.href || pathname.startsWith(`${item.href}/`)
+                    )}
                   >
-                    Profile
+                    {item.label}
                   </Link>
-                )}
-                {isAdmin && (
+                ))}
+                {user && isAdmin ? (
                   <Link
                     href="/admin/review"
                     onClick={() => setOpen(false)}
-                    className="block px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-emerald-brand hover:bg-gray-50 rounded-lg transition-colors"
+                    className={itemClass(pathname.startsWith("/admin"))}
                   >
                     Admin
                   </Link>
-                )}
-              </>
-            )}
+                ) : null}
+              </div>
+            </div>
           </nav>
         </div>
-      )}
+      ) : null}
     </>
   );
 }

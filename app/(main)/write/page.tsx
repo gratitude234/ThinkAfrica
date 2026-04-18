@@ -1,33 +1,28 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import Link from "next/link";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import slugify from "slugify";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
-import TagInput from "@/components/ui/TagInput";
-import {
-  MIN_WORD_COUNTS,
-  POST_TYPE_LABELS,
-  generateExcerpt,
-} from "@/lib/utils";
+import ProfileGate from "@/components/ui/ProfileGate";
+import { formatRelativeTime, type PostType } from "@/lib/utils";
+import ContinueDraftBanner from "./ContinueDraftBanner";
 import { useDraftManager } from "./DraftManager";
-import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import MyDrafts from "./MyDrafts";
+import PublishDrawer from "./PublishDrawer";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
   loading: () => (
-    <div className="min-h-[400px] rounded-lg border border-gray-200 bg-gray-50 animate-pulse" />
+    <div className="min-h-[400px] animate-pulse rounded-lg border border-gray-200 bg-canvas" />
   ),
 });
 
-const POST_TYPES = ["blog", "essay", "research", "policy_brief"] as const;
-type PostType = (typeof POST_TYPES)[number];
-
 interface DraftPayload {
   title: string;
+  subtitle: string;
   excerpt: string;
   content: string;
   tags: string[];
@@ -45,22 +40,62 @@ function countWords(value: string) {
 
 export default function WritePage() {
   const router = useRouter();
-  const { draftId, saveDraft, initialData, loadingDraft } = useDraftManager();
+  const {
+    draftId,
+    saveStatus,
+    lastSaved,
+    saveDraft,
+    initialData,
+    loadingDraft,
+    localBackup,
+    restoreFromBackup,
+    dismissBackup,
+  } = useDraftManager();
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [profileInfo, setProfileInfo] = useState<{
+    full_name: string | null;
+    username: string | null;
+    university: string | null;
+  } | null>(null);
+  const [loadingProfileInfo, setLoadingProfileInfo] = useState(true);
   const [postType, setPostType] = useState<PostType>("blog");
   const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [wordCount, setWordCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isPublishDrawerOpen, setIsPublishDrawerOpen] = useState(false);
+  const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      setCurrentUserId(user?.id ?? null);
+
+      if (!user) {
+        setLoadingProfileInfo(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, username, university")
+        .eq("id", user.id)
+        .single();
+
+      setProfileInfo(profile ?? null);
+      setLoadingProfileInfo(false);
+    });
+  }, []);
 
   useEffect(() => {
     if (initialData) {
       setPostType((initialData.postType as PostType) ?? "blog");
       setTitle(initialData.title);
+      setSubtitle(initialData.subtitle ?? "");
       setExcerpt(initialData.excerpt);
       setTags(initialData.tags);
       setContent(initialData.content);
@@ -72,140 +107,74 @@ export default function WritePage() {
   const getCurrentData = useCallback(
     (overrides: Partial<DraftPayload> = {}): DraftPayload => ({
       title: overrides.title ?? title,
+      subtitle: overrides.subtitle ?? subtitle,
       excerpt: overrides.excerpt ?? excerpt,
       content: overrides.content ?? content,
       tags: overrides.tags ?? tags,
       postType: overrides.postType ?? postType,
       coverImageUrl: overrides.coverImageUrl ?? coverImageUrl,
     }),
-    [title, excerpt, content, tags, postType, coverImageUrl]
+    [title, subtitle, excerpt, content, tags, postType, coverImageUrl]
   );
 
-  const handleEditorUpdate = useCallback(
-    (html: string, words: number) => {
-      setContent(html);
-      setWordCount(words);
-    },
-    []
-  );
+  const handleEditorUpdate = useCallback((html: string, words: number) => {
+    setContent(html);
+    setWordCount(words);
+  }, []);
 
-  const minWords = MIN_WORD_COUNTS[postType];
-  const meetsWordCount = wordCount >= minWords;
+  const handleMetadataChange = useCallback(
+    (changes: {
+      postType?: PostType;
+      tags?: string[];
+      coverImageUrl?: string;
+      excerpt?: string;
+    }) => {
+      if (changes.postType) setPostType(changes.postType);
+      if (changes.tags) setTags(changes.tags);
+      if (typeof changes.coverImageUrl === "string") {
+        setCoverImageUrl(changes.coverImageUrl);
+      }
+      if (typeof changes.excerpt === "string") {
+        setExcerpt(changes.excerpt);
+      }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!title.trim()) {
-      setError("Please enter a title.");
-      return;
-    }
-
-    if (!meetsWordCount) {
-      setError(
-        `${POST_TYPE_LABELS[postType]} posts require at least ${minWords.toLocaleString()} words. Current: ${wordCount.toLocaleString()}`
+      void saveDraft(
+        getCurrentData({
+          postType: changes.postType,
+          tags: changes.tags,
+          coverImageUrl: changes.coverImageUrl,
+          excerpt: changes.excerpt,
+        })
       );
+    },
+    [getCurrentData, saveDraft]
+  );
+
+  const saveStatusText = useMemo(() => {
+    if (saveStatus === "saving") return "Saving draft...";
+    if (saveStatus === "saved" && lastSaved) {
+      return `Saved ${formatRelativeTime(lastSaved.toISOString())}`;
+    }
+    if (saveStatus === "error") return "Couldn't save draft";
+    if (saveStatus === "idle") return draftId ? "Draft ready" : "Autosave on";
+    return "Unsaved changes";
+  }, [draftId, lastSaved, saveStatus]);
+
+  const canOpenPublish =
+    title.trim().length > 0 &&
+    wordCount > 0 &&
+    !!currentUserId &&
+    !loadingProfileInfo;
+
+  const handleReadyToPublish = () => {
+    if (!canOpenPublish) return;
+
+    if (!profileInfo?.username) {
+      setIsProfileGateOpen(true);
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setLoading(false);
-      router.push("/login");
-      return;
-    }
-
-    const finalExcerpt = excerpt.trim() || generateExcerpt(content, 220);
-    const normalizedTags = tags
-      .map((tag) => tag.trim().toLowerCase())
-      .filter(Boolean);
-
-    const now = new Date().toISOString();
-    const isInstantPublish = postType === "blog" || postType === "essay";
-    const submitStatus = isInstantPublish ? "published" : "pending";
-    const submitPublishedAt = isInstantPublish ? now : null;
-    let publishedPostSlug = "";
-
-    if (draftId) {
-      const { data: updated, error: updateError } = await supabase
-        .from("posts")
-        .update({
-          title: title.trim(),
-          excerpt: finalExcerpt,
-          content,
-          tags: normalizedTags,
-          type: postType,
-          cover_image_url: coverImageUrl || null,
-          status: submitStatus,
-          published_at: submitPublishedAt,
-        })
-        .eq("id", draftId)
-        .eq("author_id", user.id)
-        .select("slug")
-        .single();
-
-      if (updateError || !updated) {
-        setError(updateError?.message ?? "Failed to publish.");
-        setLoading(false);
-        return;
-      }
-
-      publishedPostSlug = updated.slug;
-    } else {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("id", user.id)
-        .single();
-
-      if (!profile) {
-        setError("Profile not found. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      const baseSlug = slugify(title, { lower: true, strict: true });
-      const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
-
-      const { data: inserted, error: insertError } = await supabase
-        .from("posts")
-        .insert({
-          author_id: profile.id,
-          title: title.trim(),
-          slug: uniqueSlug,
-          content,
-          excerpt: finalExcerpt,
-          type: postType,
-          tags: normalizedTags,
-          status: submitStatus,
-          published_at: submitPublishedAt,
-          cover_image_url: coverImageUrl || null,
-        })
-        .select("slug")
-        .single();
-
-      if (insertError || !inserted) {
-        setError(insertError?.message ?? "Failed to publish.");
-        setLoading(false);
-        return;
-      }
-
-      publishedPostSlug = inserted.slug;
-    }
-
-    router.push(
-      `/submitted?slug=${encodeURIComponent(
-        publishedPostSlug
-      )}&type=${encodeURIComponent(postType)}&live=${
-        isInstantPublish ? "1" : "0"
-      }`
-    );
+    setIsPublishDrawerOpen(true);
   };
 
   if (loadingDraft) {
@@ -218,154 +187,119 @@ export default function WritePage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <MyDrafts activeDraftId={draftId} />
-
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Write a post</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Share your ideas with Africa&apos;s intellectual community.
-          </p>
+      <div className="mb-6 flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <Link href="/" className="text-sm font-semibold tracking-wide text-gray-900">
+          ThinkAfrika
+        </Link>
+        <p className="text-xs text-gray-400">{saveStatusText}</p>
+        <div className="flex items-center gap-3 sm:justify-end">
+          <Button variant="ghost" type="button" onClick={() => router.push("/")}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="lg"
+            disabled={!canOpenPublish}
+            onClick={handleReadyToPublish}
+          >
+            Ready to publish →
+          </Button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <CoverImageUploader
-          initialUrl={coverImageUrl}
-          onUpload={(url) => {
-            setCoverImageUrl(url);
-            saveDraft(getCurrentData({ coverImageUrl: url }));
-          }}
-          onRemove={() => {
-            setCoverImageUrl("");
-            saveDraft(getCurrentData({ coverImageUrl: "" }));
-          }}
-        />
-
-        <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            Post type
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {POST_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => {
-                  setPostType(type);
-                  saveDraft(getCurrentData({ postType: type }));
-                }}
-                className={`rounded-lg border px-4 py-2 text-left text-sm font-medium transition-colors ${
-                  postType === type
-                    ? "border-emerald-brand bg-emerald-brand text-white"
-                    : "border-gray-200 bg-white text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
-                }`}
-              >
-                <span className="block">{POST_TYPE_LABELS[type]}</span>
-                <span
-                  className={`mt-0.5 block text-xs font-normal ${
-                    postType === type ? "text-emerald-100" : "text-gray-400"
-                  }`}
-                >
-                  {MIN_WORD_COUNTS[type].toLocaleString()}+ words
-                </span>
-              </button>
-            ))}
+      {localBackup ? (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+          <span className="text-amber-800">
+            We found an unsaved draft: &quot;{localBackup.title || "Untitled"}&quot;
+          </span>
+          <div className="ml-4 flex flex-shrink-0 gap-3">
+            <button
+              type="button"
+              onClick={restoreFromBackup}
+              className="font-medium text-amber-700 underline hover:text-amber-900"
+            >
+              Restore
+            </button>
+            <button
+              type="button"
+              onClick={dismissBackup}
+              className="text-amber-500 hover:text-amber-700"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
+      ) : null}
 
+      <ContinueDraftBanner activeDraftId={draftId} />
+      <MyDrafts activeDraftId={draftId} />
+
+      <div className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Title
-          </label>
           <input
             type="text"
             value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              saveDraft(getCurrentData({ title: e.target.value }));
+            onChange={(event) => {
+              setTitle(event.target.value);
+              saveDraft(getCurrentData({ title: event.target.value }));
             }}
-            placeholder="Enter your title..."
-            required
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-base font-medium focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+            placeholder="What are you writing about?"
+            className="mb-4 w-full border-none px-0 text-3xl font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
           />
-        </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Summary
-          </label>
-          <p className="mb-1.5 text-xs text-gray-400">
-            This appears in the feed preview. Keep it under 200 characters.
-          </p>
-          <div className="relative">
-              <textarea
-                value={excerpt}
-                onChange={(e) => {
-                  setExcerpt(e.target.value);
-                  saveDraft(getCurrentData({ excerpt: e.target.value }));
+          {title.trim().length > 0 ? (
+            <input
+              type="text"
+              value={subtitle}
+              onChange={(event) => {
+                setSubtitle(event.target.value);
+                saveDraft(getCurrentData({ subtitle: event.target.value }));
               }}
-              maxLength={200}
-              rows={2}
-              placeholder="Write a short summary of your post..."
-              className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+              placeholder="Add a subtitle (optional)"
+              className="mb-6 w-full border-none px-0 text-lg text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-0"
             />
-            <span className="absolute bottom-2 right-2 text-xs text-gray-400">
-              {excerpt.length}/200
-            </span>
-          </div>
-        </div>
+          ) : null}
 
-        <TagInput
-          label="Tags"
-          value={tags}
-          helperText="Add up to five tags to help readers discover your piece."
-          placeholder="e.g. economics"
-          onChange={(nextTags) => {
-            setTags(nextTags);
-            void saveDraft({
-              ...getCurrentData(),
-              tags: nextTags,
-            });
-          }}
-        />
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Content
-          </label>
           <Editor
-            key={initialData ? "loaded" : "empty"}
+            key={draftId ?? (initialData ? "draft" : "empty")}
             content={content}
-            minWords={minWords}
-            placeholder={`Start writing your ${POST_TYPE_LABELS[postType].toLowerCase()}...`}
+            placeholder="Start writing..."
             onUpdate={handleEditorUpdate}
             onAutoSave={() => saveDraft(getCurrentData())}
           />
         </div>
+      </div>
 
-        {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <Button variant="secondary" type="button" onClick={() => router.push("/")}>
-            Cancel
-          </Button>
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={() => saveDraft(getCurrentData())}
-          >
-            Save draft
-          </Button>
-          <Button type="submit" loading={loading} size="lg">
-            Publish
-          </Button>
-        </div>
-      </form>
+      {currentUserId ? (
+        <>
+          <PublishDrawer
+            open={isPublishDrawerOpen}
+            onClose={() => setIsPublishDrawerOpen(false)}
+            draftId={draftId}
+            title={title}
+            subtitle={subtitle}
+            content={content}
+            wordCount={wordCount}
+            userId={currentUserId}
+            initialTags={tags}
+            initialCoverImageUrl={coverImageUrl}
+            initialExcerpt={excerpt}
+            initialPostType={postType}
+            onMetadataChange={handleMetadataChange}
+          />
+          <ProfileGate
+            open={isProfileGateOpen}
+            userId={currentUserId}
+            initialProfile={profileInfo}
+            onClose={() => setIsProfileGateOpen(false)}
+            onComplete={(profile) => {
+              setProfileInfo(profile);
+              setIsProfileGateOpen(false);
+              setIsPublishDrawerOpen(true);
+            }}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

@@ -6,18 +6,17 @@ import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import TagInput from "@/components/ui/TagInput";
-import { MIN_WORD_COUNTS, POST_TYPE_LABELS } from "@/lib/utils";
+import { MIN_WORD_COUNTS, POST_TYPE_LABELS, type PostType } from "@/lib/utils";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
   loading: () => (
-    <div className="min-h-[400px] rounded-lg border border-gray-200 bg-gray-50 animate-pulse" />
+    <div className="min-h-[400px] rounded-lg border border-gray-200 bg-canvas animate-pulse" />
   ),
 });
 
-const POST_TYPES = ["blog", "essay", "research", "policy_brief"] as const;
-type PostType = (typeof POST_TYPES)[number];
+const POST_TYPES: PostType[] = ["blog", "essay", "research", "policy_brief"];
 
 interface Post {
   id: string;

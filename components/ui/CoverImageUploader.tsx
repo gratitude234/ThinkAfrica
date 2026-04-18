@@ -100,6 +100,7 @@ export default function CoverImageUploader({
   if (preview) {
     return (
       <div className="relative overflow-hidden rounded-lg">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={preview}
           alt="Cover"
@@ -153,7 +154,7 @@ export default function CoverImageUploader({
         className={`flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
           dragOver
             ? "border-emerald-brand bg-emerald-50"
-            : "border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100"
+            : "border-gray-300 bg-canvas hover:border-gray-400 hover:bg-gray-100"
         }`}
       >
         {uploading ? (

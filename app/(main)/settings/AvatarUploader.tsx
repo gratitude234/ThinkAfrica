@@ -32,19 +32,25 @@ export default function AvatarUploader({
     }
 
     setError(null);
-    setPreview(URL.createObjectURL(file));
+    // Show local preview immediately for responsiveness
+    const localPreview = URL.createObjectURL(file);
+    setPreview(localPreview);
     setUploading(true);
 
     const supabase = createClient();
-    const ext = file.name.split(".").pop() ?? "jpg";
-    const path = `${userId}/${Date.now()}.${ext}`;
+
+    // FIX 1: Use a fixed path per user (not timestamp) so the same file is
+    // always overwritten. Avoids storage accumulation and stale URL mismatches.
+    const ext = file.type === "image/png" ? "png" : "jpg";
+    const path = `${userId}/avatar.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(path, file, { upsert: true });
+      .upload(path, file, { upsert: true, contentType: file.type });
 
     if (uploadError) {
       setError("Upload failed: " + uploadError.message);
+      setPreview(currentUrl); // revert to last known good URL
       setUploading(false);
       return;
     }
@@ -53,20 +59,18 @@ export default function AvatarUploader({
       .from("avatars")
       .getPublicUrl(path);
 
-    // Update profile immediately
-    await supabase
-      .from("profiles")
-      .update({ avatar_url: urlData.publicUrl })
-      .eq("id", userId);
+    const cleanUrl = urlData.publicUrl;
 
+    setPreview(cleanUrl);
     setUploading(false);
-    onUpload(urlData.publicUrl);
+    onUpload(cleanUrl);
   };
 
   return (
     <div className="flex items-center gap-4">
       <div className="relative">
         {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={preview}
             alt="Avatar"

@@ -1,7 +1,5 @@
 "use client";
 
-// -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cover_image_url text;
-
 import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
@@ -45,7 +43,7 @@ interface Profile {
 }
 
 const INPUT_STYLES =
-  "w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
+  "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 export default function ProfileForm({ profile }: { profile: Profile }) {
   const [fullName, setFullName] = useState(profile.full_name ?? "");
@@ -83,6 +81,47 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         ? prev.filter((item) => item !== interest)
         : [...prev, interest]
     );
+  };
+
+  // FIX: Auto-save avatar URL to DB immediately on upload
+  const handleAvatarUpload = async (url: string) => {
+    setAvatarUrl(url);
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ avatar_url: url })
+      .eq("id", profile.id);
+
+    if (error) {
+      setToast("Failed to save profile photo.");
+    }
+  };
+
+  // FIX: Auto-save cover URL to DB immediately on upload
+  const handleCoverUpload = async (url: string) => {
+    setCoverImageUrl(url);
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ cover_image_url: url })
+      .eq("id", profile.id);
+
+    if (error) {
+      setToast("Failed to save cover photo.");
+    }
+  };
+
+  // FIX: Auto-clear cover URL in DB on remove
+  const handleCoverRemove = async () => {
+    setCoverImageUrl(null);
+
+    const supabase = createClient();
+    await supabase
+      .from("profiles")
+      .update({ cover_image_url: null })
+      .eq("id", profile.id);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -125,10 +164,9 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
           </label>
           <CoverImageUploader
             initialUrl={coverImageUrl ?? undefined}
-            onUpload={setCoverImageUrl}
-            onRemove={() => setCoverImageUrl(null)}
-            bucket="covers"
-            ensureBucket={true}
+            onUpload={handleCoverUpload}       // FIX: was setCoverImageUrl
+            onRemove={handleCoverRemove}       // FIX: was () => setCoverImageUrl(null)
+            bucket="avatars"
             buildPath={(userId) => `${userId}/cover.webp`}
             emptyTitle="Upload a cover image"
             emptyHint="This appears at the top of your profile."
@@ -144,7 +182,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             userId={profile.id}
             currentUrl={avatarUrl}
             fullName={fullName}
-            onUpload={setAvatarUrl}
+            onUpload={handleAvatarUpload}      // FIX: was setAvatarUrl
           />
         </div>
 

@@ -4,6 +4,46 @@ import { createClient } from "@/lib/supabase/server";
 import Badge from "@/components/ui/Badge";
 import Footer from "@/components/ui/Footer";
 
+type SamplePostCard = {
+  id: string;
+  title: string;
+  slug: string;
+  type: string;
+  cover_image_url: string | null;
+  profiles: {
+    username: string | null;
+    full_name: string | null;
+    university: string | null;
+  } | null;
+};
+
+type PlaceholderCard = {
+  title: string;
+  subtitle: string;
+  summary: string;
+};
+
+const PLACEHOLDER_CARDS: PlaceholderCard[] = [
+  {
+    title: "Featured this week",
+    subtitle: "Youth unemployment",
+    summary:
+      "Essays and policy writing on jobs, skills, and what growth should look like for young Africans.",
+  },
+  {
+    title: "Featured this week",
+    subtitle: "AfCFTA and trade",
+    summary:
+      "Student perspectives on regional trade, industrial policy, and what integration means beyond headlines.",
+  },
+  {
+    title: "Featured this week",
+    subtitle: "Climate adaptation",
+    summary:
+      "Research and commentary on resilience, agriculture, and the policies shaping climate futures across the continent.",
+  },
+];
+
 export default async function LandingPage() {
   const supabase = await createClient();
 
@@ -30,7 +70,7 @@ export default async function LandingPage() {
     supabase.from("debates").select("*", { count: "exact", head: true }),
   ]);
 
-  const samplePosts = (samplePostsRaw ?? []).map((post) => ({
+  const samplePosts: SamplePostCard[] = (samplePostsRaw ?? []).map((post) => ({
     ...post,
     profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
   }));
@@ -39,70 +79,30 @@ export default async function LandingPage() {
     {
       title: "Publish",
       description:
-        "Share blogs, essays, research papers, and policy briefs with Africa's academic community.",
+        "Essays, research, and policy briefs - long-form writing that builds a real portfolio, not a feed of hot takes.",
       iconBg: "bg-emerald-100",
       iconColor: "text-emerald-700",
-      icon: (
-        <svg
-          className="h-7 w-7"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M16.5 3.5l4 4M5 19l3.5-.5L20 7 16 3 4.5 14.5 4 18z"
-          />
-        </svg>
-      ),
+      numeral: "01",
     },
     {
-      title: "Debate",
+      title: "Be discovered",
       description:
-        "Engage in structured intellectual debates on the most pressing issues facing Africa today.",
+        "Your profile is your academic résumé. Verified by your university, visible to fellowships and recruiters across the continent.",
       iconBg: "bg-amber-100",
       iconColor: "text-amber-700",
-      icon: (
-        <svg
-          className="h-7 w-7"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-          />
-        </svg>
-      ),
+      numeral: "02",
     },
     {
-      title: "Grow",
+      title: "Think together",
       description:
-        "Climb the leaderboard, earn badges, and unlock fellowships as you contribute to the community.",
+        "Read, annotate, and respond to the writers shaping Africa's next decade - from students at every university.",
       iconBg: "bg-purple-100",
       iconColor: "text-purple-700",
-      icon: (
-        <svg
-          className="h-7 w-7"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4z"
-          />
-        </svg>
-      ),
+      numeral: "03",
     },
   ];
+
+  const heroCards = [...samplePosts, ...PLACEHOLDER_CARDS].slice(0, 3);
 
   return (
     <div>
@@ -116,58 +116,83 @@ export default async function LandingPage() {
               height={48}
               className="mb-6 h-12 w-auto"
             />
-            <h1 className="text-4xl font-bold leading-tight text-gray-900 sm:text-5xl">
-              Africa&apos;s intellectual social network
+            <h1 className="font-display text-5xl leading-[1.05] tracking-tight text-ink sm:text-6xl lg:text-7xl">
+              Where Africa&apos;s next thinkers are read.
             </h1>
-            <p className="mt-4 mb-8 text-lg text-gray-500">
-              Publish research, debate ideas, and build your academic profile -
-              built for African university students.
+            <p className="mb-8 mt-4 text-lg text-ink-muted sm:text-xl">
+              Publish essays, research, and policy briefs alongside students from
+              every African university. Build a verified academic profile that
+              travels with you - to fellowships, to grad school, to the
+              continent&apos;s most important conversations.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/signup"
+                href="/?guest=1"
                 className="rounded-xl bg-emerald-brand px-6 py-3 font-semibold text-white transition-colors hover:bg-emerald-600"
               >
-                Start Writing
+                Read First
               </Link>
               <Link
-                href="/?guest=1"
-                className="rounded-xl border border-gray-300 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                href="/signup"
+                className="rounded-xl border border-gray-300 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-canvas"
               >
-                Explore the Feed
+                Join Free
               </Link>
             </div>
           </div>
 
           <div className="max-h-80 overflow-hidden md:max-h-none">
             <div className="space-y-3">
-              {samplePosts.map((post) => {
-                const author = post.profiles;
+              {heroCards.map((item, index) => {
+                if ("id" in item) {
+                  const author = item.profiles;
+
+                  return (
+                    <Link
+                      key={item.id}
+                      href={`/post/${item.slug}`}
+                      className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <Badge type={item.type} />
+                        <h2 className="mt-3 line-clamp-2 text-sm font-semibold text-gray-900">
+                          {item.title}
+                        </h2>
+                        <p className="mt-2 text-xs text-gray-400">
+                          {author?.full_name ?? author?.username ?? "ThinkAfrika"}
+                          {author?.university ? ` · ${author.university}` : ""}
+                        </p>
+                      </div>
+                      {item.cover_image_url ? (
+                        <img
+                          src={item.cover_image_url}
+                          alt={item.title}
+                          className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-canvas text-xs font-semibold uppercase tracking-wide text-emerald-brand">
+                          Read
+                        </div>
+                      )}
+                    </Link>
+                  );
+                }
 
                 return (
-                  <Link
-                    key={post.id}
-                    href={`/post/${post.slug}`}
-                    className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
+                  <div
+                    key={`${item.title}-${index}`}
+                    className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
                   >
-                    <div className="min-w-0 flex-1">
-                      <Badge type={post.type} />
-                      <h2 className="mt-3 line-clamp-2 text-sm font-semibold text-gray-900">
-                        {post.title}
-                      </h2>
-                      <p className="mt-2 text-xs text-gray-400">
-                        {author?.full_name ?? author?.username ?? "ThinkAfrica"}
-                        {author?.university ? ` · ${author.university}` : ""}
-                      </p>
-                    </div>
-                    {post.cover_image_url ? (
-                      <img
-                        src={post.cover_image_url}
-                        alt={post.title}
-                        className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
-                      />
-                    ) : null}
-                  </Link>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+                      {item.title}
+                    </p>
+                    <h2 className="mt-3 text-xl font-semibold text-gray-900">
+                      {item.subtitle}
+                    </h2>
+                    <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                      {item.summary}
+                    </p>
+                  </div>
                 );
               })}
             </div>
@@ -175,28 +200,50 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <section className="border-y border-gray-100 bg-gray-50 py-8">
-        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 text-center sm:grid-cols-3">
-          <div>
-            <p className="text-2xl font-bold text-gray-900">
-              {(postCount ?? 0).toLocaleString()}+
+      {(userCount ?? 0) >= 20 ? (
+        <section className="border-y border-gray-100 bg-white py-6">
+          <div className="mx-auto max-w-5xl px-4">
+            <p className="mb-4 text-center text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              Writers from
             </p>
-            <p className="text-sm text-gray-500">Published posts</p>
+            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm font-medium text-gray-500">
+              <span>University of Ibadan</span>
+              <span>Ashesi University</span>
+              <span>Makerere University</span>
+              <span>Joseph Ayo Babalola University</span>
+              <span>University of Cape Town</span>
+              <span>Cairo University</span>
+              <span>Strathmore University</span>
+              <span>University of Lagos</span>
+            </div>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-gray-900">
-              {(userCount ?? 0).toLocaleString()}+
-            </p>
-            <p className="text-sm text-gray-500">Students</p>
+        </section>
+      ) : null}
+
+      {(postCount ?? 0) >= 100 && (userCount ?? 0) >= 50 ? (
+        <section className="border-y border-gray-100 bg-canvas py-8">
+          <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 text-center sm:grid-cols-3">
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {(postCount ?? 0).toLocaleString()}+
+              </p>
+              <p className="text-sm text-gray-500">Published posts</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {(userCount ?? 0).toLocaleString()}+
+              </p>
+              <p className="text-sm text-gray-500">Students</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {(debateCount ?? 0).toLocaleString()}+
+              </p>
+              <p className="text-sm text-gray-500">Debates</p>
+            </div>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-gray-900">
-              {(debateCount ?? 0).toLocaleString()}+
-            </p>
-            <p className="text-sm text-gray-500">Debates</p>
-          </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="py-16">
         <div className="mx-auto grid max-w-4xl gap-8 sm:grid-cols-3">
@@ -205,7 +252,9 @@ export default async function LandingPage() {
               <div
                 className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${feature.iconBg} ${feature.iconColor}`}
               >
-                {feature.icon}
+                <span className="font-display text-4xl leading-none">
+                  {feature.numeral}
+                </span>
               </div>
               <h3 className="mb-2 font-semibold text-gray-900">
                 {feature.title}
@@ -218,13 +267,13 @@ export default async function LandingPage() {
 
       <section className="mb-8 rounded-2xl bg-emerald-brand p-10 text-center text-white">
         <p className="mb-6 text-xl font-semibold">
-          Join thousands of African students already thinking out loud.
+          A continent of ideas is waiting to read you.
         </p>
         <Link
           href="/signup"
           className="inline-block rounded-lg bg-white px-6 py-3 font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
         >
-          Join ThinkAfrica Free
+          Claim your handle →
         </Link>
       </section>
 

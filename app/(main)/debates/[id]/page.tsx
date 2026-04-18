@@ -17,6 +17,11 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * Resolves the stance of an argument.
+ * New rows have an explicit `stance` column value.
+ * Legacy rows (stance = null) fall back to odd/even round parity.
+ */
 function resolveStance(argument: { stance?: string | null; round_number: number }) {
   if (argument.stance === "for" || argument.stance === "against") {
     return argument.stance;
@@ -114,7 +119,7 @@ export default async function DebatePage({ params }: PageProps) {
       <div className="sticky top-16 z-40 -mx-4 border-b border-gray-200 bg-white px-6 py-4 sm:-mx-6 lg:-mx-8">
         <div className="mx-auto flex max-w-5xl flex-col gap-3 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center">
           <div className="min-w-0">
-            <h1 className="line-clamp-1 text-xl font-bold text-gray-900">
+            <h1 className="font-display line-clamp-1 text-xl font-bold text-ink">
               {debate.title}
             </h1>
           </div>

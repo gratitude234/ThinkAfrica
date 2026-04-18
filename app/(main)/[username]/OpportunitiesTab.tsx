@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ContactInquiryModal from "@/components/profile/ContactInquiryModal";
 import { createClient } from "@/lib/supabase/client";
 
 const OPPORTUNITY_TYPES = ["internship", "research", "fellowship", "job"];
@@ -44,8 +45,6 @@ export default function OpportunitiesTab({ profileId, isOwnProfile, talentProfil
 
   // Inquiry modal state
   const [showInquiry, setShowInquiry] = useState(false);
-  const [inquiry, setInquiry] = useState({ organization_name: "", contact_email: "", message: "" });
-  const [sendingInquiry, setSendingInquiry] = useState(false);
   const [inquirySent, setInquirySent] = useState(false);
 
   const toggleType = (type: string) => {
@@ -82,21 +81,6 @@ export default function OpportunitiesTab({ profileId, isOwnProfile, talentProfil
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
     router.refresh();
-  };
-
-  const sendInquiry = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!talentProfile) return;
-    setSendingInquiry(true);
-    const supabase = createClient();
-    await supabase.from("talent_inquiries").insert([{
-      talent_id: talentProfile.id,
-      ...inquiry,
-    }]);
-    setSendingInquiry(false);
-    setInquirySent(true);
-    setShowInquiry(false);
-    setInquiry({ organization_name: "", contact_email: "", message: "" });
   };
 
   if (isOwnProfile) {
@@ -271,41 +255,14 @@ export default function OpportunitiesTab({ profileId, isOwnProfile, talentProfil
       </div>
 
       {/* Inquiry modal */}
-      {showInquiry && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm shadow-xl">
-            <h3 className="font-semibold text-gray-900 mb-4">Send an Inquiry</h3>
-            <form onSubmit={sendInquiry} className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Organization *</label>
-                <input required type="text" value={inquiry.organization_name}
-                  onChange={(e) => setInquiry({ ...inquiry, organization_name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Your Email *</label>
-                <input required type="email" value={inquiry.contact_email}
-                  onChange={(e) => setInquiry({ ...inquiry, contact_email: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                <textarea rows={3} value={inquiry.message}
-                  onChange={(e) => setInquiry({ ...inquiry, message: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none" />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <button type="button" onClick={() => setShowInquiry(false)}
-                  className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 transition-colors">Cancel</button>
-                <button type="submit" disabled={sendingInquiry}
-                  className="px-4 py-1.5 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors">
-                  {sendingInquiry ? "Sending..." : "Send"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {talentProfile ? (
+        <ContactInquiryModal
+          talentProfileId={talentProfile.id}
+          open={showInquiry}
+          onClose={() => setShowInquiry(false)}
+          onSent={() => setInquirySent(true)}
+        />
+      ) : null}
     </div>
   );
 }

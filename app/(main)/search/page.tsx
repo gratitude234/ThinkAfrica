@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Badge from "@/components/ui/Badge";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 interface PostResult {
   id: string;
@@ -255,7 +256,7 @@ export default function SearchPage() {
       {showResults ? (
         <div className="space-y-6">
           {totalResults === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center">
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-canvas px-6 py-12 text-center">
               <p className="text-base font-medium text-gray-700">
                 No results for &ldquo;{query.trim()}&rdquo;
               </p>
@@ -277,27 +278,17 @@ export default function SearchPage() {
               </h2>
               <div className="space-y-3">
                 {people.map((person) => {
-                  const initials =
-                    person.full_name?.charAt(0)?.toUpperCase() ??
-                    person.username.charAt(0).toUpperCase();
-
                   return (
                     <Link
                       key={person.id}
                       href={`/${person.username}`}
                       className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
                     >
-                      {person.avatar_url ? (
-                        <img
-                          src={person.avatar_url}
-                          alt={person.full_name ?? person.username}
-                          className="h-11 w-11 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
-                          {initials}
-                        </div>
-                      )}
+                      <UserAvatar
+                        name={person.full_name ?? person.username ?? "Anonymous"}
+                        src={person.avatar_url}
+                        size={44}
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-gray-900">
                           {person.full_name ?? person.username}
@@ -327,24 +318,24 @@ export default function SearchPage() {
                   <Link
                     key={post.id}
                     href={`/post/${post.slug}`}
-                    className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
+                    className="rounded-xl border border-gray-200/70 bg-white p-5 transition-shadow hover:shadow-md"
                   >
-                    <div className="flex-shrink-0 pt-0.5">
-                      <Badge type={post.type} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="mt-1 line-clamp-2 text-sm font-semibold text-gray-900">
+                    <Badge type={post.type} />
+                    <div className="min-w-0">
+                      <p className="font-display mt-3 line-clamp-2 text-xl font-semibold leading-snug text-ink">
                         {post.title}
                       </p>
-                      <p className="mt-1 text-xs text-gray-400">
+                      <p className="mt-3 text-xs text-gray-500">
                         {post.profiles
                           ? `${post.profiles.full_name ?? post.profiles.username}${
-                              post.profiles.university ? ` - ${post.profiles.university}` : ""
+                              post.profiles.university
+                                ? ` · ${post.profiles.university}`
+                                : ""
                             }`
                           : "ThinkAfrica"}
                       </p>
                       {post.excerpt ? (
-                        <p className="mt-2 line-clamp-2 text-sm text-gray-500">
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">
                           {post.excerpt}
                         </p>
                       ) : null}

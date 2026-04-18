@@ -2,29 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { useState, useEffect } from "react";
 
 interface BottomNavProps {
   username: string | null;
-  userId: string | null;
 }
 
-export default function BottomNav({ username, userId }: BottomNavProps) {
+function navLinkClass(isCurrent: boolean) {
+  return `flex h-full w-full flex-col items-center justify-center gap-1 pb-2 ${
+    isCurrent ? "text-emerald-brand" : "text-gray-500"
+  }`;
+}
+
+export default function BottomNav({ username }: BottomNavProps) {
   const pathname = usePathname();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    if (!userId) return;
-    const supabase = createClient();
-    supabase
-      .from("notifications")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("read", false)
-      .then(({ count }) => setUnreadCount(count ?? 0));
-  }, [userId]);
-
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
   const profileHref = username ? `/${username}` : "/settings";
@@ -34,19 +24,18 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      aria-label="Primary navigation"
     >
-      <div className="flex items-end justify-around h-16 px-2">
-        {/* Home */}
+      <div className="flex h-16 items-end justify-around px-2">
         <Link
           href="/"
-          className={`flex flex-col items-center justify-center w-full h-full gap-1 pb-2 ${
-            isActive("/") ? "text-emerald-brand" : "text-gray-500"
-          }`}
+          className={navLinkClass(isActive("/"))}
+          aria-current={isActive("/") ? "page" : undefined}
         >
           <svg
-            className="w-5 h-5"
+            className="h-5 w-5"
             fill={isActive("/") ? "currentColor" : "none"}
             stroke="currentColor"
             strokeWidth={2}
@@ -61,15 +50,13 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
           <span className="text-[10px] font-medium">Home</span>
         </Link>
 
-        {/* Explore */}
         <Link
-          href="/search"
-          className={`flex flex-col items-center justify-center w-full h-full gap-1 pb-2 ${
-            isActive("/search") ? "text-emerald-brand" : "text-gray-500"
-          }`}
+          href="/topics"
+          className={navLinkClass(isActive("/topics"))}
+          aria-current={isActive("/topics") ? "page" : undefined}
         >
           <svg
-            className="w-5 h-5"
+            className="h-5 w-5"
             fill="none"
             stroke="currentColor"
             strokeWidth={2}
@@ -78,20 +65,25 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              d="M12 21a9 9 0 100-18 9 9 0 000 18z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 3a12 12 0 014.5 9A12 12 0 0112 21 12 12 0 017.5 12 12 12 0 0112 3z"
             />
           </svg>
-          <span className="text-[10px] font-medium">Explore</span>
+          <span className="text-[10px] font-medium">Discover</span>
         </Link>
 
-        {/* Write */}
         <Link
           href="/write"
-          className="flex flex-col items-center justify-center w-full h-full gap-1 text-gray-500"
+          className={navLinkClass(isActive("/write"))}
+          aria-current={isActive("/write") ? "page" : undefined}
         >
-          <div className="w-12 h-12 rounded-full bg-emerald-brand text-white flex items-center justify-center shadow-md -mt-4">
+          <div className="-mt-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-brand text-white shadow-md">
             <svg
-              className="w-6 h-6"
+              className="h-6 w-6"
               fill="none"
               stroke="currentColor"
               strokeWidth={2}
@@ -109,48 +101,42 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
               />
             </svg>
           </div>
-          <span className="text-[10px] font-medium pb-2">Write</span>
+          <span className="pb-2 text-[10px] font-medium">Write</span>
         </Link>
 
-        {/* Notifications */}
         <Link
-          href="/notifications"
-          className={`relative flex flex-col items-center justify-center w-full h-full gap-1 pb-2 ${
-            isActive("/notifications") ? "text-emerald-brand" : "text-gray-500"
-          }`}
-        >
-          <div className="relative">
-            <svg
-              className="w-5 h-5"
-              fill={isActive("/notifications") ? "currentColor" : "none"}
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full px-0.5 leading-none">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] font-medium">Notifications</span>
-        </Link>
-
-        {/* Profile */}
-        <Link
-          href={profileHref}
-          className={`flex flex-col items-center justify-center w-full h-full gap-1 pb-2 ${
-            profileActive ? "text-emerald-brand" : "text-gray-500"
-          }`}
+          href="/opportunities"
+          className={navLinkClass(isActive("/opportunities"))}
+          aria-current={isActive("/opportunities") ? "page" : undefined}
         >
           <svg
-            className="w-5 h-5"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 8V6a3 3 0 016 0v2"
+            />
+          </svg>
+          <span className="text-[10px] font-medium">Opportunities</span>
+        </Link>
+
+        <Link
+          href={profileHref}
+          className={navLinkClass(profileActive)}
+          aria-current={profileActive ? "page" : undefined}
+        >
+          <svg
+            className="h-5 w-5"
             fill={profileActive ? "currentColor" : "none"}
             stroke="currentColor"
             strokeWidth={2}
@@ -162,7 +148,7 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
               d="M20 21a8 8 0 10-16 0m12-11a4 4 0 11-8 0 4 4 0 018 0z"
             />
           </svg>
-          <span className="text-[10px] font-medium">Profile</span>
+          <span className="text-[10px] font-medium">Me</span>
         </Link>
       </div>
     </nav>

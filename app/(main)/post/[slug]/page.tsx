@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -5,7 +6,8 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
-import { formatDate } from "@/lib/utils";
+import UserAvatar from "@/components/ui/UserAvatar";
+import { formatDate, POST_POINTS, type PostType } from "@/lib/utils";
 import LikeButton from "./LikeButton";
 import BookmarkButton from "./BookmarkButton";
 import CommentsLoader from "./CommentsLoader";
@@ -16,6 +18,7 @@ import ShareButtons from "./ShareButtons";
 import AuthorBioCard from "./AuthorBioCard";
 import TableOfContents from "./TableOfContents";
 import HighlightShare from "./HighlightShare";
+import PublishedToast from "./PublishedToast";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -27,22 +30,28 @@ function estimateReadTime(content: string): number {
   return Math.max(1, Math.ceil(words / 200));
 }
 
+function countWords(content: string): number {
+  return content.replace(/<[^>]*>/g, " ").trim().split(/\s+/).filter(Boolean).length;
+}
+
 function extractHeadings(content: string): { id: string; text: string; level: number }[] {
   const regex = /<h([23])[^>]*>(.*?)<\/h[23]>/gi;
   const matches: RegExpExecArray[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = regex.exec(content)) !== null) matches.push(m);
-  return matches.map((m, i) => ({
-    id: `heading-${i}`,
-    text: m[2].replace(/<[^>]*>/g, ""),
-    level: parseInt(m[1]),
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(content)) !== null) matches.push(match);
+
+  return matches.map((item, index) => ({
+    id: `heading-${index}`,
+    text: item[2].replace(/<[^>]*>/g, ""),
+    level: parseInt(item[1]),
   }));
 }
 
 function injectHeadingIds(content: string): string {
-  let i = 0;
+  let index = 0;
   return content.replace(/<h([23])([^>]*)>(.*?)<\/h[23]>/gi, (_, level, attrs, text) => {
-    const id = `heading-${i++}`;
+    const id = `heading-${index++}`;
     return `<h${level}${attrs} id="${id}">${text}</h${level}>`;
   });
 }
@@ -50,20 +59,29 @@ function injectHeadingIds(content: string): string {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { data: post } = await supabase
     .from("posts")
-    .select("title, excerpt, cover_image_url, slug, profiles!posts_author_id_fkey(full_name)")
+    .select(
+      "title, excerpt, cover_image_url, slug, status, author_id, profiles!posts_author_id_fkey(full_name)"
+    )
     .eq("slug", slug)
-    .eq("status", "published")
+    .in("status", ["published", "pending"])
     .single();
 
-  if (!post) return { title: "Post not found — ThinkAfrica" };
+  if (!post) return { title: "Post not found - ThinkAfrica" };
+  if (post.status === "pending" && user?.id !== post.author_id) {
+    return { title: "Post not found - ThinkAfrica" };
+  }
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
 
   return {
-    title: `${post.title} — ThinkAfrica`,
+    title: `${post.title} - ThinkAfrica`,
     description: post.excerpt ?? `Read this post by ${author?.full_name} on ThinkAfrica`,
     openGraph: {
       title: post.title,
@@ -86,27 +104,29 @@ export default async function PostPage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { data: post } = await supabase
     .from("posts")
     .select(
       `
-      id, title, slug, content, excerpt, type, tags, status,
+      id, title, slug, content, excerpt, type, tags, status, author_id,
       created_at, published_at, view_count, cover_image_url,
       profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url)
     `
     )
     .eq("slug", slug)
-    .eq("status", "published")
+    .in("status", ["published", "pending"])
     .single();
 
   if (!post) notFound();
+  if (post.status === "pending" && user?.id !== post.author_id) notFound();
 
+  const isPublished = post.status === "published";
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const coverImageUrl = (post as { cover_image_url?: string | null }).cover_image_url;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const { count: likeCount } = await supabase
     .from("likes")
@@ -137,22 +157,29 @@ export default async function PostPage({ params }: PageProps) {
   const userProfileId: string | null = user?.id ?? null;
 
   let relatedPosts: Array<{
-    id: string; title: string; slug: string; type: string; published_at: string | null; created_at: string;
+    id: string;
+    title: string;
+    slug: string;
+    type: string;
+    published_at: string | null;
+    created_at: string;
     profiles: { full_name: string; username: string } | null;
   }> = [];
-  if (post.tags && post.tags.length > 0) {
+  if (isPublished && post.tags && post.tags.length > 0) {
     const { data: relatedRaw } = await supabase
       .from("posts")
-      .select("id, title, slug, type, published_at, created_at, profiles!posts_author_id_fkey (full_name, username)")
+      .select(
+        "id, title, slug, type, published_at, created_at, profiles!posts_author_id_fkey (full_name, username)"
+      )
       .eq("status", "published")
       .neq("id", post.id)
       .overlaps("tags", post.tags)
       .order("published_at", { ascending: false })
       .limit(3);
 
-    relatedPosts = (relatedRaw ?? []).map((p) => ({
-      ...p,
-      profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
+    relatedPosts = (relatedRaw ?? []).map((item) => ({
+      ...item,
+      profiles: Array.isArray(item.profiles) ? item.profiles[0] : item.profiles,
     }));
   }
 
@@ -168,45 +195,67 @@ export default async function PostPage({ params }: PageProps) {
   }
 
   const readTime = estimateReadTime(post.content ?? "");
+  const wordCount = countWords(post.content ?? "");
   const headings = extractHeadings(post.content ?? "");
   const contentWithIds = injectHeadingIds(post.content ?? "");
+  const authorName = author?.full_name ?? author?.username ?? "Anonymous";
 
   return (
     <div className="relative">
-      <ReadingBar
-        postId={post.id}
-        userId={user?.id ?? null}
-        initialLiked={userLiked}
-        initialLikeCount={likeCount ?? 0}
-        initialBookmarked={userBookmarked}
+      {isPublished ? (
+        <>
+          <ReadingBar
+            postId={post.id}
+            userId={user?.id ?? null}
+            initialLiked={userLiked}
+            initialLikeCount={likeCount ?? 0}
+            initialBookmarked={userBookmarked}
+            title={post.title}
+            slug={post.slug}
+          />
+          <ReadingProgressBar />
+          <ViewTracker slug={slug} />
+        </>
+      ) : null}
+
+      <PublishedToast
         title={post.title}
         slug={post.slug}
+        points={POST_POINTS[(post.type as PostType) ?? "blog"] ?? 10}
+        username={author?.username ?? ""}
       />
-      <ReadingProgressBar />
-      <ViewTracker slug={slug} />
 
-      <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main content */}
+      <div className="mx-auto max-w-6xl">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
           <div className="lg:col-span-3">
             <div className="max-w-3xl">
-              {/* Cover image */}
-              {coverImageUrl && (
-                <div className="mb-8 rounded-xl overflow-hidden">
-                  <img
-                    src={coverImageUrl}
+              {post.status === "pending" ? (
+                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  ⏳ This post is under editorial review - usually within 48 hours.
+                  We&apos;ll notify you when it goes live.{" "}
+                  <Link href="/dashboard" className="font-semibold underline">
+                    View dashboard
+                  </Link>
+                </div>
+              ) : null}
+
+              {coverImageUrl ? (
+                <div className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[400px]">
+                  <Image
+                    fill
+                    sizes="100vw"
+                    priority={true}
                     alt={post.title}
-                    className="w-full object-cover"
-                    style={{ maxHeight: "400px" }}
+                    src={coverImageUrl}
+                    className="object-cover"
                   />
                 </div>
-              )}
+              ) : null}
 
-              {/* Header */}
               <header className="mb-8">
-                <div className="flex items-center gap-2 mb-4 flex-wrap">
-                  <Badge type={post.type} />
-                  {post.tags && post.tags.length > 0 && (
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <Badge type={post.type} wordCount={wordCount} />
+                  {post.tags && post.tags.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
                       {post.tags.map((tag: string) => (
                         <Link key={tag} href={`/topics/${encodeURIComponent(tag)}`}>
@@ -214,22 +263,27 @@ export default async function PostPage({ params }: PageProps) {
                         </Link>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
-                <h1 className="text-3xl font-bold text-gray-900 mb-4 leading-tight">
+                <h1 className="font-display mb-4 text-3xl font-bold leading-tight text-ink">
                   {post.title}
                 </h1>
 
-                {author && (
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <Link href={`/${author.username}`} className="flex items-center gap-3 group">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
-                        {author.full_name?.charAt(0)?.toUpperCase() ?? "?"}
-                      </div>
+                {author ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Link
+                      href={`/${author.username}`}
+                      className="group flex items-center gap-3"
+                    >
+                      <UserAvatar
+                        name={authorName}
+                        src={author.avatar_url}
+                        size={40}
+                      />
                       <div>
-                        <p className="font-medium text-gray-900 group-hover:text-emerald-brand transition-colors">
-                          {author.full_name}
+                        <p className="font-medium text-gray-900 transition-colors group-hover:text-emerald-brand">
+                          {authorName}
                         </p>
                         <p className="text-xs text-gray-400">
                           {author.university} ·{" "}
@@ -238,26 +292,28 @@ export default async function PostPage({ params }: PageProps) {
                         </p>
                       </div>
                     </Link>
-                    <div className="flex items-center gap-2">
-                      <BookmarkButton
-                        postId={post.id}
-                        initialBookmarked={userBookmarked}
-                        userId={user?.id ?? null}
-                      />
-                      <LikeButton
-                        postId={post.id}
-                        initialLiked={userLiked}
-                        initialCount={likeCount ?? 0}
-                        userId={user?.id ?? null}
-                      />
-                    </div>
+
+                    {isPublished ? (
+                      <div className="flex items-center gap-2">
+                        <BookmarkButton
+                          postId={post.id}
+                          initialBookmarked={userBookmarked}
+                          userId={user?.id ?? null}
+                        />
+                        <LikeButton
+                          postId={post.id}
+                          initialLiked={userLiked}
+                          initialCount={likeCount ?? 0}
+                          userId={user?.id ?? null}
+                        />
+                      </div>
+                    ) : null}
                   </div>
-                )}
+                ) : null}
               </header>
 
-              <hr className="border-gray-200 mb-8" />
+              <hr className="mb-8 border-gray-200" />
 
-              {/* Content */}
               <div className="relative mb-8">
                 <HighlightShare containerId="post-article-prose" />
                 <div
@@ -267,69 +323,82 @@ export default async function PostPage({ params }: PageProps) {
                 />
               </div>
 
-              {/* Share + views */}
-              <div className="flex items-center justify-between flex-wrap gap-3 mb-8">
-                <ShareButtons title={post.title} slug={post.slug} />
-                <span className="text-xs text-gray-400">
-                  {post.view_count} {post.view_count === 1 ? "view" : "views"}
-                </span>
-              </div>
+              {isPublished ? (
+                <>
+                  <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+                    <ShareButtons title={post.title} slug={post.slug} />
+                    <span className="text-xs text-gray-400">
+                      {post.view_count} {post.view_count === 1 ? "view" : "views"}
+                    </span>
+                  </div>
 
-              <hr className="border-gray-200 mb-8" />
+                  <hr className="mb-8 border-gray-200" />
+                </>
+              ) : null}
 
-              {/* Author bio card */}
-              {author && (
+              {author ? (
                 <AuthorBioCard
                   author={author}
                   userId={user?.id ?? null}
                   initialFollowing={userFollowsAuthor}
                 />
-              )}
+              ) : null}
 
-              <hr className="border-gray-200 my-8" />
+              <hr className="my-8 border-gray-200" />
 
-              {/* Related posts */}
-              {relatedPosts.length > 0 && (
+              {relatedPosts.length > 0 ? (
                 <section className="mb-8">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Related Posts</h2>
+                  <h2 className="mb-4 text-lg font-semibold text-gray-900">
+                    Related Posts
+                  </h2>
                   <div className="space-y-3">
-                    {relatedPosts.map((p) => (
+                    {relatedPosts.map((item) => (
                       <Link
-                        key={p.id}
-                        href={`/post/${p.slug}`}
-                        className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
+                        key={item.id}
+                        href={`/post/${item.slug}`}
+                        className="group flex items-center justify-between gap-3 rounded-lg p-3 transition-colors hover:bg-canvas"
                       >
                         <div>
-                          <p className="text-sm font-medium text-gray-900 group-hover:text-emerald-brand transition-colors">
-                            {p.title}
+                          <p className="text-sm font-medium text-gray-900 transition-colors group-hover:text-emerald-brand">
+                            {item.title}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {p.profiles?.full_name} · {formatDate(p.published_at ?? p.created_at)}
+                          <p className="mt-0.5 text-xs text-gray-400">
+                            {item.profiles?.full_name} ·{" "}
+                            {formatDate(item.published_at ?? item.created_at)}
                           </p>
                         </div>
-                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        <svg
+                          className="h-4 w-4 shrink-0 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
                         </svg>
                       </Link>
                     ))}
                   </div>
                 </section>
-              )}
+              ) : null}
 
-              <hr className="border-gray-200 mb-8" />
+              <hr className="mb-8 border-gray-200" />
 
-              {/* Comments — streams in after article renders */}
               <Suspense
                 fallback={
-                  <div className="space-y-4 animate-pulse">
-                    <div className="h-5 w-24 bg-gray-200 rounded" />
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="flex gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex-shrink-0" />
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-5 w-24 rounded bg-gray-200" />
+                    {[...Array(3)].map((_, index) => (
+                      <div key={index} className="flex gap-3">
+                        <div className="h-8 w-8 shrink-0 rounded-full bg-gray-200" />
                         <div className="flex-1 space-y-2">
-                          <div className="h-3 w-28 bg-gray-200 rounded" />
-                          <div className="h-3 w-full bg-gray-100 rounded" />
-                          <div className="h-3 w-4/5 bg-gray-100 rounded" />
+                          <div className="h-3 w-28 rounded bg-gray-200" />
+                          <div className="h-3 w-full rounded bg-gray-100" />
+                          <div className="h-3 w-4/5 rounded bg-gray-100" />
                         </div>
                       </div>
                     ))}
@@ -345,7 +414,7 @@ export default async function PostPage({ params }: PageProps) {
             </div>
           </div>
 
-          <aside className="hidden lg:block lg:col-span-1">
+          <aside className="hidden lg:col-span-1 lg:block">
             <TableOfContents headings={headings} />
           </aside>
         </div>

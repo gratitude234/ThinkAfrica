@@ -21,7 +21,7 @@ export default function Loading() {
 
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="flex gap-4 px-4 py-3 border-b border-gray-100 bg-gray-50">
+        <div className="flex gap-4 px-4 py-3 border-b border-gray-100 bg-canvas">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-3 w-16 bg-gray-200 rounded" />
           ))}

@@ -136,7 +136,7 @@ export default async function TopicsPage() {
       </p>
 
       {sections.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center text-sm text-gray-500">
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-canvas px-6 py-12 text-center text-sm text-gray-500">
           No topics yet. Published posts with tags will appear here.
         </div>
       ) : (

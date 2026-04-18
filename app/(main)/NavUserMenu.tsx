@@ -122,7 +122,7 @@ export default function NavUserMenu({
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+          <div className="px-4 py-3 border-b border-gray-100 bg-canvas">
             <p className="text-sm font-semibold text-gray-900 truncate">
               {displayName}
             </p>
@@ -134,7 +134,7 @@ export default function NavUserMenu({
             <Link
               href={`/${profile.username}`}
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
             >
               <svg
                 className="w-4 h-4 text-gray-400"
@@ -155,7 +155,7 @@ export default function NavUserMenu({
           <Link
             href="/dashboard"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
           >
             <svg
               className="w-4 h-4 text-gray-400"
@@ -175,7 +175,7 @@ export default function NavUserMenu({
           <Link
             href="/write"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
           >
             <svg
               className="w-4 h-4 text-gray-400"
@@ -195,7 +195,7 @@ export default function NavUserMenu({
           <Link
             href="/bookmarks"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
           >
             <svg
               className="w-4 h-4 text-gray-400"
@@ -215,7 +215,7 @@ export default function NavUserMenu({
           <Link
             href="/settings"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
           >
             <svg
               className="w-4 h-4 text-gray-400"
@@ -241,7 +241,7 @@ export default function NavUserMenu({
           <Link
             href="/stats"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
           >
             <svg
               className="w-4 h-4 text-gray-400"
@@ -262,7 +262,7 @@ export default function NavUserMenu({
             <Link
               href="/admin/review"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
             >
               <svg
                 className="w-4 h-4 text-gray-400"

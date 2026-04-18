@@ -101,7 +101,7 @@ export default function NotificationsPageClient({
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
           {localSections.map((section) => (
             <div key={section.label}>
-              <div className="border-b border-gray-100 bg-gray-50 px-4 py-2">
+              <div className="border-b border-gray-100 bg-canvas px-4 py-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   {section.label}
                 </p>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import FollowButton from "@/components/ui/FollowButton";
+import { getSuggestedPeople } from "@/lib/suggestedPeople";
 
 interface Props {
   currentUserId: string;
@@ -9,14 +10,6 @@ interface Props {
   limit?: number;
 }
 
-type Suggestion = {
-  id: string;
-  username: string;
-  full_name: string | null;
-  university: string | null;
-  avatar_url: string | null;
-};
-
 export default async function SuggestedPeople({
   currentUserId,
   university,
@@ -24,65 +17,12 @@ export default async function SuggestedPeople({
   limit = 3,
 }: Props) {
   const supabase = await createClient();
-
-  const { data: alreadyFollowing } = await supabase
-    .from("follows")
-    .select("following_id")
-    .eq("follower_id", currentUserId);
-
-  const excludeIds = [
+  const { suggestions, reason } = await getSuggestedPeople(supabase, {
     currentUserId,
-    ...(alreadyFollowing?.map((f) => f.following_id) ?? []),
-  ];
-
-  let suggestions: Suggestion[] = [];
-  let reason = "Top contributors";
-
-  const applyExclusions = <T extends { neq: (col: string, val: string) => T }>(q: T): T => {
-    let result = q;
-    for (const id of excludeIds) result = result.neq("id", id);
-    return result;
-  };
-
-  // 1. Same university AND same field
-  if (university && fieldOfStudy && suggestions.length === 0) {
-    let q = supabase
-      .from("profiles")
-      .select("id, username, full_name, university, avatar_url")
-      .eq("university", university)
-      .eq("field_of_study", fieldOfStudy);
-    q = applyExclusions(q);
-    const { data } = await q.limit(limit);
-    if (data && data.length > 0) {
-      suggestions = data as Suggestion[];
-      reason = "From your university & field";
-    }
-  }
-
-  // 2. Same university only
-  if (suggestions.length === 0 && university) {
-    let q = supabase
-      .from("profiles")
-      .select("id, username, full_name, university, avatar_url")
-      .eq("university", university);
-    q = applyExclusions(q);
-    const { data } = await q.limit(limit);
-    if (data && data.length > 0) {
-      suggestions = data as Suggestion[];
-      reason = "From your university";
-    }
-  }
-
-  // 3. Fallback: top by points
-  if (suggestions.length === 0) {
-    let q = supabase
-      .from("profiles")
-      .select("id, username, full_name, university, avatar_url")
-      .order("points", { ascending: false });
-    q = applyExclusions(q);
-    const { data } = await q.limit(limit);
-    suggestions = (data as Suggestion[] | null) ?? [];
-  }
+    university,
+    fieldOfStudy,
+    limit,
+  });
 
   if (suggestions.length === 0) return null;
 

@@ -1,97 +1,36 @@
-"use client";
+import Link from "next/link";
 
-import { useState } from "react";
-
-const INTEREST_OPTIONS = [
-  "Law",
+const DISCOVERY_TOPICS = [
+  "Law & Justice",
   "Economics",
-  "Tech",
-  "Health",
-  "Politics",
-  "Environment",
-  "Education",
-  "Culture",
-  "Research",
-  "Philosophy",
+  "Technology",
+  "Public Health",
+  "Politics & Governance",
+  "Environment & Climate",
+  "Education Policy",
+  "African Culture",
 ];
 
 export default function ForYouEmptyState() {
-  const [selected, setSelected] = useState<string[]>([]);
-  const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const toggle = (interest: string) => {
-    setSelected((prev) =>
-      prev.includes(interest)
-        ? prev.filter((item) => item !== interest)
-        : [...prev, interest]
-    );
-  };
-
-  const save = async () => {
-    if (selected.length === 0) return;
-
-    setSaving(true);
-    const { createClient } = await import("@/lib/supabase/client");
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      await supabase.from("profiles").update({ interests: selected }).eq("id", user.id);
-    }
-
-    setSaved(true);
-    setSaving(false);
-    setTimeout(() => window.location.reload(), 800);
-  };
-
-  if (saved) {
-    return (
-      <div className="py-12 text-center">
-        <p className="font-medium text-emerald-600">
-          ✓ Interests saved — personalising your feed…
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
-      <div className="mb-3 text-3xl">🎯</div>
-      <h3 className="mb-1 text-lg font-semibold text-gray-900">
-        Personalise your feed
-      </h3>
-      <p className="mb-6 text-sm text-gray-500">
-        Pick the topics you care about and we&apos;ll curate posts just for you.
+    <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
+      <p className="text-base font-semibold text-gray-900">
+        Nothing matches your interests yet.
       </p>
-
-      <div className="mb-6 flex flex-wrap justify-center gap-2">
-        {INTEREST_OPTIONS.map((interest) => (
-          <button
-            key={interest}
-            type="button"
-            onClick={() => toggle(interest)}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-              selected.includes(interest)
-                ? "border-emerald-brand bg-emerald-brand text-white"
-                : "border-gray-200 bg-white text-gray-600 hover:border-emerald-300"
-            }`}
+      <p className="mt-1 text-sm text-gray-500">
+        Explore popular topics — tap any to follow.
+      </p>
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
+        {DISCOVERY_TOPICS.map((topic) => (
+          <Link
+            key={topic}
+            href={`/topics/${encodeURIComponent(topic.toLowerCase())}`}
+            className="rounded-full border border-gray-200 bg-canvas px-3 py-1.5 text-sm text-gray-700 transition-colors hover:border-emerald-brand hover:text-emerald-brand"
           >
-            {interest}
-          </button>
+            {topic}
+          </Link>
         ))}
       </div>
-
-      <button
-        type="button"
-        onClick={save}
-        disabled={selected.length === 0 || saving}
-        className="rounded-xl bg-emerald-brand px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-      >
-        {saving ? "Saving..." : `Save ${selected.length > 0 ? `(${selected.length}) ` : ""}interests`}
-      </button>
     </div>
   );
 }

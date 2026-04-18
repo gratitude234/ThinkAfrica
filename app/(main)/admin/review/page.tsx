@@ -1,5 +1,3 @@
-// -- Run in Supabase: ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS featured boolean default false;
-
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Badge from "@/components/ui/Badge";
@@ -27,32 +25,38 @@ export default async function AdminReviewPage() {
     );
   }
 
-  const { data: pendingPosts } = await supabase
-    .from("posts")
-    .select(
-      `
+  const [
+    { data: pendingPostsRaw },
+    { data: publishedPostsRaw },
+    { data: featuredIdsRaw },
+  ] = await Promise.all([
+    supabase
+      .from("posts")
+      .select(
+        `
       id, title, excerpt, type, tags, created_at,
       profiles!posts_author_id_fkey (username, full_name, university)
     `
-    )
-    .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(50);
+      )
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("posts")
+      .select(
+        `id, title, excerpt, type, featured, created_at,
+      profiles!posts_author_id_fkey (full_name, university)`
+      )
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(20),
+    supabase.from("policy_briefs_featured").select("post_id"),
+  ]);
 
-  const posts = (pendingPosts ?? []).map((post) => ({
+  const posts = (pendingPostsRaw ?? []).map((post) => ({
     ...post,
     profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
   }));
-
-  const { data: publishedPostsRaw } = await supabase
-    .from("posts")
-    .select(
-      `id, title, excerpt, type, featured, created_at,
-      profiles!posts_author_id_fkey (full_name, university)`
-    )
-    .eq("status", "published")
-    .order("published_at", { ascending: false })
-    .limit(20);
 
   const publishedPosts = (publishedPostsRaw ?? []).map((post) => ({
     ...post,
@@ -60,10 +64,7 @@ export default async function AdminReviewPage() {
     profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
   }));
 
-  const { data: featuredIds } = await supabase
-    .from("policy_briefs_featured")
-    .select("post_id");
-  const alreadyFeatured = new Set((featuredIds ?? []).map((item) => item.post_id));
+  const alreadyFeatured = new Set((featuredIdsRaw ?? []).map((item) => item.post_id));
 
   const { data: policyBriefsRaw } = await supabase
     .from("posts")

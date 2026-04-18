@@ -51,7 +51,7 @@ export default function AboutPage() {
               desc: "Student voices on pressing issues rarely reach the policymakers and institutions that need to hear them.",
             },
           ].map((item) => (
-            <div key={item.title} className="bg-gray-50 rounded-xl p-5">
+            <div key={item.title} className="bg-canvas rounded-xl p-5">
               <div className="text-2xl mb-2">{item.icon}</div>
               <h3 className="font-semibold text-gray-900 text-sm mb-1">{item.title}</h3>
               <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>

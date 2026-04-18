@@ -1,174 +1,95 @@
+import PostsFeedTabs from "./PostsFeedTabs";
+import {
+  fetchFeedPage,
+  type FeedTimeframe,
+  type FeedTabKey,
+} from "@/lib/feedData";
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
-import PostFeed from "@/components/post/PostFeed";
-import type { PostCardData } from "@/components/post/PostCard";
-import ForYouEmptyState from "./ForYouEmptyState";
+import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 
 interface Props {
   tab: string;
+  type: string | null;
+  timeframe: string | null;
   userId: string | null;
   userInterests: string[];
+  userUniversity: string | null;
   followedIds: string[];
-  showForYouEligible: boolean;
   showFollowingEligible: boolean;
+  activeDebate: DebateInterludeData | null;
+  peopleSuggestions: {
+    id: string;
+    username: string;
+    full_name: string | null;
+    university: string | null;
+    avatar_url: string | null;
+  }[];
 }
 
-async function getLikeCounts(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  postIds: string[]
-): Promise<Record<string, number>> {
-  if (postIds.length === 0) return {};
-  const { data } = await supabase
-    .from("likes")
-    .select("post_id")
-    .in("post_id", postIds);
-  return (data ?? []).reduce(
-    (acc, like) => {
-      acc[like.post_id] = (acc[like.post_id] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
+function getInitialTab(tab: string, showFollowingEligible: boolean): FeedTabKey {
+  if (tab === "following" && showFollowingEligible) return "following";
+  if (tab === "latest") return "latest";
+  return "home";
 }
 
-function mapPosts(
-  raw: unknown[],
-  likeCounts: Record<string, number>
-): PostCardData[] {
-  return (raw as Array<Record<string, unknown>>).map((post) => ({
-    ...(post as object),
-    profiles: Array.isArray(post.profiles)
-      ? (post.profiles as unknown[])[0]
-      : post.profiles,
-    like_count: likeCounts[(post.id as string) ?? ""] ?? 0,
-  })) as PostCardData[];
+function getInitialType(type: string | null) {
+  if (
+    type === "research" ||
+    type === "essay" ||
+    type === "policy_brief" ||
+    type === "blog"
+  ) {
+    return type;
+  }
+  return "all";
 }
 
-const POST_SELECT = `id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
-  profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`;
+function getInitialTimeframe(timeframe: string | null): FeedTimeframe {
+  if (timeframe === "week" || timeframe === "month") return timeframe;
+  return "all";
+}
 
 export default async function PostsFeedSection({
   tab,
+  type,
+  timeframe,
   userId,
   userInterests,
+  userUniversity,
   followedIds,
-  showForYouEligible,
   showFollowingEligible,
+  activeDebate,
+  peopleSuggestions,
 }: Props) {
   const supabase = await createClient();
+  const initialTab = getInitialTab(tab, showFollowingEligible);
+  const initialType = getInitialType(type);
+  const initialTimeframe = getInitialTimeframe(timeframe);
 
-  // Determine which feeds are needed based on tab and eligibility
-  const needsForYou = showForYouEligible && userInterests.length > 0;
-  const needsFollowing = showFollowingEligible && followedIds.length > 0;
-
-  // Run needed queries in parallel
-  const [mainRaw, forYouRaw, followingRaw] = await Promise.all([
-    supabase
-      .from("posts")
-      .select(POST_SELECT)
-      .eq("status", "published")
-      .order("published_at", { ascending: false })
-      .limit(30)
-      .then((r) => r.data ?? []),
-
-    needsForYou
-      ? supabase
-          .from("posts")
-          .select(POST_SELECT)
-          .eq("status", "published")
-          .overlaps("tags", userInterests)
-          .order("published_at", { ascending: false })
-          .limit(10)
-          .then((r) => r.data ?? [])
-      : Promise.resolve([]),
-
-    needsFollowing
-      ? supabase
-          .from("posts")
-          .select(POST_SELECT)
-          .eq("status", "published")
-          .in("author_id", followedIds)
-          .order("published_at", { ascending: false })
-          .limit(20)
-          .then((r) => r.data ?? [])
-      : Promise.resolve([]),
-  ]);
-
-  // Fetch all like counts in parallel
-  const idSet = new Set<string>();
-  for (const p of [...mainRaw, ...forYouRaw, ...followingRaw]) {
-    idSet.add((p as { id: string }).id);
-  }
-  const allIds = Array.from(idSet);
-  const likeCounts = await getLikeCounts(supabase, allIds);
-
-  const feedPosts = mapPosts(mainRaw, likeCounts);
-  const forYouPosts = mapPosts(forYouRaw, likeCounts);
-  const followingPosts = mapPosts(followingRaw, likeCounts);
-
-  const showForYouTab = showForYouEligible;
-  const showFollowingTab = showFollowingEligible;
-  const showTabs = showForYouTab || showFollowingTab;
-
-  const activeTab =
-    tab === "following" && showFollowingTab
-      ? "following"
-      : tab === "foryou" && showForYouTab
-        ? "foryou"
-        : "latest";
-
-  const displayPosts =
-    activeTab === "following"
-      ? followingPosts
-      : activeTab === "foryou"
-        ? forYouPosts
-        : feedPosts;
+  const initialFeed = await fetchFeedPage({
+    supabase,
+    tab: initialTab,
+    page: 1,
+    pageSize: 20,
+    type: initialType === "all" ? null : initialType,
+    timeframe: initialTimeframe,
+    userId,
+    userInterests,
+    userUniversity,
+    followedIds,
+  });
 
   return (
-    <>
-      {showTabs && (
-        <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-          <Link
-            href="/"
-            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-              activeTab === "latest"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Latest
-          </Link>
-          {showFollowingTab && (
-            <Link
-              href="/?tab=following"
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "following"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Following
-            </Link>
-          )}
-          {showForYouTab && (
-            <Link
-              href="/?tab=foryou"
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "foryou"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              For You
-            </Link>
-          )}
-        </div>
-      )}
-      {activeTab === "foryou" && displayPosts.length === 0 ? (
-        <ForYouEmptyState />
-      ) : (
-        <PostFeed posts={displayPosts} />
-      )}
-    </>
+    <PostsFeedTabs
+      initialTab={initialTab}
+      initialType={initialType}
+      initialTimeframe={initialTimeframe}
+      initialPosts={initialFeed.posts}
+      initialHasMore={initialFeed.hasMore}
+      showFollowingTab={showFollowingEligible}
+      activeDebate={activeDebate}
+      peopleSuggestions={peopleSuggestions}
+      currentUserId={userId}
+    />
   );
 }

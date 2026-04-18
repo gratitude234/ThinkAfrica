@@ -97,7 +97,7 @@ export default async function FellowshipPage({ params }: PageProps) {
             </div>
           )}
           {fellowship.deadline && (
-            <div className="bg-gray-50 rounded-lg p-3">
+            <div className="bg-canvas rounded-lg p-3">
               <p className="text-xs text-gray-500 font-medium mb-0.5">Deadline</p>
               <p className="text-sm font-semibold text-gray-900">
                 {formatDate(fellowship.deadline)}

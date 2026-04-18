@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import SponsorBanner from "@/components/ui/SponsorBanner";
 import PointsTierBadge from "@/components/ui/PointsTierBadge";
-import { POST_POINTS } from "@/lib/utils";
+import { POST_POINTS, type PostType } from "@/lib/utils";
 
 export const revalidate = 120;
 
@@ -21,7 +21,8 @@ interface LeaderboardProfile {
 }
 
 export default async function LeaderboardPage({ searchParams }: PageProps) {
-  const { tab = "alltime" } = await searchParams;
+  const { tab: tabParam } = await searchParams;
+  const tab = tabParam === "alltime" ? "alltime" : "weekly";
   const supabase = await createClient();
 
   const {
@@ -56,7 +57,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
       const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
       if (!profile) continue;
 
-      const points = POST_POINTS[post.type] ?? 10;
+      const points = POST_POINTS[post.type as PostType] ?? 10;
       if (!userMap[profile.id]) {
         userMap[profile.id] = { ...profile, weekly_points: 0 };
       }
@@ -120,8 +121,8 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
   }
 
   const tabs = [
-    { label: "All Time", value: "alltime" },
     { label: "This Week", value: "weekly" },
+    // Keep all-time reachable by URL for now, but hide it from the UI until volume justifies it.
   ];
 
   const RANK_COLORS = ["text-yellow-500", "text-gray-400", "text-amber-600"];
@@ -157,6 +158,10 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
         })}
       </div>
 
+      <p className="mb-4 text-xs text-gray-400">
+        Weekly ranking is the primary view for now.
+      </p>
+
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         {profiles.length === 0 ? (
           <div className="py-12 text-center text-sm text-gray-400">
@@ -176,7 +181,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
                   className={`flex items-center gap-4 rounded-xl px-4 py-3 transition-colors ${
                     isCurrentUser
                       ? "border border-emerald-200 bg-emerald-50"
-                      : "hover:bg-gray-50"
+                      : "hover:bg-canvas"
                   }`}
                 >
                   <div
@@ -192,6 +197,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
                   </div>
 
                   {profile.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={profile.avatar_url}
                       alt={profile.full_name ?? profile.username}
@@ -256,6 +262,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
                     #{currentUserRow.rank}
                   </span>
                   {currentUserRow.profile.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={currentUserRow.profile.avatar_url}
                       alt={currentUserRow.profile.full_name ?? currentUserRow.profile.username}

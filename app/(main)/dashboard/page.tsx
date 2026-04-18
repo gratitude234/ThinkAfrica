@@ -145,7 +145,7 @@ export default async function DashboardPage() {
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
+                <tr className="border-b border-gray-100 bg-canvas">
                   <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
                     Fellowship
                   </th>
@@ -166,7 +166,7 @@ export default async function DashboardPage() {
                     rejected: "bg-red-50 text-red-600 border-red-200",
                   };
                   return (
-                    <tr key={app.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={app.id} className="hover:bg-canvas transition-colors">
                       <td className="px-4 py-3">
                         {app.fellowship ? (
                           <Link
@@ -190,7 +190,7 @@ export default async function DashboardPage() {
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
                             statusStyles[app.status] ??
-                            "bg-gray-50 text-gray-600 border-gray-200"
+                            "bg-canvas text-gray-600 border-gray-200"
                           }`}
                         >
                           {app.status.charAt(0).toUpperCase() + app.status.slice(1)}

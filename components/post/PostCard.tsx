@@ -1,6 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
-import { formatRelativeTime, POST_TYPE_LABELS } from "@/lib/utils";
+import {
+  formatRelativeTime,
+  POST_TYPE_LABELS,
+  type PostType,
+} from "@/lib/utils";
 
 export interface PostCardData {
   id: string;
@@ -11,9 +16,13 @@ export interface PostCardData {
   tags: string[] | null;
   created_at: string;
   published_at: string | null;
+  author_id?: string;
   like_count?: number;
+  bookmark_count?: number;
+  comment_count?: number;
   view_count?: number;
   cover_image_url?: string | null;
+  score?: number;
   profiles: {
     username: string;
     full_name: string | null;
@@ -26,6 +35,7 @@ export interface PostCardData {
 
 interface PostCardProps {
   post: PostCardData;
+  variant?: "standard" | "featured";
 }
 
 const PLACEHOLDER_STYLES: Record<
@@ -57,24 +67,10 @@ const VERIFIED_COLORS: Record<string, string> = {
   institution: "text-blue-600",
 };
 
-function formatViewCount(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return n.toString();
-}
-
-function getInitials(name: string | null | undefined) {
-  const cleaned = name?.trim();
-
-  if (!cleaned) return "?";
-
-  return cleaned
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-}
-
-export default function PostCard({ post }: PostCardProps) {
+export default function PostCard({
+  post,
+  variant = "standard",
+}: PostCardProps) {
   const author = post.profiles;
   const displayDate = post.published_at ?? post.created_at;
   const placeholder =
@@ -86,17 +82,97 @@ export default function PostCard({ post }: PostCardProps) {
     )
   );
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
-  const likeCount = post.like_count ?? 0;
+  const authorHref = author?.username ? `/${author.username}` : null;
+
+  const footerMeta = (
+    <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-gray-100 pt-4 text-xs text-gray-500">
+      {authorHref ? (
+        <Link
+          href={authorHref}
+          className="inline-flex min-w-0 items-center gap-1 font-medium text-gray-700 transition-colors hover:text-emerald-brand"
+        >
+          <span className="truncate">{authorName}</span>
+          {author?.verified ? (
+            <span
+              title={
+                author.verified_type
+                  ? `Verified ${author.verified_type}`
+                  : "Verified"
+              }
+              className={`text-[11px] font-bold ${
+                VERIFIED_COLORS[author.verified_type ?? "student"] ??
+                "text-emerald-600"
+              }`}
+            >
+              ✓
+            </span>
+          ) : null}
+        </Link>
+      ) : (
+        <span className="font-medium text-gray-700">{authorName}</span>
+      )}
+
+      {author?.university ? (
+        <>
+          <span aria-hidden="true">·</span>
+          <span className="truncate">{author.university}</span>
+        </>
+      ) : null}
+
+      <span aria-hidden="true">·</span>
+      <span>{readTime} min read</span>
+      <span aria-hidden="true">·</span>
+      <span>{formatRelativeTime(displayDate)}</span>
+    </div>
+  );
+
+  if (variant === "standard") {
+    return (
+      <article className="rounded-xl border border-gray-200/70 bg-white p-5 transition-shadow duration-300 hover:shadow-md">
+        <div className="flex gap-4">
+          <div className="min-w-0 flex-1">
+            <Badge type={post.type} />
+            <Link href={`/post/${post.slug}`}>
+              <h2 className="font-display mt-2 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
+                {post.title}
+              </h2>
+            </Link>
+            {post.excerpt ? (
+              <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">
+                {post.excerpt}
+              </p>
+            ) : null}
+            {footerMeta}
+          </div>
+
+          {post.cover_image_url ? (
+            <Link href={`/post/${post.slug}`} className="shrink-0 self-start">
+              <Image
+                src={post.cover_image_url}
+                alt={post.title}
+                width={96}
+                height={96}
+                className="h-24 w-24 rounded-lg object-cover"
+              />
+            </Link>
+          ) : null}
+        </div>
+      </article>
+    );
+  }
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-gray-100 bg-white transition-shadow duration-300 hover:shadow-lg">
+    <article className="group overflow-hidden rounded-xl border border-gray-200/70 bg-white transition-shadow duration-300 hover:shadow-lg">
       <Link href={`/post/${post.slug}`} className="block">
-        <div className="aspect-[16/9] w-full overflow-hidden">
+        <div className="relative aspect-[16/9] w-full overflow-hidden">
           {post.cover_image_url ? (
-            <img
+            <Image
               src={post.cover_image_url}
               alt={post.title}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="object-cover"
+              priority={false}
             />
           ) : (
             <div
@@ -105,7 +181,7 @@ export default function PostCard({ post }: PostCardProps) {
               <span
                 className={`text-sm font-semibold uppercase tracking-widest opacity-60 ${placeholder.accent}`}
               >
-                {POST_TYPE_LABELS[post.type] ?? post.type}
+                {POST_TYPE_LABELS[post.type as PostType] ?? post.type}
               </span>
             </div>
           )}
@@ -119,82 +195,18 @@ export default function PostCard({ post }: PostCardProps) {
         </div>
 
         <Link href={`/post/${post.slug}`}>
-          <h2 className="mt-3 line-clamp-2 text-lg font-semibold text-gray-900 transition-colors hover:text-emerald-brand">
+          <h2 className="font-display mt-3 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
             {post.title}
           </h2>
         </Link>
 
-        {post.excerpt && (
+        {post.excerpt ? (
           <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">
             {post.excerpt}
           </p>
-        )}
+        ) : null}
 
-        <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-4">
-          {author ? (
-            <Link
-              href={`/${author.username}`}
-              className="flex min-w-0 items-center gap-2 group/author"
-            >
-              {author.avatar_url ? (
-                <img
-                  src={author.avatar_url}
-                  alt={authorName}
-                  className="h-8 w-8 rounded-full object-cover"
-                />
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
-                  {getInitials(authorName)}
-                </div>
-              )}
-
-              <div className="min-w-0">
-                <p className="flex items-center gap-1 text-sm font-medium text-gray-900 transition-colors group-hover/author:text-emerald-brand">
-                  <span className="truncate">{authorName}</span>
-                  {author.verified && (
-                    <span
-                      title={
-                        author.verified_type
-                          ? `Verified ${author.verified_type}`
-                          : "Verified"
-                      }
-                      className={`text-xs font-bold ${
-                        VERIFIED_COLORS[author.verified_type ?? "student"] ??
-                        "text-emerald-600"
-                      }`}
-                    >
-                      ✓
-                    </span>
-                  )}
-                </p>
-                <p className="truncate text-xs text-gray-400">
-                  {author.university ?? "ThinkAfrica"}
-                </p>
-              </div>
-            </Link>
-          ) : (
-            <div className="min-w-0 text-sm font-medium text-gray-500">
-              Unknown author
-            </div>
-          )}
-
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-xs text-gray-400">
-            <span>{formatRelativeTime(displayDate)}</span>
-            {post.view_count !== undefined && post.view_count > 0 && (
-              <span>{formatViewCount(post.view_count)} views</span>
-            )}
-            <span className="flex items-center gap-1">
-              <svg
-                className="h-3.5 w-3.5"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />
-              </svg>
-              {likeCount}
-            </span>
-          </div>
-        </div>
+        {footerMeta}
       </div>
     </article>
   );

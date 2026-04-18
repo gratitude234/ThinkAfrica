@@ -51,7 +51,7 @@ export default function ExploreDropdown() {
         className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
           isActive
             ? "text-emerald-brand"
-            : "text-gray-600 hover:text-emerald-brand hover:bg-gray-50"
+            : "text-gray-600 hover:text-emerald-brand hover:bg-canvas"
         }`}
       >
         Explore
@@ -79,7 +79,7 @@ export default function ExploreDropdown() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 hover:bg-gray-50 transition-colors"
+                className="block px-4 py-2.5 hover:bg-canvas transition-colors"
               >
                 <p
                   className={`text-sm ${active ? "font-bold text-emerald-brand" : "font-medium text-gray-800"}`}

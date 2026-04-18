@@ -8,6 +8,8 @@ interface NotificationData {
   type: string;
   read: boolean;
   created_at: string;
+  message?: string | null;
+  link?: string | null;
   actor: {
     full_name: string | null;
     username: string;
@@ -26,9 +28,15 @@ const TYPE_ICONS: Record<string, string> = {
   debate_argument: "⚡",
   fellowship: "🎓",
   badge: "🏅",
+  post_approved: "✅",
+  post_rejected: "❌",
 };
 
 function buildMessage(notification: NotificationData): string {
+  if (notification.message) {
+    return notification.message;
+  }
+
   const actorName = notification.actor?.full_name ?? notification.actor?.username ?? "Someone";
   const postTitle = notification.post_title ?? "your post";
 
@@ -52,6 +60,10 @@ function buildMessage(notification: NotificationData): string {
 }
 
 function buildLink(notification: NotificationData): string | null {
+  if (notification.link) {
+    return notification.link;
+  }
+
   switch (notification.type) {
     case "like":
     case "comment":
@@ -74,10 +86,11 @@ export default function NotificationItem({ notification }: { notification: Notif
   const inner = (
     <div
       className={`flex items-start gap-3 px-4 py-4 transition-colors ${
-        !notification.read ? "bg-emerald-50 hover:bg-emerald-100/50" : "hover:bg-gray-50"
+        !notification.read ? "bg-emerald-50 hover:bg-emerald-100/50" : "hover:bg-canvas"
       }`}
     >
       {notification.actor?.avatar_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={notification.actor.avatar_url}
           alt={notification.actor.full_name ?? notification.actor.username}

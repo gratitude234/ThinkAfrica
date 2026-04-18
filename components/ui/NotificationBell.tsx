@@ -174,7 +174,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
                 return (
                   <div
                     key={n.id}
-                    className={`px-4 py-3 ${!n.read ? "bg-emerald-50" : "hover:bg-gray-50"} transition-colors`}
+                    className={`px-4 py-3 ${!n.read ? "bg-emerald-50" : "hover:bg-canvas"} transition-colors`}
                   >
                     {n.link ? (
                       <Link

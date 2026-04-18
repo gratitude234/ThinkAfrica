@@ -12,6 +12,14 @@ const config: Config = {
         "emerald-brand": "#10B981",
         gold: "#F59E0B",
         "purple-accent": "#7C3AED",
+        canvas: "#FAF8F5",
+        surface: "#FFFFFF",
+        ink: "#1A1A1A",
+        "ink-muted": "#6B6B6B",
+      },
+      fontFamily: {
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-playfair)", "Georgia", "serif"],
       },
       keyframes: {
         "slide-up": {

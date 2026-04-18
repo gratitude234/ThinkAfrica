@@ -133,9 +133,15 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="search-overlay-title"
     >
       <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="border-b border-gray-100 p-4">
+          <h2 id="search-overlay-title" className="sr-only">
+            Search ThinkAfrika
+          </h2>
           <div className="flex items-center gap-3">
             <svg
               className="h-5 w-5 flex-shrink-0 text-gray-400"
@@ -212,7 +218,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               className={`flex items-center gap-3 px-4 py-3 transition-colors ${
                 focusedIndex === index
                   ? "bg-emerald-50 ring-1 ring-emerald-200"
-                  : "hover:bg-gray-50"
+                  : "hover:bg-canvas"
               }`}
             >
               <div className="min-w-0 flex-1">

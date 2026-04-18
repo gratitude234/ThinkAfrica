@@ -83,7 +83,7 @@ export default function ArgumentForm({
 
   if (disabled) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+      <div className="rounded-xl border border-gray-200 bg-canvas p-4 text-center text-sm text-gray-500">
         This debate is closed. No new arguments can be submitted.
       </div>
     );

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 interface Author {
   id: string;
@@ -50,12 +51,16 @@ export default function AuthorBioCard({ author, userId, initialFollowing }: Prop
   };
 
   const isOwnProfile = userId === author.id;
+  const authorName = author.full_name ?? author.username ?? "Anonymous";
 
   return (
-    <div className="bg-gray-50 rounded-xl p-5 flex items-start gap-4">
-      <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-lg flex-shrink-0">
-        {author.full_name?.charAt(0)?.toUpperCase() ?? "?"}
-      </div>
+    <div className="bg-canvas rounded-xl p-5 flex items-start gap-4">
+      <UserAvatar
+        name={authorName}
+        src={author.avatar_url}
+        size={48}
+        className="flex-shrink-0"
+      />
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -63,7 +68,7 @@ export default function AuthorBioCard({ author, userId, initialFollowing }: Prop
               href={`/${author.username}`}
               className="font-semibold text-gray-900 hover:text-emerald-brand transition-colors"
             >
-              {author.full_name}
+              {authorName}
             </Link>
             <p className="text-xs text-gray-500 mt-0.5">
               {author.university}

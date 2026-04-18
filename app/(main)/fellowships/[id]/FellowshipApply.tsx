@@ -36,7 +36,7 @@ export default function FellowshipApply({
   if (existingApplication) {
     const status = existingApplication.status;
     return (
-      <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border ${STATUS_STYLES[status] ?? "bg-gray-50 text-gray-600 border-gray-200"}`}>
+      <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border ${STATUS_STYLES[status] ?? "bg-canvas text-gray-600 border-gray-200"}`}>
         Application: {status.charAt(0).toUpperCase() + status.slice(1)}
       </div>
     );

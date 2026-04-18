@@ -13,7 +13,7 @@ export default function Loading() {
 
         <div className="grid grid-cols-2 gap-4">
           {[...Array(2)].map((_, index) => (
-            <div key={index} className="rounded-lg bg-gray-50 p-3 space-y-2">
+            <div key={index} className="rounded-lg bg-canvas p-3 space-y-2">
               <div className="h-3 w-16 rounded bg-gray-100" />
               <div className="h-4 w-24 rounded bg-gray-200" />
             </div>

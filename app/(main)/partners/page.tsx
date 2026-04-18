@@ -88,7 +88,7 @@ export default async function PartnersPage() {
       )}
 
       {/* Become a partner */}
-      <div className="bg-gray-50 rounded-2xl p-8">
+      <div className="bg-canvas rounded-2xl p-8">
         <div className="max-w-xl mx-auto">
           <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
             Become a Partner

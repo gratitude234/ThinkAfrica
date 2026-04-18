@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Toast from "@/components/ui/Toast";
-import { formatDate, POST_POINTS, POST_TYPE_LABELS } from "@/lib/utils";
+import {
+  formatDate,
+  POST_POINTS,
+  POST_TYPE_LABELS,
+  type PostType,
+} from "@/lib/utils";
 
 export interface DashboardPost {
   id: string;
@@ -123,7 +128,7 @@ export default function PostsTable({
           });
 
           if (previousStatus === "pending" && record.status === "published") {
-            const points = POST_POINTS[record.type ?? "blog"] ?? 0;
+            const points = POST_POINTS[(record.type as PostType) ?? "blog"] ?? 0;
             setToastMessage(
               `\uD83C\uDF89 Post published! +${points} points earned`
             );
@@ -188,7 +193,7 @@ export default function PostsTable({
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-canvas border-b border-gray-200">
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Title
@@ -220,7 +225,7 @@ export default function PostsTable({
                       ? `/write?draft=${post.id}`
                       : `/edit/${post.slug}`;
                   return (
-                    <tr key={post.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={post.id} className="hover:bg-canvas transition-colors">
                       <td className="px-4 py-3 max-w-[200px]">
                         <p className="font-medium text-gray-900 truncate">
                           {post.title}
@@ -228,7 +233,7 @@ export default function PostsTable({
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <span className="text-gray-500 text-xs">
-                          {POST_TYPE_LABELS[post.type] ?? post.type}
+                          {POST_TYPE_LABELS[post.type as PostType] ?? post.type}
                         </span>
                       </td>
                       <td className="px-4 py-3">

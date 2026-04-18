@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate, POST_POINTS } from "@/lib/utils";
+import { formatDate, POST_POINTS, type PostType } from "@/lib/utils";
 import DigestSendButton from "./DigestSendButton";
 
 export default async function AdminDigestPage() {
@@ -70,7 +70,7 @@ export default async function AdminDigestPage() {
     const profile = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
     if (!profile) continue;
     if (!contribMap[p.author_id]) contribMap[p.author_id] = { ...profile, pts: 0 };
-    contribMap[p.author_id].pts += POST_POINTS[p.type] ?? 10;
+    contribMap[p.author_id].pts += POST_POINTS[p.type as PostType] ?? 10;
   }
   const topContrib = Object.values(contribMap).sort((a, b) => b.pts - a.pts)[0] ?? null;
 

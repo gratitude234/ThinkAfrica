@@ -15,7 +15,7 @@ export default function EditorialStandardsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-gray-50">
+              <tr className="bg-canvas">
                 <th className="text-left px-4 py-3 font-semibold text-gray-700 border border-gray-200">Type</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-700 border border-gray-200">Word Count</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-700 border border-gray-200">Review Type</th>
@@ -49,7 +49,7 @@ export default function EditorialStandardsPage() {
                   desc: "Targeted recommendations for policymakers. Problem, evidence, and recommendations required.",
                 },
               ].map((row) => (
-                <tr key={row.type} className="hover:bg-gray-50">
+                <tr key={row.type} className="hover:bg-canvas">
                   <td className="px-4 py-3 border border-gray-200 font-medium text-gray-900">
                     {row.type}
                   </td>
@@ -121,7 +121,7 @@ export default function EditorialStandardsPage() {
       </section>
 
       {/* Contact */}
-      <div className="bg-gray-50 rounded-xl p-6 text-center">
+      <div className="bg-canvas rounded-xl p-6 text-center">
         <h3 className="font-semibold text-gray-900 mb-1">Editorial Inquiries</h3>
         <p className="text-sm text-gray-500 mb-2">
           Questions about your submission or our standards?

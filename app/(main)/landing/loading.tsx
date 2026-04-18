@@ -32,7 +32,7 @@ export default function Loading() {
         </div>
       </section>
 
-      <section className="border-y border-gray-100 bg-gray-50 py-8">
+      <section className="border-y border-gray-100 bg-canvas py-8">
         <div className="mx-auto grid max-w-4xl gap-6 sm:grid-cols-3">
           {[...Array(3)].map((_, index) => (
             <div key={index} className="space-y-2 text-center">

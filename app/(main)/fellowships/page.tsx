@@ -152,7 +152,7 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
             {closed.map((f) => (
               <div
                 key={f.id}
-                className="bg-gray-50 rounded-xl border border-gray-200 p-4 opacity-70"
+                className="bg-canvas rounded-xl border border-gray-200 p-4 opacity-70"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>

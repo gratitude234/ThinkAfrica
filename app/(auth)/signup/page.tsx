@@ -6,10 +6,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 const INPUT_STYLES =
-  "w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
+  "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 const BRAND_ITEMS = [
-  { icon: "✍️", text: "Publish research, essays & policy briefs" },
+  { icon: "✏️", text: "Publish research, essays & policy briefs" },
   { icon: "⚡", text: "Debate the issues that shape Africa" },
   { icon: "🏆", text: "Earn points, badges and fellowships" },
 ];
@@ -20,17 +20,16 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     fullName: "",
-    university: "",
     email: "",
     password: "",
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setError(null);
 
@@ -41,7 +40,6 @@ export default function SignupPage() {
       options: {
         data: {
           full_name: form.fullName,
-          university: form.university,
         },
       },
     });
@@ -60,13 +58,14 @@ export default function SignupPage() {
     <div className="fixed inset-0 z-10 grid min-h-screen grid-cols-1 bg-white md:grid-cols-2">
       <div className="hidden flex-col justify-between bg-emerald-brand p-12 text-white md:flex">
         <div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
             alt="ThinkAfrica"
             className="mb-12 h-10 w-auto brightness-0 invert"
           />
           <blockquote className="mb-6 text-xl font-medium italic leading-relaxed text-white/90">
-            &quot;The pen is mightier than the sword - and the African intellectual is mightier still.&quot;
+            &quot;The pen is mightier than the sword, and the African intellectual is mightier still.&quot;
           </blockquote>
           <p className="text-sm text-white/60">
             ThinkAfrica · Africa&apos;s Intellectual Network
@@ -87,12 +86,13 @@ export default function SignupPage() {
 
       <div className="flex flex-col justify-center bg-white px-8 py-12 sm:px-16">
         <div className="mx-auto w-full max-w-md">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
             alt="ThinkAfrica"
             className="mb-8 h-8 w-auto md:hidden"
           />
-          <h1 className="mb-1 text-2xl font-bold text-gray-900">
+          <h1 className="font-display mb-1 text-2xl font-bold text-ink">
             Create your account
           </h1>
           <p className="mb-8 text-sm text-gray-500">
@@ -111,21 +111,6 @@ export default function SignupPage() {
                 onChange={handleChange}
                 required
                 placeholder="e.g. Amara Diallo"
-                className={INPUT_STYLES}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                University
-              </label>
-              <input
-                type="text"
-                name="university"
-                value={form.university}
-                onChange={handleChange}
-                required
-                placeholder="e.g. University of Lagos"
                 className={INPUT_STYLES}
               />
             </div>

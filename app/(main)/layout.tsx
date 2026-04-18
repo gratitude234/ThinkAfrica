@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import NavClient from "./NavClient";
-import BottomNav from "./BottomNav";
+import GuestBanner from "@/components/ui/GuestBanner";
+import NavigationShell from "./NavigationShell";
 
 export default async function MainLayout({
   children,
@@ -8,7 +8,7 @@ export default async function MainLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  // getSession reads from the request cookie — no network round-trip.
+  // getSession reads from the request cookie with no network round-trip.
   // getUser() would validate the JWT with Supabase's auth server on every page load.
   // For display-only nav rendering, the session cookie is sufficient.
   const {
@@ -27,22 +27,14 @@ export default async function MainLayout({
   const isAdmin = !!user && user.email === process.env.ADMIN_EMAIL;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <NavClient
-        user={user}
-        profile={profileData}
-        isAdmin={isAdmin}
-      />
+    <div className="min-h-screen bg-canvas">
+      <NavigationShell user={user} profile={profileData} isAdmin={isAdmin} />
 
-      {/* Page content — extra bottom padding on mobile for BottomNav */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
+      <main className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 lg:px-8 md:pb-8">
         {children}
       </main>
 
-      <BottomNav
-        username={profileData?.username ?? null}
-        userId={user?.id ?? null}
-      />
+      {!user ? <GuestBanner /> : null}
     </div>
   );
 }

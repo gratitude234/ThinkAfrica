@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
       <div className="text-center max-w-md">
         <Link href="/" className="inline-block mb-8">
           <span className="text-2xl font-bold text-emerald-brand">ThinkAfrica</span>
@@ -26,7 +26,7 @@ export default function NotFound() {
           </Link>
           <Link
             href="/debates"
-            className="px-5 py-2.5 bg-white text-gray-700 border border-gray-200 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            className="px-5 py-2.5 bg-white text-gray-700 border border-gray-200 font-medium rounded-lg hover:bg-canvas transition-colors text-sm"
           >
             Join a Debate
           </Link>

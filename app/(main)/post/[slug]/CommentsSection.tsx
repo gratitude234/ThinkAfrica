@@ -2,9 +2,10 @@
 
 // -- ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id uuid REFERENCES comments(id);
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Toast from "@/components/ui/Toast";
+import ProfileGate from "@/components/ui/ProfileGate";
 import { formatRelativeTime } from "@/lib/utils";
 
 interface CommentAuthor {
@@ -67,6 +68,34 @@ export default function CommentsSection({
   const [replyLoading, setReplyLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [profileInfo, setProfileInfo] = useState<{
+    full_name: string | null;
+    username: string | null;
+    university: string | null;
+  } | null>(null);
+  const [loadingProfileInfo, setLoadingProfileInfo] = useState(true);
+  const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
+  const pendingSubmitRef = useRef<{ parentId: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoadingProfileInfo(false);
+      return;
+    }
+
+    const supabase = createClient();
+    const profileId = userProfileId ?? userId;
+
+    supabase
+      .from("profiles")
+      .select("full_name, username, university")
+      .eq("id", profileId)
+      .single()
+      .then(({ data }) => {
+        setProfileInfo(data ?? null);
+        setLoadingProfileInfo(false);
+      });
+  }, [userId, userProfileId]);
 
   const totalCount = useMemo(
     () => comments.reduce((sum, comment) => sum + 1 + comment.replies.length, 0),
@@ -134,9 +163,19 @@ export default function CommentsSection({
     }
   };
 
-  const handleSubmit = async (parentId: string | null = null) => {
+  const handleSubmit = async (
+    parentId: string | null = null,
+    bypassProfileGate = false
+  ) => {
     const content = parentId ? replyContent : newComment;
     if (!content.trim()) return;
+    if (!bypassProfileGate && loadingProfileInfo) return;
+
+    if (!bypassProfileGate && userId && !profileInfo?.username) {
+      pendingSubmitRef.current = { parentId };
+      setIsProfileGateOpen(true);
+      return;
+    }
 
     if (parentId) {
       setReplyLoading(true);
@@ -302,7 +341,7 @@ export default function CommentsSection({
               ) : null}
 
               {replyingToId === comment.id ? (
-                <div className="ml-10 mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="ml-10 mt-3 rounded-lg border border-gray-200 bg-canvas p-3">
                   <textarea
                     value={replyContent}
                     onChange={(e) => setReplyContent(e.target.value)}
@@ -369,7 +408,7 @@ export default function CommentsSection({
           </div>
         </form>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+        <div className="rounded-lg border border-gray-200 bg-canvas px-4 py-3 text-sm text-gray-500">
           <a
             href="/login"
             className="font-medium text-emerald-brand hover:underline"
@@ -379,6 +418,25 @@ export default function CommentsSection({
           to leave a comment.
         </div>
       )}
+
+      <ProfileGate
+        open={isProfileGateOpen && !!userId}
+        userId={userProfileId ?? userId ?? ""}
+        initialProfile={profileInfo}
+        onClose={() => {
+          pendingSubmitRef.current = null;
+          setIsProfileGateOpen(false);
+        }}
+        onComplete={(profile) => {
+          setProfileInfo(profile);
+          setIsProfileGateOpen(false);
+          const pending = pendingSubmitRef.current;
+          pendingSubmitRef.current = null;
+          if (pending) {
+            void handleSubmit(pending.parentId, true);
+          }
+        }}
+      />
 
       {toastMessage ? (
         <Toast message={toastMessage} onDone={() => setToastMessage(null)} />

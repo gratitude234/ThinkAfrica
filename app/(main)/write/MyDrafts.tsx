@@ -43,7 +43,7 @@ export default function MyDrafts({ activeDraftId }: { activeDraftId: string | nu
   if (filtered.length === 0) return null;
 
   return (
-    <div className="mb-6 border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
+    <div className="mb-6 border border-gray-200 rounded-lg bg-canvas overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

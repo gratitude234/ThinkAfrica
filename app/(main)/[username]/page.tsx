@@ -1,84 +1,216 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import CredentialsCard from "@/components/profile/CredentialsCard";
+import FeaturedWork from "@/components/profile/FeaturedWork";
+import OpportunityBanner from "@/components/profile/OpportunityBanner";
+import ProfileHeader from "@/components/profile/ProfileHeader";
+import PublicationsSection from "@/components/profile/PublicationsSection";
+import TopArguments from "@/components/profile/TopArguments";
 import { createClient } from "@/lib/supabase/server";
-import ProfileCard from "@/components/profile/ProfileCard";
-import PostCard from "@/components/post/PostCard";
-import type { PostCardData } from "@/components/post/PostCard";
-import FollowButton from "./FollowButton";
-import { formatRelativeTime } from "@/lib/utils";
-import OpportunitiesTab from "./OpportunitiesTab";
+import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
 
 interface PageProps {
   params: Promise<{ username: string }>;
-  searchParams: Promise<{ tab?: string }>;
+}
+
+interface Badge {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+}
+
+interface ProfileRecord {
+  id: string;
+  username: string;
+  full_name: string | null;
+  university: string | null;
+  field_of_study: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  points: number;
+  cover_image_url: string | null;
+  verified: boolean;
+  verified_type: string | null;
+  created_at: string;
+}
+
+interface TalentProfile {
+  id: string;
+  open_to_opportunities: boolean;
+  opportunity_types: string[] | null;
+  cv_url: string | null;
+  linkedin_url: string | null;
+  skills: string[] | null;
+  visibility: string;
+}
+
+interface ProfilePost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  type: string;
+  tags: string[] | null;
+  created_at: string;
+  published_at: string | null;
+  view_count: number | null;
+  cover_image_url: string | null;
+  profiles: {
+    username: string;
+    full_name: string | null;
+    university: string | null;
+    avatar_url: string | null;
+    verified?: boolean;
+    verified_type?: string | null;
+  } | null;
+}
+
+interface ProfilePostRow extends Omit<ProfilePost, "profiles"> {
+  profiles:
+    | ProfilePost["profiles"]
+    | NonNullable<ProfilePost["profiles"]>[];
+}
+
+interface TopArgumentRecord {
+  id: string;
+  content: string;
+  stance: string | null;
+  upvotes: number | null;
+  round_number: number | null;
+  debate_id: string;
+  debates: {
+    id: string;
+    title: string;
+    status?: string | null;
+  } | null;
+}
+
+interface TopArgumentRow extends Omit<TopArgumentRecord, "debates"> {
+  debates:
+    | TopArgumentRecord["debates"]
+    | NonNullable<TopArgumentRecord["debates"]>[];
+}
+
+const ACTIVITY_TYPE_ICONS: Record<string, string> = {
+  like: "♥",
+  comment: "💬",
+  debate: "⚡",
+};
+
+function getDisplayName(profile: {
+  full_name: string | null;
+  username: string;
+}) {
+  return profile.full_name ?? profile.username;
+}
+
+function getFirstName(profile: {
+  full_name: string | null;
+  username: string;
+}) {
+  const name = profile.full_name?.trim();
+  return name ? name.split(/\s+/)[0] : profile.username;
+}
+
+function getBioFirstLine(bio: string | null) {
+  const firstLine = bio?.split(/\r?\n/)[0]?.trim() ?? "";
+  return firstLine;
+}
+
+function clampText(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params;
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, bio, avatar_url, username")
-    .eq("username", username)
-    .single();
 
-  if (!profile) return { title: "Profile not found — ThinkAfrica" };
-
-  return {
-    title: `${profile.full_name ?? profile.username} — ThinkAfrica`,
-    description: profile.bio ?? `View ${profile.full_name ?? profile.username}'s profile on ThinkAfrica`,
-    openGraph: {
-      title: `${profile.full_name ?? profile.username} on ThinkAfrica`,
-      description: profile.bio ?? "",
-      images: profile.avatar_url ? [{ url: profile.avatar_url, width: 400, height: 400 }] : [],
-    },
-    twitter: {
-      card: "summary",
-      title: `${profile.full_name ?? profile.username} on ThinkAfrica`,
-      description: profile.bio ?? "",
-      images: profile.avatar_url ? [profile.avatar_url] : [],
-    },
-  };
-}
-
-const ACTIVITY_TYPE_ICONS: Record<string, string> = {
-  like: "❤️",
-  comment: "💬",
-  debate: "⚡",
-};
-
-export default async function UserProfilePage({
-  params,
-  searchParams,
-}: PageProps) {
-  const { username } = await params;
-  const { tab = "posts" } = await searchParams;
-  const supabase = await createClient();
-
-  // Fetch profile
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, username, full_name, university, field_of_study, bio, avatar_url, points, cover_image_url"
+      "id, full_name, bio, avatar_url, username, university, field_of_study"
     )
     .eq("username", username)
     .single();
 
+  if (!profile) {
+    return { title: "Profile not found - ThinkAfrika" };
+  }
+
+  const { count: postCount } = await supabase
+    .from("posts")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "published")
+    .eq("author_id", profile.id);
+
+  const displayName = profile.full_name ?? profile.username;
+  const bioFirstLine = getBioFirstLine(profile.bio);
+  const title = clampText(
+    bioFirstLine
+      ? `${displayName} - ${bioFirstLine}`
+      : `${displayName} - ThinkAfrika`,
+    60
+  );
+  const description = profile.bio
+    ? clampText(profile.bio, 155)
+    : clampText(
+        `${displayName}, ${profile.field_of_study ?? "student"} at ${
+          profile.university ?? "their university"
+        }. ${(postCount ?? 0).toLocaleString()} publications on ThinkAfrika.`,
+        155
+      );
+  const image = profile.avatar_url ?? "/logo.png";
+
+  return {
+    title,
+    description,
+    openGraph: {
+      type: "profile",
+      title,
+      description,
+      images: [{ url: image, width: 400, height: 400 }],
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      images: [image],
+    },
+  };
+}
+
+export default async function UserProfilePage({ params }: PageProps) {
+  const { username } = await params;
+  const supabase = await createClient();
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "id, username, full_name, university, field_of_study, bio, avatar_url, points, cover_image_url, verified, verified_type, created_at"
+    )
+    .eq("username", username)
+    .single<ProfileRecord>();
+
   if (!profile) notFound();
 
-  // Current user
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Parallel queries for base data
+  const isOwnProfile = user?.id === profile.id;
+
   const [
     { data: posts },
     { data: userBadges },
     { count: followerCount },
     { count: followingCount },
-    _unusedLikeCount,
+    { data: talentProfile },
+    { data: topArguments },
+    activityData,
+    followStatus,
   ] = await Promise.all([
     supabase
       .from("posts")
@@ -88,429 +220,244 @@ export default async function UserProfilePage({
       .eq("author_id", profile.id)
       .eq("status", "published")
       .order("published_at", { ascending: false }),
-
     supabase
       .from("user_badges")
       .select("badge_id, awarded_at, badges (id, name, description, icon)")
       .eq("user_id", profile.id),
-
     supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
       .eq("following_id", profile.id),
-
     supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
       .eq("follower_id", profile.id),
-
-    // Total likes received on their posts
     supabase
-      .from("likes")
-      .select("*", { count: "exact", head: true })
-      .in(
-        "post_id",
-        // we need post ids — handled below after posts fetch
-        []
-      ),
+      .from("talent_profiles")
+      .select(
+        "id, open_to_opportunities, opportunity_types, cv_url, linkedin_url, skills, visibility"
+      )
+      .eq("user_id", profile.id)
+      .single<TalentProfile>(),
+    supabase
+      .from("debate_arguments")
+      .select(
+        "id, content, stance, upvotes, round_number, debate_id, debates!debate_arguments_debate_id_fkey(id, title, status)"
+      )
+      .eq("author_id", profile.id)
+      .order("upvotes", { ascending: false })
+      .limit(3),
+    isOwnProfile
+      ? Promise.all([
+          supabase
+            .from("likes")
+            .select("created_at, posts!likes_post_id_fkey(title, slug)")
+            .eq("user_id", profile.id)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          supabase
+            .from("comments")
+            .select("created_at, content, posts!comments_post_id_fkey(title, slug)")
+            .eq("author_id", profile.id)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          supabase
+            .from("debate_arguments")
+            .select("created_at, debates!debate_arguments_debate_id_fkey(id, title)")
+            .eq("author_id", profile.id)
+            .order("created_at", { ascending: false })
+            .limit(10),
+        ])
+      : Promise.resolve(null),
+    user && user.id !== profile.id
+      ? supabase
+          .from("follows")
+          .select("follower_id")
+          .eq("follower_id", user.id)
+          .eq("following_id", profile.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
-  // Fetch total likes received (using post ids)
-  const postIds = (posts ?? []).map((p) => p.id);
-  let totalLikesReceived = 0;
-  const likesByPostId: Record<string, number> = {};
-  if (postIds.length > 0) {
-    const [{ count }, { data: likeRows }] = await Promise.all([
-      supabase
-        .from("likes")
-        .select("*", { count: "exact", head: true })
-        .in("post_id", postIds),
-      supabase.from("likes").select("post_id").in("post_id", postIds),
-    ]);
-
-    likeRows?.forEach((row) => {
-      likesByPostId[row.post_id] = (likesByPostId[row.post_id] ?? 0) + 1;
-    });
-    totalLikesReceived = count ?? 0;
-  }
-
-  const badges = (userBadges ?? [])
-    .map((ub) => (Array.isArray(ub.badges) ? ub.badges[0] : ub.badges))
-    .filter(Boolean) as {
-    id: string;
-    name: string;
-    description: string | null;
-    icon: string | null;
-  }[];
-
-  // Is current user following?
-  let isFollowing = false;
-  if (user && user.id !== profile.id) {
-    const { data: followRow } = await supabase
-      .from("follows")
-      .select("follower_id")
-      .eq("follower_id", user.id)
-      .eq("following_id", profile.id)
-      .single();
-    isFollowing = !!followRow;
-  }
-
-  const feedPosts: PostCardData[] = (posts ?? []).map((p) => ({
-    ...p,
-    like_count: likesByPostId[p.id] ?? 0,
-    profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
+  const normalizedPosts = ((posts ?? []) as unknown as ProfilePostRow[]).map(
+    (post) => ({
+    ...post,
+    profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
   }));
 
-  // Total view count across published posts
-  const totalViewCount = (posts ?? []).reduce(
-    (sum, p) => sum + ((p as { view_count?: number }).view_count ?? 0),
+  const badges = (userBadges ?? [])
+    .map((userBadge) =>
+      Array.isArray(userBadge.badges) ? userBadge.badges[0] : userBadge.badges
+    )
+    .filter(Boolean) as Badge[];
+
+  const totalViews = normalizedPosts.reduce(
+    (sum, post) => sum + (post.view_count ?? 0),
     0
   );
 
-  // Debates tab data
-  let debateParticipations: {
-    debate_id: string;
-    debates: { id: string; title: string; status: string } | null;
-    created_at: string;
-  }[] = [];
+  const featuredPosts = [...normalizedPosts]
+    .sort((left, right) => (right.view_count ?? 0) - (left.view_count ?? 0))
+    .slice(0, 3);
 
-  if (tab === "debates") {
-    const { data } = await supabase
-      .from("debate_arguments")
-      .select("debate_id, created_at, debates!debate_arguments_debate_id_fkey(id, title, status)")
-      .eq("author_id", profile.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
+  const normalizedTopArguments = (
+    (topArguments ?? []) as unknown as TopArgumentRow[]
+  ).map((argument) => ({
+      ...argument,
+      debates: Array.isArray(argument.debates)
+        ? argument.debates[0]
+        : argument.debates,
+    }));
 
-    // Deduplicate by debate_id
-    const seen = new Set<string>();
-    debateParticipations = (data ?? [])
-      .filter((d) => {
-        if (seen.has(d.debate_id)) return false;
-        seen.add(d.debate_id);
-        return true;
-      })
-      .map((d) => ({
-        ...d,
-        debates: Array.isArray(d.debates) ? d.debates[0] : d.debates,
-      }));
-  }
+  const opportunityVisible =
+    !!talentProfile?.open_to_opportunities &&
+    (isOwnProfile ||
+      talentProfile.visibility === "public" ||
+      (talentProfile.visibility === "partners_only" && !!user));
 
-  // Activity tab data
-  let activity: {
-    type: "like" | "comment" | "debate";
-    description: string;
-    link: string;
-    created_at: string;
-  }[] = [];
+  const recentActivity = isOwnProfile && activityData
+    ? (() => {
+        const [likesResult, commentsResult, debatesResult] = activityData;
+        const likeActivity = (likesResult.data ?? []).map((like) => {
+          const post = Array.isArray(like.posts) ? like.posts[0] : like.posts;
+          return {
+            type: "like" as const,
+            description: `Liked "${post?.title ?? "a post"}"`,
+            link: post ? `/post/${post.slug}` : "#",
+            created_at: like.created_at,
+          };
+        });
 
-  if (tab === "activity") {
-    const [{ data: recentLikes }, { data: recentComments }, { data: recentArgs }] =
-      await Promise.all([
-        supabase
-          .from("likes")
-          .select(
-            "created_at, posts!likes_post_id_fkey(title, slug)"
+        const commentActivity = (commentsResult.data ?? []).map((comment) => {
+          const post = Array.isArray(comment.posts)
+            ? comment.posts[0]
+            : comment.posts;
+          return {
+            type: "comment" as const,
+            description: `Commented on "${post?.title ?? "a post"}"`,
+            link: post ? `/post/${post.slug}` : "#",
+            created_at: comment.created_at,
+          };
+        });
+
+        const debateActivity = (debatesResult.data ?? []).map((argument) => {
+          const debate = Array.isArray(argument.debates)
+            ? argument.debates[0]
+            : argument.debates;
+          return {
+            type: "debate" as const,
+            description: `Argued in "${debate?.title ?? "a debate"}"`,
+            link: debate ? `/debates/${debate.id}` : "#",
+            created_at: argument.created_at,
+          };
+        });
+
+        return [...likeActivity, ...commentActivity, ...debateActivity]
+          .sort(
+            (left, right) =>
+              new Date(right.created_at).getTime() -
+              new Date(left.created_at).getTime()
           )
-          .eq("user_id", profile.id)
-          .order("created_at", { ascending: false })
-          .limit(10),
+          .slice(0, 20);
+      })()
+    : [];
 
-        supabase
-          .from("comments")
-          .select(
-            "created_at, content, posts!comments_post_id_fkey(title, slug)"
-          )
-          .eq("author_id", profile.id)
-          .order("created_at", { ascending: false })
-          .limit(10),
-
-        supabase
-          .from("debate_arguments")
-          .select(
-            "created_at, debates!debate_arguments_debate_id_fkey(id, title)"
-          )
-          .eq("author_id", profile.id)
-          .order("created_at", { ascending: false })
-          .limit(10),
-      ]);
-
-    const likeActivity = (recentLikes ?? []).map((l) => {
-      const post = Array.isArray(l.posts) ? l.posts[0] : l.posts;
-      return {
-        type: "like" as const,
-        description: `Liked "${post?.title ?? "a post"}"`,
-        link: post ? `/post/${post.slug}` : "#",
-        created_at: l.created_at,
-      };
-    });
-
-    const commentActivity = (recentComments ?? []).map((c) => {
-      const post = Array.isArray(c.posts) ? c.posts[0] : c.posts;
-      return {
-        type: "comment" as const,
-        description: `Commented on "${post?.title ?? "a post"}"`,
-        link: post ? `/post/${post.slug}` : "#",
-        created_at: c.created_at,
-      };
-    });
-
-    const debateActivity = (recentArgs ?? []).map((a) => {
-      const debate = Array.isArray(a.debates) ? a.debates[0] : a.debates;
-      return {
-        type: "debate" as const,
-        description: `Argued in "${debate?.title ?? "a debate"}"`,
-        link: debate ? `/debates/${debate.id}` : "#",
-        created_at: a.created_at,
-      };
-    });
-
-    activity = [...likeActivity, ...commentActivity, ...debateActivity]
-      .sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
-      .slice(0, 20);
-  }
-
-  // Opportunities tab data
-  let talentProfile: {
-    id: string; open_to_opportunities: boolean; opportunity_types: string[] | null;
-    cv_url: string | null; linkedin_url: string | null; skills: string[] | null; visibility: string;
-  } | null = null;
-  if (tab === "opportunities" || (user?.id === profile.id)) {
-    const { data } = await supabase
-      .from("talent_profiles")
-      .select("id, open_to_opportunities, opportunity_types, cv_url, linkedin_url, skills, visibility")
-      .eq("user_id", profile.id)
-      .single();
-    talentProfile = data;
-  }
-
-  const isOwnProfile = user?.id === profile.id;
-
-  const tabLinks = [
-    { label: "Posts", value: "posts" },
-    { label: "Debates", value: "debates" },
-    { label: "Activity", value: "activity" },
-    { label: "Opportunities", value: "opportunities" },
-  ];
-
-  const profileInitials = (profile.full_name ?? profile.username ?? "?")
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part: string) => part.charAt(0).toUpperCase())
-    .join("");
+  const displayName = getDisplayName(profile);
+  const firstName = getFirstName(profile);
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-8 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-100 to-emerald-50">
-        {profile.cover_image_url ? (
-          <img
-            src={profile.cover_image_url}
-            alt={`${profile.full_name ?? profile.username} cover`}
-            className="h-40 w-full object-cover md:h-56"
-          />
-        ) : (
-          <div className="flex h-40 w-full items-center justify-center bg-gradient-to-r from-emerald-100 to-emerald-50 md:h-56">
-            <span className="text-5xl font-bold tracking-[0.3em] text-emerald-300/70 md:text-7xl">
-              {profileInitials}
-            </span>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <ProfileHeader
+        profile={profile}
+        isOwnProfile={isOwnProfile}
+        currentUserId={user?.id ?? null}
+        initialFollowing={!!followStatus.data}
+        isOpenToOpportunities={!!talentProfile?.open_to_opportunities}
+        canContact={opportunityVisible && !isOwnProfile}
+        talentProfileId={talentProfile?.id ?? null}
+        writingSince={formatMonthYear(profile.created_at)}
+      />
+
+      <OpportunityBanner
+        isOwnProfile={isOwnProfile}
+        userId={user?.id ?? null}
+        firstName={firstName}
+        opportunityTypes={talentProfile?.opportunity_types ?? []}
+        talentProfileId={talentProfile?.id ?? null}
+        isVisibleToViewer={opportunityVisible}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-6">
+          <FeaturedWork posts={featuredPosts} />
+
+          <PublicationsSection posts={normalizedPosts} fullName={displayName} />
+
+          <div className="lg:hidden">
+            <CredentialsCard
+              profile={profile}
+              badges={badges}
+              postCount={normalizedPosts.length}
+              totalViews={totalViews}
+              followerCount={followerCount ?? 0}
+              followingCount={followingCount ?? 0}
+            />
           </div>
-        )}
-      </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-      {/* Sidebar */}
-      <div className="lg:col-span-1">
-        <ProfileCard
-          profile={profile}
-          badges={badges}
-          postCount={feedPosts.length}
-          followerCount={followerCount ?? 0}
-          followingCount={followingCount ?? 0}
-          totalViews={totalViewCount}
-        >
-          <FollowButton
-            targetUserId={profile.id}
-            currentUserId={user?.id ?? null}
-            initialFollowing={isFollowing}
-          />
-        </ProfileCard>
+          <TopArguments argumentsList={normalizedTopArguments} />
 
-        {/* Stats row */}
-        <div className="mt-4 bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Stats
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="text-center bg-gray-50 rounded-lg p-3">
-              <p className="text-lg font-bold text-gray-900">
-                {feedPosts.length}
-              </p>
-              <p className="text-xs text-gray-400">Posts</p>
-            </div>
-            <div className="text-center bg-gray-50 rounded-lg p-3">
-              <p className="text-lg font-bold text-gray-900">
-                {totalLikesReceived}
-              </p>
-              <p className="text-xs text-gray-400">Likes</p>
-            </div>
-            <div className="text-center bg-gray-50 rounded-lg p-3">
-              <p className="text-lg font-bold text-emerald-brand">
-                {profile.points}
-              </p>
-              <p className="text-xs text-gray-400">Points</p>
-            </div>
-            <div className="text-center bg-gray-50 rounded-lg p-3">
-              <p className="text-lg font-bold text-gray-900">
-                {followerCount ?? 0}
-              </p>
-              <p className="text-xs text-gray-400">Followers</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="lg:col-span-2">
-        {/* Tab navigation */}
-        <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-          {tabLinks.map((t) => {
-            const active = tab === t.value;
-            return (
-              <Link
-                key={t.value}
-                href={`/${username}?tab=${t.value}`}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  active
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Posts tab */}
-        {tab === "posts" && (
-          <>
-            {feedPosts.length === 0 ? (
-              <div className="text-gray-400 text-sm py-8 text-center">
-                No published posts yet.
+          {isOwnProfile ? (
+            <section className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Your recent activity
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Private to you. Useful for tracking your latest engagement.
+                </p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {isOwnProfile ? (
-                  <div className="mb-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
-                    {totalViewCount.toLocaleString()} total views · {totalLikesReceived.toLocaleString()} total likes
-                  </div>
-                ) : null}
-                {feedPosts.map((post) => (
-                  <div key={post.id} className="space-y-2">
-                    {isOwnProfile ? (
-                      <div className="ml-auto text-right text-xs text-gray-400">
-                        👁 {(post.view_count ?? 0).toLocaleString()} · ❤ {(post.like_count ?? 0).toLocaleString()}
-                      </div>
-                    ) : null}
-                    <PostCard post={post} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
 
-        {/* Debates tab */}
-        {tab === "debates" && (
-          <>
-            {debateParticipations.length === 0 ? (
-              <div className="text-gray-400 text-sm py-8 text-center">
-                No debate participations yet.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {debateParticipations.map((d) => {
-                  const debate = d.debates;
-                  if (!debate) return null;
-                  return (
+              {recentActivity.length === 0 ? (
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
+                  No recent activity yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentActivity.map((item, index) => (
                     <Link
-                      key={`${d.debate_id}-${d.created_at}`}
-                      href={`/debates/${debate.id}`}
-                      className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-shadow"
+                      key={`${item.type}-${item.created_at}-${index}`}
+                      href={item.link}
+                      className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
                     >
-                      <span className="text-xl flex-shrink-0">⚡</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 hover:text-emerald-brand transition-colors">
-                          {debate.title}
+                      <span className="mt-0.5 text-base">
+                        {ACTIVITY_TYPE_ICONS[item.type]}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-gray-700">
+                          {item.description}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                              debate.status === "open"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : debate.status === "active"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-gray-100 text-gray-500"
-                            }`}
-                          >
-                            {debate.status}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            {formatRelativeTime(d.created_at)}
-                          </span>
-                        </div>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {formatRelativeTime(item.created_at)}
+                        </p>
                       </div>
                     </Link>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : null}
+        </div>
 
-        {/* Activity tab */}
-        {tab === "activity" && (
-          <>
-            {activity.length === 0 ? (
-              <div className="text-gray-400 text-sm py-8 text-center">
-                No recent activity.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {activity.map((item, i) => (
-                  <Link
-                    key={i}
-                    href={item.link}
-                    className="flex items-start gap-3 bg-white border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-shadow"
-                  >
-                    <span className="text-base flex-shrink-0 mt-0.5">
-                      {ACTIVITY_TYPE_ICONS[item.type] ?? "🔔"}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700">{item.description}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {formatRelativeTime(item.created_at)}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-        {/* Opportunities tab */}
-        {tab === "opportunities" && (
-          <OpportunitiesTab
-            profileId={profile.id}
-            isOwnProfile={isOwnProfile}
-            talentProfile={talentProfile}
-            userId={user?.id ?? null}
+        <div className="hidden lg:block">
+          <CredentialsCard
+            profile={profile}
+            badges={badges}
+            postCount={normalizedPosts.length}
+            totalViews={totalViews}
+            followerCount={followerCount ?? 0}
+            followingCount={followingCount ?? 0}
           />
-        )}
-      </div>
+        </div>
       </div>
     </div>
   );

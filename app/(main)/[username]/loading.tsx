@@ -14,7 +14,7 @@ export default function Loading() {
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="grid grid-cols-2 gap-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-gray-50 rounded-lg p-3 space-y-2">
+              <div key={i} className="bg-canvas rounded-lg p-3 space-y-2">
                 <div className="h-6 w-12 bg-gray-200 rounded mx-auto" />
                 <div className="h-3 w-10 bg-gray-100 rounded mx-auto" />
               </div>

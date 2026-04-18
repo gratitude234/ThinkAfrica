@@ -2,102 +2,49 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import NavUserMenu from "./NavUserMenu";
 import MobileNav from "./MobileNav";
 import NotificationBell from "@/components/ui/NotificationBell";
-import SearchOverlay from "@/components/ui/SearchOverlay";
 
 interface NavClientProps {
   user: User | null;
   profile: { username: string; full_name: string | null; points?: number } | null;
   isAdmin: boolean;
+  onOpenSearch: () => void;
 }
 
-const NAV_PILLARS = [
-  {
-    label: "Discover",
-    items: [
-      { label: "Feed", href: "/" },
-      { label: "Debates", href: "/debates" },
-      { label: "Webinars", href: "/webinars" },
-      { label: "Leaderboard", href: "/leaderboard" },
-      { label: "People", href: "/talent" },
-      { label: "Topics", href: "/topics" },
-    ],
-    activePrefixes: ["/", "/debates", "/webinars", "/leaderboard", "/talent", "/topics"],
-  },
-  {
-    label: "Create",
-    items: [
-      { label: "Write a post", href: "/write" },
-      { label: "Start a debate", href: "/debates/create" },
-      { label: "Host a webinar", href: "/webinars/create" },
-      { label: "My dashboard", href: "/dashboard" },
-    ],
-    activePrefixes: ["/write", "/debates/create", "/webinars/create", "/dashboard"],
-  },
-  {
-    label: "Grow",
-    items: [
-      { label: "Fellowships", href: "/fellowships" },
-      { label: "Ambassadors", href: "/ambassadors" },
-      { label: "Bookmarks", href: "/bookmarks" },
-      { label: "Partners", href: "/partners" },
-    ],
-    activePrefixes: ["/fellowships", "/ambassadors", "/bookmarks", "/partners"],
-  },
-] as const;
-
-function matchesPrefix(pathname: string, prefix: string) {
-  if (prefix === "/") {
-    return pathname === "/";
-  }
-
-  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+function navItemClass(isActive: boolean) {
+  return `rounded-lg px-4 py-2 text-sm transition-colors ${
+    isActive
+      ? "font-semibold text-emerald-brand"
+      : "text-ink-muted hover:bg-canvas hover:text-ink"
+  }`;
 }
 
-function getActivePillar(pathname: string) {
-  const priorityOrder = ["Create", "Grow", "Discover"] as const;
-
-  for (const label of priorityOrder) {
-    const pillar = NAV_PILLARS.find((item) => item.label === label);
-    if (pillar?.activePrefixes.some((prefix) => matchesPrefix(pathname, prefix))) {
-      return pillar.label;
-    }
-  }
-
-  return null;
-}
-
-export default function NavClient({ user, profile, isAdmin }: NavClientProps) {
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+export default function NavClient({
+  user,
+  profile,
+  isAdmin,
+  onOpenSearch,
+}: NavClientProps) {
   const pathname = usePathname();
-  const activePillar = getActivePillar(pathname);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setIsSearchOpen(true);
-      }
-      if (e.key === "Escape") {
-        setIsSearchOpen(false);
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  const isHomeActive = pathname === "/";
+  const isDiscoverActive =
+    pathname === "/topics" || pathname.startsWith("/topics/");
+  const isOpportunitiesActive =
+    pathname === "/opportunities" || pathname.startsWith("/opportunities/");
+  const isWriteActive = pathname.startsWith("/write");
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+    <nav
+      className="sticky top-0 z-50 border-b border-gray-200 bg-white"
+      aria-label="Primary navigation"
+    >
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-3">
+          <Link href="/" className="flex flex-shrink-0 items-center gap-2">
             <Image
               src="/logo.png"
               alt="ThinkAfrika"
@@ -108,63 +55,77 @@ export default function NavClient({ user, profile, isAdmin }: NavClientProps) {
             />
           </Link>
 
-          {/* Center nav links - desktop */}
-          <div className="hidden md:flex items-center gap-1">
-            {NAV_PILLARS.map((pillar) => {
-              const isActive = activePillar === pillar.label;
+          <div className="hidden min-w-0 flex-1 items-center justify-center gap-3 px-4 md:flex">
+            <div className="flex items-center gap-1">
+              <Link
+                href="/"
+                className={navItemClass(isHomeActive)}
+                aria-current={isHomeActive ? "page" : undefined}
+              >
+                Home
+              </Link>
+              <Link
+                href="/topics"
+                className={navItemClass(isDiscoverActive)}
+                aria-current={isDiscoverActive ? "page" : undefined}
+              >
+                Discover
+              </Link>
+              <Link
+                href="/opportunities"
+                className={navItemClass(isOpportunitiesActive)}
+                aria-current={isOpportunitiesActive ? "page" : undefined}
+              >
+                Opportunities
+              </Link>
+              <Link
+                href="/write"
+                className={`rounded-lg px-4 py-2 text-sm transition-colors ${
+                  isWriteActive
+                    ? "font-semibold text-emerald-brand"
+                    : "text-emerald-brand/90 hover:bg-emerald-50 hover:text-emerald-brand"
+                }`}
+                aria-current={isWriteActive ? "page" : undefined}
+              >
+                Write
+              </Link>
+            </div>
 
-              return (
-                <div key={pillar.label} className="relative group">
-                  <button
-                    type="button"
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
-                      isActive
-                        ? "text-emerald-brand font-semibold"
-                        : "text-gray-600 hover:text-emerald-brand hover:bg-gray-50"
-                    }`}
-                  >
-                    <span>{pillar.label}</span>
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 pointer-events-none group-hover:pointer-events-auto">
-                    {pillar.items.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-emerald-brand"
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Right side */}
-          <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsSearchOpen(true)}
-              title="Search (⌘K)"
-              aria-label="Search (Cmd+K)"
-              className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              type="button"
+              onClick={onOpenSearch}
+              className="flex w-full max-w-sm items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm text-ink-muted transition-colors hover:border-emerald-brand hover:text-ink"
+              aria-label="Open search"
             >
               <svg
-                className="w-5 h-5"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <span>Search posts, people, topics…</span>
+              <kbd className="ml-auto hidden text-xs text-gray-400 sm:inline">
+                ⌘K
+              </kbd>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenSearch}
+              className="rounded-full border border-gray-200 bg-white p-2 text-ink-muted transition-colors hover:border-emerald-brand hover:text-ink md:hidden"
+              aria-label="Open search"
+            >
+              <svg
+                className="h-4 w-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -177,8 +138,7 @@ export default function NavClient({ user, profile, isAdmin }: NavClientProps) {
                 />
               </svg>
             </button>
-
-            {user && <NotificationBell userId={user.id} />}
+            {user ? <NotificationBell userId={user.id} /> : null}
             <NavUserMenu
               user={user}
               profile={profile}
@@ -189,11 +149,6 @@ export default function NavClient({ user, profile, isAdmin }: NavClientProps) {
           </div>
         </div>
       </div>
-
-      <SearchOverlay
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-      />
     </nav>
   );
 }
