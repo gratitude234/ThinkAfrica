@@ -10,8 +10,14 @@ import NotificationBell from "@/components/ui/NotificationBell";
 
 interface NavClientProps {
   user: User | null;
-  profile: { username: string; full_name: string | null; points?: number } | null;
+  profile: {
+    username: string;
+    full_name: string | null;
+    points?: number;
+    role?: "student" | "reviewer" | "editor" | "admin";
+  } | null;
   isAdmin: boolean;
+  canAccessReview: boolean;
   onOpenSearch: () => void;
 }
 
@@ -27,6 +33,7 @@ export default function NavClient({
   user,
   profile,
   isAdmin,
+  canAccessReview,
   onOpenSearch,
 }: NavClientProps) {
   const pathname = usePathname();
@@ -144,8 +151,14 @@ export default function NavClient({
               profile={profile}
               points={profile?.points ?? 0}
               isAdmin={isAdmin}
+              canAccessReview={canAccessReview}
             />
-            <MobileNav user={user} profile={profile} isAdmin={isAdmin} />
+            <MobileNav
+              user={user}
+              profile={profile}
+              isAdmin={isAdmin}
+              canAccessReview={canAccessReview}
+            />
           </div>
         </div>
       </div>

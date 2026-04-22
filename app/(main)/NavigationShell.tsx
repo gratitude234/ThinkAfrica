@@ -8,14 +8,21 @@ import SearchOverlay from "@/components/ui/SearchOverlay";
 
 interface NavigationShellProps {
   user: User | null;
-  profile: { username: string; full_name: string | null; points?: number } | null;
+  profile: {
+    username: string;
+    full_name: string | null;
+    points?: number;
+    role?: "student" | "reviewer" | "editor" | "admin";
+  } | null;
   isAdmin: boolean;
+  canAccessReview: boolean;
 }
 
 export default function NavigationShell({
   user,
   profile,
   isAdmin,
+  canAccessReview,
 }: NavigationShellProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -41,6 +48,7 @@ export default function NavigationShell({
         user={user}
         profile={profile}
         isAdmin={isAdmin}
+        canAccessReview={canAccessReview}
         onOpenSearch={() => setIsSearchOpen(true)}
       />
       <BottomNav username={profile?.username ?? null} />

@@ -7,6 +7,9 @@ interface NotificationData {
   type: string;
   read: boolean;
   created_at: string;
+  message?: string | null;
+  link?: string | null;
+  post_id?: string | null;
   actor: {
     full_name: string | null;
     username: string;
@@ -19,7 +22,11 @@ interface NotificationData {
 
 function groupByDate(notifications: NotificationData[]) {
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
   const weekAgoStart = todayStart - 6 * 24 * 60 * 60 * 1000;
 
   const today: NotificationData[] = [];
@@ -48,7 +55,7 @@ export default async function NotificationsPage() {
     .from("notifications")
     .select(
       `
-      id, type, read, created_at, actor_id, post_id,
+      id, type, read, created_at, actor_id, post_id, message, link,
       actor:profiles!notifications_actor_id_fkey(full_name, username, avatar_url),
       post:posts!notifications_post_id_fkey(title, slug)
     `
@@ -68,6 +75,9 @@ export default async function NotificationsPage() {
       type: notification.type,
       read: notification.read,
       created_at: notification.created_at,
+      message: notification.message ?? null,
+      link: notification.link ?? null,
+      post_id: notification.post_id ?? null,
       actor: actor as NotificationData["actor"],
       actor_username: actor?.username ?? null,
       post_title: post?.title ?? null,

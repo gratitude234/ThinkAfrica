@@ -7,11 +7,14 @@ import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import ProfileGate from "@/components/ui/ProfileGate";
+import type { PostReferenceRecord } from "@/lib/types";
 import { formatRelativeTime, type PostType } from "@/lib/utils";
 import ContinueDraftBanner from "./ContinueDraftBanner";
 import { useDraftManager } from "./DraftManager";
 import MyDrafts from "./MyDrafts";
 import PublishDrawer from "./PublishDrawer";
+import { ensureDraft, savePostReferences } from "./actions";
+import { composeContentWithSubtitle } from "./writeUtils";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
@@ -66,9 +69,11 @@ export default function WritePage() {
   const [tags, setTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [references, setReferences] = useState<PostReferenceRecord[]>([]);
   const [wordCount, setWordCount] = useState(0);
   const [isPublishDrawerOpen, setIsPublishDrawerOpen] = useState(false);
   const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
+  const [publishDraftId, setPublishDraftId] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -103,6 +108,27 @@ export default function WritePage() {
       setWordCount(countWords(initialData.content));
     }
   }, [initialData]);
+
+  useEffect(() => {
+    setPublishDraftId(draftId);
+  }, [draftId]);
+
+  useEffect(() => {
+    if (!draftId) {
+      setReferences([]);
+      return;
+    }
+
+    const supabase = createClient();
+    supabase
+      .from("post_references")
+      .select("*")
+      .eq("post_id", draftId)
+      .order("display_order", { ascending: true })
+      .then(({ data }) => {
+        setReferences((data as PostReferenceRecord[] | null) ?? []);
+      });
+  }, [draftId]);
 
   const getCurrentData = useCallback(
     (overrides: Partial<DraftPayload> = {}): DraftPayload => ({
@@ -166,12 +192,36 @@ export default function WritePage() {
     !!currentUserId &&
     !loadingProfileInfo;
 
-  const handleReadyToPublish = () => {
+  const handleReadyToPublish = async () => {
     if (!canOpenPublish) return;
 
     if (!profileInfo?.username) {
       setIsProfileGateOpen(true);
       return;
+    }
+
+    if (!publishDraftId) {
+      const contentWithSubtitle = composeContentWithSubtitle(content, subtitle);
+      const { draftId: ensuredDraftId } = await ensureDraft({
+        draftId,
+        title,
+        subtitle,
+        excerpt,
+        content: contentWithSubtitle,
+        tags,
+        postType,
+        coverImageUrl,
+      });
+
+      if (ensuredDraftId) {
+        setPublishDraftId(ensuredDraftId);
+        if (references.length > 0) {
+          void savePostReferences({
+            postId: ensuredDraftId,
+            references,
+          });
+        }
+      }
     }
 
     setIsPublishDrawerOpen(true);
@@ -261,11 +311,22 @@ export default function WritePage() {
           ) : null}
 
           <Editor
-            key={draftId ?? (initialData ? "draft" : "empty")}
+            key={publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}
             content={content}
             placeholder="Start writing..."
+            postType={postType}
+            references={references}
+            onReferencesChange={setReferences}
             onUpdate={handleEditorUpdate}
-            onAutoSave={() => saveDraft(getCurrentData())}
+            onAutoSave={async () => {
+              await saveDraft(getCurrentData());
+              if (publishDraftId) {
+                await savePostReferences({
+                  postId: publishDraftId,
+                  references,
+                });
+              }
+            }}
           />
         </div>
       </div>
@@ -275,7 +336,7 @@ export default function WritePage() {
           <PublishDrawer
             open={isPublishDrawerOpen}
             onClose={() => setIsPublishDrawerOpen(false)}
-            draftId={draftId}
+            draftId={publishDraftId}
             title={title}
             subtitle={subtitle}
             content={content}
@@ -285,6 +346,7 @@ export default function WritePage() {
             initialCoverImageUrl={coverImageUrl}
             initialExcerpt={excerpt}
             initialPostType={postType}
+            initialReferences={references}
             onMetadataChange={handleMetadataChange}
           />
           <ProfileGate
@@ -295,7 +357,7 @@ export default function WritePage() {
             onComplete={(profile) => {
               setProfileInfo(profile);
               setIsProfileGateOpen(false);
-              setIsPublishDrawerOpen(true);
+              void handleReadyToPublish();
             }}
           />
         </>

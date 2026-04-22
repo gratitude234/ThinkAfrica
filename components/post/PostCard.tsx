@@ -23,6 +23,13 @@ export interface PostCardData {
   view_count?: number;
   cover_image_url?: string | null;
   score?: number;
+  co_authors?: Array<{
+    user_id: string;
+    profile?: {
+      username: string;
+      full_name: string | null;
+    } | null;
+  }>;
   profiles: {
     username: string;
     full_name: string | null;
@@ -83,6 +90,9 @@ export default function PostCard({
   );
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
   const authorHref = author?.username ? `/${author.username}` : null;
+  const coAuthorCount = post.co_authors?.length ?? 0;
+  const authorLine =
+    coAuthorCount > 0 ? `${authorName} + ${coAuthorCount} others` : authorName;
 
   const footerMeta = (
     <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-gray-100 pt-4 text-xs text-gray-500">
@@ -91,7 +101,7 @@ export default function PostCard({
           href={authorHref}
           className="inline-flex min-w-0 items-center gap-1 font-medium text-gray-700 transition-colors hover:text-emerald-brand"
         >
-          <span className="truncate">{authorName}</span>
+          <span className="truncate">{authorLine}</span>
           {author?.verified ? (
             <span
               title={
@@ -109,7 +119,7 @@ export default function PostCard({
           ) : null}
         </Link>
       ) : (
-        <span className="font-medium text-gray-700">{authorName}</span>
+        <span className="font-medium text-gray-700">{authorLine}</span>
       )}
 
       {author?.university ? (

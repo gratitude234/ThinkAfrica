@@ -61,8 +61,9 @@ export default function BookmarksPage() {
         .from("bookmarks")
         .select(
           `post_id, posts!bookmarks_post_id_fkey (
-            id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
-            profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)
+            id, author_id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
+            profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
+            post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
           )`
         )
         .eq("user_id", user.id)
@@ -77,6 +78,17 @@ export default function BookmarksPage() {
           return {
             ...post,
             profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
+            co_authors: Array.isArray((post as { post_authors?: unknown[] }).post_authors)
+              ? ((post as { post_authors?: Array<Record<string, unknown>> }).post_authors ?? [])
+                  .filter((row) => !!row.accepted_at)
+                  .filter((row) => row.user_id !== (post as { author_id?: string }).author_id)
+                  .map((row) => ({
+                    user_id: row.user_id as string,
+                    profile: Array.isArray(row.profile)
+                      ? (row.profile[0] as { username: string; full_name: string | null })
+                      : (row.profile as { username: string; full_name: string | null }),
+                  }))
+              : [],
           } as PostCardData;
         })
         .filter(Boolean) as PostCardData[];

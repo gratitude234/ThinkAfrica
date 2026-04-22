@@ -48,6 +48,7 @@ interface TalentProfile {
 
 interface ProfilePost {
   id: string;
+  author_id?: string;
   title: string;
   slug: string;
   excerpt: string | null;
@@ -204,6 +205,7 @@ export default async function UserProfilePage({ params }: PageProps) {
 
   const [
     { data: posts },
+    { data: coAuthoredPosts },
     { data: userBadges },
     { count: followerCount },
     { count: followingCount },
@@ -215,11 +217,18 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("posts")
       .select(
-        "id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)"
+        "id, author_id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type), post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
       )
       .eq("author_id", profile.id)
       .eq("status", "published")
       .order("published_at", { ascending: false }),
+    supabase
+      .from("post_authors")
+      .select(
+        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
+      )
+      .eq("user_id", profile.id)
+      .not("accepted_at", "is", null),
     supabase
       .from("user_badges")
       .select("badge_id, awarded_at, badges (id, name, description, icon)")
@@ -283,7 +292,38 @@ export default async function UserProfilePage({ params }: PageProps) {
     (post) => ({
     ...post,
     profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
+    co_authors: Array.isArray((post as { post_authors?: unknown[] }).post_authors)
+      ? ((post as { post_authors?: Array<Record<string, unknown>> }).post_authors ?? [])
+          .filter((row) => !!row.accepted_at)
+          .filter((row) => row.user_id !== (post as { author_id?: string }).author_id)
+          .map((row) => ({
+            user_id: row.user_id as string,
+            profile: Array.isArray(row.profile)
+              ? (row.profile[0] as { username: string; full_name: string | null })
+              : (row.profile as { username: string; full_name: string | null }),
+          }))
+      : [],
+    isCoAuthor: false,
   }));
+
+  const normalizedCoAuthoredPosts = (coAuthoredPosts ?? [])
+    .map((row) => {
+      const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
+      if (!post || (post as { author_id?: string }).author_id === profile.id) return null;
+      return {
+        ...post,
+        profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
+        isCoAuthor: true,
+      };
+    })
+    .filter((post): post is NonNullable<typeof post> => post !== null);
+
+  const mergedPosts = [
+    ...normalizedPosts,
+    ...normalizedCoAuthoredPosts.filter(
+      (post) => !normalizedPosts.some((ownedPost) => ownedPost.id === post?.id)
+    ),
+  ];
 
   const badges = (userBadges ?? [])
     .map((userBadge) =>
@@ -391,13 +431,13 @@ export default async function UserProfilePage({ params }: PageProps) {
         <div className="space-y-6">
           <FeaturedWork posts={featuredPosts} />
 
-          <PublicationsSection posts={normalizedPosts} fullName={displayName} />
+          <PublicationsSection posts={mergedPosts} fullName={displayName} />
 
           <div className="lg:hidden">
             <CredentialsCard
               profile={profile}
               badges={badges}
-              postCount={normalizedPosts.length}
+              postCount={mergedPosts.length}
               totalViews={totalViews}
               followerCount={followerCount ?? 0}
               followingCount={followingCount ?? 0}
@@ -452,7 +492,7 @@ export default async function UserProfilePage({ params }: PageProps) {
           <CredentialsCard
             profile={profile}
             badges={badges}
-            postCount={normalizedPosts.length}
+            postCount={mergedPosts.length}
             totalViews={totalViews}
             followerCount={followerCount ?? 0}
             followingCount={followingCount ?? 0}

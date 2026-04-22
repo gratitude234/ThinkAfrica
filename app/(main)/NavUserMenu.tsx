@@ -9,9 +9,15 @@ import Button from "@/components/ui/Button";
 
 interface NavUserMenuProps {
   user: User | null;
-  profile: { username: string; full_name: string | null; points?: number } | null;
+  profile: {
+    username: string;
+    full_name: string | null;
+    points?: number;
+    role?: "student" | "reviewer" | "editor" | "admin";
+  } | null;
   points: number;
   isAdmin?: boolean;
+  canAccessReview?: boolean;
 }
 
 function getTier(
@@ -53,6 +59,7 @@ export default function NavUserMenu({
   profile,
   points,
   isAdmin,
+  canAccessReview,
 }: NavUserMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -192,6 +199,28 @@ export default function NavUserMenu({
             </svg>
             Write
           </Link>
+          {canAccessReview ? (
+            <Link
+              href="/review"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
+            >
+              <svg
+                className="w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m5-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Review
+            </Link>
+          ) : null}
           <Link
             href="/bookmarks"
             onClick={() => setOpen(false)}

@@ -19,6 +19,7 @@ import AuthorBioCard from "./AuthorBioCard";
 import TableOfContents from "./TableOfContents";
 import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
+import CiteThis from "./CiteThis";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -44,7 +45,7 @@ function extractHeadings(content: string): { id: string; text: string; level: nu
   return matches.map((item, index) => ({
     id: `heading-${index}`,
     text: item[2].replace(/<[^>]*>/g, ""),
-    level: parseInt(item[1]),
+    level: parseInt(item[1], 10),
   }));
 }
 
@@ -54,6 +55,34 @@ function injectHeadingIds(content: string): string {
     const id = `heading-${index++}`;
     return `<h${level}${attrs} id="${id}">${text}</h${level}>`;
   });
+}
+
+function renderReferenceShortcodes(content: string): string {
+  return content.replace(
+    /\[ref:(\d+)\]/g,
+    (_match, refNumber) =>
+      `<sup><a href="#ref-${refNumber}" class="no-underline">[${refNumber}]</a></sup>`
+  );
+}
+
+function formatReference(reference: {
+  authors: string | null;
+  year: number | null;
+  title: string;
+  source: string | null;
+  url: string | null;
+  doi: string | null;
+}) {
+  return [
+    reference.authors,
+    reference.year ? `(${reference.year}).` : null,
+    reference.title,
+    reference.source,
+    reference.doi ? `DOI: ${reference.doi}` : null,
+    reference.url,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -69,11 +98,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       "title, excerpt, cover_image_url, slug, status, author_id, profiles!posts_author_id_fkey(full_name)"
     )
     .eq("slug", slug)
-    .in("status", ["published", "pending"])
+    .in("status", ["published", "pending", "pending_revision"])
     .single();
 
   if (!post) return { title: "Post not found - ThinkAfrica" };
-  if (post.status === "pending" && user?.id !== post.author_id) {
+  if (
+    (post.status === "pending" || post.status === "pending_revision") &&
+    user?.id !== post.author_id
+  ) {
     return { title: "Post not found - ThinkAfrica" };
   }
 
@@ -113,25 +145,69 @@ export default async function PostPage({ params }: PageProps) {
     .select(
       `
       id, title, slug, content, excerpt, type, tags, status, author_id,
-      created_at, published_at, view_count, cover_image_url,
+      created_at, published_at, view_count, cover_image_url, citation_id,
       profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url)
     `
     )
     .eq("slug", slug)
-    .in("status", ["published", "pending"])
+    .in("status", ["published", "pending", "pending_revision"])
     .single();
 
   if (!post) notFound();
-  if (post.status === "pending" && user?.id !== post.author_id) notFound();
+
+  if (
+    (post.status === "pending" || post.status === "pending_revision") &&
+    user?.id !== post.author_id
+  ) {
+    const [{ data: reviewAssignment }, { data: coAuthorInvite }] = await Promise.all([
+      user
+        ? supabase
+            .from("post_reviews")
+            .select("id")
+            .eq("post_id", post.id)
+            .eq("reviewer_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      user
+        ? supabase
+            .from("post_authors")
+            .select("user_id")
+            .eq("post_id", post.id)
+            .eq("user_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    if (!reviewAssignment && !coAuthorInvite) notFound();
+  }
 
   const isPublished = post.status === "published";
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const coverImageUrl = (post as { cover_image_url?: string | null }).cover_image_url;
 
-  const { count: likeCount } = await supabase
-    .from("likes")
-    .select("*", { count: "exact", head: true })
-    .eq("post_id", post.id);
+  const [
+    { count: likeCount },
+    { data: referencesRaw },
+    { data: coAuthorsRaw },
+  ] = await Promise.all([
+    supabase
+      .from("likes")
+      .select("*", { count: "exact", head: true })
+      .eq("post_id", post.id),
+    supabase
+      .from("post_references")
+      .select("*")
+      .eq("post_id", post.id)
+      .order("display_order", { ascending: true }),
+    supabase
+      .from("post_authors")
+      .select(
+        "user_id, display_order, corresponding_author, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name)"
+      )
+      .eq("post_id", post.id)
+      .not("accepted_at", "is", null)
+      .order("display_order", { ascending: true }),
+  ]);
 
   let userLiked = false;
   let userBookmarked = false;
@@ -194,10 +270,35 @@ export default async function PostPage({ params }: PageProps) {
     userFollowsAuthor = !!followData;
   }
 
+  const references = referencesRaw ?? [];
+  const acceptedAuthors = (coAuthorsRaw ?? []).map((item) => ({
+    ...item,
+    profile: Array.isArray(item.profile) ? item.profile[0] : item.profile,
+  }));
+  const primaryAuthorRecord = acceptedAuthors.find((record) => record.user_id === author?.id) ?? null;
+  const coAuthors = acceptedAuthors.filter((record) => record.user_id !== author?.id);
+  const citationAuthors = (
+    acceptedAuthors.length > 0
+      ? acceptedAuthors.map((authorRecord) => ({
+          full_name: authorRecord.profile?.full_name ?? null,
+          username: authorRecord.profile?.username ?? "author",
+        }))
+      : author
+        ? [
+            {
+              full_name: author.full_name ?? null,
+              username: author.username,
+            },
+          ]
+        : []
+  ) as Array<{ full_name: string | null; username: string }>;
+
   const readTime = estimateReadTime(post.content ?? "");
   const wordCount = countWords(post.content ?? "");
   const headings = extractHeadings(post.content ?? "");
-  const contentWithIds = injectHeadingIds(post.content ?? "");
+  const contentWithIds = renderReferenceShortcodes(
+    injectHeadingIds(post.content ?? "")
+  );
   const authorName = author?.full_name ?? author?.username ?? "Anonymous";
 
   return (
@@ -229,10 +330,10 @@ export default async function PostPage({ params }: PageProps) {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
           <div className="lg:col-span-3">
             <div className="max-w-3xl">
-              {post.status === "pending" ? (
+              {post.status === "pending" || post.status === "pending_revision" ? (
                 <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                  ⏳ This post is under editorial review - usually within 48 hours.
-                  We&apos;ll notify you when it goes live.{" "}
+                  This submission is in the editorial workflow. We&apos;ll
+                  notify you when a final decision is recorded.{" "}
                   <Link href="/dashboard" className="font-semibold underline">
                     View dashboard
                   </Link>
@@ -286,8 +387,7 @@ export default async function PostPage({ params }: PageProps) {
                           {authorName}
                         </p>
                         <p className="text-xs text-gray-400">
-                          {author.university} ·{" "}
-                          {formatDate(post.published_at ?? post.created_at)} ·{" "}
+                          {author.university} · {formatDate(post.published_at ?? post.created_at)} ·{" "}
                           {readTime} min read
                         </p>
                       </div>
@@ -310,6 +410,21 @@ export default async function PostPage({ params }: PageProps) {
                     ) : null}
                   </div>
                 ) : null}
+
+                {coAuthors.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {coAuthors.map((coAuthor) => (
+                      <Link
+                        key={coAuthor.user_id}
+                        href={`/${coAuthor.profile?.username}`}
+                        className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-brand"
+                      >
+                        {coAuthor.corresponding_author ? "Corresponding · " : ""}
+                        {coAuthor.profile?.full_name ?? coAuthor.profile?.username}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
               </header>
 
               <hr className="mb-8 border-gray-200" />
@@ -322,6 +437,45 @@ export default async function PostPage({ params }: PageProps) {
                   dangerouslySetInnerHTML={{ __html: contentWithIds }}
                 />
               </div>
+
+              {references.length > 0 ? (
+                <section className="mb-8">
+                  <h2 className="mb-4 text-xl font-semibold text-gray-900">
+                    References
+                  </h2>
+                  <ol className="space-y-3">
+                    {references.map((reference, index) => (
+                      <li
+                        key={reference.id}
+                        id={`ref-${index + 1}`}
+                        className="pl-8 -indent-8 text-sm leading-relaxed text-gray-600"
+                      >
+                        [{index + 1}]{" "}
+                        {formatReference({
+                          authors: reference.authors ?? null,
+                          year: reference.year ?? null,
+                          title: reference.title,
+                          source: reference.source ?? null,
+                          url: reference.url ?? null,
+                          doi: reference.doi ?? null,
+                        })}
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              ) : null}
+
+              {isPublished && post.citation_id ? (
+                <div className="mb-8">
+                  <CiteThis
+                    citationId={post.citation_id}
+                    citationPath={`/publication/${post.citation_id}`}
+                    title={post.title}
+                    publishedAt={post.published_at ?? post.created_at}
+                    authors={citationAuthors}
+                  />
+                </div>
+              ) : null}
 
               {isPublished ? (
                 <>
@@ -341,6 +495,17 @@ export default async function PostPage({ params }: PageProps) {
                   author={author}
                   userId={user?.id ?? null}
                   initialFollowing={userFollowsAuthor}
+                  isCorrespondingAuthor={primaryAuthorRecord?.corresponding_author ?? false}
+                  coAuthors={coAuthors
+                    .filter((coAuthor) => coAuthor.profile?.username)
+                    .map((coAuthor) => ({
+                      user_id: coAuthor.user_id,
+                      corresponding_author: coAuthor.corresponding_author,
+                      profile: {
+                        username: coAuthor.profile?.username ?? "",
+                        full_name: coAuthor.profile?.full_name ?? null,
+                      },
+                    }))}
                 />
               ) : null}
 
@@ -363,8 +528,7 @@ export default async function PostPage({ params }: PageProps) {
                             {item.title}
                           </p>
                           <p className="mt-0.5 text-xs text-gray-400">
-                            {item.profiles?.full_name} ·{" "}
-                            {formatDate(item.published_at ?? item.created_at)}
+                            {item.profiles?.full_name} · {formatDate(item.published_at ?? item.created_at)}
                           </p>
                         </div>
                         <svg

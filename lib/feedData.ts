@@ -1,5 +1,6 @@
 import type { PostCardData } from "@/components/post/PostCard";
 import { rankPosts, type RankingContext } from "@/lib/feedRanking";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type FeedTabKey = "home" | "following" | "latest";
 export type FeedTimeframe = "all" | "week" | "month";
@@ -10,7 +11,9 @@ export interface FeedPageResult {
 }
 
 interface FeedOptions {
-  supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>;
+  supabase: {
+    from: (table: string) => any;
+  };
   tab: FeedTabKey;
   page: number;
   pageSize: number;
@@ -22,8 +25,8 @@ interface FeedOptions {
   followedIds: string[];
 }
 
-const POST_SELECT = `id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, author_id,
-  profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)`;
+const POST_SELECT =
+  "id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, author_id";
 
 function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   if (timeframe === "week") {
@@ -36,7 +39,9 @@ function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
 }
 
 export async function getCountsByPostId(
-  supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
+  supabase: {
+    from: (table: string) => any;
+  },
   table: "likes" | "bookmarks" | "comments",
   postIds: string[]
 ): Promise<Record<string, number>> {
@@ -45,7 +50,7 @@ export async function getCountsByPostId(
   const { data } = await supabase.from(table).select("post_id").in("post_id", postIds);
 
   return (data ?? []).reduce(
-    (acc, row) => {
+    (acc: Record<string, number>, row: { post_id?: string }) => {
       const key = (row as { post_id?: string }).post_id;
       if (!key) return acc;
       acc[key] = (acc[key] ?? 0) + 1;
@@ -55,38 +60,128 @@ export async function getCountsByPostId(
   );
 }
 
-function normalizePosts(
-  raw: unknown[],
-  likeCounts: Record<string, number>,
-  bookmarkCounts: Record<string, number>,
-  commentCounts: Record<string, number>
-): PostCardData[] {
+async function enrichPosts(
+  supabase: {
+    from: (table: string) => any;
+  },
+  raw: unknown[]
+): Promise<PostCardData[]> {
+  const ids = (raw as Array<{ id: string }>).map((post) => post.id);
+  const authorIds = Array.from(
+    new Set(
+      (raw as Array<{ author_id?: string }>)
+        .map((post) => post.author_id)
+        .filter(Boolean) as string[]
+    )
+  );
+
+  const [
+    likeCounts,
+    bookmarkCounts,
+    commentCounts,
+    profilesResult,
+    postAuthorsResult,
+  ] = await Promise.all([
+    getCountsByPostId(supabase, "likes", ids),
+    getCountsByPostId(supabase, "bookmarks", ids),
+    getCountsByPostId(supabase, "comments", ids),
+    authorIds.length > 0
+      ? supabase
+          .from("profiles")
+          .select(
+            "id, username, full_name, university, avatar_url, verified, verified_type"
+          )
+          .in("id", authorIds)
+      : Promise.resolve({ data: [], error: null }),
+    ids.length > 0
+      ? supabase
+          .from("post_authors")
+          .select("post_id, user_id, display_order")
+          .in("post_id", ids)
+          .not("accepted_at", "is", null)
+          .order("display_order", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const profiles = (profilesResult.data ?? []) as Array<{
+    id: string;
+    username: string;
+    full_name: string | null;
+    university: string | null;
+    avatar_url: string | null;
+    verified?: boolean;
+    verified_type?: string | null;
+  }>;
+
+  const acceptedPostAuthors = (postAuthorsResult.data ?? []) as Array<{
+    post_id: string;
+    user_id: string;
+    display_order: number;
+  }>;
+
+  const coAuthorIds = Array.from(
+    new Set(acceptedPostAuthors.map((row) => row.user_id).filter(Boolean))
+  );
+
+  const coAuthorProfilesResult =
+    coAuthorIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("id, username, full_name")
+          .in("id", coAuthorIds)
+      : { data: [], error: null };
+
+  const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const coAuthorProfilesById = new Map(
+    ((coAuthorProfilesResult.data ?? []) as Array<{
+      id: string;
+      username: string;
+      full_name: string | null;
+    }>).map((profile) => [profile.id, profile])
+  );
+
+  const coAuthorsByPostId = acceptedPostAuthors.reduce(
+    (acc, row) => {
+      const nextRow = {
+        user_id: row.user_id,
+        profile: coAuthorProfilesById.get(row.user_id)
+          ? {
+              username: coAuthorProfilesById.get(row.user_id)!.username,
+              full_name: coAuthorProfilesById.get(row.user_id)!.full_name,
+            }
+          : null,
+      };
+
+      const current = acc[row.post_id] ?? [];
+      current.push(nextRow);
+      acc[row.post_id] = current;
+      return acc;
+    },
+    {} as Record<
+      string,
+      Array<{
+        user_id: string;
+        profile: { username: string; full_name: string | null } | null;
+      }>
+    >
+  );
+
   return (raw as Array<Record<string, unknown>>).map((post) => {
     const id = (post.id as string) ?? "";
+    const authorId = (post.author_id as string) ?? "";
+    const coAuthors = (coAuthorsByPostId[id] ?? []).filter(
+      (coAuthor) => coAuthor.user_id !== authorId
+    );
+
     return {
       ...(post as object),
-      profiles: Array.isArray(post.profiles)
-        ? (post.profiles as unknown[])[0]
-        : post.profiles,
+      profiles: profilesById.get(authorId) ?? null,
+      co_authors: coAuthors,
       like_count: likeCounts[id] ?? 0,
       bookmark_count: bookmarkCounts[id] ?? 0,
       comment_count: commentCounts[id] ?? 0,
     } as PostCardData;
   });
-}
-
-async function enrichPosts(
-  supabase: FeedOptions["supabase"],
-  raw: unknown[]
-): Promise<PostCardData[]> {
-  const ids = (raw as Array<{ id: string }>).map((post) => post.id);
-  const [likeCounts, bookmarkCounts, commentCounts] = await Promise.all([
-    getCountsByPostId(supabase, "likes", ids),
-    getCountsByPostId(supabase, "bookmarks", ids),
-    getCountsByPostId(supabase, "comments", ids),
-  ]);
-
-  return normalizePosts(raw, likeCounts, bookmarkCounts, commentCounts);
 }
 
 function applyPostFilters(
@@ -121,6 +216,9 @@ export async function fetchFeedPage({
   userUniversity,
   followedIds,
 }: FeedOptions): Promise<FeedPageResult> {
+  const reader = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createAdminClient()
+    : supabase;
   const safePage = Math.max(1, page);
   const safePageSize = Math.min(Math.max(pageSize, 1), 30);
   const cutoff = getTimeframeCutoff(timeframe);
@@ -133,7 +231,7 @@ export async function fetchFeedPage({
     const start = (safePage - 1) * safePageSize;
     const end = start + safePageSize;
     const query = applyPostFilters(
-      supabase.from("posts").select(POST_SELECT),
+      reader.from("posts").select(POST_SELECT),
       { type, cutoff }
     );
     const { data } = await query
@@ -142,7 +240,7 @@ export async function fetchFeedPage({
       .range(start, end);
 
     const raw = data ?? [];
-    const posts = await enrichPosts(supabase, raw.slice(0, safePageSize));
+    const posts = await enrichPosts(reader, raw.slice(0, safePageSize));
     return { posts, hasMore: raw.length > safePageSize };
   }
 
@@ -150,7 +248,7 @@ export async function fetchFeedPage({
     const start = (safePage - 1) * safePageSize;
     const end = start + safePageSize;
     const query = applyPostFilters(
-      supabase.from("posts").select(POST_SELECT),
+      reader.from("posts").select(POST_SELECT),
       { type, cutoff }
     );
     const { data } = await query
@@ -158,19 +256,16 @@ export async function fetchFeedPage({
       .range(start, end);
 
     const raw = data ?? [];
-    const posts = await enrichPosts(supabase, raw.slice(0, safePageSize));
+    const posts = await enrichPosts(reader, raw.slice(0, safePageSize));
     return { posts, hasMore: raw.length > safePageSize };
   }
 
   const candidateLimit = Math.max(80, safePage * safePageSize + 20);
-  const homeCutoff =
-    cutoff ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
   const query = applyPostFilters(
-    supabase.from("posts").select(POST_SELECT),
+    reader.from("posts").select(POST_SELECT),
     {
       type,
-      cutoff: homeCutoff,
+      cutoff,
     }
   );
 
@@ -178,7 +273,7 @@ export async function fetchFeedPage({
     .order("published_at", { ascending: false })
     .limit(candidateLimit);
 
-  const enriched = await enrichPosts(supabase, data ?? []);
+  const enriched = await enrichPosts(reader, data ?? []);
   const rankingContext: RankingContext = {
     userId,
     followedIds: new Set(followedIds),

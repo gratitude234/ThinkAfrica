@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import TagInput from "@/components/ui/TagInput";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import type { PostReferenceRecord } from "@/lib/types";
 import {
   generateExcerpt,
   isQuickTake,
@@ -22,6 +23,7 @@ import {
   normalizeTagValue,
 } from "@/lib/tags";
 import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
+import { publishPost } from "./actions";
 
 interface PublishDrawerProps {
   open: boolean;
@@ -36,6 +38,7 @@ interface PublishDrawerProps {
   initialCoverImageUrl?: string;
   initialExcerpt?: string;
   initialPostType?: PostType;
+  initialReferences?: PostReferenceRecord[];
   onMetadataChange?: (changes: {
     postType?: PostType;
     tags?: string[];
@@ -54,6 +57,12 @@ interface ProfileRow {
 
 interface TagRow {
   tags: string[] | null;
+}
+
+interface CoAuthorProfile {
+  id: string;
+  username: string;
+  full_name: string | null;
 }
 
 function readTimeFromText(text: string) {
@@ -131,6 +140,7 @@ export default function PublishDrawer({
   initialCoverImageUrl = "",
   initialExcerpt = "",
   initialPostType,
+  initialReferences = [],
   onMetadataChange,
 }: PublishDrawerProps) {
   const router = useRouter();
@@ -149,6 +159,10 @@ export default function PublishDrawer({
   const [platformTags, setPlatformTags] = useState<string[]>([]);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showRefine, setShowRefine] = useState(false);
+  const [coAuthors, setCoAuthors] = useState<CoAuthorProfile[]>([]);
+  const [correspondingAuthorId, setCorrespondingAuthorId] = useState<string>(userId);
+  const [coAuthorQuery, setCoAuthorQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<CoAuthorProfile[]>([]);
 
   const inferredType = useMemo(
     () => inferTypeFromContent(content, wordCount),
@@ -166,6 +180,10 @@ export default function PublishDrawer({
     setError(null);
     setShowTypePicker(false);
     setShowRefine(false);
+    setCoAuthors([]);
+    setCorrespondingAuthorId(userId);
+    setCoAuthorQuery("");
+    setSearchResults([]);
   }, [
     open,
     initialPostType,
@@ -174,6 +192,7 @@ export default function PublishDrawer({
     initialTags,
     initialCoverImageUrl,
     initialExcerpt,
+    userId,
   ]);
 
   useEffect(() => {
@@ -212,6 +231,33 @@ export default function PublishDrawer({
     });
   }, [open, userId]);
 
+  useEffect(() => {
+    if (!open || !coAuthorQuery.trim() || coAuthors.length >= 5) {
+      setSearchResults([]);
+      return;
+    }
+
+    const supabase = createClient();
+    const timer = setTimeout(() => {
+      supabase
+        .from("profiles")
+        .select("id, username, full_name")
+        .ilike("username", `%${coAuthorQuery.trim()}%`)
+        .neq("id", userId)
+        .limit(5)
+        .then(({ data }) => {
+          const existing = new Set(coAuthors.map((coAuthor) => coAuthor.id));
+          setSearchResults(
+            ((data as CoAuthorProfile[] | null) ?? []).filter(
+              (profile) => !existing.has(profile.id)
+            )
+          );
+        });
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [coAuthorQuery, coAuthors, open, userId]);
+
   const suggestedTags = useMemo(
     () =>
       getSuggestedTags({
@@ -225,6 +271,10 @@ export default function PublishDrawer({
   const publishLabel = useMemo(() => {
     if (isQuickTake(postType, wordCount)) {
       return "Publish Quick Take";
+    }
+
+    if (postType === "research" || postType === "policy_brief") {
+      return "Submit for Editorial Review";
     }
 
     return `Publish ${POST_TYPE_LABELS[postType]}`;
@@ -266,98 +316,42 @@ export default function PublishDrawer({
       return;
     }
 
-    setPublishing(true);
-    setError(null);
-
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setPublishing(false);
-      router.push("/login");
+    if (
+      (postType === "research" || postType === "policy_brief") &&
+      initialReferences.filter((reference) => reference.title?.trim()).length === 0
+    ) {
+      setError("Research and policy briefs need at least one structured reference.");
       return;
     }
+
+    setPublishing(true);
+    setError(null);
 
     const finalExcerpt = excerpt.trim() || generateExcerpt(content, 220);
     const normalizedTags = tags.map((tag) => normalizeTagValue(tag)).filter(Boolean);
     const contentWithSubtitle = composeContentWithSubtitle(content, subtitle);
-    const now = new Date().toISOString();
-    const submitStatus = isInstantPublish ? "published" : "pending";
-    const submitPublishedAt = isInstantPublish ? now : null;
-    let publishedPostSlug = "";
+    const { error: publishError, slug: publishedPostSlug } = await publishPost({
+      draftId,
+      title: title.trim(),
+      subtitle,
+      excerpt: finalExcerpt,
+      content: contentWithSubtitle,
+      tags: normalizedTags,
+      postType,
+      coverImageUrl,
+      customSlug: normalizedSlug,
+      coAuthors: coAuthors.map((coAuthor, index) => ({
+        user_id: coAuthor.id,
+        display_order: index + 1,
+        corresponding_author: correspondingAuthorId === coAuthor.id,
+      })),
+      references: initialReferences,
+    });
 
-    if (draftId) {
-      const updatePayload: {
-        title: string;
-        excerpt: string;
-        content: string;
-        tags: string[];
-        type: PostType;
-        cover_image_url: string | null;
-        status: string;
-        published_at: string | null;
-        slug?: string;
-      } = {
-        title: title.trim(),
-        excerpt: finalExcerpt,
-        content: contentWithSubtitle,
-        tags: normalizedTags,
-        type: postType,
-        cover_image_url: coverImageUrl || null,
-        status: submitStatus,
-        published_at: submitPublishedAt,
-      };
-
-      if (normalizedSlug) {
-        updatePayload.slug = normalizedSlug;
-      }
-
-      const { data: updated, error: updateError } = await supabase
-        .from("posts")
-        .update(updatePayload)
-        .eq("id", draftId)
-        .eq("author_id", user.id)
-        .select("slug")
-        .single();
-
-      if (updateError || !updated) {
-        setError(updateError?.message ?? "Failed to publish.");
-        setPublishing(false);
-        return;
-      }
-
-      publishedPostSlug = updated.slug;
-    } else {
-      const baseSlug =
-        normalizedSlug ||
-        `${slugify(title, { lower: true, strict: true })}-${Date.now().toString(36)}`;
-
-      const { data: inserted, error: insertError } = await supabase
-        .from("posts")
-        .insert({
-          author_id: user.id,
-          title: title.trim(),
-          slug: baseSlug,
-          content: contentWithSubtitle,
-          excerpt: finalExcerpt,
-          type: postType,
-          tags: normalizedTags,
-          status: submitStatus,
-          published_at: submitPublishedAt,
-          cover_image_url: coverImageUrl || null,
-        })
-        .select("slug")
-        .single();
-
-      if (insertError || !inserted) {
-        setError(insertError?.message ?? "Failed to publish.");
-        setPublishing(false);
-        return;
-      }
-
-      publishedPostSlug = inserted.slug;
+    if (publishError || !publishedPostSlug) {
+      setError(publishError ?? "Failed to publish.");
+      setPublishing(false);
+      return;
     }
 
     router.push(
@@ -405,6 +399,152 @@ export default function PublishDrawer({
         </div>
 
         <div className="space-y-6 px-5 py-5">
+          <section className="space-y-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Authorship</p>
+              <p className="mt-1 text-xs text-gray-500">
+                Set author order, invite collaborators, and choose the corresponding author.
+              </p>
+            </div>
+
+            <div className="space-y-2 rounded-xl border border-gray-200 bg-canvas p-3">
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                <div>
+                  <p className="font-medium text-gray-900">{authorName}</p>
+                  <p className="text-xs text-gray-500">Lead author</p>
+                </div>
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+                  <input
+                    type="radio"
+                    name="corresponding-author"
+                    checked={correspondingAuthorId === userId}
+                    onChange={() => setCorrespondingAuthorId(userId)}
+                    className="h-4 w-4 border-gray-300 text-emerald-brand focus:ring-emerald-brand"
+                  />
+                  Corresponding
+                </label>
+              </div>
+            </div>
+
+            <input
+              type="text"
+              value={coAuthorQuery}
+              onChange={(event) => setCoAuthorQuery(event.target.value)}
+              placeholder="Search by username"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+            />
+
+            {searchResults.length > 0 ? (
+              <div className="space-y-2 rounded-xl border border-gray-200 bg-canvas p-3">
+                {searchResults.map((result) => (
+                  <button
+                    key={result.id}
+                    type="button"
+                    onClick={() => {
+                      setCoAuthors((current) => [...current, result].slice(0, 5));
+                      setCoAuthorQuery("");
+                      setSearchResults([]);
+                    }}
+                    className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-sm text-gray-700 hover:border-emerald-200 hover:bg-emerald-50"
+                  >
+                    <span>
+                      @{result.username}
+                      {result.full_name ? ` · ${result.full_name}` : ""}
+                    </span>
+                    <span className="text-emerald-brand">Add</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {coAuthors.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {coAuthors.map((coAuthor) => (
+                  <span
+                    key={coAuthor.id}
+                    className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700"
+                  >
+                    @{coAuthor.username}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCoAuthors((current) =>
+                          current.filter((item) => item.id !== coAuthor.id)
+                        )
+                      }
+                      className="text-emerald-600 hover:text-emerald-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {coAuthors.length > 0 ? (
+              <div className="space-y-2 rounded-xl border border-gray-200 bg-canvas p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Author order and corresponding author
+                </p>
+                {coAuthors.map((coAuthor, index) => (
+                  <div
+                    key={`${coAuthor.id}-controls`}
+                    className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-gray-900">
+                        {index + 2}. {coAuthor.full_name ?? `@${coAuthor.username}`}
+                      </p>
+                      <p className="text-xs text-gray-500">@{coAuthor.username}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        onClick={() =>
+                          setCoAuthors((current) => {
+                            const next = [...current];
+                            const [item] = next.splice(index, 1);
+                            next.splice(index - 1, 0, item);
+                            return next;
+                          })
+                        }
+                        className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        disabled={index === coAuthors.length - 1}
+                        onClick={() =>
+                          setCoAuthors((current) => {
+                            const next = [...current];
+                            const [item] = next.splice(index, 1);
+                            next.splice(index + 1, 0, item);
+                            return next;
+                          })
+                        }
+                        className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
+                      >
+                        ↓
+                      </button>
+                      <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+                        <input
+                          type="radio"
+                          name="corresponding-author"
+                          checked={correspondingAuthorId === coAuthor.id}
+                          onChange={() => setCorrespondingAuthorId(coAuthor.id)}
+                          className="h-4 w-4 border-gray-300 text-emerald-brand focus:ring-emerald-brand"
+                        />
+                        Corresponding
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
           <section className="space-y-3">
             <div className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-canvas px-4 py-3">
               <div>
@@ -637,7 +777,7 @@ export default function PublishDrawer({
           <p className="text-sm text-gray-500">
             {isInstantPublish
               ? "Publishes instantly."
-              : "Enters editorial review. Usually live within 48 hours."}
+              : "Enters formal editorial review. Reviewer recommendations inform the outcome, but publication only happens after a final editor decision."}
           </p>
 
           {softWarning ? (

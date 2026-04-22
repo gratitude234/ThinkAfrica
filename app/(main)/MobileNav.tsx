@@ -8,8 +8,14 @@ import { isEnabled } from "@/lib/featureFlags";
 
 interface MobileNavProps {
   user: User | null;
-  profile: { username: string; full_name: string | null; points?: number } | null;
+  profile: {
+    username: string;
+    full_name: string | null;
+    points?: number;
+    role?: "student" | "reviewer" | "editor" | "admin";
+  } | null;
   isAdmin?: boolean;
+  canAccessReview?: boolean;
 }
 
 const PRIMARY_LINKS = [
@@ -31,6 +37,7 @@ export default function MobileNav({
   user,
   profile,
   isAdmin,
+  canAccessReview,
 }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -49,6 +56,7 @@ export default function MobileNav({
     { label: "Bookmarks", href: "/bookmarks" },
     { label: "Partners", href: "/partners" },
     { label: "Dashboard", href: "/dashboard" },
+    canAccessReview ? { label: "Review", href: "/review" } : null,
   ].filter(Boolean) as { label: string; href: string }[];
 
   return (

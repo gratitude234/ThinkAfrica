@@ -6,11 +6,16 @@ import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
 import { useEffect, useRef, useState } from "react";
+import type { PostReferenceRecord, ReferenceType } from "@/lib/types";
+import type { PostType } from "@/lib/utils";
 
 interface EditorProps {
   content?: string;
   placeholder?: string;
   minWords?: number;
+  postType?: PostType;
+  references?: PostReferenceRecord[];
+  onReferencesChange?: (references: PostReferenceRecord[]) => void;
   onUpdate?: (html: string, wordCount: number) => void;
   onAutoSave?: () => void | Promise<void>;
 }
@@ -38,6 +43,9 @@ export default function Editor({
   content = "",
   placeholder = "Start writing your piece...",
   minWords = 0,
+  postType = "blog",
+  references = [],
+  onReferencesChange,
   onUpdate,
   onAutoSave,
 }: EditorProps) {
@@ -51,7 +59,14 @@ export default function Editor({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [changeTick, setChangeTick] = useState(0);
   const [showMoreToolbar, setShowMoreToolbar] = useState(false);
+  const [localReferences, setLocalReferences] = useState<PostReferenceRecord[]>(
+    references
+  );
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLocalReferences(references);
+  }, [references]);
 
   const editor = useEditor({
     extensions: [
@@ -159,6 +174,15 @@ export default function Editor({
 
   const countMessage =
     minWords > 0 ? wordCountMessage(displayWordCount, minWords) : "";
+
+  const showReferences = postType === "research" || postType === "policy_brief";
+
+  const updateReferences = (nextReferences: PostReferenceRecord[]) => {
+    setLocalReferences(nextReferences);
+    onReferencesChange?.(nextReferences);
+    setSaveStatus("unsaved");
+    setChangeTick((current) => current + 1);
+  };
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -401,6 +425,94 @@ export default function Editor({
       />
 
       <EditorContent editor={editor} className="min-h-[400px]" />
+
+      {showReferences ? (
+        <div className="border-t border-gray-200 bg-canvas px-4 py-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">References</h3>
+              <p className="text-xs text-gray-500">
+                Use structured source data here and cite it inline with `[ref:1]`, `[ref:2]`, and so on in the body.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                updateReferences([
+                  ...localReferences,
+                  {
+                    id: `temp-${Date.now()}-${localReferences.length}`,
+                    post_id: "",
+                    display_order: localReferences.length,
+                    ref_type: "other",
+                    authors: "",
+                    title: "",
+                    year: null,
+                    source: "",
+                    url: "",
+                    doi: "",
+                    raw: "",
+                  },
+                ])
+              }
+              className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+            >
+              Add reference
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {localReferences.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-5 text-sm text-gray-500">
+                No references yet.
+              </div>
+            ) : (
+              localReferences.map((reference, index) => (
+                <ReferenceRow
+                  key={reference.id || `reference-${index}`}
+                  index={index}
+                  reference={reference}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < localReferences.length - 1}
+                  onMove={(direction) => {
+                    const nextReferences = [...localReferences];
+                    const targetIndex = direction === "up" ? index - 1 : index + 1;
+                    const [item] = nextReferences.splice(index, 1);
+                    nextReferences.splice(targetIndex, 0, item);
+                    updateReferences(
+                      nextReferences.map((row, rowIndex) => ({
+                        ...row,
+                        display_order: rowIndex,
+                      }))
+                    );
+                  }}
+                  onChange={(nextReference) => {
+                    const nextReferences = localReferences.map((row, rowIndex) =>
+                      rowIndex === index
+                        ? {
+                            ...nextReference,
+                            display_order: index,
+                          }
+                        : row
+                    );
+                    updateReferences(nextReferences);
+                  }}
+                  onRemove={() => {
+                    updateReferences(
+                      localReferences
+                        .filter((_, rowIndex) => rowIndex !== index)
+                        .map((row, rowIndex) => ({
+                          ...row,
+                          display_order: rowIndex,
+                        }))
+                    );
+                  }}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -429,5 +541,162 @@ function ToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+function ReferenceRow({
+  index,
+  reference,
+  canMoveUp,
+  canMoveDown,
+  onMove,
+  onChange,
+  onRemove,
+}: {
+  index: number;
+  reference: PostReferenceRecord;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (direction: "up" | "down") => void;
+  onChange: (reference: PostReferenceRecord) => void;
+  onRemove: () => void;
+}) {
+  const inputClasses =
+    "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand";
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-gray-900">Reference {index + 1}</p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onMove("up")}
+            disabled={!canMoveUp}
+            className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            onClick={() => onMove("down")}
+            disabled={!canMoveDown}
+            className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="rounded border border-red-200 px-2 py-1 text-xs text-red-600"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="text-xs font-medium text-gray-600">
+          Type
+          <select
+            value={reference.ref_type ?? "other"}
+            onChange={(event) =>
+              onChange({
+                ...reference,
+                ref_type: event.target.value as ReferenceType,
+              })
+            }
+            className={`${inputClasses} mt-1`}
+          >
+            {["journal", "book", "website", "report", "other"].map((option) => (
+              <option key={option} value={option}>
+                {option.charAt(0).toUpperCase() + option.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-medium text-gray-600">
+          Authors
+          <input
+            type="text"
+            value={reference.authors ?? ""}
+            onChange={(event) =>
+              onChange({ ...reference, authors: event.target.value })
+            }
+            className={`${inputClasses} mt-1`}
+          />
+        </label>
+        <label className="text-xs font-medium text-gray-600 md:col-span-2">
+          Title
+          <input
+            type="text"
+            value={reference.title}
+            onChange={(event) =>
+              onChange({ ...reference, title: event.target.value })
+            }
+            className={`${inputClasses} mt-1`}
+          />
+        </label>
+        <label className="text-xs font-medium text-gray-600">
+          Year
+          <input
+            type="number"
+            value={reference.year ?? ""}
+            onChange={(event) =>
+              onChange({
+                ...reference,
+                year: event.target.value ? Number(event.target.value) : null,
+              })
+            }
+            className={`${inputClasses} mt-1`}
+          />
+        </label>
+        <label className="text-xs font-medium text-gray-600">
+          Source
+          <input
+            type="text"
+            value={reference.source ?? ""}
+            onChange={(event) =>
+              onChange({ ...reference, source: event.target.value })
+            }
+            className={`${inputClasses} mt-1`}
+          />
+        </label>
+        <label className="text-xs font-medium text-gray-600">
+          URL
+          <input
+            type="url"
+            value={reference.url ?? ""}
+            onChange={(event) =>
+              onChange({ ...reference, url: event.target.value })
+            }
+            className={`${inputClasses} mt-1`}
+          />
+        </label>
+        <label className="text-xs font-medium text-gray-600">
+          DOI
+          <input
+            type="text"
+            value={reference.doi ?? ""}
+            onChange={(event) =>
+              onChange({ ...reference, doi: event.target.value })
+            }
+            className={`${inputClasses} mt-1`}
+          />
+        </label>
+        <label className="text-xs font-medium text-gray-600 md:col-span-2">
+          Note
+          <textarea
+            value={reference.raw ?? ""}
+            onChange={(event) =>
+              onChange({ ...reference, raw: event.target.value })
+            }
+            rows={2}
+            className={`${inputClasses} mt-1 resize-none`}
+            placeholder="Optional note for edition, page range, archive details, or context."
+          />
+        </label>
+      </div>
+    </div>
   );
 }

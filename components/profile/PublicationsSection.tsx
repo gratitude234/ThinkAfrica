@@ -13,6 +13,7 @@ interface PublicationPost {
   created_at: string;
   published_at: string | null;
   view_count?: number | null;
+  isCoAuthor?: boolean;
 }
 
 interface PublicationsSectionProps {
@@ -99,6 +100,11 @@ export default function PublicationsSection({
                     <div className="min-w-0">
                       <h4 className="truncate text-sm font-semibold text-gray-900">
                         {post.title}
+                        {post.isCoAuthor ? (
+                          <span className="ml-2 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-purple-700">
+                            Co-author
+                          </span>
+                        ) : null}
                       </h4>
                       {post.excerpt ? (
                         <p className="mt-1 line-clamp-1 text-sm text-gray-500">

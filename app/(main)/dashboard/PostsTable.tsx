@@ -17,20 +17,30 @@ export interface DashboardPost {
   slug: string;
   type: string;
   status: string;
+  citation_id?: string | null;
   view_count: number;
   like_count: number;
   created_at: string;
   published_at: string | null;
+  revision_due_at?: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
   pending: "bg-amber-100 text-amber-700",
+  pending_revision: "bg-orange-100 text-orange-700",
   published: "bg-emerald-100 text-emerald-700",
   rejected: "bg-red-100 text-red-600",
 };
 
-const TABS = ["all", "published", "pending", "draft", "rejected"] as const;
+const TABS = [
+  "all",
+  "published",
+  "pending",
+  "pending_revision",
+  "draft",
+  "rejected",
+] as const;
 type Tab = (typeof TABS)[number];
 
 function normalizePost(
@@ -43,10 +53,12 @@ function normalizePost(
     slug: record.slug ?? existing?.slug ?? "",
     type: record.type ?? existing?.type ?? "blog",
     status: record.status ?? existing?.status ?? "draft",
+    citation_id: record.citation_id ?? existing?.citation_id ?? null,
     view_count: record.view_count ?? existing?.view_count ?? 0,
     like_count: existing?.like_count ?? 0,
     created_at: record.created_at ?? existing?.created_at ?? new Date().toISOString(),
     published_at: record.published_at ?? existing?.published_at ?? null,
+    revision_due_at: record.revision_due_at ?? existing?.revision_due_at ?? null,
   };
 }
 
@@ -70,6 +82,14 @@ export default function PostsTable({
 
   const filtered =
     activeTab === "all" ? rows : rows.filter((p) => p.status === activeTab);
+
+  const getStatusLabel = (post: DashboardPost) => {
+    const reviewedType = post.type === "research" || post.type === "policy_brief";
+    if (reviewedType && post.status === "pending") return "Under review";
+    if (reviewedType && post.status === "pending_revision") return "Revision requested";
+    if (reviewedType && post.status === "rejected") return "Declined";
+    return post.status.replace("_", " ");
+  };
 
   useEffect(() => {
     const supabase = createClient();
@@ -220,10 +240,15 @@ export default function PostsTable({
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((post) => {
-                  const editHref =
+                  const reviewedPublication =
+                    post.status === "published" &&
+                    (post.type === "research" || post.type === "policy_brief");
+                  const actionHref =
                     post.status === "draft"
                       ? `/write?draft=${post.id}`
-                      : `/edit/${post.slug}`;
+                      : reviewedPublication && post.citation_id
+                        ? `/publication/${post.citation_id}`
+                        : `/edit/${post.slug}`;
                   return (
                     <tr key={post.id} className="hover:bg-canvas transition-colors">
                       <td className="px-4 py-3 max-w-[200px]">
@@ -240,7 +265,7 @@ export default function PostsTable({
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLORS[post.status] ?? "bg-gray-100 text-gray-600"}`}
                         >
-                          {post.status}
+                          {getStatusLabel(post)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-gray-500 hidden md:table-cell">
@@ -255,10 +280,10 @@ export default function PostsTable({
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Link
-                            href={editHref}
+                            href={actionHref}
                             className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
                           >
-                            Edit
+                            {reviewedPublication ? "View" : "Edit"}
                           </Link>
                           {post.status === "draft" && (
                             <button

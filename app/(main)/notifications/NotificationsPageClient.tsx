@@ -10,6 +10,9 @@ interface NotificationData {
   type: string;
   read: boolean;
   created_at: string;
+  message?: string | null;
+  link?: string | null;
+  post_id?: string | null;
   actor: { full_name: string | null; username: string; avatar_url?: string | null } | null;
   actor_username: string | null;
   post_title: string | null;
@@ -94,7 +97,7 @@ export default function NotificationsPageClient({
           <span className="mb-4 block text-4xl">🔔</span>
           <p className="font-medium text-gray-500">No notifications yet</p>
           <p className="mt-1 text-sm text-gray-400">
-            You&apos;ll be notified when someone likes or comments on your posts.
+            You&apos;ll be notified when someone interacts with your work.
           </p>
         </div>
       ) : (

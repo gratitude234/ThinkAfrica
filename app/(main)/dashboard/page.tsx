@@ -18,7 +18,9 @@ export default async function DashboardPage() {
   // Fetch all posts by this user
   const { data: postsRaw } = await supabase
     .from("posts")
-    .select("id, title, slug, type, status, view_count, created_at, published_at")
+    .select(
+      "id, title, slug, type, status, view_count, created_at, published_at, revision_due_at, citation_id"
+    )
     .eq("author_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -77,8 +79,11 @@ export default async function DashboardPage() {
     ...p,
     view_count: p.view_count ?? 0,
     like_count: likeCounts[p.id] ?? 0,
+    revision_due_at: p.revision_due_at ?? null,
+    citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
   }));
 
+  const revisionPosts = posts.filter((post) => post.status === "pending_revision");
   const publishedPosts = posts.filter((p) => p.status === "published");
   const totalViews = publishedPosts.reduce((sum, p) => sum + p.view_count, 0);
   const totalLikes = publishedPosts.reduce((sum, p) => sum + p.like_count, 0);
@@ -126,6 +131,37 @@ export default async function DashboardPage() {
 
       {pct < 100 ? (
         <ProfileCompletionCard pct={pct} items={completionItems} />
+      ) : null}
+
+      {revisionPosts.length > 0 ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
+          <h2 className="text-sm font-semibold text-amber-900">
+            Reviewer feedback received
+          </h2>
+          <div className="mt-3 space-y-2">
+            {revisionPosts.map((post) => (
+              <Link
+                key={post.id}
+                href={`/edit/${post.slug}`}
+                className="flex items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 text-sm text-gray-700 transition-colors hover:bg-amber-100/40"
+              >
+                <span className="font-medium text-gray-900">{post.title}</span>
+                <span className="text-right text-xs font-medium text-amber-700">
+                  {post.revision_due_at
+                    ? `Revise by ${new Date(post.revision_due_at).toLocaleDateString(
+                        "en-US",
+                        {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        }
+                      )}`
+                    : "Revise now"}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       <StatsBar

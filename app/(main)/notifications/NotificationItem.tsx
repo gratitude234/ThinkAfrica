@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils";
+import { respondToCoAuthorInvite } from "./actions";
 
 interface NotificationData {
   id: string;
@@ -10,6 +11,7 @@ interface NotificationData {
   created_at: string;
   message?: string | null;
   link?: string | null;
+  post_id?: string | null;
   actor: {
     full_name: string | null;
     username: string;
@@ -30,6 +32,12 @@ const TYPE_ICONS: Record<string, string> = {
   badge: "🏅",
   post_approved: "✅",
   post_rejected: "❌",
+  review_assigned: "📝",
+  revision_requested: "✍️",
+  post_published: "📚",
+  co_author_invite: "🤝",
+  co_author_accepted: "✅",
+  co_author_declined: "↩️",
 };
 
 function buildMessage(notification: NotificationData): string {
@@ -54,6 +62,18 @@ function buildMessage(notification: NotificationData): string {
       return "You have a fellowship update";
     case "badge":
       return "You earned a new badge";
+    case "review_assigned":
+      return `You've been assigned to review: ${postTitle}`;
+    case "revision_requested":
+      return `Reviewers have requested revisions on: ${postTitle}`;
+    case "post_published":
+      return `Your post ${postTitle} has been published.`;
+    case "co_author_invite":
+      return `${actorName} has invited you to co-author: ${postTitle}`;
+    case "co_author_accepted":
+      return `${actorName} accepted your co-author invitation on: ${postTitle}`;
+    case "co_author_declined":
+      return `${actorName} declined your co-author invitation on: ${postTitle}`;
     default:
       return "New notification";
   }
@@ -67,6 +87,12 @@ function buildLink(notification: NotificationData): string | null {
   switch (notification.type) {
     case "like":
     case "comment":
+    case "review_assigned":
+    case "revision_requested":
+    case "post_published":
+    case "co_author_invite":
+    case "co_author_accepted":
+    case "co_author_declined":
       return notification.post_slug ? `/post/${notification.post_slug}` : null;
     case "follow":
       return notification.actor_username ? `/${notification.actor_username}` : null;
@@ -106,6 +132,40 @@ export default function NotificationItem({ notification }: { notification: Notif
         <p className="mt-1 text-xs text-gray-400">
           {formatRelativeTime(notification.created_at)}
         </p>
+        {notification.type === "co_author_invite" && notification.post_id ? (
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={async (event) => {
+                event.preventDefault();
+                await respondToCoAuthorInvite({
+                  notificationId: notification.id,
+                  postId: notification.post_id!,
+                  accept: true,
+                });
+                window.location.reload();
+              }}
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white"
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              onClick={async (event) => {
+                event.preventDefault();
+                await respondToCoAuthorInvite({
+                  notificationId: notification.id,
+                  postId: notification.post_id!,
+                  accept: false,
+                });
+                window.location.reload();
+              }}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700"
+            >
+              Decline
+            </button>
+          </div>
+        ) : null}
       </div>
       {!notification.read ? (
         <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-emerald-500" />

@@ -2,98 +2,115 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { approvePost, rejectPost } from "./actions";
+import { submitEditorialDecision } from "./actions";
+import type { EditorDecision } from "@/lib/types";
 
 interface ReviewActionsProps {
   postId: string;
+  requiresEditorialWorkflow: boolean;
+  readyForDecision: boolean;
+  blockingReason: string | null;
+  currentRound: number;
+  reviewSummary?: string | null;
 }
 
-export default function ReviewActions({ postId }: ReviewActionsProps) {
+const DECISION_LABELS: Record<EditorDecision, string> = {
+  accept: "Accept for Publication",
+  request_revision: "Request Revision",
+  reject: "Reject",
+};
+
+export default function ReviewActions({
+  postId,
+  requiresEditorialWorkflow,
+  readyForDecision,
+  blockingReason,
+  currentRound,
+  reviewSummary,
+}: ReviewActionsProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState<"approve" | "reject" | null>(null);
+  const [loading, setLoading] = useState<EditorDecision | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [isRejectHovered, setIsRejectHovered] = useState(false);
+  const [notes, setNotes] = useState("");
 
-  const showRejectionReason = isRejectHovered || rejectionReason.trim().length > 0;
-
-  const handleApprove = async () => {
-    setLoading("approve");
+  const handleDecision = async (decision: EditorDecision) => {
+    setLoading(decision);
     setError(null);
 
     try {
-      const { error: actionError } = await approvePost(postId);
+      const { error: actionError } = await submitEditorialDecision({
+        postId,
+        decision,
+        notes,
+      });
 
       if (actionError) {
         setError(actionError);
         return;
       }
 
+      setNotes("");
       router.refresh();
     } catch {
-      setError("Unable to approve this post right now.");
+      setError("Unable to record this editorial decision right now.");
     } finally {
       setLoading(null);
     }
   };
 
-  const handleReject = async () => {
-    setLoading("reject");
-    setError(null);
-
-    try {
-      const { error: actionError } = await rejectPost(postId, rejectionReason);
-
-      if (actionError) {
-        setError(actionError);
-        return;
-      }
-
-      setRejectionReason("");
-      router.refresh();
-    } catch {
-      setError("Unable to reject this post right now.");
-    } finally {
-      setLoading(null);
-    }
-  };
+  const disableDecision = requiresEditorialWorkflow && !readyForDecision;
 
   return (
-    <div className="flex flex-col gap-2">
-      <button
-        onClick={handleApprove}
-        disabled={!!loading}
-        className="rounded-lg bg-emerald-brand px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-      >
-        {loading === "approve" ? "Publishing..." : "Approve"}
-      </button>
-
-      <div
-        className="flex flex-col gap-2"
-        onMouseEnter={() => setIsRejectHovered(true)}
-        onMouseLeave={() => setIsRejectHovered(false)}
-      >
-        <button
-          onClick={handleReject}
-          disabled={!!loading}
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
-        >
-          {loading === "reject" ? "Rejecting..." : "Reject"}
-        </button>
-
-        {showRejectionReason ? (
-          <textarea
-            value={rejectionReason}
-            onChange={(event) => setRejectionReason(event.target.value)}
-            placeholder="Reason for rejection (shown to author)..."
-            rows={2}
-            disabled={!!loading}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700 placeholder:text-gray-400 focus:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
-          />
-        ) : null}
+    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+      <div>
+        <p className="text-sm font-semibold text-gray-900">
+          {requiresEditorialWorkflow ? "Editorial decision" : "Publication decision"}
+        </p>
+        <p className="mt-1 text-xs text-gray-500">
+          Round {currentRound}
+          {reviewSummary ? ` · ${reviewSummary}` : ""}
+        </p>
       </div>
 
-      {error ? <p className="text-xs text-red-500 mt-1">{error}</p> : null}
+      <textarea
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
+        placeholder={
+          requiresEditorialWorkflow
+            ? "Decision note for the author and editorial record..."
+            : "Optional note for the author..."
+        }
+        rows={3}
+        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-emerald-brand focus:outline-none focus:ring-2 focus:ring-emerald-100"
+      />
+
+      <div className="grid gap-2">
+        {(["accept", "request_revision", "reject"] as EditorDecision[]).map((decision) => (
+          <button
+            key={decision}
+            type="button"
+            onClick={() => handleDecision(decision)}
+            disabled={Boolean(loading) || disableDecision}
+            className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              decision === "accept"
+                ? "bg-emerald-brand text-white hover:bg-emerald-600"
+                : decision === "request_revision"
+                  ? "border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                  : "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+            }`}
+          >
+            {loading === decision ? "Saving..." : DECISION_LABELS[decision]}
+          </button>
+        ))}
+      </div>
+
+      {disableDecision ? (
+        <p className="text-xs text-amber-700">
+          {blockingReason ?? "Complete reviewer assignments and submitted recommendations first."}
+        </p>
+      ) : null}
+
+      {error ? <p className="text-xs text-red-500">{error}</p> : null}
     </div>
   );
 }

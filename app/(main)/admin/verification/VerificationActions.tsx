@@ -2,49 +2,98 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { updateVerificationStatus } from "./actions";
+import type { AppRole, VerificationType } from "@/lib/types";
 
 interface Props {
   userId: string;
   verified: boolean;
   verifiedType: string | null;
+  currentRole: AppRole;
 }
 
-export default function VerificationActions({ userId, verified, verifiedType }: Props) {
+const VERIFIED_OPTIONS: VerificationType[] = [
+  "student",
+  "researcher",
+  "faculty",
+  "institution",
+];
+
+export default function VerificationActions({
+  userId,
+  verified,
+  verifiedType,
+  currentRole,
+}: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [type, setType] = useState(verifiedType ?? "student");
+  const [type, setType] = useState<VerificationType>(
+    (verifiedType as VerificationType | null) ?? "student"
+  );
+  const [role, setRole] = useState<AppRole>(currentRole ?? "student");
 
-  const update = async (newVerified: boolean) => {
+  const elevatedRoleAllowed = type === "faculty" || type === "institution";
+  const roleOptions: AppRole[] = elevatedRoleAllowed
+    ? ["student", "reviewer", "editor"]
+    : ["student"];
+
+  const update = async (nextVerified: boolean) => {
     setLoading(true);
-    const supabase = createClient();
-    await supabase
-      .from("profiles")
-      .update({ verified: newVerified, verified_type: newVerified ? type : null })
-      .eq("id", userId);
+    const { error } = await updateVerificationStatus({
+      userId,
+      verified: nextVerified,
+      verifiedType: nextVerified ? type : null,
+      role: nextVerified && elevatedRoleAllowed ? role : "student",
+    });
     setLoading(false);
-    router.refresh();
+
+    if (!error) {
+      router.refresh();
+    }
   };
 
   return (
     <div className="flex items-center gap-2">
-      {!verified && (
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-brand"
-        >
-          <option value="student">Student</option>
-          <option value="researcher">Researcher</option>
-          <option value="faculty">Faculty</option>
-          <option value="institution">Institution</option>
-        </select>
-      )}
+      {!verified ? (
+        <>
+          <select
+            value={type}
+            onChange={(event) => {
+              const nextType = event.target.value as VerificationType;
+              setType(nextType);
+              if (nextType !== "faculty" && nextType !== "institution") {
+                setRole("student");
+              }
+            }}
+            className="rounded-lg border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-brand"
+          >
+            {VERIFIED_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option.charAt(0).toUpperCase() + option.slice(1)}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={elevatedRoleAllowed ? role : "student"}
+            onChange={(event) => setRole(event.target.value as AppRole)}
+            disabled={!elevatedRoleAllowed}
+            className="rounded-lg border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-brand disabled:bg-gray-100 disabled:text-gray-400"
+          >
+            {roleOptions.map((option) => (
+              <option key={option} value={option}>
+                {option.charAt(0).toUpperCase() + option.slice(1)}
+              </option>
+            ))}
+          </select>
+        </>
+      ) : null}
+
       {verified ? (
         <button
           onClick={() => update(false)}
           disabled={loading}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg border bg-red-50 text-red-600 border-red-200 hover:bg-red-100 disabled:opacity-50 transition-colors"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
         >
           {loading ? "..." : "Revoke"}
         </button>
@@ -52,7 +101,7 @@ export default function VerificationActions({ userId, verified, verifiedType }: 
         <button
           onClick={() => update(true)}
           disabled={loading}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg border bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-100 disabled:opacity-50"
         >
           {loading ? "..." : "Verify"}
         </button>
