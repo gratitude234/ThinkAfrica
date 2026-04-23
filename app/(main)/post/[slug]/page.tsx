@@ -119,12 +119,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       "title, excerpt, cover_image_url, slug, status, author_id, profiles!posts_author_id_fkey(full_name)"
     )
     .eq("slug", slug)
-    .in("status", ["published", "pending", "pending_revision"])
+    .in("status", ["published", "pending", "pending_revision", "draft"])
     .single();
 
   if (!post) return { title: "Post not found - ThinkAfrica" };
+  // Drafts and in-review posts are only visible to the author (and assigned reviewers/co-authors)
   if (
-    (post.status === "pending" || post.status === "pending_revision") &&
+    (post.status === "draft" ||
+      post.status === "pending" ||
+      post.status === "pending_revision") &&
     user?.id !== post.author_id
   ) {
     return { title: "Post not found - ThinkAfrica" };
@@ -171,10 +174,13 @@ export default async function PostPage({ params }: PageProps) {
     `
     )
     .eq("slug", slug)
-    .in("status", ["published", "pending", "pending_revision"])
+    .in("status", ["published", "pending", "pending_revision", "draft"])
     .single();
 
   if (!post) notFound();
+
+  // Draft posts: only visible to the author
+  if (post.status === "draft" && user?.id !== post.author_id) notFound();
 
   if (
     (post.status === "pending" || post.status === "pending_revision") &&
@@ -369,6 +375,15 @@ export default async function PostPage({ params }: PageProps) {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
           <div className="lg:col-span-3">
             <div className="max-w-3xl">
+              {post.status === "draft" ? (
+                <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                  This post is a <strong>draft</strong> and is only visible to you.{" "}
+                  <Link href={`/edit/${post.slug}`} className="font-semibold underline">
+                    Edit &amp; publish
+                  </Link>
+                </div>
+              ) : null}
+
               {post.status === "pending" || post.status === "pending_revision" ? (
                 <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                   This submission is in the editorial workflow. We&apos;ll
