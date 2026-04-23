@@ -106,6 +106,11 @@ function formatReference(reference: {
     .join(" ");
 }
 
+function throwPostQueryError(slug: string, stage: "metadata" | "page", error: unknown): never {
+  console.error(`[post/${slug}] ${stage} query failed`, error);
+  throw new Error(`Failed to load post "${slug}".`);
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createClient();
@@ -113,14 +118,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: post } = await supabase
+  const { data: post, error: postError } = await supabase
     .from("posts")
     .select(
       "title, excerpt, cover_image_url, slug, status, author_id, profiles!posts_author_id_fkey(full_name)"
     )
     .eq("slug", slug)
     .in("status", ["published", "pending", "pending_revision", "draft"])
-    .single();
+    .maybeSingle();
+
+  if (postError) {
+    throwPostQueryError(slug, "metadata", postError);
+  }
 
   if (!post) return { title: "Post not found - ThinkAfrica" };
   // Drafts and in-review posts are only visible to the author (and assigned reviewers/co-authors)
@@ -164,7 +173,7 @@ export default async function PostPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: post } = await supabase
+  const { data: post, error: postError } = await supabase
     .from("posts")
     .select(
       `
@@ -175,7 +184,11 @@ export default async function PostPage({ params }: PageProps) {
     )
     .eq("slug", slug)
     .in("status", ["published", "pending", "pending_revision", "draft"])
-    .single();
+    .maybeSingle();
+
+  if (postError) {
+    throwPostQueryError(slug, "page", postError);
+  }
 
   if (!post) notFound();
 
@@ -186,7 +199,10 @@ export default async function PostPage({ params }: PageProps) {
     (post.status === "pending" || post.status === "pending_revision") &&
     user?.id !== post.author_id
   ) {
-    const [{ data: reviewAssignment }, { data: coAuthorInvite }] = await Promise.all([
+    const [
+      { data: reviewAssignment, error: reviewAssignmentError },
+      { data: coAuthorInvite, error: coAuthorInviteError },
+    ] = await Promise.all([
       user
         ? supabase
             .from("post_reviews")
@@ -194,7 +210,7 @@ export default async function PostPage({ params }: PageProps) {
             .eq("post_id", post.id)
             .eq("reviewer_id", user.id)
             .maybeSingle()
-        : Promise.resolve({ data: null }),
+        : Promise.resolve({ data: null, error: null }),
       user
         ? supabase
             .from("post_authors")
@@ -202,8 +218,16 @@ export default async function PostPage({ params }: PageProps) {
             .eq("post_id", post.id)
             .eq("user_id", user.id)
             .maybeSingle()
-        : Promise.resolve({ data: null }),
+        : Promise.resolve({ data: null, error: null }),
     ]);
+
+    if (reviewAssignmentError || coAuthorInviteError) {
+      console.error(`[post/${slug}] visibility query failed`, {
+        reviewAssignmentError,
+        coAuthorInviteError,
+      });
+      throw new Error(`Failed to verify access for post "${slug}".`);
+    }
 
     if (!reviewAssignment && !coAuthorInvite) notFound();
   }
