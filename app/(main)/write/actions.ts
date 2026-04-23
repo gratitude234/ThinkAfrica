@@ -552,6 +552,26 @@ export async function publishPost(input: {
   revalidatePath("/");
   revalidatePath("/admin/review");
 
+  if (submitStatus === "published") {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    void fetch(`${appUrl}/api/audio-summary`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": process.env.ADMIN_SECRET ?? "",
+      },
+      body: JSON.stringify({
+        postId,
+        title: input.title.trim(),
+        content: input.content,
+        authorName: ownerProfile?.full_name ?? "A ThinkAfrika author",
+        postType: input.postType,
+      }),
+    }).catch(() => {
+      // Audio summary generation is best-effort.
+    });
+  }
+
   return {
     error: null,
     slug,

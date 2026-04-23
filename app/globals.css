@@ -32,3 +32,31 @@
 .tiptap hr { @apply my-6 border-gray-200; }
 .tiptap strong { @apply font-bold; }
 .tiptap em { @apply italic; }
+
+/* Lite Mode */
+/* Activated by the .lite-mode class on the layout wrapper.
+   Strips images and reduces data usage on slow connections. */
+
+.lite-mode img,
+.lite-mode [data-lite-hide] {
+  display: none !important;
+}
+
+.lite-mode [data-lite-placeholder]::before {
+  content: attr(data-lite-placeholder);
+  display: block;
+  background: #f1efe8;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #888780;
+  font-style: italic;
+}
+
+.lite-mode [data-lite-keep] {
+  display: block !important;
+}
+
+.lite-mode .aspect-\[16\/9\] {
+  display: none !important;
+}

@@ -45,6 +45,10 @@ export default function MessagesUnreadBadge({
   useEffect(() => {
     void fetchCount();
 
+    if (document.cookie.includes("ta_lite=1")) {
+      return;
+    }
+
     const supabase = createClient();
     const channel = supabase
       .channel(`unread-badge-${userId}`)

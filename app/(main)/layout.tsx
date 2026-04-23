@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import GuestBanner from "@/components/ui/GuestBanner";
+import { isLiteModeServer } from "@/lib/liteMode";
 import NavigationShell from "./NavigationShell";
 import { canReview } from "@/lib/roles";
 
@@ -29,9 +31,11 @@ export default async function MainLayout({
     !!user &&
     (user.email === process.env.ADMIN_EMAIL || profileData?.role === "admin");
   const canAccessReview = !!profileData?.role && canReview(profileData.role);
+  const cookieStore = cookies();
+  const isLite = isLiteModeServer(cookieStore.toString());
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className={`min-h-screen bg-canvas${isLite ? " lite-mode" : ""}`}>
       <NavigationShell
         user={user}
         profile={profileData}

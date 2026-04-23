@@ -163,6 +163,28 @@ export async function submitEditorialDecision(input: {
         }
       }
 
+      const { data: authorProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", post.author_id)
+        .maybeSingle();
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      void fetch(`${appUrl}/api/audio-summary`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": process.env.ADMIN_SECRET ?? "",
+        },
+        body: JSON.stringify({
+          postId: input.postId,
+          title: post.title,
+          content: post.content ?? "",
+          authorName: authorProfile?.full_name ?? "A ThinkAfrika author",
+          postType: post.type,
+        }),
+      }).catch(() => {});
+
       await supabase.from("notifications").insert({
         user_id: post.author_id,
         type: "post_published",

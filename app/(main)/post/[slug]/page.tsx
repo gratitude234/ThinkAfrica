@@ -20,6 +20,7 @@ import TableOfContents from "./TableOfContents";
 import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
 import CiteThis from "./CiteThis";
+import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -127,7 +128,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { data: post, error: postError } = await supabase
     .from("posts")
     .select(
-      "title, excerpt, cover_image_url, slug, status, author_id, profiles!posts_author_id_fkey(full_name)"
+      "title, excerpt, cover_image_url, slug, status, author_id, type, profiles!posts_author_id_fkey(full_name, university)"
     )
     .eq("slug", slug)
     .in("status", ["published", "pending", "pending_revision", "draft"])
@@ -150,6 +151,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://thinkafrika.com";
+  const ogImageUrl = `${appUrl}/api/og?${new URLSearchParams({
+    title: post.title,
+    author: author?.full_name ?? "",
+    university: author?.university ?? "",
+    type: post.type ?? "essay",
+  }).toString()}`;
+  const ogImage = coverUrl ?? ogImageUrl;
 
   return {
     title: `${post.title} - ThinkAfrica`,
@@ -157,16 +166,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       title: post.title,
       description: post.excerpt ?? "",
-      url: `https://thinkafrika.com/post/${post.slug}`,
+      url: `${appUrl}/post/${post.slug}`,
       siteName: "ThinkAfrica",
-      images: coverUrl ? [{ url: coverUrl, width: 1200, height: 630 }] : [],
+      images: [{ url: ogImage, width: 1200, height: 630 }],
       type: "article",
     },
     twitter: {
-      card: coverUrl ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: post.title,
       description: post.excerpt ?? "",
-      images: coverUrl ? [coverUrl] : [],
+      images: [ogImage],
     },
   };
 }
@@ -186,6 +195,7 @@ export default async function PostPage({ params }: PageProps) {
       id, title, slug, content, excerpt, type, tags, status, author_id,
       created_at, published_at, view_count, cover_image_url, citation_id,
       in_response_to,
+      audio_summary_url,
       parent_post:posts!posts_in_response_to_fkey(id, title, slug),
       profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url)
     `
@@ -243,6 +253,9 @@ export default async function PostPage({ params }: PageProps) {
   const isPublished = post.status === "published";
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const coverImageUrl = (post as { cover_image_url?: string | null }).cover_image_url;
+  const audioSummaryUrl = (
+    post as typeof post & { audio_summary_url?: string | null }
+  ).audio_summary_url ?? null;
   const parentPostRaw = (
     post as typeof post & {
       parent_post?: ParentPostRef | ParentPostRef[] | null;
@@ -447,6 +460,8 @@ export default async function PostPage({ params }: PageProps) {
                 </div>
               ) : null}
 
+              {audioSummaryUrl ? <AudioSummaryPlayer url={audioSummaryUrl} /> : null}
+
               <header className="mb-8">
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                   <Badge type={post.type} wordCount={wordCount} />
@@ -589,7 +604,12 @@ export default async function PostPage({ params }: PageProps) {
               {isPublished ? (
                 <>
                   <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-                    <ShareButtons title={post.title} slug={post.slug} />
+                    <ShareButtons
+                      title={post.title}
+                      slug={post.slug}
+                      excerpt={post.excerpt ?? null}
+                      authorName={author?.full_name ?? null}
+                    />
                     <span className="text-xs text-gray-400">
                       {post.view_count} {post.view_count === 1 ? "view" : "views"}
                     </span>

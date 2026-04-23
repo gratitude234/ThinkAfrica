@@ -8,6 +8,7 @@ import NavUserMenu from "./NavUserMenu";
 import MobileNav from "./MobileNav";
 import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import NotificationBell from "@/components/ui/NotificationBell";
+import LiteModeToggle from "@/components/ui/LiteModeToggle";
 
 interface NavClientProps {
   user: User | null;
@@ -45,7 +46,8 @@ export default function NavClient({
     pathname === "/alumni" || pathname.startsWith("/alumni/");
   const isOpportunitiesActive =
     pathname === "/opportunities" || pathname.startsWith("/opportunities/");
-  const isMessagesActive = pathname === "/messages" || pathname.startsWith("/messages/");
+  const isMessagesActive =
+    pathname === "/messages" || pathname.startsWith("/messages/");
   const isWriteActive = pathname.startsWith("/write");
 
   return (
@@ -62,6 +64,7 @@ export default function NavClient({
               width={160}
               height={48}
               priority
+              data-lite-keep
               className="h-16 w-auto"
             />
           </Link>
@@ -143,9 +146,9 @@ export default function NavClient({
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
-              <span>Search posts, people, topics…</span>
+              <span>Search posts, people, topics...</span>
               <kbd className="ml-auto hidden text-xs text-gray-400 sm:inline">
-                ⌘K
+                Ctrl+K
               </kbd>
             </button>
           </div>
@@ -172,6 +175,7 @@ export default function NavClient({
               </svg>
             </button>
             {user ? <NotificationBell userId={user.id} /> : null}
+            <LiteModeToggle />
             <NavUserMenu
               user={user}
               profile={profile}

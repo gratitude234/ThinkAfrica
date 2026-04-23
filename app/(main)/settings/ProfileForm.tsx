@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
+import { isUniversityEmail } from "@/lib/universityDomains";
 import AvatarUploader from "./AvatarUploader";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 
@@ -40,6 +41,9 @@ interface Profile {
   graduation_year: number | null;
   is_alumni?: boolean;
   open_to_mentoring?: boolean;
+  verified?: boolean;
+  verified_type?: string | null;
+  signup_email?: string | null;
   avatar_url: string | null;
   interests: string[] | null;
   cover_image_url: string | null;
@@ -204,6 +208,20 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             onUpload={handleAvatarUpload}      // FIX: was setAvatarUrl
           />
         </div>
+
+        {profile.verified &&
+        profile.verified_type === "student" &&
+        profile.signup_email &&
+        isUniversityEmail(profile.signup_email) ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-sm font-medium text-emerald-800">
+              ✓ Verified via {profile.signup_email.split("@")[1]}
+            </p>
+            <p className="mt-0.5 text-xs text-emerald-600">
+              Your university email automatically verified your account.
+            </p>
+          </div>
+        ) : null}
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">

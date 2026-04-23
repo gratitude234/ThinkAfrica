@@ -46,6 +46,10 @@ export default function MessageThread({
   }, [messages]);
 
   useEffect(() => {
+    if (document.cookie.includes("ta_lite=1")) {
+      return;
+    }
+
     const channel = supabase
       .channel(`messages:${conversationId}`)
       .on(

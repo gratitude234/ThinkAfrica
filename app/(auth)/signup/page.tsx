@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { isUniversityEmail } from "@/lib/universityDomains";
 
 const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
@@ -53,6 +54,9 @@ export default function SignupPage() {
     router.push("/");
     router.refresh();
   };
+
+  const isUniversityEmailDetected =
+    form.email.includes("@") && isUniversityEmail(form.email);
 
   return (
     <div className="fixed inset-0 z-10 grid min-h-screen grid-cols-1 bg-white md:grid-cols-2">
@@ -128,6 +132,13 @@ export default function SignupPage() {
                 placeholder="you@university.edu"
                 className={INPUT_STYLES}
               />
+              {isUniversityEmailDetected ? (
+                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-600">
+                  <span aria-hidden="true">✓</span>
+                  University email detected - your account will be verified
+                  instantly.
+                </p>
+              ) : null}
             </div>
 
             <div>
