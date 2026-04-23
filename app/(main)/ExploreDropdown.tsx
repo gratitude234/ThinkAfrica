@@ -21,6 +21,11 @@ const EXPLORE_ITEMS = [
     label: "Fellowships",
     description: "Funding opportunities",
   },
+  {
+    href: "/alumni",
+    label: "Alumni",
+    description: "Graduates and mentors",
+  },
 ];
 
 export default function ExploreDropdown() {

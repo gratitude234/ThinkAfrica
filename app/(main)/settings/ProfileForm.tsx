@@ -38,6 +38,8 @@ interface Profile {
   university: string | null;
   field_of_study: string | null;
   graduation_year: number | null;
+  is_alumni?: boolean;
+  open_to_mentoring?: boolean;
   avatar_url: string | null;
   interests: string[] | null;
   cover_image_url: string | null;
@@ -54,6 +56,10 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const [fieldOfStudy, setFieldOfStudy] = useState(profile.field_of_study ?? "");
   const [graduationYear, setGraduationYear] = useState<string>(
     profile.graduation_year ? String(profile.graduation_year) : ""
+  );
+  const [openToMentoring, setOpenToMentoring] = useState(
+    (profile as typeof profile & { open_to_mentoring?: boolean })
+      .open_to_mentoring ?? false
   );
   const [interests, setInterests] = useState<string[]>(profile.interests ?? []);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
@@ -133,6 +139,13 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
     if (usernameError) return;
 
     setSaving(true);
+    const parsedYear = graduationYear ? parseInt(graduationYear, 10) : null;
+    if (parsedYear !== null && (parsedYear < 2015 || parsedYear > 2040)) {
+      setToast("Please enter a valid graduation year between 2015 and 2040.");
+      setSaving(false);
+      return;
+    }
+
     const supabase = createClient();
 
     const { error } = await supabase
@@ -143,7 +156,8 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         bio,
         university,
         field_of_study: fieldOfStudy,
-        graduation_year: graduationYear ? parseInt(graduationYear, 10) : null,
+        graduation_year: parsedYear,
+        open_to_mentoring: openToMentoring,
         interests,
         avatar_url: avatarUrl,
         cover_image_url: coverImageUrl,
@@ -252,10 +266,11 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             Graduation year
           </label>
           <input
+            id="graduation_year"
             type="number"
-            min={2000}
+            min={2015}
             max={2040}
-            placeholder="e.g. 2026"
+            placeholder="e.g. 2027"
             value={graduationYear}
             onChange={(e) => setGraduationYear(e.target.value)}
             className={INPUT_STYLES}
@@ -264,6 +279,32 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             We&apos;ll keep your profile active after you graduate.
           </p>
         </div>
+
+        {(profile.is_alumni || graduationYear) ? (
+          <div className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-800">Open to mentoring</p>
+              <p className="mt-0.5 text-xs text-gray-400">
+                Students can find you in the alumni directory and reach out.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={openToMentoring}
+              onClick={() => setOpenToMentoring((value) => !value)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                openToMentoring ? "bg-emerald-500" : "bg-gray-200"
+              }`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                  openToMentoring ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        ) : null}
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">

@@ -26,7 +26,7 @@ interface FeedOptions {
 }
 
 const POST_SELECT =
-  "id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, author_id";
+  "id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, author_id";
 
 function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   if (timeframe === "week") {

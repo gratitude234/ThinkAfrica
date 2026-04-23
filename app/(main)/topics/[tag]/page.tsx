@@ -16,7 +16,7 @@ export default async function TopicPage({ params }: PageProps) {
   const { data: postsRaw } = await supabase
     .from("posts")
     .select(`
-      id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
+      id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
       profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)
     `)
     .eq("status", "published")
@@ -80,6 +80,8 @@ export default async function TopicPage({ params }: PageProps) {
                   id: post.id,
                   title: post.title,
                   slug: post.slug,
+                  in_response_to:
+                    (post as { in_response_to?: string | null }).in_response_to ?? null,
                   excerpt: post.excerpt,
                   type: post.type,
                   tags: post.tags,

@@ -54,6 +54,7 @@ interface ProfilePost {
   author_id?: string;
   title: string;
   slug: string;
+  in_response_to?: string | null;
   excerpt: string | null;
   type: string;
   tags: string[] | null;
@@ -220,7 +221,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("posts")
       .select(
-        "id, author_id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type), post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
+        "id, author_id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type), post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
       )
       .eq("author_id", profile.id)
       .eq("status", "published")
@@ -228,7 +229,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("post_authors")
       .select(
-        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
+        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
       )
       .eq("user_id", profile.id)
       .not("accepted_at", "is", null),

@@ -11,6 +11,6 @@ INSERT INTO public.badges (id, name, description, icon)
 VALUES (
   '00000000-0000-0000-0000-000000000010',
   'Alumni',
-  'Graduated scholar. Part of the ThinkAfrica network for life.',
+  'Graduated scholar. Part of the ThinkAfrika network for life.',
   '🎓'
 ) ON CONFLICT (id) DO NOTHING;

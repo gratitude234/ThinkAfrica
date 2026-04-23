@@ -46,6 +46,12 @@ interface ResponsePostRow {
       }[];
 }
 
+interface ParentPostRef {
+  id: string;
+  title: string;
+  slug: string;
+}
+
 function estimateReadTime(content: string): number {
   const text = content.replace(/<[^>]*>/g, " ");
   const words = text.trim().split(/\s+/).filter(Boolean).length;
@@ -179,6 +185,8 @@ export default async function PostPage({ params }: PageProps) {
       `
       id, title, slug, content, excerpt, type, tags, status, author_id,
       created_at, published_at, view_count, cover_image_url, citation_id,
+      in_response_to,
+      parent_post:posts!posts_in_response_to_fkey(id, title, slug),
       profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url)
     `
     )
@@ -235,6 +243,14 @@ export default async function PostPage({ params }: PageProps) {
   const isPublished = post.status === "published";
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const coverImageUrl = (post as { cover_image_url?: string | null }).cover_image_url;
+  const parentPostRaw = (
+    post as typeof post & {
+      parent_post?: ParentPostRef | ParentPostRef[] | null;
+    }
+  ).parent_post ?? null;
+  const parentPost = Array.isArray(parentPostRaw)
+    ? parentPostRaw[0] ?? null
+    : parentPostRaw;
 
   const [
     { count: likeCount },
@@ -444,6 +460,21 @@ export default async function PostPage({ params }: PageProps) {
                     </div>
                   ) : null}
                 </div>
+
+                {parentPost ? (
+                  <Link
+                    href={`/post/${parentPost.slug}`}
+                    className="mb-3 inline-flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-600"
+                  >
+                    <span aria-hidden="true">{"\u21A9"}</span>
+                    <span>
+                      In response to:{" "}
+                      <span className="font-medium text-gray-600">
+                        {parentPost.title}
+                      </span>
+                    </span>
+                  </Link>
+                ) : null}
 
                 <h1 className="font-display mb-4 text-3xl font-bold leading-tight text-ink">
                   {post.title}

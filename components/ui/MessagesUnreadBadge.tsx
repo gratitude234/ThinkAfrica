@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface ParticipantRow {
@@ -20,29 +20,51 @@ export default function MessagesUnreadBadge({
 }) {
   const [count, setCount] = useState(0);
 
-  useEffect(() => {
+  const fetchCount = useCallback(async () => {
     const supabase = createClient();
-
-    supabase
+    const { data } = await supabase
       .from("conversation_participants")
       .select("last_read_at, conversations!inner(last_message_at)")
-      .eq("user_id", userId)
-      .then(({ data }) => {
-        const unread = ((data ?? []) as ParticipantRow[]).filter((row) => {
-          const conversation = Array.isArray(row.conversations)
-            ? row.conversations[0]
-            : row.conversations;
+      .eq("user_id", userId);
 
-          return (
-            !!conversation &&
-            new Date(conversation.last_message_at).getTime() >
-              new Date(row.last_read_at).getTime()
-          );
-        }).length;
+    const unread = ((data ?? []) as ParticipantRow[]).filter((row) => {
+      const conversation = Array.isArray(row.conversations)
+        ? row.conversations[0]
+        : row.conversations;
 
-        setCount(unread);
-      });
+      return (
+        !!conversation &&
+        new Date(conversation.last_message_at).getTime() >
+          new Date(row.last_read_at).getTime()
+      );
+    }).length;
+
+    setCount(unread);
   }, [userId]);
+
+  useEffect(() => {
+    void fetchCount();
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`unread-badge-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        () => {
+          void fetchCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, fetchCount]);
 
   if (!count) return null;
 

@@ -28,5 +28,5 @@ END;
 $$;
 
 -- Schedule via pg_cron (enable pg_cron extension in Supabase dashboard first)
--- SELECT cron.schedule('promote-alumni', '0 1 * * *', 'SELECT public.promote_alumni()');
+-- SELECT cron.schedule('promote-alumni', '0 1 1 1 *', 'SELECT public.promote_alumni()');
 -- Leave as a comment — the developer enables cron manually in Supabase dashboard

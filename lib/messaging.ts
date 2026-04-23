@@ -13,6 +13,10 @@ interface ProfileUniversityRow {
   university: string | null;
 }
 
+interface ProfileVerifiedRow {
+  verified: boolean;
+}
+
 interface TalentRow {
   open_to_opportunities: boolean;
   visibility: string;
@@ -25,6 +29,19 @@ export async function getMessageEligibility(
 ): Promise<{ eligible: boolean; reason: string | null }> {
   if (currentUserId === targetUserId) {
     return { eligible: false, reason: null };
+  }
+
+  const { data: myProfile } = await supabase
+    .from("profiles")
+    .select("verified")
+    .eq("id", currentUserId)
+    .maybeSingle<ProfileVerifiedRow>();
+
+  if (!myProfile?.verified) {
+    return {
+      eligible: false,
+      reason: "Verify your account to send messages",
+    };
   }
 
   const [{ data: iFollow }, { data: theyFollow }] = await Promise.all([
@@ -111,7 +128,7 @@ export async function findOrCreateConversation(
   });
 
   if (error) {
-    return null;
+    throw new Error(error.message);
   }
 
   return typeof data === "string" ? data : null;

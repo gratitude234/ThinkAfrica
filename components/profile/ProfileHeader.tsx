@@ -102,12 +102,13 @@ export default function ProfileHeader({
                     "text-emerald-600"
                   }`}
                 >
-                  ✓
+                  {"\u2713"}
                 </span>
               ) : null}
               {profile.is_alumni && profile.graduation_year ? (
                 <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
-                  🎓 Alumni &apos;{String(profile.graduation_year).slice(-2)}
+                  {"\uD83C\uDF93"} Alumni &apos;
+                  {String(profile.graduation_year).slice(-2)}
                 </span>
               ) : null}
             </h1>
@@ -155,7 +156,8 @@ export default function ProfileHeader({
                     />
                   ) : (
                     <div className="w-full rounded-lg border border-dashed border-gray-200 px-4 py-2 text-center text-xs text-gray-400">
-                      Message after following each other
+                      {messagingEligibility?.reason ??
+                        "Message after following each other"}
                     </div>
                   )
                 ) : null}
@@ -203,9 +205,11 @@ function MessageButton({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleMessage = async () => {
     setLoading(true);
+    setError(null);
 
     try {
       const supabase = createClient();
@@ -217,7 +221,15 @@ function MessageButton({
 
       if (conversationId) {
         router.push(`/messages/${conversationId}`);
+      } else {
+        setError("Unable to start conversation.");
       }
+    } catch (messageError) {
+      setError(
+        messageError instanceof Error
+          ? messageError.message
+          : "Unable to start conversation."
+      );
     } finally {
       setLoading(false);
     }
@@ -236,6 +248,9 @@ function MessageButton({
       >
         {loading ? "Opening..." : "Message"}
       </button>
+      {error ? (
+        <p className="mt-1 text-center text-[10px] text-red-500">{error}</p>
+      ) : null}
     </div>
   );
 }

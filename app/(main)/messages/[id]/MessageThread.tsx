@@ -126,6 +126,21 @@ export default function MessageThread({
     setSending(false);
   };
 
+  const handleDelete = async (messageId: string) => {
+    const deletedAt = new Date().toISOString();
+    await supabase
+      .from("messages")
+      .update({ deleted_at: deletedAt })
+      .eq("id", messageId)
+      .eq("sender_id", currentUserId);
+
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === messageId ? { ...message, deleted_at: deletedAt } : message
+      )
+    );
+  };
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col" style={{ height: "calc(100vh - 8rem)" }}>
       <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
@@ -163,8 +178,18 @@ export default function MessageThread({
           return (
             <div
               key={message.id}
-              className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+              className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}
             >
+              {isMine && !message.deleted_at ? (
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(message.id)}
+                  className="mr-2 self-center text-[11px] text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-400"
+                  aria-label="Delete message"
+                >
+                  Delete
+                </button>
+              ) : null}
               <div
                 className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
                   message.deleted_at

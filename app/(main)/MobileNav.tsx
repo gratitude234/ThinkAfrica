@@ -52,6 +52,7 @@ export default function MobileNav({
     isEnabled("fellowshipsSection") ? { label: "Fellowships", href: "/fellowships" } : null,
     isEnabled("ambassadors") ? { label: "Ambassadors", href: "/ambassadors" } : null,
     { label: "Leaderboard", href: "/leaderboard" },
+    { label: "Alumni", href: "/alumni" },
     isEnabled("talentMarketplace") ? { label: "People", href: "/talent" } : null,
     { label: "Bookmarks", href: "/bookmarks" },
     { label: "Partners", href: "/partners" },

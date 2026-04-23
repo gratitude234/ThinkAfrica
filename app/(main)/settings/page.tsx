@@ -12,7 +12,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, username, full_name, bio, university, field_of_study, graduation_year, avatar_url, interests, cover_image_url")
+    .select("id, username, full_name, bio, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, avatar_url, interests, cover_image_url")
     .eq("id", user.id)
     .single();
 
@@ -55,6 +55,8 @@ export default async function SettingsPage() {
             university: profile.university ?? null,
             field_of_study: profile.field_of_study ?? null,
             graduation_year: profile.graduation_year ?? null,
+            is_alumni: profile.is_alumni ?? false,
+            open_to_mentoring: profile.open_to_mentoring ?? false,
             avatar_url: profile.avatar_url ?? null,
             interests: (profile.interests as string[] | null) ?? null,
             cover_image_url: (profile.cover_image_url as string | null) ?? null,

@@ -41,6 +41,8 @@ export default function NavClient({
   const isHomeActive = pathname === "/";
   const isDiscoverActive =
     pathname === "/topics" || pathname.startsWith("/topics/");
+  const isAlumniActive =
+    pathname === "/alumni" || pathname.startsWith("/alumni/");
   const isOpportunitiesActive =
     pathname === "/opportunities" || pathname.startsWith("/opportunities/");
   const isMessagesActive = pathname === "/messages" || pathname.startsWith("/messages/");
@@ -86,6 +88,13 @@ export default function NavClient({
                 aria-current={isOpportunitiesActive ? "page" : undefined}
               >
                 Opportunities
+              </Link>
+              <Link
+                href="/alumni"
+                className={navItemClass(isAlumniActive)}
+                aria-current={isAlumniActive ? "page" : undefined}
+              >
+                Alumni
               </Link>
               {user ? (
                 <Link

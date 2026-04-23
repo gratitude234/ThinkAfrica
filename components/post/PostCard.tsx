@@ -11,6 +11,7 @@ export interface PostCardData {
   id: string;
   title: string;
   slug: string;
+  in_response_to?: string | null;
   excerpt: string | null;
   type: string;
   tags: string[] | null;
@@ -114,7 +115,7 @@ export default function PostCard({
                 "text-emerald-600"
               }`}
             >
-              ✓
+              {"\u2713"}
             </span>
           ) : null}
         </Link>
@@ -141,7 +142,14 @@ export default function PostCard({
       <article className="rounded-xl border border-gray-200/70 bg-white p-5 transition-shadow duration-300 hover:shadow-md">
         <div className="flex gap-4">
           <div className="min-w-0 flex-1">
-            <Badge type={post.type} />
+            <div className="flex items-center gap-2">
+              <Badge type={post.type} />
+              {post.in_response_to ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
+                  <span aria-hidden="true">{"\u21A9"}</span> Response
+                </span>
+              ) : null}
+            </div>
             <Link href={`/post/${post.slug}`}>
               <h2 className="font-display mt-2 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
                 {post.title}
@@ -200,7 +208,14 @@ export default function PostCard({
 
       <div className="p-5">
         <div className="flex items-center justify-between gap-3">
-          <Badge type={post.type} />
+          <div className="flex items-center gap-2">
+            <Badge type={post.type} />
+            {post.in_response_to ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
+                <span aria-hidden="true">{"\u21A9"}</span> Response
+              </span>
+            ) : null}
+          </div>
           <span className="text-xs text-gray-400">{readTime} min read</span>
         </div>
 
