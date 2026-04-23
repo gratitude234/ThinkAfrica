@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Badge from "@/components/ui/Badge";
 import type { PostReferenceRecord, VersionAuthorRecord } from "@/lib/types";
+import CiteThis from "../../post/[slug]/CiteThis";
 
 interface PageProps {
   params: Promise<{ citationId: string }>;
@@ -60,6 +61,18 @@ export default async function PublicationArchivePage({ params }: PageProps) {
   const references = (Array.isArray(version.references)
     ? version.references
     : []) as PostReferenceRecord[];
+  const citationAuthors =
+    archivedAuthors.length > 0
+      ? archivedAuthors.map((author) => ({
+          full_name: author.profile?.full_name ?? null,
+          username: author.profile?.username ?? "author",
+        }))
+      : [leadAuthor]
+          .filter(Boolean)
+          .map((author) => ({
+            full_name: author.full_name ?? null,
+            username: author.username ?? "author",
+          }));
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -149,6 +162,16 @@ export default async function PublicationArchivePage({ params }: PageProps) {
             ))}
           </ol>
         </section>
+      ) : null}
+
+      {post.citation_id ? (
+        <CiteThis
+          citationId={post.citation_id}
+          citationPath={`/publication/${post.citation_id}`}
+          title={version.title}
+          publishedAt={post.published_at ?? version.created_at}
+          authors={citationAuthors}
+        />
       ) : null}
     </div>
   );

@@ -46,8 +46,9 @@ export default async function EditPage({ params }: PageProps) {
     { data: references },
     { data: reviews },
     { data: decisions },
-    { data: versions },
+    { data: versionRows },
     { data: authors },
+    { data: versions },
   ] = await Promise.all([
     supabase
       .from("post_references")
@@ -83,6 +84,11 @@ export default async function EditPage({ params }: PageProps) {
       )
       .eq("post_id", post.id)
       .order("display_order", { ascending: true }),
+    supabase
+      .from("post_versions")
+      .select("id, version_number, version_kind, round, author_note, created_at")
+      .eq("post_id", post.id)
+      .order("version_number", { ascending: true }),
   ]);
 
   const normalizedReviews = ((reviews ?? []) as Array<Record<string, unknown>>).map(
@@ -116,7 +122,7 @@ export default async function EditPage({ params }: PageProps) {
       }) as PostEditorDecisionRecord
   );
 
-  const normalizedVersions = ((versions ?? []) as Array<Record<string, unknown>>).map(
+  const normalizedVersions = ((versionRows ?? []) as Array<Record<string, unknown>>).map(
     (item) =>
       ({
         id: item.id,
@@ -133,6 +139,17 @@ export default async function EditPage({ params }: PageProps) {
         authors: Array.isArray(item.authors) ? item.authors : [],
         created_at: item.created_at,
       }) as PostVersionRecord
+  );
+
+  const submissionVersions = ((versions ?? []) as Array<Record<string, unknown>>).map(
+    (item) => ({
+      id: item.id as string,
+      version_number: item.version_number as number,
+      version_kind: item.version_kind as string,
+      round: item.round as number,
+      author_note: (item.author_note as string | null) ?? null,
+      created_at: item.created_at as string,
+    })
   );
 
   const normalizedAuthors = ((authors ?? []) as Array<Record<string, unknown>>)
@@ -166,6 +183,7 @@ export default async function EditPage({ params }: PageProps) {
         published_version_id: post.published_version_id ?? null,
       }}
       initialReferences={(references ?? []) as PostReferenceRecord[]}
+      versions={submissionVersions}
       reviewHistory={normalizedReviews}
       decisionHistory={normalizedDecisions}
       versionHistory={normalizedVersions}

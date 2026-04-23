@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import NavUserMenu from "./NavUserMenu";
 import MobileNav from "./MobileNav";
+import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import NotificationBell from "@/components/ui/NotificationBell";
 
 interface NavClientProps {
@@ -22,7 +23,7 @@ interface NavClientProps {
 }
 
 function navItemClass(isActive: boolean) {
-  return `rounded-lg px-4 py-2 text-sm transition-colors ${
+  return `relative rounded-lg px-4 py-2 text-sm transition-colors ${
     isActive
       ? "font-semibold text-emerald-brand"
       : "text-ink-muted hover:bg-canvas hover:text-ink"
@@ -42,6 +43,7 @@ export default function NavClient({
     pathname === "/topics" || pathname.startsWith("/topics/");
   const isOpportunitiesActive =
     pathname === "/opportunities" || pathname.startsWith("/opportunities/");
+  const isMessagesActive = pathname === "/messages" || pathname.startsWith("/messages/");
   const isWriteActive = pathname.startsWith("/write");
 
   return (
@@ -85,6 +87,21 @@ export default function NavClient({
               >
                 Opportunities
               </Link>
+              {user ? (
+                <Link
+                  href="/messages"
+                  className={navItemClass(isMessagesActive)}
+                  aria-current={isMessagesActive ? "page" : undefined}
+                >
+                  <span className="relative">
+                    Messages
+                    <MessagesUnreadBadge
+                      userId={user.id}
+                      className="-right-4 -top-1"
+                    />
+                  </span>
+                </Link>
+              ) : null}
               <Link
                 href="/write"
                 className={`rounded-lg px-4 py-2 text-sm transition-colors ${

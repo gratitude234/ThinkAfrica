@@ -7,6 +7,7 @@ import OpportunityBanner from "@/components/profile/OpportunityBanner";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import PublicationsSection from "@/components/profile/PublicationsSection";
 import TopArguments from "@/components/profile/TopArguments";
+import { getMessageEligibility } from "@/lib/messaging";
 import { createClient } from "@/lib/supabase/server";
 import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
 
@@ -27,6 +28,8 @@ interface ProfileRecord {
   full_name: string | null;
   university: string | null;
   field_of_study: string | null;
+  graduation_year: number | null;
+  is_alumni: boolean;
   bio: string | null;
   avatar_url: string | null;
   points: number;
@@ -190,7 +193,7 @@ export default async function UserProfilePage({ params }: PageProps) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, username, full_name, university, field_of_study, bio, avatar_url, points, cover_image_url, verified, verified_type, created_at"
+      "id, username, full_name, university, field_of_study, graduation_year, is_alumni, bio, avatar_url, points, cover_image_url, verified, verified_type, created_at"
     )
     .eq("username", username)
     .single<ProfileRecord>();
@@ -402,6 +405,11 @@ export default async function UserProfilePage({ params }: PageProps) {
       })()
     : [];
 
+  const messagingEligibility =
+    user && user.id !== profile.id
+      ? await getMessageEligibility(supabase, user.id, profile.id)
+      : null;
+
   const displayName = getDisplayName(profile);
   const firstName = getFirstName(profile);
 
@@ -416,6 +424,7 @@ export default async function UserProfilePage({ params }: PageProps) {
         canContact={opportunityVisible && !isOwnProfile}
         talentProfileId={talentProfile?.id ?? null}
         writingSince={formatMonthYear(profile.created_at)}
+        messagingEligibility={messagingEligibility}
       />
 
       <OpportunityBanner

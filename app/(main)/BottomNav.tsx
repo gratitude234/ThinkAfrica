@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 
 interface BottomNavProps {
   username: string | null;
+  userId: string | null;
 }
 
 function navLinkClass(isCurrent: boolean) {
@@ -13,7 +15,7 @@ function navLinkClass(isCurrent: boolean) {
   }`;
 }
 
-export default function BottomNav({ username }: BottomNavProps) {
+export default function BottomNav({ username, userId }: BottomNavProps) {
   const pathname = usePathname();
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -104,31 +106,59 @@ export default function BottomNav({ username }: BottomNavProps) {
           <span className="pb-2 text-[10px] font-medium">Write</span>
         </Link>
 
-        <Link
-          href="/opportunities"
-          className={navLinkClass(isActive("/opportunities"))}
-          aria-current={isActive("/opportunities") ? "page" : undefined}
-        >
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
+        {username ? (
+          <Link
+            href="/messages"
+            className={navLinkClass(isActive("/messages"))}
+            aria-current={isActive("/messages") ? "page" : undefined}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9 8V6a3 3 0 016 0v2"
-            />
-          </svg>
-          <span className="text-[10px] font-medium">Opportunities</span>
-        </Link>
+            <div className="relative">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M8 10h.01M12 10h.01M16 10h.01M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"
+                />
+              </svg>
+              {userId ? (
+                <MessagesUnreadBadge userId={userId} className="-right-2 -top-1" />
+              ) : null}
+            </div>
+            <span className="text-[10px] font-medium">Messages</span>
+          </Link>
+        ) : (
+          <Link
+            href="/opportunities"
+            className={navLinkClass(isActive("/opportunities"))}
+            aria-current={isActive("/opportunities") ? "page" : undefined}
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 8V6a3 3 0 016 0v2"
+              />
+            </svg>
+            <span className="text-[10px] font-medium">Opportunities</span>
+          </Link>
+        )}
 
         <Link
           href={profileHref}

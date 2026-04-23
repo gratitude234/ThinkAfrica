@@ -22,7 +22,7 @@ interface LeaderboardProfile {
 
 export default async function LeaderboardPage({ searchParams }: PageProps) {
   const { tab: tabParam } = await searchParams;
-  const tab = tabParam === "alltime" ? "alltime" : "weekly";
+  const tab = tabParam === "alumni" ? "alumni" : "weekly";
   const supabase = await createClient();
 
   const {
@@ -71,6 +71,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
     const { data } = await supabase
       .from("profiles")
       .select("id, username, full_name, university, avatar_url, points")
+      .eq("is_alumni", true)
       .order("points", { ascending: false })
       .limit(20);
 
@@ -100,17 +101,19 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
     rank: number;
   } | null = null;
 
-  if (user && !isUserInTop20 && tab !== "weekly") {
+  if (user && !isUserInTop20 && tab === "alumni") {
     const { data: currentUserProfile } = await supabase
       .from("profiles")
       .select("id, username, full_name, university, avatar_url, points")
       .eq("id", user.id)
+      .eq("is_alumni", true)
       .single();
 
     if (currentUserProfile) {
       const { count } = await supabase
         .from("profiles")
         .select("*", { count: "exact", head: true })
+        .eq("is_alumni", true)
         .gt("points", currentUserProfile.points);
 
       currentUserRow = {
@@ -122,7 +125,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
 
   const tabs = [
     { label: "This Week", value: "weekly" },
-    // Keep all-time reachable by URL for now, but hide it from the UI until volume justifies it.
+    { label: "Alumni", value: "alumni" },
   ];
 
   const RANK_COLORS = ["text-yellow-500", "text-gray-400", "text-amber-600"];
@@ -146,7 +149,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
               href={`/leaderboard?tab=${item.value}`}
               className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
                 active
-                  ? item.value === "weekly"
+                  ? item.value === "alumni"
                     ? "bg-amber-500 text-white shadow-sm"
                     : "bg-white text-gray-900 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
@@ -159,13 +162,15 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
       </div>
 
       <p className="mb-4 text-xs text-gray-400">
-        Weekly ranking is the primary view for now.
+        {tab === "alumni"
+          ? "Points earned across the ThinkAfrica alumni network."
+          : "Weekly ranking is the primary view for now."}
       </p>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         {profiles.length === 0 ? (
           <div className="py-12 text-center text-sm text-gray-400">
-            {tab === "weekly" ? "No activity this week yet." : "No contributors yet."}
+            {tab === "weekly" ? "No activity this week yet." : "No alumni contributors yet."}
           </div>
         ) : (
           <div className="divide-y divide-gray-100 p-2">

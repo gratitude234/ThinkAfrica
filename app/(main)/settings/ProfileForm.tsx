@@ -37,6 +37,7 @@ interface Profile {
   bio: string | null;
   university: string | null;
   field_of_study: string | null;
+  graduation_year: number | null;
   avatar_url: string | null;
   interests: string[] | null;
   cover_image_url: string | null;
@@ -51,6 +52,9 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const [bio, setBio] = useState(profile.bio ?? "");
   const [university, setUniversity] = useState(profile.university ?? "");
   const [fieldOfStudy, setFieldOfStudy] = useState(profile.field_of_study ?? "");
+  const [graduationYear, setGraduationYear] = useState<string>(
+    profile.graduation_year ? String(profile.graduation_year) : ""
+  );
   const [interests, setInterests] = useState<string[]>(profile.interests ?? []);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
   const [coverImageUrl, setCoverImageUrl] = useState(profile.cover_image_url);
@@ -139,6 +143,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         bio,
         university,
         field_of_study: fieldOfStudy,
+        graduation_year: graduationYear ? parseInt(graduationYear, 10) : null,
         interests,
         avatar_url: avatarUrl,
         cover_image_url: coverImageUrl,
@@ -240,6 +245,24 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             placeholder="e.g. Computer Science, Law, Economics"
             className={INPUT_STYLES}
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Graduation year
+          </label>
+          <input
+            type="number"
+            min={2000}
+            max={2040}
+            placeholder="e.g. 2026"
+            value={graduationYear}
+            onChange={(e) => setGraduationYear(e.target.value)}
+            className={INPUT_STYLES}
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            We&apos;ll keep your profile active after you graduate.
+          </p>
         </div>
 
         <div>

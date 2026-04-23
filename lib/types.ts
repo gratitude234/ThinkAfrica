@@ -26,6 +26,8 @@ export interface ProfileSummary {
   username: string;
   full_name: string | null;
   university: string | null;
+  graduation_year?: number | null;
+  is_alumni?: boolean;
   avatar_url?: string | null;
   verified?: boolean;
   verified_type?: VerificationType | null;
@@ -131,6 +133,7 @@ export interface ExtendedPostRecord {
   citation_id: string | null;
   revision_due_at: string | null;
   published_version_id?: string | null;
+  in_response_to?: string | null;
 }
 
 export interface PostContributorSummary extends ProfileSummary {
@@ -143,4 +146,18 @@ export interface EditorialRoundSummary {
   version: PostVersionRecord | null;
   decision: PostEditorDecisionRecord | null;
   reviews: PostReviewRecord[];
+}
+
+export interface ResponsePostSummary {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  published_at: string | null;
+  author: {
+    username: string;
+    full_name: string | null;
+    avatar_url: string | null;
+    verified?: boolean;
+  };
 }

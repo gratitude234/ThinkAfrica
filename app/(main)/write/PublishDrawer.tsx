@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/client";
@@ -39,11 +39,13 @@ interface PublishDrawerProps {
   initialExcerpt?: string;
   initialPostType?: PostType;
   initialReferences?: PostReferenceRecord[];
+  inResponseTo?: string | null;
   onMetadataChange?: (changes: {
     postType?: PostType;
     tags?: string[];
     coverImageUrl?: string;
     excerpt?: string;
+    references?: PostReferenceRecord[];
   }) => void;
 }
 
@@ -141,6 +143,7 @@ export default function PublishDrawer({
   initialExcerpt = "",
   initialPostType,
   initialReferences = [],
+  inResponseTo,
   onMetadataChange,
 }: PublishDrawerProps) {
   const router = useRouter();
@@ -160,9 +163,15 @@ export default function PublishDrawer({
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showRefine, setShowRefine] = useState(false);
   const [coAuthors, setCoAuthors] = useState<CoAuthorProfile[]>([]);
-  const [correspondingAuthorId, setCorrespondingAuthorId] = useState<string>(userId);
+  const [correspondingAuthorId, setCorrespondingAuthorId] = useState<string | null>(null);
   const [coAuthorQuery, setCoAuthorQuery] = useState("");
   const [searchResults, setSearchResults] = useState<CoAuthorProfile[]>([]);
+  const [refs, setRefs] = useState<PostReferenceRecord[]>(initialReferences);
+  const [showReferences, setShowReferences] = useState(false);
+  const [newReferenceTitle, setNewReferenceTitle] = useState("");
+  const [newReferenceAuthors, setNewReferenceAuthors] = useState("");
+  const [newReferenceSource, setNewReferenceSource] = useState("");
+  const wasOpenRef = useRef(false);
 
   const inferredType = useMemo(
     () => inferTypeFromContent(content, wordCount),
@@ -170,20 +179,27 @@ export default function PublishDrawer({
   );
 
   useEffect(() => {
-    if (!open) return;
+    if (open && !wasOpenRef.current) {
+      setPostType(initialPostType ?? inferTypeFromContent(content, wordCount));
+      setTags(initialTags);
+      setCoverImageUrl(initialCoverImageUrl);
+      setExcerpt(initialExcerpt || generateExcerpt(content, 220));
+      setCustomSlug("");
+      setError(null);
+      setShowTypePicker(false);
+      setShowRefine(false);
+      setCoAuthors([]);
+      setCorrespondingAuthorId(null);
+      setCoAuthorQuery("");
+      setSearchResults([]);
+      setRefs(initialReferences);
+      setShowReferences(false);
+      setNewReferenceTitle("");
+      setNewReferenceAuthors("");
+      setNewReferenceSource("");
+    }
 
-    setPostType(initialPostType ?? inferTypeFromContent(content, wordCount));
-    setTags(initialTags);
-    setCoverImageUrl(initialCoverImageUrl);
-    setExcerpt(initialExcerpt || generateExcerpt(content, 220));
-    setCustomSlug("");
-    setError(null);
-    setShowTypePicker(false);
-    setShowRefine(false);
-    setCoAuthors([]);
-    setCorrespondingAuthorId(userId);
-    setCoAuthorQuery("");
-    setSearchResults([]);
+    wasOpenRef.current = open;
   }, [
     open,
     initialPostType,
@@ -192,7 +208,7 @@ export default function PublishDrawer({
     initialTags,
     initialCoverImageUrl,
     initialExcerpt,
-    userId,
+    initialReferences,
   ]);
 
   useEffect(() => {
@@ -299,6 +315,15 @@ export default function PublishDrawer({
     onMetadataChange?.({ tags: nextTags });
   };
 
+  const updateReferences = (nextRefs: PostReferenceRecord[]) => {
+    const normalizedRefs = nextRefs.map((reference, index) => ({
+      ...reference,
+      display_order: index,
+    }));
+    setRefs(normalizedRefs);
+    onMetadataChange?.({ references: normalizedRefs });
+  };
+
   const addSuggestedTag = (tag: string) => {
     const normalized = normalizeTagValue(tag);
     if (tags.includes(normalized) || tags.length >= 5) return;
@@ -318,7 +343,7 @@ export default function PublishDrawer({
 
     if (
       (postType === "research" || postType === "policy_brief") &&
-      initialReferences.filter((reference) => reference.title?.trim()).length === 0
+      refs.filter((reference) => reference.title?.trim()).length === 0
     ) {
       setError("Research and policy briefs need at least one structured reference.");
       return;
@@ -339,13 +364,15 @@ export default function PublishDrawer({
       tags: normalizedTags,
       postType,
       coverImageUrl,
+      inResponseTo,
       customSlug: normalizedSlug,
       coAuthors: coAuthors.map((coAuthor, index) => ({
         user_id: coAuthor.id,
         display_order: index + 1,
-        corresponding_author: correspondingAuthorId === coAuthor.id,
+        corresponding_author: false,
       })),
-      references: initialReferences,
+      correspondingAuthorId,
+      references: refs,
     });
 
     if (publishError || !publishedPostSlug) {
@@ -411,18 +438,15 @@ export default function PublishDrawer({
               <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
                 <div>
                   <p className="font-medium text-gray-900">{authorName}</p>
-                  <p className="text-xs text-gray-500">Lead author</p>
+                  <p className="text-xs text-gray-500">
+                    {correspondingAuthorId
+                      ? "Lead author"
+                      : "Lead author · Default corresponding author"}
+                  </p>
                 </div>
-                <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
-                  <input
-                    type="radio"
-                    name="corresponding-author"
-                    checked={correspondingAuthorId === userId}
-                    onChange={() => setCorrespondingAuthorId(userId)}
-                    className="h-4 w-4 border-gray-300 text-emerald-brand focus:ring-emerald-brand"
-                  />
-                  Corresponding
-                </label>
+                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                  {correspondingAuthorId ? "Primary contact fallback" : "Corresponding"}
+                </span>
               </div>
             </div>
 
@@ -467,11 +491,14 @@ export default function PublishDrawer({
                     @{coAuthor.username}
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
                         setCoAuthors((current) =>
                           current.filter((item) => item.id !== coAuthor.id)
-                        )
-                      }
+                        );
+                        if (correspondingAuthorId === coAuthor.id) {
+                          setCorrespondingAuthorId(null);
+                        }
+                      }}
                       className="text-emerald-600 hover:text-emerald-800"
                     >
                       ×
@@ -498,6 +525,26 @@ export default function PublishDrawer({
                       <p className="text-xs text-gray-500">@{coAuthor.username}</p>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCorrespondingAuthorId((current) =>
+                            current === coAuthor.id ? null : coAuthor.id
+                          )
+                        }
+                        className={`rounded border px-2 py-1 text-xs transition-colors ${
+                          correspondingAuthorId === coAuthor.id
+                            ? "border-amber-200 bg-amber-50 text-amber-600"
+                            : "border-gray-200 bg-white text-gray-400 hover:text-gray-600"
+                        }`}
+                        aria-label={
+                          correspondingAuthorId === coAuthor.id
+                            ? `Unset ${coAuthor.username} as corresponding author`
+                            : `Set ${coAuthor.username} as corresponding author`
+                        }
+                      >
+                        {correspondingAuthorId === coAuthor.id ? "★" : "☆"}
+                      </button>
                       <button
                         type="button"
                         disabled={index === 0}
@@ -528,22 +575,124 @@ export default function PublishDrawer({
                       >
                         ↓
                       </button>
-                      <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
-                        <input
-                          type="radio"
-                          name="corresponding-author"
-                          checked={correspondingAuthorId === coAuthor.id}
-                          onChange={() => setCorrespondingAuthorId(coAuthor.id)}
-                          className="h-4 w-4 border-gray-300 text-emerald-brand focus:ring-emerald-brand"
-                        />
-                        Corresponding
-                      </label>
                     </div>
                   </div>
                 ))}
               </div>
             ) : null}
           </section>
+
+          {postType === "research" || postType === "policy_brief" ? (
+            <section className="rounded-xl border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowReferences((current) => !current)}
+                className="flex w-full items-center justify-between px-4 py-3 text-left"
+              >
+                <div>
+                  <p className="text-sm font-medium text-gray-900">References</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Add or remove enough references to complete editorial submission.
+                  </p>
+                </div>
+                <span className="text-sm font-medium text-emerald-brand">
+                  {showReferences ? "Hide" : "Open"}
+                </span>
+              </button>
+
+              {showReferences ? (
+                <div className="space-y-4 border-t border-gray-100 px-4 py-4">
+                  {refs.length > 0 ? (
+                    <div className="space-y-2">
+                      {refs.map((reference) => (
+                        <div
+                          key={reference.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-canvas px-3 py-2"
+                        >
+                          <p className="truncate text-sm text-gray-700">
+                            {reference.title || "Untitled reference"}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateReferences(
+                                refs.filter((item) => item.id !== reference.id)
+                              )
+                            }
+                            className="text-sm text-gray-400 transition-colors hover:text-gray-700"
+                            aria-label={`Remove ${reference.title || "reference"}`}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">No references added yet.</p>
+                  )}
+
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                    <input
+                      type="text"
+                      value={newReferenceTitle}
+                      onChange={(event) => setNewReferenceTitle(event.target.value)}
+                      placeholder="Title"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                    />
+                    <input
+                      type="text"
+                      value={newReferenceAuthors}
+                      onChange={(event) => setNewReferenceAuthors(event.target.value)}
+                      placeholder="Authors"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                    />
+                    <input
+                      type="text"
+                      value={newReferenceSource}
+                      onChange={(event) => setNewReferenceSource(event.target.value)}
+                      placeholder="Source / URL"
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmedTitle = newReferenceTitle.trim();
+                        if (!trimmedTitle) {
+                          return;
+                        }
+
+                        const sourceValue = newReferenceSource.trim();
+                        const isUrl = /^https?:\/\//i.test(sourceValue);
+                        updateReferences([
+                          ...refs,
+                          {
+                            id: `temp-${Date.now().toString(36)}`,
+                            post_id: draftId ?? "",
+                            display_order: refs.length,
+                            ref_type: "other",
+                            authors: newReferenceAuthors.trim() || null,
+                            title: trimmedTitle,
+                            year: null,
+                            source: isUrl ? null : sourceValue || null,
+                            url: isUrl ? sourceValue : null,
+                            doi: null,
+                            raw: null,
+                          },
+                        ]);
+                        setNewReferenceTitle("");
+                        setNewReferenceAuthors("");
+                        setNewReferenceSource("");
+                      }}
+                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                      aria-label="Add reference"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           <section className="space-y-3">
             <div className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-canvas px-4 py-3">

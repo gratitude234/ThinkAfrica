@@ -25,6 +25,27 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+interface ResponsePostRow {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  published_at: string | null;
+  profiles:
+    | {
+        username: string;
+        full_name: string | null;
+        avatar_url: string | null;
+        verified?: boolean;
+      }
+    | {
+        username: string;
+        full_name: string | null;
+        avatar_url: string | null;
+        verified?: boolean;
+      }[];
+}
+
 function estimateReadTime(content: string): number {
   const text = content.replace(/<[^>]*>/g, " ");
   const words = text.trim().split(/\s+/).filter(Boolean).length;
@@ -189,6 +210,7 @@ export default async function PostPage({ params }: PageProps) {
     { count: likeCount },
     { data: referencesRaw },
     { data: coAuthorsRaw },
+    { data: responsePostsRaw },
   ] = await Promise.all([
     supabase
       .from("likes")
@@ -207,6 +229,15 @@ export default async function PostPage({ params }: PageProps) {
       .eq("post_id", post.id)
       .not("accepted_at", "is", null)
       .order("display_order", { ascending: true }),
+    supabase
+      .from("posts")
+      .select(
+        "id, title, slug, excerpt, published_at, profiles!posts_author_id_fkey(username, full_name, avatar_url, verified)"
+      )
+      .eq("in_response_to", post.id)
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(10),
   ]);
 
   let userLiked = false;
@@ -275,6 +306,14 @@ export default async function PostPage({ params }: PageProps) {
     ...item,
     profile: Array.isArray(item.profile) ? item.profile[0] : item.profile,
   }));
+  const responsePosts = ((responsePostsRaw ?? []) as ResponsePostRow[]).map(
+    (response) => ({
+      ...response,
+      profiles: Array.isArray(response.profiles)
+        ? response.profiles[0]
+        : response.profiles,
+    })
+  );
   const primaryAuthorRecord = acceptedAuthors.find((record) => record.user_id === author?.id) ?? null;
   const coAuthors = acceptedAuthors.filter((record) => record.user_id !== author?.id);
   const citationAuthors = (
@@ -486,6 +525,23 @@ export default async function PostPage({ params }: PageProps) {
                     </span>
                   </div>
 
+                  {user ? (
+                    <div className="mt-8 rounded-xl border border-gray-100 bg-canvas px-6 py-5">
+                      <p className="text-sm font-medium text-gray-700">
+                        Have a substantive pushback? Write a response post.
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        More than a comment warrants - your argument, your byline, your post.
+                      </p>
+                      <Link
+                        href={`/write?response_to=${post.slug}`}
+                        className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+                      >
+                        ↩ Write a response
+                      </Link>
+                    </div>
+                  ) : null}
+
                   <hr className="mb-8 border-gray-200" />
                 </>
               ) : null}
@@ -575,6 +631,64 @@ export default async function PostPage({ params }: PageProps) {
                   userProfileId={userProfileId}
                 />
               </Suspense>
+
+              {responsePosts.length > 0 ? (
+                <section className="mt-10">
+                  <h2 className="mb-4 text-lg font-semibold text-gray-900">
+                    Responses ({responsePosts.length})
+                  </h2>
+                  <div className="space-y-4">
+                    {responsePosts.map((response) => {
+                      const responseAuthor = response.profiles;
+
+                      return (
+                        <Link
+                          key={response.id}
+                          href={`/post/${response.slug}`}
+                          className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
+                        >
+                          <div className="w-1 flex-shrink-0 self-stretch rounded-full bg-emerald-400" />
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex items-center gap-2">
+                              {responseAuthor?.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={responseAuthor.avatar_url}
+                                  alt={responseAuthor.full_name ?? responseAuthor.username}
+                                  className="h-5 w-5 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
+                                  {(responseAuthor?.full_name ?? responseAuthor?.username ?? "?")
+                                    .charAt(0)
+                                    .toUpperCase()}
+                                </div>
+                              )}
+                              <span className="text-xs text-gray-500">
+                                <span className="font-medium text-gray-700">
+                                  {responseAuthor?.full_name ?? responseAuthor?.username ?? "Unknown"}
+                                </span>
+                                {" · "}
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 italic">
+                                  Response
+                                </span>
+                              </span>
+                            </div>
+                            <p className="text-sm font-semibold leading-snug text-gray-900">
+                              {response.title}
+                            </p>
+                            {response.excerpt ? (
+                              <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                                {response.excerpt}
+                              </p>
+                            ) : null}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
             </div>
           </div>
 

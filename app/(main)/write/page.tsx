@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
@@ -31,6 +31,7 @@ interface DraftPayload {
   tags: string[];
   postType: PostType;
   coverImageUrl: string;
+  inResponseToId: string | null;
 }
 
 function countWords(value: string) {
@@ -43,6 +44,8 @@ function countWords(value: string) {
 
 export default function WritePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const responseToSlug = searchParams.get("response_to");
   const {
     draftId,
     saveStatus,
@@ -69,6 +72,9 @@ export default function WritePage() {
   const [tags, setTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [inResponseToId, setInResponseToId] = useState<string | null>(null);
+  const [inResponseToTitle, setInResponseToTitle] = useState<string | null>(null);
+  const [inResponseToAuthor, setInResponseToAuthor] = useState<string | null>(null);
   const [references, setReferences] = useState<PostReferenceRecord[]>([]);
   const [wordCount, setWordCount] = useState(0);
   const [isPublishDrawerOpen, setIsPublishDrawerOpen] = useState(false);
@@ -105,9 +111,65 @@ export default function WritePage() {
       setTags(initialData.tags);
       setContent(initialData.content);
       setCoverImageUrl(initialData.coverImageUrl);
+      setInResponseToId(initialData.inResponseToId);
       setWordCount(countWords(initialData.content));
     }
   }, [initialData]);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function loadParentPost() {
+      if (responseToSlug) {
+        const { data: parentPost } = await supabase
+          .from("posts")
+          .select("id, title, profiles!posts_author_id_fkey(username)")
+          .eq("slug", responseToSlug)
+          .eq("status", "published")
+          .single();
+
+        if (parentPost) {
+          const authorProfile = Array.isArray(parentPost.profiles)
+            ? parentPost.profiles[0]
+            : (parentPost.profiles as { username: string } | null);
+          setInResponseToId(parentPost.id);
+          setInResponseToTitle(parentPost.title);
+          setInResponseToAuthor(authorProfile?.username ?? null);
+          return;
+        }
+
+        setInResponseToId(null);
+        setInResponseToTitle(null);
+        setInResponseToAuthor(null);
+        return;
+      }
+
+      if (inResponseToId) {
+        const { data: parentPost } = await supabase
+          .from("posts")
+          .select("id, title, profiles!posts_author_id_fkey(username)")
+          .eq("id", inResponseToId)
+          .single();
+
+        if (parentPost) {
+          const authorProfile = Array.isArray(parentPost.profiles)
+            ? parentPost.profiles[0]
+            : (parentPost.profiles as { username: string } | null);
+          setInResponseToId(parentPost.id);
+          setInResponseToTitle(parentPost.title);
+          setInResponseToAuthor(authorProfile?.username ?? null);
+          return;
+        }
+
+        setInResponseToId(null);
+      }
+
+      setInResponseToTitle(null);
+      setInResponseToAuthor(null);
+    }
+
+    void loadParentPost();
+  }, [inResponseToId, responseToSlug]);
 
   useEffect(() => {
     setPublishDraftId(draftId);
@@ -139,8 +201,9 @@ export default function WritePage() {
       tags: overrides.tags ?? tags,
       postType: overrides.postType ?? postType,
       coverImageUrl: overrides.coverImageUrl ?? coverImageUrl,
+      inResponseToId: overrides.inResponseToId ?? inResponseToId,
     }),
-    [title, subtitle, excerpt, content, tags, postType, coverImageUrl]
+    [title, subtitle, excerpt, content, tags, postType, coverImageUrl, inResponseToId]
   );
 
   const handleEditorUpdate = useCallback((html: string, words: number) => {
@@ -154,6 +217,8 @@ export default function WritePage() {
       tags?: string[];
       coverImageUrl?: string;
       excerpt?: string;
+      references?: PostReferenceRecord[];
+      inResponseToId?: string | null;
     }) => {
       if (changes.postType) setPostType(changes.postType);
       if (changes.tags) setTags(changes.tags);
@@ -163,6 +228,12 @@ export default function WritePage() {
       if (typeof changes.excerpt === "string") {
         setExcerpt(changes.excerpt);
       }
+      if (changes.references) {
+        setReferences(changes.references);
+      }
+      if ("inResponseToId" in changes) {
+        setInResponseToId(changes.inResponseToId ?? null);
+      }
 
       void saveDraft(
         getCurrentData({
@@ -170,6 +241,7 @@ export default function WritePage() {
           tags: changes.tags,
           coverImageUrl: changes.coverImageUrl,
           excerpt: changes.excerpt,
+          inResponseToId: changes.inResponseToId,
         })
       );
     },
@@ -211,6 +283,7 @@ export default function WritePage() {
         tags,
         postType,
         coverImageUrl,
+        inResponseTo: inResponseToId,
       });
 
       if (ensuredDraftId) {
@@ -286,6 +359,39 @@ export default function WritePage() {
 
       <div className="space-y-4">
         <div>
+          {inResponseToId && inResponseToTitle ? (
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <span className="mt-0.5 text-lg">↩</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Writing a response to
+                </p>
+                <p className="mt-0.5 truncate text-sm font-medium text-gray-900">
+                  {inResponseToTitle}
+                  {inResponseToAuthor ? (
+                    <span className="ml-1 font-normal text-gray-500">
+                      by @{inResponseToAuthor}
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setInResponseToId(null);
+                  setInResponseToTitle(null);
+                  setInResponseToAuthor(null);
+                  void saveDraft(getCurrentData({ inResponseToId: null }));
+                  router.replace(draftId ? `/write?draft=${draftId}` : "/write");
+                }}
+                className="text-xs text-gray-400 hover:text-gray-600"
+                aria-label="Remove response link"
+              >
+                ✕
+              </button>
+            </div>
+          ) : null}
+
           <input
             type="text"
             value={title}
@@ -347,6 +453,7 @@ export default function WritePage() {
             initialExcerpt={excerpt}
             initialPostType={postType}
             initialReferences={references}
+            inResponseTo={inResponseToId}
             onMetadataChange={handleMetadataChange}
           />
           <ProfileGate

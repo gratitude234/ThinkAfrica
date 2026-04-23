@@ -38,6 +38,7 @@ const TYPE_ICONS: Record<string, string> = {
   co_author_invite: "🤝",
   co_author_accepted: "✅",
   co_author_declined: "↩️",
+  response_post: "↩",
 };
 
 function buildMessage(notification: NotificationData): string {
@@ -45,7 +46,8 @@ function buildMessage(notification: NotificationData): string {
     return notification.message;
   }
 
-  const actorName = notification.actor?.full_name ?? notification.actor?.username ?? "Someone";
+  const actorName =
+    notification.actor?.full_name ?? notification.actor?.username ?? "Someone";
   const postTitle = notification.post_title ?? "your post";
 
   switch (notification.type) {
@@ -74,6 +76,8 @@ function buildMessage(notification: NotificationData): string {
       return `${actorName} accepted your co-author invitation on: ${postTitle}`;
     case "co_author_declined":
       return `${actorName} declined your co-author invitation on: ${postTitle}`;
+    case "response_post":
+      return `${actorName} wrote a response to "${postTitle}"`;
     default:
       return "New notification";
   }
@@ -93,6 +97,7 @@ function buildLink(notification: NotificationData): string | null {
     case "co_author_invite":
     case "co_author_accepted":
     case "co_author_declined":
+    case "response_post":
       return notification.post_slug ? `/post/${notification.post_slug}` : null;
     case "follow":
       return notification.actor_username ? `/${notification.actor_username}` : null;
@@ -104,7 +109,11 @@ function buildLink(notification: NotificationData): string | null {
   }
 }
 
-export default function NotificationItem({ notification }: { notification: NotificationData }) {
+export default function NotificationItem({
+  notification,
+}: {
+  notification: NotificationData;
+}) {
   const message = buildMessage(notification);
   const link = buildLink(notification);
   const icon = TYPE_ICONS[notification.type] ?? "🔔";

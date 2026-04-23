@@ -266,6 +266,7 @@ export async function ensureDraft(input: {
   tags: string[];
   postType: PostType;
   coverImageUrl: string;
+  inResponseTo?: string | null;
 }) {
   const { supabase, user } = await getCurrentUser();
 
@@ -290,6 +291,7 @@ export async function ensureDraft(input: {
         tags: normalizedTags,
         type: input.postType,
         cover_image_url: input.coverImageUrl || null,
+        in_response_to: input.inResponseTo ?? null,
       })
       .eq("id", input.draftId)
       .eq("author_id", user.id);
@@ -309,6 +311,7 @@ export async function ensureDraft(input: {
       type: input.postType,
       status: "draft",
       cover_image_url: input.coverImageUrl || null,
+      in_response_to: input.inResponseTo ?? null,
     })
     .select("id")
     .single();
@@ -355,8 +358,10 @@ export async function publishPost(input: {
   tags: string[];
   postType: PostType;
   coverImageUrl: string;
+  inResponseTo?: string | null;
   customSlug?: string;
   coAuthors?: CoAuthorInput[];
+  correspondingAuthorId?: string | null;
   references?: ReferenceInput[];
 }) {
   const { supabase, user } = await getCurrentUser();
@@ -391,6 +396,7 @@ export async function publishPost(input: {
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
 
   let postId = input.draftId;
+  let responseParentPath: string | null = null;
 
   if (postId) {
     const { error } = await supabase
@@ -402,6 +408,7 @@ export async function publishPost(input: {
         tags: normalizedTags,
         type: input.postType,
         cover_image_url: input.coverImageUrl || null,
+        in_response_to: input.inResponseTo ?? null,
         status: submitStatus,
         published_at: publishedAt,
         slug,
@@ -426,6 +433,7 @@ export async function publishPost(input: {
         excerpt: input.excerpt,
         type: input.postType,
         tags: normalizedTags,
+        in_response_to: input.inResponseTo ?? null,
         status: submitStatus,
         published_at: publishedAt,
         current_round: 1,
@@ -445,6 +453,30 @@ export async function publishPost(input: {
     return { error: "Unable to resolve the draft.", slug: null as string | null };
   }
 
+  if (input.inResponseTo) {
+    const { data: parentPost } = await supabase
+      .from("posts")
+      .select("author_id, slug")
+      .eq("id", input.inResponseTo)
+      .maybeSingle();
+
+    if (parentPost) {
+      responseParentPath = `/post/${parentPost.slug}`;
+
+      if (parentPost.author_id !== user.id) {
+        await supabase.from("notifications").insert({
+          user_id: parentPost.author_id,
+          type: "response_post",
+          message: `${ownerProfile?.full_name ?? "A ThinkAfrika author"} wrote a response to your post.`,
+          link: `/post/${slug}`,
+          actor_id: user.id,
+          post_id: postId,
+          read: false,
+        });
+      }
+    }
+  }
+
   try {
     await syncReferences(supabase, postId, input.references ?? []);
     await syncAuthors(
@@ -455,6 +487,28 @@ export async function publishPost(input: {
       input.coAuthors ?? [],
       ownerProfile?.full_name ?? "A ThinkAfrika author"
     );
+
+    if (input.correspondingAuthorId) {
+      const { error: clearCorrespondingError } = await supabase
+        .from("post_authors")
+        .update({ corresponding_author: false })
+        .eq("post_id", postId)
+        .neq("user_id", input.correspondingAuthorId);
+
+      if (clearCorrespondingError) {
+        throw new Error(clearCorrespondingError.message);
+      }
+
+      const { error: setCorrespondingError } = await supabase
+        .from("post_authors")
+        .update({ corresponding_author: true })
+        .eq("post_id", postId)
+        .eq("user_id", input.correspondingAuthorId);
+
+      if (setCorrespondingError) {
+        throw new Error(setCorrespondingError.message);
+      }
+    }
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to save editorial metadata.",
@@ -492,6 +546,9 @@ export async function publishPost(input: {
 
   revalidatePath("/dashboard");
   revalidatePath(`/post/${slug}`);
+  if (responseParentPath) {
+    revalidatePath(responseParentPath);
+  }
   revalidatePath("/");
   revalidatePath("/admin/review");
 

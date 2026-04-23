@@ -7,6 +7,8 @@ import FollowButton from "@/app/(main)/[username]/FollowButton";
 import ContactInquiryModal from "@/components/profile/ContactInquiryModal";
 import ShareButton from "@/components/profile/ShareButton";
 import UserAvatar from "@/components/ui/UserAvatar";
+import { createClient } from "@/lib/supabase/client";
+import { findOrCreateConversation } from "@/lib/messaging";
 
 const VERIFIED_COLORS: Record<string, string> = {
   student: "text-emerald-600",
@@ -22,6 +24,8 @@ interface ProfileHeaderProps {
     full_name: string | null;
     university: string | null;
     field_of_study: string | null;
+    graduation_year?: number | null;
+    is_alumni?: boolean;
     bio: string | null;
     avatar_url: string | null;
     cover_image_url?: string | null;
@@ -36,6 +40,7 @@ interface ProfileHeaderProps {
   canContact: boolean;
   talentProfileId: string | null;
   writingSince: string;
+  messagingEligibility?: { eligible: boolean; reason: string | null } | null;
 }
 
 export default function ProfileHeader({
@@ -47,6 +52,7 @@ export default function ProfileHeader({
   canContact,
   talentProfileId,
   writingSince,
+  messagingEligibility,
 }: ProfileHeaderProps) {
   const router = useRouter();
   const [showInquiry, setShowInquiry] = useState(false);
@@ -54,7 +60,9 @@ export default function ProfileHeader({
   const affiliationBits = [
     profile.university,
     profile.field_of_study,
-    `Writing since ${writingSince}`,
+    profile.is_alumni && profile.graduation_year
+      ? `Graduated ${profile.graduation_year}`
+      : `Writing since ${writingSince}`,
   ].filter(Boolean);
 
   return (
@@ -97,6 +105,11 @@ export default function ProfileHeader({
                   ✓
                 </span>
               ) : null}
+              {profile.is_alumni && profile.graduation_year ? (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                  🎓 Alumni &apos;{String(profile.graduation_year).slice(-2)}
+                </span>
+              ) : null}
             </h1>
 
             <p className="mt-1 text-sm text-gray-500">@{profile.username}</p>
@@ -133,6 +146,19 @@ export default function ProfileHeader({
                   initialFollowing={initialFollowing}
                   className="mt-0"
                 />
+                {!isOwnProfile && currentUserId ? (
+                  messagingEligibility?.eligible ? (
+                    <MessageButton
+                      currentUserId={currentUserId}
+                      targetUserId={profile.id}
+                      reason={messagingEligibility.reason}
+                    />
+                  ) : (
+                    <div className="w-full rounded-lg border border-dashed border-gray-200 px-4 py-2 text-center text-xs text-gray-400">
+                      Message after following each other
+                    </div>
+                  )
+                ) : null}
                 <ShareButton className="w-full" />
                 {isOpenToOpportunities && canContact ? (
                   <button
@@ -163,5 +189,53 @@ export default function ProfileHeader({
         />
       ) : null}
     </>
+  );
+}
+
+function MessageButton({
+  currentUserId,
+  targetUserId,
+  reason,
+}: {
+  currentUserId: string;
+  targetUserId: string;
+  reason: string | null;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  const handleMessage = async () => {
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const conversationId = await findOrCreateConversation(
+        supabase,
+        currentUserId,
+        targetUserId
+      );
+
+      if (conversationId) {
+        router.push(`/messages/${conversationId}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      {reason ? (
+        <p className="mb-1 text-center text-[10px] text-gray-400">{reason}</p>
+      ) : null}
+      <button
+        type="button"
+        onClick={handleMessage}
+        disabled={loading}
+        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:text-gray-900 disabled:opacity-50"
+      >
+        {loading ? "Opening..." : "Message"}
+      </button>
+    </div>
   );
 }

@@ -45,6 +45,14 @@ interface Post {
 interface EditFormProps {
   post: Post;
   initialReferences: PostReferenceRecord[];
+  versions: Array<{
+    id: string;
+    version_number: number;
+    version_kind: string;
+    round: number;
+    author_note: string | null;
+    created_at: string;
+  }>;
   reviewHistory: Array<
     PostReviewRecord & {
       reviewer: { full_name: string | null; username: string } | null;
@@ -62,6 +70,7 @@ function formatRoundLabel(round: number) {
 export default function EditForm({
   post,
   initialReferences,
+  versions,
   reviewHistory,
   decisionHistory,
   versionHistory,
@@ -194,6 +203,16 @@ export default function EditForm({
     setContent(html);
   }, []);
 
+  const submissionDateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+    []
+  );
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -309,6 +328,58 @@ export default function EditForm({
           ))}
         </div>
       </section>
+
+      {versions.length > 0 ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Submission history</h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Snapshot timeline for your submitted versions.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {versions.map((version) => {
+              const dotClassName =
+                version.version_kind === "publication"
+                  ? "bg-emerald-500"
+                  : version.version_kind === "revision"
+                    ? "bg-amber-400"
+                    : "bg-sky-400";
+
+              return (
+                <div
+                  key={version.id}
+                  className="flex gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3"
+                >
+                  <span className={`mt-1 h-2.5 w-2.5 rounded-full ${dotClassName}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-900">
+                        v{version.version_number}
+                      </span>
+                      <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600">
+                        {version.version_kind}
+                      </span>
+                      <span className="text-xs font-medium text-gray-500">
+                        Round {version.round}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {submissionDateFormatter.format(new Date(version.created_at))}
+                      </span>
+                    </div>
+                    {version.author_note ? (
+                      <p className="mt-1 text-xs italic text-gray-500">{version.author_note}</p>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {post.status === "pending_revision" ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">

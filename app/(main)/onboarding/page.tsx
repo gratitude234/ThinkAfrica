@@ -32,6 +32,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
+  const [graduationYear, setGraduationYear] = useState("");
 
   useEffect(() => {
     const supabase = createClient();
@@ -46,7 +47,7 @@ export default function OnboardingPage() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("interests, onboarding_completed")
+        .select("interests, onboarding_completed, graduation_year")
         .eq("id", user.id)
         .single();
 
@@ -56,6 +57,9 @@ export default function OnboardingPage() {
       }
 
       setInterests((profile?.interests as string[] | null) ?? []);
+      setGraduationYear(
+        profile?.graduation_year ? String(profile.graduation_year) : ""
+      );
     });
   }, [router]);
 
@@ -74,12 +78,19 @@ export default function OnboardingPage() {
 
     setLoading(true);
     const supabase = createClient();
-    const payload: { interests?: string[]; onboarding_completed: boolean } = {
+    const payload: {
+      interests?: string[];
+      graduation_year?: number | null;
+      onboarding_completed: boolean;
+    } = {
       onboarding_completed: true,
     };
 
     if (!skip) {
       payload.interests = interests;
+      payload.graduation_year = graduationYear
+        ? parseInt(graduationYear, 10)
+        : null;
     }
 
     await supabase.from("profiles").update(payload).eq("id", userId);
@@ -112,6 +123,24 @@ export default function OnboardingPage() {
               {tag}
             </button>
           ))}
+        </div>
+
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            When do you graduate? <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <input
+            type="number"
+            min={2024}
+            max={2040}
+            placeholder="e.g. 2027"
+            value={graduationYear}
+            onChange={(e) => setGraduationYear(e.target.value)}
+            className="w-full max-w-xs rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            We&apos;ll keep your account active and transition you to Alumni after you finish.
+          </p>
         </div>
 
         <div className="mt-8 flex items-center justify-between">

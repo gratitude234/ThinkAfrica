@@ -51,7 +51,10 @@ export default function NavigationShell({
         canAccessReview={canAccessReview}
         onOpenSearch={() => setIsSearchOpen(true)}
       />
-      <BottomNav username={profile?.username ?? null} />
+      <BottomNav
+        username={profile?.username ?? null}
+        userId={user?.id ?? null}
+      />
       <SearchOverlay
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}

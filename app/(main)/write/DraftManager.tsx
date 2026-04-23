@@ -19,6 +19,7 @@ interface DraftData {
   tags: string[];
   postType: string;
   coverImageUrl: string;
+  inResponseToId: string | null;
 }
 
 interface UseDraftManagerReturn {
@@ -69,6 +70,7 @@ export function useDraftManager(): UseDraftManagerReturn {
             tags: parsedBackup.tags ?? [],
             postType: parsedBackup.postType ?? "blog",
             coverImageUrl: parsedBackup.coverImageUrl ?? "",
+            inResponseToId: parsedBackup.inResponseToId ?? null,
           };
 
           const hasContent =
@@ -91,7 +93,7 @@ export function useDraftManager(): UseDraftManagerReturn {
     const supabase = createClient();
     supabase
       .from("posts")
-      .select("id, title, excerpt, content, tags, type, cover_image_url")
+      .select("id, title, excerpt, content, tags, type, cover_image_url, in_response_to")
       .eq("id", draftIdParam)
       .eq("status", "draft")
       .single()
@@ -109,6 +111,8 @@ export function useDraftManager(): UseDraftManagerReturn {
             coverImageUrl:
               (data as { cover_image_url?: string | null }).cover_image_url ??
               "",
+            inResponseToId:
+              (data as { in_response_to?: string | null }).in_response_to ?? null,
           });
         }
         setLoadingDraft(false);
@@ -183,6 +187,7 @@ export function useDraftManager(): UseDraftManagerReturn {
               tags,
               type: data.postType,
               cover_image_url: data.coverImageUrl || null,
+              in_response_to: data.inResponseToId,
             })
             .eq("id", currentDraftId)
             .eq("author_id", user.id);
@@ -212,6 +217,7 @@ export function useDraftManager(): UseDraftManagerReturn {
               type: data.postType,
               status: "draft",
               cover_image_url: data.coverImageUrl || null,
+              in_response_to: data.inResponseToId,
             })
             .select("id")
             .single();
