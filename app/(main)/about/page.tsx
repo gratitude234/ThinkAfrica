@@ -5,7 +5,7 @@ export default function AboutPage() {
     <div className="max-w-3xl mx-auto">
       {/* Hero */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">About ThinkAfrica</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">About ThinkAfrika</h1>
         <p className="text-lg text-gray-500 leading-relaxed max-w-2xl mx-auto">
           The intellectual home for Africa&apos;s next generation of thinkers, researchers, and changemakers.
         </p>
@@ -15,7 +15,7 @@ export default function AboutPage() {
       <section className="mb-10">
         <h2 className="text-xl font-bold text-gray-900 mb-3">Our Mission</h2>
         <p className="text-gray-600 leading-relaxed">
-          ThinkAfrica exists to elevate student intellectual discourse across the African continent. We believe
+          ThinkAfrika exists to elevate student intellectual discourse across the African continent. We believe
           that Africa&apos;s brightest minds are in its universities — and their ideas deserve a platform as
           ambitious as the problems they aim to solve.
         </p>
@@ -64,7 +64,7 @@ export default function AboutPage() {
       <section className="mb-12">
         <h2 className="text-xl font-bold text-gray-900 mb-3">The Team</h2>
         <p className="text-gray-600 leading-relaxed mb-4">
-          ThinkAfrica was founded by a team of African students and professionals passionate about knowledge,
+          ThinkAfrika was founded by a team of African students and professionals passionate about knowledge,
           governance, and technology. Our editors and moderators are drawn from universities across East,
           West, and Southern Africa.
         </p>

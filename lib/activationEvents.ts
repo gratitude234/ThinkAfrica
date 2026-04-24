@@ -2,15 +2,21 @@ export type ActivationEventName =
   | "signup_completed"
   | "onboarding_started"
   | "onboarding_completed"
+  | "onboarding_step_completed"
   | "interest_selected"
   | "writer_followed"
+  | "post_opened"
+  | "search_performed"
   | "draft_started"
+  | "publish_drawer_opened"
   | "post_submitted"
   | "debate_joined";
 
 interface ActivationEventPayload {
   event: ActivationEventName;
   metadata?: Record<string, string | number | boolean | null>;
+  source?: string;
+  route?: string;
 }
 
 export function logActivationEvent(
@@ -27,7 +33,11 @@ export function logActivationEvent(
 export function trackActivationEvent(payload: ActivationEventPayload) {
   if (typeof window === "undefined") return;
 
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify({
+    source: "client",
+    route: `${window.location.pathname}${window.location.search}`,
+    ...payload,
+  });
 
   if (navigator.sendBeacon) {
     navigator.sendBeacon("/api/activation", new Blob([body], { type: "application/json" }));

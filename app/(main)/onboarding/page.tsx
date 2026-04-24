@@ -59,6 +59,13 @@ function getStepFromParam(value: string | null): Step {
   return STEP_ORDER.includes(value as Step) ? (value as Step) : "identity";
 }
 
+function trackStepCompleted(step: Step) {
+  trackActivationEvent({
+    event: "onboarding_step_completed",
+    metadata: { step },
+  });
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -226,6 +233,7 @@ export default function OnboardingPage() {
       return;
     }
 
+    trackStepCompleted("identity");
     goToStep("interests");
   };
 
@@ -259,6 +267,7 @@ export default function OnboardingPage() {
 
     await loadSuggestions(userId, university, fieldOfStudy);
     setLoading(false);
+    trackStepCompleted("interests");
     goToStep("follow");
   };
 
@@ -271,6 +280,7 @@ export default function OnboardingPage() {
       .from("profiles")
       .update({ onboarding_completed: true })
       .eq("id", userId);
+    trackStepCompleted("contribute");
     trackActivationEvent({ event: "onboarding_completed" });
     setLoading(false);
     router.push(destination);
@@ -466,7 +476,10 @@ export default function OnboardingPage() {
             </div>
             <button
               type="button"
-              onClick={() => goToStep("contribute")}
+              onClick={() => {
+                trackStepCompleted("follow");
+                goToStep("contribute");
+              }}
               className="text-sm text-gray-400 transition-colors hover:text-gray-600"
             >
               Skip for now
@@ -542,7 +555,10 @@ export default function OnboardingPage() {
             </button>
             <button
               type="button"
-              onClick={() => goToStep("contribute")}
+              onClick={() => {
+                trackStepCompleted("follow");
+                goToStep("contribute");
+              }}
               disabled={followedIds.size < 3}
               className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
             >
@@ -561,7 +577,7 @@ export default function OnboardingPage() {
             Choose how you want to enter the conversation
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            You can start small. A short blog draft is enough to begin building momentum.
+            Start with one low-friction action. You can read first, respond to someone, or draft a short quick take.
           </p>
 
           <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -571,34 +587,34 @@ export default function OnboardingPage() {
               className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-left transition-colors hover:bg-emerald-100"
             >
               <p className="text-sm font-semibold text-emerald-900">
-                Write a short blog
+                Write a quick take
               </p>
               <p className="mt-2 text-xs leading-relaxed text-emerald-800">
-                Use a beginner template for a 200-word argument or reflection.
+                Use a beginner template for a clear point, example, and next question.
               </p>
             </button>
             <button
               type="button"
-              onClick={() => completeOnboarding("/?tab=latest")}
+              onClick={() => completeOnboarding("/?tab=latest&welcome=1")}
+              className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-emerald-200"
+            >
+              <p className="text-sm font-semibold text-gray-900">
+                Read latest posts
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                See what students are publishing now and save what you want to revisit.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => completeOnboarding("/?tab=latest&type=essay&welcome=1")}
               className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-emerald-200"
             >
               <p className="text-sm font-semibold text-gray-900">
                 Respond to a post
               </p>
               <p className="mt-2 text-xs leading-relaxed text-gray-500">
-                Find a strong essay and publish a substantive response.
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => completeOnboarding("/debates")}
-              className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-emerald-200"
-            >
-              <p className="text-sm font-semibold text-gray-900">
-                Join a debate
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-gray-500">
-                Pick a side and add a concise argument to a live discussion.
+                Open an essay, then use Write a response when you have a substantive reply.
               </p>
             </button>
           </div>

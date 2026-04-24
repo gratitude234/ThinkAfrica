@@ -38,17 +38,17 @@ export async function generateMetadata({
     .eq("id", id)
     .single();
 
-  if (!debate) return { title: "Debate not found - ThinkAfrica" };
+  if (!debate) return { title: "Debate not found - ThinkAfrika" };
 
   return {
-    title: `${debate.title} - ThinkAfrica Debates`,
+    title: `${debate.title} - ThinkAfrika Debates`,
     description:
       (debate as { description?: string | null }).description ??
-      "Join this debate on ThinkAfrica",
+      "Join this debate on ThinkAfrika",
     openGraph: {
       title: debate.title,
       description: (debate as { description?: string | null }).description ?? "",
-      siteName: "ThinkAfrica",
+      siteName: "ThinkAfrika",
     },
   };
 }

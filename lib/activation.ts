@@ -1,6 +1,7 @@
 export type ActivationTaskKey =
   | "profile"
   | "follow"
+  | "read"
   | "start"
   | "submit";
 
@@ -15,6 +16,7 @@ export interface ActivationTask {
 export interface ActivationState {
   profileComplete: boolean;
   followCount: number;
+  meaningfulEngagementCount: number;
   submittedPostCount: number;
   draftCount: number;
   debateArgumentCount: number;
@@ -43,6 +45,18 @@ async function countRows(
   return result.count ?? 0;
 }
 
+async function countRowsSafe(
+  query: Promise<{ count?: number | null; error?: unknown }>
+): Promise<number> {
+  try {
+    const result = await query;
+    if (result.error) return 0;
+    return result.count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function getActivationState(
   supabase: any,
   userId: string
@@ -50,6 +64,9 @@ export async function getActivationState(
   const [
     { data: profile },
     followCount,
+    postOpenCount,
+    bookmarkCount,
+    commentCount,
     submittedPostCount,
     draftCount,
     debateArgumentCount,
@@ -64,6 +81,34 @@ export async function getActivationState(
         .from("follows")
         .select("*", { count: "exact", head: true })
         .eq("follower_id", userId) as unknown as Promise<{ count?: number | null }>
+    ),
+    countRowsSafe(
+      supabase
+        .from("activation_events")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("event_name", "post_opened") as unknown as Promise<{
+        count?: number | null;
+        error?: unknown;
+      }>
+    ),
+    countRowsSafe(
+      supabase
+        .from("bookmarks")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId) as unknown as Promise<{
+        count?: number | null;
+        error?: unknown;
+      }>
+    ),
+    countRowsSafe(
+      supabase
+        .from("comments")
+        .select("*", { count: "exact", head: true })
+        .eq("author_id", userId) as unknown as Promise<{
+        count?: number | null;
+        error?: unknown;
+      }>
     ),
     countRows(
       supabase
@@ -91,6 +136,8 @@ export async function getActivationState(
 
   const profileComplete = isProfileComplete(profile);
   const hasStartedContribution = draftCount > 0 || debateArgumentCount > 0;
+  const meaningfulEngagementCount = postOpenCount + bookmarkCount + commentCount;
+  const hasMeaningfulEngagement = meaningfulEngagementCount >= 2;
   const hasSubmittedContribution =
     submittedPostCount > 0 || debateArgumentCount > 0;
 
@@ -110,18 +157,18 @@ export async function getActivationState(
       done: followCount >= 3,
     },
     {
-      key: "start",
-      label: "Start your first contribution",
-      description: "Save a draft or join a debate to move from reader to contributor.",
-      href: "/write?type=blog&starter=1",
-      done: hasStartedContribution,
+      key: "read",
+      label: "Read something relevant",
+      description: "Open, save, or discuss a few posts so ThinkAfrika can learn what matters to you.",
+      href: "/?tab=latest",
+      done: hasMeaningfulEngagement,
     },
     {
-      key: "submit",
-      label: "Publish or submit your first post",
-      description: "A short blog post is enough to start building your intellectual profile.",
+      key: "start",
+      label: "Start a quick take",
+      description: "Turn one clear point into a short draft. You can publish now or keep polishing.",
       href: "/write?type=blog&starter=1",
-      done: hasSubmittedContribution,
+      done: hasStartedContribution,
     },
   ];
 
@@ -130,10 +177,14 @@ export async function getActivationState(
   return {
     profileComplete,
     followCount,
+    meaningfulEngagementCount,
     submittedPostCount,
     draftCount,
     debateArgumentCount,
-    activated: profileComplete && followCount >= 3 && hasSubmittedContribution,
+    activated:
+      profileComplete &&
+      followCount >= 3 &&
+      (hasMeaningfulEngagement || hasStartedContribution || hasSubmittedContribution),
     tasks,
     nextTask,
   };

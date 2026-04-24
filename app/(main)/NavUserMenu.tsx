@@ -160,6 +160,26 @@ export default function NavUserMenu({
             </Link>
           )}
           <Link
+            href="/messages"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
+          >
+            <svg
+              className="w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.275 2.903 2.875 2.903h.375a2.625 2.625 0 011.855.769l.396.396.396-.396A2.625 2.625 0 019.252 15.663h.375c1.6 0 2.875-1.302 2.875-2.903V8.25c0-1.6-1.275-2.903-2.875-2.903H5.625C4.025 5.347 2.75 6.65 2.75 8.25v4.51z"
+              />
+            </svg>
+            Messages
+          </Link>
+          <Link
             href="/dashboard"
             onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"

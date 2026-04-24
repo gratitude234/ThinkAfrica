@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import NavUserMenu from "./NavUserMenu";
 import MobileNav from "./MobileNav";
-import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import NotificationBell from "@/components/ui/NotificationBell";
 import LiteModeToggle from "@/components/ui/LiteModeToggle";
 
@@ -42,12 +41,8 @@ export default function NavClient({
   const isHomeActive = pathname === "/";
   const isDiscoverActive =
     pathname === "/topics" || pathname.startsWith("/topics/");
-  const isAlumniActive =
-    pathname === "/alumni" || pathname.startsWith("/alumni/");
   const isOpportunitiesActive =
     pathname === "/opportunities" || pathname.startsWith("/opportunities/");
-  const isMessagesActive =
-    pathname === "/messages" || pathname.startsWith("/messages/");
   const isWriteActive = pathname.startsWith("/write");
 
   return (
@@ -86,44 +81,22 @@ export default function NavClient({
                 Discover
               </Link>
               <Link
+                href="/write"
+                className={`rounded-full px-4 py-2 text-sm transition-colors ${
+                  isWriteActive
+                    ? "bg-ink font-semibold text-white"
+                    : "bg-emerald-brand font-semibold text-white hover:bg-emerald-600"
+                }`}
+                aria-current={isWriteActive ? "page" : undefined}
+              >
+                Write
+              </Link>
+              <Link
                 href="/opportunities"
                 className={navItemClass(isOpportunitiesActive)}
                 aria-current={isOpportunitiesActive ? "page" : undefined}
               >
                 Opportunities
-              </Link>
-              <Link
-                href="/alumni"
-                className={navItemClass(isAlumniActive)}
-                aria-current={isAlumniActive ? "page" : undefined}
-              >
-                Alumni
-              </Link>
-              {user ? (
-                <Link
-                  href="/messages"
-                  className={navItemClass(isMessagesActive)}
-                  aria-current={isMessagesActive ? "page" : undefined}
-                >
-                  <span className="relative">
-                    Messages
-                    <MessagesUnreadBadge
-                      userId={user.id}
-                      className="-right-4 -top-1"
-                    />
-                  </span>
-                </Link>
-              ) : null}
-              <Link
-                href="/write"
-                className={`rounded-lg px-4 py-2 text-sm transition-colors ${
-                  isWriteActive
-                    ? "font-semibold text-ink"
-                    : "text-ink-muted hover:bg-canvas hover:text-ink"
-                }`}
-                aria-current={isWriteActive ? "page" : undefined}
-              >
-                Write
               </Link>
             </div>
 

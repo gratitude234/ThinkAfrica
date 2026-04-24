@@ -52,14 +52,14 @@ export default function LoginPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
-            alt="ThinkAfrica"
+            alt="ThinkAfrika"
             className="mb-12 h-10 w-auto brightness-0 invert"
           />
           <blockquote className="mb-6 text-xl font-medium italic leading-relaxed text-white/90">
             &quot;The pen is mightier than the sword, and the African intellectual is mightier still.&quot;
           </blockquote>
           <p className="text-sm text-white/60">
-            ThinkAfrica · Africa&apos;s Intellectual Network
+            ThinkAfrika · Africa&apos;s Intellectual Network
           </p>
         </div>
         <div className="space-y-4">
@@ -80,7 +80,7 @@ export default function LoginPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
-            alt="ThinkAfrica"
+            alt="ThinkAfrika"
             className="mb-8 h-8 w-auto md:hidden"
           />
           <h1 className="font-display mb-1 text-2xl font-bold text-ink">

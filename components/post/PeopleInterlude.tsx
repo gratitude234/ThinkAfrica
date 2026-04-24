@@ -14,9 +14,11 @@ interface Person {
 
 export default function PeopleInterlude({
   people,
+  reason,
   currentUserId,
 }: {
   people: Person[];
+  reason: string;
   currentUserId: string | null;
 }) {
   return (
@@ -29,6 +31,7 @@ export default function PeopleInterlude({
           <h3 className="text-lg font-semibold text-gray-900">
             Writers worth following
           </h3>
+          <p className="mt-1 text-xs text-gray-500">{reason}</p>
         </div>
         <Link
           href="/leaderboard"

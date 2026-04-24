@@ -55,7 +55,8 @@ export async function getSuggestedPeople(
       .from("profiles")
       .select("id, username, full_name, university, avatar_url")
       .eq("university", university)
-      .eq("field_of_study", fieldOfStudy);
+      .eq("field_of_study", fieldOfStudy)
+      .order("points", { ascending: false });
     query = applyExclusions(query as unknown as QueryBuilder, excludeIds);
     const { data } = await (query as unknown as QueryBuilder).limit(limit);
     if (data && data.length > 0) {
@@ -68,7 +69,8 @@ export async function getSuggestedPeople(
     let query = supabase
       .from("profiles")
       .select("id, username, full_name, university, avatar_url")
-      .eq("university", university);
+      .eq("university", university)
+      .order("points", { ascending: false });
     query = applyExclusions(query as unknown as QueryBuilder, excludeIds);
     const { data } = await (query as unknown as QueryBuilder).limit(limit);
     if (data && data.length > 0) {

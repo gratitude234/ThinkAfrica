@@ -25,6 +25,7 @@ interface Props {
     university: string | null;
     avatar_url: string | null;
   }[];
+  peopleSuggestionReason?: string;
   prioritizePeopleSuggestions?: boolean;
 }
 
@@ -63,6 +64,7 @@ export default async function PostsFeedSection({
   activeDebate,
   sectionLabel,
   peopleSuggestions,
+  peopleSuggestionReason,
   prioritizePeopleSuggestions = false,
 }: Props) {
   const supabase = await createClient();
@@ -93,6 +95,7 @@ export default async function PostsFeedSection({
       showFollowingTab={showFollowingEligible}
       activeDebate={activeDebate}
       peopleSuggestions={peopleSuggestions}
+      peopleSuggestionReason={peopleSuggestionReason}
       prioritizePeopleSuggestions={prioritizePeopleSuggestions}
       currentUserId={userId}
       sectionLabel={sectionLabel}

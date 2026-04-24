@@ -22,6 +22,7 @@ import {
   getSuggestedTags,
   normalizeTagValue,
 } from "@/lib/tags";
+import { trackActivationEvent } from "@/lib/activationEvents";
 import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
 import { publishPost } from "./actions";
 
@@ -180,7 +181,15 @@ export default function PublishDrawer({
 
   useEffect(() => {
     if (open && !wasOpenRef.current) {
-      setPostType(initialPostType ?? inferTypeFromContent(content, wordCount));
+      trackActivationEvent({
+        event: "publish_drawer_opened",
+        metadata: {
+          draftId,
+          postType: initialPostType ?? inferredType,
+          wordCount,
+        },
+      });
+      setPostType(initialPostType ?? inferredType);
       setTags(initialTags);
       setCoverImageUrl(initialCoverImageUrl);
       setExcerpt(initialExcerpt || generateExcerpt(content, 220));
@@ -202,7 +211,9 @@ export default function PublishDrawer({
     wasOpenRef.current = open;
   }, [
     open,
+    draftId,
     initialPostType,
+    inferredType,
     content,
     wordCount,
     initialTags,

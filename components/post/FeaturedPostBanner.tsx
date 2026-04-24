@@ -45,7 +45,7 @@ export default function FeaturedPostBanner({ post }: Props) {
       ) : null}
 
       <p className="mb-2 text-xs font-semibold text-amber-600">
-        Featured by ThinkAfrica
+        Featured by ThinkAfrika
       </p>
 
       <Link href={`/post/${post.slug}`}>

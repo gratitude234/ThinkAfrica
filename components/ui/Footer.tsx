@@ -8,7 +8,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="text-xl font-bold text-emerald-400">
-              ThinkAfrica
+              ThinkAfrika
             </Link>
             <p className="mt-2 text-sm text-gray-400 leading-relaxed">
               Where Africa&apos;s Ideas Connect
@@ -48,7 +48,7 @@ export default function Footer() {
             <ul className="space-y-2">
               {[
                 { label: "Become an Ambassador", href: "/ambassadors" },
-                { label: "Write for ThinkAfrica", href: "/write" },
+                { label: "Write for ThinkAfrika", href: "/write" },
                 { label: "Editorial Standards", href: "/editorial-standards" },
                 { label: "About Us", href: "/about" },
               ].map(({ label, href }) => (
@@ -88,7 +88,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-gray-800 text-center text-xs text-gray-500">
-          &copy; 2025 ThinkAfrica. Built for Africa.
+          &copy; 2025 ThinkAfrika. Built for Africa.
         </div>
       </div>
     </footer>

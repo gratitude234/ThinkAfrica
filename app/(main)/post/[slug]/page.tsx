@@ -137,7 +137,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     throwPostQueryError(slug, "metadata", postError);
   }
 
-  if (!post) return { title: "Post not found - ThinkAfrica" };
+  if (!post) return { title: "Post not found - ThinkAfrika" };
   // Drafts and in-review posts are only visible to the author (and assigned reviewers/co-authors)
   if (
     (post.status === "draft" ||
@@ -145,7 +145,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       post.status === "pending_revision") &&
     user?.id !== post.author_id
   ) {
-    return { title: "Post not found - ThinkAfrica" };
+    return { title: "Post not found - ThinkAfrika" };
   }
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
@@ -160,13 +160,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const ogImage = coverUrl ?? ogImageUrl;
 
   return {
-    title: `${post.title} - ThinkAfrica`,
-    description: post.excerpt ?? `Read this post by ${author?.full_name} on ThinkAfrica`,
+    title: `${post.title} - ThinkAfrika`,
+    description: post.excerpt ?? `Read this post by ${author?.full_name} on ThinkAfrika`,
     openGraph: {
       title: post.title,
       description: post.excerpt ?? "",
       url: `${appUrl}/post/${post.slug}`,
-      siteName: "ThinkAfrica",
+      siteName: "ThinkAfrika",
       images: [{ url: ogImage, width: 1200, height: 630 }],
       type: "article",
     },
@@ -538,7 +538,7 @@ export default async function PostPage({ params }: PageProps) {
                               className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-brand text-[9px] font-bold text-white"
                               aria-label="Verified"
                             >
-                              ✓
+                              {"\u2713"}
                             </span>
                           ) : null}
                         </p>
@@ -576,9 +576,10 @@ export default async function PostPage({ params }: PageProps) {
                 {isPublished ? (
                   <Link
                     href={`/write?inResponseTo=${post.id}&type=essay`}
-                    className="mt-4 inline-flex items-center gap-1.5 text-sm text-emerald-600 hover:underline"
+                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100"
                   >
-                    {"\u21A9"} Write a response
+                    <span aria-hidden="true">{"\u21A9"}</span>
+                    Write a response
                   </Link>
                 ) : null}
               </header>
@@ -672,13 +673,14 @@ export default async function PostPage({ params }: PageProps) {
                         Have a substantive pushback? Write a response post.
                       </p>
                       <p className="mt-1 text-xs text-gray-500">
-                        More than a comment warrants — your argument, your byline, your post.
+                        More than a comment warrants - your argument, your byline, your post.
                       </p>
                       <Link
                         href={`/write?inResponseTo=${post.id}&type=essay`}
                         className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
                       >
-                        ↩ Write a response
+                        <span aria-hidden="true">{"\u21A9"}</span>
+                        Write a response
                       </Link>
                     </div>
                   ) : null}

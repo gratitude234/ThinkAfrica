@@ -26,11 +26,11 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
 const POST_TYPES = [
   {
     type: "blog",
-    label: "Blog post",
+    label: "Quick take",
     minWords: 200,
-    readTime: "~5 min to write",
+    readTime: "~10 min to write",
     review: "No editorial review",
-    desc: "Quick takes, opinions, personal reflections",
+    desc: "One clear thought, example, or response",
   },
   {
     type: "essay",
@@ -69,12 +69,12 @@ const STARTER_TEMPLATES: Record<
   }
 > = {
   blog: {
-    title: "What I think about [topic]",
-    subtitle: "A short argument from my current reading and experience",
-    excerpt: "A concise view on a question worth discussing.",
-    tags: ["student writing"],
+    title: "One thing I think about [topic]",
+    subtitle: "A quick take from my current reading and experience",
+    excerpt: "A concise point on a question worth discussing.",
+    tags: ["quick take"],
     content:
-      "<p><strong>My main point:</strong> State the idea you want readers to leave with.</p><p><strong>Why it matters:</strong> Explain the campus, community, or African context in plain language.</p><p><strong>One example:</strong> Add a concrete example, source, or lived observation.</p><p><strong>What should happen next:</strong> End with a question or recommendation.</p>",
+      "<p><strong>My point:</strong> State the idea you want readers to leave with.</p><p><strong>Why it matters:</strong> Explain the campus, community, or African context in plain language.</p><p><strong>One example:</strong> Add a concrete example, source, or lived observation.</p><p><strong>What should happen next:</strong> End with a question or recommendation.</p>",
   },
   essay: {
     title: "Rethinking [issue] in Africa",

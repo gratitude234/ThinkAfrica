@@ -5,7 +5,7 @@ export default function PrivacyPage() {
       <p className="text-gray-500 text-sm mb-8">Last updated: April 2025</p>
       <div className="prose prose-gray max-w-none space-y-6 text-gray-600">
         <p>
-          ThinkAfrica (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) is committed to protecting your privacy. This Privacy Policy
+          ThinkAfrika (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) is committed to protecting your privacy. This Privacy Policy
           explains how we collect, use, and safeguard your information when you use our platform.
         </p>
         <h2 className="text-lg font-semibold text-gray-900">Information We Collect</h2>

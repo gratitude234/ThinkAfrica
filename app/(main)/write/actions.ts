@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { logActivationEvent } from "@/lib/activationEvents";
+import { recordActivationEvent } from "@/lib/activationServer";
 import {
   createVersionSnapshot,
   getSubmissionTrack,
@@ -573,11 +573,17 @@ export async function publishPost(input: {
     });
   }
 
-  logActivationEvent("post_submitted", {
+  await recordActivationEvent({
+    supabase,
+    event: "post_submitted",
     userId: user.id,
-    postId,
-    postType: input.postType,
-    status: submitStatus,
+    metadata: {
+      postId,
+      postType: input.postType,
+      status: submitStatus,
+    },
+    source: "server_action",
+    route: "/write",
   });
 
   return {

@@ -17,6 +17,7 @@ interface PostFeedProps {
     university: string | null;
     avatar_url: string | null;
   }[];
+  peopleSuggestionReason?: string;
   prioritizePeopleSuggestions?: boolean;
   currentUserId?: string | null;
 }
@@ -45,6 +46,7 @@ export default function PostFeed({
   activeTab,
   activeDebate = null,
   peopleSuggestions = [],
+  peopleSuggestionReason = "Suggested for you",
   prioritizePeopleSuggestions = false,
   currentUserId = null,
 }: PostFeedProps) {
@@ -56,21 +58,39 @@ export default function PostFeed({
     <div>
       {posts.length === 0 ? (
         activeTab === "following" ? (
-          <div className="py-16 text-center">
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
             <p className="text-sm text-gray-500">
               You&apos;re not following anyone yet.
             </p>
             <Link
               href="/onboarding?step=follow"
-              className="mt-3 inline-block text-sm text-emerald-600 hover:underline"
+              className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
             >
-              Find writers to follow {"->"}
+              Find writers to follow
             </Link>
           </div>
         ) : (
-          <div className="py-16 text-center text-gray-400">
-            <p className="mb-1 text-lg font-medium">No posts yet</p>
-            <p className="text-sm">There&apos;s nothing here yet.</p>
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
+            <p className="mb-1 text-lg font-medium text-gray-900">
+              No posts match this view yet.
+            </p>
+            <p className="text-sm text-gray-500">
+              Try the latest feed or start the first quick take in this space.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Link
+                href="/?tab=latest"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-canvas"
+              >
+                View latest
+              </Link>
+              <Link
+                href="/write?type=blog&starter=1"
+                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+              >
+                Write a quick take
+              </Link>
+            </div>
           </div>
         )
       ) : (
@@ -78,6 +98,7 @@ export default function PostFeed({
           {prioritizePeopleSuggestions && peopleSuggestions.length > 0 ? (
             <PeopleInterlude
               people={peopleSuggestions}
+              reason={peopleSuggestionReason}
               currentUserId={currentUserId}
             />
           ) : null}
@@ -97,6 +118,7 @@ export default function PostFeed({
               {!prioritizePeopleSuggestions && index === 11 && peopleSuggestions.length > 0 ? (
                 <PeopleInterlude
                   people={peopleSuggestions}
+                  reason={peopleSuggestionReason}
                   currentUserId={currentUserId}
                 />
               ) : null}

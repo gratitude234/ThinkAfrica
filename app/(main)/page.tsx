@@ -6,6 +6,7 @@ import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import WelcomeBanner from "@/components/ui/WelcomeBanner";
 import { getActivationState, type ActivationState } from "@/lib/activation";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import EditorPicksRow from "./EditorPicksRow";
 import FeaturedPostLead from "./FeaturedPostLead";
@@ -228,7 +229,7 @@ export default async function HomePage({ searchParams }: PageProps) {
       : 0
     : 0;
 
-  const activeDebate: DebateInterludeData | null = hotDebateRaw
+  const activeDebate: DebateInterludeData | null = FEATURE_FLAGS.debates && hotDebateRaw
     ? {
         id: hotDebateRaw.id,
         title: hotDebateRaw.title,
@@ -301,7 +302,7 @@ export default async function HomePage({ searchParams }: PageProps) {
       {welcome === "1" && user ? <WelcomeBanner firstName={firstName} /> : null}
 
       {activationState ? (
-        <ActivationChecklist state={activationState} />
+        <ActivationChecklist state={activationState} compact />
       ) : null}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -322,6 +323,7 @@ export default async function HomePage({ searchParams }: PageProps) {
               showFollowingEligible={showFollowingEligible}
               activeDebate={activeDebate}
               peopleSuggestions={peopleResult.suggestions}
+              peopleSuggestionReason={peopleResult.reason}
               prioritizePeopleSuggestions={followCount < 3}
               sectionLabel="Latest"
             />
@@ -332,7 +334,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           <HomeSidebar
             activeDebate={activeDebate}
             newVoice={newVoice}
-            upcomingWebinar={upcomingWebinar}
+            upcomingWebinar={FEATURE_FLAGS.webinars ? upcomingWebinar : null}
             recentDraft={recentDraft ?? null}
           />
         </aside>

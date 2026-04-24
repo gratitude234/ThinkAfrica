@@ -94,7 +94,7 @@ export default function PartnerContactForm() {
           rows={4}
           value={form.message}
           onChange={(e) => setForm({ ...form, message: e.target.value })}
-          placeholder="Tell us about your organization and how you'd like to partner with ThinkAfrica..."
+          placeholder="Tell us about your organization and how you'd like to partner with ThinkAfrika..."
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
         />
       </div>

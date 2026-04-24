@@ -15,11 +15,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ThinkAfrica - Africa's Intellectual Social Network",
+  title: "ThinkAfrika - Africa's Intellectual Social Network",
   description:
     "Research, essays, and policy briefs from African university students.",
   openGraph: {
-    siteName: "ThinkAfrica",
+    siteName: "ThinkAfrika",
     images: ["/og-default.png"],
   },
   icons: {

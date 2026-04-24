@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Badge from "@/components/ui/Badge";
 import UserAvatar from "@/components/ui/UserAvatar";
+import { trackActivationEvent } from "@/lib/activationEvents";
 
 interface PostResult {
   id: string;
@@ -145,6 +146,16 @@ export default function SearchPage() {
       setPeople((peopleResults ?? []) as PersonResult[]);
       setTopics(normalizedTopics);
       setLoading(false);
+      trackActivationEvent({
+        event: "search_performed",
+        metadata: {
+          queryLength: trimmed.length,
+          resultCount:
+            normalizedPosts.length +
+            (peopleResults?.length ?? 0) +
+            normalizedTopics.length,
+        },
+      });
     },
     [allTopics]
   );
@@ -332,7 +343,7 @@ export default function SearchPage() {
                                 ? ` · ${post.profiles.university}`
                                 : ""
                             }`
-                          : "ThinkAfrica"}
+                          : "ThinkAfrika"}
                       </p>
                       {post.excerpt ? (
                         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">

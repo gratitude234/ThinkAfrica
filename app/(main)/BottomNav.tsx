@@ -17,7 +17,6 @@ function navLinkClass(isCurrent: boolean) {
 
 export default function BottomNav({
   username,
-  hasActiveDebate,
 }: BottomNavProps) {
   const pathname = usePathname();
   const isActive = (href: string) =>
@@ -56,9 +55,9 @@ export default function BottomNav({
         </Link>
 
         <Link
-          href="/search"
-          className={navLinkClass(isActive("/search"))}
-          aria-current={isActive("/search") ? "page" : undefined}
+          href="/topics"
+          className={navLinkClass(isActive("/topics"))}
+          aria-current={isActive("/topics") ? "page" : undefined}
         >
           <svg
             className="h-5 w-5"
@@ -73,7 +72,7 @@ export default function BottomNav({
               d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
             />
           </svg>
-          <span className="text-[10px] font-medium">Search</span>
+          <span className="text-[10px] font-medium">Discover</span>
         </Link>
 
         <Link
@@ -105,9 +104,9 @@ export default function BottomNav({
         </Link>
 
         <Link
-          href="/debates"
-          className={navLinkClass(isActive("/debates"))}
-          aria-current={isActive("/debates") ? "page" : undefined}
+          href="/opportunities"
+          className={navLinkClass(isActive("/opportunities"))}
+          aria-current={isActive("/opportunities") ? "page" : undefined}
         >
           <div className="relative">
             <svg
@@ -120,14 +119,11 @@ export default function BottomNav({
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.275 2.903 2.875 2.903h.375a2.625 2.625 0 0 1 1.855.769l.396.396.396-.396A2.625 2.625 0 0 1 9.252 15.663h.375c1.6 0 2.875-1.302 2.875-2.903V8.25c0-1.6-1.275-2.903-2.875-2.903H5.625C4.025 5.347 2.75 6.65 2.75 8.25v4.51z"
+                d="M12 6v12m6-6H6m11.5 7h-11A2.5 2.5 0 014 16.5v-9A2.5 2.5 0 016.5 5h11A2.5 2.5 0 0120 7.5v9a2.5 2.5 0 01-2.5 2.5z"
               />
             </svg>
-            {hasActiveDebate ? (
-              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
-            ) : null}
           </div>
-          <span className="text-[10px] font-medium">Debates</span>
+          <span className="text-[10px] font-medium">Opportunities</span>
         </Link>
 
         <Link
@@ -148,7 +144,7 @@ export default function BottomNav({
               d="M20 21a8 8 0 10-16 0m12-11a4 4 0 11-8 0 4 4 0 018 0z"
             />
           </svg>
-          <span className="text-[10px] font-medium">Profile</span>
+          <span className="text-[10px] font-medium">Me</span>
         </Link>
       </div>
     </nav>
