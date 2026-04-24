@@ -196,7 +196,6 @@ export default async function PostPage({ params }: PageProps) {
       created_at, published_at, view_count, cover_image_url, citation_id,
       in_response_to,
       audio_summary_url,
-      parent_post:posts!posts_in_response_to_fkey(id, title, slug),
       profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url)
     `
     )
@@ -256,14 +255,24 @@ export default async function PostPage({ params }: PageProps) {
   const audioSummaryUrl = (
     post as typeof post & { audio_summary_url?: string | null }
   ).audio_summary_url ?? null;
-  const parentPostRaw = (
-    post as typeof post & {
-      parent_post?: ParentPostRef | ParentPostRef[] | null;
+  const parentPostId = (post as typeof post & { in_response_to?: string | null })
+    .in_response_to ?? null;
+  let parentPost: ParentPostRef | null = null;
+
+  if (parentPostId) {
+    const { data: parentPostData, error: parentPostError } = await supabase
+      .from("posts")
+      .select("id, title, slug")
+      .eq("id", parentPostId)
+      .eq("status", "published")
+      .maybeSingle();
+
+    if (parentPostError) {
+      console.error(`[post/${slug}] parent post query failed`, parentPostError);
+    } else {
+      parentPost = parentPostData;
     }
-  ).parent_post ?? null;
-  const parentPost = Array.isArray(parentPostRaw)
-    ? parentPostRaw[0] ?? null
-    : parentPostRaw;
+  }
 
   const [
     { count: likeCount },
