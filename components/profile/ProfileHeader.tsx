@@ -157,7 +157,7 @@ export default function ProfileHeader({
                   ) : (
                     <div className="w-full rounded-lg border border-dashed border-gray-200 px-4 py-2 text-center text-xs text-gray-400">
                       {messagingEligibility?.reason ??
-                        "Message after following each other"}
+                        "Sign in to send a message"}
                     </div>
                   )
                 ) : null}

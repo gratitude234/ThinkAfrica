@@ -125,7 +125,7 @@ export default async function MessagesPage() {
           <p className="mb-3 text-4xl">💬</p>
           <p className="text-sm font-medium text-gray-700">No messages yet</p>
           <p className="mt-1 text-xs text-gray-400">
-            Follow someone and have them follow back to start a conversation.
+            Visit a profile and start a direct conversation.
           </p>
         </div>
       ) : (
