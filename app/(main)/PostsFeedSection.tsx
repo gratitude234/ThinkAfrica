@@ -25,6 +25,7 @@ interface Props {
     university: string | null;
     avatar_url: string | null;
   }[];
+  prioritizePeopleSuggestions?: boolean;
 }
 
 function getInitialTab(tab: string, showFollowingEligible: boolean): FeedTabKey {
@@ -62,6 +63,7 @@ export default async function PostsFeedSection({
   activeDebate,
   sectionLabel,
   peopleSuggestions,
+  prioritizePeopleSuggestions = false,
 }: Props) {
   const supabase = await createClient();
   const initialTab = getInitialTab(tab, showFollowingEligible);
@@ -91,6 +93,7 @@ export default async function PostsFeedSection({
       showFollowingTab={showFollowingEligible}
       activeDebate={activeDebate}
       peopleSuggestions={peopleSuggestions}
+      prioritizePeopleSuggestions={prioritizePeopleSuggestions}
       currentUserId={userId}
       sectionLabel={sectionLabel}
     />

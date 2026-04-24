@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
+import { trackActivationEvent } from "@/lib/activationEvents";
 import {
   type DebatePhase,
   PHASE_DESCRIPTIONS,
@@ -60,6 +61,10 @@ export default function ArgumentForm({
       setError(rpcError.message);
     } else if (data === "for" || data === "against") {
       setLockedStance(data);
+      trackActivationEvent({
+        event: "debate_joined",
+        metadata: { debateId, stance: data },
+      });
     }
 
     setJoining(false);

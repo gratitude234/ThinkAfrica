@@ -5,7 +5,8 @@ import StatsBar from "./StatsBar";
 import PostsTable from "./PostsTable";
 import type { DashboardPost } from "./PostsTable";
 import Button from "@/components/ui/Button";
-import ProfileCompletionCard from "@/components/ui/ProfileCompletionCard";
+import ActivationChecklist from "@/components/ui/ActivationChecklist";
+import { getActivationState } from "@/lib/activation";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -55,21 +56,7 @@ export default async function DashboardPage() {
     .select("*", { count: "exact", head: true })
     .eq("following_id", user.id);
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, bio, avatar_url, university, field_of_study, interests")
-    .eq("id", user.id)
-    .single();
-
-  const { count: followingCount } = await supabase
-    .from("follows")
-    .select("*", { count: "exact", head: true })
-    .eq("follower_id", user.id);
-
-  const { count: debateCount } = await supabase
-    .from("debate_arguments")
-    .select("*", { count: "exact", head: true })
-    .eq("author_id", user.id);
+  const activationState = await getActivationState(supabase, user.id);
 
   // Fellowship applications by this user
   const { data: applicationsRaw } = await supabase
@@ -110,39 +97,6 @@ export default async function DashboardPage() {
   const publishedPosts = posts.filter((p) => p.status === "published");
   const totalViews = publishedPosts.reduce((sum, p) => sum + p.view_count, 0);
   const totalLikes = publishedPosts.reduce((sum, p) => sum + p.like_count, 0);
-  const completionItems = [
-    { label: "Add your name", done: !!profile?.full_name, href: "/settings" },
-    { label: "Write a bio", done: !!profile?.bio, href: "/settings" },
-    { label: "Upload a photo", done: !!profile?.avatar_url, href: "/settings" },
-    {
-      label: "Set your university",
-      done: !!profile?.university,
-      href: "/settings",
-    },
-    {
-      label: "Pick your interests",
-      done: ((profile?.interests as string[] | null)?.length ?? 0) > 0,
-      href: "/settings",
-    },
-    {
-      label: "Publish your first post",
-      done: publishedPosts.length > 0,
-      href: "/write",
-    },
-    {
-      label: "Join a live debate",
-      done: (debateCount ?? 0) > 0,
-      href: "/debates",
-    },
-    {
-      label: "Follow a writer",
-      done: (followingCount ?? 0) > 0,
-      href: "/leaderboard",
-    },
-  ];
-  const doneCount = completionItems.filter((item) => item.done).length;
-  const pct = Math.round((doneCount / completionItems.length) * 100);
-
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-8">
@@ -157,7 +111,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <ProfileCompletionCard pct={pct} items={completionItems} />
+      <ActivationChecklist state={activationState} />
 
       {revisionPosts.length > 0 ? (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">

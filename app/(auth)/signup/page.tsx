@@ -4,39 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { isUniversityEmail } from "@/lib/universityDomains";
-import UniversitySelect from "@/components/ui/UniversitySelect";
+import { trackActivationEvent } from "@/lib/activationEvents";
 
 const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 const BRAND_ITEMS = [
-  { icon: "✏️", text: "Publish research, essays & policy briefs" },
-  { icon: "⚡", text: "Debate the issues that shape Africa" },
-  { icon: "🏆", text: "Earn points, badges and fellowships" },
-];
-
-const FIELD_OF_STUDY_OPTIONS = [
-  "Law & Justice",
-  "Economics",
-  "Technology",
-  "Public Health",
-  "Politics & Governance",
-  "Environment & Climate",
-  "Education Policy",
-  "African Culture",
-  "Philosophy",
-  "Gender Studies",
-  "Business & Finance",
-  "International Relations",
-  "Computer Science",
-  "Medicine",
-  "Agriculture",
-  "Literature & Writing",
-  "History",
-  "Human Rights",
-  "Social Justice",
-  "Engineering",
+  { marker: "01", text: "Publish research, essays, and policy briefs" },
+  { marker: "02", text: "Debate the issues that shape Africa" },
+  { marker: "03", text: "Build a profile that travels with your work" },
 ];
 
 export default function SignupPage() {
@@ -45,20 +21,11 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     fullName: "",
-    university: "",
-    fieldOfStudy: "",
-    graduationYear: String(new Date().getFullYear()),
     email: "",
     password: "",
   });
 
-  const graduationYears = Array.from({ length: 6 }, (_, index) =>
-    String(new Date().getFullYear() + index)
-  );
-
-  const handleChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
@@ -67,12 +34,6 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
 
-    if (!form.university.trim() || !form.fieldOfStudy) {
-      setError("Please select your university and field of study.");
-      setLoading(false);
-      return;
-    }
-
     const supabase = createClient();
     const { error: signUpError } = await supabase.auth.signUp({
       email: form.email,
@@ -80,9 +41,6 @@ export default function SignupPage() {
       options: {
         data: {
           full_name: form.fullName,
-          university: form.university,
-          field_of_study: form.fieldOfStudy,
-          graduation_year: parseInt(form.graduationYear, 10),
         },
       },
     });
@@ -93,12 +51,10 @@ export default function SignupPage() {
       return;
     }
 
+    trackActivationEvent({ event: "signup_completed" });
     router.push("/onboarding");
     router.refresh();
   };
-
-  const isUniversityEmailDetected =
-    form.email.includes("@") && isUniversityEmail(form.email);
 
   return (
     <div className="fixed inset-0 z-10 grid min-h-screen grid-cols-1 bg-white md:grid-cols-2">
@@ -107,14 +63,14 @@ export default function SignupPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
-            alt="ThinkAfrica"
+            alt="ThinkAfrika"
             className="mb-12 h-10 w-auto brightness-0 invert"
           />
           <blockquote className="mb-6 text-xl font-medium italic leading-relaxed text-white/90">
             &quot;The pen is mightier than the sword, and the African intellectual is mightier still.&quot;
           </blockquote>
           <p className="text-sm text-white/60">
-            ThinkAfrica · Africa&apos;s Intellectual Network
+            ThinkAfrika - Africa&apos;s Intellectual Network
           </p>
         </div>
         <div className="space-y-4">
@@ -123,7 +79,9 @@ export default function SignupPage() {
               key={item.text}
               className="flex items-center gap-3 text-sm text-white/80"
             >
-              <span className="text-lg">{item.icon}</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-xs font-semibold">
+                {item.marker}
+              </span>
               <span>{item.text}</span>
             </div>
           ))}
@@ -135,14 +93,15 @@ export default function SignupPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
-            alt="ThinkAfrica"
+            alt="ThinkAfrika"
             className="mb-8 h-8 w-auto md:hidden"
           />
           <h1 className="font-display mb-1 text-2xl font-bold text-ink">
             Create your account
           </h1>
           <p className="mb-8 text-sm text-gray-500">
-            Join Africa&apos;s intellectual network
+            Join ThinkAfrika in under a minute. We will shape your academic
+            profile next.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -163,57 +122,6 @@ export default function SignupPage() {
 
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                University
-              </label>
-              <UniversitySelect
-                value={form.university}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, university: value }))
-                }
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Field of study
-              </label>
-              <select
-                name="fieldOfStudy"
-                value={form.fieldOfStudy}
-                onChange={handleChange}
-                required
-                className={INPUT_STYLES}
-              >
-                <option value="">Select field of study</option>
-                {FIELD_OF_STUDY_OPTIONS.map((field) => (
-                  <option key={field} value={field}>
-                    {field}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Graduation year
-              </label>
-              <select
-                name="graduationYear"
-                value={form.graduationYear}
-                onChange={handleChange}
-                required
-                className={INPUT_STYLES}
-              >
-                {graduationYears.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Email
               </label>
               <input
@@ -225,13 +133,6 @@ export default function SignupPage() {
                 placeholder="you@university.edu"
                 className={INPUT_STYLES}
               />
-              {isUniversityEmailDetected ? (
-                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-600">
-                  <span aria-hidden="true">✓</span>
-                  University email detected - your account will be verified
-                  instantly.
-                </p>
-              ) : null}
             </div>
 
             <div>
@@ -261,7 +162,7 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full rounded-xl bg-emerald-brand py-3 font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Creating account..." : "Create Account"}
+              {loading ? "Creating account..." : "Create account"}
             </button>
           </form>
 

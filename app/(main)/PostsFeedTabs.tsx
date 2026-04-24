@@ -108,6 +108,7 @@ export default function PostsFeedTabs({
   showFollowingTab,
   activeDebate,
   peopleSuggestions,
+  prioritizePeopleSuggestions,
   currentUserId,
   sectionLabel = "Latest",
 }: {
@@ -125,6 +126,7 @@ export default function PostsFeedTabs({
     university: string | null;
     avatar_url: string | null;
   }[];
+  prioritizePeopleSuggestions?: boolean;
   currentUserId: string | null;
   sectionLabel?: string;
 }) {
@@ -280,6 +282,7 @@ export default function PostsFeedTabs({
         activeTab={activeTab}
         activeDebate={activeDebate}
         peopleSuggestions={peopleSuggestions}
+        prioritizePeopleSuggestions={prioritizePeopleSuggestions}
         currentUserId={currentUserId}
       />
 

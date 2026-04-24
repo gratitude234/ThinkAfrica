@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/client";
+import { trackActivationEvent } from "@/lib/activationEvents";
 import {
   composeContentWithSubtitle,
   extractSubtitleFromContent,
@@ -229,6 +230,10 @@ export function useDraftManager(): UseDraftManagerReturn {
             setDraftId(inserted.id);
             setSaveStatus("saved");
             setLastSaved(new Date());
+            trackActivationEvent({
+              event: "draft_started",
+              metadata: { draftId: inserted.id, postType: data.postType },
+            });
             router.replace(`/write?draft=${inserted.id}`);
           }
         }

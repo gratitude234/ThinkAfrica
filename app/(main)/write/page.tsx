@@ -58,6 +58,50 @@ const POST_TYPES = [
   },
 ] as const;
 
+const STARTER_TEMPLATES: Record<
+  PostType,
+  {
+    title: string;
+    subtitle: string;
+    excerpt: string;
+    tags: string[];
+    content: string;
+  }
+> = {
+  blog: {
+    title: "What I think about [topic]",
+    subtitle: "A short argument from my current reading and experience",
+    excerpt: "A concise view on a question worth discussing.",
+    tags: ["student writing"],
+    content:
+      "<p><strong>My main point:</strong> State the idea you want readers to leave with.</p><p><strong>Why it matters:</strong> Explain the campus, community, or African context in plain language.</p><p><strong>One example:</strong> Add a concrete example, source, or lived observation.</p><p><strong>What should happen next:</strong> End with a question or recommendation.</p>",
+  },
+  essay: {
+    title: "Rethinking [issue] in Africa",
+    subtitle: "An argument with context, evidence, and a clear position",
+    excerpt: "This essay argues for a more careful way to understand the issue.",
+    tags: ["essay"],
+    content:
+      "<h2>Opening claim</h2><p>Introduce the issue and your position.</p><h2>Context</h2><p>Explain the background readers need before they can judge the argument.</p><h2>Evidence</h2><p>Bring in examples, data, readings, or cases.</p><h2>Counterargument</h2><p>Address the strongest objection to your view.</p><h2>Conclusion</h2><p>Close with what your argument changes.</p>",
+  },
+  policy_brief: {
+    title: "Policy brief: Improving [issue]",
+    subtitle: "Problem, evidence, options, and recommendations",
+    excerpt: "A short policy brief with practical recommendations.",
+    tags: ["policy"],
+    content:
+      "<h2>Problem</h2><p>Define the policy problem and who is affected.</p><h2>Evidence</h2><p>Summarize the strongest facts, cases, or research.</p><h2>Policy options</h2><p>Compare two or three realistic choices.</p><h2>Recommendation</h2><p>State what decision-makers should do and why.</p>",
+  },
+  research: {
+    title: "Research: [question]",
+    subtitle: "A study of [topic, place, or population]",
+    excerpt: "This research examines a focused question using evidence and method.",
+    tags: ["research"],
+    content:
+      "<h2>Abstract</h2><p>Summarize the question, method, finding, and contribution.</p><h2>Introduction</h2><p>Explain the research problem and why it matters.</p><h2>Literature and context</h2><p>Position your work in existing debates.</p><h2>Method</h2><p>Describe your data, sources, or analytical approach.</p><h2>Findings</h2><p>Present the main results clearly.</p><h2>Conclusion</h2><p>Explain implications and limits.</p>",
+  },
+};
+
 function isPostType(value: string | null): value is PostType {
   return (
     value === "blog" ||
@@ -93,6 +137,7 @@ export default function WritePage() {
   const responseToIdParam = searchParams.get("inResponseTo");
   const typeParam = searchParams.get("type");
   const draftParam = searchParams.get("draft");
+  const starterParam = searchParams.get("starter");
   const initialPostType = isPostType(typeParam) ? typeParam : "blog";
   const {
     draftId,
@@ -382,6 +427,28 @@ export default function WritePage() {
     setIsPublishDrawerOpen(true);
   };
 
+  const applyTemplate = (templateType: PostType) => {
+    const template = STARTER_TEMPLATES[templateType];
+    const nextData = getCurrentData({
+      title: template.title,
+      subtitle: template.subtitle,
+      excerpt: template.excerpt,
+      content: template.content,
+      tags: template.tags,
+      postType: templateType,
+    });
+
+    setPostType(templateType);
+    setShowChooser(false);
+    setTitle(template.title);
+    setSubtitle(template.subtitle);
+    setExcerpt(template.excerpt);
+    setTags(template.tags);
+    setContent(template.content);
+    setWordCount(countWords(template.content));
+    void saveDraft(nextData);
+  };
+
   if (loadingDraft) {
     return (
       <div className="mx-auto max-w-3xl py-12 text-center text-gray-400">
@@ -407,7 +474,7 @@ export default function WritePage() {
             disabled={!canOpenPublish}
             onClick={handleReadyToPublish}
           >
-            Ready to publish →
+            Ready to publish
           </Button>
         </div>
       </div>
@@ -538,6 +605,45 @@ export default function WritePage() {
               >
                 ✕
               </button>
+            </div>
+          ) : null}
+
+          {(starterParam === "1" || (!draftParam && wordCount === 0)) ? (
+            <div className="mb-6 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900">
+                    Start with a guided template
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-emerald-800">
+                    Choose a structure and replace the prompts with your own argument.
+                  </p>
+                </div>
+                {draftId ? (
+                  <p className="text-xs font-medium text-emerald-700">
+                    Draft saved. Add your words, then use Ready to publish.
+                  </p>
+                ) : null}
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {POST_TYPES.map((type) => (
+                  <button
+                    key={type.type}
+                    type="button"
+                    onClick={() => applyTemplate(type.type)}
+                    className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                      postType === type.type
+                        ? "border-emerald-300 bg-white text-emerald-900"
+                        : "border-emerald-100 bg-emerald-50/50 text-emerald-800 hover:bg-white"
+                    }`}
+                  >
+                    <span className="block font-medium">{type.label}</span>
+                    <span className="mt-0.5 block text-xs opacity-80">
+                      Use starter structure
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
 

@@ -17,6 +17,7 @@ interface PostFeedProps {
     university: string | null;
     avatar_url: string | null;
   }[];
+  prioritizePeopleSuggestions?: boolean;
   currentUserId?: string | null;
 }
 
@@ -44,6 +45,7 @@ export default function PostFeed({
   activeTab,
   activeDebate = null,
   peopleSuggestions = [],
+  prioritizePeopleSuggestions = false,
   currentUserId = null,
 }: PostFeedProps) {
   const featuredPostId = getFeaturedPostId(posts);
@@ -59,10 +61,10 @@ export default function PostFeed({
               You&apos;re not following anyone yet.
             </p>
             <Link
-              href="/search"
+              href="/onboarding?step=follow"
               className="mt-3 inline-block text-sm text-emerald-600 hover:underline"
             >
-              Discover people to follow {"->"}
+              Find writers to follow {"->"}
             </Link>
           </div>
         ) : (
@@ -73,6 +75,13 @@ export default function PostFeed({
         )
       ) : (
         <div className="space-y-4">
+          {prioritizePeopleSuggestions && peopleSuggestions.length > 0 ? (
+            <PeopleInterlude
+              people={peopleSuggestions}
+              currentUserId={currentUserId}
+            />
+          ) : null}
+
           {posts.map((post, index) => (
             <div key={post.id} className="space-y-4">
               <PostCard
@@ -85,7 +94,7 @@ export default function PostFeed({
               activeDebate ? (
                 <DebateInterlude debate={activeDebate} />
               ) : null}
-              {index === 11 && peopleSuggestions.length > 0 ? (
+              {!prioritizePeopleSuggestions && index === 11 && peopleSuggestions.length > 0 ? (
                 <PeopleInterlude
                   people={peopleSuggestions}
                   currentUserId={currentUserId}

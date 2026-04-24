@@ -2,10 +2,11 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
-import ActivationBanner from "@/components/ui/ActivationBanner";
+import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import WelcomeBanner from "@/components/ui/WelcomeBanner";
-import { getSuggestedPeople } from "@/lib/suggestedPeople";
+import { getActivationState, type ActivationState } from "@/lib/activation";
+import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import EditorPicksRow from "./EditorPicksRow";
 import FeaturedPostLead from "./FeaturedPostLead";
 import PostsFeedSection from "./PostsFeedSection";
@@ -272,20 +273,20 @@ export default async function HomePage({ searchParams }: PageProps) {
     Array.from(voiceCounts.values()).sort((left, right) => right.count - left.count)[0] ??
     null;
 
-  const peopleResult = user
-    ? await getSuggestedPeople(supabase, {
+  let peopleResult: SuggestedPeopleResult = { suggestions: [], reason: "" };
+  let activationState: ActivationState | null = null;
+
+  if (user) {
+    [peopleResult, activationState] = await Promise.all([
+      getSuggestedPeople(supabase, {
         currentUserId: user.id,
         university: userUniversity,
         fieldOfStudy: userFieldOfStudy,
         limit: 3,
-      })
-    : { suggestions: [], reason: "" };
-
-  const showActivation =
-    !!user &&
-    ((publishedCount ?? 0) === 0 ||
-      followCount === 0 ||
-      (debateCount ?? 0) === 0);
+      }),
+      getActivationState(supabase, user.id),
+    ]);
+  }
 
   const showFollowingEligible = !!user;
   const activeTab =
@@ -299,13 +300,8 @@ export default async function HomePage({ searchParams }: PageProps) {
     <div>
       {welcome === "1" && user ? <WelcomeBanner firstName={firstName} /> : null}
 
-      {showActivation ? (
-        <ActivationBanner
-          userId={user?.id ?? ""}
-          hasPublished={(publishedCount ?? 0) > 0}
-          hasFollowed={followCount > 0}
-          hasDebated={(debateCount ?? 0) > 0}
-        />
+      {activationState ? (
+        <ActivationChecklist state={activationState} />
       ) : null}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -326,6 +322,7 @@ export default async function HomePage({ searchParams }: PageProps) {
               showFollowingEligible={showFollowingEligible}
               activeDebate={activeDebate}
               peopleSuggestions={peopleResult.suggestions}
+              prioritizePeopleSuggestions={followCount < 3}
               sectionLabel="Latest"
             />
           </Suspense>

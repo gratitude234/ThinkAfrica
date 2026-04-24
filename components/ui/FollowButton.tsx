@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { trackActivationEvent } from "@/lib/activationEvents";
 
 interface Props {
   followerId: string;
@@ -22,6 +23,7 @@ export default function FollowButton({
   const handleToggle = async () => {
     setLoading(true);
     const supabase = createClient();
+
     if (following) {
       await supabase
         .from("follows")
@@ -33,7 +35,15 @@ export default function FollowButton({
         .from("follows")
         .insert({ follower_id: followerId, following_id: followingId });
     }
+
     const nextFollowing = !following;
+    if (nextFollowing) {
+      trackActivationEvent({
+        event: "writer_followed",
+        metadata: { followingId },
+      });
+    }
+
     setFollowing(nextFollowing);
     onChange?.(nextFollowing);
     setLoading(false);
@@ -44,13 +54,13 @@ export default function FollowButton({
       onClick={handleToggle}
       disabled={loading}
       aria-label={following ? "Unfollow" : "Follow"}
-      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50 flex-shrink-0 ${
+      className={`flex-shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
         following
-          ? "bg-gray-100 border-gray-200 text-gray-600"
-          : "bg-emerald-brand text-white border-emerald-brand hover:bg-emerald-600"
+          ? "border-gray-200 bg-gray-100 text-gray-600"
+          : "border-emerald-brand bg-emerald-brand text-white hover:bg-emerald-600"
       }`}
     >
-      {loading ? "..." : following ? "Following ✓" : "Follow"}
+      {loading ? "..." : following ? "Following" : "Follow"}
     </button>
   );
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logActivationEvent } from "@/lib/activationEvents";
 import {
   createVersionSnapshot,
   getSubmissionTrack,
@@ -571,6 +572,13 @@ export async function publishPost(input: {
       // Audio summary generation is best-effort.
     });
   }
+
+  logActivationEvent("post_submitted", {
+    userId: user.id,
+    postId,
+    postType: input.postType,
+    status: submitStatus,
+  });
 
   return {
     error: null,

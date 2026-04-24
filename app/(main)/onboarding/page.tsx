@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import FollowButton from "@/components/ui/FollowButton";
+import UniversitySelect from "@/components/ui/UniversitySelect";
 import UserAvatar from "@/components/ui/UserAvatar";
+import AvatarUploader from "../settings/AvatarUploader";
+import { trackActivationEvent } from "@/lib/activationEvents";
 
 const INTEREST_OPTIONS = [
   "Law & Justice",
@@ -30,29 +32,67 @@ const INTEREST_OPTIONS = [
   "Engineering",
 ];
 
+const FIELD_OF_STUDY_OPTIONS = INTEREST_OPTIONS;
+
 interface SuggestedProfile {
   id: string;
   username: string | null;
   full_name: string | null;
   university: string | null;
+  field_of_study?: string | null;
   avatar_url: string | null;
   points: number | null;
 }
 
-type Step = "interests" | "follow";
+type Step = "identity" | "interests" | "follow" | "contribute";
+
+const STEP_ORDER: Step[] = ["identity", "interests", "follow", "contribute"];
+
+const INPUT_STYLES =
+  "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
+
+function normalizeUsername(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9_]/g, "");
+}
+
+function getStepFromParam(value: string | null): Step {
+  return STEP_ORDER.includes(value as Step) ? (value as Step) : "identity";
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialStep = getStepFromParam(searchParams.get("step"));
+
   const [loading, setLoading] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [interests, setInterests] = useState<string[]>([]);
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [university, setUniversity] = useState("");
+  const [fieldOfStudy, setFieldOfStudy] = useState("");
   const [graduationYear, setGraduationYear] = useState("");
-  const [university, setUniversity] = useState<string | null>(null);
-  const [fieldOfStudy, setFieldOfStudy] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [interests, setInterests] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestedProfile[]>([]);
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
-  const [step, setStep] = useState<Step>("interests");
+  const [step, setStep] = useState<Step>(initialStep);
+
+  const currentStepIndex = STEP_ORDER.indexOf(step);
+  const progress = Math.round(((currentStepIndex + 1) / STEP_ORDER.length) * 100);
+  const graduationYears = useMemo(
+    () => Array.from({ length: 12 }, (_, index) => String(new Date().getFullYear() + index)),
+    []
+  );
+
+  const goToStep = useCallback(
+    (nextStep: Step) => {
+      setStep(nextStep);
+      router.replace(`/onboarding?step=${nextStep}`);
+    },
+    [router]
+  );
 
   const loadSuggestions = useCallback(
     async (currentUserId: string, userUniversity: string | null, userField: string | null) => {
@@ -70,11 +110,12 @@ export default function OnboardingPage() {
           (row) => row.following_id
         )
       );
+      setFollowedIds(alreadyFollowing);
 
       async function runProfileQuery(matchProfile: boolean) {
         let query = supabase
           .from("profiles")
-          .select("id, username, full_name, university, avatar_url, points")
+          .select("id, username, full_name, university, field_of_study, avatar_url, points")
           .neq("id", currentUserId)
           .order("points", { ascending: false })
           .limit(36);
@@ -109,8 +150,10 @@ export default function OnboardingPage() {
       }
 
       setUserId(user.id);
+      trackActivationEvent({ event: "onboarding_started" });
 
       const metadata = user.user_metadata as {
+        full_name?: string;
         university?: string;
         field_of_study?: string;
         graduation_year?: string | number;
@@ -119,71 +162,107 @@ export default function OnboardingPage() {
       const { data: profile } = await supabase
         .from("profiles")
         .select(
-          "interests, onboarding_completed, graduation_year, university, field_of_study"
+          "full_name, username, avatar_url, interests, onboarding_completed, graduation_year, university, field_of_study"
         )
         .eq("id", user.id)
         .single();
 
-      if (profile?.onboarding_completed) {
+      if (profile?.onboarding_completed && initialStep === "identity") {
         router.push("/");
         return;
       }
 
-      const nextUniversity = profile?.university || metadata.university || null;
-      const nextFieldOfStudy =
-        profile?.field_of_study || metadata.field_of_study || null;
-      const nextGraduationYear =
-        profile?.graduation_year ?? metadata.graduation_year ?? "";
+      const nextFullName = profile?.full_name || metadata.full_name || "";
+      const emailUsername = user.email?.split("@")[0] ?? "";
 
+      setFullName(nextFullName);
+      setUsername(profile?.username || normalizeUsername(emailUsername));
+      setAvatarUrl(profile?.avatar_url ?? null);
       setInterests((profile?.interests as string[] | null) ?? []);
-      setGraduationYear(nextGraduationYear ? String(nextGraduationYear) : "");
-      setUniversity(nextUniversity);
-      setFieldOfStudy(nextFieldOfStudy);
-    });
-  }, [router]);
+      setUniversity(profile?.university || metadata.university || "");
+      setFieldOfStudy(profile?.field_of_study || metadata.field_of_study || "");
+      setGraduationYear(
+        profile?.graduation_year || metadata.graduation_year
+          ? String(profile?.graduation_year ?? metadata.graduation_year)
+          : ""
+      );
 
-  const toggleInterest = (tag: string) => {
-    setInterests((prev) =>
-      prev.includes(tag)
-        ? prev.filter((item) => item !== tag)
-        : prev.length >= 6
-          ? prev
-          : [...prev, tag]
-    );
+      if (initialStep === "follow") {
+        await loadSuggestions(
+          user.id,
+          profile?.university || metadata.university || null,
+          profile?.field_of_study || metadata.field_of_study || null
+        );
+      }
+    });
+  }, [initialStep, loadSuggestions, router]);
+
+  const saveIdentity = async () => {
+    if (!userId) return;
+    if (!fullName.trim() || !username.trim() || !university.trim() || !fieldOfStudy) {
+      setError("Add your name, username, university, and field of study.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        full_name: fullName.trim(),
+        username: normalizeUsername(username),
+        university: university.trim(),
+        field_of_study: fieldOfStudy,
+        graduation_year: graduationYear ? parseInt(graduationYear, 10) : null,
+        avatar_url: avatarUrl,
+        onboarding_completed: false,
+      })
+      .eq("id", userId);
+
+    setLoading(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    goToStep("interests");
   };
 
-  const saveInterestsAndContinue = async (skip = false) => {
+  const toggleInterest = (tag: string) => {
+    setInterests((prev) => {
+      if (prev.includes(tag)) {
+        return prev.filter((item) => item !== tag);
+      }
+      if (prev.length >= 6) return prev;
+      trackActivationEvent({ event: "interest_selected", metadata: { tag } });
+      return [...prev, tag];
+    });
+  };
+
+  const saveInterestsAndContinue = async () => {
     if (!userId) return;
 
     setLoading(true);
+    setError(null);
     const supabase = createClient();
-    const payload: {
-      interests?: string[];
-      graduation_year?: number | null;
-      university?: string;
-      field_of_study?: string;
-      onboarding_completed: boolean;
-    } = {
-      onboarding_completed: false,
-    };
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ interests, onboarding_completed: false })
+      .eq("id", userId);
 
-    if (!skip) {
-      payload.interests = interests;
-      payload.graduation_year = graduationYear
-        ? parseInt(graduationYear, 10)
-        : null;
+    if (updateError) {
+      setError(updateError.message);
+      setLoading(false);
+      return;
     }
 
-    if (university) payload.university = university;
-    if (fieldOfStudy) payload.field_of_study = fieldOfStudy;
-
-    await supabase.from("profiles").update(payload).eq("id", userId);
     await loadSuggestions(userId, university, fieldOfStudy);
-    setStep("follow");
     setLoading(false);
+    goToStep("follow");
   };
 
-  const completeOnboarding = async (welcome: boolean) => {
+  const completeOnboarding = async (destination = "/?welcome=1") => {
     if (!userId) return;
 
     setLoading(true);
@@ -192,33 +271,206 @@ export default function OnboardingPage() {
       .from("profiles")
       .update({ onboarding_completed: true })
       .eq("id", userId);
+    trackActivationEvent({ event: "onboarding_completed" });
     setLoading(false);
-    router.push(welcome ? "/?welcome=1" : "/");
+    router.push(destination);
   };
 
-  if (step === "follow") {
-    return (
-      <div className="mx-auto max-w-4xl py-10">
-        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+  const handleAvatarUpload = async (url: string) => {
+    setAvatarUrl(url);
+    if (!userId) return;
+
+    const supabase = createClient();
+    await supabase.from("profiles").update({ avatar_url: url }).eq("id", userId);
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl py-8">
+      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5">
+        <div className="mb-3 flex items-center justify-between text-xs font-medium text-gray-500">
+          <span>Step {currentStepIndex + 1} of {STEP_ORDER.length}</span>
+          <span>{progress}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {step === "identity" ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+            Academic identity
+          </p>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900">
+            Set up the profile people will trust
+          </h1>
+          <p className="mt-2 text-sm text-gray-500">
+            These details help classmates, editors, and readers understand your work.
+          </p>
+
+          <div className="mt-6 grid gap-5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              {userId ? (
+                <AvatarUploader
+                  userId={userId}
+                  currentUrl={avatarUrl}
+                  fullName={fullName}
+                  onUpload={handleAvatarUpload}
+                />
+              ) : null}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Full name
+              </label>
+              <input
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                className={INPUT_STYLES}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Username
+              </label>
+              <input
+                value={username}
+                onChange={(event) => setUsername(normalizeUsername(event.target.value))}
+                className={INPUT_STYLES}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                University
+              </label>
+              <UniversitySelect value={university} onChange={setUniversity} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Field of study
+              </label>
+              <select
+                value={fieldOfStudy}
+                onChange={(event) => setFieldOfStudy(event.target.value)}
+                className={INPUT_STYLES}
+              >
+                <option value="">Select field of study</option>
+                {FIELD_OF_STUDY_OPTIONS.map((field) => (
+                  <option key={field} value={field}>
+                    {field}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Graduation year
+              </label>
+              <select
+                value={graduationYear}
+                onChange={(event) => setGraduationYear(event.target.value)}
+                className={INPUT_STYLES}
+              >
+                <option value="">Select graduation year</option>
+                {graduationYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+
+          <div className="mt-8 flex justify-end">
+            <button
+              type="button"
+              onClick={saveIdentity}
+              disabled={loading}
+              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            >
+              {loading ? "Saving..." : "Continue"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {step === "interests" ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+            Interests
+          </p>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900">
+            Choose the ideas you want in your feed
+          </h1>
+          <p className="mt-2 text-sm text-gray-500">
+            Pick up to 6 topics. We will use them for recommendations and first follows.
+          </p>
+
+          <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-4">
+            {INTEREST_OPTIONS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleInterest(tag)}
+                className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                  interests.includes(tag)
+                    ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
+                    : "border border-gray-200 bg-canvas text-gray-700 hover:border-emerald-300"
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+
+          {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+
+          <div className="mt-8 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => goToStep("identity")}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={saveInterestsAndContinue}
+              disabled={loading || interests.length === 0}
+              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            >
+              {loading ? "Saving..." : "Continue"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {step === "follow" ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Follow some voices
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                First network
+              </p>
+              <h1 className="mt-2 text-2xl font-bold text-gray-900">
+                Follow 3 writers to shape your home feed
               </h1>
               <p className="mt-2 text-sm text-gray-500">
-                Start with a few writers from your field and the wider network.
+                {Math.min(followedIds.size, 3)} of 3 followed.
               </p>
             </div>
-            <Link
-              href="/"
-              onClick={(event) => {
-                event.preventDefault();
-                void completeOnboarding(false);
-              }}
+            <button
+              type="button"
+              onClick={() => goToStep("contribute")}
               className="text-sm text-gray-400 transition-colors hover:text-gray-600"
             >
-              Skip for now {"->"}
-            </Link>
+              Skip for now
+            </button>
           </div>
 
           {loadingSuggestions ? (
@@ -227,7 +479,7 @@ export default function OnboardingPage() {
             </div>
           ) : suggestions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
-              No suggestions yet.
+              No suggestions yet. You can still continue and explore the latest posts.
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -280,85 +532,96 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => completeOnboarding(true)}
-              disabled={loading || followedIds.size === 0}
-              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => goToStep("interests")}
+              className="text-sm text-gray-500 hover:text-gray-700"
             >
-              {loading ? "Finishing..." : "Finish onboarding"}
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => goToStep("contribute")}
+              disabled={followedIds.size < 3}
+              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            >
+              Continue
             </button>
           </div>
-        </div>
-      </div>
-    );
-  }
+        </section>
+      ) : null}
 
-  return (
-    <div className="mx-auto max-w-2xl py-10">
-      <div className="rounded-2xl border border-gray-200 bg-white p-8">
-        <h1 className="text-2xl font-bold text-gray-900">Interests</h1>
-        <p className="mt-2 text-sm text-gray-500">
-          Pick a few topics you care about. We&apos;ll use them to shape your feed
-          from day one.
-        </p>
-        <p className="mt-4 text-xs text-gray-400">Choose up to 6 topics.</p>
-
-        <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-4">
-          {INTEREST_OPTIONS.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => toggleInterest(tag)}
-              className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${
-                interests.includes(tag)
-                  ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
-                  : "border border-gray-200 bg-canvas text-gray-700 hover:border-emerald-300"
-              }`}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-6">
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            When do you graduate?{" "}
-            <span className="font-normal text-gray-400">(optional)</span>
-          </label>
-          <input
-            type="number"
-            min={2024}
-            max={2040}
-            placeholder="e.g. 2027"
-            value={graduationYear}
-            onChange={(e) => setGraduationYear(e.target.value)}
-            className="w-full max-w-xs rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-          <p className="mt-1 text-xs text-gray-400">
-            We&apos;ll keep your account active and transition you to Alumni after you finish.
+      {step === "contribute" ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+            First contribution
           </p>
-        </div>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900">
+            Choose how you want to enter the conversation
+          </h1>
+          <p className="mt-2 text-sm text-gray-500">
+            You can start small. A short blog draft is enough to begin building momentum.
+          </p>
 
-        <div className="mt-8 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => saveInterestsAndContinue(true)}
-            className="text-sm text-gray-400 transition-colors hover:text-gray-600"
-          >
-            Skip interests
-          </button>
-          <button
-            type="button"
-            onClick={() => saveInterestsAndContinue(false)}
-            disabled={loading}
-            className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-          >
-            {loading ? "Saving..." : "Continue"}
-          </button>
-        </div>
-      </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => completeOnboarding("/write?type=blog&starter=1")}
+              className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-left transition-colors hover:bg-emerald-100"
+            >
+              <p className="text-sm font-semibold text-emerald-900">
+                Write a short blog
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-emerald-800">
+                Use a beginner template for a 200-word argument or reflection.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => completeOnboarding("/?tab=latest")}
+              className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-emerald-200"
+            >
+              <p className="text-sm font-semibold text-gray-900">
+                Respond to a post
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                Find a strong essay and publish a substantive response.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => completeOnboarding("/debates")}
+              className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-emerald-200"
+            >
+              <p className="text-sm font-semibold text-gray-900">
+                Join a debate
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                Pick a side and add a concise argument to a live discussion.
+              </p>
+            </button>
+          </div>
+
+          <div className="mt-8 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => goToStep("follow")}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => completeOnboarding()}
+              disabled={loading}
+              className="rounded-lg border border-gray-200 px-6 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-canvas disabled:opacity-50"
+            >
+              {loading ? "Finishing..." : "Finish for now"}
+            </button>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
