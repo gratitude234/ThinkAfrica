@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { isUniversityEmail } from "@/lib/universityDomains";
+import UniversitySelect from "@/components/ui/UniversitySelect";
 
 const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
@@ -15,17 +16,49 @@ const BRAND_ITEMS = [
   { icon: "🏆", text: "Earn points, badges and fellowships" },
 ];
 
+const FIELD_OF_STUDY_OPTIONS = [
+  "Law & Justice",
+  "Economics",
+  "Technology",
+  "Public Health",
+  "Politics & Governance",
+  "Environment & Climate",
+  "Education Policy",
+  "African Culture",
+  "Philosophy",
+  "Gender Studies",
+  "Business & Finance",
+  "International Relations",
+  "Computer Science",
+  "Medicine",
+  "Agriculture",
+  "Literature & Writing",
+  "History",
+  "Human Rights",
+  "Social Justice",
+  "Engineering",
+];
+
 export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     fullName: "",
+    university: "",
+    fieldOfStudy: "",
+    graduationYear: String(new Date().getFullYear()),
     email: "",
     password: "",
   });
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const graduationYears = Array.from({ length: 6 }, (_, index) =>
+    String(new Date().getFullYear() + index)
+  );
+
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
@@ -34,6 +67,12 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
 
+    if (!form.university.trim() || !form.fieldOfStudy) {
+      setError("Please select your university and field of study.");
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
     const { error: signUpError } = await supabase.auth.signUp({
       email: form.email,
@@ -41,6 +80,9 @@ export default function SignupPage() {
       options: {
         data: {
           full_name: form.fullName,
+          university: form.university,
+          field_of_study: form.fieldOfStudy,
+          graduation_year: parseInt(form.graduationYear, 10),
         },
       },
     });
@@ -51,7 +93,7 @@ export default function SignupPage() {
       return;
     }
 
-    router.push("/");
+    router.push("/onboarding");
     router.refresh();
   };
 
@@ -117,6 +159,57 @@ export default function SignupPage() {
                 placeholder="e.g. Amara Diallo"
                 className={INPUT_STYLES}
               />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                University
+              </label>
+              <UniversitySelect
+                value={form.university}
+                onChange={(value) =>
+                  setForm((prev) => ({ ...prev, university: value }))
+                }
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Field of study
+              </label>
+              <select
+                name="fieldOfStudy"
+                value={form.fieldOfStudy}
+                onChange={handleChange}
+                required
+                className={INPUT_STYLES}
+              >
+                <option value="">Select field of study</option>
+                {FIELD_OF_STUDY_OPTIONS.map((field) => (
+                  <option key={field} value={field}>
+                    {field}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Graduation year
+              </label>
+              <select
+                name="graduationYear"
+                value={form.graduationYear}
+                onChange={handleChange}
+                required
+                className={INPUT_STYLES}
+              >
+                {graduationYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
