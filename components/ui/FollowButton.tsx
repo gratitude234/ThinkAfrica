@@ -7,12 +7,14 @@ interface Props {
   followerId: string;
   followingId: string;
   initialFollowing?: boolean;
+  onChange?: (following: boolean) => void;
 }
 
 export default function FollowButton({
   followerId,
   followingId,
   initialFollowing = false,
+  onChange,
 }: Props) {
   const [following, setFollowing] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,9 @@ export default function FollowButton({
         .from("follows")
         .insert({ follower_id: followerId, following_id: followingId });
     }
-    setFollowing(!following);
+    const nextFollowing = !following;
+    setFollowing(nextFollowing);
+    onChange?.(nextFollowing);
     setLoading(false);
   };
 
