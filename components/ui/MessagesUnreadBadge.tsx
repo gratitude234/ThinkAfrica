@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface ParticipantRow {
@@ -19,9 +19,14 @@ export default function MessagesUnreadBadge({
   className?: string;
 }) {
   const [count, setCount] = useState(0);
+  const supabase = useMemo(() => createClient(), []);
+  const channelId = useRef(
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2)
+  );
 
   const fetchCount = useCallback(async () => {
-    const supabase = createClient();
     const { data } = await supabase
       .from("conversation_participants")
       .select("last_read_at, conversations!inner(last_message_at)")
@@ -40,7 +45,7 @@ export default function MessagesUnreadBadge({
     }).length;
 
     setCount(unread);
-  }, [userId]);
+  }, [supabase, userId]);
 
   useEffect(() => {
     void fetchCount();
@@ -49,9 +54,8 @@ export default function MessagesUnreadBadge({
       return;
     }
 
-    const supabase = createClient();
     const channel = supabase
-      .channel(`unread-badge-${userId}`)
+      .channel(`unread-badge-${userId}-${channelId.current}`)
       .on(
         "postgres_changes",
         {
@@ -68,7 +72,7 @@ export default function MessagesUnreadBadge({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, fetchCount]);
+  }, [supabase, userId, fetchCount]);
 
   if (!count) return null;
 
