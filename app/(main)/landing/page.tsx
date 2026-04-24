@@ -164,9 +164,11 @@ export default async function LandingPage() {
                         </p>
                       </div>
                       {item.cover_image_url ? (
-                        <img
+                        <Image
                           src={item.cover_image_url}
                           alt={item.title}
+                          width={64}
+                          height={64}
                           className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
                         />
                       ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { trackActivationEvent } from "@/lib/activationEvents";
 import { formatRelativeTime } from "@/lib/utils";
 import { respondToCoAuthorInvite } from "./actions";
 
@@ -23,22 +24,22 @@ interface NotificationData {
 }
 
 const TYPE_ICONS: Record<string, string> = {
-  follow: "👤",
-  like: "❤️",
-  comment: "💬",
-  debate_reply: "⚡",
-  debate_argument: "⚡",
-  fellowship: "🎓",
-  badge: "🏅",
-  post_approved: "✅",
-  post_rejected: "❌",
-  review_assigned: "📝",
-  revision_requested: "✍️",
-  post_published: "📚",
-  co_author_invite: "🤝",
-  co_author_accepted: "✅",
-  co_author_declined: "↩️",
-  response_post: "↩",
+  follow: "+",
+  like: "<3",
+  comment: "...",
+  debate_reply: "!",
+  debate_argument: "!",
+  fellowship: "$",
+  badge: "*",
+  post_approved: "OK",
+  post_rejected: "X",
+  review_assigned: "R",
+  revision_requested: "RE",
+  post_published: "P",
+  co_author_invite: "CO",
+  co_author_accepted: "OK",
+  co_author_declined: "NO",
+  response_post: "RE",
 };
 
 function buildMessage(notification: NotificationData): string {
@@ -116,7 +117,7 @@ export default function NotificationItem({
 }) {
   const message = buildMessage(notification);
   const link = buildLink(notification);
-  const icon = TYPE_ICONS[notification.type] ?? "🔔";
+  const icon = TYPE_ICONS[notification.type] ?? "N";
 
   const inner = (
     <div
@@ -132,7 +133,7 @@ export default function NotificationItem({
           className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
         />
       ) : (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-base">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
           {icon}
         </div>
       )}
@@ -182,8 +183,24 @@ export default function NotificationItem({
     </div>
   );
 
-  if (link) {
-    return <Link href={link}>{inner}</Link>;
+  if (link && notification.type !== "co_author_invite") {
+    return (
+      <Link
+        href={link}
+        onClick={() => {
+          trackActivationEvent({
+            event: "notification_opened",
+            metadata: {
+              notificationId: notification.id,
+              type: notification.type,
+              source: "notifications_page",
+            },
+          });
+        }}
+      >
+        {inner}
+      </Link>
+    );
   }
 
   return inner;

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { trackActivationEvent } from "@/lib/activationEvents";
 import { createClient } from "@/lib/supabase/client";
 
 interface Notification {
   id: string;
   type: string;
-  message: string;
+  message: string | null;
   read: boolean;
   link: string | null;
   created_at: string;
@@ -30,19 +31,42 @@ function timeAgo(dateString: string): string {
 }
 
 const TYPE_ICONS: Record<string, string> = {
-  like: "❤️",
-  comment: "💬",
-  follow: "👤",
-  debate_reply: "⚡",
-  post_approved: "✅",
-  response_post: "↩",
+  like: "<3",
+  comment: "...",
+  follow: "+",
+  debate_reply: "!",
+  post_approved: "OK",
+  post_published: "P",
+  revision_requested: "RE",
+  response_post: "RE",
 };
+
+function notificationText(notification: Notification) {
+  if (notification.message) return notification.message;
+
+  switch (notification.type) {
+    case "follow":
+      return "Someone started following you";
+    case "like":
+      return "Someone liked your post";
+    case "comment":
+      return "Someone commented on your post";
+    case "response_post":
+      return "Someone wrote a response to your post";
+    case "revision_requested":
+      return "A post needs revision";
+    case "post_published":
+      return "Your post has been published";
+    default:
+      return "New notification";
+  }
+}
 
 export default function NotificationBell({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const unreadCount = notifications.filter((notification) => !notification.read).length;
 
@@ -56,7 +80,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
         .limit(10);
 
       if (data) {
-        setNotifications(data);
+        setNotifications(data as Notification[]);
       }
     }
 
@@ -112,6 +136,17 @@ export default function NotificationBell({ userId }: { userId: string }) {
     );
   }
 
+  function trackOpen(notification: Notification) {
+    trackActivationEvent({
+      event: "notification_opened",
+      metadata: {
+        notificationId: notification.id,
+        type: notification.type,
+        source: "notification_bell",
+      },
+    });
+  }
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -158,18 +193,25 @@ export default function NotificationBell({ userId }: { userId: string }) {
           <div className="max-h-80 divide-y divide-gray-50 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-400">
-                No notifications yet
+                <p>No notifications yet</p>
+                <Link
+                  href="/?tab=latest"
+                  onClick={() => setOpen(false)}
+                  className="mt-3 inline-flex text-xs font-medium text-emerald-600 hover:text-emerald-700"
+                >
+                  Read latest posts
+                </Link>
               </div>
             ) : (
               notifications.map((notification) => {
                 const inner = (
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 flex-shrink-0 text-base">
-                      {TYPE_ICONS[notification.type] ?? "🔔"}
+                    <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600">
+                      {TYPE_ICONS[notification.type] ?? "N"}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm leading-snug text-gray-700">
-                        {notification.message}
+                        {notificationText(notification)}
                       </p>
                       <p className="mt-1 text-xs text-gray-400">
                         {timeAgo(notification.created_at)}
@@ -189,7 +231,13 @@ export default function NotificationBell({ userId }: { userId: string }) {
                     }`}
                   >
                     {notification.link ? (
-                      <Link href={notification.link} onClick={() => setOpen(false)}>
+                      <Link
+                        href={notification.link}
+                        onClick={() => {
+                          trackOpen(notification);
+                          setOpen(false);
+                        }}
+                      >
                         {inner}
                       </Link>
                     ) : (
@@ -207,7 +255,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
               onClick={() => setOpen(false)}
               className="block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700"
             >
-              View all notifications →
+              View all notifications -&gt;
             </Link>
           </div>
         </div>

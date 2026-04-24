@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, POST_POINTS, type PostType } from "@/lib/utils";
 import DigestSendButton from "./DigestSendButton";
@@ -81,10 +82,14 @@ export default async function AdminDigestPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      <RetentionEventTracker event="weekly_digest_previewed" metadata={{ source: "admin_digest" }} />
+
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Weekly Digest Preview</h1>
-          <p className="text-gray-500 text-sm mt-1">What this week&apos;s email digest would contain</p>
+          <p className="text-gray-500 text-sm mt-1">
+            Admin-only preview. Email delivery is not connected in this V1.
+          </p>
         </div>
         <DigestSendButton />
       </div>

@@ -16,6 +16,11 @@ const ALLOWED_EVENTS = new Set<ActivationEventName>([
   "publish_drawer_opened",
   "post_submitted",
   "debate_joined",
+  "home_viewed",
+  "dashboard_viewed",
+  "next_action_clicked",
+  "notification_opened",
+  "weekly_digest_previewed",
 ]);
 
 export async function POST(request: Request) {

@@ -14,7 +14,10 @@ const inter = Inter({
   display: "swap",
 });
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(appUrl),
   title: "ThinkAfrika - Africa's Intellectual Social Network",
   description:
     "Research, essays, and policy briefs from African university students.",

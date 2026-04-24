@@ -2,11 +2,14 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
+import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
+import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
 import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import WelcomeBanner from "@/components/ui/WelcomeBanner";
 import { getActivationState, type ActivationState } from "@/lib/activation";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { getRetentionSummary, type RetentionSummary } from "@/lib/retention";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import EditorPicksRow from "./EditorPicksRow";
 import FeaturedPostLead from "./FeaturedPostLead";
@@ -276,6 +279,7 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   let peopleResult: SuggestedPeopleResult = { suggestions: [], reason: "" };
   let activationState: ActivationState | null = null;
+  let retentionSummary: RetentionSummary | null = null;
 
   if (user) {
     [peopleResult, activationState] = await Promise.all([
@@ -287,6 +291,8 @@ export default async function HomePage({ searchParams }: PageProps) {
       }),
       getActivationState(supabase, user.id),
     ]);
+
+    retentionSummary = await getRetentionSummary(supabase, user.id, activationState);
   }
 
   const showFollowingEligible = !!user;
@@ -299,10 +305,21 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   return (
     <div>
+      {user ? (
+        <RetentionEventTracker
+          event="home_viewed"
+          metadata={{ tab: activeTab, activated: Boolean(activationState?.activated) }}
+        />
+      ) : null}
+
       {welcome === "1" && user ? <WelcomeBanner firstName={firstName} /> : null}
 
-      {activationState ? (
+      {activationState && !activationState.activated ? (
         <ActivationChecklist state={activationState} compact />
+      ) : null}
+
+      {activationState?.activated && retentionSummary ? (
+        <RetentionThisWeek summary={retentionSummary} source="home" />
       ) : null}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

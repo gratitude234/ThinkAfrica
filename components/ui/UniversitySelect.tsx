@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useId } from "react";
 
 const AFRICAN_UNIVERSITIES = [
   "Addis Ababa University",
@@ -76,6 +76,7 @@ export default function UniversitySelect({ value, onChange, className = "" }: Pr
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const listId = useId();
 
   const filtered = AFRICAN_UNIVERSITIES.filter((u) =>
     u.toLowerCase().includes(inputValue.toLowerCase())
@@ -165,13 +166,19 @@ export default function UniversitySelect({ value, onChange, className = "" }: Pr
         onKeyDown={handleKeyDown}
         placeholder="Search university..."
         autoComplete="off"
+        role="combobox"
         aria-autocomplete="list"
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-controls={open && filtered.length > 0 ? listId : undefined}
+        aria-activedescendant={
+          activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined
+        }
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
       />
       {open && filtered.length > 0 && (
         <ul
+          id={listId}
           ref={listRef}
           role="listbox"
           className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto"
@@ -179,6 +186,7 @@ export default function UniversitySelect({ value, onChange, className = "" }: Pr
           {filtered.map((item, i) => (
             <li
               key={item}
+              id={`${listId}-option-${i}`}
               role="option"
               aria-selected={i === activeIndex}
               onMouseDown={() => selectItem(item)}

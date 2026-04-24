@@ -4,9 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import StatsBar from "./StatsBar";
 import PostsTable from "./PostsTable";
 import type { DashboardPost } from "./PostsTable";
+import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
+import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
 import Button from "@/components/ui/Button";
 import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import { getActivationState } from "@/lib/activation";
+import { getRetentionSummary } from "@/lib/retention";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -57,6 +60,11 @@ export default async function DashboardPage() {
     .eq("following_id", user.id);
 
   const activationState = await getActivationState(supabase, user.id);
+  const retentionSummary = await getRetentionSummary(
+    supabase,
+    user.id,
+    activationState
+  );
 
   // Fellowship applications by this user
   const { data: applicationsRaw } = await supabase
@@ -99,6 +107,14 @@ export default async function DashboardPage() {
   const totalLikes = publishedPosts.reduce((sum, p) => sum + p.like_count, 0);
   return (
     <div className="max-w-5xl mx-auto">
+      <RetentionEventTracker
+        event="dashboard_viewed"
+        metadata={{
+          activated: activationState.activated,
+          publishedCount: publishedPosts.length,
+        }}
+      />
+
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
@@ -111,7 +127,11 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <ActivationChecklist state={activationState} />
+      {activationState.activated ? (
+        <RetentionThisWeek summary={retentionSummary} source="dashboard" />
+      ) : (
+        <ActivationChecklist state={activationState} />
+      )}
 
       {revisionPosts.length > 0 ? (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">

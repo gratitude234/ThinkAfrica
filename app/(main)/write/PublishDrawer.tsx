@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/client";
@@ -893,10 +894,12 @@ export default function PublishDrawer({
             <article className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
               <div className="relative aspect-[16/9] w-full overflow-hidden">
                 {coverImageUrl ? (
-                  <img
+                  <Image
                     src={coverImageUrl}
                     alt={title}
-                    className="h-full w-full object-cover"
+                    fill
+                    sizes="440px"
+                    className="object-cover"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 to-emerald-100">

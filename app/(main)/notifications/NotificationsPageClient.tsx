@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Toast from "@/components/ui/Toast";
 import NotificationItem from "./NotificationItem";
@@ -93,12 +94,34 @@ export default function NotificationsPageClient({
       </div>
 
       {notifications.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white py-20 text-center">
-          <span className="mb-4 block text-4xl">🔔</span>
-          <p className="font-medium text-gray-500">No notifications yet</p>
-          <p className="mt-1 text-sm text-gray-400">
-            You&apos;ll be notified when someone interacts with your work.
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-20 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+            All caught up
           </p>
+          <p className="mt-2 font-medium text-gray-700">No notifications yet</p>
+          <p className="mt-1 text-sm text-gray-400">
+            Return to the feed, follow credible writers, or keep building your next draft.
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Link
+              href="/?tab=latest"
+              className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+            >
+              Read latest
+            </Link>
+            <Link
+              href="/onboarding?step=follow"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-canvas"
+            >
+              Follow writers
+            </Link>
+            <Link
+              href="/write"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-canvas"
+            >
+              Continue writing
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
