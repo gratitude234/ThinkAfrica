@@ -471,8 +471,6 @@ export default async function PostPage({ params }: PageProps) {
                 </div>
               ) : null}
 
-              {audioSummaryUrl ? <AudioSummaryPlayer url={audioSummaryUrl} /> : null}
-
               <header className="mb-8">
                 {/* Kicker - post type + word count + read time */}
                 <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-brand">
@@ -574,7 +572,20 @@ export default async function PostPage({ params }: PageProps) {
                     ))}
                   </div>
                 ) : null}
+
+                {isPublished ? (
+                  <Link
+                    href={`/write?inResponseTo=${post.id}&type=essay`}
+                    className="mt-4 inline-flex items-center gap-1.5 text-sm text-emerald-600 hover:underline"
+                  >
+                    {"\u21A9"} Write a response
+                  </Link>
+                ) : null}
               </header>
+
+              {audioSummaryUrl ? (
+                <AudioSummaryPlayer audioUrl={audioSummaryUrl} />
+              ) : null}
 
               <hr className="mb-8 border-gray-200" />
 
@@ -664,7 +675,7 @@ export default async function PostPage({ params }: PageProps) {
                         More than a comment warrants — your argument, your byline, your post.
                       </p>
                       <Link
-                        href={`/write?response_to=${post.slug}`}
+                        href={`/write?inResponseTo=${post.id}&type=essay`}
                         className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
                       >
                         ↩ Write a response
