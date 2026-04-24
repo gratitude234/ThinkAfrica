@@ -228,6 +228,8 @@ export default async function DebatePage({ params }: PageProps) {
           <DebateRecap
             recapText={debate.recap_text}
             generatedAt={debate.recap_generated_at ?? debate.created_at}
+            forVotes={debate.motion_for_count ?? 0}
+            againstVotes={debate.motion_against_count ?? 0}
           />
         ) : status === "closed" ? (
           <div className="mt-10 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
