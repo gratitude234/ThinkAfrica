@@ -4,10 +4,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
 import UserAvatar from "@/components/ui/UserAvatar";
-import { formatDate, POST_POINTS, type PostType } from "@/lib/utils";
+import { formatDate, POST_POINTS, POST_TYPE_LABELS, type PostType } from "@/lib/utils";
 import LikeButton from "./LikeButton";
 import BookmarkButton from "./BookmarkButton";
 import CommentsLoader from "./CommentsLoader";
@@ -196,7 +195,7 @@ export default async function PostPage({ params }: PageProps) {
       created_at, published_at, view_count, cover_image_url, citation_id,
       in_response_to,
       audio_summary_url,
-      profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url)
+      profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url, verified, verified_type)
     `
     )
     .eq("slug", slug)
@@ -472,40 +471,53 @@ export default async function PostPage({ params }: PageProps) {
               {audioSummaryUrl ? <AudioSummaryPlayer url={audioSummaryUrl} /> : null}
 
               <header className="mb-8">
-                <div className="mb-4 flex flex-wrap items-center gap-2">
-                  <Badge type={post.type} wordCount={wordCount} />
-                  {post.tags && post.tags.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {post.tags.map((tag: string) => (
-                        <Link key={tag} href={`/topics/${encodeURIComponent(tag)}`}>
-                          <Tag label={tag} />
-                        </Link>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+                {/* Kicker - post type + word count + read time */}
+                <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-brand">
+                  {POST_TYPE_LABELS[(post.type as PostType) ?? "blog"] ?? post.type}
+                  <span className="mx-2 text-gray-300">·</span>
+                  <span className="text-ink-muted">
+                    {wordCount.toLocaleString()} words · {readTime} min read
+                  </span>
+                </p>
 
                 {parentPost ? (
                   <Link
                     href={`/post/${parentPost.slug}`}
-                    className="mb-3 inline-flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-600"
+                    className="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-600"
                   >
                     <span aria-hidden="true">{"\u21A9"}</span>
                     <span>
                       In response to:{" "}
-                      <span className="font-medium text-gray-600">
-                        {parentPost.title}
-                      </span>
+                      <span className="font-medium text-gray-600">{parentPost.title}</span>
                     </span>
                   </Link>
                 ) : null}
 
-                <h1 className="font-display mb-4 text-3xl font-bold leading-tight text-ink">
+                {/* Tags - moved below kicker, before title */}
+                {post.tags && post.tags.length > 0 ? (
+                  <div className="mb-4 flex flex-wrap gap-1.5">
+                    {post.tags.map((tag: string) => (
+                      <Link key={tag} href={`/topics/${encodeURIComponent(tag)}`}>
+                        <Tag label={tag} />
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+
+                {/* Title - enlarged to match journal scale */}
+                <h1 className="font-display mb-5 text-4xl font-medium leading-[1.05] tracking-tight text-ink sm:text-5xl">
                   {post.title}
                 </h1>
 
+                {/* Deck / standfirst - rendered from excerpt if present */}
+                {post.excerpt ? (
+                  <p className="font-display mb-6 text-xl font-normal italic leading-relaxed text-gray-600 sm:text-2xl">
+                    {post.excerpt}
+                  </p>
+                ) : null}
+
                 {author ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-4 border-y border-gray-200 py-4">
                     <Link
                       href={`/${author.username}`}
                       className="group flex items-center gap-3"
@@ -513,34 +525,35 @@ export default async function PostPage({ params }: PageProps) {
                       <UserAvatar
                         name={authorName}
                         src={author.avatar_url}
-                        size={40}
+                        size={44}
+                        className="flex-shrink-0"
                       />
                       <div>
                         <p className="font-medium text-gray-900 transition-colors group-hover:text-emerald-brand">
                           {authorName}
+                          {author.verified ? (
+                            <span
+                              title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
+                              className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-brand text-[9px] font-bold text-white"
+                              aria-label="Verified"
+                            >
+                              ✓
+                            </span>
+                          ) : null}
                         </p>
-                        <p className="text-xs text-gray-400">
-                          {author.university} · {formatDate(post.published_at ?? post.created_at)} ·{" "}
-                          {readTime} min read
+                        <p className="text-xs text-gray-500">
+                          {author.field_of_study ? `${author.field_of_study} · ` : ""}
+                          {author.university}
                         </p>
                       </div>
                     </Link>
 
-                    {isPublished ? (
-                      <div className="flex items-center gap-2">
-                        <BookmarkButton
-                          postId={post.id}
-                          initialBookmarked={userBookmarked}
-                          userId={user?.id ?? null}
-                        />
-                        <LikeButton
-                          postId={post.id}
-                          initialLiked={userLiked}
-                          initialCount={likeCount ?? 0}
-                          userId={user?.id ?? null}
-                        />
-                      </div>
-                    ) : null}
+                    <div className="ml-auto text-right">
+                      <p className="text-sm font-medium text-gray-900">
+                        {formatDate(post.published_at ?? post.created_at)}
+                      </p>
+                      <p className="text-xs text-gray-400">Published</p>
+                    </div>
                   </div>
                 ) : null}
 
@@ -562,11 +575,11 @@ export default async function PostPage({ params }: PageProps) {
 
               <hr className="mb-8 border-gray-200" />
 
-              <div className="relative mb-8">
+              <div className="article-journal-body relative mb-8">
                 <HighlightShare containerId="post-article-prose" />
                 <div
                   id="post-article-prose"
-                  className="prose prose-gray max-w-none prose-a:text-emerald-brand prose-headings:text-gray-900"
+                  className="article-journal-body prose prose-gray max-w-none prose-lg prose-a:text-emerald-brand prose-headings:font-medium prose-headings:tracking-tight prose-headings:text-gray-900"
                   dangerouslySetInnerHTML={{ __html: contentWithIds }}
                 />
               </div>
@@ -612,25 +625,40 @@ export default async function PostPage({ params }: PageProps) {
 
               {isPublished ? (
                 <>
-                  <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-                    <ShareButtons
-                      title={post.title}
-                      slug={post.slug}
-                      excerpt={post.excerpt ?? null}
-                      authorName={author?.full_name ?? null}
-                    />
+                  {/* Unified action strip - like, bookmark, share consolidated here */}
+                  <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-y border-gray-200 py-4">
+                    <div className="flex items-center gap-3">
+                      <LikeButton
+                        postId={post.id}
+                        initialLiked={userLiked}
+                        initialCount={likeCount ?? 0}
+                        userId={user?.id ?? null}
+                      />
+                      <BookmarkButton
+                        postId={post.id}
+                        initialBookmarked={userBookmarked}
+                        userId={user?.id ?? null}
+                      />
+                      <ShareButtons
+                        title={post.title}
+                        slug={post.slug}
+                        excerpt={post.excerpt ?? null}
+                        authorName={author?.full_name ?? null}
+                      />
+                    </div>
                     <span className="text-xs text-gray-400">
-                      {post.view_count} {post.view_count === 1 ? "view" : "views"}
+                      {post.view_count?.toLocaleString()}{" "}
+                      {post.view_count === 1 ? "view" : "views"}
                     </span>
                   </div>
 
                   {user ? (
-                    <div className="mt-8 rounded-xl border border-gray-100 bg-canvas px-6 py-5">
-                      <p className="text-sm font-medium text-gray-700">
+                    <div className="mb-8 rounded-xl border border-gray-200 bg-canvas px-6 py-5">
+                      <p className="text-sm font-medium text-gray-900">
                         Have a substantive pushback? Write a response post.
                       </p>
-                      <p className="mt-1 text-xs text-gray-400">
-                        More than a comment warrants - your argument, your byline, your post.
+                      <p className="mt-1 text-xs text-gray-500">
+                        More than a comment warrants — your argument, your byline, your post.
                       </p>
                       <Link
                         href={`/write?response_to=${post.slug}`}
@@ -640,8 +668,6 @@ export default async function PostPage({ params }: PageProps) {
                       </Link>
                     </div>
                   ) : null}
-
-                  <hr className="mb-8 border-gray-200" />
                 </>
               ) : null}
 

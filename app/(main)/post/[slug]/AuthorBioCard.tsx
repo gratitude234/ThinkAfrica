@@ -69,11 +69,11 @@ export default function AuthorBioCard({
   const authorName = author.full_name ?? author.username ?? "Anonymous";
 
   return (
-    <div className="flex items-start gap-4 rounded-xl bg-canvas p-5">
+    <div className="flex items-start gap-5 rounded-xl border border-gray-200 bg-white p-6">
       <UserAvatar
         name={authorName}
         src={author.avatar_url}
-        size={48}
+        size={52}
         className="flex-shrink-0"
       />
       <div className="min-w-0 flex-1">
@@ -81,28 +81,26 @@ export default function AuthorBioCard({
           <div>
             <Link
               href={`/${author.username}`}
-              className="font-semibold text-gray-900 transition-colors hover:text-emerald-brand"
+              className="font-display text-lg font-medium text-gray-900 transition-colors hover:text-emerald-brand"
             >
               {authorName}
             </Link>
             <p className="mt-0.5 text-xs text-gray-500">
+              {author.field_of_study ? `${author.field_of_study} · ` : ""}
               {author.university}
-              {author.field_of_study ? ` · ${author.field_of_study}` : ""}
+              {isCorrespondingAuthor ? (
+                <span className="ml-2 font-medium text-emerald-700">Corresponding author</span>
+              ) : null}
             </p>
-            {isCorrespondingAuthor ? (
-              <p className="mt-1 text-xs font-medium text-emerald-700">
-                Corresponding author
-              </p>
-            ) : null}
           </div>
           {!isOwnProfile ? (
             <button
               onClick={toggleFollow}
               disabled={loading}
-              className={`flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+              className={`flex-shrink-0 rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
                 following
-                  ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  : "bg-emerald-brand text-white hover:bg-emerald-600"
+                  ? "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  : "bg-ink text-white hover:bg-gray-800"
               }`}
             >
               {following ? "Following" : "Follow"}
@@ -110,7 +108,7 @@ export default function AuthorBioCard({
           ) : null}
         </div>
         {author.bio ? (
-          <p className="mt-2 text-sm leading-relaxed text-gray-500">{author.bio}</p>
+          <p className="mt-3 text-sm leading-relaxed text-gray-600">{author.bio}</p>
         ) : null}
         {coAuthors.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">

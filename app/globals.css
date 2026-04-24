@@ -60,3 +60,57 @@
 .lite-mode .aspect-\[16\/9\] {
   display: none !important;
 }
+
+/* ── Journal article typography ─────────────────────────────────────── */
+
+/* Drop cap on the first paragraph of the article body */
+.article-journal-body .prose > p:first-of-type::first-letter {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 4rem;
+  font-weight: 500;
+  float: left;
+  line-height: 0.95;
+  margin: 0.1em 0.1em 0 0;
+  color: #1A1A1A;
+}
+
+/* Serif body text inside the article */
+.article-journal-body .prose p,
+.article-journal-body .prose li {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+
+/* Pull quote — add the class "ta-pullquote" to a <blockquote> in Tiptap */
+.article-journal-body .prose blockquote {
+  border-left: 2px solid #10B981;
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+  padding: 4px 0 4px 1.5rem;
+  margin: 2.25rem 0;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.25rem;
+  line-height: 1.45;
+  font-style: italic;
+  color: #1A1A1A;
+  background: transparent;
+  border-radius: 0;
+}
+
+/* References list — rendered via the existing <ol> in page.tsx */
+.article-journal-body .prose ol li::marker {
+  color: #10B981;
+  font-weight: 600;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+/* Section headings inside article */
+.article-journal-body .prose h2,
+.article-journal-body .prose h3 {
+  font-family: var(--font-display), Georgia, serif;
+  letter-spacing: -0.005em;
+  font-weight: 500;
+}
