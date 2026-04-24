@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { type DebatePhase, PHASE_LABELS } from "@/lib/debatePhases";
 import UpvoteButton from "./UpvoteButton";
 import ArgumentForm from "./ArgumentForm";
+import MotionVotePanel from "./MotionVotePanel";
+import PhaseControls from "./PhaseControls";
 
 interface ArgumentAuthor {
   username: string;
@@ -27,12 +30,18 @@ interface Argument {
 
 interface LiveArgumentsProps {
   debateId: string;
+  debateTitle: string;
   initialForArguments: Argument[];
   initialAgainstArguments: Argument[];
   currentUserId: string | null;
   userVotedIds: string[];
   debateStatus: string;
-  currentRound: number;
+  userParticipant: { stance: "for" | "against" } | null;
+  motionForCount: number;
+  motionAgainstCount: number;
+  userMotionVote: "for" | "against" | null;
+  currentPhase: DebatePhase;
+  isModeratorOfDebate: boolean;
 }
 
 function timeAgo(dateString: string): string {
@@ -153,9 +162,7 @@ function ArgumentCard({
               ) : (
                 <span className="text-sm font-semibold text-gray-900">Unknown</span>
               )}
-              <span
-                className={`rounded px-1.5 text-[10px] font-bold ${badgeClass}`}
-              >
+              <span className={`rounded px-1.5 text-[10px] font-bold ${badgeClass}`}>
                 {badgeLabel}
               </span>
             </div>
@@ -186,12 +193,18 @@ function ArgumentCard({
 
 export default function LiveArguments({
   debateId,
+  debateTitle,
   initialForArguments,
   initialAgainstArguments,
   currentUserId,
   userVotedIds,
   debateStatus,
-  currentRound,
+  userParticipant,
+  motionForCount,
+  motionAgainstCount,
+  userMotionVote,
+  currentPhase,
+  isModeratorOfDebate,
 }: LiveArgumentsProps) {
   const [forArguments, setForArguments] = useState<Argument[]>(initialForArguments);
   const [againstArguments, setAgainstArguments] = useState<Argument[]>(
@@ -260,10 +273,6 @@ export default function LiveArguments({
 
   const sortedForArguments = sortByUpvotes(forArguments);
   const sortedAgainstArguments = sortByUpvotes(againstArguments);
-  const latestRound = Math.max(
-    currentRound,
-    ...[...forArguments, ...againstArguments].map((argument) => argument.round_number)
-  );
   const forPoints = sortedForArguments.reduce(
     (sum, argument) => sum + argument.upvotes,
     0
@@ -280,8 +289,24 @@ export default function LiveArguments({
   return (
     <div>
       <div className="mb-4 text-sm text-gray-500">
-        For: {sortedForArguments.length} · Against: {sortedAgainstArguments.length}
+        For: {sortedForArguments.length} - Against: {sortedAgainstArguments.length}
       </div>
+
+      <div className="mb-4 text-center">
+        <span className="rounded-full bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-600">
+          Phase: {PHASE_LABELS[currentPhase]}
+        </span>
+      </div>
+
+      {isModeratorOfDebate ? (
+        <div className="mb-4">
+          <PhaseControls
+            debateId={debateId}
+            currentPhase={currentPhase}
+            debateStatus={debateStatus}
+          />
+        </div>
+      ) : null}
 
       <div className="grid gap-6 md:grid-cols-2">
         <div>
@@ -324,6 +349,9 @@ export default function LiveArguments({
       </div>
 
       <div className="mt-8">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">
+          Argument quality score
+        </p>
         <div className="mb-3 flex items-center justify-between text-sm font-semibold text-gray-700">
           <span>FOR</span>
           <span>AGAINST</span>
@@ -344,6 +372,16 @@ export default function LiveArguments({
         </div>
       </div>
 
+      <MotionVotePanel
+        debateId={debateId}
+        initialForCount={motionForCount}
+        initialAgainstCount={motionAgainstCount}
+        initialUserVote={userMotionVote}
+        isClosed={isClosed}
+        currentUserId={currentUserId}
+        motionTitle={debateTitle}
+      />
+
       <div className="mt-8 border-t border-gray-200 pt-6">
         <h3 className="mb-4 text-base font-semibold text-gray-900">
           {isClosed ? "Debate Closed" : "Submit Your Argument"}
@@ -361,8 +399,9 @@ export default function LiveArguments({
         ) : (
           <ArgumentForm
             debateId={debateId}
-            roundNumber={latestRound}
             disabled={isClosed}
+            userParticipant={userParticipant}
+            currentPhase={currentPhase}
           />
         )}
       </div>

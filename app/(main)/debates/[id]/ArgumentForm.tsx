@@ -1,48 +1,75 @@
 "use client";
 
-// -- ALTER TABLE debate_arguments ADD COLUMN stance text CHECK (stance IN ('for', 'against'));
-
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
+import {
+  type DebatePhase,
+  PHASE_DESCRIPTIONS,
+  PHASE_LABELS,
+  PHASE_ROUND_MAP,
+  PHASE_WORD_LIMITS,
+} from "@/lib/debatePhases";
 
 interface ArgumentFormProps {
   debateId: string;
-  roundNumber: number;
   disabled?: boolean;
+  userParticipant: { stance: "for" | "against" } | null;
+  currentPhase: DebatePhase;
 }
-
-type Stance = "for" | "against" | null;
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-const MAX_WORDS = 300;
-
 export default function ArgumentForm({
   debateId,
-  roundNumber,
   disabled,
+  userParticipant,
+  currentPhase,
 }: ArgumentFormProps) {
   const [content, setContent] = useState("");
-  const [stance, setStance] = useState<Stance>(null);
+  const [joining, setJoining] = useState(false);
+  const [joiningStance, setJoiningStance] = useState<"for" | "against" | null>(
+    null
+  );
+  const [lockedStance, setLockedStance] = useState<"for" | "against" | null>(
+    userParticipant?.stance ?? null
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const maxWords = PHASE_WORD_LIMITS[currentPhase];
+  const roundNumber = PHASE_ROUND_MAP[currentPhase];
   const wordCount = countWords(content);
-  const isOverLimit = wordCount > MAX_WORDS;
+  const isOverLimit = wordCount > maxWords;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  const handleJoin = async (stance: "for" | "against") => {
+    setJoining(true);
+    setJoiningStance(stance);
+    setError(null);
 
-    if (!stance) {
-      setError("Please choose your stance");
-      return;
+    const supabase = createClient();
+    const { data, error: rpcError } = await supabase.rpc("join_debate", {
+      p_debate_id: debateId,
+      p_stance: stance,
+    });
+
+    if (rpcError) {
+      setError(rpcError.message);
+    } else if (data === "for" || data === "against") {
+      setLockedStance(data);
     }
 
-    if (isOverLimit || !content.trim()) return;
+    setJoining(false);
+    setJoiningStance(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!lockedStance || isOverLimit || !content.trim()) return;
 
     setLoading(true);
     setError(null);
@@ -59,27 +86,24 @@ export default function ArgumentForm({
       return;
     }
 
-    const { error: insertError } = await supabase
-      .from("debate_arguments")
-      .insert({
-        debate_id: debateId,
-        author_id: user.id,
-        content: content.trim(),
-        round_number: roundNumber,
-        stance,
-      });
+    const { error: insertError } = await supabase.from("debate_arguments").insert({
+      debate_id: debateId,
+      author_id: user.id,
+      content: content.trim(),
+      round_number: roundNumber,
+      stance: lockedStance,
+    });
 
     if (insertError) {
       setError(insertError.message);
     } else {
       setContent("");
-      setStance(null);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     }
 
     setLoading(false);
-  }
+  };
 
   if (disabled) {
     return (
@@ -89,58 +113,84 @@ export default function ArgumentForm({
     );
   }
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div>
-        <p className="mb-2 text-sm font-medium text-gray-700">Choose your stance</p>
-        <div className="flex flex-wrap gap-2">
+  if (!lockedStance) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <p className="mb-1 text-sm font-semibold text-gray-800">
+          Choose your side to join the debate
+        </p>
+        <p className="mb-4 text-xs text-gray-400">
+          Your position is locked once you join. Choose carefully.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => setStance("for")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              stance === "for"
-                ? "bg-emerald-600 text-white"
-                : "border border-gray-200 bg-gray-100 text-gray-700"
-            }`}
+            onClick={() => void handleJoin("for")}
+            disabled={joining}
+            className="flex items-center justify-center gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-4 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
           >
-            For the motion
+            {joining && joiningStance === "for" ? "Joining..." : "Argue FOR"}
           </button>
           <button
             type="button"
-            onClick={() => setStance("against")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              stance === "against"
-                ? "bg-red-600 text-white"
-                : "border border-gray-200 bg-gray-100 text-gray-700"
-            }`}
+            onClick={() => void handleJoin("against")}
+            disabled={joining}
+            className="flex items-center justify-center gap-2 rounded-xl border-2 border-red-300 bg-red-50 px-4 py-4 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
           >
-            Against the motion
+            {joining && joiningStance === "against"
+              ? "Joining..."
+              : "Argue AGAINST"}
           </button>
         </div>
+        {error ? <p className="mt-3 text-xs text-red-500">{error}</p> : null}
+      </div>
+    );
+  }
+
+  const stanceColor =
+    lockedStance === "for"
+      ? "border-emerald-200 bg-emerald-100 text-emerald-700"
+      : "border-red-200 bg-red-100 text-red-700";
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+          {PHASE_LABELS[currentPhase]}
+        </p>
+        <p className="mt-0.5 text-xs text-gray-500">
+          {PHASE_DESCRIPTIONS[currentPhase]} Max {maxWords} words.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span
+          className={`rounded-full border px-3 py-1 text-xs font-bold ${stanceColor}`}
+        >
+          {lockedStance === "for" ? "FOR" : "AGAINST"} - Locked
+        </span>
       </div>
 
       <div>
         <div className="mb-1.5 flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700">
-            Your Argument (Round {roundNumber})
-          </label>
+          <label className="text-sm font-medium text-gray-700">Your Argument</label>
           <span
             className={`text-xs font-medium ${
               isOverLimit
                 ? "text-red-500"
-                : wordCount > MAX_WORDS * 0.85
+                : wordCount > maxWords * 0.85
                   ? "text-amber-500"
                   : "text-gray-400"
             }`}
           >
-            {wordCount} / {MAX_WORDS} words
+            {wordCount} / {maxWords} words
           </span>
         </div>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={6}
-          placeholder="Present your argument clearly and concisely (max 300 words)..."
+          placeholder="Present your argument clearly and concisely..."
           className={`w-full resize-none rounded-lg border px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 ${
             isOverLimit
               ? "border-red-300 focus:ring-red-400"
@@ -149,7 +199,7 @@ export default function ArgumentForm({
         />
         {isOverLimit ? (
           <p className="mt-1 text-xs text-red-500">
-            Please shorten your argument to {MAX_WORDS} words or fewer.
+            Please shorten your argument to {maxWords} words or fewer.
           </p>
         ) : null}
       </div>
@@ -165,11 +215,7 @@ export default function ArgumentForm({
         </div>
       ) : null}
 
-      <Button
-        type="submit"
-        loading={loading}
-        disabled={isOverLimit || !content.trim()}
-      >
+      <Button type="submit" loading={loading} disabled={isOverLimit || !content.trim()}>
         Submit Argument
       </Button>
     </form>

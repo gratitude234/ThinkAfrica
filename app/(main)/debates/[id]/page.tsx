@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import type { DebatePhase } from "@/lib/debatePhases";
 import { formatRelativeTime } from "@/lib/utils";
 import LiveArguments from "./LiveArguments";
+import DebateRecap from "./DebateRecap";
 import DebateCountdown from "./DebateCountdown";
 
 type DebateStatus = "open" | "active" | "closed";
@@ -17,11 +19,6 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-/**
- * Resolves the stance of an argument.
- * New rows have an explicit `stance` column value.
- * Legacy rows (stance = null) fall back to odd/even round parity.
- */
 function resolveStance(argument: { stance?: string | null; round_number: number }) {
   if (argument.stance === "for" || argument.stance === "against") {
     return argument.stance;
@@ -66,9 +63,7 @@ export default async function DebatePage({ params }: PageProps) {
 
   const { data: debate } = await supabase
     .from("debates")
-    .select(
-      "*, profiles!debates_moderator_id_fkey(username, full_name, university)"
-    )
+    .select("*, profiles!debates_moderator_id_fkey(username, full_name, university)")
     .eq("id", id)
     .single();
 
@@ -84,7 +79,9 @@ export default async function DebatePage({ params }: PageProps) {
 
   const argumentsWithProfiles = (rawArgs ?? []).map((argument) => ({
     ...argument,
-    profiles: Array.isArray(argument.profiles) ? argument.profiles[0] : argument.profiles,
+    profiles: Array.isArray(argument.profiles)
+      ? argument.profiles[0]
+      : argument.profiles,
   }));
 
   let userVotedIds: string[] = [];
@@ -95,17 +92,46 @@ export default async function DebatePage({ params }: PageProps) {
       .select("argument_id")
       .eq("user_id", user.id)
       .in("argument_id", argumentIds);
+
     userVotedIds = (votes ?? []).map((vote) => vote.argument_id);
   }
 
+  let userParticipant: { stance: "for" | "against" } | null = null;
+  if (user) {
+    const { data: participantRow } = await supabase
+      .from("debate_participants")
+      .select("stance")
+      .eq("debate_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (participantRow) {
+      userParticipant = {
+        stance: participantRow.stance as "for" | "against",
+      };
+    }
+  }
+
+  let userMotionVote: "for" | "against" | null = null;
+  if (user) {
+    const { data: motionVoteRow } = await supabase
+      .from("debate_motion_votes")
+      .select("vote")
+      .eq("debate_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (motionVoteRow) {
+      userMotionVote = motionVoteRow.vote as "for" | "against";
+    }
+  }
+
   const status = debate.status as DebateStatus;
+  const currentPhase = (debate.current_phase ?? "opening") as DebatePhase;
   const moderator = Array.isArray(debate.profiles)
     ? debate.profiles[0]
     : debate.profiles;
-  const currentRound =
-    argumentsWithProfiles.length > 0
-      ? Math.max(...argumentsWithProfiles.map((argument) => argument.round_number))
-      : 1;
+  const isModeratorOfDebate = user?.id === debate.moderator_id;
   const forArguments = argumentsWithProfiles.filter(
     (argument) => resolveStance(argument) === "for"
   );
@@ -184,13 +210,30 @@ export default async function DebatePage({ params }: PageProps) {
 
         <LiveArguments
           debateId={id}
+          debateTitle={debate.title}
           initialForArguments={forArguments}
           initialAgainstArguments={againstArguments}
           currentUserId={user?.id ?? null}
           userVotedIds={userVotedIds}
           debateStatus={status}
-          currentRound={currentRound}
+          userParticipant={userParticipant}
+          motionForCount={debate.motion_for_count ?? 0}
+          motionAgainstCount={debate.motion_against_count ?? 0}
+          userMotionVote={userMotionVote}
+          currentPhase={currentPhase}
+          isModeratorOfDebate={isModeratorOfDebate}
         />
+
+        {status === "closed" && debate.recap_text ? (
+          <DebateRecap
+            recapText={debate.recap_text}
+            generatedAt={debate.recap_generated_at ?? debate.created_at}
+          />
+        ) : status === "closed" ? (
+          <div className="mt-10 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
+            Recap is being generated...
+          </div>
+        ) : null}
       </div>
     </div>
   );
