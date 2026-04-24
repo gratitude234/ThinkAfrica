@@ -69,7 +69,10 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
               href={`/post/${post.slug}`}
               className="group overflow-hidden rounded-xl border border-gray-200/70 bg-white transition-shadow hover:shadow-lg"
             >
-              <div className="relative aspect-video overflow-hidden">
+              <div
+                data-lite-hide={post.cover_image_url ? "" : undefined}
+                className="relative aspect-video overflow-hidden"
+              >
                 {post.cover_image_url ? (
                   <Image
                     src={post.cover_image_url}

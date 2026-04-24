@@ -456,7 +456,10 @@ export default async function PostPage({ params }: PageProps) {
               ) : null}
 
               {coverImageUrl ? (
-                <div className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[400px]">
+                <div
+                  data-lite-hide
+                  className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[400px]"
+                >
                   <Image
                     fill
                     sizes="100vw"

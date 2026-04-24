@@ -3,10 +3,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import ActivationBanner from "@/components/ui/ActivationBanner";
-import SuggestedPeople from "@/components/ui/SuggestedPeople";
-import YourDraftCard from "@/components/ui/YourDraftCard";
+import HomeSidebar from "@/components/ui/HomeSidebar";
 import WelcomeBanner from "@/components/ui/WelcomeBanner";
 import { getSuggestedPeople } from "@/lib/suggestedPeople";
+import EditorPicksRow from "./EditorPicksRow";
+import FeaturedPostLead from "./FeaturedPostLead";
 import PostsFeedSection from "./PostsFeedSection";
 
 export const revalidate = 60;
@@ -19,6 +20,45 @@ interface PageProps {
     timeframe?: string;
     welcome?: string;
   }>;
+}
+
+interface FeaturedProfile {
+  username: string | null;
+  full_name: string | null;
+  university: string | null;
+  avatar_url: string | null;
+  verified?: boolean;
+}
+
+interface FeaturedPostRaw {
+  id: string;
+  author_id: string;
+  title: string;
+  slug: string;
+  type: string;
+  excerpt: string | null;
+  cover_image_url: string | null;
+  view_count: number | null;
+  published_at: string | null;
+  profiles: FeaturedProfile | FeaturedProfile[] | null;
+}
+
+interface VoicePostRaw {
+  author_id: string;
+  profiles: VoiceProfile | VoiceProfile[] | null;
+}
+
+interface UpcomingWebinar {
+  id: string;
+  title: string;
+  scheduled_at: string;
+}
+
+interface VoiceProfile {
+  username: string | null;
+  full_name: string | null;
+  university: string | null;
+  avatar_url: string | null;
 }
 
 function FeedSkeleton() {
@@ -88,6 +128,9 @@ export default async function HomePage({ searchParams }: PageProps) {
     { count: debateCount },
     { data: hotDebateRaw },
     { data: recentDraft },
+    featuredPostsResult,
+    upcomingWebinarResult,
+    newVoiceResult,
   ] = await Promise.all([
     user
       ? supabase
@@ -130,6 +173,46 @@ export default async function HomePage({ searchParams }: PageProps) {
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+
+    supabase
+      .from("posts")
+      .select(
+        `
+        id, author_id, title, slug, type, excerpt, cover_image_url, view_count, published_at,
+        profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified)
+      `
+      )
+      .eq("status", "published")
+      .gte(
+        "published_at",
+        new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+      )
+      .order("view_count", { ascending: false })
+      .limit(3),
+
+    supabase
+      .from("webinars")
+      .select("id, title, scheduled_at")
+      .eq("status", "scheduled")
+      .gte("scheduled_at", new Date().toISOString())
+      .order("scheduled_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+
+    supabase
+      .from("posts")
+      .select(
+        `
+        author_id,
+        profiles!posts_author_id_fkey (username, full_name, university, avatar_url)
+      `
+      )
+      .eq("status", "published")
+      .gte(
+        "published_at",
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      )
+      .limit(50),
   ]);
 
   const followedIds = (followedUsers ?? []).map(
@@ -151,6 +234,43 @@ export default async function HomePage({ searchParams }: PageProps) {
         argumentCount: hotDebateArgumentCount,
       }
     : null;
+
+  const featuredPostsRaw = (featuredPostsResult.data ?? []) as FeaturedPostRaw[];
+  const upcomingWebinar =
+    (upcomingWebinarResult.data as UpcomingWebinar | null) ?? null;
+  const newVoiceRaw = (newVoiceResult.data ?? []) as VoicePostRaw[];
+
+  const featuredPostsNorm = featuredPostsRaw.map((post) => ({
+    ...post,
+    profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
+  }));
+
+  const [featuredPost = null, ...editorPicksRaw] = featuredPostsNorm;
+  const editorPicks = editorPicksRaw.slice(0, 2);
+
+  const voiceCounts = new Map<
+    string,
+    {
+      count: number;
+      profile: VoiceProfile | null;
+    }
+  >();
+
+  for (const row of newVoiceRaw) {
+    if (!row.author_id || row.author_id === featuredPost?.author_id) continue;
+    const profile = Array.isArray(row.profiles)
+      ? row.profiles[0] ?? null
+      : row.profiles;
+    const existing = voiceCounts.get(row.author_id);
+    voiceCounts.set(row.author_id, {
+      count: (existing?.count ?? 0) + 1,
+      profile,
+    });
+  }
+
+  const newVoice =
+    Array.from(voiceCounts.values()).sort((left, right) => right.count - left.count)[0] ??
+    null;
 
   const peopleResult = user
     ? await getSuggestedPeople(supabase, {
@@ -175,46 +295,50 @@ export default async function HomePage({ searchParams }: PageProps) {
         : "home";
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-      <div className="lg:col-span-2">
-        {welcome === "1" && user ? <WelcomeBanner firstName={firstName} /> : null}
+    <div>
+      {welcome === "1" && user ? <WelcomeBanner firstName={firstName} /> : null}
 
-        {showActivation ? (
-          <ActivationBanner
-            userId={user?.id ?? ""}
-            hasPublished={(publishedCount ?? 0) > 0}
-            hasFollowed={followCount > 0}
-            hasDebated={(debateCount ?? 0) > 0}
-          />
-        ) : null}
+      {showActivation ? (
+        <ActivationBanner
+          userId={user?.id ?? ""}
+          hasPublished={(publishedCount ?? 0) > 0}
+          hasFollowed={followCount > 0}
+          hasDebated={(debateCount ?? 0) > 0}
+        />
+      ) : null}
 
-        <Suspense fallback={<FeedSkeleton />}>
-          <PostsFeedSection
-            tab={activeTab}
-            type={type ?? null}
-            timeframe={timeframe ?? null}
-            userId={user?.id ?? null}
-            userInterests={userInterests}
-            userUniversity={userUniversity}
-            followedIds={followedIds}
-            showFollowingEligible={followCount > 0}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div className="space-y-0 lg:col-span-2">
+          <FeaturedPostLead post={featuredPost} />
+
+          <EditorPicksRow picks={editorPicks} />
+
+          <Suspense fallback={<FeedSkeleton />}>
+            <PostsFeedSection
+              tab={activeTab}
+              type={type ?? null}
+              timeframe={timeframe ?? null}
+              userId={user?.id ?? null}
+              userInterests={userInterests}
+              userUniversity={userUniversity}
+              followedIds={followedIds}
+              showFollowingEligible={followCount > 0}
+              activeDebate={activeDebate}
+              peopleSuggestions={peopleResult.suggestions}
+              sectionLabel="Latest"
+            />
+          </Suspense>
+        </div>
+
+        <aside className="hidden self-start space-y-6 lg:sticky lg:top-24 lg:col-span-1 lg:block">
+          <HomeSidebar
             activeDebate={activeDebate}
-            peopleSuggestions={peopleResult.suggestions}
+            newVoice={newVoice}
+            upcomingWebinar={upcomingWebinar}
+            recentDraft={recentDraft ?? null}
           />
-        </Suspense>
+        </aside>
       </div>
-
-      <aside className="hidden self-start space-y-6 lg:sticky lg:top-24 lg:col-span-1 lg:block">
-        {user ? (
-          <SuggestedPeople
-            currentUserId={user.id}
-            university={userUniversity}
-            fieldOfStudy={userFieldOfStudy}
-          />
-        ) : null}
-
-        {recentDraft ? <YourDraftCard draft={recentDraft} /> : null}
-      </aside>
     </div>
   );
 }

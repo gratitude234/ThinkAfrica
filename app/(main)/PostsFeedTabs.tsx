@@ -69,7 +69,7 @@ function EndStateCard({ topics }: { topics: string[] }) {
           <a
             key={topic}
             href={`/topics/${encodeURIComponent(topic)}`}
-            className="rounded-full border border-gray-200 bg-canvas px-3 py-1.5 text-sm text-gray-700 hover:border-emerald-brand hover:text-emerald-brand"
+            className="rounded-full border border-gray-200 bg-canvas px-3 py-1.5 text-sm text-gray-700 hover:border-gray-400 hover:text-ink"
           >
             + {topic}
           </a>
@@ -77,7 +77,7 @@ function EndStateCard({ topics }: { topics: string[] }) {
       </div>
       <a
         href="/?tab=latest"
-        className="mt-3 inline-block text-sm text-emerald-brand hover:underline"
+        className="mt-3 inline-block text-sm font-medium text-ink hover:underline"
       >
         Or switch to Latest →
       </a>
@@ -109,6 +109,7 @@ export default function PostsFeedTabs({
   activeDebate,
   peopleSuggestions,
   currentUserId,
+  sectionLabel = "Latest",
 }: {
   initialTab: TabKey;
   initialType: TypeFilter;
@@ -125,6 +126,7 @@ export default function PostsFeedTabs({
     avatar_url: string | null;
   }[];
   currentUserId: string | null;
+  sectionLabel?: string;
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>(initialType);
@@ -238,35 +240,33 @@ export default function PostsFeedTabs({
 
   return (
     <div>
-      <div className="sticky top-16 z-20 mb-4 bg-canvas/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-canvas/80">
-        <div className="flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
-          {(["home", "following", "latest"] as const).map((tab) => {
-            if (tab === "following" && !showFollowingTab) return null;
-            return (
+      <div className="mb-4 flex items-center justify-between border-t border-gray-100 pt-6">
+        <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-ink-muted">
+          {sectionLabel}
+        </span>
+        {showFollowingTab ? (
+          <div className="flex gap-3 text-sm">
+            {(["home", "following", "latest"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => updateState(tab, typeFilter, timeframe)}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
+                className={`capitalize transition-colors ${
                   activeTab === tab
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "font-medium text-ink"
+                    : "text-ink-muted hover:text-ink"
                 }`}
               >
                 {tab}
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <FeedFilterChips
         type={typeFilter}
-        timeframe={timeframe}
         onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
-        onTimeframeChange={(nextTimeframe) =>
-          updateState(activeTab, typeFilter, nextTimeframe)
-        }
       />
 
       {error ? (

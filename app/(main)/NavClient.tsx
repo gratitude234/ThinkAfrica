@@ -26,7 +26,7 @@ interface NavClientProps {
 function navItemClass(isActive: boolean) {
   return `relative rounded-lg px-4 py-2 text-sm transition-colors ${
     isActive
-      ? "font-semibold text-emerald-brand"
+      ? "font-semibold text-ink"
       : "text-ink-muted hover:bg-canvas hover:text-ink"
   }`;
 }
@@ -118,8 +118,8 @@ export default function NavClient({
                 href="/write"
                 className={`rounded-lg px-4 py-2 text-sm transition-colors ${
                   isWriteActive
-                    ? "font-semibold text-emerald-brand"
-                    : "text-emerald-brand/90 hover:bg-emerald-50 hover:text-emerald-brand"
+                    ? "font-semibold text-ink"
+                    : "text-ink-muted hover:bg-canvas hover:text-ink"
                 }`}
                 aria-current={isWriteActive ? "page" : undefined}
               >
@@ -130,11 +130,12 @@ export default function NavClient({
             <button
               type="button"
               onClick={onOpenSearch}
-              className="flex w-full max-w-sm items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm text-ink-muted transition-colors hover:border-emerald-brand hover:text-ink"
+              className="hidden items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm text-ink-muted transition-colors hover:border-gray-400 hover:text-ink md:flex"
               aria-label="Open search"
+              style={{ minWidth: 0, maxWidth: "220px" }}
             >
               <svg
-                className="h-4 w-4"
+                className="h-4 w-4 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -146,10 +147,7 @@ export default function NavClient({
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
-              <span>Search posts, people, topics...</span>
-              <kbd className="ml-auto hidden text-xs text-gray-400 sm:inline">
-                Ctrl+K
-              </kbd>
+              <span className="truncate">Search</span>
             </button>
           </div>
 
@@ -157,7 +155,7 @@ export default function NavClient({
             <button
               type="button"
               onClick={onOpenSearch}
-              className="rounded-full border border-gray-200 bg-white p-2 text-ink-muted transition-colors hover:border-emerald-brand hover:text-ink md:hidden"
+              className="rounded-full border border-gray-200 bg-white p-2 text-ink-muted transition-colors hover:border-gray-400 hover:text-ink md:hidden"
               aria-label="Open search"
             >
               <svg

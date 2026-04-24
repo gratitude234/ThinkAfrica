@@ -29,7 +29,10 @@ export default function FeaturedPostBanner({ post }: Props) {
   return (
     <div className="mb-6 rounded-xl border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50 p-5">
       {post.cover_image_url ? (
-        <div className="relative mb-4 h-48 overflow-hidden rounded-lg">
+        <div
+          data-lite-hide
+          className="relative mb-4 h-48 overflow-hidden rounded-lg"
+        >
           <Image
             src={post.cover_image_url}
             alt={post.title}

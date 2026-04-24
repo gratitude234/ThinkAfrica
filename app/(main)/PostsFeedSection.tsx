@@ -17,6 +17,7 @@ interface Props {
   followedIds: string[];
   showFollowingEligible: boolean;
   activeDebate: DebateInterludeData | null;
+  sectionLabel?: string;
   peopleSuggestions: {
     id: string;
     username: string;
@@ -59,6 +60,7 @@ export default async function PostsFeedSection({
   followedIds,
   showFollowingEligible,
   activeDebate,
+  sectionLabel,
   peopleSuggestions,
 }: Props) {
   const supabase = await createClient();
@@ -90,6 +92,7 @@ export default async function PostsFeedSection({
       activeDebate={activeDebate}
       peopleSuggestions={peopleSuggestions}
       currentUserId={userId}
+      sectionLabel={sectionLabel}
     />
   );
 }

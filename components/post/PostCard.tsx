@@ -51,8 +51,8 @@ const PLACEHOLDER_STYLES: Record<
   { gradient: string; accent: string }
 > = {
   blog: {
-    gradient: "from-emerald-50 to-emerald-100",
-    accent: "text-emerald-600",
+    gradient: "from-gray-50 to-gray-100",
+    accent: "text-gray-600",
   },
   essay: {
     gradient: "from-amber-50 to-amber-100",
@@ -69,7 +69,7 @@ const PLACEHOLDER_STYLES: Record<
 };
 
 const VERIFIED_COLORS: Record<string, string> = {
-  student: "text-emerald-600",
+  student: "text-gray-600",
   researcher: "text-purple-600",
   faculty: "text-amber-500",
   institution: "text-blue-600",
@@ -100,7 +100,7 @@ export default function PostCard({
       {authorHref ? (
         <Link
           href={authorHref}
-          className="inline-flex min-w-0 items-center gap-1 font-medium text-gray-700 transition-colors hover:text-emerald-brand"
+          className="inline-flex min-w-0 items-center gap-1 font-medium text-gray-700 transition-colors hover:text-ink"
         >
           <span className="truncate">{authorLine}</span>
           {author?.verified ? (
@@ -112,7 +112,7 @@ export default function PostCard({
               }
               className={`text-[11px] font-bold ${
                 VERIFIED_COLORS[author.verified_type ?? "student"] ??
-                "text-emerald-600"
+                "text-gray-600"
               }`}
             >
               {"\u2713"}
@@ -142,16 +142,20 @@ export default function PostCard({
       <article className="rounded-xl border border-gray-200/70 bg-white p-5 transition-shadow duration-300 hover:shadow-md">
         <div className="flex gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <Badge type={post.type} />
-              {post.in_response_to ? (
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-muted">
+                {POST_TYPE_LABELS[post.type as PostType] ?? post.type}
+                <span className="mx-1.5 text-gray-300">·</span>
+                {readTime} min read
+              </span>
+              {post.in_response_to && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
-                  <span aria-hidden="true">{"\u21A9"}</span> Response
+                  ↩ Response
                 </span>
-              ) : null}
+              )}
             </div>
             <Link href={`/post/${post.slug}`}>
-              <h2 className="font-display mt-2 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
+              <h2 className="font-display line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-gray-700">
                 {post.title}
               </h2>
             </Link>
@@ -164,7 +168,11 @@ export default function PostCard({
           </div>
 
           {post.cover_image_url ? (
-            <Link href={`/post/${post.slug}`} className="shrink-0 self-start">
+            <Link
+              href={`/post/${post.slug}`}
+              data-lite-hide
+              className="shrink-0 self-start"
+            >
               <Image
                 src={post.cover_image_url}
                 alt={post.title}
@@ -182,7 +190,10 @@ export default function PostCard({
   return (
     <article className="group overflow-hidden rounded-xl border border-gray-200/70 bg-white transition-shadow duration-300 hover:shadow-lg">
       <Link href={`/post/${post.slug}`} className="block">
-        <div className="relative aspect-[16/9] w-full overflow-hidden">
+        <div
+          data-lite-hide={post.cover_image_url ? "" : undefined}
+          className="relative aspect-[16/9] w-full overflow-hidden"
+        >
           {post.cover_image_url ? (
             <Image
               src={post.cover_image_url}
@@ -220,7 +231,7 @@ export default function PostCard({
         </div>
 
         <Link href={`/post/${post.slug}`}>
-          <h2 className="font-display mt-3 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
+          <h2 className="font-display mt-3 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-gray-700">
             {post.title}
           </h2>
         </Link>
