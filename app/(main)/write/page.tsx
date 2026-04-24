@@ -23,6 +23,50 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ),
 });
 
+const POST_TYPES = [
+  {
+    type: "blog",
+    label: "Blog post",
+    minWords: 200,
+    readTime: "~5 min to write",
+    review: "No editorial review",
+    desc: "Quick takes, opinions, personal reflections",
+  },
+  {
+    type: "essay",
+    label: "Essay",
+    minWords: 800,
+    readTime: "~45 min to write",
+    review: "Light editorial review",
+    desc: "Structured argument, cultural commentary, analysis",
+  },
+  {
+    type: "policy_brief",
+    label: "Policy brief",
+    minWords: 500,
+    readTime: "~30 min to write",
+    review: "Editorial review",
+    desc: "Evidence-based recommendations for policymakers",
+  },
+  {
+    type: "research",
+    label: "Research paper",
+    minWords: 3000,
+    readTime: "Multiple sessions",
+    review: "Full peer review process",
+    desc: "Original research with citations and methodology",
+  },
+] as const;
+
+function isPostType(value: string | null): value is PostType {
+  return (
+    value === "blog" ||
+    value === "essay" ||
+    value === "policy_brief" ||
+    value === "research"
+  );
+}
+
 interface DraftPayload {
   title: string;
   subtitle: string;
@@ -46,6 +90,10 @@ export default function WritePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const responseToSlug = searchParams.get("response_to");
+  const responseToIdParam = searchParams.get("inResponseTo");
+  const typeParam = searchParams.get("type");
+  const draftParam = searchParams.get("draft");
+  const initialPostType = isPostType(typeParam) ? typeParam : "blog";
   const {
     draftId,
     saveStatus,
@@ -65,14 +113,17 @@ export default function WritePage() {
     university: string | null;
   } | null>(null);
   const [loadingProfileInfo, setLoadingProfileInfo] = useState(true);
-  const [postType, setPostType] = useState<PostType>("blog");
+  const [postType, setPostType] = useState<PostType>(initialPostType);
+  const [showChooser, setShowChooser] = useState(!typeParam && !draftParam);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
-  const [inResponseToId, setInResponseToId] = useState<string | null>(null);
+  const [inResponseToId, setInResponseToId] = useState<string | null>(
+    responseToIdParam
+  );
   const [inResponseToTitle, setInResponseToTitle] = useState<string | null>(null);
   const [inResponseToAuthor, setInResponseToAuthor] = useState<string | null>(null);
   const [references, setReferences] = useState<PostReferenceRecord[]>([]);
@@ -120,6 +171,30 @@ export default function WritePage() {
     const supabase = createClient();
 
     async function loadParentPost() {
+      if (responseToIdParam) {
+        const { data: parentPost } = await supabase
+          .from("posts")
+          .select("id, title, profiles!posts_author_id_fkey(username)")
+          .eq("id", responseToIdParam)
+          .eq("status", "published")
+          .single();
+
+        if (parentPost) {
+          const authorProfile = Array.isArray(parentPost.profiles)
+            ? parentPost.profiles[0]
+            : (parentPost.profiles as { username: string } | null);
+          setInResponseToId(parentPost.id);
+          setInResponseToTitle(parentPost.title);
+          setInResponseToAuthor(authorProfile?.username ?? null);
+          return;
+        }
+
+        setInResponseToId(null);
+        setInResponseToTitle(null);
+        setInResponseToAuthor(null);
+        return;
+      }
+
       if (responseToSlug) {
         const { data: parentPost } = await supabase
           .from("posts")
@@ -169,7 +244,7 @@ export default function WritePage() {
     }
 
     void loadParentPost();
-  }, [inResponseToId, responseToSlug]);
+  }, [inResponseToId, responseToIdParam, responseToSlug]);
 
   useEffect(() => {
     setPublishDraftId(draftId);
@@ -263,6 +338,13 @@ export default function WritePage() {
     wordCount > 0 &&
     !!currentUserId &&
     !loadingProfileInfo;
+  const selectedPostType =
+    POST_TYPES.find((item) => item.type === postType) ?? POST_TYPES[0];
+  const wordProgress = Math.min(
+    100,
+    (wordCount / selectedPostType.minWords) * 100
+  );
+  const estimatedReadTime = Math.max(1, Math.ceil(wordCount / 200));
 
   const handleReadyToPublish = async () => {
     if (!canOpenPublish) return;
@@ -357,8 +439,75 @@ export default function WritePage() {
       <ContinueDraftBanner activeDraftId={draftId} />
       <MyDrafts activeDraftId={draftId} />
 
+      {showChooser ? (
+        <div className="py-6">
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-brand">
+              Choose format
+            </p>
+            <h1 className="mt-2 text-2xl font-bold text-gray-900">
+              What are you writing?
+            </h1>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {POST_TYPES.map((type) => {
+              const selected = postType === type.type;
+
+              return (
+                <button
+                  key={type.type}
+                  type="button"
+                  onClick={() => {
+                    setPostType(type.type);
+                    setShowChooser(false);
+                    if (draftId) {
+                      void saveDraft(getCurrentData({ postType: type.type }));
+                    }
+                  }}
+                  className={`rounded-xl border bg-white p-5 text-left transition-all hover:border-emerald-300 hover:ring-2 hover:ring-emerald-100 ${
+                    selected
+                      ? "border-emerald-brand ring-2 ring-emerald-100"
+                      : "border-gray-200"
+                  }`}
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-bold text-gray-900">
+                        {type.label}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-500">{type.desc}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-canvas px-2.5 py-1 text-xs font-medium text-gray-600">
+                      min. {type.minWords.toLocaleString()} words
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                      {type.readTime}
+                    </span>
+                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">
+                      {type.review}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {!showChooser ? (
       <div className="space-y-4">
         <div>
+          <button
+            type="button"
+            onClick={() => setShowChooser(true)}
+            className="mb-5 text-sm font-medium text-emerald-600 hover:underline"
+          >
+            {"<-"} Change type
+          </button>
+
           {inResponseToId && inResponseToTitle ? (
             <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
               <span className="mt-0.5 text-lg">↩</span>
@@ -420,6 +569,7 @@ export default function WritePage() {
             key={publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}
             content={content}
             placeholder="Start writing..."
+            minWords={selectedPostType.minWords}
             postType={postType}
             references={references}
             onReferencesChange={setReferences}
@@ -434,8 +584,26 @@ export default function WritePage() {
               }
             }}
           />
+          <div className="sticky bottom-0 z-20 border-t border-gray-100 bg-white px-4 py-3 shadow-[0_-8px_20px_rgba(15,23,42,0.04)]">
+            <div className="mb-2 h-2 overflow-hidden rounded-full bg-gray-100">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  wordCount >= selectedPostType.minWords
+                    ? "bg-emerald-500"
+                    : "bg-gray-300"
+                }`}
+                style={{ width: `${wordProgress}%` }}
+              />
+            </div>
+            <p className="text-xs font-medium text-gray-500">
+              {wordCount.toLocaleString()} /{" "}
+              {selectedPostType.minWords.toLocaleString()} words ·{" "}
+              {selectedPostType.label} · {estimatedReadTime} min read
+            </p>
+          </div>
         </div>
       </div>
+      ) : null}
 
       {currentUserId ? (
         <>
