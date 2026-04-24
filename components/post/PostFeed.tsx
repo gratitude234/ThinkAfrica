@@ -1,10 +1,14 @@
+import Link from "next/link";
 import PostCard, { PostCardData } from "./PostCard";
 import DebateInterlude, { type DebateInterludeData } from "./DebateInterlude";
 import PeopleInterlude from "./PeopleInterlude";
 import TopicInterlude from "./TopicInterlude";
 
+type FeedTabKey = "home" | "following" | "latest";
+
 interface PostFeedProps {
   posts: PostCardData[];
+  activeTab: FeedTabKey;
   activeDebate?: DebateInterludeData | null;
   peopleSuggestions?: {
     id: string;
@@ -37,20 +41,36 @@ function getFeaturedPostId(posts: PostCardData[]) {
 
 export default function PostFeed({
   posts,
+  activeTab,
   activeDebate = null,
   peopleSuggestions = [],
   currentUserId = null,
 }: PostFeedProps) {
   const featuredPostId = getFeaturedPostId(posts);
   const topicPosts = posts.filter((post) => (post.tags ?? []).length > 0);
+  const canShowDebateInterlude = activeTab === "home" || activeTab === "latest";
 
   return (
     <div>
       {posts.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-lg font-medium mb-1">No posts yet</p>
-          <p className="text-sm">There’s nothing here yet.</p>
-        </div>
+        activeTab === "following" ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-gray-500">
+              You&apos;re not following anyone yet.
+            </p>
+            <Link
+              href="/search"
+              className="mt-3 inline-block text-sm text-emerald-600 hover:underline"
+            >
+              Discover people to follow {"->"}
+            </Link>
+          </div>
+        ) : (
+          <div className="py-16 text-center text-gray-400">
+            <p className="mb-1 text-lg font-medium">No posts yet</p>
+            <p className="text-sm">There&apos;s nothing here yet.</p>
+          </div>
+        )
       ) : (
         <div className="space-y-4">
           {posts.map((post, index) => (
@@ -60,7 +80,9 @@ export default function PostFeed({
                 variant={post.id === featuredPostId ? "featured" : "standard"}
               />
 
-              {index === 5 && activeDebate ? (
+              {canShowDebateInterlude &&
+              (index + 1) % 8 === 0 &&
+              activeDebate ? (
                 <DebateInterlude debate={activeDebate} />
               ) : null}
               {index === 11 && peopleSuggestions.length > 0 ? (

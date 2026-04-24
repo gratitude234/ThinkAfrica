@@ -287,8 +287,9 @@ export default async function HomePage({ searchParams }: PageProps) {
       followCount === 0 ||
       (debateCount ?? 0) === 0);
 
+  const showFollowingEligible = !!user;
   const activeTab =
-    tab === "following" && followCount > 0
+    tab === "following" && showFollowingEligible
       ? "following"
       : tab === "latest"
         ? "latest"
@@ -322,7 +323,7 @@ export default async function HomePage({ searchParams }: PageProps) {
               userInterests={userInterests}
               userUniversity={userUniversity}
               followedIds={followedIds}
-              showFollowingEligible={followCount > 0}
+              showFollowingEligible={showFollowingEligible}
               activeDebate={activeDebate}
               peopleSuggestions={peopleResult.suggestions}
               sectionLabel="Latest"

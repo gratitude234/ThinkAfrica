@@ -277,6 +277,7 @@ export default function PostsFeedTabs({
 
       <PostFeed
         posts={posts}
+        activeTab={activeTab}
         activeDebate={activeDebate}
         peopleSuggestions={peopleSuggestions}
         currentUserId={currentUserId}
