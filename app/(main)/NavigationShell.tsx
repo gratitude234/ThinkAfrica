@@ -16,6 +16,7 @@ interface NavigationShellProps {
   } | null;
   isAdmin: boolean;
   canAccessReview: boolean;
+  hasActiveDebate: boolean;
 }
 
 export default function NavigationShell({
@@ -23,6 +24,7 @@ export default function NavigationShell({
   profile,
   isAdmin,
   canAccessReview,
+  hasActiveDebate,
 }: NavigationShellProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -54,6 +56,7 @@ export default function NavigationShell({
       <BottomNav
         username={profile?.username ?? null}
         userId={user?.id ?? null}
+        hasActiveDebate={hasActiveDebate}
       />
       <SearchOverlay
         isOpen={isSearchOpen}

@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 
 interface BottomNavProps {
   username: string | null;
   userId: string | null;
+  hasActiveDebate: boolean;
 }
 
 function navLinkClass(isCurrent: boolean) {
@@ -15,7 +15,10 @@ function navLinkClass(isCurrent: boolean) {
   }`;
 }
 
-export default function BottomNav({ username, userId }: BottomNavProps) {
+export default function BottomNav({
+  username,
+  hasActiveDebate,
+}: BottomNavProps) {
   const pathname = usePathname();
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -53,9 +56,9 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
         </Link>
 
         <Link
-          href="/topics"
-          className={navLinkClass(isActive("/topics"))}
-          aria-current={isActive("/topics") ? "page" : undefined}
+          href="/search"
+          className={navLinkClass(isActive("/search"))}
+          aria-current={isActive("/search") ? "page" : undefined}
         >
           <svg
             className="h-5 w-5"
@@ -67,15 +70,10 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M12 21a9 9 0 100-18 9 9 0 000 18z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 3a12 12 0 014.5 9A12 12 0 0112 21 12 12 0 017.5 12 12 12 0 0112 3z"
+              d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
             />
           </svg>
-          <span className="text-[10px] font-medium">Discover</span>
+          <span className="text-[10px] font-medium">Search</span>
         </Link>
 
         <Link
@@ -106,38 +104,12 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
           <span className="pb-2 text-[10px] font-medium">Write</span>
         </Link>
 
-        {username ? (
-          <Link
-            href="/messages"
-            className={navLinkClass(isActive("/messages"))}
-            aria-current={isActive("/messages") ? "page" : undefined}
-          >
-            <div className="relative">
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8 10h.01M12 10h.01M16 10h.01M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"
-                />
-              </svg>
-              {userId ? (
-                <MessagesUnreadBadge userId={userId} className="-right-2 -top-1" />
-              ) : null}
-            </div>
-            <span className="text-[10px] font-medium">Messages</span>
-          </Link>
-        ) : (
-          <Link
-            href="/opportunities"
-            className={navLinkClass(isActive("/opportunities"))}
-            aria-current={isActive("/opportunities") ? "page" : undefined}
-          >
+        <Link
+          href="/debates"
+          className={navLinkClass(isActive("/debates"))}
+          aria-current={isActive("/debates") ? "page" : undefined}
+        >
+          <div className="relative">
             <svg
               className="h-5 w-5"
               fill="none"
@@ -148,17 +120,15 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 8V6a3 3 0 016 0v2"
+                d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.275 2.903 2.875 2.903h.375a2.625 2.625 0 0 1 1.855.769l.396.396.396-.396A2.625 2.625 0 0 1 9.252 15.663h.375c1.6 0 2.875-1.302 2.875-2.903V8.25c0-1.6-1.275-2.903-2.875-2.903H5.625C4.025 5.347 2.75 6.65 2.75 8.25v4.51z"
               />
             </svg>
-            <span className="text-[10px] font-medium">Opportunities</span>
-          </Link>
-        )}
+            {hasActiveDebate ? (
+              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+            ) : null}
+          </div>
+          <span className="text-[10px] font-medium">Debates</span>
+        </Link>
 
         <Link
           href={profileHref}
@@ -178,7 +148,7 @@ export default function BottomNav({ username, userId }: BottomNavProps) {
               d="M20 21a8 8 0 10-16 0m12-11a4 4 0 11-8 0 4 4 0 018 0z"
             />
           </svg>
-          <span className="text-[10px] font-medium">Me</span>
+          <span className="text-[10px] font-medium">Profile</span>
         </Link>
       </div>
     </nav>

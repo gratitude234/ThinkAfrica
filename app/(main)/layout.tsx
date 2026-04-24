@@ -27,6 +27,11 @@ export default async function MainLayout({
         .single()
     : { data: null };
 
+  const { count: activeDebateCount } = await supabase
+    .from("debates")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "active");
+
   const isAdmin =
     !!user &&
     (user.email === process.env.ADMIN_EMAIL || profileData?.role === "admin");
@@ -41,6 +46,7 @@ export default async function MainLayout({
         profile={profileData}
         isAdmin={isAdmin}
         canAccessReview={canAccessReview}
+        hasActiveDebate={(activeDebateCount ?? 0) > 0}
       />
 
       <main className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 lg:px-8 md:pb-8">
