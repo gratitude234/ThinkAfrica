@@ -61,6 +61,11 @@ export default async function DashboardPage() {
     .select("*", { count: "exact", head: true })
     .eq("follower_id", user.id);
 
+  const { count: debateCount } = await supabase
+    .from("debate_arguments")
+    .select("*", { count: "exact", head: true })
+    .eq("author_id", user.id);
+
   // Fellowship applications by this user
   const { data: applicationsRaw } = await supabase
     .from("fellowship_applications")
@@ -107,6 +112,11 @@ export default async function DashboardPage() {
       href: "/write",
     },
     {
+      label: "Join a live debate",
+      done: (debateCount ?? 0) > 0,
+      href: "/debates",
+    },
+    {
       label: "Follow a writer",
       done: (followingCount ?? 0) > 0,
       href: "/leaderboard",
@@ -129,9 +139,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {pct < 100 ? (
-        <ProfileCompletionCard pct={pct} items={completionItems} />
-      ) : null}
+      <ProfileCompletionCard pct={pct} items={completionItems} />
 
       {revisionPosts.length > 0 ? (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">

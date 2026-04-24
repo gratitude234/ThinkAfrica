@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function ProfileCompletionCard({ pct, items }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(pct < 60);
   const incomplete = items.filter((item) => !item.done);
 
   return (
@@ -42,7 +42,15 @@ export default function ProfileCompletionCard({ pct, items }: Props) {
         />
       </div>
 
-      {expanded ? (
+      {expanded && pct === 100 ? (
+        <div className="py-4 text-center">
+          <p className="mb-1 text-2xl">🎉</p>
+          <p className="text-sm font-semibold text-gray-900">Profile complete!</p>
+          <p className="mt-1 text-xs text-gray-400">
+            You&apos;re all set to publish and debate.
+          </p>
+        </div>
+      ) : expanded ? (
         <ul className="mt-3 space-y-2">
           {items.map((item) => (
             <li key={item.label} className="flex items-center gap-3">
