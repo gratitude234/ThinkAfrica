@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { type DebatePhase, PHASE_LABELS } from "@/lib/debatePhases";
+import Toast from "@/components/ui/Toast";
 import UpvoteButton from "./UpvoteButton";
 import ArgumentForm from "./ArgumentForm";
 import MotionVotePanel from "./MotionVotePanel";
@@ -211,6 +212,18 @@ export default function LiveArguments({
     initialAgainstArguments
   );
   const [votedIds] = useState<Set<string>>(new Set(userVotedIds));
+  const [localDebateStatus, setLocalDebateStatus] = useState(debateStatus);
+  const [localCurrentPhase, setLocalCurrentPhase] =
+    useState<DebatePhase>(currentPhase);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalDebateStatus(debateStatus);
+  }, [debateStatus]);
+
+  useEffect(() => {
+    setLocalCurrentPhase(currentPhase);
+  }, [currentPhase]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -264,6 +277,46 @@ export default function LiveArguments({
           setAgainstArguments((prev) => updateVoteCount(prev, newId, newUpvotes));
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "debates",
+          filter: `id=eq.${debateId}`,
+        },
+        (payload) => {
+          const nextStatus =
+            typeof payload.new.status === "string" ? payload.new.status : null;
+          const nextPhase =
+            payload.new.current_phase === "opening" ||
+            payload.new.current_phase === "rebuttal" ||
+            payload.new.current_phase === "closing"
+              ? payload.new.current_phase
+              : null;
+
+          if (nextStatus) {
+            setLocalDebateStatus((previousStatus) => {
+              if (nextStatus !== previousStatus) {
+                if (previousStatus === "open" && nextStatus === "active") {
+                  setToastMessage("Debate is now LIVE — submit your argument!");
+                }
+                if (previousStatus === "active" && nextStatus === "closed") {
+                  setToastMessage(
+                    "This debate has closed. See the results below."
+                  );
+                }
+              }
+
+              return nextStatus;
+            });
+          }
+
+          if (nextPhase) {
+            setLocalCurrentPhase(nextPhase);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
@@ -284,7 +337,7 @@ export default function LiveArguments({
   const totalPoints = forPoints + againstPoints;
   const forWidth = totalPoints === 0 ? 50 : (forPoints / totalPoints) * 100;
   const againstWidth = totalPoints === 0 ? 50 : (againstPoints / totalPoints) * 100;
-  const isClosed = debateStatus === "closed";
+  const isClosed = localDebateStatus === "closed";
 
   return (
     <div>
@@ -294,7 +347,7 @@ export default function LiveArguments({
 
       <div className="mb-4 text-center">
         <span className="rounded-full bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-600">
-          Phase: {PHASE_LABELS[currentPhase]}
+          Phase: {PHASE_LABELS[localCurrentPhase]}
         </span>
       </div>
 
@@ -302,8 +355,8 @@ export default function LiveArguments({
         <div className="mb-4">
           <PhaseControls
             debateId={debateId}
-            currentPhase={currentPhase}
-            debateStatus={debateStatus}
+            currentPhase={localCurrentPhase}
+            debateStatus={localDebateStatus}
           />
         </div>
       ) : null}
@@ -401,10 +454,13 @@ export default function LiveArguments({
             debateId={debateId}
             disabled={isClosed}
             userParticipant={userParticipant}
-            currentPhase={currentPhase}
+            currentPhase={localCurrentPhase}
           />
         )}
       </div>
+      {toastMessage ? (
+        <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
+      ) : null}
     </div>
   );
 }
