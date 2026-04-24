@@ -1,5 +1,4 @@
--- Verified users can start direct conversations with any other profile.
--- Relationship/context checks are intentionally removed from the RPC gate.
+-- Fix PL/pgSQL name ambiguity from the previous verified-open-DMs RPC.
 create or replace function public.find_or_create_conversation(target_user_id uuid)
 returns uuid
 language plpgsql
