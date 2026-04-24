@@ -11,6 +11,17 @@ import {
   type PostType,
 } from "@/lib/utils";
 
+export interface DashboardPostReview {
+  assigned_at: string;
+  submitted_at: string | null;
+  recommendation: string | null;
+}
+
+export interface DashboardEditorDecision {
+  decision: string;
+  created_at: string;
+}
+
 export interface DashboardPost {
   id: string;
   title: string;
@@ -23,6 +34,9 @@ export interface DashboardPost {
   created_at: string;
   published_at: string | null;
   revision_due_at?: string | null;
+  post_reviews?: DashboardPostReview[];
+  post_editor_decisions?: DashboardEditorDecision[];
+  queuePosition?: number | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -59,6 +73,10 @@ function normalizePost(
     created_at: record.created_at ?? existing?.created_at ?? new Date().toISOString(),
     published_at: record.published_at ?? existing?.published_at ?? null,
     revision_due_at: record.revision_due_at ?? existing?.revision_due_at ?? null,
+    post_reviews: record.post_reviews ?? existing?.post_reviews ?? [],
+    post_editor_decisions:
+      record.post_editor_decisions ?? existing?.post_editor_decisions ?? [],
+    queuePosition: record.queuePosition ?? existing?.queuePosition ?? null,
   };
 }
 
@@ -89,6 +107,36 @@ export default function PostsTable({
     if (reviewedType && post.status === "pending_revision") return "Revision requested";
     if (reviewedType && post.status === "rejected") return "Declined";
     return post.status.replace("_", " ");
+  };
+
+  const getReviewStatus = (post: DashboardPost) => {
+    if (post.status === "pending_revision") {
+      const dueDate = post.revision_due_at
+        ? new Date(post.revision_due_at).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+        : null;
+      return dueDate
+        ? `Revision requested — due ${dueDate}`
+        : "Revision requested";
+    }
+
+    if (post.status !== "pending") return null;
+
+    const reviews = post.post_reviews ?? [];
+    const decisions = post.post_editor_decisions ?? [];
+
+    if (reviews.some((review) => !review.submitted_at)) {
+      return "In review — awaiting reviewer feedback";
+    }
+
+    if (reviews.length > 0 && decisions.length === 0) {
+      return "In review — editor deciding";
+    }
+
+    return "In review — awaiting assignment";
   };
 
   useEffect(() => {
@@ -243,6 +291,7 @@ export default function PostsTable({
                   const reviewedPublication =
                     post.status === "published" &&
                     (post.type === "research" || post.type === "policy_brief");
+                  const reviewStatus = getReviewStatus(post);
                   const actionHref =
                     post.status === "draft"
                       ? `/write?draft=${post.id}`
@@ -255,6 +304,18 @@ export default function PostsTable({
                         <p className="font-medium text-gray-900 truncate">
                           {post.title}
                         </p>
+                        {reviewStatus ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                              {reviewStatus}
+                            </span>
+                            {post.queuePosition ? (
+                              <span className="rounded-full bg-gray-50 px-2 py-0.5 text-xs text-gray-500">
+                                Position ~{post.queuePosition} in review queue
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <span className="text-gray-500 text-xs">

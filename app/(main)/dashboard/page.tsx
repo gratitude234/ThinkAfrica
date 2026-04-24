@@ -19,7 +19,12 @@ export default async function DashboardPage() {
   const { data: postsRaw } = await supabase
     .from("posts")
     .select(
-      "id, title, slug, type, status, view_count, created_at, published_at, revision_due_at, citation_id"
+      `
+      id, title, slug, type, status, view_count, created_at, published_at,
+      revision_due_at, citation_id,
+      post_reviews(assigned_at, submitted_at, recommendation),
+      post_editor_decisions(decision, created_at)
+      `
     )
     .eq("author_id", user.id)
     .order("created_at", { ascending: false });
@@ -80,12 +85,25 @@ export default async function DashboardPage() {
     fellowship: Array.isArray(a.fellowships) ? a.fellowships[0] : a.fellowships,
   }));
 
+  const pendingQueue = [...(postsRaw ?? [])]
+    .filter((post) => post.status === "pending")
+    .sort(
+      (left, right) =>
+        new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
+    );
+  const queuePositionById = new Map(
+    pendingQueue.map((post, index) => [post.id, index + 1])
+  );
+
   const posts: DashboardPost[] = (postsRaw ?? []).map((p) => ({
     ...p,
     view_count: p.view_count ?? 0,
     like_count: likeCounts[p.id] ?? 0,
     revision_due_at: p.revision_due_at ?? null,
     citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
+    post_reviews: p.post_reviews ?? [],
+    post_editor_decisions: p.post_editor_decisions ?? [],
+    queuePosition: queuePositionById.get(p.id) ?? null,
   }));
 
   const revisionPosts = posts.filter((post) => post.status === "pending_revision");
