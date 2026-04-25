@@ -340,7 +340,7 @@ export default function SearchPage() {
                         {post.profiles
                           ? `${post.profiles.full_name ?? post.profiles.username}${
                               post.profiles.university
-                                ? ` · ${post.profiles.university}`
+                                ? ` / ${post.profiles.university}`
                                 : ""
                             }`
                           : "ThinkAfrika"}

@@ -8,6 +8,7 @@ import FeaturePolicyButton from "@/app/(main)/policy/FeaturePolicyButton";
 import FeaturePostButton from "./FeaturePostButton";
 import AssignReviewers from "./AssignReviewers";
 import { requiresEditorialWorkflow } from "@/lib/reviewWorkflow";
+import { getPostQualitySummary } from "@/lib/postQuality";
 
 type ReviewerAssignment = {
   post_id: string;
@@ -58,7 +59,7 @@ function getReviewSummary(assignments: ReviewerAssignment[]) {
     { accept: 0, revise: 0, reject: 0 }
   );
 
-  return `Accept ${counts.accept} · Revise ${counts.revise} · Reject ${counts.reject}`;
+  return `Accept ${counts.accept} / Revise ${counts.revise} / Reject ${counts.reject}`;
 }
 
 export default async function AdminReviewPage() {
@@ -103,7 +104,8 @@ export default async function AdminReviewPage() {
       .from("posts")
       .select(
         `
-        id, title, excerpt, type, status, tags, created_at, author_id, current_round,
+        id, title, excerpt, content, type, status, tags, created_at, author_id, current_round,
+        post_references(id),
         profiles!posts_author_id_fkey (username, full_name, university)
       `
       )
@@ -242,6 +244,26 @@ export default async function AdminReviewPage() {
                     assignments
                   );
                   const readyForDecision = !blockingReason;
+                  const referenceCount =
+                    (
+                      post as typeof post & {
+                        post_references?: Array<{ id: string }>;
+                      }
+                    ).post_references?.length ?? 0;
+                  const qualitySummary = getPostQualitySummary({
+                    type: post.type,
+                    status: post.status,
+                    title: post.title,
+                    excerpt: post.excerpt,
+                    content: post.content,
+                    tags: post.tags ?? [],
+                    author: post.profiles,
+                    referenceCount,
+                    reviewCount: assignments.length,
+                    completedReviewCount: assignments.filter(
+                      (assignment) => assignment.submitted_at
+                    ).length,
+                  });
 
                   return (
                     <div
@@ -258,6 +280,15 @@ export default async function AdminReviewPage() {
                                   Editorial workflow required
                                 </span>
                               ) : null}
+                              {qualitySummary.requiresReferences && referenceCount === 0 ? (
+                                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                  Missing references
+                                </span>
+                              ) : (
+                                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                  Quality checks clear
+                                </span>
+                              )}
                               {post.tags?.slice(0, 3).map((tag: string) => (
                                 <Tag key={tag} label={tag} />
                               ))}
@@ -275,15 +306,15 @@ export default async function AdminReviewPage() {
                                 <span className="font-medium text-gray-600">
                                   {post.profiles?.full_name}
                                 </span>{" "}
-                                · {post.profiles?.university}
+                                / {post.profiles?.university}
                               </span>
-                              <span>·</span>
+                              <span>/</span>
                               <span>Submitted {formatDate(post.created_at)}</span>
-                              <span>·</span>
+                              <span>/</span>
                               <span>Round {currentRound}</span>
                               {track?.requires_review ? (
                                 <>
-                                  <span>·</span>
+                                  <span>/</span>
                                   <span>
                                     {assignments.filter((assignment) => assignment.submitted_at).length}/
                                     {track.min_reviewers} required reviews complete
@@ -372,7 +403,7 @@ export default async function AdminReviewPage() {
         <div className="mt-12">
           <div className="mb-4">
             <h2 className="text-lg font-bold text-gray-900">
-              Policy Briefs — Feature for Institutions
+              Policy Briefs - Feature for Institutions
             </h2>
             <p className="mt-0.5 text-sm text-gray-500">
               {policyBriefs.length} published brief
@@ -396,7 +427,7 @@ export default async function AdminReviewPage() {
                       </p>
                     ) : null}
                     <p className="mt-1 text-xs text-gray-400">
-                      By {post.profiles?.full_name} · {post.profiles?.university}
+                      By {post.profiles?.full_name} / {post.profiles?.university}
                     </p>
                   </div>
                   <div className="flex-shrink-0">
@@ -431,7 +462,7 @@ export default async function AdminReviewPage() {
                       <Badge type={post.type} />
                       {post.featured ? (
                         <span className="text-xs font-medium text-amber-600">
-                          ★ Currently featured
+                          Currently featured
                         </span>
                       ) : null}
                     </div>
@@ -442,7 +473,7 @@ export default async function AdminReviewPage() {
                       </p>
                     ) : null}
                     <p className="mt-1 text-xs text-gray-400">
-                      By {post.profiles?.full_name} · {post.profiles?.university}
+                      By {post.profiles?.full_name} / {post.profiles?.university}
                     </p>
                   </div>
                   <div className="flex-shrink-0">

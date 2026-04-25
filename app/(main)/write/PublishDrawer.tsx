@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import TagInput from "@/components/ui/TagInput";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import QualityChecklist from "@/components/post/QualityChecklist";
 import type { PostReferenceRecord } from "@/lib/types";
 import {
   generateExcerpt,
@@ -24,6 +25,7 @@ import {
   normalizeTagValue,
 } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { getPostQualitySummary } from "@/lib/postQuality";
 import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
 import { publishPost } from "./actions";
 
@@ -190,6 +192,14 @@ export default function PublishDrawer({
           wordCount,
         },
       });
+      trackActivationEvent({
+        event: "quality_check_viewed",
+        metadata: {
+          draftId,
+          postType: initialPostType ?? inferredType,
+          wordCount,
+        },
+      });
       setPostType(initialPostType ?? inferredType);
       setTags(initialTags);
       setCoverImageUrl(initialCoverImageUrl);
@@ -313,6 +323,41 @@ export default function PublishDrawer({
     [inferredType, postType, wordCount]
   );
 
+  const qualitySummary = useMemo(
+    () =>
+      getPostQualitySummary({
+        type: postType,
+        status: "draft",
+        title,
+        excerpt,
+        content,
+        wordCount,
+        tags,
+        referenceCount: refs.filter((reference) => reference.title?.trim()).length,
+        isResponse: Boolean(inResponseTo),
+        author: {
+          full_name: profile?.full_name ?? null,
+          username: userId,
+          university: profile?.university ?? null,
+          field_of_study: profile?.field_of_study ?? null,
+        },
+      }),
+    [
+      content,
+      excerpt,
+      inResponseTo,
+      postType,
+      profile?.field_of_study,
+      profile?.full_name,
+      profile?.university,
+      refs,
+      tags,
+      title,
+      userId,
+      wordCount,
+    ]
+  );
+
   if (!open) return null;
 
   const isInstantPublish = postType === "blog" || postType === "essay";
@@ -353,11 +398,11 @@ export default function PublishDrawer({
       return;
     }
 
-    if (
-      (postType === "research" || postType === "policy_brief") &&
-      refs.filter((reference) => reference.title?.trim()).length === 0
-    ) {
-      setError("Research and policy briefs need at least one structured reference.");
+    if (!qualitySummary.readyForSubmission) {
+      const blockingItem = qualitySummary.checklist.find(
+        (item) => item.blocking && !item.done
+      );
+      setError(blockingItem?.helper ?? "Complete the required quality checks.");
       return;
     }
 
@@ -392,6 +437,16 @@ export default function PublishDrawer({
       setPublishing(false);
       return;
     }
+
+    trackActivationEvent({
+      event: "quality_check_completed",
+      metadata: {
+        draftId,
+        postType,
+        wordCount,
+        referenceCount: refs.filter((reference) => reference.title?.trim()).length,
+      },
+    });
 
     router.push(
       `/post/${publishedPostSlug}?justPublished=1&live=${
@@ -433,7 +488,7 @@ export default function PublishDrawer({
             className="text-2xl leading-none text-gray-400 transition-colors hover:text-gray-600"
             aria-label="Close publish drawer"
           >
-            ×
+            x
           </button>
         </div>
 
@@ -453,7 +508,7 @@ export default function PublishDrawer({
                   <p className="text-xs text-gray-500">
                     {correspondingAuthorId
                       ? "Lead author"
-                      : "Lead author · Default corresponding author"}
+                      : "Lead author / Default corresponding author"}
                   </p>
                 </div>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">
@@ -485,7 +540,7 @@ export default function PublishDrawer({
                   >
                     <span>
                       @{result.username}
-                      {result.full_name ? ` · ${result.full_name}` : ""}
+                      {result.full_name ? ` / ${result.full_name}` : ""}
                     </span>
                     <span className="text-emerald-brand">Add</span>
                   </button>
@@ -513,7 +568,7 @@ export default function PublishDrawer({
                       }}
                       className="text-emerald-600 hover:text-emerald-800"
                     >
-                      ×
+                      remove
                     </button>
                   </span>
                 ))}
@@ -555,7 +610,7 @@ export default function PublishDrawer({
                             : `Set ${coAuthor.username} as corresponding author`
                         }
                       >
-                        {correspondingAuthorId === coAuthor.id ? "★" : "☆"}
+                        {correspondingAuthorId === coAuthor.id ? "Unset" : "Set"}
                       </button>
                       <button
                         type="button"
@@ -570,7 +625,7 @@ export default function PublishDrawer({
                         }
                         className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
                       >
-                        ↑
+                        Up
                       </button>
                       <button
                         type="button"
@@ -585,7 +640,7 @@ export default function PublishDrawer({
                         }
                         className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
                       >
-                        ↓
+                        Down
                       </button>
                     </div>
                   </div>
@@ -634,7 +689,7 @@ export default function PublishDrawer({
                             className="text-sm text-gray-400 transition-colors hover:text-gray-700"
                             aria-label={`Remove ${reference.title || "reference"}`}
                           >
-                            ✕
+                            Remove
                           </button>
                         </div>
                       ))}
@@ -691,6 +746,14 @@ export default function PublishDrawer({
                             raw: null,
                           },
                         ]);
+                        trackActivationEvent({
+                          event: "reference_added",
+                          metadata: {
+                            draftId,
+                            postType,
+                            referenceCount: refs.length + 1,
+                          },
+                        });
                         setNewReferenceTitle("");
                         setNewReferenceAuthors("");
                         setNewReferenceSource("");
@@ -705,6 +768,8 @@ export default function PublishDrawer({
               ) : null}
             </section>
           ) : null}
+
+          <QualityChecklist summary={qualitySummary} />
 
           <section className="space-y-3">
             <div className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-canvas px-4 py-3">

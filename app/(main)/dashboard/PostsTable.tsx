@@ -119,7 +119,7 @@ export default function PostsTable({
           })
         : null;
       return dueDate
-        ? `Revision requested — due ${dueDate}`
+        ? `Revision requested - due ${dueDate}`
         : "Revision requested";
     }
 
@@ -129,14 +129,14 @@ export default function PostsTable({
     const decisions = post.post_editor_decisions ?? [];
 
     if (reviews.some((review) => !review.submitted_at)) {
-      return "In review — awaiting reviewer feedback";
+      return "In review - awaiting reviewer feedback";
     }
 
     if (reviews.length > 0 && decisions.length === 0) {
-      return "In review — editor deciding";
+      return "In review - editor deciding";
     }
 
-    return "In review — awaiting assignment";
+    return "In review - awaiting assignment";
   };
 
   useEffect(() => {
@@ -352,7 +352,7 @@ export default function PostsTable({
                               disabled={deletingId === post.id}
                               className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
                             >
-                              {deletingId === post.id ? "…" : "Delete"}
+                              {deletingId === post.id ? "Deleting" : "Delete"}
                             </button>
                           )}
                         </div>

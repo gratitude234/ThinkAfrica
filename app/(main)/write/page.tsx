@@ -27,7 +27,7 @@ const POST_TYPES = [
   {
     type: "blog",
     label: "Quick take",
-    minWords: 200,
+    minWords: 50,
     readTime: "~10 min to write",
     review: "No editorial review",
     desc: "One clear thought, example, or response",
@@ -603,7 +603,7 @@ export default function WritePage() {
                 className="text-xs text-gray-400 hover:text-gray-600"
                 aria-label="Remove response link"
               >
-                ✕
+                Remove
               </button>
             </div>
           ) : null}
@@ -703,8 +703,8 @@ export default function WritePage() {
             </div>
             <p className="text-xs font-medium text-gray-500">
               {wordCount.toLocaleString()} /{" "}
-              {selectedPostType.minWords.toLocaleString()} words ·{" "}
-              {selectedPostType.label} · {estimatedReadTime} min read
+              {selectedPostType.minWords.toLocaleString()} words /{" "}
+              {selectedPostType.label} / {estimatedReadTime} min read
             </p>
           </div>
         </div>

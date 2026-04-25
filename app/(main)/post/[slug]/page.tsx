@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import Tag from "@/components/ui/Tag";
 import UserAvatar from "@/components/ui/UserAvatar";
-import { formatDate, POST_POINTS, POST_TYPE_LABELS, type PostType } from "@/lib/utils";
+import { formatDate, POST_POINTS, type PostType } from "@/lib/utils";
 import LikeButton from "./LikeButton";
 import BookmarkButton from "./BookmarkButton";
 import CommentsLoader from "./CommentsLoader";
@@ -20,6 +20,9 @@ import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
 import CiteThis from "./CiteThis";
 import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
+import CredibilityPanel from "@/components/post/CredibilityPanel";
+import ResponseStartLink from "@/components/post/ResponseStartLink";
+import { getPostQualitySummary } from "@/lib/postQuality";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -90,26 +93,6 @@ function renderReferenceShortcodes(content: string): string {
     (_match, refNumber) =>
       `<sup><a href="#ref-${refNumber}" class="no-underline">[${refNumber}]</a></sup>`
   );
-}
-
-function formatReference(reference: {
-  authors: string | null;
-  year: number | null;
-  title: string;
-  source: string | null;
-  url: string | null;
-  doi: string | null;
-}) {
-  return [
-    reference.authors,
-    reference.year ? `(${reference.year}).` : null,
-    reference.title,
-    reference.source,
-    reference.doi ? `DOI: ${reference.doi}` : null,
-    reference.url,
-  ]
-    .filter(Boolean)
-    .join(" ");
 }
 
 function throwPostQueryError(slug: string, stage: "metadata" | "page", error: unknown): never {
@@ -278,6 +261,9 @@ export default async function PostPage({ params }: PageProps) {
     { data: referencesRaw },
     { data: coAuthorsRaw },
     { data: responsePostsRaw },
+    { data: reviewsRaw },
+    { count: commentCount },
+    { count: bookmarkCount },
   ] = await Promise.all([
     supabase
       .from("likes")
@@ -305,6 +291,15 @@ export default async function PostPage({ params }: PageProps) {
       .eq("status", "published")
       .order("published_at", { ascending: false })
       .limit(10),
+    supabase.from("post_reviews").select("submitted_at").eq("post_id", post.id),
+    supabase
+      .from("comments")
+      .select("*", { count: "exact", head: true })
+      .eq("post_id", post.id),
+    supabase
+      .from("bookmarks")
+      .select("*", { count: "exact", head: true })
+      .eq("post_id", post.id),
   ]);
 
   let userLiked = false;
@@ -406,6 +401,26 @@ export default async function PostPage({ params }: PageProps) {
     injectHeadingIds(post.content ?? "")
   );
   const authorName = author?.full_name ?? author?.username ?? "Anonymous";
+  const qualitySummary = getPostQualitySummary({
+    type: post.type,
+    status: post.status,
+    title: post.title,
+    excerpt: post.excerpt,
+    content: post.content,
+    wordCount,
+    tags: post.tags ?? [],
+    citationId: post.citation_id ?? null,
+    isResponse: Boolean(parentPostId),
+    author,
+    referenceCount: references.length,
+    responseCount: responsePosts.length,
+    reviewCount: reviewsRaw?.length ?? 0,
+    completedReviewCount:
+      reviewsRaw?.filter((review) => Boolean(review.submitted_at)).length ?? 0,
+    commentCount: commentCount ?? 0,
+    likeCount: likeCount ?? 0,
+    bookmarkCount: bookmarkCount ?? 0,
+  });
 
   return (
     <div className="relative">
@@ -474,10 +489,10 @@ export default async function PostPage({ params }: PageProps) {
               <header className="mb-8">
                 {/* Kicker - post type + word count + read time */}
                 <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-brand">
-                  {POST_TYPE_LABELS[(post.type as PostType) ?? "blog"] ?? post.type}
-                  <span className="mx-2 text-gray-300">·</span>
+                  {qualitySummary.contentLabel}
+                  <span className="mx-2 text-gray-300">/</span>
                   <span className="text-ink-muted">
-                    {wordCount.toLocaleString()} words · {readTime} min read
+                    {wordCount.toLocaleString()} words / {readTime} min read
                   </span>
                 </p>
 
@@ -543,7 +558,7 @@ export default async function PostPage({ params }: PageProps) {
                           ) : null}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {author.field_of_study ? `${author.field_of_study} · ` : ""}
+                          {author.field_of_study ? `${author.field_of_study} / ` : ""}
                           {author.university}
                         </p>
                       </div>
@@ -566,7 +581,7 @@ export default async function PostPage({ params }: PageProps) {
                         href={`/${coAuthor.profile?.username}`}
                         className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-brand"
                       >
-                        {coAuthor.corresponding_author ? "Corresponding · " : ""}
+                        {coAuthor.corresponding_author ? "Corresponding / " : ""}
                         {coAuthor.profile?.full_name ?? coAuthor.profile?.username}
                       </Link>
                     ))}
@@ -574,15 +589,22 @@ export default async function PostPage({ params }: PageProps) {
                 ) : null}
 
                 {isPublished ? (
-                  <Link
-                    href={`/write?inResponseTo=${post.id}&type=essay`}
+                  <ResponseStartLink
+                    postId={post.id}
                     className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100"
                   >
-                    <span aria-hidden="true">{"\u21A9"}</span>
                     Write a response
-                  </Link>
+                  </ResponseStartLink>
                 ) : null}
               </header>
+
+              <div className="mb-8 lg:hidden">
+                <CredibilityPanel
+                  postId={post.id}
+                  summary={qualitySummary}
+                  isPublished={isPublished}
+                />
+              </div>
 
               {audioSummaryUrl ? (
                 <AudioSummaryPlayer audioUrl={audioSummaryUrl} />
@@ -601,25 +623,55 @@ export default async function PostPage({ params }: PageProps) {
 
               {references.length > 0 ? (
                 <section className="mb-8">
-                  <h2 className="mb-4 text-xl font-semibold text-gray-900">
-                    References
-                  </h2>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      References
+                    </h2>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
+                      {references.length} listed
+                    </span>
+                  </div>
                   <ol className="space-y-3">
                     {references.map((reference, index) => (
                       <li
                         key={reference.id}
                         id={`ref-${index + 1}`}
-                        className="pl-8 -indent-8 text-sm leading-relaxed text-gray-600"
+                        className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-600"
                       >
-                        [{index + 1}]{" "}
-                        {formatReference({
-                          authors: reference.authors ?? null,
-                          year: reference.year ?? null,
-                          title: reference.title,
-                          source: reference.source ?? null,
-                          url: reference.url ?? null,
-                          doi: reference.doi ?? null,
-                        })}
+                        <div className="flex gap-3">
+                          <span className="shrink-0 font-semibold text-emerald-700">
+                            [{index + 1}]
+                          </span>
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {reference.title}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {[reference.authors, reference.year, reference.source]
+                                .filter(Boolean)
+                                .join(" / ") || "Reference details not provided"}
+                            </p>
+                            {reference.doi || reference.url ? (
+                              <p className="mt-1 text-xs">
+                                {reference.doi ? (
+                                  <span className="mr-2 text-gray-500">
+                                    DOI: {reference.doi}
+                                  </span>
+                                ) : null}
+                                {reference.url ? (
+                                  <a
+                                    href={reference.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-emerald-700 hover:underline"
+                                  >
+                                    Open source
+                                  </a>
+                                ) : null}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
                       </li>
                     ))}
                   </ol>
@@ -673,15 +725,15 @@ export default async function PostPage({ params }: PageProps) {
                         Have a substantive pushback? Write a response post.
                       </p>
                       <p className="mt-1 text-xs text-gray-500">
-                        More than a comment warrants - your argument, your byline, your post.
+                        More than a comment warrants your argument, your byline, and your post.
                       </p>
-                      <Link
-                        href={`/write?inResponseTo=${post.id}&type=essay`}
+                      <ResponseStartLink
+                        postId={post.id}
+                        source="post_reading_moment"
                         className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
                       >
-                        <span aria-hidden="true">{"\u21A9"}</span>
                         Write a response
-                      </Link>
+                      </ResponseStartLink>
                     </div>
                   ) : null}
                 </>
@@ -725,7 +777,7 @@ export default async function PostPage({ params }: PageProps) {
                             {item.title}
                           </p>
                           <p className="mt-0.5 text-xs text-gray-400">
-                            {item.profiles?.full_name} · {formatDate(item.published_at ?? item.created_at)}
+                            {item.profiles?.full_name} / {formatDate(item.published_at ?? item.created_at)}
                           </p>
                         </div>
                         <svg
@@ -791,25 +843,20 @@ export default async function PostPage({ params }: PageProps) {
                           <div className="w-1 flex-shrink-0 self-stretch rounded-full bg-emerald-400" />
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex items-center gap-2">
-                              {responseAuthor?.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={responseAuthor.avatar_url}
-                                  alt={responseAuthor.full_name ?? responseAuthor.username}
-                                  className="h-5 w-5 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
-                                  {(responseAuthor?.full_name ?? responseAuthor?.username ?? "?")
-                                    .charAt(0)
-                                    .toUpperCase()}
-                                </div>
-                              )}
+                              <UserAvatar
+                                name={
+                                  responseAuthor?.full_name ??
+                                  responseAuthor?.username ??
+                                  "Unknown"
+                                }
+                                src={responseAuthor?.avatar_url ?? null}
+                                size={20}
+                              />
                               <span className="text-xs text-gray-500">
                                 <span className="font-medium text-gray-700">
                                   {responseAuthor?.full_name ?? responseAuthor?.username ?? "Unknown"}
                                 </span>
-                                {" · "}
+                                {" / "}
                                 <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 italic">
                                   Response
                                 </span>
@@ -834,7 +881,14 @@ export default async function PostPage({ params }: PageProps) {
           </div>
 
           <aside className="hidden lg:col-span-1 lg:block">
-            <TableOfContents headings={headings} />
+            <div className="space-y-4">
+              <TableOfContents headings={headings} />
+              <CredibilityPanel
+                postId={post.id}
+                summary={qualitySummary}
+                isPublished={isPublished}
+              />
+            </div>
           </aside>
         </div>
       </div>

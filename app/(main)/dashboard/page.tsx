@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import StatsBar from "./StatsBar";
 import PostsTable from "./PostsTable";
 import type { DashboardPost } from "./PostsTable";
+import QualitySignals, { type DashboardQualityItem } from "./QualitySignals";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
 import Button from "@/components/ui/Button";
 import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import { getActivationState } from "@/lib/activation";
 import { getRetentionSummary } from "@/lib/retention";
+import { getPostQualitySummary } from "@/lib/postQuality";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -24,8 +26,8 @@ export default async function DashboardPage() {
     .from("posts")
     .select(
       `
-      id, title, slug, type, status, view_count, created_at, published_at,
-      revision_due_at, citation_id,
+      id, title, slug, content, excerpt, tags, type, status, view_count,
+      created_at, published_at, revision_due_at, citation_id, in_response_to,
       post_reviews(assigned_at, submitted_at, recommendation),
       post_editor_decisions(decision, created_at)
       `
@@ -53,11 +55,73 @@ export default async function DashboardPage() {
     }
   }
 
+  let referenceCounts: Record<string, number> = {};
+  let commentCounts: Record<string, number> = {};
+  let bookmarkCounts: Record<string, number> = {};
+  let responseCounts: Record<string, number> = {};
+
+  if (postIds.length > 0) {
+    const [
+      { data: references },
+      { data: comments },
+      { data: bookmarks },
+      { data: responses },
+    ] = await Promise.all([
+      supabase.from("post_references").select("post_id").in("post_id", postIds),
+      supabase.from("comments").select("post_id").in("post_id", postIds),
+      supabase.from("bookmarks").select("post_id").in("post_id", postIds),
+      supabase
+        .from("posts")
+        .select("in_response_to")
+        .eq("status", "published")
+        .in("in_response_to", postIds),
+    ]);
+
+    referenceCounts = ((references ?? []) as Array<{ post_id: string | null }>).reduce(
+      (acc, row) => {
+        if (row.post_id) acc[row.post_id] = (acc[row.post_id] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    commentCounts = ((comments ?? []) as Array<{ post_id: string | null }>).reduce(
+      (acc, row) => {
+        if (row.post_id) acc[row.post_id] = (acc[row.post_id] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    bookmarkCounts = ((bookmarks ?? []) as Array<{ post_id: string | null }>).reduce(
+      (acc, row) => {
+        if (row.post_id) acc[row.post_id] = (acc[row.post_id] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    responseCounts = (
+      (responses ?? []) as Array<{ in_response_to: string | null }>
+    ).reduce(
+      (acc, row) => {
+        if (row.in_response_to) {
+          acc[row.in_response_to] = (acc[row.in_response_to] ?? 0) + 1;
+        }
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+  }
+
   // Follower count
   const { count: followerCount } = await supabase
     .from("follows")
     .select("*", { count: "exact", head: true })
     .eq("following_id", user.id);
+
+  const { data: authorProfile } = await supabase
+    .from("profiles")
+    .select("username, full_name, university, field_of_study, verified, verified_type")
+    .eq("id", user.id)
+    .single();
 
   const activationState = await getActivationState(supabase, user.id);
   const retentionSummary = await getRetentionSummary(
@@ -100,6 +164,64 @@ export default async function DashboardPage() {
     post_editor_decisions: p.post_editor_decisions ?? [],
     queuePosition: queuePositionById.get(p.id) ?? null,
   }));
+
+  const qualityItems: DashboardQualityItem[] = (postsRaw ?? [])
+    .map((post) => {
+      const reviews = post.post_reviews ?? [];
+      const summary = getPostQualitySummary({
+        type: post.type,
+        status: post.status,
+        title: post.title,
+        excerpt: post.excerpt,
+        content: post.content,
+        tags: post.tags ?? [],
+        citationId: (post as { citation_id?: string | null }).citation_id ?? null,
+        isResponse: Boolean(
+          (post as { in_response_to?: string | null }).in_response_to
+        ),
+        author: authorProfile,
+        referenceCount: referenceCounts[post.id] ?? 0,
+        responseCount: responseCounts[post.id] ?? 0,
+        reviewCount: reviews.length,
+        completedReviewCount: reviews.filter((review) => review.submitted_at).length,
+        commentCount: commentCounts[post.id] ?? 0,
+        likeCount: likeCounts[post.id] ?? 0,
+        bookmarkCount: bookmarkCounts[post.id] ?? 0,
+      });
+
+      return {
+        id: post.id,
+        title: post.title,
+        status: post.status,
+        actionHref:
+          post.status === "draft" ? `/write?draft=${post.id}` : `/edit/${post.slug}`,
+        actionLabel:
+          post.status === "pending_revision"
+            ? "Review notes"
+            : post.status === "draft"
+              ? "Continue"
+              : "Improve",
+        summary,
+      };
+    })
+    .filter(
+      (item) =>
+        item.status === "pending_revision" ||
+        item.status === "draft" ||
+        item.summary.missingItems.length > 0 ||
+        item.summary.wordCount > 0
+    )
+    .sort((left, right) => {
+      const priority = (item: DashboardQualityItem) => {
+        if (item.status === "pending_revision") return 0;
+        if (!item.summary.readyForSubmission) return 1;
+        if (item.status === "draft") return 2;
+        return 3;
+      };
+
+      return priority(left) - priority(right);
+    })
+    .slice(0, 4);
 
   const revisionPosts = posts.filter((post) => post.status === "pending_revision");
   const publishedPosts = posts.filter((p) => p.status === "published");
@@ -164,6 +286,8 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
+      <QualitySignals items={qualityItems} />
+
       <StatsBar
         totalViews={totalViews}
         totalLikes={totalLikes}
@@ -212,7 +336,7 @@ export default async function DashboardPage() {
                             {app.fellowship.title}
                           </Link>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-gray-400">No fellowship found</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">

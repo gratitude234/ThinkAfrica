@@ -1,4 +1,28 @@
 import Link from "next/link";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
+
+const platformLinks = [
+  { label: "Home", href: "/" },
+  { label: "Discover", href: "/topics" },
+  { label: "Write", href: "/write" },
+  { label: "Opportunities", href: "/opportunities" },
+  { label: "Policy Hub", href: "/policy" },
+  ...(FEATURE_FLAGS.debates ? [{ label: "Debates", href: "/debates" }] : []),
+  ...(FEATURE_FLAGS.webinars ? [{ label: "Webinars", href: "/webinars" }] : []),
+];
+
+const communityLinks = [
+  ...(FEATURE_FLAGS.ambassadors
+    ? [{ label: "Become an Ambassador", href: "/ambassadors" }]
+    : []),
+  { label: "Editorial Standards", href: "/editorial-standards" },
+  { label: "About Us", href: "/about" },
+];
+
+const legalLinks = [
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms of Use", href: "/terms" },
+];
 
 export default function Footer() {
   return (
@@ -21,13 +45,7 @@ export default function Footer() {
               Platform
             </h3>
             <ul className="space-y-2">
-              {[
-                { label: "Feed", href: "/" },
-                { label: "Debates", href: "/debates" },
-                { label: "Webinars", href: "/webinars" },
-                { label: "Leaderboard", href: "/leaderboard" },
-                { label: "Policy Hub", href: "/policy" },
-              ].map(({ label, href }) => (
+              {platformLinks.map(({ label, href }) => (
                 <li key={href}>
                   <Link
                     href={href}
@@ -46,12 +64,7 @@ export default function Footer() {
               Community
             </h3>
             <ul className="space-y-2">
-              {[
-                { label: "Become an Ambassador", href: "/ambassadors" },
-                { label: "Write for ThinkAfrika", href: "/write" },
-                { label: "Editorial Standards", href: "/editorial-standards" },
-                { label: "About Us", href: "/about" },
-              ].map(({ label, href }) => (
+              {communityLinks.map(({ label, href }) => (
                 <li key={href}>
                   <Link
                     href={href}
@@ -70,10 +83,7 @@ export default function Footer() {
               Legal
             </h3>
             <ul className="space-y-2">
-              {[
-                { label: "Privacy Policy", href: "/privacy" },
-                { label: "Terms of Use", href: "/terms" },
-              ].map(({ label, href }) => (
+              {legalLinks.map(({ label, href }) => (
                 <li key={href}>
                   <Link
                     href={href}

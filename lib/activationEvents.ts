@@ -15,7 +15,15 @@ export type ActivationEventName =
   | "dashboard_viewed"
   | "next_action_clicked"
   | "notification_opened"
-  | "weekly_digest_previewed";
+  | "weekly_digest_previewed"
+  | "quality_check_viewed"
+  | "quality_check_completed"
+  | "reference_added"
+  | "comment_submitted"
+  | "response_started"
+  | "landing_viewed"
+  | "landing_read_clicked"
+  | "landing_signup_clicked";
 
 interface ActivationEventPayload {
   event: ActivationEventName;

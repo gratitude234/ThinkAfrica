@@ -3,10 +3,13 @@
 // -- ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id uuid REFERENCES comments(id);
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Toast from "@/components/ui/Toast";
 import ProfileGate from "@/components/ui/ProfileGate";
 import { formatRelativeTime } from "@/lib/utils";
+import { trackActivationEvent } from "@/lib/activationEvents";
+import ResponseStartLink from "@/components/post/ResponseStartLink";
 
 interface CommentAuthor {
   username: string;
@@ -40,6 +43,13 @@ interface CommentsSectionProps {
 function sortCommentsByUpvotes<T extends { upvotes: number }>(items: T[]) {
   return [...items].sort((a, b) => b.upvotes - a.upvotes);
 }
+
+const COMMENT_PROMPTS = [
+  { label: "Question", text: "Question: " },
+  { label: "Evidence", text: "Evidence to add: " },
+  { label: "Counterpoint", text: "Counterpoint: " },
+  { label: "Clarification", text: "Clarification needed: " },
+];
 
 export default function CommentsSection({
   postId,
@@ -244,6 +254,15 @@ export default function CommentsSection({
         );
         setNewComment("");
       }
+
+      trackActivationEvent({
+        event: "comment_submitted",
+        metadata: {
+          postId,
+          parent: Boolean(parentId),
+          length: content.trim().length,
+        },
+      });
     }
 
     setLoading(false);
@@ -290,7 +309,7 @@ export default function CommentsSection({
                 : "text-gray-400 hover:text-emerald-600"
             } disabled:cursor-default disabled:opacity-50`}
           >
-            <span className="text-base leading-none">▲</span>
+            <span>Upvote</span>
             <span>{comment.upvotes}</span>
           </button>
           {parentId ? null : (
@@ -318,9 +337,22 @@ export default function CommentsSection({
 
       <div className="mb-8 space-y-6">
         {totalCount === 0 ? (
-          <p className="text-sm text-gray-400">
-            No comments yet. Be the first to respond.
-          </p>
+          <div className="rounded-xl border border-dashed border-gray-200 bg-canvas px-4 py-4">
+            <p className="text-sm font-medium text-gray-900">
+              Start the discussion with a useful move.
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-gray-500">
+              Ask a question, add evidence, offer a counterpoint, or write a full
+              response if you have a developed argument.
+            </p>
+            <ResponseStartLink
+              postId={postId}
+              source="empty_comments"
+              className="mt-3 inline-flex rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+            >
+              Write a response instead
+            </ResponseStartLink>
+          </div>
         ) : null}
 
         {comments.map((comment) => {
@@ -346,9 +378,22 @@ export default function CommentsSection({
                     value={replyContent}
                     onChange={(e) => setReplyContent(e.target.value)}
                     rows={2}
-                    placeholder="Write your reply..."
+                    placeholder="Reply with a question, evidence, counterpoint, or clarification..."
                     className="mb-2 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
                   />
+                  {replyContent.trim().length >= 220 ? (
+                    <div className="mb-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                      This is becoming substantive.{" "}
+                      <ResponseStartLink
+                        postId={postId}
+                        source="long_reply"
+                        className="font-semibold underline"
+                      >
+                        Turn it into a response post
+                      </ResponseStartLink>
+                      .
+                    </div>
+                  ) : null}
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
@@ -392,10 +437,39 @@ export default function CommentsSection({
           <textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Share your thoughts..."
+            placeholder="Ask a question, add evidence, offer a counterpoint, or request clarification..."
             rows={3}
             className="mb-2 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
           />
+          <div className="mb-3 flex flex-wrap gap-2">
+            {COMMENT_PROMPTS.map((prompt) => (
+              <button
+                key={prompt.label}
+                type="button"
+                onClick={() =>
+                  setNewComment((current) =>
+                    current.trim() ? current : prompt.text
+                  )
+                }
+                className="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+              >
+                {prompt.label}
+              </button>
+            ))}
+          </div>
+          {newComment.trim().length >= 280 ? (
+            <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              This reads like a substantive argument.{" "}
+              <ResponseStartLink
+                postId={postId}
+                source="long_comment"
+                className="font-semibold underline"
+              >
+                Turn it into a response post
+              </ResponseStartLink>
+              .
+            </div>
+          ) : null}
           {error ? <p className="mb-2 text-sm text-red-600">{error}</p> : null}
           <div className="flex justify-end">
             <button
@@ -409,12 +483,12 @@ export default function CommentsSection({
         </form>
       ) : (
         <div className="rounded-lg border border-gray-200 bg-canvas px-4 py-3 text-sm text-gray-500">
-          <a
+          <Link
             href="/login"
             className="font-medium text-emerald-brand hover:underline"
           >
             Sign in
-          </a>{" "}
+          </Link>{" "}
           to leave a comment.
         </div>
       )}
