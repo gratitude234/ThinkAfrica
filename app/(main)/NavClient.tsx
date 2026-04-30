@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import NavUserMenu from "./NavUserMenu";
 import MobileNav from "./MobileNav";
 import NotificationBell from "@/components/ui/NotificationBell";
-import LiteModeToggle from "@/components/ui/LiteModeToggle";
 
 interface NavClientProps {
   user: User | null;
@@ -23,10 +21,10 @@ interface NavClientProps {
 }
 
 function navItemClass(isActive: boolean) {
-  return `relative rounded-lg px-4 py-2 text-sm transition-colors ${
+  return `rounded-[7px] px-[9px] py-[5px] text-[13px] font-medium transition-colors ${
     isActive
       ? "font-semibold text-ink"
-      : "text-ink-muted hover:bg-canvas hover:text-ink"
+      : "text-gray-500 hover:bg-gray-100 hover:text-ink"
   }`;
 }
 
@@ -41,31 +39,28 @@ export default function NavClient({
   const isHomeActive = pathname === "/";
   const isDiscoverActive =
     pathname === "/topics" || pathname.startsWith("/topics/");
+  const isDebatesActive =
+    pathname === "/debates" || pathname.startsWith("/debates/");
   const isOpportunitiesActive =
     pathname === "/opportunities" || pathname.startsWith("/opportunities/");
   const isWriteActive = pathname.startsWith("/write");
 
   return (
     <nav
-      className="sticky top-0 z-50 border-b border-gray-200 bg-white"
+      className="sticky top-0 z-50 h-14 border-b border-gray-200 bg-white/95 backdrop-blur-xl"
       aria-label="Primary navigation"
     >
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-3">
-          <Link href="/" className="flex flex-shrink-0 items-center gap-2">
-            <Image
-              src="/logo.png"
-              alt="ThinkAfrika"
-              width={160}
-              height={48}
-              priority
-              data-lite-keep
-              className="h-16 w-auto"
-            />
+      <div className="mx-auto flex h-full max-w-[1152px] items-center gap-6 px-5">
+          <Link
+            href="/"
+            className="shrink-0 font-display text-xl font-bold leading-none"
+          >
+            <span className="text-emerald-brand">Think</span>
+            <span className="text-purple-accent">Africa</span>
           </Link>
 
-          <div className="hidden min-w-0 flex-1 items-center justify-center gap-3 px-4 md:flex">
-            <div className="flex items-center gap-1">
+          <div className="hidden min-w-0 flex-1 items-center gap-6 md:flex">
+            <div className="flex items-center gap-0.5">
               <Link
                 href="/"
                 className={navItemClass(isHomeActive)}
@@ -81,15 +76,11 @@ export default function NavClient({
                 Discover
               </Link>
               <Link
-                href="/write"
-                className={`rounded-full px-4 py-2 text-sm transition-colors ${
-                  isWriteActive
-                    ? "bg-ink font-semibold text-white"
-                    : "bg-emerald-brand font-semibold text-white hover:bg-emerald-600"
-                }`}
-                aria-current={isWriteActive ? "page" : undefined}
+                href="/debates"
+                className={navItemClass(isDebatesActive)}
+                aria-current={isDebatesActive ? "page" : undefined}
               >
-                Write
+                Debates
               </Link>
               <Link
                 href="/opportunities"
@@ -103,12 +94,11 @@ export default function NavClient({
             <button
               type="button"
               onClick={onOpenSearch}
-              className="hidden items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm text-ink-muted transition-colors hover:border-gray-400 hover:text-ink md:flex"
+              className="ml-auto hidden w-full max-w-[280px] items-center gap-2 rounded-[9px] border border-transparent bg-gray-100 px-3 py-1.5 text-[13px] text-gray-400 transition-colors hover:border-gray-300 hover:bg-white hover:text-ink md:flex"
               aria-label="Open search"
-              style={{ minWidth: 0, maxWidth: "220px" }}
             >
               <svg
-                className="h-4 w-4 flex-shrink-0"
+                className="h-3.5 w-3.5 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -120,15 +110,15 @@ export default function NavClient({
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
-              <span className="truncate">Search</span>
+              <span className="truncate">Search essays, writers, topics...</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
               onClick={onOpenSearch}
-              className="rounded-full border border-gray-200 bg-white p-2 text-ink-muted transition-colors hover:border-gray-400 hover:text-ink md:hidden"
+              className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-ink md:hidden"
               aria-label="Open search"
             >
               <svg
@@ -146,7 +136,27 @@ export default function NavClient({
               </svg>
             </button>
             {user ? <NotificationBell userId={user.id} /> : null}
-            <LiteModeToggle />
+            <Link
+              href="/write"
+              className={`hidden items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors sm:inline-flex ${
+                isWriteActive
+                  ? "bg-ink"
+                  : "bg-emerald-brand hover:bg-emerald-600"
+              }`}
+              aria-current={isWriteActive ? "page" : undefined}
+            >
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+              Write
+            </Link>
             <NavUserMenu
               user={user}
               profile={profile}
@@ -161,7 +171,6 @@ export default function NavClient({
               canAccessReview={canAccessReview}
             />
           </div>
-        </div>
       </div>
     </nav>
   );

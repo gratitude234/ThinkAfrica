@@ -24,29 +24,27 @@ export default function TopicInterlude({ posts }: { posts: PostCardData[] }) {
   if (!topic) return null;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-canvas p-5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+    <section className="my-2 rounded-xl border border-gray-200 bg-canvas px-5 py-[18px]">
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">
         Topic spotlight
       </p>
       <Link
         href={`/topics/${encodeURIComponent(topic.tag)}`}
-        className="mt-2 inline-block text-lg font-semibold text-gray-900 hover:text-emerald-brand"
+        className="font-display mb-2.5 block text-[17px] font-semibold text-ink hover:text-emerald-brand"
       >
-        {topic.tag}
+        #{topic.tag}
       </Link>
-      <div className="mt-3 space-y-2">
+      <div>
         {topic.posts.map((post) => (
           <Link
             key={post.id}
             href={`/post/${post.slug}`}
-            className="block rounded-xl bg-white px-4 py-3 hover:bg-gray-100"
+            className="mb-1.5 block rounded-lg bg-white px-3.5 py-2.5 text-[13px] font-medium text-gray-700 transition-colors last:mb-0 hover:bg-gray-50"
           >
-            <p className="line-clamp-2 text-sm font-medium text-gray-800">
-              {post.title}
-            </p>
+            <span className="line-clamp-2">{post.title}</span>
           </Link>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

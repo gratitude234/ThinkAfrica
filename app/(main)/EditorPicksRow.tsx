@@ -19,9 +19,9 @@ interface PickPost {
 
 const COVER_COLORS: Record<string, string> = {
   research: "bg-[#534AB7]",
-  policy_brief: "bg-[#993C1D]",
+  policy_brief: "bg-[#1D4ED8]",
   essay: "bg-[#444441]",
-  blog: "bg-[#6B625C]",
+  blog: "bg-[#047857]",
 };
 
 function estimateReadTime(excerpt: string | null): number {
@@ -35,11 +35,11 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
   if (picks.length === 0) return null;
 
   return (
-    <div className="mb-8">
-      <p className="mb-4 border-t border-gray-100 pt-6 text-[11px] font-medium uppercase tracking-[0.2em] text-ink-muted">
+    <section>
+      <p className="mb-3 border-t border-gray-100 pt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
         Also picked this week
       </p>
-      <div className={`grid gap-4 ${picks.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+      <div className={`mb-6 grid gap-2.5 ${picks.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
         {picks.map((pick) => {
           const author = pick.profiles;
           const typeLabel = POST_TYPE_LABELS[pick.type as PostType] ?? pick.type;
@@ -50,10 +50,10 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
             <Link
               key={pick.id}
               href={`/post/${pick.slug}`}
-              className="group overflow-hidden rounded-xl border border-gray-200/70 bg-white transition-shadow hover:shadow-md"
+              className="group overflow-hidden rounded-[10px] border border-gray-200/80 bg-white transition-shadow hover:shadow-md"
             >
               {pick.cover_image_url ? (
-                <div data-lite-hide className="relative h-20 w-full">
+                <div data-lite-hide className="relative h-[72px] w-full">
                   <Image
                     src={pick.cover_image_url}
                     alt={pick.title}
@@ -63,25 +63,23 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
                   />
                 </div>
               ) : (
-                <div className={`flex h-20 w-full items-end ${coverBg} p-3`}>
-                  <span className="font-serif text-xs italic text-white/80">
+                <div className={`flex h-[72px] w-full items-end ${coverBg} px-2.5 py-2`}>
+                  <span className="font-display text-[11px] italic text-white/45">
                     {typeLabel.toLowerCase()}
                   </span>
                 </div>
               )}
-              <div className="p-3">
-                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-ink-muted">
-                  {typeLabel}
-                  <span className="mx-1.5 text-gray-300">·</span>
-                  {readTime} min read
+              <div className="px-3 py-2.5">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+                  {typeLabel} {"\u00B7"} {readTime} min
                 </p>
-                <h3 className="font-display line-clamp-2 text-sm font-semibold leading-snug text-ink transition-colors group-hover:text-gray-700">
+                <h3 className="font-display line-clamp-2 text-[13px] font-semibold leading-[1.3] text-ink transition-colors group-hover:text-gray-700">
                   {pick.title}
                 </h3>
                 {author ? (
-                  <p className="mt-2 truncate text-xs text-ink-muted">
+                  <p className="mt-1 truncate text-[11px] text-ink-muted">
                     {author.full_name ?? author.username}
-                    {author.university ? ` · ${author.university}` : ""}
+                    {author.university ? ` - ${author.university}` : ""}
                   </p>
                 ) : null}
               </div>
@@ -89,6 +87,6 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

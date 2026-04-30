@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
@@ -140,7 +140,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="border-b border-gray-100 p-4">
           <h2 id="search-overlay-title" className="sr-only">
-            Search ThinkAfrika
+            Search ThinkAfrica
           </h2>
           <div className="flex items-center gap-3">
             <svg

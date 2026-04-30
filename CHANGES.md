@@ -1,4 +1,4 @@
-# ThinkAfrika V2 Focus & Polish Pass
+﻿# ThinkAfrica V2 Focus & Polish Pass
 
 ## Phase 1 — Visual Identity Foundation
 - Added `Playfair Display` and `Inter` in `app/layout.tsx` and registered them in `tailwind.config.ts`.

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "user",
-            content: `You are writing a 90-second spoken audio summary for a ThinkAfrika post.
+            content: `You are writing a 90-second spoken audio summary for a ThinkAfrica post.
 The post is a ${postType} by ${authorName}, titled: "${title}".
 
 Write a tight, engaging spoken summary of exactly 200-240 words.

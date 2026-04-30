@@ -55,7 +55,7 @@ export default async function MainLayout({
         hasActiveDebate={(activeDebateCount ?? 0) > 0}
       />
 
-      <main className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 lg:px-8 md:pb-8">
+      <main className="mx-auto max-w-[1152px] px-5 pb-24 pt-6 md:pb-16">
         {children}
       </main>
 

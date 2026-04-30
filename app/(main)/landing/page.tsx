@@ -1,4 +1,4 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import Footer from "@/components/ui/Footer";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
@@ -101,7 +101,7 @@ function relativeDate(dateStr: string | null): string {
 function authorLine(post: LandingPost) {
   const p = post.profiles;
   return {
-    name: p?.full_name ?? p?.username ?? "ThinkAfrika",
+    name: p?.full_name ?? p?.username ?? "ThinkAfrica",
     university: p?.university ?? null,
   };
 }

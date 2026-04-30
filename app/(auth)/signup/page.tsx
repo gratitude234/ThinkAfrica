@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -63,14 +63,14 @@ export default function SignupPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
-            alt="ThinkAfrika"
+            alt="ThinkAfrica"
             className="mb-12 h-10 w-auto brightness-0 invert"
           />
           <blockquote className="mb-6 text-xl font-medium italic leading-relaxed text-white/90">
             &quot;The pen is mightier than the sword, and the African intellectual is mightier still.&quot;
           </blockquote>
           <p className="text-sm text-white/60">
-            ThinkAfrika - Africa&apos;s Intellectual Network
+            ThinkAfrica - Africa&apos;s Intellectual Network
           </p>
         </div>
         <div className="space-y-4">
@@ -93,14 +93,14 @@ export default function SignupPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
-            alt="ThinkAfrika"
+            alt="ThinkAfrica"
             className="mb-8 h-8 w-auto md:hidden"
           />
           <h1 className="font-display mb-1 text-2xl font-bold text-ink">
             Create your account
           </h1>
           <p className="mb-8 text-sm text-gray-500">
-            Join ThinkAfrika in under a minute. We will shape your academic
+            Join ThinkAfrica in under a minute. We will shape your academic
             profile next.
           </p>
 

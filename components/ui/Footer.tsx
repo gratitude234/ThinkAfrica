@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 const platformLinks = [
@@ -38,7 +38,7 @@ export default function Footer({ landing = false }: { landing?: boolean }) {
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="text-xl font-bold text-emerald-400">
-              ThinkAfrika
+              ThinkAfrica
             </Link>
             <p className="mt-2 text-sm text-gray-400 leading-relaxed">
               Where Africa&apos;s Ideas Connect
@@ -104,7 +104,7 @@ export default function Footer({ landing = false }: { landing?: boolean }) {
         </div>
 
         <div className="mt-10 pt-6 border-t border-gray-800 text-center text-xs text-gray-500">
-          &copy; 2025 ThinkAfrika. Built for Africa.
+          &copy; 2025 ThinkAfrica. Built for Africa.
         </div>
       </div>
     </footer>

@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import StatsBar from "./StatsBar";
@@ -223,7 +223,7 @@ export default async function DashboardPage() {
       title: post?.title ?? "Untitled collaboration",
       slug: post?.slug ?? "",
       authorName:
-        authorProfile?.full_name ?? authorProfile?.username ?? "A ThinkAfrika author",
+        authorProfile?.full_name ?? authorProfile?.username ?? "A ThinkAfrica author",
     };
   });
 
@@ -236,7 +236,7 @@ export default async function DashboardPage() {
       id: response.id,
       title: response.title,
       slug: response.slug,
-      authorName: profile?.full_name ?? profile?.username ?? "ThinkAfrika writer",
+      authorName: profile?.full_name ?? profile?.username ?? "ThinkAfrica writer",
       avatarUrl: profile?.avatar_url ?? null,
     };
   });

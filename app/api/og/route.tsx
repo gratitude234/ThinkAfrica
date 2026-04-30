@@ -1,11 +1,11 @@
-import { ImageResponse } from "next/og";
+﻿import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 
 export const runtime = "edge";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const title = searchParams.get("title") ?? "ThinkAfrika";
+  const title = searchParams.get("title") ?? "ThinkAfrica";
   const author = searchParams.get("author") ?? "";
   const university = searchParams.get("university") ?? "";
   const type = searchParams.get("type") ?? "essay";
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
               letterSpacing: "-0.01em",
             }}
           >
-            ThinkAfrika
+            ThinkAfrica
           </div>
         </div>
       </div>

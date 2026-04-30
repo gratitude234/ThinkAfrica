@@ -54,10 +54,10 @@ export default function FollowButton({
       onClick={handleToggle}
       disabled={loading}
       aria-label={following ? "Unfollow" : "Follow"}
-      className={`flex-shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+      className={`flex-shrink-0 rounded-full border px-3.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
         following
-          ? "border-gray-200 bg-gray-100 text-gray-600"
-          : "border-emerald-brand bg-emerald-brand text-white hover:bg-emerald-600"
+          ? "border-emerald-100 bg-emerald-50 text-emerald-brand"
+          : "border-gray-300 bg-white text-gray-700 hover:border-emerald-brand hover:text-emerald-brand"
       }`}
     >
       {loading ? "..." : following ? "Following" : "Follow"}

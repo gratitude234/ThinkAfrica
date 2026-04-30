@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AmbassadorsPage() {
@@ -47,7 +47,7 @@ export default async function AmbassadorsPage() {
           Campus Ambassador Program
         </h1>
         <p className="text-gray-600 max-w-2xl mx-auto mb-6">
-          Represent ThinkAfrika at your university and help grow Africa&apos;s largest student intellectual community.
+          Represent ThinkAfrica at your university and help grow Africa&apos;s largest student intellectual community.
         </p>
 
         {existingApplication ? (
@@ -80,7 +80,7 @@ export default async function AmbassadorsPage() {
           {
             icon: "🎓",
             title: "Represent Your University",
-            desc: "Be the official ThinkAfrika voice at your campus and connect students to the platform.",
+            desc: "Be the official ThinkAfrica voice at your campus and connect students to the platform.",
           },
           {
             icon: "🏆",

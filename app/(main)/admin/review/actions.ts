@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -180,7 +180,7 @@ export async function submitEditorialDecision(input: {
           postId: input.postId,
           title: post.title,
           content: post.content ?? "",
-          authorName: authorProfile?.full_name ?? "A ThinkAfrika author",
+          authorName: authorProfile?.full_name ?? "A ThinkAfrica author",
           postType: post.type,
         }),
       }).catch(() => {});

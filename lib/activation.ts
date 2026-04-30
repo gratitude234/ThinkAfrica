@@ -1,4 +1,4 @@
-export type ActivationTaskKey =
+﻿export type ActivationTaskKey =
   | "profile"
   | "follow"
   | "read"
@@ -159,7 +159,7 @@ export async function getActivationState(
     {
       key: "read",
       label: "Read something relevant",
-      description: "Open, save, or discuss a few posts so ThinkAfrika can learn what matters to you.",
+      description: "Open, save, or discuss a few posts so ThinkAfrica can learn what matters to you.",
       href: "/?tab=latest",
       done: hasMeaningfulEngagement,
     },

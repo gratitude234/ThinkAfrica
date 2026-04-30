@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
@@ -324,7 +324,7 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
                 const displayName =
                   profile?.full_name ??
                   profile?.username ??
-                  "ThinkAfrika member";
+                  "ThinkAfrica member";
 
                 return (
                   <Link

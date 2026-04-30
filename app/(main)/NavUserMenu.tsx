@@ -104,27 +104,14 @@ export default function NavUserMenu({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-emerald-brand transition-colors"
+        className="flex items-center gap-2 text-sm font-medium text-gray-700 transition-colors hover:text-emerald-brand"
+        aria-label="Open account menu"
       >
         <div
-          className={`w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-sm font-bold flex-shrink-0 ring-2 ${tier.ring} ring-offset-2`}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[13px] font-semibold text-emerald-800"
         >
           {displayName.charAt(0).toUpperCase()}
         </div>
-        <span className="hidden sm:block">{displayName}</span>
-        <svg
-          className="w-4 h-4 text-gray-400 hidden sm:block"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
       </button>
 
       {open && (

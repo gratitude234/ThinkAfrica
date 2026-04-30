@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -39,8 +39,8 @@ export default function PublishedToast({
 
   if (!open) return null;
 
-  const url = `https://thinkafrika.com/post/${slug}`;
-  const shareText = `I just published "${title}" on ThinkAfrika`;
+  const url = `https://thinkafrica.com/post/${slug}`;
+  const shareText = `I just published "${title}" on ThinkAfrica`;
 
   const onWhatsApp = () =>
     window.open(

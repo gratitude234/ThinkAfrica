@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -265,7 +265,7 @@ export default function OpportunityProfileEditor({
           </button>
           <p className="text-xs text-gray-400">
             Public profiles appear in opportunity discovery. Signed-in members
-            keeps discovery inside ThinkAfrika.
+            keeps discovery inside ThinkAfrica.
           </p>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import SponsorBanner from "@/components/ui/SponsorBanner";
 import PointsTierBadge from "@/components/ui/PointsTierBadge";
@@ -136,7 +136,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Leaderboard</h1>
-        <p className="mt-1 text-sm text-gray-500">Top contributors on ThinkAfrika</p>
+        <p className="mt-1 text-sm text-gray-500">Top contributors on ThinkAfrica</p>
       </div>
 
       <div className="mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
@@ -163,7 +163,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
 
       <p className="mb-4 text-xs text-gray-400">
         {tab === "alumni"
-          ? "Points earned across the ThinkAfrika alumni network."
+          ? "Points earned across the ThinkAfrica alumni network."
           : "Weekly ranking is the primary view for now."}
       </p>
 

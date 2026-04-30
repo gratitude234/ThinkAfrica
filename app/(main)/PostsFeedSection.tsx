@@ -17,7 +17,6 @@ interface Props {
   followedIds: string[];
   showFollowingEligible: boolean;
   activeDebate: DebateInterludeData | null;
-  sectionLabel?: string;
   peopleSuggestions: {
     id: string;
     username: string;
@@ -62,7 +61,6 @@ export default async function PostsFeedSection({
   followedIds,
   showFollowingEligible,
   activeDebate,
-  sectionLabel,
   peopleSuggestions,
   peopleSuggestionReason,
   prioritizePeopleSuggestions = false,
@@ -98,7 +96,6 @@ export default async function PostsFeedSection({
       peopleSuggestionReason={peopleSuggestionReason}
       prioritizePeopleSuggestions={prioritizePeopleSuggestions}
       currentUserId={userId}
-      sectionLabel={sectionLabel}
     />
   );
 }

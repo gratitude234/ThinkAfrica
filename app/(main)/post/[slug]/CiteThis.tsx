@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 
@@ -50,28 +50,28 @@ export default function CiteThis({
   const formatted = useMemo(() => {
     const date = new Date(publishedAt);
     const year = date.getFullYear();
-    const url = `https://thinkafrika.com${citationPath}`;
+    const url = `https://thinkafrica.com${citationPath}`;
     const fullNames = authors.map((author) => author.full_name ?? author.username);
     const apaAuthors = authors
       .map((author) => formatApaAuthor(author.full_name ?? author.username))
       .join(", ");
-    const mlaLead = formatMlaAuthor(fullNames[0] ?? "ThinkAfrika");
+    const mlaLead = formatMlaAuthor(fullNames[0] ?? "ThinkAfrica");
 
     return {
-      apa: `${apaAuthors} (${year}). ${title}. ThinkAfrika. ${url} (${citationId})`,
+      apa: `${apaAuthors} (${year}). ${title}. ThinkAfrica. ${url} (${citationId})`,
       bibtex: `@article{${citationId},
   author    = {${formatAuthors(authors)}},
   title     = {${title}},
-  journal   = {ThinkAfrika},
+  journal   = {ThinkAfrica},
   year      = {${year}},
   url       = {${url}},
   note      = {${citationId}}
 }`,
-      mla: `${mlaLead}. "${title}." ThinkAfrika, ${date.toLocaleDateString("en-US", {
+      mla: `${mlaLead}. "${title}." ThinkAfrica, ${date.toLocaleDateString("en-US", {
         day: "numeric",
         month: "short",
         year: "numeric",
-      })}, thinkafrika.com${citationPath}.`,
+      })}, thinkafrica.com${citationPath}.`,
     };
   }, [authors, citationId, citationPath, publishedAt, title]);
 

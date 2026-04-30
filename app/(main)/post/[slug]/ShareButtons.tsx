@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 
@@ -27,7 +27,7 @@ export default function ShareButtons({
     excerpt
       ? `${excerpt.slice(0, 120)}${excerpt.length > 120 ? "…" : ""}`
       : null,
-    `Read on ThinkAfrika → ${url}`,
+    `Read on ThinkAfrica → ${url}`,
   ]
     .filter(Boolean)
     .join("\n");

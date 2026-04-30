@@ -1,7 +1,12 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { LITE_MODE_COOKIE } from "@/lib/liteMode";
 
 export async function middleware(request: NextRequest) {
+  if (request.cookies.has(LITE_MODE_COOKIE)) {
+    request.cookies.delete(LITE_MODE_COOKIE);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -45,6 +50,7 @@ export async function middleware(request: NextRequest) {
 
   // Expose pathname to server layouts via a request header
   supabaseResponse.headers.set("x-pathname", pathname);
+  supabaseResponse.cookies.delete(LITE_MODE_COOKIE);
 
   return supabaseResponse;
 }

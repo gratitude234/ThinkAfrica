@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -333,7 +333,7 @@ export default function PublishDrawer({
 
   const isInstantPublish = postType === "blog" || postType === "essay";
   const authorName = profile?.full_name ?? "You";
-  const authorUniversity = profile?.university ?? "ThinkAfrika";
+  const authorUniversity = profile?.university ?? "ThinkAfrica";
   const normalizedSlug = customSlug.trim()
     ? slugify(customSlug.trim(), { lower: true, strict: true })
     : "";

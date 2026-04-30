@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useState, useCallback, useEffect, useMemo } from "react";
@@ -465,7 +465,7 @@ export default function WritePage() {
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/" className="text-sm font-semibold tracking-wide text-gray-900">
-          ThinkAfrika
+          ThinkAfrica
         </Link>
         <p className="text-xs text-gray-400">{saveStatusText}</p>
         <div className="flex items-center gap-3 sm:justify-end">

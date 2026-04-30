@@ -3,14 +3,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
-import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
-import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import HomeSidebar from "@/components/ui/HomeSidebar";
-import WelcomeBanner from "@/components/ui/WelcomeBanner";
 import { getActivationState, type ActivationState } from "@/lib/activation";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
-import { getRetentionSummary, type RetentionSummary } from "@/lib/retention";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
+import DailyBriefStrip from "./DailyBriefStrip";
 import EditorPicksRow from "./EditorPicksRow";
 import FeaturedPostLead from "./FeaturedPostLead";
 import PostsFeedSection from "./PostsFeedSection";
@@ -23,7 +20,6 @@ interface PageProps {
     tab?: string;
     type?: string;
     timeframe?: string;
-    welcome?: string;
   }>;
 }
 
@@ -92,7 +88,7 @@ function FeedSkeleton() {
 }
 
 export default async function HomePage({ searchParams }: PageProps) {
-  const { guest, tab, type, timeframe, welcome } = await searchParams;
+  const { guest, tab, type, timeframe } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -106,31 +102,27 @@ export default async function HomePage({ searchParams }: PageProps) {
   let userInterests: string[] = [];
   let userUniversity: string | null = null;
   let userFieldOfStudy: string | null = null;
-  let userFullName: string | null = null;
+  let userPoints: number | null = null;
 
   if (user) {
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("interests, university, field_of_study, full_name")
+      .select("interests, university, field_of_study, points")
       .eq("id", user.id)
       .single();
 
     userInterests = (profileData?.interests as string[] | null) ?? [];
     userUniversity = profileData?.university ?? null;
     userFieldOfStudy = profileData?.field_of_study ?? null;
-    userFullName = profileData?.full_name ?? null;
+    userPoints = profileData?.points ?? null;
   }
-
-  const firstName = userFullName?.trim().split(/\s+/)[0] ?? "there";
 
   const draftCutoff = new Date(
     Date.now() - 14 * 24 * 60 * 60 * 1000
   ).toISOString();
 
   const [
-    { count: publishedCount },
     { data: followedUsers },
-    { count: debateCount },
     { data: hotDebateRaw },
     { data: recentDraft },
     featuredPostsResult,
@@ -139,25 +131,10 @@ export default async function HomePage({ searchParams }: PageProps) {
   ] = await Promise.all([
     user
       ? supabase
-          .from("posts")
-          .select("*", { count: "exact", head: true })
-          .eq("author_id", user.id)
-          .eq("status", "published")
-      : Promise.resolve({ count: 0, data: null, error: null }),
-
-    user
-      ? supabase
           .from("follows")
           .select("following_id")
           .eq("follower_id", user.id)
       : Promise.resolve({ data: [], error: null }),
-
-    user
-      ? supabase
-          .from("debate_arguments")
-          .select("*", { count: "exact", head: true })
-          .eq("author_id", user.id)
-      : Promise.resolve({ count: 0, data: null, error: null }),
 
     supabase
       .from("debates")
@@ -279,7 +256,6 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   let peopleResult: SuggestedPeopleResult = { suggestions: [], reason: "" };
   let activationState: ActivationState | null = null;
-  let retentionSummary: RetentionSummary | null = null;
 
   if (user) {
     [peopleResult, activationState] = await Promise.all([
@@ -291,8 +267,6 @@ export default async function HomePage({ searchParams }: PageProps) {
       }),
       getActivationState(supabase, user.id),
     ]);
-
-    retentionSummary = await getRetentionSummary(supabase, user.id, activationState);
   }
 
   const showFollowingEligible = !!user;
@@ -312,18 +286,14 @@ export default async function HomePage({ searchParams }: PageProps) {
         />
       ) : null}
 
-      {welcome === "1" && user ? <WelcomeBanner firstName={firstName} /> : null}
+      <DailyBriefStrip
+        featuredPost={featuredPost}
+        activeDebate={activeDebate}
+        points={userPoints}
+      />
 
-      {activationState && !activationState.activated ? (
-        <ActivationChecklist state={activationState} compact />
-      ) : null}
-
-      {activationState?.activated && retentionSummary ? (
-        <RetentionThisWeek summary={retentionSummary} source="home" />
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="space-y-0 lg:col-span-2">
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_296px]">
+        <div className="min-w-0">
           <FeaturedPostLead post={featuredPost} />
 
           <EditorPicksRow picks={editorPicks} />
@@ -342,17 +312,19 @@ export default async function HomePage({ searchParams }: PageProps) {
               peopleSuggestions={peopleResult.suggestions}
               peopleSuggestionReason={peopleResult.reason}
               prioritizePeopleSuggestions={followCount < 3}
-              sectionLabel="Latest"
             />
           </Suspense>
         </div>
 
-        <aside className="hidden self-start space-y-6 lg:sticky lg:top-24 lg:col-span-1 lg:block">
+        <aside className="hidden self-start lg:sticky lg:top-[76px] lg:block">
           <HomeSidebar
             activeDebate={activeDebate}
             newVoice={newVoice}
             upcomingWebinar={FEATURE_FLAGS.webinars ? upcomingWebinar : null}
             recentDraft={recentDraft ?? null}
+            activationState={activationState}
+            peopleSuggestions={peopleResult.suggestions}
+            currentUserId={user?.id ?? null}
           />
         </aside>
       </div>

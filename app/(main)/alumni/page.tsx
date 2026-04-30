@@ -1,8 +1,8 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import UserAvatar from "@/components/ui/UserAvatar";
 
-export const metadata = { title: "Alumni - ThinkAfrika" };
+export const metadata = { title: "Alumni - ThinkAfrica" };
 
 interface AlumnusRow {
   id: string;

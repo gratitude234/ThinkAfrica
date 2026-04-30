@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
@@ -18,11 +18,11 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
-  title: "ThinkAfrika - Africa's Intellectual Social Network",
+  title: "ThinkAfrica - Africa's Intellectual Social Network",
   description:
     "Research, essays, and policy briefs from African university students.",
   openGraph: {
-    siteName: "ThinkAfrika",
+    siteName: "ThinkAfrica",
     images: ["/og-default.png"],
   },
   icons: {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 interface DebateRecapProfile {
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     }`;
   };
 
-  const prompt = `You are writing a 400-word debate recap for the ThinkAfrika intellectual platform.
+  const prompt = `You are writing a 400-word debate recap for the ThinkAfrica intellectual platform.
 
 Motion: "${debate.title}"
 ${debate.description ? `Context: ${debate.description}` : ""}

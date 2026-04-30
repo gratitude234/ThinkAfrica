@@ -1,4 +1,4 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 
@@ -45,7 +45,7 @@ export default function FeaturedPostBanner({ post }: Props) {
       ) : null}
 
       <p className="mb-2 text-xs font-semibold text-amber-600">
-        Featured by ThinkAfrika
+        Featured by ThinkAfrica
       </p>
 
       <Link href={`/post/${post.slug}`}>

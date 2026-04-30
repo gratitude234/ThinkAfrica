@@ -111,7 +111,6 @@ export default function PostsFeedTabs({
   peopleSuggestionReason,
   prioritizePeopleSuggestions,
   currentUserId,
-  sectionLabel = "Latest",
 }: {
   initialTab: TabKey;
   initialType: TypeFilter;
@@ -130,7 +129,6 @@ export default function PostsFeedTabs({
   peopleSuggestionReason?: string;
   prioritizePeopleSuggestions?: boolean;
   currentUserId: string | null;
-  sectionLabel?: string;
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>(initialType);
@@ -244,28 +242,27 @@ export default function PostsFeedTabs({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between border-t border-gray-100 pt-6">
-        <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-ink-muted">
-          {sectionLabel}
-        </span>
-        {showFollowingTab ? (
-          <div className="flex gap-3 text-sm">
-            {(["home", "following", "latest"] as const).map((tab) => (
+      <div className="mb-5 flex items-center border-b border-gray-200">
+        {(["home", "following", "latest"] as const)
+          .filter((tab) => tab !== "following" || showFollowingTab)
+          .map((tab) => {
+            const label =
+              tab === "home" ? "For you" : tab === "following" ? "Following" : "Latest";
+            return (
               <button
                 key={tab}
                 type="button"
                 onClick={() => updateState(tab, typeFilter, timeframe)}
-                className={`capitalize transition-colors ${
+                className={`mb-[-1px] border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors ${
                   activeTab === tab
-                    ? "font-medium text-ink"
-                    : "text-ink-muted hover:text-ink"
+                    ? "border-emerald-brand text-ink"
+                    : "border-transparent text-gray-500 hover:text-ink"
                 }`}
               >
-                {tab}
+                {label}
               </button>
-            ))}
-          </div>
-        ) : null}
+            );
+          })}
       </div>
 
       <FeedFilterChips
@@ -290,7 +287,7 @@ export default function PostsFeedTabs({
       />
 
       {loading ? (
-        <div className="py-6 text-center text-sm text-gray-400">Loading more…</div>
+        <div className="py-6 text-center text-sm text-gray-400">Loading more...</div>
       ) : null}
 
       {!loading && showEndState && posts.length > 0 ? (

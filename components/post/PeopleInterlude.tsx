@@ -22,56 +22,56 @@ export default function PeopleInterlude({
   currentUserId: string | null;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <div className="mb-4 flex items-center justify-between">
+    <section className="my-2 rounded-xl border border-gray-200 bg-white px-5 py-[18px]">
+      <div className="mb-3.5 flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-            People to follow
+          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+            Writers to follow
           </p>
-          <h3 className="text-lg font-semibold text-gray-900">
-            Writers worth following
+          <h3 className="mt-0.5 text-base font-semibold text-ink">
+            Based on your reading history
           </h3>
-          <p className="mt-1 text-xs text-gray-500">{reason}</p>
+          <p className="mt-0.5 text-xs text-ink-muted">{reason}</p>
         </div>
         <Link
           href="/leaderboard"
-          className="text-sm font-medium text-emerald-brand hover:underline"
+          className="text-[13px] font-semibold text-emerald-brand hover:underline"
         >
-          Explore →
+          Explore -&gt;
         </Link>
       </div>
 
-      <div className="space-y-3">
+      <div>
         {people.map((person) => (
-          <div key={person.id} className="flex items-center gap-3">
+          <div
+            key={person.id}
+            className="flex items-center gap-3 border-b border-gray-100 py-2 last:border-b-0 last:pb-0"
+          >
             <Link href={`/${person.username}`} className="shrink-0">
               <UserAvatar
                 name={person.full_name ?? person.username ?? "Anonymous"}
                 src={person.avatar_url}
-                size={40}
+                size={38}
               />
             </Link>
             <div className="min-w-0 flex-1">
               <Link href={`/${person.username}`}>
-                <p className="truncate text-sm font-medium text-gray-900 hover:text-emerald-brand">
+                <p className="truncate text-sm font-medium text-ink hover:text-emerald-brand">
                   {person.full_name ?? person.username}
                 </p>
               </Link>
               {person.university ? (
-                <p className="truncate text-xs text-gray-400">
+                <p className="mt-0.5 truncate text-xs text-ink-muted">
                   {person.university}
                 </p>
               ) : null}
             </div>
             {currentUserId ? (
-              <FollowButton
-                followerId={currentUserId}
-                followingId={person.id}
-              />
+              <FollowButton followerId={currentUserId} followingId={person.id} />
             ) : (
               <Link
                 href={`/${person.username}`}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
+                className="rounded-full border border-gray-200 px-3.5 py-1 text-xs font-medium text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
               >
                 View
               </Link>
@@ -79,6 +79,6 @@ export default function PeopleInterlude({
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import type { DebatePhase } from "@/lib/debatePhases";
@@ -38,17 +38,17 @@ export async function generateMetadata({
     .eq("id", id)
     .single();
 
-  if (!debate) return { title: "Debate not found - ThinkAfrika" };
+  if (!debate) return { title: "Debate not found - ThinkAfrica" };
 
   return {
-    title: `${debate.title} - ThinkAfrika Debates`,
+    title: `${debate.title} - ThinkAfrica Debates`,
     description:
       (debate as { description?: string | null }).description ??
-      "Join this debate on ThinkAfrika",
+      "Join this debate on ThinkAfrica",
     openGraph: {
       title: debate.title,
       description: (debate as { description?: string | null }).description ?? "",
-      siteName: "ThinkAfrika",
+      siteName: "ThinkAfrica",
     },
   };
 }

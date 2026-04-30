@@ -4,10 +4,10 @@ type TypeFilter = "all" | "research" | "essay" | "policy_brief" | "blog";
 
 const TYPE_OPTIONS: Array<{ label: string; value: TypeFilter }> = [
   { label: "All", value: "all" },
-  { label: "Essay", value: "essay" },
+  { label: "Essays", value: "essay" },
   { label: "Research", value: "research" },
-  { label: "Policy Brief", value: "policy_brief" },
-  { label: "Blog", value: "blog" },
+  { label: "Policy Briefs", value: "policy_brief" },
+  { label: "Quick Takes", value: "blog" },
 ];
 
 function Chip({
@@ -23,7 +23,7 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
         active
           ? "border-ink bg-ink text-canvas"
           : "border-gray-200 bg-white text-ink-muted hover:border-gray-400 hover:text-ink"
@@ -42,7 +42,7 @@ export default function FeedFilterChips({
   onTypeChange: (value: TypeFilter) => void;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap gap-2">
+    <div className="mb-5 flex flex-wrap gap-1.5">
       {TYPE_OPTIONS.map((option) => (
         <Chip
           key={option.value}

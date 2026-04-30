@@ -1,4 +1,4 @@
-I have a Next.js 14 app (ThinkAfrika) where clicking links feels slow — pages take a while to load before anything appears. I need you to fix the navigation performance. Here's what to do:
+﻿I have a Next.js 14 app (ThinkAfrica) where clicking links feels slow — pages take a while to load before anything appears. I need you to fix the navigation performance. Here's what to do:
 
 1. **Add `loading.tsx` files** in every route folder under `app/(main)/` that doesn't already have one. Each loading file should export a skeleton UI using Tailwind CSS that matches the page shape (e.g., skeleton cards for feed, skeleton profile for user pages). This gives instant visual feedback on navigation.
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -74,7 +74,7 @@ export default function AmbassadorApplyPage() {
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Application Submitted!</h1>
         <p className="text-gray-500 mb-6">
-          Thank you for applying to become a ThinkAfrika Campus Ambassador. We&apos;ll review your application and get back to you soon.
+          Thank you for applying to become a ThinkAfrica Campus Ambassador. We&apos;ll review your application and get back to you soon.
         </p>
         <a
           href="/ambassadors"
@@ -91,7 +91,7 @@ export default function AmbassadorApplyPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Ambassador Application</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Tell us why you&apos;d be a great ThinkAfrika ambassador at your campus.
+          Tell us why you&apos;d be a great ThinkAfrica ambassador at your campus.
         </p>
       </div>
 
@@ -125,7 +125,7 @@ export default function AmbassadorApplyPage() {
             required
             value={why}
             onChange={(e) => setWhy(e.target.value)}
-            placeholder="Share your motivation and connection to the ThinkAfrika mission..."
+            placeholder="Share your motivation and connection to the ThinkAfrica mission..."
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
           />
         </div>
@@ -139,7 +139,7 @@ export default function AmbassadorApplyPage() {
             required
             value={howRecruit}
             onChange={(e) => setHowRecruit(e.target.value)}
-            placeholder="Describe your plan to grow the ThinkAfrika community at your campus..."
+            placeholder="Describe your plan to grow the ThinkAfrica community at your campus..."
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
           />
         </div>

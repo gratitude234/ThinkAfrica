@@ -22,25 +22,6 @@ interface PostFeedProps {
   currentUserId?: string | null;
 }
 
-function getFeaturedPostId(posts: PostCardData[]) {
-  if (posts.length === 0) return null;
-  const scoredPosts = posts.filter(
-    (post) => post.score !== undefined && post.cover_image_url
-  );
-  if (scoredPosts.length === 0) return null;
-
-  const scores = [...scoredPosts]
-    .map((post) => post.score ?? 0)
-    .sort((left, right) => right - left);
-  const cutoffIndex = Math.max(0, Math.floor(scores.length * 0.2) - 1);
-  const cutoff = scores[cutoffIndex] ?? scores[0] ?? 0;
-
-  return (
-    scoredPosts.find((post, index) => index === 0 && (post.score ?? 0) >= cutoff)
-      ?.id ?? null
-  );
-}
-
 export default function PostFeed({
   posts,
   activeTab,
@@ -50,7 +31,6 @@ export default function PostFeed({
   prioritizePeopleSuggestions = false,
   currentUserId = null,
 }: PostFeedProps) {
-  const featuredPostId = getFeaturedPostId(posts);
   const topicPosts = posts.filter((post) => (post.tags ?? []).length > 0);
   const canShowDebateInterlude = activeTab === "home" || activeTab === "latest";
 
@@ -58,7 +38,7 @@ export default function PostFeed({
     <div>
       {posts.length === 0 ? (
         activeTab === "following" ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
+          <div className="rounded-[14px] border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
             <p className="text-sm text-gray-500">
               You&apos;re not following anyone yet.
             </p>
@@ -70,7 +50,7 @@ export default function PostFeed({
             </Link>
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
+          <div className="rounded-[14px] border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
             <p className="mb-1 text-lg font-medium text-gray-900">
               No posts match this view yet.
             </p>
@@ -94,7 +74,7 @@ export default function PostFeed({
           </div>
         )
       ) : (
-        <div className="space-y-4">
+        <div>
           {prioritizePeopleSuggestions && peopleSuggestions.length > 0 ? (
             <PeopleInterlude
               people={peopleSuggestions}
@@ -103,12 +83,13 @@ export default function PostFeed({
             />
           ) : null}
 
+          <div className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+            Latest in your feed
+          </div>
+
           {posts.map((post, index) => (
-            <div key={post.id} className="space-y-4">
-              <PostCard
-                post={post}
-                variant={post.id === featuredPostId ? "featured" : "standard"}
-              />
+            <div key={post.id}>
+              <PostCard post={post} variant="standard" />
 
               {canShowDebateInterlude &&
               (index + 1) % 8 === 0 &&

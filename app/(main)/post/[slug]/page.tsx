@@ -1,4 +1,4 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -123,7 +123,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     throwPostQueryError(slug, "metadata", postError);
   }
 
-  if (!post) return { title: "Post not found - ThinkAfrika" };
+  if (!post) return { title: "Post not found - ThinkAfrica" };
   // Drafts and in-review posts are only visible to the author (and assigned reviewers/co-authors)
   if (
     (post.status === "draft" ||
@@ -131,12 +131,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       post.status === "pending_revision") &&
     user?.id !== post.author_id
   ) {
-    return { title: "Post not found - ThinkAfrika" };
+    return { title: "Post not found - ThinkAfrica" };
   }
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://thinkafrika.com";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://thinkafrica.com";
   const ogImageUrl = `${appUrl}/api/og?${new URLSearchParams({
     title: post.title,
     author: author?.full_name ?? "",
@@ -146,13 +146,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const ogImage = coverUrl ?? ogImageUrl;
 
   return {
-    title: `${post.title} - ThinkAfrika`,
-    description: post.excerpt ?? `Read this post by ${author?.full_name} on ThinkAfrika`,
+    title: `${post.title} - ThinkAfrica`,
+    description: post.excerpt ?? `Read this post by ${author?.full_name} on ThinkAfrica`,
     openGraph: {
       title: post.title,
       description: post.excerpt ?? "",
       url: `${appUrl}/post/${post.slug}`,
-      siteName: "ThinkAfrika",
+      siteName: "ThinkAfrica",
       images: [{ url: ogImage, width: 1200, height: 630 }],
       type: "article",
     },

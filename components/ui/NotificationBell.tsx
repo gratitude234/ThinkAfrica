@@ -152,11 +152,11 @@ export default function NotificationBell({ userId }: { userId: string }) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="relative rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+        className="relative flex h-[34px] w-[34px] items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
         aria-label="Notifications"
       >
         <svg
-          className="h-5 w-5"
+          className="h-[18px] w-[18px]"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

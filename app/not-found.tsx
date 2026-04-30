@@ -1,11 +1,11 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
       <div className="text-center max-w-md">
         <Link href="/" className="inline-block mb-8">
-          <span className="text-2xl font-bold text-emerald-brand">ThinkAfrika</span>
+          <span className="text-2xl font-bold text-emerald-brand">ThinkAfrica</span>
         </Link>
 
         <div className="text-7xl font-black text-gray-200 mb-4 select-none">404</div>
@@ -14,7 +14,7 @@ export default function NotFound() {
           This page doesn&apos;t exist — but your ideas do.
         </h1>
         <p className="text-gray-500 text-sm mb-8">
-          The page you&apos;re looking for may have moved or never existed. Head back to explore what&apos;s happening on ThinkAfrika.
+          The page you&apos;re looking for may have moved or never existed. Head back to explore what&apos;s happening on ThinkAfrica.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">

@@ -22,7 +22,7 @@ export default function LandingNav() {
         {/* Logo */}
         <Link href="/" className="flex-shrink-0 font-display text-[22px] font-bold">
           <span className="text-emerald-500">Think</span>
-          <span className="text-purple-600">Afrika</span>
+          <span className="text-purple-600">Africa</span>
         </Link>
 
         {/* Nav links */}

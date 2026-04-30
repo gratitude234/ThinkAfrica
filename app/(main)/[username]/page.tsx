@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import CredentialsCard from "@/components/profile/CredentialsCard";
@@ -147,7 +147,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     .single();
 
   if (!profile) {
-    return { title: "Profile not found - ThinkAfrika" };
+    return { title: "Profile not found - ThinkAfrica" };
   }
 
   const { count: postCount } = await supabase
@@ -161,7 +161,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = clampText(
     bioFirstLine
       ? `${displayName} - ${bioFirstLine}`
-      : `${displayName} - ThinkAfrika`,
+      : `${displayName} - ThinkAfrica`,
     60
   );
   const description = profile.bio
@@ -169,7 +169,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     : clampText(
         `${displayName}, ${profile.field_of_study ?? "student"} at ${
           profile.university ?? "their university"
-        }. ${(postCount ?? 0).toLocaleString()} publications on ThinkAfrika.`,
+        }. ${(postCount ?? 0).toLocaleString()} publications on ThinkAfrica.`,
         155
       );
   const image = profile.avatar_url ?? "/logo.png";

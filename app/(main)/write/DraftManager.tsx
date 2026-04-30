@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -35,7 +35,7 @@ interface UseDraftManagerReturn {
   dismissBackup: () => void;
 }
 
-const LS_KEY = "thinkafrika_draft_backup";
+const LS_KEY = "thinkafrica_draft_backup";
 const AUTOSAVE_DELAY = 3000;
 const LS_INTERVAL = 5000;
 

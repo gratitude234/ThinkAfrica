@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import slugify from "slugify";
@@ -479,7 +479,7 @@ export async function publishPost(input: {
         await supabase.from("notifications").insert({
           user_id: parentPost.author_id,
           type: "response_post",
-          message: `${ownerProfile?.full_name ?? "A ThinkAfrika author"} wrote a response to your post.`,
+          message: `${ownerProfile?.full_name ?? "A ThinkAfrica author"} wrote a response to your post.`,
           link: `/post/${slug}`,
           actor_id: user.id,
           post_id: postId,
@@ -497,7 +497,7 @@ export async function publishPost(input: {
       slug,
       user.id,
       input.coAuthors ?? [],
-      ownerProfile?.full_name ?? "A ThinkAfrika author"
+      ownerProfile?.full_name ?? "A ThinkAfrica author"
     );
 
     if (input.correspondingAuthorId) {
@@ -576,7 +576,7 @@ export async function publishPost(input: {
         postId,
         title: input.title.trim(),
         content: input.content,
-        authorName: ownerProfile?.full_name ?? "A ThinkAfrika author",
+        authorName: ownerProfile?.full_name ?? "A ThinkAfrica author",
         postType: input.postType,
       }),
     }).catch(() => {

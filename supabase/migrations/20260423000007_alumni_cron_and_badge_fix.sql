@@ -1,5 +1,5 @@
-update public.badges
-set description = 'Graduated scholar. Part of the ThinkAfrika network for life.'
+﻿update public.badges
+set description = 'Graduated scholar. Part of the ThinkAfrica network for life.'
 where id = '00000000-0000-0000-0000-000000000010';
 
 do $$

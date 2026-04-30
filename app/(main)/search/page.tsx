@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -343,7 +343,7 @@ export default function SearchPage() {
                                 ? ` / ${post.profiles.university}`
                                 : ""
                             }`
-                          : "ThinkAfrika"}
+                          : "ThinkAfrica"}
                       </p>
                       {post.excerpt ? (
                         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">

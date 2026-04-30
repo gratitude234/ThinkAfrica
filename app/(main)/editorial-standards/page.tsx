@@ -1,10 +1,10 @@
-export default function EditorialStandardsPage() {
+﻿export default function EditorialStandardsPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-10">
         <h1 className="mb-3 text-3xl font-bold text-gray-900">Editorial Standards</h1>
         <p className="leading-relaxed text-gray-500">
-          ThinkAfrika is committed to publishing high-quality, original intellectual work from
+          ThinkAfrica is committed to publishing high-quality, original intellectual work from
           African students. Blogs and essays move through a lighter editorial check. Research and
           policy briefs follow a formal editorial workflow with reviewer recommendations and a
           final editor decision before publication.

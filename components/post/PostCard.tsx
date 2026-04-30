@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import Badge from "@/components/ui/Badge";
 import {
   formatRelativeTime,
   POST_TYPE_LABELS,
@@ -46,203 +45,133 @@ interface PostCardProps {
   variant?: "standard" | "featured";
 }
 
-const PLACEHOLDER_STYLES: Record<
-  string,
-  { gradient: string; accent: string }
-> = {
-  blog: {
-    gradient: "from-gray-50 to-gray-100",
-    accent: "text-gray-600",
-  },
-  essay: {
-    gradient: "from-amber-50 to-amber-100",
-    accent: "text-amber-600",
-  },
-  research: {
-    gradient: "from-purple-50 to-purple-100",
-    accent: "text-purple-600",
-  },
-  policy_brief: {
-    gradient: "from-blue-50 to-blue-100",
-    accent: "text-blue-600",
-  },
+const THUMB_STYLES: Record<string, string> = {
+  blog: "from-emerald-900 to-emerald-700 text-emerald-100/50",
+  essay: "from-amber-950 to-amber-700 text-amber-100/45",
+  research: "from-purple-950 to-purple-700 text-purple-100/45",
+  policy_brief: "from-blue-950 to-blue-700 text-blue-100/45",
 };
 
 const VERIFIED_COLORS: Record<string, string> = {
-  student: "text-gray-600",
-  researcher: "text-purple-600",
-  faculty: "text-amber-500",
-  institution: "text-blue-600",
+  student: "bg-emerald-brand",
+  researcher: "bg-purple-accent",
+  faculty: "bg-amber-500",
+  institution: "bg-blue-600",
 };
+
+function estimateReadTime(excerpt: string | null): number {
+  return Math.max(
+    1,
+    Math.ceil((excerpt?.trim().split(/\s+/).filter(Boolean).length ?? 0) / 200)
+  );
+}
 
 export default function PostCard({
   post,
-  variant = "standard",
 }: PostCardProps) {
   const author = post.profiles;
   const displayDate = post.published_at ?? post.created_at;
-  const placeholder =
-    PLACEHOLDER_STYLES[post.type] ?? PLACEHOLDER_STYLES.blog;
-  const readTime = Math.max(
-    1,
-    Math.ceil(
-      (post.excerpt?.trim().split(/\s+/).filter(Boolean).length ?? 0) / 200
-    )
-  );
+  const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
+  const readTime = estimateReadTime(post.excerpt);
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
   const authorHref = author?.username ? `/${author.username}` : null;
   const coAuthorCount = post.co_authors?.length ?? 0;
   const authorLine =
     coAuthorCount > 0 ? `${authorName} + ${coAuthorCount} others` : authorName;
-
-  const footerMeta = (
-    <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-gray-100 pt-4 text-xs text-gray-500">
-      {authorHref ? (
-        <Link
-          href={authorHref}
-          className="inline-flex min-w-0 items-center gap-1 font-medium text-gray-700 transition-colors hover:text-ink"
-        >
-          <span className="truncate">{authorLine}</span>
-          {author?.verified ? (
-            <span
-              title={
-                author.verified_type
-                  ? `Verified ${author.verified_type}`
-                  : "Verified"
-              }
-              className={`text-[11px] font-bold ${
-                VERIFIED_COLORS[author.verified_type ?? "student"] ??
-                "text-gray-600"
-              }`}
-            >
-              {"\u2713"}
-            </span>
-          ) : null}
-        </Link>
-      ) : (
-        <span className="font-medium text-gray-700">{authorLine}</span>
-      )}
-
-      {author?.university ? (
-        <>
-          <span aria-hidden="true">·</span>
-          <span className="truncate">{author.university}</span>
-        </>
-      ) : null}
-
-      <span aria-hidden="true">·</span>
-      <span>{readTime} min read</span>
-      <span aria-hidden="true">·</span>
-      <span>{formatRelativeTime(displayDate)}</span>
-    </div>
-  );
-
-  if (variant === "standard") {
-    return (
-      <article className="rounded-xl border border-gray-200/70 bg-white p-5 transition-shadow duration-300 hover:shadow-md">
-        <div className="flex gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-muted">
-                {POST_TYPE_LABELS[post.type as PostType] ?? post.type}
-                <span className="mx-1.5 text-gray-300">·</span>
-                {readTime} min read
-              </span>
-              {post.in_response_to && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
-                  ↩ Response
-                </span>
-              )}
-            </div>
-            <Link href={`/post/${post.slug}`}>
-              <h2 className="font-display line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-gray-700">
-                {post.title}
-              </h2>
-            </Link>
-            {post.excerpt ? (
-              <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">
-                {post.excerpt}
-              </p>
-            ) : null}
-            {footerMeta}
-          </div>
-
-          {post.cover_image_url ? (
-            <Link
-              href={`/post/${post.slug}`}
-              data-lite-hide
-              className="shrink-0 self-start"
-            >
-              <Image
-                src={post.cover_image_url}
-                alt={post.title}
-                width={96}
-                height={96}
-                className="h-24 w-24 rounded-lg object-cover"
-              />
-            </Link>
-          ) : null}
-        </div>
-      </article>
-    );
-  }
+  const thumbStyle = THUMB_STYLES[post.type] ?? THUMB_STYLES.blog;
+  const verifiedBg =
+    VERIFIED_COLORS[author?.verified_type ?? "student"] ?? "bg-emerald-brand";
 
   return (
-    <article className="group overflow-hidden rounded-xl border border-gray-200/70 bg-white transition-shadow duration-300 hover:shadow-lg">
-      <Link href={`/post/${post.slug}`} className="block">
-        <div
-          data-lite-hide={post.cover_image_url ? "" : undefined}
-          className="relative aspect-[16/9] w-full overflow-hidden"
-        >
-          {post.cover_image_url ? (
+    <article className="mb-2 rounded-xl border border-gray-200/80 bg-white px-5 py-[18px] transition-all duration-300 hover:-translate-y-px hover:shadow-md">
+      <div className="flex gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-muted">
+              {typeLabel}
+            </span>
+            <span className="text-gray-300">{"\u00B7"}</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-muted">
+              {readTime} min read
+            </span>
+            {post.in_response_to ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
+                {"\u21A9"} Response
+              </span>
+            ) : null}
+          </div>
+
+          <Link href={`/post/${post.slug}`}>
+            <h2 className="font-display line-clamp-2 text-lg font-semibold leading-tight text-ink transition-colors hover:text-gray-700">
+              {post.title}
+            </h2>
+          </Link>
+
+          {post.excerpt ? (
+            <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-gray-500">
+              {post.excerpt}
+            </p>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-gray-100 pt-2.5 text-xs text-ink-muted">
+            {authorHref ? (
+              <Link
+                href={authorHref}
+                className="inline-flex min-w-0 items-center gap-1 font-medium text-gray-700 transition-colors hover:text-ink"
+              >
+                <span className="truncate">{authorLine}</span>
+                {author?.verified ? (
+                  <span
+                    title={
+                      author.verified_type
+                        ? `Verified ${author.verified_type}`
+                        : "Verified"
+                    }
+                    className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-full ${verifiedBg} text-[7px] font-bold text-white`}
+                  >
+                    {"\u2713"}
+                  </span>
+                ) : null}
+              </Link>
+            ) : (
+              <span className="font-medium text-gray-700">{authorLine}</span>
+            )}
+
+            {author?.university ? (
+              <>
+                <span aria-hidden="true">{"\u00B7"}</span>
+                <span className="max-w-[160px] truncate">{author.university}</span>
+              </>
+            ) : null}
+
+            <span aria-hidden="true">{"\u00B7"}</span>
+            <span>{formatRelativeTime(displayDate)}</span>
+          </div>
+        </div>
+
+        {post.cover_image_url ? (
+          <Link
+            href={`/post/${post.slug}`}
+            data-lite-hide
+            className="shrink-0 self-start"
+          >
             <Image
               src={post.cover_image_url}
               alt={post.title}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-cover"
-              priority={false}
+              width={88}
+              height={88}
+              className="h-[88px] w-[88px] rounded-[9px] object-cover"
             />
-          ) : (
-            <div
-              className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${placeholder.gradient}`}
-            >
-              <span
-                className={`text-sm font-semibold uppercase tracking-widest opacity-60 ${placeholder.accent}`}
-              >
-                {POST_TYPE_LABELS[post.type as PostType] ?? post.type}
-              </span>
-            </div>
-          )}
-        </div>
-      </Link>
-
-      <div className="p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Badge type={post.type} />
-            {post.in_response_to ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
-                <span aria-hidden="true">{"\u21A9"}</span> Response
-              </span>
-            ) : null}
-          </div>
-          <span className="text-xs text-gray-400">{readTime} min read</span>
-        </div>
-
-        <Link href={`/post/${post.slug}`}>
-          <h2 className="font-display mt-3 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-gray-700">
-            {post.title}
-          </h2>
-        </Link>
-
-        {post.excerpt ? (
-          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">
-            {post.excerpt}
-          </p>
-        ) : null}
-
-        {footerMeta}
+          </Link>
+        ) : (
+          <Link
+            href={`/post/${post.slug}`}
+            data-lite-hide
+            className={`flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-[9px] bg-gradient-to-br ${thumbStyle} text-[10px] font-bold uppercase tracking-[0.1em]`}
+          >
+            {typeLabel.slice(0, 3)}
+          </Link>
+        )}
       </div>
     </article>
   );
