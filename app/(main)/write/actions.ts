@@ -254,6 +254,17 @@ async function syncAuthors(
         post_id: postId,
         read: false,
       });
+      await recordActivationEvent({
+        supabase,
+        event: "coauthor_invite_sent",
+        userId: ownerId,
+        metadata: {
+          postId,
+          invitedUserId: coAuthor.user_id,
+        },
+        source: "server_action",
+        route: "/write",
+      });
     }
   }
 }

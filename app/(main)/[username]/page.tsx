@@ -4,10 +4,14 @@ import { notFound } from "next/navigation";
 import CredentialsCard from "@/components/profile/CredentialsCard";
 import FeaturedWork from "@/components/profile/FeaturedWork";
 import OpportunityBanner from "@/components/profile/OpportunityBanner";
+import OpportunityProfileEditor from "@/components/opportunities/OpportunityProfileEditor";
+import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import PublicationsSection from "@/components/profile/PublicationsSection";
 import TopArguments from "@/components/profile/TopArguments";
+import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import { getMessageEligibility } from "@/lib/messaging";
+import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
 import { createClient } from "@/lib/supabase/server";
 import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
 
@@ -58,6 +62,7 @@ interface ProfilePost {
   excerpt: string | null;
   type: string;
   tags: string[] | null;
+  citation_id?: string | null;
   created_at: string;
   published_at: string | null;
   view_count: number | null;
@@ -99,9 +104,9 @@ interface TopArgumentRow extends Omit<TopArgumentRecord, "debates"> {
 }
 
 const ACTIVITY_TYPE_ICONS: Record<string, string> = {
-  like: "♥",
-  comment: "💬",
-  debate: "⚡",
+  like: "Like",
+  comment: "Comment",
+  debate: "Debate",
 };
 
 function getDisplayName(profile: {
@@ -126,7 +131,7 @@ function getBioFirstLine(bio: string | null) {
 
 function clampText(value: string, maxLength: number) {
   if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+  return `${value.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -221,7 +226,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("posts")
       .select(
-        "id, author_id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type), post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
+        "id, author_id, title, slug, in_response_to, excerpt, type, tags, citation_id, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type), post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
       )
       .eq("author_id", profile.id)
       .eq("status", "published")
@@ -229,7 +234,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("post_authors")
       .select(
-        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
+        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, in_response_to, excerpt, type, tags, citation_id, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
       )
       .eq("user_id", profile.id)
       .not("accepted_at", "is", null),
@@ -413,9 +418,31 @@ export default async function UserProfilePage({ params }: PageProps) {
 
   const displayName = getDisplayName(profile);
   const firstName = getFirstName(profile);
+  const opportunityReadiness = getOpportunityReadinessSummary({
+    profile,
+    talentProfile,
+    posts: mergedPosts.map((post) => ({
+      type: post.type,
+      status: "published",
+      citation_id: (post as { citation_id?: string | null }).citation_id ?? null,
+    })),
+    setupHref: `/${profile.username}#opportunity-profile`,
+  });
+  const showOwnOpportunityReadiness =
+    isOwnProfile &&
+    (mergedPosts.length > 0 ||
+      Boolean(talentProfile?.open_to_opportunities) ||
+      Boolean(talentProfile));
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      {showOwnOpportunityReadiness ? (
+        <RetentionEventTracker
+          event="opportunity_readiness_viewed"
+          metadata={{ source: "profile", score: opportunityReadiness.score }}
+        />
+      ) : null}
+
       <ProfileHeader
         profile={profile}
         isOwnProfile={isOwnProfile}
@@ -435,7 +462,22 @@ export default async function UserProfilePage({ params }: PageProps) {
         opportunityTypes={talentProfile?.opportunity_types ?? []}
         talentProfileId={talentProfile?.id ?? null}
         isVisibleToViewer={opportunityVisible}
+        settingsHref={`/${profile.username}#opportunity-profile`}
       />
+
+      {showOwnOpportunityReadiness ? (
+        <>
+          <OpportunityReadinessCard
+            summary={opportunityReadiness}
+            source="profile"
+          />
+          <OpportunityProfileEditor
+            userId={profile.id}
+            talentProfile={talentProfile}
+            source="profile"
+          />
+        </>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
@@ -479,7 +521,7 @@ export default async function UserProfilePage({ params }: PageProps) {
                       href={item.link}
                       className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
                     >
-                      <span className="mt-0.5 text-base">
+                      <span className="mt-0.5 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
                         {ACTIVITY_TYPE_ICONS[item.type]}
                       </span>
                       <div className="min-w-0 flex-1">

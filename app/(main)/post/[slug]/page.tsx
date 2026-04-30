@@ -20,8 +20,11 @@ import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
 import CiteThis from "./CiteThis";
 import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
+import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
+import { getCollaborationSummary } from "@/lib/collaboration";
+import { getMessageEligibility } from "@/lib/messaging";
 import { getPostQualitySummary } from "@/lib/postQuality";
 
 interface PageProps {
@@ -363,6 +366,9 @@ export default async function PostPage({ params }: PageProps) {
     userFollowsAuthor = !!followData;
   }
 
+  const messageEligibility =
+    user && author ? await getMessageEligibility(supabase, user.id, author.id) : null;
+
   const references = referencesRaw ?? [];
   const acceptedAuthors = (coAuthorsRaw ?? []).map((item) => ({
     ...item,
@@ -420,6 +426,17 @@ export default async function PostPage({ params }: PageProps) {
     commentCount: commentCount ?? 0,
     likeCount: likeCount ?? 0,
     bookmarkCount: bookmarkCount ?? 0,
+  });
+  const collaborationSummary = getCollaborationSummary({
+    postId: post.id,
+    postSlug: post.slug,
+    authorId: author?.id ?? null,
+    viewerId: user?.id ?? null,
+    responseCount: responsePosts.length,
+    coauthorCount: coAuthors.length,
+    isFollowingAuthor: userFollowsAuthor,
+    messageEligible: messageEligibility?.eligible ?? false,
+    messageReason: messageEligibility?.reason ?? null,
   });
 
   return (
@@ -719,22 +736,11 @@ export default async function PostPage({ params }: PageProps) {
                     </span>
                   </div>
 
-                  {user ? (
-                    <div className="mb-8 rounded-xl border border-gray-200 bg-canvas px-6 py-5">
-                      <p className="text-sm font-medium text-gray-900">
-                        Have a substantive pushback? Write a response post.
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        More than a comment warrants your argument, your byline, and your post.
-                      </p>
-                      <ResponseStartLink
-                        postId={post.id}
-                        source="post_reading_moment"
-                        className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
-                      >
-                        Write a response
-                      </ResponseStartLink>
-                    </div>
+                  {author ? (
+                    <CollaborationPanel
+                      summary={collaborationSummary}
+                      authorName={authorName}
+                    />
                   ) : null}
                 </>
               ) : null}
@@ -826,7 +832,7 @@ export default async function PostPage({ params }: PageProps) {
               </Suspense>
 
               {responsePosts.length > 0 ? (
-                <section className="mt-10">
+                <section id="responses" className="mt-10 scroll-mt-24">
                   <h2 className="mb-4 text-lg font-semibold text-gray-900">
                     Responses ({responsePosts.length})
                   </h2>

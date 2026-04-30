@@ -24,6 +24,7 @@ export interface DashboardEditorDecision {
 
 export interface DashboardPost {
   id: string;
+  author_id?: string;
   title: string;
   slug: string;
   type: string;
@@ -36,6 +37,10 @@ export interface DashboardPost {
   revision_due_at?: string | null;
   post_reviews?: DashboardPostReview[];
   post_editor_decisions?: DashboardEditorDecision[];
+  co_authors?: Array<{
+    user_id: string;
+    profile: { username: string; full_name: string | null } | null;
+  }>;
   queuePosition?: number | null;
 }
 
@@ -63,6 +68,7 @@ function normalizePost(
 ): DashboardPost {
   return {
     id: record.id,
+    author_id: record.author_id ?? existing?.author_id,
     title: record.title ?? existing?.title ?? "Untitled",
     slug: record.slug ?? existing?.slug ?? "",
     type: record.type ?? existing?.type ?? "blog",
@@ -76,6 +82,7 @@ function normalizePost(
     post_reviews: record.post_reviews ?? existing?.post_reviews ?? [],
     post_editor_decisions:
       record.post_editor_decisions ?? existing?.post_editor_decisions ?? [],
+    co_authors: record.co_authors ?? existing?.co_authors ?? [],
     queuePosition: record.queuePosition ?? existing?.queuePosition ?? null,
   };
 }
@@ -304,6 +311,19 @@ export default function PostsTable({
                         <p className="font-medium text-gray-900 truncate">
                           {post.title}
                         </p>
+                        {post.co_authors && post.co_authors.length > 0 ? (
+                          <p className="mt-1 truncate text-xs text-gray-400">
+                            With{" "}
+                            {post.co_authors
+                              .map(
+                                (coAuthor) =>
+                                  coAuthor.profile?.full_name ??
+                                  coAuthor.profile?.username ??
+                                  "coauthor"
+                              )
+                              .join(", ")}
+                          </p>
+                        ) : null}
                         {reviewStatus ? (
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">

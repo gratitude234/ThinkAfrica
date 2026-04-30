@@ -7,6 +7,9 @@ import slugify from "slugify";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import CoAuthorPicker, {
+  type CoAuthorProfile,
+} from "@/components/collaboration/CoAuthorPicker";
 import TagInput from "@/components/ui/TagInput";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import QualityChecklist from "@/components/post/QualityChecklist";
@@ -43,6 +46,7 @@ interface PublishDrawerProps {
   initialExcerpt?: string;
   initialPostType?: PostType;
   initialReferences?: PostReferenceRecord[];
+  initialCoAuthors?: CoAuthorProfile[];
   inResponseTo?: string | null;
   onMetadataChange?: (changes: {
     postType?: PostType;
@@ -51,6 +55,7 @@ interface PublishDrawerProps {
     excerpt?: string;
     references?: PostReferenceRecord[];
   }) => void;
+  onCoAuthorsChange?: (coAuthors: CoAuthorProfile[]) => void;
 }
 
 const POST_TYPES: PostType[] = ["blog", "essay", "policy_brief", "research"];
@@ -63,12 +68,6 @@ interface ProfileRow {
 
 interface TagRow {
   tags: string[] | null;
-}
-
-interface CoAuthorProfile {
-  id: string;
-  username: string;
-  full_name: string | null;
 }
 
 function readTimeFromText(text: string) {
@@ -147,8 +146,10 @@ export default function PublishDrawer({
   initialExcerpt = "",
   initialPostType,
   initialReferences = [],
+  initialCoAuthors = [],
   inResponseTo,
   onMetadataChange,
+  onCoAuthorsChange,
 }: PublishDrawerProps) {
   const router = useRouter();
   const [postType, setPostType] = useState<PostType>(
@@ -166,10 +167,8 @@ export default function PublishDrawer({
   const [platformTags, setPlatformTags] = useState<string[]>([]);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showRefine, setShowRefine] = useState(false);
-  const [coAuthors, setCoAuthors] = useState<CoAuthorProfile[]>([]);
+  const [coAuthors, setCoAuthors] = useState<CoAuthorProfile[]>(initialCoAuthors);
   const [correspondingAuthorId, setCorrespondingAuthorId] = useState<string | null>(null);
-  const [coAuthorQuery, setCoAuthorQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<CoAuthorProfile[]>([]);
   const [refs, setRefs] = useState<PostReferenceRecord[]>(initialReferences);
   const [showReferences, setShowReferences] = useState(false);
   const [newReferenceTitle, setNewReferenceTitle] = useState("");
@@ -208,10 +207,8 @@ export default function PublishDrawer({
       setError(null);
       setShowTypePicker(false);
       setShowRefine(false);
-      setCoAuthors([]);
+      setCoAuthors(initialCoAuthors);
       setCorrespondingAuthorId(null);
-      setCoAuthorQuery("");
-      setSearchResults([]);
       setRefs(initialReferences);
       setShowReferences(false);
       setNewReferenceTitle("");
@@ -231,6 +228,7 @@ export default function PublishDrawer({
     initialCoverImageUrl,
     initialExcerpt,
     initialReferences,
+    initialCoAuthors,
   ]);
 
   useEffect(() => {
@@ -268,33 +266,6 @@ export default function PublishDrawer({
       setPlatformTags(ranked);
     });
   }, [open, userId]);
-
-  useEffect(() => {
-    if (!open || !coAuthorQuery.trim() || coAuthors.length >= 5) {
-      setSearchResults([]);
-      return;
-    }
-
-    const supabase = createClient();
-    const timer = setTimeout(() => {
-      supabase
-        .from("profiles")
-        .select("id, username, full_name")
-        .ilike("username", `%${coAuthorQuery.trim()}%`)
-        .neq("id", userId)
-        .limit(5)
-        .then(({ data }) => {
-          const existing = new Set(coAuthors.map((coAuthor) => coAuthor.id));
-          setSearchResults(
-            ((data as CoAuthorProfile[] | null) ?? []).filter(
-              (profile) => !existing.has(profile.id)
-            )
-          );
-        });
-    }, 200);
-
-    return () => clearTimeout(timer);
-  }, [coAuthorQuery, coAuthors, open, userId]);
 
   const suggestedTags = useMemo(
     () =>
@@ -385,6 +356,24 @@ export default function PublishDrawer({
     const normalized = normalizeTagValue(tag);
     if (tags.includes(normalized) || tags.length >= 5) return;
     handleTagChange([...tags, normalized]);
+  };
+
+  const handleCoAuthorsChange = (nextCoAuthors: CoAuthorProfile[]) => {
+    setCoAuthors(nextCoAuthors);
+    onCoAuthorsChange?.(nextCoAuthors);
+    if (
+      correspondingAuthorId &&
+      !nextCoAuthors.some((coAuthor) => coAuthor.id === correspondingAuthorId)
+    ) {
+      setCorrespondingAuthorId(null);
+    }
+  };
+
+  const moveCoAuthor = (fromIndex: number, toIndex: number) => {
+    const next = [...coAuthors];
+    const [item] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, item);
+    handleCoAuthorsChange(next);
   };
 
   const handlePublish = async () => {
@@ -517,63 +506,12 @@ export default function PublishDrawer({
               </div>
             </div>
 
-            <input
-              type="text"
-              value={coAuthorQuery}
-              onChange={(event) => setCoAuthorQuery(event.target.value)}
-              placeholder="Search by username"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+            <CoAuthorPicker
+              userId={userId}
+              value={coAuthors}
+              onChange={handleCoAuthorsChange}
+              source="publish_drawer"
             />
-
-            {searchResults.length > 0 ? (
-              <div className="space-y-2 rounded-xl border border-gray-200 bg-canvas p-3">
-                {searchResults.map((result) => (
-                  <button
-                    key={result.id}
-                    type="button"
-                    onClick={() => {
-                      setCoAuthors((current) => [...current, result].slice(0, 5));
-                      setCoAuthorQuery("");
-                      setSearchResults([]);
-                    }}
-                    className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-sm text-gray-700 hover:border-emerald-200 hover:bg-emerald-50"
-                  >
-                    <span>
-                      @{result.username}
-                      {result.full_name ? ` / ${result.full_name}` : ""}
-                    </span>
-                    <span className="text-emerald-brand">Add</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {coAuthors.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {coAuthors.map((coAuthor) => (
-                  <span
-                    key={coAuthor.id}
-                    className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700"
-                  >
-                    @{coAuthor.username}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCoAuthors((current) =>
-                          current.filter((item) => item.id !== coAuthor.id)
-                        );
-                        if (correspondingAuthorId === coAuthor.id) {
-                          setCorrespondingAuthorId(null);
-                        }
-                      }}
-                      className="text-emerald-600 hover:text-emerald-800"
-                    >
-                      remove
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : null}
 
             {coAuthors.length > 0 ? (
               <div className="space-y-2 rounded-xl border border-gray-200 bg-canvas p-3">
@@ -615,14 +553,7 @@ export default function PublishDrawer({
                       <button
                         type="button"
                         disabled={index === 0}
-                        onClick={() =>
-                          setCoAuthors((current) => {
-                            const next = [...current];
-                            const [item] = next.splice(index, 1);
-                            next.splice(index - 1, 0, item);
-                            return next;
-                          })
-                        }
+                        onClick={() => moveCoAuthor(index, index - 1)}
                         className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
                       >
                         Up
@@ -630,14 +561,7 @@ export default function PublishDrawer({
                       <button
                         type="button"
                         disabled={index === coAuthors.length - 1}
-                        onClick={() =>
-                          setCoAuthors((current) => {
-                            const next = [...current];
-                            const [item] = next.splice(index, 1);
-                            next.splice(index + 1, 0, item);
-                            return next;
-                          })
-                        }
+                        onClick={() => moveCoAuthor(index, index + 1)}
                         className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
                       >
                         Down

@@ -123,7 +123,7 @@ export default function ProfileHeader({
 
             {affiliationBits.length > 0 ? (
               <p className="mt-2 text-sm text-gray-500">
-                {affiliationBits.join(" · ")}
+                {affiliationBits.join(" / ")}
               </p>
             ) : null}
           </div>
@@ -188,6 +188,7 @@ export default function ProfileHeader({
           talentProfileId={talentProfileId}
           open={showInquiry}
           onClose={() => setShowInquiry(false)}
+          source="profile_header"
         />
       ) : null}
     </>

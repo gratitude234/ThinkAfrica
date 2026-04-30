@@ -37,7 +37,7 @@ export default function OpportunityBanner({
   const typeLabel = useMemo(() => {
     const labels =
       opportunityTypes?.map((type) => OPPORTUNITY_LABELS[type] ?? type) ?? [];
-    return labels.length > 0 ? labels.join(" · ") : "";
+    return labels.length > 0 ? labels.join(" / ") : "";
   }, [opportunityTypes]);
 
   if (!isVisibleToViewer) return null;
@@ -47,9 +47,6 @@ export default function OpportunityBanner({
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm font-medium text-emerald-900">
-            <span aria-hidden="true" className="mr-2">
-              ✨
-            </span>
             Open to {typeLabel ? `${typeLabel} opportunities` : "opportunities"}
           </p>
 
@@ -83,6 +80,7 @@ export default function OpportunityBanner({
           talentProfileId={talentProfileId}
           open={showInquiry}
           onClose={() => setShowInquiry(false)}
+          source="opportunity_banner"
         />
       ) : null}
     </>

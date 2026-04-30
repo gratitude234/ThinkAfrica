@@ -23,7 +23,24 @@ export type ActivationEventName =
   | "response_started"
   | "landing_viewed"
   | "landing_read_clicked"
-  | "landing_signup_clicked";
+  | "landing_signup_clicked"
+  | "opportunity_profile_viewed"
+  | "opportunity_profile_updated"
+  | "opportunity_readiness_viewed"
+  | "opportunity_filter_used"
+  | "opportunity_inquiry_started"
+  | "opportunity_inquiry_submitted"
+  | "fellowship_opened"
+  | "fellowship_application_submitted"
+  | "collaboration_panel_viewed"
+  | "collaboration_cta_clicked"
+  | "coauthor_search_performed"
+  | "coauthor_invite_sent"
+  | "coauthor_invite_accepted"
+  | "coauthor_invite_declined"
+  | "message_started"
+  | "message_sent"
+  | "response_thread_opened";
 
 interface ActivationEventPayload {
   event: ActivationEventName;

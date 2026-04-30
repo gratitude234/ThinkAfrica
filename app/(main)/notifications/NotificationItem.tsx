@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { formatRelativeTime } from "@/lib/utils";
 import { respondToCoAuthorInvite } from "./actions";
@@ -118,11 +119,32 @@ export default function NotificationItem({
   const message = buildMessage(notification);
   const link = buildLink(notification);
   const icon = TYPE_ICONS[notification.type] ?? "N";
+  const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");
+  const [localRead, setLocalRead] = useState(notification.read);
+
+  const handleInviteResponse = async (accept: boolean) => {
+    if (!notification.post_id || inviteState === "saving") return;
+
+    setInviteState("saving");
+    const result = await respondToCoAuthorInvite({
+      notificationId: notification.id,
+      postId: notification.post_id,
+      accept,
+    });
+
+    if (result.error) {
+      setInviteState("idle");
+      return;
+    }
+
+    setInviteState(accept ? "accepted" : "declined");
+    setLocalRead(true);
+  };
 
   const inner = (
     <div
       className={`flex items-start gap-3 px-4 py-4 transition-colors ${
-        !notification.read ? "bg-emerald-50 hover:bg-emerald-100/50" : "hover:bg-canvas"
+        !localRead ? "bg-emerald-50 hover:bg-emerald-100/50" : "hover:bg-canvas"
       }`}
     >
       {notification.actor?.avatar_url ? (
@@ -144,40 +166,40 @@ export default function NotificationItem({
         </p>
         {notification.type === "co_author_invite" && notification.post_id ? (
           <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={async (event) => {
-                event.preventDefault();
-                await respondToCoAuthorInvite({
-                  notificationId: notification.id,
-                  postId: notification.post_id!,
-                  accept: true,
-                });
-                window.location.reload();
-              }}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white"
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              onClick={async (event) => {
-                event.preventDefault();
-                await respondToCoAuthorInvite({
-                  notificationId: notification.id,
-                  postId: notification.post_id!,
-                  accept: false,
-                });
-                window.location.reload();
-              }}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700"
-            >
-              Decline
-            </button>
+            {inviteState === "accepted" || inviteState === "declined" ? (
+              <span className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+                {inviteState === "accepted" ? "Accepted" : "Declined"}
+              </span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleInviteResponse(true);
+                  }}
+                  disabled={inviteState === "saving"}
+                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  {inviteState === "saving" ? "Saving..." : "Accept"}
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleInviteResponse(false);
+                  }}
+                  disabled={inviteState === "saving"}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-50"
+                >
+                  Decline
+                </button>
+              </>
+            )}
           </div>
         ) : null}
       </div>
-      {!notification.read ? (
+      {!localRead ? (
         <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-emerald-500" />
       ) : null}
     </div>

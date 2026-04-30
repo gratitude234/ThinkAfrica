@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
+import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import FellowshipApply from "./FellowshipApply";
 
 interface PageProps {
@@ -43,6 +44,10 @@ export default async function FellowshipPage({ params }: PageProps) {
 
   return (
     <div className="max-w-3xl mx-auto">
+      <RetentionEventTracker
+        event="fellowship_opened"
+        metadata={{ fellowshipId: id, status: fellowship.status }}
+      />
       <Link
         href="/fellowships"
         className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors"

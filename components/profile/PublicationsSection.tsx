@@ -14,6 +14,10 @@ interface PublicationPost {
   published_at: string | null;
   view_count?: number | null;
   isCoAuthor?: boolean;
+  co_authors?: Array<{
+    user_id: string;
+    profile: { username: string; full_name: string | null } | null;
+  }>;
 }
 
 interface PublicationsSectionProps {
@@ -70,7 +74,7 @@ export default function PublicationsSection({
           >
             <div className="mb-4 flex items-center justify-between gap-3">
               <h3 className="text-base font-semibold text-gray-900">
-                {label} · {groupPosts.length}
+                {label} / {groupPosts.length}
               </h3>
               {groupPosts.length > 5 ? (
                 <button
@@ -83,7 +87,7 @@ export default function PublicationsSection({
                   }
                   className="text-sm font-medium text-emerald-brand transition-colors hover:text-emerald-700"
                 >
-                  {expanded ? "Show less" : `See all (${groupPosts.length}) →`}
+                  {expanded ? "Show less" : `See all (${groupPosts.length}) ->`}
                 </button>
               ) : null}
             </div>
@@ -109,6 +113,19 @@ export default function PublicationsSection({
                       {post.excerpt ? (
                         <p className="mt-1 line-clamp-1 text-sm text-gray-500">
                           {post.excerpt}
+                        </p>
+                      ) : null}
+                      {post.co_authors && post.co_authors.length > 0 ? (
+                        <p className="mt-1 line-clamp-1 text-xs text-gray-400">
+                          With{" "}
+                          {post.co_authors
+                            .map(
+                              (coAuthor) =>
+                                coAuthor.profile?.full_name ??
+                                coAuthor.profile?.username ??
+                                "coauthor"
+                            )
+                            .join(", ")}
                         </p>
                       ) : null}
                     </div>

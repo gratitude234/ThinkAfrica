@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { recordActivationEvent } from "@/lib/activationServer";
 
 export async function respondToCoAuthorInvite(input: {
   notificationId: string;
@@ -70,6 +71,17 @@ export async function respondToCoAuthorInvite(input: {
       post_id: input.postId,
       read: false,
     });
+    await recordActivationEvent({
+      supabase,
+      event: "coauthor_invite_accepted",
+      userId: user.id,
+      metadata: {
+        postId: input.postId,
+        notificationId: input.notificationId,
+      },
+      source: "server_action",
+      route: "/notifications",
+    });
   } else {
     const { data: removedInvite, error } = await supabase
       .from("post_authors")
@@ -98,6 +110,17 @@ export async function respondToCoAuthorInvite(input: {
       actor_id: user.id,
       post_id: input.postId,
       read: false,
+    });
+    await recordActivationEvent({
+      supabase,
+      event: "coauthor_invite_declined",
+      userId: user.id,
+      metadata: {
+        postId: input.postId,
+        notificationId: input.notificationId,
+      },
+      source: "server_action",
+      route: "/notifications",
     });
   }
 

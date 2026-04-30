@@ -18,6 +18,15 @@ interface ActivationEventRow {
   created_at: string;
 }
 
+interface TalentProfileAnalyticsRow {
+  open_to_opportunities: boolean | null;
+  visibility: string | null;
+  skills: string[] | null;
+  opportunity_types: string[] | null;
+  cv_url: string | null;
+  linkedin_url: string | null;
+}
+
 function StatCard({
   label,
   value,
@@ -166,6 +175,10 @@ export default async function AdminAnalyticsPage() {
     { data: allPublishedAuthorsRaw },
     { data: activationEventsRaw },
     { data: followsRaw },
+    { data: talentProfilesRaw },
+    { count: totalTalentInquiries },
+    { count: acceptedCoauthorCount },
+    { count: totalMessages },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -208,11 +221,23 @@ export default async function AdminAnalyticsPage() {
       .select("user_id, event_name, created_at")
       .limit(10000),
     supabase.from("follows").select("follower_id").limit(10000),
+    supabase
+      .from("talent_profiles")
+      .select("open_to_opportunities, visibility, skills, opportunity_types, cv_url, linkedin_url")
+      .limit(10000),
+    supabase.from("talent_inquiries").select("*", { count: "exact", head: true }),
+    supabase
+      .from("post_authors")
+      .select("*", { count: "exact", head: true })
+      .not("accepted_at", "is", null)
+      .gt("display_order", 0),
+    supabase.from("messages").select("*", { count: "exact", head: true }),
   ]);
 
   const profiles = (profilesRaw ?? []) as ProfileRow[];
   const totalUsers = profiles.length;
   const activationEvents = (activationEventsRaw ?? []) as ActivationEventRow[];
+  const talentProfiles = (talentProfilesRaw ?? []) as TalentProfileAnalyticsRow[];
 
   const weeklyActiveUsers = new Set((activeThisWeekRaw ?? []).map((p) => p.author_id)).size;
   const prevWeekActiveUsers = new Set((activePrevWeekRaw ?? []).map((p) => p.author_id)).size;
@@ -339,6 +364,46 @@ export default async function AdminAnalyticsPage() {
   }
   const d1Return = computeReturnRate(profiles, eventsByUser, 1);
   const d7Return = computeReturnRate(profiles, eventsByUser, 7);
+  const responseStarts = activationEvents.filter(
+    (event) => event.event_name === "response_started"
+  ).length;
+  const coauthorInvitesSent = activationEvents.filter(
+    (event) => event.event_name === "coauthor_invite_sent"
+  ).length;
+  const coauthorInvitesAccepted = activationEvents.filter(
+    (event) => event.event_name === "coauthor_invite_accepted"
+  ).length;
+  const messageSentEvents = activationEvents.filter(
+    (event) => event.event_name === "message_sent"
+  ).length;
+  const collaborationUsers = new Set(
+    activationEvents
+      .filter((event) =>
+        [
+          "response_started",
+          "coauthor_invite_sent",
+          "coauthor_invite_accepted",
+          "message_sent",
+        ].includes(event.event_name)
+      )
+      .map((event) => event.user_id)
+      .filter(Boolean) as string[]
+  );
+  const publicOpportunityProfiles = talentProfiles.filter(
+    (profile) =>
+      profile.open_to_opportunities === true && profile.visibility === "public"
+  ).length;
+  const readinessCompleteProfiles = talentProfiles.filter((profile) => {
+    const skills = profile.skills ?? [];
+    const types = profile.opportunity_types ?? [];
+    return Boolean(
+      profile.open_to_opportunities === true &&
+        profile.visibility === "public" &&
+        skills.length >= 2 &&
+        types.length > 0 &&
+        (profile.cv_url || profile.linkedin_url)
+    );
+  }).length;
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -377,6 +442,70 @@ export default async function AdminAnalyticsPage() {
             value={postOpened.size}
             trend="neutral"
             trendLabel={`${pct(postOpened.size, totalUsers)} of registered users`}
+          />
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Opportunity Outcomes
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="Public Opportunity Profiles"
+            value={publicOpportunityProfiles}
+            trend="neutral"
+            trendLabel={`${pct(publicOpportunityProfiles, totalUsers)} of registered users`}
+          />
+          <HealthCard
+            label="Readiness Complete"
+            value={readinessCompleteProfiles}
+            trend="neutral"
+            trendLabel={`${pct(readinessCompleteProfiles, talentProfiles.length)} of opportunity profiles`}
+          />
+          <HealthCard
+            label="Inquiries Submitted"
+            value={totalTalentInquiries ?? 0}
+            trend="neutral"
+            trendLabel="persisted contact interest"
+          />
+          <HealthCard
+            label="Fellowship Applications"
+            value={totalApplications ?? 0}
+            trend="neutral"
+            trendLabel="submitted applications"
+          />
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Collaboration Loop
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="Response Starts"
+            value={responseStarts}
+            trend="neutral"
+            trendLabel="public collaboration intent"
+          />
+          <HealthCard
+            label="Coauthor Invites"
+            value={coauthorInvitesSent}
+            trend="neutral"
+            trendLabel={`${coauthorInvitesAccepted} accepted`}
+          />
+          <HealthCard
+            label="Accepted Coauthors"
+            value={acceptedCoauthorCount ?? 0}
+            trend="neutral"
+            trendLabel="published or draft authorship"
+          />
+          <HealthCard
+            label="Messages Sent"
+            value={Math.max(totalMessages ?? 0, messageSentEvents)}
+            trend="neutral"
+            trendLabel={`${pct(collaborationUsers.size, totalUsers)} collaboration conversion`}
           />
         </div>
       </div>

@@ -6,6 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
+import CoAuthorPicker, {
+  type CoAuthorProfile,
+} from "@/components/collaboration/CoAuthorPicker";
 import ProfileGate from "@/components/ui/ProfileGate";
 import type { PostReferenceRecord } from "@/lib/types";
 import { formatRelativeTime, type PostType } from "@/lib/utils";
@@ -172,6 +175,7 @@ export default function WritePage() {
   const [inResponseToTitle, setInResponseToTitle] = useState<string | null>(null);
   const [inResponseToAuthor, setInResponseToAuthor] = useState<string | null>(null);
   const [references, setReferences] = useState<PostReferenceRecord[]>([]);
+  const [coAuthors, setCoAuthors] = useState<CoAuthorProfile[]>([]);
   const [wordCount, setWordCount] = useState(0);
   const [isPublishDrawerOpen, setIsPublishDrawerOpen] = useState(false);
   const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
@@ -577,7 +581,6 @@ export default function WritePage() {
 
           {inResponseToId && inResponseToTitle ? (
             <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <span className="mt-0.5 text-lg">↩</span>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                   Writing a response to
@@ -605,6 +608,17 @@ export default function WritePage() {
               >
                 Remove
               </button>
+            </div>
+          ) : null}
+
+          {currentUserId ? (
+            <div className="mb-6">
+              <CoAuthorPicker
+                userId={currentUserId}
+                value={coAuthors}
+                onChange={setCoAuthors}
+                source="write"
+              />
             </div>
           ) : null}
 
@@ -727,8 +741,10 @@ export default function WritePage() {
             initialExcerpt={excerpt}
             initialPostType={postType}
             initialReferences={references}
+            initialCoAuthors={coAuthors}
             inResponseTo={inResponseToId}
             onMetadataChange={handleMetadataChange}
+            onCoAuthorsChange={setCoAuthors}
           />
           <ProfileGate
             open={isProfileGateOpen}

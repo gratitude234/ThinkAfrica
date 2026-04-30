@@ -5,11 +5,15 @@ import StatsBar from "./StatsBar";
 import PostsTable from "./PostsTable";
 import type { DashboardPost } from "./PostsTable";
 import QualitySignals, { type DashboardQualityItem } from "./QualitySignals";
+import CollaborationDashboardCard from "@/components/collaboration/CollaborationDashboardCard";
+import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
 import Button from "@/components/ui/Button";
 import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import { getActivationState } from "@/lib/activation";
+import { getCollaborationSuggestions } from "@/lib/collaboration";
+import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
 import { getRetentionSummary } from "@/lib/retention";
 import { getPostQualitySummary } from "@/lib/postQuality";
 
@@ -26,10 +30,11 @@ export default async function DashboardPage() {
     .from("posts")
     .select(
       `
-      id, title, slug, content, excerpt, tags, type, status, view_count,
+      id, author_id, title, slug, content, excerpt, tags, type, status, view_count,
       created_at, published_at, revision_due_at, citation_id, in_response_to,
       post_reviews(assigned_at, submitted_at, recommendation),
-      post_editor_decisions(decision, created_at)
+      post_editor_decisions(decision, created_at),
+      post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
       `
     )
     .eq("author_id", user.id)
@@ -117,11 +122,31 @@ export default async function DashboardPage() {
     .select("*", { count: "exact", head: true })
     .eq("following_id", user.id);
 
-  const { data: authorProfile } = await supabase
-    .from("profiles")
-    .select("username, full_name, university, field_of_study, verified, verified_type")
-    .eq("id", user.id)
-    .single();
+  const [{ data: authorProfile }, { data: talentProfile }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "username, full_name, university, field_of_study, bio, verified, verified_type"
+      )
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("talent_profiles")
+      .select(
+        "id, open_to_opportunities, opportunity_types, cv_url, linkedin_url, skills, visibility"
+      )
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
+
+  const { data: opportunityInquiriesRaw } = talentProfile?.id
+    ? await supabase
+        .from("talent_inquiries")
+        .select("id, organization_name, contact_email, message, created_at")
+        .eq("talent_id", talentProfile.id)
+        .order("created_at", { ascending: false })
+        .limit(5)
+    : { data: [] };
 
   const activationState = await getActivationState(supabase, user.id);
   const retentionSummary = await getRetentionSummary(
@@ -144,6 +169,96 @@ export default async function DashboardPage() {
     fellowship: Array.isArray(a.fellowships) ? a.fellowships[0] : a.fellowships,
   }));
 
+  const collaborationTags = Array.from(
+    new Set((postsRaw ?? []).flatMap((post) => post.tags ?? []))
+  ).slice(0, 8);
+  const [
+    { data: pendingInvitesRaw },
+    { data: recentResponsesRaw },
+    { data: conversationParticipantsRaw },
+    collaborationSuggestions,
+  ] = await Promise.all([
+    supabase
+      .from("post_authors")
+      .select(
+        "post_id, invited_at, posts!post_authors_post_id_fkey(id, title, slug, profiles!posts_author_id_fkey(full_name, username))"
+      )
+      .eq("user_id", user.id)
+      .is("accepted_at", null)
+      .order("invited_at", { ascending: false })
+      .limit(3),
+    postIds.length > 0
+      ? supabase
+          .from("posts")
+          .select(
+            "id, title, slug, in_response_to, published_at, profiles!posts_author_id_fkey(username, full_name, avatar_url)"
+          )
+          .eq("status", "published")
+          .neq("author_id", user.id)
+          .in("in_response_to", postIds)
+          .order("published_at", { ascending: false })
+          .limit(3)
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from("conversation_participants")
+      .select("last_read_at, conversations!inner(last_message_at)")
+      .eq("user_id", user.id),
+    getCollaborationSuggestions(supabase, {
+      currentUserId: user.id,
+      university: authorProfile?.university ?? null,
+      fieldOfStudy: authorProfile?.field_of_study ?? null,
+      tags: collaborationTags,
+      limit: 3,
+    }),
+  ]);
+
+  const pendingInvites = (pendingInvitesRaw ?? []).map((invite) => {
+    const post = Array.isArray(invite.posts) ? invite.posts[0] : invite.posts;
+    const authorProfile = Array.isArray(post?.profiles)
+      ? post?.profiles[0]
+      : post?.profiles;
+
+    return {
+      postId: invite.post_id,
+      title: post?.title ?? "Untitled collaboration",
+      slug: post?.slug ?? "",
+      authorName:
+        authorProfile?.full_name ?? authorProfile?.username ?? "A ThinkAfrika author",
+    };
+  });
+
+  const recentResponses = (recentResponsesRaw ?? []).map((response) => {
+    const profile = Array.isArray(response.profiles)
+      ? response.profiles[0]
+      : response.profiles;
+
+    return {
+      id: response.id,
+      title: response.title,
+      slug: response.slug,
+      authorName: profile?.full_name ?? profile?.username ?? "ThinkAfrika writer",
+      avatarUrl: profile?.avatar_url ?? null,
+    };
+  });
+
+  const unreadMessageCount = ((conversationParticipantsRaw ?? []) as Array<{
+    last_read_at: string;
+    conversations:
+      | { last_message_at: string }
+      | { last_message_at: string }[]
+      | null;
+  }>).filter((row) => {
+    const conversation = Array.isArray(row.conversations)
+      ? row.conversations[0]
+      : row.conversations;
+
+    return (
+      !!conversation &&
+      new Date(conversation.last_message_at).getTime() >
+        new Date(row.last_read_at).getTime()
+    );
+  }).length;
+
   const pendingQueue = [...(postsRaw ?? [])]
     .filter((post) => post.status === "pending")
     .sort(
@@ -162,6 +277,17 @@ export default async function DashboardPage() {
     citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
     post_reviews: p.post_reviews ?? [],
     post_editor_decisions: p.post_editor_decisions ?? [],
+    co_authors: Array.isArray((p as { post_authors?: unknown[] }).post_authors)
+      ? ((p as { post_authors?: Array<Record<string, unknown>> }).post_authors ?? [])
+          .filter((row) => row.accepted_at)
+          .filter((row) => row.user_id !== user.id)
+          .map((row) => ({
+            user_id: row.user_id as string,
+            profile: Array.isArray(row.profile)
+              ? (row.profile[0] as { username: string; full_name: string | null })
+              : (row.profile as { username: string; full_name: string | null } | null),
+          }))
+      : [],
     queuePosition: queuePositionById.get(p.id) ?? null,
   }));
 
@@ -227,6 +353,18 @@ export default async function DashboardPage() {
   const publishedPosts = posts.filter((p) => p.status === "published");
   const totalViews = publishedPosts.reduce((sum, p) => sum + p.view_count, 0);
   const totalLikes = publishedPosts.reduce((sum, p) => sum + p.like_count, 0);
+  const opportunityReadiness = getOpportunityReadinessSummary({
+    profile: authorProfile,
+    talentProfile,
+    posts: (postsRaw ?? []).map((post) => ({
+      type: post.type,
+      status: post.status,
+      citation_id: (post as { citation_id?: string | null }).citation_id ?? null,
+      referenceCount: referenceCounts[post.id] ?? 0,
+    })),
+  });
+  const opportunityInquiries = opportunityInquiriesRaw ?? [];
+
   return (
     <div className="max-w-5xl mx-auto">
       <RetentionEventTracker
@@ -254,6 +392,22 @@ export default async function DashboardPage() {
       ) : (
         <ActivationChecklist state={activationState} />
       )}
+
+      <CollaborationDashboardCard
+        pendingInvites={pendingInvites}
+        recentResponses={recentResponses}
+        unreadMessageCount={unreadMessageCount}
+        suggestions={collaborationSuggestions}
+      />
+
+      <RetentionEventTracker
+        event="opportunity_readiness_viewed"
+        metadata={{ source: "dashboard", score: opportunityReadiness.score }}
+      />
+      <OpportunityReadinessCard
+        summary={opportunityReadiness}
+        source="dashboard"
+      />
 
       {revisionPosts.length > 0 ? (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
@@ -296,6 +450,45 @@ export default async function DashboardPage() {
       />
 
       <PostsTable posts={posts} userId={user.id} />
+
+      {opportunityInquiries.length > 0 ? (
+        <div className="mt-10">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            Opportunity interest
+          </h2>
+          <div className="space-y-3">
+            {opportunityInquiries.map((inquiry) => (
+              <div
+                key={inquiry.id}
+                className="rounded-xl border border-gray-200 bg-white p-4"
+              >
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {inquiry.organization_name ?? "Organization not listed"}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {inquiry.contact_email ?? "No reply email provided"}
+                    </p>
+                  </div>
+                  <span className="text-xs text-gray-400">
+                    {new Date(inquiry.created_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+                {inquiry.message ? (
+                  <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-gray-600">
+                    {inquiry.message}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {applications.length > 0 && (
         <div className="mt-10">

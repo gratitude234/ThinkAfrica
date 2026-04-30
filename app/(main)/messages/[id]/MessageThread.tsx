@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { formatRelativeTime } from "@/lib/utils";
+import { trackActivationEvent } from "@/lib/activationEvents";
 
 interface Message {
   id: string;
@@ -38,12 +39,23 @@ export default function MessageThread({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const displayName = otherProfile?.full_name ?? otherProfile?.username ?? "Unknown";
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    trackActivationEvent({
+      event: "message_started",
+      metadata: {
+        conversationId,
+        source: "message_thread",
+        hasPriorMessages: initialMessages.length > 0,
+      },
+    });
+  }, [conversationId, initialMessages.length]);
 
   useEffect(() => {
     if (document.cookie.includes("ta_lite=1")) {
@@ -125,6 +137,13 @@ export default function MessageThread({
         .update({ last_read_at: new Date().toISOString() })
         .eq("conversation_id", conversationId)
         .eq("user_id", currentUserId);
+      trackActivationEvent({
+        event: "message_sent",
+        metadata: {
+          conversationId,
+          length: text.length,
+        },
+      });
     }
 
     setSending(false);
@@ -154,7 +173,7 @@ export default function MessageThread({
           className="mr-1 text-gray-400 hover:text-gray-600"
           aria-label="Back to inbox"
         >
-          ←
+          Back
         </button>
         <UserAvatar
           name={displayName}
@@ -210,7 +229,7 @@ export default function MessageThread({
                   }`}
                 >
                   {formatRelativeTime(message.created_at)}
-                  {message.edited_at && !message.deleted_at ? " · edited" : ""}
+                  {message.edited_at && !message.deleted_at ? " / edited" : ""}
                 </p>
               </div>
             </div>

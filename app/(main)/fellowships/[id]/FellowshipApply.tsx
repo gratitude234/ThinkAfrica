@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { trackActivationEvent } from "@/lib/activationEvents";
 
 interface Props {
   fellowshipId: string;
@@ -74,6 +75,13 @@ export default function FellowshipApply({
       setLoading(false);
       return;
     }
+    trackActivationEvent({
+      event: "fellowship_application_submitted",
+      metadata: {
+        fellowshipId,
+        coverLetterWordCount: wordCount,
+      },
+    });
     setLoading(false);
     setSubmitted(true);
     setOpen(false);
@@ -83,6 +91,7 @@ export default function FellowshipApply({
     <div>
       {!open ? (
         <button
+          type="button"
           onClick={() => {
             if (!userId) router.push(`/login?redirectTo=/fellowships/${fellowshipId}`);
             else setOpen(true);
