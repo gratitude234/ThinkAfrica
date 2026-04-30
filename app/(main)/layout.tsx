@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import GuestBanner from "@/components/ui/GuestBanner";
 import { isLiteModeServer } from "@/lib/liteMode";
 import NavigationShell from "./NavigationShell";
@@ -10,6 +10,12 @@ export default async function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Landing page renders its own nav — skip the shared shell entirely
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  if (pathname === "/landing") {
+    return <div className="min-h-screen bg-canvas">{children}</div>;
+  }
+
   const supabase = await createClient();
   // getSession reads from the request cookie with no network round-trip.
   // getUser() would validate the JWT with Supabase's auth server on every page load.

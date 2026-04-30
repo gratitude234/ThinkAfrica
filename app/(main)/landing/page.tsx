@@ -4,6 +4,7 @@ import Footer from "@/components/ui/Footer";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
+import LandingNav from "./LandingNav";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -79,9 +80,9 @@ function typeGradient(type: string) {
 
 function typeBadge(type: string): { classes: string; label: string } {
   switch (type) {
-    case "essay":        return { classes: "bg-amber-100 text-amber-800",   label: "Essay" };
-    case "research":     return { classes: "bg-purple-100 text-purple-800", label: "Research" };
-    case "policy_brief": return { classes: "bg-blue-100 text-blue-800",     label: "Policy Brief" };
+    case "essay":        return { classes: "bg-amber-100 text-amber-800",     label: "Essay" };
+    case "research":     return { classes: "bg-purple-100 text-purple-800",   label: "Research" };
+    case "policy_brief": return { classes: "bg-blue-100 text-blue-800",       label: "Policy Brief" };
     case "quick_take":   return { classes: "bg-emerald-100 text-emerald-800", label: "Quick Take" };
     default:             return { classes: "bg-emerald-100 text-emerald-800", label: "Blog" };
   }
@@ -133,8 +134,8 @@ export default async function LandingPage() {
   }));
 
   const [leadPost = null, ...rest] = posts;
-  const railPosts = rest.slice(0, 3);
-  const gridPosts = posts.slice(0, 4);
+  const railPosts  = rest.slice(0, 3);
+  const gridPosts  = posts.slice(0, 4);
   const primaryHref = leadPost ? `/post/${leadPost.slug}` : "/?guest=1";
 
   const displayPostCount = postCount ?? 0;
@@ -148,7 +149,8 @@ export default async function LandingPage() {
   ];
 
   return (
-    <div className="landing-page -mt-8">
+    <div className="landing-page">
+      <LandingNav />
       <LandingAnimations />
       <RetentionEventTracker
         event="landing_viewed"
@@ -156,7 +158,7 @@ export default async function LandingPage() {
       />
 
       {/* ── Hero ──────────────────────────────────────────────────── */}
-      <section className="relative left-1/2 -translate-x-1/2 w-screen border-b border-gray-200 py-16 sm:py-20">
+      <section className="border-b border-gray-200 py-16 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-16 lg:grid-cols-[1fr_440px]">
 
@@ -281,7 +283,7 @@ export default async function LandingPage() {
 
                   {/* Compact rail items */}
                   {railPosts.map((post, i) => {
-                    const badge = typeBadge(post.type);
+                    const badge  = typeBadge(post.type);
                     const author = authorLine(post);
                     return (
                       <LandingTrackedLink
@@ -326,7 +328,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Stats bar ─────────────────────────────────────────────── */}
-      <div id="stats-bar" className="relative left-1/2 -translate-x-1/2 w-screen border-b border-gray-200 bg-white py-5">
+      <div id="stats-bar" className="border-b border-gray-200 bg-white py-5">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-center divide-x divide-gray-200">
             {stats.map(({ value, suffix, label }) => (
@@ -343,7 +345,7 @@ export default async function LandingPage() {
 
       {/* ── Latest posts ──────────────────────────────────────────── */}
       {gridPosts.length > 0 && (
-        <section className="py-20">
+        <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20">
           <div className="section-head mb-8 flex items-end justify-between">
             <div>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
@@ -363,10 +365,10 @@ export default async function LandingPage() {
 
           <div id="post-grid" className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {gridPosts.map((post, i) => {
-              const badge = typeBadge(post.type);
+              const badge    = typeBadge(post.type);
               const gradient = typeGradient(post.type);
-              const author = authorLine(post);
-              const isWide = i === 0;
+              const author   = authorLine(post);
+              const isWide   = i === 0;
 
               return (
                 <LandingTrackedLink
@@ -383,7 +385,7 @@ export default async function LandingPage() {
                       </div>
                       <div className="flex flex-col justify-between p-6">
                         <div>
-                          <div className="mb-2.5 flex items-center justify-between">
+                          <div className="mb-2.5 flex items-center">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
                           </div>
                           <h2 className="mb-2 line-clamp-3 font-display text-[22px] font-semibold leading-snug text-ink">{post.title}</h2>
@@ -404,7 +406,7 @@ export default async function LandingPage() {
                         <span className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-50">{badge.label}</span>
                       </div>
                       <div className="p-4">
-                        <div className="mb-2.5 flex items-center justify-between">
+                        <div className="mb-2.5">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
                         </div>
                         <h2 className="mb-2 line-clamp-2 font-display text-[17px] font-semibold leading-snug text-ink">{post.title}</h2>
@@ -427,13 +429,11 @@ export default async function LandingPage() {
       )}
 
       {/* ── Topics ────────────────────────────────────────────────── */}
-      <section className="relative left-1/2 -translate-x-1/2 w-screen border-y border-gray-200 bg-white py-14">
+      <section className="border-y border-gray-200 bg-white py-14">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="section-head mb-6 flex items-end justify-between">
             <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-                Browse by topic
-              </p>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">Browse by topic</p>
               <h2 className="font-display text-[26px] font-medium text-ink">Find ideas that interest you</h2>
             </div>
           </div>
@@ -455,7 +455,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Debates ───────────────────────────────────────────────── */}
-      <section className="relative left-1/2 -translate-x-1/2 w-screen border-b border-gray-200 bg-white py-20">
+      <section className="border-b border-gray-200 bg-white py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-16 lg:grid-cols-2">
 
@@ -556,7 +556,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Value props ───────────────────────────────────────────── */}
-      <section className="relative left-1/2 -translate-x-1/2 w-screen border-b border-gray-200 bg-white py-14">
+      <section className="border-b border-gray-200 bg-white py-14">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">How it works</p>
@@ -580,7 +580,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Dual CTA ──────────────────────────────────────────────── */}
-      <section className="py-20">
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20">
         <div id="dual-cta" className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div className="cta-card rounded-2xl bg-gray-900 px-10 py-11 text-white">
             <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For readers</p>
@@ -624,7 +624,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <Footer />
+      <Footer landing />
     </div>
   );
 }

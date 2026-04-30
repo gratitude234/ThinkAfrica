@@ -24,9 +24,15 @@ const legalLinks = [
   { label: "Terms of Use", href: "/terms" },
 ];
 
-export default function Footer() {
+export default function Footer({ landing = false }: { landing?: boolean }) {
   return (
-    <footer className="relative left-1/2 mt-16 -mb-24 w-screen -translate-x-1/2 bg-gray-900 text-gray-300 md:-mb-8">
+    <footer
+      className={
+        landing
+          ? "bg-gray-900 text-gray-300"
+          : "relative left-1/2 mt-16 -mb-24 w-screen -translate-x-1/2 bg-gray-900 text-gray-300 md:-mb-8"
+      }
+    >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
