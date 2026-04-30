@@ -11,7 +11,8 @@
       "Bash(mkdir -p \"C:/dev/Think_Africa/app/\\(main\\)/[username]/following\")",
       "Bash(./node_modules/.bin/tsc --noEmit)",
       "Bash(node_modules/.bin/tsc --noEmit)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(npx next *)"
     ]
   }
 }

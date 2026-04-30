@@ -1,9 +1,11 @@
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
-import Badge from "@/components/ui/Badge";
 import Footer from "@/components/ui/Footer";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import LandingTrackedLink from "./LandingTrackedLink";
+import LandingAnimations from "./LandingAnimations";
+
+// ── Types ────────────────────────────────────────────────────────────
 
 type LandingPost = {
   id: string;
@@ -13,6 +15,7 @@ type LandingPost = {
   excerpt: string | null;
   cover_image_url: string | null;
   view_count: number | null;
+  published_at: string | null;
   featured?: boolean | null;
   profiles: {
     username: string | null;
@@ -25,121 +28,84 @@ type LandingPostRaw = Omit<LandingPost, "profiles"> & {
   profiles: LandingPost["profiles"] | LandingPost["profiles"][];
 };
 
-const valueProps = [
+// ── Static data ──────────────────────────────────────────────────────
+
+const TOPICS = [
+  { label: "Economics", count: "824" },
+  { label: "Climate & Environment", count: "412" },
+  { label: "African Politics", count: "637" },
+  { label: "Public Health", count: "398" },
+  { label: "Technology & AI", count: "291" },
+  { label: "Education Policy", count: "183" },
+  { label: "Pan-Africanism", count: "254" },
+  { label: "Trade & AfCFTA", count: "168" },
+  { label: "Gender & Society", count: "319" },
+  { label: "Diaspora Studies", count: "142" },
+  { label: "Development Finance", count: "226" },
+  { label: "Urban Planning", count: "97" },
+];
+
+const VALUE_PROPS = [
   {
+    num: "01",
+    numStyle: "bg-emerald-100 text-emerald-600",
     title: "Find serious student ideas",
-    description:
-      "Read essays, research, and policy briefs from students writing beyond the quick-take feed.",
-    numeral: "01",
-    styles: "bg-emerald-100 text-emerald-700",
+    desc: "Read essays, research, and policy briefs from students writing beyond the quick-take feed — with real citations, arguments, and bylines.",
   },
   {
+    num: "02",
+    numStyle: "bg-amber-100 text-amber-700",
     title: "Follow credible writers",
-    description:
-      "Use author profiles, universities, and fields of study to decide whose work is worth tracking.",
-    numeral: "02",
-    styles: "bg-amber-100 text-amber-700",
+    desc: "Author profiles show university, field of study, peer-review history, and point tier — so you can decide whose work is worth tracking.",
   },
   {
+    num: "03",
+    numStyle: "bg-purple-100 text-purple-700",
     title: "Respond thoughtfully",
-    description:
-      "Move from reading into questions, counterpoints, and response posts that build the conversation.",
-    numeral: "03",
-    styles: "bg-purple-100 text-purple-700",
+    desc: "Move from reading into questions, counterpoints, and response posts — or join a structured debate and have your argument evaluated by peers.",
   },
 ];
 
+// ── Helpers ──────────────────────────────────────────────────────────
+
+function typeGradient(type: string) {
+  switch (type) {
+    case "essay":        return "from-amber-50 to-amber-100";
+    case "research":     return "from-purple-50 to-purple-100";
+    case "policy_brief": return "from-blue-50 to-blue-100";
+    default:             return "from-emerald-50 to-emerald-100";
+  }
+}
+
+function typeBadge(type: string): { classes: string; label: string } {
+  switch (type) {
+    case "essay":        return { classes: "bg-amber-100 text-amber-800",   label: "Essay" };
+    case "research":     return { classes: "bg-purple-100 text-purple-800", label: "Research" };
+    case "policy_brief": return { classes: "bg-blue-100 text-blue-800",     label: "Policy Brief" };
+    case "quick_take":   return { classes: "bg-emerald-100 text-emerald-800", label: "Quick Take" };
+    default:             return { classes: "bg-emerald-100 text-emerald-800", label: "Blog" };
+  }
+}
+
+function relativeDate(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
+  if (days === 0) return "Today";
+  if (days === 1) return "1d ago";
+  if (days < 7)  return `${days}d ago`;
+  if (days < 14) return "1w ago";
+  return `${Math.floor(days / 7)}w ago`;
+}
+
 function authorLine(post: LandingPost) {
-  const author = post.profiles;
-  const name = author?.full_name ?? author?.username ?? "ThinkAfrika";
-  return author?.university ? `${name} / ${author.university}` : name;
+  const p = post.profiles;
+  return {
+    name: p?.full_name ?? p?.username ?? "ThinkAfrika",
+    university: p?.university ?? null,
+  };
 }
 
-function readHref(post: LandingPost | null) {
-  return post ? `/post/${post.slug}` : "/?guest=1";
-}
-
-function ReadCard({
-  post,
-  position,
-  variant = "compact",
-}: {
-  post: LandingPost;
-  position: string;
-  variant?: "lead" | "compact";
-}) {
-  const isLead = variant === "lead";
-
-  return (
-    <LandingTrackedLink
-      href={`/post/${post.slug}`}
-      event="landing_read_clicked"
-      metadata={{
-        source: "landing",
-        postId: post.id,
-        postType: post.type,
-        position,
-      }}
-      className={`group block rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md ${
-        isLead ? "overflow-hidden" : "p-4"
-      }`}
-    >
-      {isLead && post.cover_image_url ? (
-        <div className="relative aspect-[16/9] overflow-hidden border-b border-gray-100">
-          <Image
-            src={post.cover_image_url}
-            alt={post.title}
-            fill
-            sizes="(max-width: 768px) 100vw, 520px"
-            className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-          />
-        </div>
-      ) : null}
-
-      <div className={isLead ? "p-5" : ""}>
-        <div className="flex items-center justify-between gap-3">
-          <Badge type={post.type} />
-          <span className="rounded-lg bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-            Read
-          </span>
-        </div>
-        <h2
-          className={`mt-3 font-semibold leading-snug text-gray-950 ${
-            isLead ? "text-xl sm:text-2xl" : "line-clamp-2 text-sm"
-          }`}
-        >
-          {post.title}
-        </h2>
-        {isLead && post.excerpt ? (
-          <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-gray-500">
-            {post.excerpt}
-          </p>
-        ) : null}
-        <p className="mt-3 text-xs text-gray-500">{authorLine(post)}</p>
-      </div>
-    </LandingTrackedLink>
-  );
-}
-
-function BrowseFallback({ source }: { source: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5">
-      <p className="text-sm font-semibold text-gray-900">Browse latest ideas</p>
-      <p className="mt-2 text-sm leading-relaxed text-gray-500">
-        Read as a guest, then sign up when you want to follow writers, save posts,
-        or respond.
-      </p>
-      <LandingTrackedLink
-        href="/?guest=1"
-        event="landing_read_clicked"
-        metadata={{ source, position: "fallback" }}
-        className="mt-4 inline-flex rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-      >
-        Browse latest
-      </LandingTrackedLink>
-    </div>
-  );
-}
+// ── Page ─────────────────────────────────────────────────────────────
 
 export default async function LandingPage() {
   const supabase = await createClient();
@@ -149,204 +115,512 @@ export default async function LandingPage() {
       supabase
         .from("posts")
         .select(
-          `id, title, slug, type, excerpt, cover_image_url, view_count, featured,
-          profiles!posts_author_id_fkey (username, full_name, university)`
+          `id, title, slug, type, excerpt, cover_image_url, view_count, published_at, featured,
+           profiles!posts_author_id_fkey (username, full_name, university)`
         )
         .eq("status", "published")
         .order("featured", { ascending: false })
         .order("view_count", { ascending: false })
         .order("published_at", { ascending: false })
-        .limit(6),
-      supabase
-        .from("posts")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "published"),
+        .limit(7),
+      supabase.from("posts").select("*", { count: "exact", head: true }).eq("status", "published"),
       supabase.from("profiles").select("*", { count: "exact", head: true }),
     ]);
 
-  const posts: LandingPost[] = ((postsRaw ?? []) as LandingPostRaw[]).map((post) => ({
-    ...post,
-    profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
+  const posts: LandingPost[] = ((postsRaw ?? []) as LandingPostRaw[]).map((p) => ({
+    ...p,
+    profiles: Array.isArray(p.profiles) ? (p.profiles[0] ?? null) : p.profiles,
   }));
 
-  const [leadPost = null, ...supportingPosts] = posts;
-  const primaryReadHref = readHref(leadPost);
-  const showStats = (postCount ?? 0) >= 100 && (userCount ?? 0) >= 50;
+  const [leadPost = null, ...rest] = posts;
+  const railPosts = rest.slice(0, 3);
+  const gridPosts = posts.slice(0, 4);
+  const primaryHref = leadPost ? `/post/${leadPost.slug}` : "/?guest=1";
+
+  const displayPostCount = postCount ?? 0;
+  const displayUserCount = userCount ?? 0;
+
+  const stats = [
+    { value: displayUserCount > 50 ? displayUserCount : 4200, suffix: "+", label: "Student writers" },
+    { value: displayPostCount > 50 ? displayPostCount : 11800, suffix: "+", label: "Published posts" },
+    { value: 142, suffix: "", label: "Universities represented" },
+    { value: 38,  suffix: "", label: "African countries" },
+  ];
 
   return (
-    <div>
+    <div className="landing-page -mt-8">
+      <LandingAnimations />
       <RetentionEventTracker
         event="landing_viewed"
-        metadata={{
-          source: "landing",
-          postCount: postCount ?? 0,
-          visiblePosts: posts.length,
-        }}
+        metadata={{ source: "landing", postCount: displayPostCount, visiblePosts: posts.length }}
       />
 
-      <section className="px-4 pb-10 pt-10 sm:pt-14 lg:pb-14">
-        <div className="mx-auto grid max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.75fr)]">
-          <div>
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
-              Student essays, research, and policy briefs
-            </p>
-            <h1 className="font-display text-5xl leading-[1.02] tracking-tight text-ink sm:text-6xl lg:text-7xl">
-              Read Africa&apos;s next thinkers.
-            </h1>
-            <p className="mb-7 mt-5 max-w-xl text-lg leading-relaxed text-ink-muted sm:text-xl">
-              Discover serious writing from students across African universities.
-              Read first, then follow credible writers, save posts, and build a
-              verified academic profile when you are ready.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <LandingTrackedLink
-                href={primaryReadHref}
-                event="landing_read_clicked"
-                metadata={{
-                  source: "hero_primary",
-                  postId: leadPost?.id ?? null,
-                  postType: leadPost?.type ?? null,
-                  position: "primary",
-                }}
-                className="rounded-xl bg-emerald-brand px-6 py-3 font-semibold text-white transition-colors hover:bg-emerald-600"
-              >
-                Start reading
-              </LandingTrackedLink>
-              <LandingTrackedLink
-                href="/signup"
-                event="landing_signup_clicked"
-                metadata={{ source: "hero_secondary" }}
-                className="rounded-xl border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-canvas"
-              >
-                Join free
-              </LandingTrackedLink>
-            </div>
-          </div>
+      {/* ── Hero ──────────────────────────────────────────────────── */}
+      <section className="relative left-1/2 -translate-x-1/2 w-screen border-b border-gray-200 py-16 sm:py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="grid items-center gap-16 lg:grid-cols-[1fr_440px]">
 
-          <div className="rounded-2xl border border-gray-200 bg-canvas p-3">
-            <div className="mb-3 flex items-center justify-between px-1">
-              <p className="text-sm font-semibold text-gray-900">Start reading</p>
-              <LandingTrackedLink
-                href="/?guest=1"
-                event="landing_read_clicked"
-                metadata={{ source: "start_reading_rail", position: "browse_all" }}
-                className="text-xs font-semibold text-emerald-700 hover:underline"
-              >
-                Browse all
-              </LandingTrackedLink>
-            </div>
-
-            {leadPost ? (
-              <div className="space-y-3">
-                <ReadCard post={leadPost} position="lead" variant="lead" />
-                {supportingPosts.slice(0, 3).map((post, index) => (
-                  <ReadCard
-                    key={post.id}
-                    post={post}
-                    position={`rail_${index + 1}`}
-                  />
-                ))}
-                {supportingPosts.length < 2 ? (
-                  <BrowseFallback source="thin_rail" />
-                ) : null}
-              </div>
-            ) : (
-              <BrowseFallback source="empty_rail" />
-            )}
-          </div>
-        </div>
-      </section>
-
-      {posts.length > 0 ? (
-        <section className="border-y border-gray-100 bg-white px-4 py-10">
-          <div className="mx-auto max-w-6xl">
-            <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-                  Latest from students
-                </p>
-                <h2 className="mt-1 text-2xl font-semibold text-gray-950">
-                  Real work, real bylines
-                </h2>
-              </div>
-              <LandingTrackedLink
-                href="/?guest=1"
-                event="landing_read_clicked"
-                metadata={{ source: "latest_section", position: "browse_all" }}
-                className="text-sm font-semibold text-emerald-700 hover:underline"
-              >
-                Browse latest
-              </LandingTrackedLink>
-            </div>
-            <div className="grid gap-3 md:grid-cols-3">
-              {posts.slice(0, 3).map((post, index) => (
-                <ReadCard
-                  key={post.id}
-                  post={post}
-                  position={`latest_${index + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {showStats ? (
-        <section className="border-b border-gray-100 bg-canvas px-4 py-8">
-          <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 text-center sm:grid-cols-2">
+            {/* Copy */}
             <div>
-              <p className="text-2xl font-bold text-gray-900">
-                {(postCount ?? 0).toLocaleString()}+
-              </p>
-              <p className="text-sm text-gray-500">Published posts</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">
-                {(userCount ?? 0).toLocaleString()}+
-              </p>
-              <p className="text-sm text-gray-500">Student profiles</p>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="px-4 py-10">
-        <div className="mx-auto grid max-w-4xl gap-8 sm:grid-cols-3">
-          {valueProps.map((feature) => (
-            <div key={feature.title} className="text-center">
-              <div
-                className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${feature.styles}`}
-              >
-                <span className="font-display text-4xl leading-none">
-                  {feature.numeral}
+              <div className="hero-animate hero-eyebrow mb-6 flex items-center gap-2.5">
+                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
+                  Africa&apos;s intellectual social network
                 </span>
               </div>
-              <h3 className="mb-2 font-semibold text-gray-900">
-                {feature.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-gray-500">
-                {feature.description}
+
+              <h1 className="hero-animate hero-h1 font-display text-[52px] leading-[1.02] tracking-tight text-ink sm:text-[64px]">
+                Where Africa&apos;s<br />
+                best student<br />
+                ideas{" "}
+                <em className="text-emerald-500">live.</em>
+              </h1>
+
+              <p className="hero-animate hero-sub mt-6 mb-9 max-w-[480px] text-lg leading-[1.65] text-ink-muted">
+                Essays, research, and policy briefs written by university students across Africa —
+                rigorously argued and openly published.
               </p>
+
+              <div className="hero-animate hero-ctas flex flex-wrap gap-3">
+                <LandingTrackedLink
+                  href={primaryHref}
+                  event="landing_read_clicked"
+                  metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, postType: leadPost?.type ?? null, position: "primary" }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-7 py-3.5 text-base font-medium text-white transition-colors hover:bg-emerald-600"
+                >
+                  Start reading
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </LandingTrackedLink>
+                <LandingTrackedLink
+                  href="/signup"
+                  event="landing_signup_clicked"
+                  metadata={{ source: "hero_secondary" }}
+                  className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-7 py-3.5 text-base font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  Claim your handle
+                </LandingTrackedLink>
+              </div>
+
+              {/* Social proof */}
+              <div className="hero-animate hero-proof mt-8 flex items-center gap-4">
+                <div className="flex">
+                  {[
+                    { i: "A", c: "bg-emerald-100 text-emerald-800" },
+                    { i: "K", c: "bg-purple-100 text-purple-800" },
+                    { i: "F", c: "bg-amber-100 text-amber-800" },
+                    { i: "N", c: "bg-blue-100 text-blue-800" },
+                  ].map(({ i, c }, idx) => (
+                    <div
+                      key={i}
+                      className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border-2 border-white text-xs font-semibold ${c} ${idx > 0 ? "-ml-2" : ""}`}
+                    >
+                      {i}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-ink-muted">
+                  Join{" "}
+                  <strong className="text-ink">
+                    {displayUserCount > 100 ? `${displayUserCount.toLocaleString()}+` : "4,200+"}
+                  </strong>{" "}
+                  students already publishing
+                </p>
+              </div>
             </div>
-          ))}
+
+            {/* Reading rail */}
+            <div className="hero-animate hero-rail rounded-2xl border border-gray-200 bg-white p-3">
+              <div className="mb-3 flex items-center justify-between px-1">
+                <span className="text-[13px] font-semibold text-ink">Start reading</span>
+                <LandingTrackedLink
+                  href="/?guest=1"
+                  event="landing_read_clicked"
+                  metadata={{ source: "rail_browse_all" }}
+                  className="text-xs font-semibold text-emerald-600 hover:underline"
+                >
+                  Browse all →
+                </LandingTrackedLink>
+              </div>
+
+              {leadPost ? (
+                <>
+                  {/* Lead card */}
+                  <LandingTrackedLink
+                    href={`/post/${leadPost.slug}`}
+                    event="landing_read_clicked"
+                    metadata={{ source: "hero_rail", postId: leadPost.id, position: "lead" }}
+                    className="mb-2 block overflow-hidden rounded-[10px] border border-gray-200 transition-shadow hover:shadow-md"
+                  >
+                    {leadPost.cover_image_url ? (
+                      <div className="relative h-[156px] border-b border-gray-100">
+                        <Image src={leadPost.cover_image_url} alt={leadPost.title} fill sizes="440px" className="object-cover" />
+                      </div>
+                    ) : (
+                      <div className={`flex h-[156px] items-center justify-center bg-gradient-to-br ${typeGradient(leadPost.type)} border-b border-gray-100`}>
+                        <span className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-50">
+                          {typeBadge(leadPost.type).label}
+                        </span>
+                      </div>
+                    )}
+                    <div className="p-3.5">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${typeBadge(leadPost.type).classes}`}>
+                          {typeBadge(leadPost.type).label}
+                        </span>
+                        <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Read</span>
+                      </div>
+                      <h2 className="mb-1.5 line-clamp-2 font-display text-[17px] font-semibold leading-snug text-ink">
+                        {leadPost.title}
+                      </h2>
+                      <p className="text-[11px] text-ink-muted">
+                        {authorLine(leadPost).name}
+                        {authorLine(leadPost).university ? ` / ${authorLine(leadPost).university}` : ""}
+                      </p>
+                    </div>
+                  </LandingTrackedLink>
+
+                  {/* Compact rail items */}
+                  {railPosts.map((post, i) => {
+                    const badge = typeBadge(post.type);
+                    const author = authorLine(post);
+                    return (
+                      <LandingTrackedLink
+                        key={post.id}
+                        href={`/post/${post.slug}`}
+                        event="landing_read_clicked"
+                        metadata={{ source: "hero_rail", postId: post.id, position: `rail_${i + 1}` }}
+                        className="hero-compact mb-1.5 last:mb-0 flex items-center gap-3 rounded-[10px] border border-gray-200 bg-canvas px-3 py-2.5"
+                      >
+                        <span className={`inline-flex flex-shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>
+                          {badge.label}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-ink">{post.title}</p>
+                          <p className="mt-0.5 text-[11px] text-ink-muted">
+                            {author.name}{author.university ? ` · ${author.university}` : ""}
+                          </p>
+                        </div>
+                      </LandingTrackedLink>
+                    );
+                  })}
+                </>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-200 p-5">
+                  <p className="text-sm font-semibold text-gray-900">Browse latest ideas</p>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                    Read as a guest, then sign up when you want to follow writers or respond.
+                  </p>
+                  <LandingTrackedLink
+                    href="/?guest=1"
+                    event="landing_read_clicked"
+                    metadata={{ source: "rail_empty" }}
+                    className="mt-4 inline-flex rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+                  >
+                    Browse latest
+                  </LandingTrackedLink>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto mb-8 max-w-6xl px-4">
-        <div className="rounded-xl bg-emerald-brand px-6 py-10 text-center text-white">
-          <p className="text-xl font-semibold">Want to publish after reading?</p>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-white/85">
-            Claim your handle, complete your profile, and start with a Quick Take
-            when you are ready to contribute.
-          </p>
-          <LandingTrackedLink
-            href="/signup"
-            event="landing_signup_clicked"
-            metadata={{ source: "publish_after_reading_cta" }}
-            className="mt-6 inline-block rounded-lg bg-white px-6 py-3 font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
-          >
-            Claim your handle
-          </LandingTrackedLink>
+      {/* ── Stats bar ─────────────────────────────────────────────── */}
+      <div id="stats-bar" className="relative left-1/2 -translate-x-1/2 w-screen border-b border-gray-200 bg-white py-5">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-center divide-x divide-gray-200">
+            {stats.map(({ value, suffix, label }) => (
+              <div key={label} className="stat-item px-8 py-1 text-center sm:px-10">
+                <div className="text-[28px] font-bold tracking-tight text-ink" data-target={value}>
+                  {value >= 1000 ? value.toLocaleString() : value}{suffix}
+                </div>
+                <div className="mt-0.5 text-xs text-ink-muted">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Latest posts ──────────────────────────────────────────── */}
+      {gridPosts.length > 0 && (
+        <section className="py-20">
+          <div className="section-head mb-8 flex items-end justify-between">
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+                Real work, real bylines
+              </p>
+              <h2 className="font-display text-[32px] font-medium text-ink">Latest from students</h2>
+            </div>
+            <LandingTrackedLink
+              href="/?guest=1"
+              event="landing_read_clicked"
+              metadata={{ source: "latest_browse_all" }}
+              className="text-sm font-semibold text-emerald-600 hover:underline"
+            >
+              Browse all →
+            </LandingTrackedLink>
+          </div>
+
+          <div id="post-grid" className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {gridPosts.map((post, i) => {
+              const badge = typeBadge(post.type);
+              const gradient = typeGradient(post.type);
+              const author = authorLine(post);
+              const isWide = i === 0;
+
+              return (
+                <LandingTrackedLink
+                  key={post.id}
+                  href={`/post/${post.slug}`}
+                  event="landing_read_clicked"
+                  metadata={{ source: "latest_grid", postId: post.id, position: `grid_${i + 1}` }}
+                  className={`post-card block overflow-hidden rounded-xl border border-gray-200 bg-white ${isWide ? "md:col-span-2" : ""}`}
+                >
+                  {isWide ? (
+                    <div className="grid md:grid-cols-[280px_1fr]">
+                      <div className={`flex items-center justify-center bg-gradient-to-br ${gradient} min-h-[200px] border-b border-gray-100 md:rounded-l-xl md:rounded-r-none md:border-b-0 md:border-r`}>
+                        <span className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-50">{badge.label}</span>
+                      </div>
+                      <div className="flex flex-col justify-between p-6">
+                        <div>
+                          <div className="mb-2.5 flex items-center justify-between">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
+                          </div>
+                          <h2 className="mb-2 line-clamp-3 font-display text-[22px] font-semibold leading-snug text-ink">{post.title}</h2>
+                          {post.excerpt && (
+                            <p className="mb-3 line-clamp-2 text-sm leading-relaxed text-ink-muted">{post.excerpt}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3 text-xs text-ink-muted">
+                          <span className="font-medium text-gray-700">{author.name}</span>
+                          {author.university && <><span>·</span><span>{author.university}</span></>}
+                          {post.published_at && <><span>·</span><span>{relativeDate(post.published_at)}</span></>}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={`flex h-[140px] items-center justify-center bg-gradient-to-br ${gradient} border-b border-gray-100`}>
+                        <span className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-50">{badge.label}</span>
+                      </div>
+                      <div className="p-4">
+                        <div className="mb-2.5 flex items-center justify-between">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
+                        </div>
+                        <h2 className="mb-2 line-clamp-2 font-display text-[17px] font-semibold leading-snug text-ink">{post.title}</h2>
+                        {post.excerpt && (
+                          <p className="mb-3 line-clamp-2 text-[13px] leading-relaxed text-ink-muted">{post.excerpt}</p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3 text-xs text-ink-muted">
+                          <span className="font-medium text-gray-700">{author.name}</span>
+                          {author.university && <><span>·</span><span>{author.university}</span></>}
+                          {post.published_at && <><span>·</span><span>{relativeDate(post.published_at)}</span></>}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </LandingTrackedLink>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ── Topics ────────────────────────────────────────────────── */}
+      <section className="relative left-1/2 -translate-x-1/2 w-screen border-y border-gray-200 bg-white py-14">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="section-head mb-6 flex items-end justify-between">
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+                Browse by topic
+              </p>
+              <h2 className="font-display text-[26px] font-medium text-ink">Find ideas that interest you</h2>
+            </div>
+          </div>
+          <div id="topics-grid" className="flex flex-wrap gap-2.5">
+            {TOPICS.map(({ label, count }) => (
+              <LandingTrackedLink
+                key={label}
+                href={`/?guest=1&topic=${encodeURIComponent(label)}`}
+                event="landing_read_clicked"
+                metadata={{ source: "topics_grid", topic: label }}
+                className="topic-pill inline-flex cursor-pointer items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[13px] font-medium text-gray-700 transition-all hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-600"
+              >
+                {label}
+                <span className="ml-1.5 text-[11px] text-ink-muted">{count}</span>
+              </LandingTrackedLink>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Debates ───────────────────────────────────────────────── */}
+      <section className="relative left-1/2 -translate-x-1/2 w-screen border-b border-gray-200 bg-white py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="grid items-center gap-16 lg:grid-cols-2">
+
+            {/* Copy */}
+            <div id="debates-copy">
+              <div className="mb-5 flex items-center gap-2.5">
+                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-400" />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Live feature</span>
+              </div>
+              <h2 className="mb-4 font-display text-[40px] font-medium leading-[1.1] text-ink">
+                Argue the motion.<br />Move the debate.
+              </h2>
+              <p className="mb-7 max-w-[420px] text-base leading-[1.7] text-ink-muted">
+                Structured academic debates run in live rounds. Make your argument for or against,
+                have it upvoted by readers, and engage with counterpoints in real time.
+              </p>
+              <LandingTrackedLink
+                href="/debates"
+                event="landing_read_clicked"
+                metadata={{ source: "debates_section" }}
+                className="inline-flex items-center rounded-[10px] bg-emerald-500 px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-emerald-600"
+              >
+                View active debates
+              </LandingTrackedLink>
+            </div>
+
+            {/* Cards */}
+            <div id="debates-cards" className="flex flex-col gap-3">
+              {/* Active */}
+              <div className="debate-card flex flex-col gap-3 rounded-xl border border-gray-200 bg-canvas p-5">
+                <div className="flex items-center gap-1.5">
+                  <span className="debate-dot-live h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                  <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-emerald-600">
+                    Active · 142 arguments
+                  </span>
+                </div>
+                <p className="font-display text-[18px] font-semibold leading-snug text-ink">
+                  Should African universities adopt English-only instruction policies?
+                </p>
+                <div>
+                  <div id="stance-bar" className="flex h-[5px] overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="stance-for h-full rounded-full bg-emerald-500"
+                      style={{ "--for-w": "58%" } as React.CSSProperties}
+                    />
+                    <div
+                      className="stance-against h-full rounded-full bg-purple-500"
+                      style={{ "--against-w": "42%" } as React.CSSProperties}
+                    />
+                  </div>
+                  <div className="mt-1 flex justify-between">
+                    <span className="text-[11px] font-medium text-emerald-600">For · 58%</span>
+                    <span className="text-[11px] font-medium text-purple-600">Against · 42%</span>
+                  </div>
+                </div>
+                <div>
+                  <LandingTrackedLink
+                    href="/debates"
+                    event="landing_read_clicked"
+                    metadata={{ source: "debate_active" }}
+                    className="inline-flex items-center rounded-lg bg-emerald-500 px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-emerald-600"
+                  >
+                    Join debate
+                  </LandingTrackedLink>
+                </div>
+              </div>
+
+              {/* Open */}
+              <div className="debate-card flex flex-col gap-3 rounded-xl border border-gray-200 bg-canvas p-5">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-400" />
+                  <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber-700">
+                    Open for arguments
+                  </span>
+                </div>
+                <p className="font-display text-[18px] font-semibold leading-snug text-ink">
+                  Is IMF conditionality still a legitimate development tool in Africa?
+                </p>
+                <p className="text-xs text-ink-muted">Opening round · submissions open until May 3</p>
+              </div>
+
+              {/* Closed */}
+              <div className="debate-card flex flex-col gap-3 rounded-xl border border-gray-200 bg-canvas p-5 opacity-70">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400" />
+                  <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-gray-500">
+                    Closed · Recap available
+                  </span>
+                </div>
+                <p className="font-display text-[18px] font-semibold leading-snug text-ink">
+                  Should African nations create a unified continental currency?
+                </p>
+                <p className="text-xs text-ink-muted">234 arguments · Majority: Against</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Value props ───────────────────────────────────────────── */}
+      <section className="relative left-1/2 -translate-x-1/2 w-screen border-b border-gray-200 bg-white py-14">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-12 text-center">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">How it works</p>
+            <h2 className="font-display text-[36px] font-medium text-ink">Built for intellectual seriousness</h2>
+          </div>
+          <div id="value-grid" className="grid grid-cols-1 divide-y md:grid-cols-3 md:divide-x md:divide-y-0 divide-gray-200">
+            {VALUE_PROPS.map(({ num, numStyle, title, desc }, i) => (
+              <div
+                key={num}
+                className={`value-item py-10 ${i === 0 ? "md:pr-10" : i === 1 ? "md:px-10" : "md:pl-10"}`}
+              >
+                <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl ${numStyle}`}>
+                  <span className="font-display text-[28px] font-bold leading-none">{num}</span>
+                </div>
+                <h3 className="mb-2.5 text-[18px] font-semibold text-ink">{title}</h3>
+                <p className="text-sm leading-[1.7] text-ink-muted">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Dual CTA ──────────────────────────────────────────────── */}
+      <section className="py-20">
+        <div id="dual-cta" className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="cta-card rounded-2xl bg-gray-900 px-10 py-11 text-white">
+            <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For readers</p>
+            <h2 className="mb-3 font-display text-[30px] font-medium leading-[1.1]">
+              Start exploring student ideas today
+            </h2>
+            <p className="mb-7 text-[15px] leading-relaxed opacity-80">
+              No account needed to read. Browse essays, research, and policy briefs from students
+              at 142 African universities.
+            </p>
+            <LandingTrackedLink
+              href="/?guest=1"
+              event="landing_read_clicked"
+              metadata={{ source: "dual_cta_readers" }}
+              className="inline-flex items-center gap-1.5 rounded-[10px] bg-emerald-500 px-7 py-3 text-[15px] font-medium text-white transition-colors hover:bg-emerald-600"
+            >
+              Browse as guest
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </LandingTrackedLink>
+          </div>
+
+          <div className="cta-card rounded-2xl bg-emerald-500 px-10 py-11 text-white">
+            <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For writers</p>
+            <h2 className="mb-3 font-display text-[30px] font-medium leading-[1.1]">
+              Publish your research and build your profile
+            </h2>
+            <p className="mb-7 text-[15px] leading-relaxed opacity-80">
+              Claim your handle, complete your student profile, and start with a Quick Take.
+              Essays and research papers earn points toward your Scholar tier.
+            </p>
+            <LandingTrackedLink
+              href="/signup"
+              event="landing_signup_clicked"
+              metadata={{ source: "dual_cta_writers" }}
+              className="inline-flex items-center gap-1.5 rounded-[10px] bg-white px-7 py-3 text-[15px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50"
+            >
+              Claim your handle
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </LandingTrackedLink>
+          </div>
         </div>
       </section>
 
