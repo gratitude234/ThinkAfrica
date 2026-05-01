@@ -1,10 +1,11 @@
 import Link from "next/link";
+import AboutAnimations from "./AboutAnimations";
 import AboutTeamCard, { type TeamMember } from "./AboutTeamCard";
 
 const STATS = [
-  { value: "14+", label: "Universities" },
-  { value: "3", label: "Countries" },
-  { value: "200+", label: "Essays Published" },
+  { value: "14+", label: "Universities", target: 14, suffix: "+" },
+  { value: "3", label: "Countries", target: 3 },
+  { value: "200+", label: "Essays Published", target: 200, suffix: "+" },
   { value: "2024", label: "Founded" },
 ];
 
@@ -99,9 +100,21 @@ const TEAM_MEMBERS: TeamMember[] = [
   },
 ];
 
-function Eyebrow({ children, centered = false }: { children: React.ReactNode; centered?: boolean }) {
+function Eyebrow({
+  children,
+  centered = false,
+  reveal,
+  delay,
+}: {
+  children: React.ReactNode;
+  centered?: boolean;
+  reveal?: "up" | "fade";
+  delay?: number;
+}) {
   return (
     <p
+      data-about-reveal={reveal}
+      data-about-delay={delay}
       className={`mb-5 flex items-center gap-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-700 ${
         centered ? "justify-center" : ""
       }`}
@@ -115,10 +128,11 @@ function Eyebrow({ children, centered = false }: { children: React.ReactNode; ce
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto max-w-[960px] text-ink">
+    <div className="about-page mx-auto max-w-[960px] text-ink">
+      <AboutAnimations />
       <section className="relative overflow-hidden border-b border-[#e5e0d8] px-2 py-14 text-center sm:py-16">
         <div
-          className="pointer-events-none absolute inset-0 opacity-60"
+          className="about-dot-grid pointer-events-none absolute inset-0 opacity-60"
           style={{
             backgroundImage:
               "radial-gradient(circle, rgba(16,185,129,0.13) 1px, transparent 1px)",
@@ -130,18 +144,32 @@ export default function AboutPage() {
           }}
         />
         <div className="relative">
-          <Eyebrow centered>About ThinkAfrica</Eyebrow>
-          <h1 className="mx-auto max-w-[740px] font-display text-[40px] font-bold leading-[1.08] tracking-tight text-ink sm:text-[56px] lg:text-[64px]">
+          <Eyebrow centered reveal="up">
+            About ThinkAfrica
+          </Eyebrow>
+          <h1
+            data-about-reveal="up"
+            data-about-delay="1"
+            className="mx-auto max-w-[740px] font-display text-[40px] font-bold leading-[1.08] tracking-tight text-ink sm:text-[56px] lg:text-[64px]"
+          >
             Where African student ideas <em className="text-emerald-700">become </em>
             the record
           </h1>
-          <p className="mx-auto mt-5 max-w-[520px] text-base leading-[1.75] text-ink-muted">
+          <p
+            data-about-reveal="up"
+            data-about-delay="2"
+            className="mx-auto mt-5 max-w-[520px] text-base leading-[1.75] text-ink-muted"
+          >
             A platform built on the conviction that Africa&apos;s most important
             thinking is happening on its campuses, and it deserves to be heard
             far beyond them.
           </p>
 
-          <div className="mx-auto mt-10 grid max-w-[640px] grid-cols-2 border-y border-[#e5e0d8] sm:grid-cols-4 sm:border-y-0">
+          <div
+            data-about-reveal="up"
+            data-about-delay="3"
+            className="mx-auto mt-10 grid max-w-[640px] grid-cols-2 border-y border-[#e5e0d8] sm:grid-cols-4 sm:border-y-0"
+          >
             {STATS.map((stat, index) => (
               <div
                 key={stat.label}
@@ -149,7 +177,11 @@ export default function AboutPage() {
                   index > 0 ? "sm:border-l sm:border-[#e5e0d8]" : ""
                 } ${index < 2 ? "border-b border-[#e5e0d8] sm:border-b-0" : ""}`}
               >
-                <span className="block font-display text-3xl font-bold leading-none text-ink">
+                <span
+                  data-about-stat-target={stat.target}
+                  data-about-stat-suffix={stat.suffix}
+                  className="block font-display text-3xl font-bold leading-none text-ink"
+                >
                   {stat.value}
                 </span>
                 <span className="mt-2 block text-[10px] font-medium uppercase tracking-[0.08em] text-ink-muted">
@@ -162,9 +194,9 @@ export default function AboutPage() {
       </section>
 
       <section className="border-b border-[#e5e0d8] py-16">
-        <Eyebrow>Why we exist</Eyebrow>
+        <Eyebrow reveal="fade">Why we exist</Eyebrow>
         <div className="grid gap-10 lg:grid-cols-2 lg:gap-14">
-          <div>
+          <div data-about-reveal="left">
             <h2 className="font-display text-3xl font-bold leading-tight tracking-tight text-ink sm:text-[34px]">
               A different kind of intellectual infrastructure
             </h2>
@@ -183,7 +215,11 @@ export default function AboutPage() {
               </p>
             </div>
 
-            <blockquote className="mt-8 rounded-b-xl border border-[#e5e0d8] border-t-4 border-t-emerald-brand bg-white px-7 py-6">
+            <blockquote
+              data-about-reveal="up"
+              data-about-delay="2"
+              className="mt-8 rounded-b-xl border border-[#e5e0d8] border-t-4 border-t-emerald-brand bg-white px-7 py-6"
+            >
               <span className="block font-display text-7xl font-bold leading-[0.65] text-emerald-brand/20">
                 &quot;
               </span>
@@ -198,6 +234,8 @@ export default function AboutPage() {
             {BELIEFS.map((belief) => (
               <article
                 key={belief.title}
+                data-about-reveal="right"
+                data-about-delay={belief.number}
                 className={`grid grid-cols-[36px_1fr] gap-4 rounded-xl border border-[#e5e0d8] border-l-[3px] bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.07)] ${belief.accent}`}
               >
                 <span className="pt-0.5 font-display text-sm font-bold">
@@ -219,8 +257,12 @@ export default function AboutPage() {
 
       <section className="relative left-1/2 w-[calc(100vw-16px)] -translate-x-1/2 bg-ink py-16 text-white">
         <div className="mx-auto max-w-[960px] px-5">
-          <Eyebrow>The problem we solve</Eyebrow>
-          <h2 className="max-w-[520px] font-display text-3xl font-bold leading-tight tracking-tight text-white sm:text-[34px]">
+          <Eyebrow reveal="fade">The problem we solve</Eyebrow>
+          <h2
+            data-about-reveal="up"
+            data-about-delay="1"
+            className="max-w-[520px] font-display text-3xl font-bold leading-tight tracking-tight text-white sm:text-[34px]"
+          >
             Three gaps we were built to close
           </h2>
 
@@ -228,10 +270,12 @@ export default function AboutPage() {
             {GAPS.map((gap) => (
               <article
                 key={gap.title}
-                className="relative min-h-[270px] overflow-hidden bg-white/[0.04] p-7 transition hover:bg-white/[0.06]"
+                data-about-reveal="up"
+                data-about-delay={gap.number}
+                className="about-gap-card relative min-h-[270px] overflow-hidden bg-white/[0.04] p-7 transition hover:bg-white/[0.06]"
               >
                 <span
-                  className={`absolute inset-x-0 top-0 h-[3px] ${gap.accent}`}
+                  className={`about-gap-accent absolute inset-x-0 top-0 h-[3px] ${gap.accent}`}
                 />
                 <span className="pointer-events-none absolute bottom-3 right-4 font-display text-7xl font-bold leading-none text-transparent [-webkit-text-stroke:1px_rgba(255,255,255,0.08)]">
                   {gap.number}
@@ -257,7 +301,7 @@ export default function AboutPage() {
       </section>
 
       <section className="border-b border-[#e5e0d8] py-16">
-        <div className="mb-10 max-w-[540px]">
+        <div className="mb-10 max-w-[540px]" data-about-reveal="up">
           <Eyebrow>The founding team</Eyebrow>
           <h2 className="font-display text-3xl font-bold tracking-tight text-ink sm:text-[34px]">
             Built by students, for students
@@ -270,14 +314,21 @@ export default function AboutPage() {
         </div>
 
         <div className="grid gap-5 lg:grid-cols-3">
-          {TEAM_MEMBERS.map((member) => (
-            <AboutTeamCard key={member.name} member={member} />
+          {TEAM_MEMBERS.map((member, index) => (
+            <AboutTeamCard
+              key={member.name}
+              member={member}
+              revealDelay={index + 1}
+            />
           ))}
         </div>
       </section>
 
       <section className="relative left-1/2 w-[calc(100vw-16px)] -translate-x-1/2 border-y border-[#e5e0d8] bg-[#f4f2ee] py-12">
-        <div className="mx-auto grid max-w-[960px] items-center gap-6 px-5 lg:grid-cols-[1fr_auto] lg:gap-12">
+        <div
+          data-about-reveal="up"
+          className="mx-auto grid max-w-[960px] items-center gap-6 px-5 lg:grid-cols-[1fr_auto] lg:gap-12"
+        >
           <div>
             <h2 className="font-display text-2xl font-bold tracking-tight text-ink">
               Become a campus ambassador
@@ -306,9 +357,12 @@ export default function AboutPage() {
       </section>
 
       <section className="py-16">
-        <div className="relative overflow-hidden rounded-[20px] bg-ink px-7 py-12 text-center text-white sm:px-14 sm:py-16">
-          <div className="pointer-events-none absolute -left-16 top-1/2 hidden h-72 w-80 -translate-y-1/2 rounded-full bg-emerald-brand/20 blur-3xl sm:block" />
-          <div className="pointer-events-none absolute -right-10 top-1/2 hidden h-64 w-72 -translate-y-1/2 rounded-full bg-purple-accent/15 blur-3xl sm:block" />
+        <div
+          data-about-reveal="scale"
+          className="relative overflow-hidden rounded-[20px] bg-ink px-7 py-12 text-center text-white sm:px-14 sm:py-16"
+        >
+          <div className="about-cta-orb-a pointer-events-none absolute -left-16 top-1/2 hidden h-72 w-80 -translate-y-1/2 rounded-full bg-emerald-brand/20 blur-3xl sm:block" />
+          <div className="about-cta-orb-b pointer-events-none absolute -right-10 top-1/2 hidden h-64 w-72 -translate-y-1/2 rounded-full bg-purple-accent/15 blur-3xl sm:block" />
           <div className="relative">
             <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-brand">
               Join the community

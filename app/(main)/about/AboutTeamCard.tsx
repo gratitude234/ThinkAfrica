@@ -13,11 +13,21 @@ export interface TeamMember {
   priority?: boolean;
 }
 
-export default function AboutTeamCard({ member }: { member: TeamMember }) {
+export default function AboutTeamCard({
+  member,
+  revealDelay,
+}: {
+  member: TeamMember;
+  revealDelay?: number;
+}) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-[#e5e0d8] bg-white transition hover:-translate-y-0.5 hover:shadow-[0_10px_36px_rgba(0,0,0,0.08)]">
+    <article
+      data-about-reveal="up"
+      data-about-delay={revealDelay}
+      className="overflow-hidden rounded-2xl border border-[#e5e0d8] bg-white transition hover:-translate-y-0.5 hover:shadow-[0_10px_36px_rgba(0,0,0,0.08)]"
+    >
       <div className="relative aspect-[5/4] overflow-hidden bg-[#f4f2ee]">
         <Image
           src={member.image}
@@ -61,7 +71,7 @@ export default function AboutTeamCard({ member }: { member: TeamMember }) {
         </button>
 
         <div
-          className={`grid transition-[grid-template-rows,opacity] duration-300 ${
+          className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.25,0,0,1)] ${
             isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
           }`}
         >

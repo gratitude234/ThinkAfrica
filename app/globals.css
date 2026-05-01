@@ -225,3 +225,117 @@
 
 /* Live dot pulse */
 .debate-dot-live { animation: ta-pulse-dot 2s ease-in-out infinite; }
+
+/* About page editorial animations */
+@keyframes about-rise {
+  from { opacity: 0; transform: translate3d(0, 22px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes about-grid-drift {
+  from { background-position: 0 0; }
+  to   { background-position: 28px 28px; }
+}
+
+@keyframes about-stat-shimmer {
+  0%   { color: #10B981; }
+  65%  { color: #1A1A1A; }
+  100% { color: #1A1A1A; }
+}
+
+@keyframes about-orb-a {
+  0%, 100% { transform: translate(0, -50%) scale(1); }
+  45%      { transform: translate(18px, calc(-50% - 12px)) scale(1.04); }
+  75%      { transform: translate(-10px, calc(-50% + 8px)) scale(0.98); }
+}
+
+@keyframes about-orb-b {
+  0%, 100% { transform: translate(0, -50%) scale(1); }
+  40%      { transform: translate(-18px, calc(-50% + 14px)) scale(1.05); }
+  72%      { transform: translate(10px, calc(-50% - 10px)) scale(0.97); }
+}
+
+.about-page .about-dot-grid {
+  animation: about-grid-drift 13s linear infinite;
+}
+
+.about-page.about-animations-ready [data-about-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition:
+    opacity 0.58s cubic-bezier(0.25, 0, 0, 1),
+    transform 0.58s cubic-bezier(0.25, 0, 0, 1),
+    box-shadow 0.25s ease,
+    background-color 0.2s ease;
+  transition-delay: var(--about-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.about-page.about-animations-ready [data-about-reveal="left"] {
+  transform: translate3d(-26px, 0, 0);
+}
+
+.about-page.about-animations-ready [data-about-reveal="right"] {
+  transform: translate3d(26px, 0, 0);
+}
+
+.about-page.about-animations-ready [data-about-reveal="scale"] {
+  transform: scale(0.96);
+}
+
+.about-page.about-animations-ready [data-about-reveal="fade"] {
+  transform: none;
+}
+
+.about-page.about-animations-ready [data-about-reveal].about-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.about-page.about-animations-ready article[data-about-reveal].about-visible:hover {
+  transform: translateY(-2px);
+}
+
+.about-page.about-animations-ready .about-gap-accent {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.75s cubic-bezier(0.25, 0, 0, 1);
+  transition-delay: var(--about-delay, 0ms);
+}
+
+.about-page.about-animations-ready .about-gap-card.about-visible .about-gap-accent {
+  transform: scaleX(1);
+}
+
+.about-page .about-stat-counted {
+  animation: about-stat-shimmer 0.55s ease forwards;
+}
+
+.about-page .about-cta-orb-a {
+  animation: about-orb-a 10s ease-in-out infinite;
+}
+
+.about-page .about-cta-orb-b {
+  animation: about-orb-b 12s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-page .about-dot-grid,
+  .about-page .about-cta-orb-a,
+  .about-page .about-cta-orb-b,
+  .about-page .about-stat-counted {
+    animation: none !important;
+  }
+
+  .about-page.about-animations-ready [data-about-reveal],
+  .about-page.about-animations-ready [data-about-reveal].about-visible {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .about-page.about-animations-ready .about-gap-accent {
+    transform: none !important;
+    transition: none !important;
+  }
+}
