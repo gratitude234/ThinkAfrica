@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { StanceMeter, getVoteSplit } from "../DebatePrimitives";
 
 interface MotionVotePanelProps {
   debateId: string;
@@ -31,9 +32,7 @@ export default function MotionVotePanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const total = forCount + againstCount;
-  const forPct = total === 0 ? 50 : Math.round((forCount / total) * 100);
-  const againstPct = 100 - forPct;
+  const split = getVoteSplit(forCount, againstCount);
 
   const handleVote = async (vote: "for" | "against") => {
     if (!currentUserId || loading) return;
@@ -69,7 +68,9 @@ export default function MotionVotePanel({
       <p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-400">
         {isClosed ? "Final community verdict" : "Vote on the motion"}
       </p>
-      <p className="mb-4 text-sm font-semibold text-gray-800">{motionTitle}</p>
+      <p className="mb-4 text-sm font-semibold leading-6 text-gray-800">
+        {motionTitle}
+      </p>
 
       {!isClosed && currentUserId ? (
         <div className="mb-4 grid grid-cols-2 gap-3">
@@ -101,7 +102,7 @@ export default function MotionVotePanel({
       ) : null}
 
       {!isClosed && !currentUserId ? (
-        <p className="mb-4 text-sm text-gray-500">
+        <p className="mb-4 rounded-xl border border-gray-200 bg-canvas p-4 text-sm text-gray-500">
           <Link href="/login" className="font-medium text-emerald-600 hover:underline">
             Sign in
           </Link>{" "}
@@ -109,33 +110,27 @@ export default function MotionVotePanel({
         </p>
       ) : null}
 
-      <div className="overflow-hidden rounded-full bg-gray-100" style={{ height: "10px" }}>
-        <div className="flex h-full">
-          <div
-            className="bg-emerald-400 transition-all duration-500"
-            style={{ width: `${forPct}%` }}
-          />
-          <div
-            className="bg-amber-400 transition-all duration-500"
-            style={{ width: `${againstPct}%` }}
-          />
+      <div className="rounded-xl border border-gray-100 bg-canvas p-3">
+        <StanceMeter
+          forCount={forCount}
+          againstCount={againstCount}
+          label={isClosed ? "Final vote" : "Current vote"}
+          compact
+        />
+        <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
+          <span>{forCount} for</span>
+          <span>{split.total} votes</span>
+          <span>{againstCount} against</span>
         </div>
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-sm">
-        <span className="font-semibold text-emerald-700">
-          {forPct}% FOR <span className="font-normal text-gray-400">({forCount})</span>
-        </span>
-        <span className="text-xs text-gray-400">{total} votes</span>
-        <span className="font-semibold text-amber-700">
-          <span className="font-normal text-gray-400">({againstCount})</span>{" "}
-          {againstPct}% AGAINST
-        </span>
-      </div>
+      {error ? (
+        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+          {error}
+        </p>
+      ) : null}
 
-      {error ? <p className="mt-3 text-xs text-red-500">{error}</p> : null}
-
-      {isClosed && total > 0 ? (
+      {isClosed && split.total > 0 ? (
         <div
           className={`mt-4 rounded-xl px-4 py-3 text-center text-sm font-bold ${
             forCount > againstCount

@@ -1,10 +1,18 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
+import {
+  DebateStatusPill,
+  PhasePill,
+  PhaseStepper,
+  StanceMeter,
+  StatTile,
+} from "../DebatePrimitives";
 
 const DURATION_OPTIONS = [5, 10, 15];
 
@@ -22,6 +30,35 @@ function parseTags(input: string) {
     .slice(0, 6);
 }
 
+function AccessCard({
+  eyebrow,
+  title,
+  body,
+  actions,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+  actions: ReactNode;
+}) {
+  return (
+    <div className="mx-auto max-w-2xl">
+      <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+          {eyebrow}
+        </p>
+        <h1 className="font-display mt-2 text-2xl font-bold text-ink">
+          {title}
+        </h1>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">
+          {body}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">{actions}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function CreateDebatePage() {
   const router = useRouter();
   const [access, setAccess] = useState<AccessState>({ status: "checking" });
@@ -33,6 +70,8 @@ export default function CreateDebatePage() {
   const [error, setError] = useState<string | null>(null);
 
   const parsedTags = useMemo(() => parseTags(tags), [tags]);
+  const titleCount = title.trim().length;
+  const contextCount = description.trim().length;
 
   useEffect(() => {
     let mounted = true;
@@ -112,9 +151,27 @@ export default function CreateDebatePage() {
 
   if (access.status === "checking") {
     return (
-      <div className="mx-auto max-w-2xl">
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">
-          Checking debate access...
+      <div className="mx-auto max-w-5xl animate-pulse">
+        <div className="mb-6 space-y-2">
+          <div className="h-4 w-32 rounded bg-gray-200" />
+          <div className="h-9 w-72 rounded bg-gray-200" />
+          <div className="h-4 w-96 max-w-full rounded bg-gray-100" />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <div className="space-y-5">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="space-y-2">
+                  <div className="h-4 w-32 rounded bg-gray-200" />
+                  <div className="h-11 rounded-lg bg-gray-100" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+            <div className="h-5 w-24 rounded bg-gray-200" />
+            <div className="mt-4 h-20 rounded bg-gray-100" />
+          </div>
         </div>
       </div>
     );
@@ -122,41 +179,30 @@ export default function CreateDebatePage() {
 
   if (access.status === "guest") {
     return (
-      <div className="mx-auto max-w-2xl">
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
-            Start a debate
-          </p>
-          <h1 className="font-display mt-2 text-2xl font-bold text-ink">
-            Sign in to frame a motion
-          </h1>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">
-            Debate moderators need an account so they can start rounds, guide the
-            room, and close the final verdict.
-          </p>
+      <AccessCard
+        eyebrow="Start a debate"
+        title="Sign in to frame a motion"
+        body="Debate moderators need an account so they can start rounds, guide the room, and close the final verdict."
+        actions={
           <Link
             href="/login?redirectTo=/debates/create"
-            className="mt-5 inline-flex rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+            className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
           >
             Sign in
           </Link>
-        </div>
-      </div>
+        }
+      />
     );
   }
 
   if (access.status === "blocked") {
     return (
-      <div className="mx-auto max-w-2xl">
-        <div className="rounded-2xl border border-gray-200 bg-white p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
-            Verified moderators
-          </p>
-          <h1 className="font-display mt-2 text-2xl font-bold text-ink">
-            Get verified to start debates
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-gray-500">{access.reason}</p>
-          <div className="mt-5 flex flex-wrap gap-2">
+      <AccessCard
+        eyebrow="Verified moderators"
+        title="Get verified to start debates"
+        body={access.reason}
+        actions={
+          <>
             <Link
               href="/settings"
               className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
@@ -169,37 +215,56 @@ export default function CreateDebatePage() {
             >
               Browse debates
             </Link>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
     );
   }
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mb-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="mb-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
-              Debate motion
-            </p>
-            <h1 className="font-display mt-2 text-3xl font-bold text-ink">
-              Start a structured debate
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-gray-500">
-              Frame one motion, provide enough context, then moderate the room
-              through opening, rebuttal, and closing phases.
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+            Debate motion
+          </p>
+          <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-ink md:text-4xl">
+            Start a structured debate
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
+            Frame a clear claim, set the room tempo, then guide participants
+            from opening statements to a final verdict.
+          </p>
+        </div>
+        <Link
+          href="/debates"
+          className="inline-flex w-fit rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-canvas"
+        >
+          Browse debates
+        </Link>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-2xl border border-gray-200 bg-white p-6"
+        >
+          <div className="border-b border-gray-100 pb-5">
+            <h2 className="text-base font-semibold text-ink">Motion details</h2>
+            <p className="mt-1 text-sm leading-6 text-gray-500">
+              Write the motion as one debatable claim. The room can handle nuance
+              later; the title should make the sides obvious.
             </p>
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-5 rounded-2xl border border-gray-200 bg-white p-6"
-          >
+          <div className="space-y-5 pt-5">
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-gray-800">
-                Motion <span className="text-red-500">*</span>
-              </label>
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <label className="block text-sm font-semibold text-gray-800">
+                  Motion <span className="text-red-500">*</span>
+                </label>
+                <span className="text-xs text-gray-400">{titleCount}/160</span>
+              </div>
               <input
                 type="text"
                 value={title}
@@ -210,21 +275,24 @@ export default function CreateDebatePage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <p className="mt-1 text-xs text-gray-400">
-                Write this as a debatable claim, not a broad topic.
+                Use a claim people can clearly argue for or against.
               </p>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-gray-800">
-                Context
-              </label>
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <label className="block text-sm font-semibold text-gray-800">
+                  Context
+                </label>
+                <span className="text-xs text-gray-400">{contextCount}/900</span>
+              </div>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={5}
+                rows={6}
                 maxLength={900}
                 placeholder="Explain why this motion matters, what assumptions are allowed, and what participants should focus on."
-                className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2.5 text-sm leading-6 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
@@ -248,19 +316,20 @@ export default function CreateDebatePage() {
               <label className="mb-2 block text-sm font-semibold text-gray-800">
                 Phase duration
               </label>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {DURATION_OPTIONS.map((mins) => (
                   <button
                     key={mins}
                     type="button"
                     onClick={() => setDuration(mins)}
-                    className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    className={`rounded-xl border px-3 py-3 text-left text-sm transition-colors ${
                       duration === mins
-                        ? "border-emerald-brand bg-emerald-brand text-white"
-                        : "border-gray-300 text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
+                        ? "border-emerald-brand bg-emerald-50 text-emerald-800 ring-2 ring-emerald-100"
+                        : "border-gray-200 text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
                     }`}
                   >
-                    {mins} min
+                    <span className="block text-base font-bold">{mins}</span>
+                    <span className="block text-xs">min phases</span>
                   </button>
                 ))}
               </div>
@@ -275,7 +344,7 @@ export default function CreateDebatePage() {
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-5">
               <Button type="submit" loading={loading} disabled={!title.trim()}>
                 Create open motion
               </Button>
@@ -287,19 +356,20 @@ export default function CreateDebatePage() {
                 Cancel
               </Button>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
 
-        <aside className="space-y-4 lg:sticky lg:top-[76px]">
+        <aside className="space-y-4 lg:sticky lg:top-[76px] lg:self-start">
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-              Preview
-            </p>
-            <h2 className="font-display mt-3 text-lg font-semibold leading-tight text-ink">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <DebateStatusPill status="open" />
+              <PhasePill phase="opening" />
+            </div>
+            <h2 className="font-display text-lg font-semibold leading-tight text-ink">
               {title.trim() || "Your debate motion will appear here"}
             </h2>
             {description.trim() ? (
-              <p className="mt-2 line-clamp-4 text-sm leading-6 text-gray-500">
+              <p className="mt-2 line-clamp-5 text-sm leading-6 text-gray-500">
                 {description.trim()}
               </p>
             ) : (
@@ -319,19 +389,26 @@ export default function CreateDebatePage() {
                 ))}
               </div>
             ) : null}
+            <div className="mt-5">
+              <StanceMeter forCount={0} againstCount={0} compact />
+            </div>
           </section>
 
-          <section className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
-            <p className="text-sm font-semibold text-emerald-900">
-              Debate lifecycle
+          <section className="rounded-2xl border border-gray-200 bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+              Lifecycle
             </p>
-            <ol className="mt-3 space-y-2 text-sm text-emerald-800">
-              <li>1. Create the motion as open.</li>
-              <li>2. Participants choose FOR or AGAINST.</li>
-              <li>3. Start the debate when ready.</li>
-              <li>4. Advance through opening, rebuttal, and closing.</li>
-              <li>5. Close the debate to generate a recap.</li>
-            </ol>
+            <div className="mt-4">
+              <PhaseStepper currentPhase="opening" status="open" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <StatTile label="Room opens as" value="Open" tone="emerald" />
+              <StatTile label="Phase length" value={`${duration}m`} tone="amber" />
+            </div>
+            <p className="mt-4 text-xs leading-5 text-gray-500">
+              Participants can vote and choose sides while the motion is open.
+              Argument submission starts when you start the debate.
+            </p>
           </section>
         </aside>
       </div>

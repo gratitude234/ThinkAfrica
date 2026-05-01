@@ -15,6 +15,7 @@ import {
 interface ArgumentFormProps {
   debateId: string;
   disabled?: boolean;
+  submissionDisabled?: boolean;
   userParticipant: { stance: "for" | "against" } | null;
   currentPhase: DebatePhase;
 }
@@ -26,6 +27,7 @@ function countWords(text: string): number {
 export default function ArgumentForm({
   debateId,
   disabled,
+  submissionDisabled,
   userParticipant,
   currentPhase,
 }: ArgumentFormProps) {
@@ -120,11 +122,11 @@ export default function ArgumentForm({
 
   if (!lockedStance) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <div className="rounded-xl border border-gray-200 bg-white p-4">
         <p className="mb-1 text-sm font-semibold text-gray-800">
-          Choose your side to join the debate
+          Choose your side
         </p>
-        <p className="mb-4 text-xs text-gray-400">
+        <p className="mb-4 text-xs leading-5 text-gray-500">
           Your position is locked once you join. You can vote separately, but
           your arguments will stay on this side.
         </p>
@@ -157,6 +159,24 @@ export default function ArgumentForm({
     lockedStance === "for"
       ? "border-emerald-200 bg-emerald-100 text-emerald-700"
       : "border-amber-200 bg-amber-100 text-amber-700";
+
+  if (submissionDisabled) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full border px-3 py-1 text-xs font-bold ${stanceColor}`}
+          >
+            {lockedStance === "for" ? "FOR" : "AGAINST"} - Locked
+          </span>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-canvas p-4 text-sm text-gray-500">
+          Argument submission opens when the moderator starts the debate. Your
+          side is saved, so you can come back ready for the opening phase.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">

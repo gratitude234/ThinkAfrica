@@ -2,19 +2,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { PHASE_LABELS, type DebatePhase } from "@/lib/debatePhases";
+import { type DebatePhase } from "@/lib/debatePhases";
 import { formatDate, formatRelativeTime, formatTimeUntil } from "@/lib/utils";
+import {
+  DebateStatusPill,
+  PhasePill,
+  StanceMeter,
+  StatTile,
+  getVoteSplit,
+  type DebateStatus,
+} from "../DebatePrimitives";
 import LiveArguments from "./LiveArguments";
 import DebateRecap from "./DebateRecap";
 import DebateCountdown from "./DebateCountdown";
-
-type DebateStatus = "open" | "active" | "closed";
-
-const STATUS_STYLES: Record<DebateStatus, string> = {
-  open: "bg-emerald-100 text-emerald-700",
-  active: "bg-amber-100 text-amber-700",
-  closed: "bg-gray-100 text-gray-500",
-};
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -26,16 +26,6 @@ function resolveStance(argument: { stance?: string | null; round_number: number 
   }
 
   return argument.round_number % 2 === 1 ? "for" : "against";
-}
-
-function getVoteSplit(forCount: number, againstCount: number) {
-  const total = forCount + againstCount;
-  const forPct = total > 0 ? Math.round((forCount / total) * 100) : 50;
-  return {
-    total,
-    forPct,
-    againstPct: 100 - forPct,
-  };
 }
 
 export async function generateMetadata({
@@ -164,8 +154,6 @@ export default async function DebatePage({ params }: PageProps) {
   const forVotes = debate.motion_for_count ?? 0;
   const againstVotes = debate.motion_against_count ?? 0;
   const voteSplit = getVoteSplit(forVotes, againstVotes);
-  const statusLabel =
-    status === "active" ? "Live" : status === "open" ? "Open" : "Closed";
   const timeLabel =
     status === "active"
       ? formatTimeUntil(debate.ends_at)
@@ -190,11 +178,7 @@ export default async function DebatePage({ params }: PageProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[status]}`}
-            >
-              {statusLabel}
-            </span>
+            <DebateStatusPill status={status} />
             <span className="text-xs font-medium text-gray-500">
               {argumentCount} {argumentCount === 1 ? "argument" : "arguments"}
             </span>
@@ -212,14 +196,8 @@ export default async function DebatePage({ params }: PageProps) {
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="p-6">
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[status]}`}
-                >
-                  {statusLabel}
-                </span>
-                <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500">
-                  {PHASE_LABELS[currentPhase]}
-                </span>
+                <DebateStatusPill status={status} />
+                <PhasePill phase={currentPhase} />
                 {timeLabel ? (
                   <span className="text-xs font-medium text-gray-400">
                     {timeLabel}
@@ -261,43 +239,33 @@ export default async function DebatePage({ params }: PageProps) {
                     </span>
                   </span>
                 ) : null}
+                {status !== "closed" ? (
+                  <a
+                    href="#participate"
+                    className="font-semibold text-emerald-brand hover:text-emerald-700"
+                  >
+                    Vote and argue
+                  </a>
+                ) : null}
               </div>
             </div>
 
             <aside className="border-t border-gray-100 bg-canvas p-5 lg:border-l lg:border-t-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-                Official verdict
-              </p>
-              <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-gray-200">
-                <span
-                  className="bg-emerald-brand"
-                  style={{ width: `${voteSplit.forPct}%` }}
-                />
-                <span
-                  className="bg-amber-500"
-                  style={{ width: `${voteSplit.againstPct}%` }}
-                />
-              </div>
-              <div className="mt-3 flex items-center justify-between text-sm font-semibold">
-                <span className="text-emerald-700">FOR {voteSplit.forPct}%</span>
-                <span className="text-amber-700">
-                  {voteSplit.againstPct}% AGAINST
-                </span>
-              </div>
+              <StanceMeter
+                forCount={forVotes}
+                againstCount={againstVotes}
+                label={status === "closed" ? "Final verdict" : "Community vote"}
+              />
               <p className="mt-2 text-xs text-gray-500">
                 {voteSplit.total} community {voteSplit.total === 1 ? "vote" : "votes"}
               </p>
               <div className="mt-5 grid grid-cols-2 gap-2 text-center">
-                <div className="rounded-xl bg-white p-3">
-                  <p className="text-lg font-bold text-ink">{argumentCount}</p>
-                  <p className="text-[11px] text-gray-400">arguments</p>
-                </div>
-                <div className="rounded-xl bg-white p-3">
-                  <p className="text-lg font-bold text-ink">
-                    {forArguments.length}/{againstArguments.length}
-                  </p>
-                  <p className="text-[11px] text-gray-400">for/against</p>
-                </div>
+                <StatTile label="arguments" value={argumentCount} />
+                <StatTile
+                  label="for/against"
+                  value={`${forArguments.length}/${againstArguments.length}`}
+                  tone="emerald"
+                />
               </div>
             </aside>
           </div>

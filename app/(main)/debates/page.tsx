@@ -1,19 +1,21 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import Pill from "@/components/ui/Pill";
 import {
   formatDate,
   formatRelativeTime,
   formatTimeUntil,
 } from "@/lib/utils";
+import { type DebatePhase } from "@/lib/debatePhases";
 import {
-  PHASE_LABELS,
-  type DebatePhase,
-} from "@/lib/debatePhases";
+  DebateStatusPill,
+  PhasePill,
+  StanceMeter,
+  StatTile,
+  type DebateStatus,
+} from "./DebatePrimitives";
 
 export const revalidate = 30;
 
-type DebateStatus = "open" | "active" | "closed";
 type DebateFilter = "live" | "open" | "closed" | "recaps";
 
 const TABS: Array<{ label: string; value: DebateFilter; href: string }> = [
@@ -22,12 +24,6 @@ const TABS: Array<{ label: string; value: DebateFilter; href: string }> = [
   { label: "Closed", value: "closed", href: "/debates?status=closed" },
   { label: "Recaps", value: "recaps", href: "/debates?status=recaps" },
 ];
-
-const STATUS_VARIANTS: Record<DebateStatus, "emerald" | "amber" | "gray"> = {
-  open: "emerald",
-  active: "amber",
-  closed: "gray",
-};
 
 interface PageProps {
   searchParams: Promise<{ status?: string }>;
@@ -145,6 +141,12 @@ function DebateCard({ debate }: { debate: DebateRow }) {
   const moderator = getProfile(debate.profiles);
   const split = getVoteSplit(debate);
   const phase = debate.current_phase ?? "opening";
+  const statusAccent =
+    status === "active"
+      ? "border-l-amber-400"
+      : status === "open"
+        ? "border-l-emerald-brand"
+        : "border-l-gray-300";
   const timeLabel =
     status === "active"
       ? formatTimeUntil(debate.ends_at)
@@ -155,17 +157,13 @@ function DebateCard({ debate }: { debate: DebateRow }) {
   return (
     <Link
       href={`/debates/${debate.id}`}
-      className="group block rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:-translate-y-px hover:shadow-md"
+      className={`group block rounded-2xl border border-l-4 border-gray-200 bg-white p-5 transition-all hover:-translate-y-px hover:border-gray-300 hover:shadow-md ${statusAccent}`}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Pill variant={STATUS_VARIANTS[status]} className="capitalize">
-              {status === "active" ? "Live" : status}
-            </Pill>
-            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">
-              {PHASE_LABELS[phase]}
-            </span>
+            <DebateStatusPill status={status} />
+            <PhasePill phase={phase} />
             {timeLabel ? (
               <span className="text-xs font-medium text-gray-400">{timeLabel}</span>
             ) : null}
@@ -195,25 +193,12 @@ function DebateCard({ debate }: { debate: DebateRow }) {
           ) : null}
         </div>
 
-        <div className="w-full shrink-0 rounded-xl border border-gray-100 bg-canvas p-3 sm:w-[220px]">
-          <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">
-            <span>Community vote</span>
-            <span>{split.total}</span>
-          </div>
-          <div className="flex h-2 overflow-hidden rounded-full bg-gray-200">
-            <span
-              className="h-full bg-emerald-brand"
-              style={{ width: `${split.forPct}%` }}
-            />
-            <span
-              className="h-full bg-amber-500"
-              style={{ width: `${split.againstPct}%` }}
-            />
-          </div>
-          <div className="mt-2 flex justify-between text-[11px] font-semibold">
-            <span className="text-emerald-700">For {split.forPct}%</span>
-            <span className="text-amber-700">Against {split.againstPct}%</span>
-          </div>
+        <div className="w-full shrink-0 rounded-xl border border-gray-100 bg-canvas p-3 sm:w-[230px]">
+          <StanceMeter
+            forCount={split.forCount}
+            againstCount={split.againstCount}
+            compact
+          />
         </div>
       </div>
 
@@ -233,6 +218,9 @@ function DebateCard({ debate }: { debate: DebateRow }) {
         {debate.recap_text ? (
           <span className="font-medium text-emerald-brand">Recap available</span>
         ) : null}
+        <span className="ml-auto hidden font-semibold text-emerald-brand transition-colors group-hover:text-emerald-700 sm:inline">
+          Enter room
+        </span>
       </div>
     </Link>
   );
@@ -262,6 +250,32 @@ export default async function DebatesPage({ searchParams }: PageProps) {
     profile?.role === "editor" ||
     profile?.role === "admin";
 
+  const [liveCount, openCount, closedCount, recapCount] = await Promise.all([
+    supabase
+      .from("debates")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active"),
+    supabase
+      .from("debates")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "open"),
+    supabase
+      .from("debates")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "closed"),
+    supabase
+      .from("debates")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "closed")
+      .not("recap_text", "is", null),
+  ]);
+  const counts: Record<DebateFilter, number> = {
+    live: liveCount.count ?? 0,
+    open: openCount.count ?? 0,
+    closed: closedCount.count ?? 0,
+    recaps: recapCount.count ?? 0,
+  };
+
   let query = supabase
     .from("debates")
     .select(
@@ -290,30 +304,44 @@ export default async function DebatesPage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-6">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
-              Debate room
-            </p>
-            <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-ink">
-              Argue ideas in public, with structure
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
-              Join live motions, vote on the community verdict, and surface the
-              strongest arguments from both sides.
-            </p>
-          </div>
+      <div className="mb-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+            Debate room
+          </p>
+          <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-ink md:text-4xl">
+            Argue ideas in public, with structure
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
+            Pick a side, vote on the motion, and make the strongest case while
+            moderators guide each room through opening, rebuttal, and closing.
+          </p>
+        </div>
+        <div className="flex flex-col items-start gap-3 md:items-end">
           <Link
             href={user ? "/debates/create" : "/login?redirectTo=/debates/create"}
             className={`inline-flex w-fit items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               canCreate || !user
                 ? "bg-emerald-brand text-white hover:bg-emerald-600"
-                : "border border-gray-200 text-gray-600 hover:bg-canvas"
+                : "border border-gray-200 bg-white text-gray-600 hover:bg-white"
             }`}
           >
             {canCreate || !user ? "Start a debate" : "Verify to start one"}
           </Link>
+          {!canCreate && user ? (
+            <p className="max-w-xs text-xs leading-5 text-gray-500 md:text-right">
+              Verified members, editors, and admins can moderate new motions.
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mb-5 grid grid-cols-3 gap-3 sm:grid-cols-4">
+        <StatTile label="Live rooms" value={counts.live} tone="amber" />
+        <StatTile label="Open motions" value={counts.open} tone="emerald" />
+        <StatTile label="Closed" value={counts.closed} />
+        <div className="hidden sm:block">
+          <StatTile label="Recaps" value={counts.recaps} />
         </div>
       </div>
 
@@ -325,13 +353,22 @@ export default async function DebatesPage({ searchParams }: PageProps) {
               <Link
                 key={tab.value}
                 href={tab.href}
-                className={`mb-[-1px] border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors ${
+                className={`mb-[-1px] inline-flex items-center gap-2 border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors ${
                   active
                     ? "border-emerald-brand text-ink"
                     : "border-transparent text-gray-500 hover:text-ink"
                 }`}
               >
-                {tab.label}
+                <span>{tab.label}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] ${
+                    active
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-white text-gray-400"
+                  }`}
+                >
+                  {counts[tab.value]}
+                </span>
               </Link>
             );
           })}

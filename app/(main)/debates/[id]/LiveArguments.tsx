@@ -8,6 +8,7 @@ import {
   PHASE_DESCRIPTIONS,
   PHASE_LABELS,
 } from "@/lib/debatePhases";
+import { PhaseStepper, StanceMeter } from "../DebatePrimitives";
 import Toast from "@/components/ui/Toast";
 import UpvoteButton from "./UpvoteButton";
 import ArgumentForm from "./ArgumentForm";
@@ -107,7 +108,7 @@ function updateVoteCount(argumentsList: Argument[], id: string, upvotes: number)
 
 function EmptyColumn({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-400">
+    <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5 text-sm leading-6 text-gray-400">
       {message}
     </div>
   );
@@ -130,15 +131,15 @@ function ArgumentCard({
   const argumentPhase = phaseForRound(argument.round_number);
   const borderClass =
     actualStance === "for"
-      ? "border-l-4 border-emerald-500"
+      ? "border-l-4 border-l-emerald-500"
       : actualStance === "against"
-        ? "border-l-4 border-red-400"
-        : "border-l-4 border-gray-200";
+        ? "border-l-4 border-l-amber-500"
+        : "border-l-4 border-l-gray-200";
   const badgeClass =
     actualStance === "for"
       ? "bg-emerald-100 text-emerald-700"
       : actualStance === "against"
-        ? "bg-red-100 text-red-600"
+        ? "bg-amber-100 text-amber-700"
         : "bg-gray-100 text-gray-500";
   const badgeLabel =
     actualStance === "for"
@@ -148,7 +149,9 @@ function ArgumentCard({
         : "LEGACY";
 
   return (
-    <div className={`mb-3 rounded-xl border border-gray-200 bg-white p-4 ${borderClass}`}>
+    <article
+      className={`mb-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm shadow-gray-100/60 ${borderClass}`}
+    >
       <div className="mb-3 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           {author?.avatar_url ? (
@@ -165,11 +168,11 @@ function ArgumentCard({
           )}
 
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               {author ? (
                 <Link
                   href={`/${author.username}`}
-                  className="text-sm font-semibold text-gray-900 transition-colors hover:text-emerald-brand"
+                  className="truncate text-sm font-semibold text-gray-900 transition-colors hover:text-emerald-brand"
                 >
                   {authorName}
                 </Link>
@@ -194,17 +197,19 @@ function ArgumentCard({
         </span>
       </div>
 
-      <p className="mb-3 whitespace-pre-line text-sm leading-relaxed text-gray-700">
+      <p className="mb-3 whitespace-pre-line break-words text-[15px] leading-7 text-gray-700">
         {argument.content}
       </p>
 
-      <UpvoteButton
-        argumentId={argument.id}
-        initialCount={argument.upvotes}
-        initialVoted={hasVoted}
-        disabled={!currentUserId || isClosed}
-      />
-    </div>
+      <div className="border-t border-gray-100 pt-3">
+        <UpvoteButton
+          argumentId={argument.id}
+          initialCount={argument.upvotes}
+          initialVoted={hasVoted}
+          disabled={!currentUserId || isClosed}
+        />
+      </div>
+    </article>
   );
 }
 
@@ -232,6 +237,9 @@ export default function LiveArguments({
   const [localCurrentPhase, setLocalCurrentPhase] =
     useState<DebatePhase>(currentPhase);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [visibleStance, setVisibleStance] = useState<"for" | "against">(
+    userParticipant?.stance ?? "for"
+  );
 
   useEffect(() => {
     setLocalDebateStatus(debateStatus);
@@ -315,11 +323,11 @@ export default function LiveArguments({
             setLocalDebateStatus((previousStatus) => {
               if (nextStatus !== previousStatus) {
                 if (previousStatus === "open" && nextStatus === "active") {
-                  setToastMessage("Debate is now LIVE - submit your argument!");
+                  setToastMessage("Debate is live. Submit your opening argument.");
                 }
                 if (previousStatus === "active" && nextStatus === "closed") {
                   setToastMessage(
-                    "This debate has closed. See the results below."
+                    "This debate has closed. Read the final verdict and recap."
                   );
                 }
               }
@@ -350,18 +358,14 @@ export default function LiveArguments({
     (sum, argument) => sum + argument.upvotes,
     0
   );
-  const totalPoints = forPoints + againstPoints;
-  const forWidth = totalPoints === 0 ? 50 : (forPoints / totalPoints) * 100;
-  const againstWidth = totalPoints === 0 ? 50 : (againstPoints / totalPoints) * 100;
   const isClosed = localDebateStatus === "closed";
   const isOpen = localDebateStatus === "open";
   const canSubmitArguments = localDebateStatus === "active";
-  const phases: DebatePhase[] = ["opening", "rebuttal", "closing"];
 
   return (
     <div>
-      <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-4">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
               Room status
@@ -382,36 +386,10 @@ export default function LiveArguments({
             </p>
           </div>
 
-          <div className="flex min-w-[220px] items-center gap-1.5">
-            {phases.map((phase, index) => {
-              const currentIndex = phases.indexOf(localCurrentPhase);
-              const active = !isOpen && index <= currentIndex;
-              const current = !isOpen && phase === localCurrentPhase && !isClosed;
-              return (
-                <div key={phase} className="flex flex-1 items-center gap-1.5">
-                  <span
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${
-                      active
-                        ? "bg-emerald-brand text-white"
-                        : "bg-gray-100 text-gray-400"
-                    } ${current ? "ring-2 ring-emerald-100" : ""}`}
-                    title={PHASE_LABELS[phase]}
-                  >
-                    {index + 1}
-                  </span>
-                  {index < phases.length - 1 ? (
-                    <span
-                      className={`h-0.5 flex-1 rounded-full ${
-                        index < currentIndex && !isOpen
-                          ? "bg-emerald-brand"
-                          : "bg-gray-200"
-                      }`}
-                    />
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
+          <PhaseStepper
+            currentPhase={localCurrentPhase}
+            status={localDebateStatus}
+          />
         </div>
       </div>
 
@@ -442,10 +420,35 @@ export default function LiveArguments({
             </span>
           </div>
 
+          <div className="mb-4 grid grid-cols-2 rounded-xl border border-gray-200 bg-white p-1 md:hidden">
+            <button
+              type="button"
+              onClick={() => setVisibleStance("for")}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                visibleStance === "for"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "text-gray-500"
+              }`}
+            >
+              FOR ({sortedForArguments.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisibleStance("against")}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                visibleStance === "against"
+                  ? "bg-amber-50 text-amber-700"
+                  : "text-gray-500"
+              }`}
+            >
+              AGAINST ({sortedAgainstArguments.length})
+            </button>
+          </div>
+
           <div className="grid gap-6 md:grid-cols-2">
-            <div>
+            <div className={visibleStance === "for" ? "block" : "hidden md:block"}>
               <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-emerald-700">
-                FOR
+                FOR - {sortedForArguments.length}
               </div>
 
               {sortedForArguments.length === 0 ? (
@@ -463,9 +466,13 @@ export default function LiveArguments({
               )}
             </div>
 
-            <div>
+            <div
+              className={
+                visibleStance === "against" ? "block" : "hidden md:block"
+              }
+            >
               <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-amber-700">
-                AGAINST
+                AGAINST - {sortedAgainstArguments.length}
               </div>
 
               {sortedAgainstArguments.length === 0 ? (
@@ -485,23 +492,11 @@ export default function LiveArguments({
           </div>
 
           <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">
-              Argument quality score
-            </p>
-            <div className="mb-3 flex items-center justify-between text-sm font-semibold text-gray-700">
-              <span>FOR</span>
-              <span>AGAINST</span>
-            </div>
-            <div className="flex h-3 overflow-hidden rounded-full bg-gray-100">
-              <div
-                className="bg-emerald-400 transition-all duration-300"
-                style={{ width: `${forWidth}%` }}
-              />
-              <div
-                className="bg-amber-400 transition-all duration-300"
-                style={{ width: `${againstWidth}%` }}
-              />
-            </div>
+            <StanceMeter
+              forCount={forPoints}
+              againstCount={againstPoints}
+              label="Argument quality score"
+            />
             <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
               <span>{forPoints} pts</span>
               <span>{againstPoints} pts</span>
@@ -509,7 +504,10 @@ export default function LiveArguments({
           </div>
         </div>
 
-        <div className="space-y-5 lg:sticky lg:top-[84px] lg:self-start">
+        <div
+          id="participate"
+          className="order-first space-y-5 lg:sticky lg:top-[84px] lg:order-none lg:self-start"
+        >
           <MotionVotePanel
             debateId={debateId}
             initialForCount={motionForCount}
@@ -522,18 +520,18 @@ export default function LiveArguments({
 
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
             <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
-              {isClosed ? "Debate closed" : "Submit an argument"}
+              {isClosed ? "Debate closed" : "Join the room"}
             </p>
             <h3 className="mt-1 text-base font-semibold text-gray-900">
               {isOpen
-                ? "Waiting for moderator"
+                ? "Choose a side before start"
                 : isClosed
                   ? "No new arguments"
                   : `Write for ${PHASE_LABELS[localCurrentPhase]}`}
             </h3>
             <p className="mt-1 text-xs leading-5 text-gray-500">
               {isOpen
-                ? "You can choose a side and vote now. Argument submission opens when the debate starts."
+                ? "Vote now and lock your side. Argument submission opens when the moderator starts rounds."
                 : isClosed
                   ? "The room is archived. Vote totals and strongest arguments remain visible."
                   : PHASE_DESCRIPTIONS[localCurrentPhase]}
@@ -543,17 +541,18 @@ export default function LiveArguments({
               {!currentUserId && !isClosed ? (
                 <div className="rounded-xl border border-gray-200 bg-canvas p-4 text-center text-sm text-gray-500">
                   <Link
-                    href="/login"
+                    href={`/login?redirectTo=/debates/${debateId}`}
                     className="font-medium text-emerald-600 hover:underline"
                   >
                     Sign in
                   </Link>{" "}
                   to vote, choose a side, or submit an argument.
                 </div>
-              ) : canSubmitArguments ? (
+              ) : !isClosed ? (
                 <ArgumentForm
                   debateId={debateId}
                   disabled={false}
+                  submissionDisabled={!canSubmitArguments}
                   userParticipant={userParticipant}
                   currentPhase={localCurrentPhase}
                 />

@@ -38,16 +38,20 @@ export default function UpvoteButton({
     setLoading(false);
   }
 
+  const title = disabled ? "Voting unavailable" : voted ? "Remove vote" : "Upvote";
+
   return (
     <button
+      type="button"
       onClick={handleToggle}
       disabled={disabled || loading}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+      aria-pressed={voted}
+      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
         voted
           ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
           : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
       } disabled:opacity-50 disabled:cursor-not-allowed`}
-      title={disabled ? "Sign in to vote" : voted ? "Remove vote" : "Upvote"}
+      title={title}
     >
       <svg
         className="w-4 h-4"
