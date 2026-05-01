@@ -38,7 +38,7 @@ export default function NavClient({
   const pathname = usePathname();
   const isHomeActive = pathname === "/";
   const isDiscoverActive =
-    pathname === "/topics" || pathname.startsWith("/topics/");
+    pathname === "/discover" || pathname.startsWith("/discover/");
   const isDebatesActive =
     pathname === "/debates" || pathname.startsWith("/debates/");
   const isOpportunitiesActive =
@@ -69,7 +69,7 @@ export default function NavClient({
                 Home
               </Link>
               <Link
-                href="/topics"
+                href="/discover"
                 className={navItemClass(isDiscoverActive)}
                 aria-current={isDiscoverActive ? "page" : undefined}
               >

@@ -55,9 +55,9 @@ export default function BottomNav({
         </Link>
 
         <Link
-          href="/topics"
-          className={navLinkClass(isActive("/topics"))}
-          aria-current={isActive("/topics") ? "page" : undefined}
+          href="/discover"
+          className={navLinkClass(isActive("/discover"))}
+          aria-current={isActive("/discover") ? "page" : undefined}
         >
           <svg
             className="h-5 w-5"

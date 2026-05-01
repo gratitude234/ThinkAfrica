@@ -20,7 +20,7 @@ interface MobileNavProps {
 
 const PRIMARY_LINKS = [
   { label: "Home", href: "/" },
-  { label: "Discover", href: "/topics" },
+  { label: "Discover", href: "/discover" },
   { label: "Opportunities", href: "/opportunities" },
   { label: "Write", href: "/write" },
 ] as const;

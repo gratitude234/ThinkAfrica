@@ -1,0 +1,14 @@
+
+> think-africa@0.1.0 dev
+> next dev -p 3000
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 6.4s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 1262ms (125 modules)
+ ○ Compiling /discover ...
+ ✓ Compiled /discover in 11.8s (781 modules)

@@ -98,7 +98,7 @@ export default function TopicsClient({
                       {savingTag === entry.tag
                         ? "Saving..."
                         : isFollowing
-                          ? "Following ✓"
+                          ? "Following"
                           : "Follow +"}
                     </button>
                   ) : null}

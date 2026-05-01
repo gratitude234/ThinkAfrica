@@ -137,7 +137,7 @@ export default async function DebatesPage({ searchParams }: PageProps) {
                       </Pill>
                       {remaining && status === "active" ? (
                         <span className="text-xs font-medium text-amber-600">
-                          ⏱ {remaining}
+                          {remaining}
                         </span>
                       ) : null}
                     </div>

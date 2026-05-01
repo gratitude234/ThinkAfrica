@@ -79,7 +79,7 @@ function EndStateCard({ topics }: { topics: string[] }) {
         href="/?tab=latest"
         className="mt-3 inline-block text-sm font-medium text-ink hover:underline"
       >
-        Or switch to Latest →
+        Or switch to Latest -&gt;
       </a>
     </div>
   );

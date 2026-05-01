@@ -3,7 +3,7 @@ import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 const platformLinks = [
   { label: "Home", href: "/" },
-  { label: "Discover", href: "/topics" },
+  { label: "Discover", href: "/discover" },
   { label: "Write", href: "/write" },
   { label: "Opportunities", href: "/opportunities" },
   { label: "Policy Hub", href: "/policy" },
