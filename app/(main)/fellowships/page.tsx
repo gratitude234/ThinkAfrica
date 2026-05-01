@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getOpportunityShortLabel,
+  getOpportunityStyle,
+  normalizeOpportunityType,
+} from "@/lib/opportunities";
 import { formatDate } from "@/lib/utils";
 import EmptyState, { EMPTY_STATES } from "@/components/ui/EmptyState";
 import SponsorBanner from "@/components/ui/SponsorBanner";
@@ -34,7 +39,9 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
 
   const { data: all } = await supabase
     .from("fellowships")
-    .select("id, title, sponsor_name, amount, eligibility, deadline, status, created_at")
+    .select(
+      "id, title, sponsor_name, amount, eligibility, deadline, status, opportunity_type, skills, location, featured, created_at"
+    )
     .order("deadline", { ascending: true, nullsFirst: false });
 
   const now = new Date();
@@ -63,8 +70,12 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
       <SponsorBanner placement={sponsor} />
       {/* Hero */}
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Fellowships &amp; Grants</h1>
-        <p className="text-gray-500 text-lg">Funding Africa&apos;s Next Generation of Thinkers</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Curated Opportunities
+        </h1>
+        <p className="text-gray-500 text-lg">
+          Fellowships, internships, research roles, and early-career openings
+        </p>
       </div>
 
       {/* Filter */}
@@ -95,7 +106,7 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
         })}
       </div>
 
-      {/* Open fellowships */}
+      {/* Open opportunities */}
       {displayOpen.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200">
           <EmptyState {...EMPTY_STATES.fellowships} />
@@ -103,41 +114,7 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
           {displayOpen.map((f) => (
-            <Link
-              key={f.id}
-              href={`/fellowships/${f.id}`}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow flex flex-col"
-            >
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <h2 className="text-base font-semibold text-gray-900 leading-snug flex-1">
-                  {f.title}
-                </h2>
-                <DeadlineBadge deadline={f.deadline} />
-              </div>
-
-              {f.sponsor_name && (
-                <p className="text-xs font-medium text-emerald-600 mb-2">
-                  by {f.sponsor_name}
-                </p>
-              )}
-
-              {f.amount && (
-                <p className="text-sm font-semibold text-gray-700 mb-2">{f.amount}</p>
-              )}
-
-              {f.eligibility && (
-                <p className="text-xs text-gray-500 line-clamp-2 mb-4 flex-1">
-                  {f.eligibility}
-                </p>
-              )}
-
-              <span className="mt-auto inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors self-start">
-                Apply Now
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </span>
-            </Link>
+            <OpportunityCard key={f.id} opportunity={f} />
           ))}
         </div>
       )}
@@ -145,7 +122,7 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
       {/* Past opportunities */}
       {closed.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 text-gray-400">
+          <h2 className="text-lg font-semibold text-gray-400 mb-4">
             Past Opportunities
           </h2>
           <div className="space-y-3">
@@ -169,5 +146,80 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
         </section>
       )}
     </div>
+  );
+}
+
+function OpportunityCard({
+  opportunity,
+}: {
+  opportunity: {
+    id: string;
+    title: string;
+    sponsor_name: string | null;
+    amount: string | null;
+    eligibility: string | null;
+    deadline: string | null;
+    opportunity_type?: string | null;
+    skills?: string[] | null;
+    location?: string | null;
+    featured?: boolean | null;
+  };
+}) {
+  const type = normalizeOpportunityType(opportunity.opportunity_type);
+
+  return (
+    <Link
+      href={`/fellowships/${opportunity.id}`}
+      className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow flex flex-col"
+    >
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span
+          className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getOpportunityStyle(
+            type
+          )}`}
+        >
+          {getOpportunityShortLabel(type)}
+        </span>
+        {opportunity.featured ? (
+          <span className="rounded-full bg-ink px-2.5 py-0.5 text-xs font-semibold text-white">
+            Featured
+          </span>
+        ) : null}
+        <DeadlineBadge deadline={opportunity.deadline} />
+      </div>
+
+      <h2 className="text-base font-semibold text-gray-900 leading-snug">
+        {opportunity.title}
+      </h2>
+
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+        {opportunity.sponsor_name ? <span>{opportunity.sponsor_name}</span> : null}
+        {opportunity.location ? <span>{opportunity.location}</span> : null}
+        {opportunity.amount ? <span>{opportunity.amount}</span> : null}
+      </div>
+
+      {opportunity.eligibility ? (
+        <p className="mt-3 line-clamp-2 flex-1 text-xs leading-relaxed text-gray-500">
+          {opportunity.eligibility}
+        </p>
+      ) : null}
+
+      {opportunity.skills?.length ? (
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {opportunity.skills.slice(0, 4).map((skill) => (
+            <span
+              key={skill}
+              className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"
+            >
+              {skill}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <span className="mt-5 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-brand text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors self-start">
+        View opportunity
+      </span>
+    </Link>
   );
 }

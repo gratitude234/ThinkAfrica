@@ -41,8 +41,8 @@ const ADMIN_LINKS: AdminLink[] = [
   },
   {
     href: "/admin/fellowships",
-    title: "Fellowships",
-    description: "Manage fellowship applications and programs.",
+    title: "Opportunities",
+    description: "Manage curated opportunities and applications.",
     roles: ["admin"],
     bootstrapOnly: true,
   },

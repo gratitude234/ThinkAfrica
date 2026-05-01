@@ -46,8 +46,8 @@ export const EMPTY_STATES = {
   },
   fellowships: {
     icon: "🎓",
-    title: "No open fellowships right now.",
-    description: "Check back soon for new funding opportunities.",
+    title: "No open opportunities right now.",
+    description: "Check back soon for fellowships, internships, and research roles.",
     cta: undefined,
   },
 } as const;

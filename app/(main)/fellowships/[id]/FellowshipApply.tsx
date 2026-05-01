@@ -10,6 +10,7 @@ interface Props {
   userId: string | null;
   existingApplication: { status: string } | null;
   fellowshipStatus: string;
+  opportunityType?: string | null;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -24,6 +25,7 @@ export default function FellowshipApply({
   userId,
   existingApplication,
   fellowshipStatus,
+  opportunityType,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -76,9 +78,18 @@ export default function FellowshipApply({
       return;
     }
     trackActivationEvent({
+      event: "opportunity_apply_submitted",
+      metadata: {
+        fellowshipId,
+        opportunityType: opportunityType ?? null,
+        coverLetterWordCount: wordCount,
+      },
+    });
+    trackActivationEvent({
       event: "fellowship_application_submitted",
       metadata: {
         fellowshipId,
+        opportunityType: opportunityType ?? null,
         coverLetterWordCount: wordCount,
       },
     });
@@ -94,11 +105,20 @@ export default function FellowshipApply({
           type="button"
           onClick={() => {
             if (!userId) router.push(`/login?redirectTo=/fellowships/${fellowshipId}`);
-            else setOpen(true);
+            else {
+              trackActivationEvent({
+                event: "opportunity_apply_started",
+                metadata: {
+                  fellowshipId,
+                  opportunityType: opportunityType ?? null,
+                },
+              });
+              setOpen(true);
+            }
           }}
           className="px-5 py-2.5 bg-emerald-brand text-white font-medium rounded-lg hover:bg-emerald-600 transition-colors text-sm"
         >
-          Apply for this Fellowship
+          Apply for this opportunity
         </button>
       ) : (
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
@@ -119,7 +139,7 @@ export default function FellowshipApply({
               required
               value={coverLetter}
               onChange={(e) => setCoverLetter(e.target.value)}
-              placeholder="Tell us about yourself, your work, and why you'd be a great recipient for this fellowship..."
+              placeholder="Tell us about yourself, your work, and why this opportunity fits your goals..."
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
             />
           </div>

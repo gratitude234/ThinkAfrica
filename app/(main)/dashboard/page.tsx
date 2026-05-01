@@ -13,9 +13,14 @@ import Button from "@/components/ui/Button";
 import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import { getActivationState } from "@/lib/activation";
 import { getCollaborationSuggestions } from "@/lib/collaboration";
+import {
+  getOpportunityShortLabel,
+  getOpportunityStyle,
+} from "@/lib/opportunities";
 import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
 import { getRetentionSummary } from "@/lib/retention";
 import { getPostQualitySummary } from "@/lib/postQuality";
+import { updateOpportunityInquiryStatus } from "./opportunityInquiryActions";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -140,10 +145,13 @@ export default async function DashboardPage() {
   ]);
 
   const { data: opportunityInquiriesRaw } = talentProfile?.id
-    ? await supabase
+      ? await supabase
         .from("talent_inquiries")
-        .select("id, organization_name, contact_email, message, created_at")
+        .select(
+          "id, organization_name, contact_email, opportunity_type, role_title, message, status, read_at, created_at"
+        )
         .eq("talent_id", talentProfile.id)
+        .neq("status", "archived")
         .order("created_at", { ascending: false })
         .limit(5)
     : { data: [] };
@@ -159,7 +167,7 @@ export default async function DashboardPage() {
   const { data: applicationsRaw } = await supabase
     .from("fellowship_applications")
     .select(
-      "id, status, created_at, fellowships(id, title, deadline)"
+      "id, status, created_at, fellowships(id, title, deadline, opportunity_type)"
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
@@ -452,7 +460,7 @@ export default async function DashboardPage() {
       <PostsTable posts={posts} userId={user.id} />
 
       {opportunityInquiries.length > 0 ? (
-        <div className="mt-10">
+        <div id="opportunity-interest" className="mt-10 scroll-mt-24">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">
             Opportunity interest
           </h2>
@@ -460,14 +468,35 @@ export default async function DashboardPage() {
             {opportunityInquiries.map((inquiry) => (
               <div
                 key={inquiry.id}
-                className="rounded-xl border border-gray-200 bg-white p-4"
+                className={`rounded-xl border bg-white p-4 ${
+                  inquiry.status === "new"
+                    ? "border-emerald-200 shadow-sm"
+                    : "border-gray-200"
+                }`}
               >
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {inquiry.organization_name ?? "Organization not listed"}
-                    </p>
-                    <p className="text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {inquiry.role_title ?? "Opportunity inquiry"}
+                      </p>
+                      {inquiry.status === "new" ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                          New
+                        </span>
+                      ) : null}
+                      {inquiry.opportunity_type ? (
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getOpportunityStyle(
+                            inquiry.opportunity_type
+                          )}`}
+                        >
+                          {getOpportunityShortLabel(inquiry.opportunity_type)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {inquiry.organization_name ?? "Organization not listed"} /{" "}
                       {inquiry.contact_email ?? "No reply email provided"}
                     </p>
                   </div>
@@ -480,10 +509,34 @@ export default async function DashboardPage() {
                   </span>
                 </div>
                 {inquiry.message ? (
-                  <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-gray-600">
+                  <p className="mt-3 text-sm leading-relaxed text-gray-600">
                     {inquiry.message}
                   </p>
                 ) : null}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {inquiry.status === "new" ? (
+                    <form action={updateOpportunityInquiryStatus}>
+                      <input type="hidden" name="inquiryId" value={inquiry.id} />
+                      <input type="hidden" name="status" value="read" />
+                      <button
+                        type="submit"
+                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-emerald-300 hover:text-emerald-700"
+                      >
+                        Mark read
+                      </button>
+                    </form>
+                  ) : null}
+                  <form action={updateOpportunityInquiryStatus}>
+                    <input type="hidden" name="inquiryId" value={inquiry.id} />
+                    <input type="hidden" name="status" value="archived" />
+                    <button
+                      type="submit"
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700"
+                    >
+                      Archive
+                    </button>
+                  </form>
+                </div>
               </div>
             ))}
           </div>
@@ -493,14 +546,14 @@ export default async function DashboardPage() {
       {applications.length > 0 && (
         <div className="mt-10">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Fellowship Applications
+            Opportunity applications
           </h2>
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-canvas">
                   <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Fellowship
+                    Opportunity
                   </th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
                     Applied

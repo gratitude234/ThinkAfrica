@@ -4,15 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TagInput from "@/components/ui/TagInput";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { OPPORTUNITY_LABELS, OPPORTUNITY_TYPES } from "@/lib/opportunities";
 import { createClient } from "@/lib/supabase/client";
-
-const OPPORTUNITY_TYPES = ["internship", "research", "fellowship", "job"];
-const OPPORTUNITY_LABELS: Record<string, string> = {
-  internship: "Internship",
-  research: "Research project",
-  fellowship: "Fellowship",
-  job: "Job",
-};
 
 interface TalentProfile {
   id: string;
@@ -107,7 +100,7 @@ export default function OpportunityProfileEditor({
   return (
     <section
       id="opportunity-profile"
-      className="rounded-xl border border-gray-200 bg-white p-5"
+      className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
     >
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -115,11 +108,11 @@ export default function OpportunityProfileEditor({
             Opportunity profile
           </p>
           <h2 className="mt-1 text-lg font-semibold text-gray-900">
-            Set how partners discover you
+            Set up your opportunity signal
           </h2>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-gray-500">
-            Partners see your name, university, opportunity types, skills, and
-            profile links before sending an inquiry.
+            Choose the work you want, add scan-friendly skills, and control who
+            can find your profile.
           </p>
         </div>
         {saved ? (
@@ -132,7 +125,10 @@ export default function OpportunityProfileEditor({
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-100 bg-canvas px-4 py-3">
           <div>
-            <p className="text-sm font-medium text-gray-900">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Step 1
+            </p>
+            <p className="mt-0.5 text-sm font-medium text-gray-900">
               Open to opportunities
             </p>
             <p className="mt-0.5 text-xs text-gray-500">
@@ -161,7 +157,10 @@ export default function OpportunityProfileEditor({
         </div>
 
         <div>
-          <p className="mb-2 text-sm font-medium text-gray-700">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Step 2
+          </p>
+          <p className="mb-2 mt-0.5 text-sm font-medium text-gray-700">
             Opportunity types
           </p>
           <div className="flex flex-wrap gap-2">
@@ -182,14 +181,19 @@ export default function OpportunityProfileEditor({
           </div>
         </div>
 
-        <TagInput
-          label="Skills"
-          value={form.skills}
-          onChange={(skills) => setForm((current) => ({ ...current, skills }))}
-          placeholder="Add a skill"
-          helperText="Add 2-8 practical skills partners can scan quickly."
-          maxTags={8}
-        />
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Step 3
+          </p>
+          <TagInput
+            label="Skills"
+            value={form.skills}
+            onChange={(skills) => setForm((current) => ({ ...current, skills }))}
+            placeholder="Add a skill"
+            helperText="Add 2-8 practical skills partners can scan quickly."
+            maxTags={8}
+          />
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -229,6 +233,9 @@ export default function OpportunityProfileEditor({
         </div>
 
         <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Step 4
+          </p>
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Visibility
           </label>
@@ -257,7 +264,16 @@ export default function OpportunityProfileEditor({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={saveProfile}
+            onClick={() => {
+              trackActivationEvent({
+                event: "opportunity_profile_setup_cta_clicked",
+                metadata: {
+                  source,
+                  action: "save_opportunity_profile",
+                },
+              });
+              void saveProfile();
+            }}
             disabled={saving}
             className="rounded-lg bg-emerald-brand px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
           >

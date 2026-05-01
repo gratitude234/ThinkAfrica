@@ -347,7 +347,7 @@ function DiscoverAside({ data }: { data: DiscoverData }) {
           title="Find people and openings connected to serious work"
           body={`${data.opportunitySummary.openProfileCount.toLocaleString()} open profiles${
             data.opportunitySummary.openFellowshipCount > 0
-              ? ` and ${data.opportunitySummary.openFellowshipCount} open fellowships`
+              ? ` and ${data.opportunitySummary.openFellowshipCount} curated opportunities`
               : ""
           }`}
           href="/opportunities"
@@ -369,7 +369,7 @@ function DiscoverAside({ data }: { data: DiscoverData }) {
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-              Fellowships
+              Opportunities
             </p>
             <DiscoverTrackedLink
               href="/fellowships"

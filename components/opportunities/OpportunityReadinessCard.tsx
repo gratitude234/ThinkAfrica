@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { OpportunityReadinessSummary } from "@/lib/opportunityReadiness";
+import TrackedActionLink from "@/components/retention/TrackedActionLink";
 
 export default function OpportunityReadinessCard({
   summary,
@@ -9,25 +9,28 @@ export default function OpportunityReadinessCard({
   source: "dashboard" | "profile" | "opportunities";
 }) {
   return (
-    <section className="mb-6 rounded-xl border border-gray-200 bg-white p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <section className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
             Opportunity readiness
           </p>
-          <h2 className="mt-1 text-lg font-semibold text-gray-900">
+          <h2 className="mt-1 text-base font-semibold text-gray-900">
             {summary.statusLabel}
           </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-gray-500">
-            Help partners and collaborators understand what you can do, what work
-            backs it up, and how to reach you.
+          <p className="mt-1 max-w-2xl text-sm text-gray-500">
+            {summary.completedCount} of {summary.totalCount} setup signals are
+            complete.
           </p>
         </div>
-        <div className="min-w-[150px] rounded-xl bg-canvas px-4 py-3 text-center">
-          <p className="text-3xl font-bold text-gray-900">{summary.score}%</p>
-          <p className="text-xs text-gray-500">
-            {summary.completedCount} of {summary.totalCount} complete
-          </p>
+        <div className="flex min-w-[180px] items-center gap-3 rounded-xl bg-canvas px-4 py-3">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-200">
+            <div
+              className="h-full rounded-full bg-emerald-brand"
+              style={{ width: `${summary.score}%` }}
+            />
+          </div>
+          <p className="text-sm font-bold text-gray-900">{summary.score}%</p>
         </div>
       </div>
 
@@ -57,12 +60,15 @@ export default function OpportunityReadinessCard({
             Next:{" "}
             <span className="font-semibold">{summary.nextAction.label}</span>
           </p>
-          <Link
+          <TrackedActionLink
             href={summary.nextAction.actionHref}
+            actionKey={summary.nextAction.key}
+            label={summary.nextAction.actionLabel}
+            source={`opportunity_readiness_${source}`}
             className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
           >
             {summary.nextAction.actionLabel}
-          </Link>
+          </TrackedActionLink>
         </div>
       ) : (
         <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">

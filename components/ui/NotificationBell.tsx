@@ -39,6 +39,7 @@ const TYPE_ICONS: Record<string, string> = {
   post_published: "P",
   revision_requested: "RE",
   response_post: "RE",
+  opportunity_inquiry: "OP",
 };
 
 function notificationText(notification: Notification) {
@@ -57,6 +58,8 @@ function notificationText(notification: Notification) {
       return "A post needs revision";
     case "post_published":
       return "Your post has been published";
+    case "opportunity_inquiry":
+      return "New opportunity inquiry";
     default:
       return "New notification";
   }

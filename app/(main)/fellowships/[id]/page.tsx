@@ -1,6 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getOpportunityShortLabel,
+  getOpportunityStyle,
+  normalizeOpportunityType,
+} from "@/lib/opportunities";
 import { formatDate } from "@/lib/utils";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import FellowshipApply from "./FellowshipApply";
@@ -20,6 +25,7 @@ export default async function FellowshipPage({ params }: PageProps) {
     .single();
 
   if (!fellowship) notFound();
+  const opportunityType = normalizeOpportunityType(fellowship.opportunity_type);
 
   const {
     data: { user },
@@ -46,7 +52,20 @@ export default async function FellowshipPage({ params }: PageProps) {
     <div className="max-w-3xl mx-auto">
       <RetentionEventTracker
         event="fellowship_opened"
-        metadata={{ fellowshipId: id, status: fellowship.status }}
+        metadata={{
+          fellowshipId: id,
+          status: fellowship.status,
+          opportunityType,
+        }}
+      />
+      <RetentionEventTracker
+        event="opportunity_listing_opened"
+        metadata={{
+          fellowshipId: id,
+          status: fellowship.status,
+          opportunityType,
+          source: "detail",
+        }}
       />
       <Link
         href="/fellowships"
@@ -55,7 +74,7 @@ export default async function FellowshipPage({ params }: PageProps) {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        Fellowships
+        Opportunities
       </Link>
 
       <div className="bg-white rounded-xl border border-gray-200 p-8 mb-6">
@@ -69,6 +88,13 @@ export default async function FellowshipPage({ params }: PageProps) {
             }`}
           >
             {fellowship.status === "open" ? "Open" : "Closed"}
+          </span>
+          <span
+            className={`px-2.5 py-0.5 rounded-full border text-xs font-semibold ${getOpportunityStyle(
+              opportunityType
+            )}`}
+          >
+            {getOpportunityShortLabel(opportunityType)}
           </span>
           {daysLeft !== null && daysLeft >= 0 && fellowship.status === "open" && (
             <span
@@ -109,14 +135,42 @@ export default async function FellowshipPage({ params }: PageProps) {
               </p>
             </div>
           )}
+          {fellowship.location && (
+            <div className="bg-canvas rounded-lg p-3">
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Location</p>
+              <p className="text-sm font-semibold text-gray-900">
+                {fellowship.location}
+              </p>
+            </div>
+          )}
         </div>
 
         {fellowship.description && (
           <div className="mb-6">
-            <h2 className="text-sm font-semibold text-gray-900 mb-2">About this Fellowship</h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-2">
+              About this opportunity
+            </h2>
             <p className="text-sm text-gray-600 leading-relaxed">{fellowship.description}</p>
           </div>
         )}
+
+        {fellowship.skills?.length ? (
+          <div className="mb-6">
+            <h2 className="text-sm font-semibold text-gray-900 mb-2">
+              Useful skills
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {fellowship.skills.map((skill: string) => (
+                <span
+                  key={skill}
+                  className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {fellowship.eligibility && (
           <div className="mb-6">
@@ -145,6 +199,7 @@ export default async function FellowshipPage({ params }: PageProps) {
             userId={user?.id ?? null}
             existingApplication={existingApplication}
             fellowshipStatus={fellowship.status}
+            opportunityType={opportunityType}
           />
         </div>
       </div>

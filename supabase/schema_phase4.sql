@@ -17,8 +17,13 @@ create table if not exists public.fellowships (
   eligibility text,
   deadline timestamptz,
   application_url text,
+  opportunity_type text not null default 'fellowship' check (opportunity_type in ('internship', 'research', 'fellowship', 'job')),
+  skills text[] default '{}',
+  location text,
+  featured boolean not null default false,
   status text not null default 'open' check (status in ('open', 'closed')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.fellowship_applications (
@@ -58,10 +63,16 @@ create table if not exists public.talent_profiles (
 create table if not exists public.talent_inquiries (
   id uuid primary key default gen_random_uuid(),
   talent_id uuid not null references public.talent_profiles(id) on delete cascade,
+  sender_id uuid references public.profiles(id) on delete set null,
   organization_name text,
   contact_email text,
+  opportunity_type text check (opportunity_type in ('internship', 'research', 'fellowship', 'job')),
+  role_title text,
   message text,
-  created_at timestamptz not null default now()
+  status text not null default 'new' check (status in ('new', 'read', 'archived')),
+  read_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.sponsor_placements (
@@ -96,10 +107,15 @@ alter table public.profiles add column if not exists verified_type text check (v
 
 create index if not exists fellowships_status_idx on public.fellowships(status);
 create index if not exists fellowships_deadline_idx on public.fellowships(deadline asc);
+create index if not exists fellowships_status_type_deadline_idx on public.fellowships(status, opportunity_type, deadline asc);
+create index if not exists fellowships_featured_idx on public.fellowships(featured, status) where featured = true;
+create index if not exists fellowships_skills_gin_idx on public.fellowships using gin(skills);
 create index if not exists fellowship_applications_fellowship_id_idx on public.fellowship_applications(fellowship_id);
 create index if not exists fellowship_applications_user_id_idx on public.fellowship_applications(user_id);
 create index if not exists institutional_partners_active_idx on public.institutional_partners(active);
 create index if not exists talent_profiles_visibility_idx on public.talent_profiles(visibility);
+create index if not exists talent_inquiries_talent_status_created_idx on public.talent_inquiries(talent_id, status, created_at desc);
+create index if not exists talent_inquiries_sender_idx on public.talent_inquiries(sender_id, created_at desc) where sender_id is not null;
 create index if not exists sponsor_placements_type_active_idx on public.sponsor_placements(placement_type, active);
 
 -- ============================================================
@@ -179,11 +195,23 @@ create policy "Users can manage their own talent profile"
 -- talent_inquiries
 create policy "Anyone authenticated can send inquiries"
   on public.talent_inquiries for insert
-  with check (auth.role() = 'authenticated');
+  with check (
+    auth.role() = 'authenticated'
+    and (sender_id is null or sender_id = auth.uid())
+  );
 
 create policy "Talent can read their own inquiries"
   on public.talent_inquiries for select
   using (
+    exists (select 1 from public.talent_profiles where id = talent_id and user_id = auth.uid())
+  );
+
+create policy "Talent can update their own inquiries"
+  on public.talent_inquiries for update
+  using (
+    exists (select 1 from public.talent_profiles where id = talent_id and user_id = auth.uid())
+  )
+  with check (
     exists (select 1 from public.talent_profiles where id = talent_id and user_id = auth.uid())
   );
 

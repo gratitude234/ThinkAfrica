@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { OPPORTUNITY_TYPES, OPPORTUNITY_LABELS } from "@/lib/opportunities";
+import { submitOpportunityInquiry } from "./opportunityInquiryActions";
 
 interface ContactInquiryModalProps {
   talentProfileId: string;
@@ -55,30 +56,19 @@ export default function ContactInquiryModal({
 
     setSending(true);
 
-    const composedMessage = [
-      inquiry.role_title.trim()
-        ? `Role/opportunity: ${inquiry.role_title.trim()}`
-        : null,
-      inquiry.opportunity_type ? `Opportunity type: ${inquiry.opportunity_type}` : null,
-      `Message: ${message}`,
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    const supabase = createClient();
-    const { error: insertError } = await supabase.from("talent_inquiries").insert([
-      {
-        talent_id: talentProfileId,
-        organization_name: inquiry.organization_name.trim(),
-        contact_email: inquiry.contact_email.trim(),
-        message: composedMessage,
-      },
-    ]);
+    const result = await submitOpportunityInquiry({
+      talentProfileId,
+      organizationName: inquiry.organization_name,
+      contactEmail: inquiry.contact_email,
+      opportunityType: inquiry.opportunity_type,
+      roleTitle: inquiry.role_title,
+      message,
+    });
 
     setSending(false);
 
-    if (insertError) {
-      setError(insertError.message);
+    if (!result.ok) {
+      setError(result.error ?? "Unable to send inquiry.");
       return;
     }
 
@@ -126,9 +116,8 @@ export default function ContactInquiryModal({
               Inquiry sent
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-500">
-              The student will see this as opportunity interest on their
-              dashboard. Email delivery is not configured yet, so use your reply
-              email in the message if you need a direct response.
+              The student will see this in their dashboard and notifications.
+              Your reply email is included so they can follow up directly.
             </p>
             <div className="mt-5 flex justify-end">
               <button
@@ -225,10 +214,11 @@ export default function ContactInquiryModal({
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
             >
               <option value="">Select a type</option>
-              <option value="internship">Internship</option>
-              <option value="research">Research project</option>
-              <option value="fellowship">Fellowship</option>
-              <option value="job">Job</option>
+              {OPPORTUNITY_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {OPPORTUNITY_LABELS[type]}
+                </option>
+              ))}
             </select>
           </div>
 

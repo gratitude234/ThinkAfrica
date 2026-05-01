@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { OPPORTUNITY_LABELS, OPPORTUNITY_TYPES } from "@/lib/opportunities";
 import { createClient } from "@/lib/supabase/client";
 
 export default function FellowshipForm() {
@@ -16,6 +17,10 @@ export default function FellowshipForm() {
     eligibility: "",
     deadline: "",
     application_url: "",
+    opportunity_type: "fellowship",
+    skills: "",
+    location: "",
+    featured: false,
     status: "open",
   });
 
@@ -23,13 +28,42 @@ export default function FellowshipForm() {
     e.preventDefault();
     setLoading(true);
     const supabase = createClient();
+    const skills = form.skills
+      .split(",")
+      .map((skill) => skill.trim().toLowerCase())
+      .filter(Boolean)
+      .slice(0, 8);
+
     await supabase.from("fellowships").insert([{
-      ...form,
+      title: form.title,
+      description: form.description || null,
+      sponsor_name: form.sponsor_name || null,
+      amount: form.amount || null,
+      eligibility: form.eligibility || null,
       deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
+      application_url: form.application_url || null,
+      opportunity_type: form.opportunity_type,
+      skills,
+      location: form.location || null,
+      featured: form.featured,
+      status: form.status,
     }]);
     setLoading(false);
     setOpen(false);
-    setForm({ title: "", description: "", sponsor_name: "", amount: "", eligibility: "", deadline: "", application_url: "", status: "open" });
+    setForm({
+      title: "",
+      description: "",
+      sponsor_name: "",
+      amount: "",
+      eligibility: "",
+      deadline: "",
+      application_url: "",
+      opportunity_type: "fellowship",
+      skills: "",
+      location: "",
+      featured: false,
+      status: "open",
+    });
     router.refresh();
   };
 
@@ -39,14 +73,14 @@ export default function FellowshipForm() {
         onClick={() => setOpen(true)}
         className="px-4 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors"
       >
-        + Add New Fellowship
+        + Add Opportunity
       </button>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-4 mb-6">
-      <h3 className="font-semibold text-gray-900">New Fellowship</h3>
+      <h3 className="font-semibold text-gray-900">New curated opportunity</h3>
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
@@ -59,8 +93,22 @@ export default function FellowshipForm() {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-          <input type="text" placeholder="e.g. $500 grant" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+          <select value={form.opportunity_type} onChange={e => setForm({ ...form, opportunity_type: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent">
+            {OPPORTUNITY_TYPES.map((type) => (
+              <option key={type} value={type}>{OPPORTUNITY_LABELS[type]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Award or pay</label>
+          <input type="text" placeholder="e.g. $500 grant, paid internship" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+          <input type="text" placeholder="Remote, Lagos, Nairobi..." value={form.location} onChange={e => setForm({ ...form, location: e.target.value })}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent" />
         </div>
         <div>
@@ -75,6 +123,13 @@ export default function FellowshipForm() {
             <option value="open">Open</option>
             <option value="closed">Closed</option>
           </select>
+        </div>
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Skills</label>
+          <input type="text" value={form.skills} onChange={e => setForm({ ...form, skills: e.target.value })}
+            placeholder="research, policy analysis, data visualization"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent" />
+          <p className="mt-1 text-xs text-gray-400">Separate skills with commas.</p>
         </div>
         <div className="col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -92,11 +147,20 @@ export default function FellowshipForm() {
             placeholder="https://..."
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent" />
         </div>
+        <label className="col-span-2 flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={form.featured}
+            onChange={e => setForm({ ...form, featured: e.target.checked })}
+            className="h-4 w-4 rounded border-gray-300 text-emerald-brand focus:ring-emerald-brand"
+          />
+          Feature on the opportunity hub
+        </label>
       </div>
       <div className="flex gap-2">
         <button type="submit" disabled={loading}
           className="px-4 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors">
-          {loading ? "Saving..." : "Save Fellowship"}
+          {loading ? "Saving..." : "Save opportunity"}
         </button>
         <button type="button" onClick={() => setOpen(false)}
           className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">

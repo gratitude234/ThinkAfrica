@@ -1,19 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-
-const OPPORTUNITY_LABELS: Record<string, string> = {
-  internship: "Internship",
-  research: "Research",
-  fellowship: "Fellowship",
-  job: "Job",
-};
-
-const OPPORTUNITY_STYLES: Record<string, string> = {
-  internship: "bg-blue-50 text-blue-700",
-  research: "bg-purple-50 text-purple-700",
-  fellowship: "bg-amber-50 text-amber-700",
-  job: "bg-emerald-50 text-emerald-700",
-};
+import {
+  getOpportunityShortLabel,
+  getOpportunityStyle,
+} from "@/lib/opportunities";
 
 export default async function TalentPage() {
   const supabase = await createClient();
@@ -99,11 +89,11 @@ export default async function TalentPage() {
                     {t.opportunity_types.slice(0, 3).map((type: string) => (
                       <span
                         key={type}
-                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                          OPPORTUNITY_STYLES[type] ?? "bg-gray-100 text-gray-600"
-                        }`}
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full border ${getOpportunityStyle(
+                          type
+                        )}`}
                       >
-                        {OPPORTUNITY_LABELS[type] ?? type}
+                        {getOpportunityShortLabel(type)}
                       </span>
                     ))}
                   </div>

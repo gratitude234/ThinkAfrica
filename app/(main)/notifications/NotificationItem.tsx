@@ -41,6 +41,7 @@ const TYPE_ICONS: Record<string, string> = {
   co_author_accepted: "OK",
   co_author_declined: "NO",
   response_post: "RE",
+  opportunity_inquiry: "OP",
 };
 
 function buildMessage(notification: NotificationData): string {
@@ -80,6 +81,8 @@ function buildMessage(notification: NotificationData): string {
       return `${actorName} declined your co-author invitation on: ${postTitle}`;
     case "response_post":
       return `${actorName} wrote a response to "${postTitle}"`;
+    case "opportunity_inquiry":
+      return "New opportunity inquiry";
     default:
       return "New notification";
   }
@@ -106,6 +109,8 @@ function buildLink(notification: NotificationData): string | null {
     case "debate_reply":
     case "debate_argument":
       return "/debates";
+    case "opportunity_inquiry":
+      return "/dashboard#opportunity-interest";
     default:
       return null;
   }

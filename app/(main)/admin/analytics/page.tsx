@@ -470,7 +470,7 @@ export default async function AdminAnalyticsPage() {
             trendLabel="persisted contact interest"
           />
           <HealthCard
-            label="Fellowship Applications"
+            label="Opportunity Applications"
             value={totalApplications ?? 0}
             trend="neutral"
             trendLabel="submitted applications"
@@ -578,7 +578,7 @@ export default async function AdminAnalyticsPage() {
         />
         <StatCard label="Debates Created" value={totalDebates ?? 0} />
         <StatCard label="Webinars Hosted" value={totalWebinars ?? 0} />
-        <StatCard label="Fellowship Applications" value={totalApplications ?? 0} />
+        <StatCard label="Opportunity Applications" value={totalApplications ?? 0} />
         <StatCard label="Total Page Views" value={totalViews} />
       </div>
 

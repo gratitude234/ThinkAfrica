@@ -4,13 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ContactInquiryModal from "@/components/profile/ContactInquiryModal";
-
-const OPPORTUNITY_LABELS: Record<string, string> = {
-  internship: "Internship",
-  research: "Research",
-  fellowship: "Fellowship",
-  job: "Job",
-};
+import { getOpportunityShortLabel } from "@/lib/opportunities";
 
 interface OpportunityBannerProps {
   isOwnProfile: boolean;
@@ -36,7 +30,7 @@ export default function OpportunityBanner({
 
   const typeLabel = useMemo(() => {
     const labels =
-      opportunityTypes?.map((type) => OPPORTUNITY_LABELS[type] ?? type) ?? [];
+      opportunityTypes?.map((type) => getOpportunityShortLabel(type)) ?? [];
     return labels.length > 0 ? labels.join(" / ") : "";
   }, [opportunityTypes]);
 

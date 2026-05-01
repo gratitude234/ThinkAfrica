@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getOpportunityShortLabel,
+  getOpportunityStyle,
+} from "@/lib/opportunities";
 import { formatDate } from "@/lib/utils";
 import FellowshipForm from "./FellowshipForm";
 import ApplicationActions from "./ApplicationActions";
@@ -23,7 +27,7 @@ export default async function AdminFellowshipsPage() {
 
   const { data: fellowships } = await supabase
     .from("fellowships")
-    .select("id, title, status, deadline, sponsor_name")
+    .select("id, title, status, deadline, sponsor_name, opportunity_type, location, featured")
     .order("created_at", { ascending: false });
 
   const { data: applicationsRaw } = await supabase
@@ -52,16 +56,16 @@ export default async function AdminFellowshipsPage() {
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Manage Fellowships</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Manage Opportunities</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            {(fellowships ?? []).length} fellowships · {totalApps} applications
+            {(fellowships ?? []).length} opportunities / {totalApps} applications
           </p>
         </div>
         <FellowshipForm />
       </div>
 
       {(fellowships ?? []).length === 0 ? (
-        <div className="text-center py-16 text-gray-400">No fellowships yet.</div>
+        <div className="text-center py-16 text-gray-400">No opportunities yet.</div>
       ) : (
         <div className="space-y-8">
           {(fellowships ?? []).map((fellowship) => {
@@ -73,10 +77,19 @@ export default async function AdminFellowshipsPage() {
                     <h2 className="font-semibold text-gray-900">{fellowship.title}</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {fellowship.sponsor_name && `${fellowship.sponsor_name} · `}
+                      {fellowship.location && `${fellowship.location} / `}
                       {fellowship.deadline ? `Deadline: ${formatDate(fellowship.deadline)}` : "No deadline"}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${getOpportunityStyle(fellowship.opportunity_type)}`}>
+                      {getOpportunityShortLabel(fellowship.opportunity_type)}
+                    </span>
+                    {fellowship.featured ? (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-ink text-white">
+                        Featured
+                      </span>
+                    ) : null}
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full border capitalize ${
                       fellowship.status === "open" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-gray-100 text-gray-500 border-gray-200"
                     }`}>
