@@ -1,6 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import { POST_TYPE_LABELS, type PostType } from "@/lib/utils";
+import {
+  POST_TYPE_LABELS,
+  sanitizePostExcerpt,
+  type PostType,
+} from "@/lib/utils";
 
 interface PickPost {
   id: string;
@@ -44,7 +48,7 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
           const author = pick.profiles;
           const typeLabel = POST_TYPE_LABELS[pick.type as PostType] ?? pick.type;
           const coverBg = COVER_COLORS[pick.type] ?? "bg-[#444441]";
-          const readTime = estimateReadTime(pick.excerpt);
+          const readTime = estimateReadTime(sanitizePostExcerpt(pick.excerpt));
 
           return (
             <Link

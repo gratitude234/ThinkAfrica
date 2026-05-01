@@ -27,6 +27,33 @@ export function generateExcerpt(content: string, maxLength = 200): string {
   return `${text.substring(0, maxLength).replace(/\w+$/, "")}...`;
 }
 
+export function sanitizePostExcerpt(excerpt: string | null): string | null {
+  if (!excerpt) return null;
+
+  const cleaned = excerpt
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(body|excerpt|abstract)\s*:\s*/i, "");
+
+  return cleaned || null;
+}
+
+export function formatTimeUntil(dateString: string | null): string | null {
+  if (!dateString) return null;
+
+  const diffMs = new Date(dateString).getTime() - Date.now();
+  if (diffMs <= 0) return "Ending soon";
+
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+
+  if (days > 0) return `${days}d away`;
+  if (hours > 0) return `${hours}h away`;
+  return `${Math.max(1, minutes)}m away`;
+}
+
 export const POST_TYPE_LABELS: Record<PostType, string> = {
   blog: "Blog",
   essay: "Essay",

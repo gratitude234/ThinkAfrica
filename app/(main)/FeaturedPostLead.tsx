@@ -1,6 +1,11 @@
 ﻿import Image from "next/image";
 import Link from "next/link";
-import { formatDate, POST_TYPE_LABELS, type PostType } from "@/lib/utils";
+import {
+  formatDate,
+  POST_TYPE_LABELS,
+  sanitizePostExcerpt,
+  type PostType,
+} from "@/lib/utils";
 
 interface FeaturedPost {
   id: string;
@@ -33,26 +38,27 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
   const authorName = author?.full_name ?? author?.username ?? "ThinkAfrica";
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
   const readTime = estimateReadTime(post.excerpt);
+  const excerpt = sanitizePostExcerpt(post.excerpt);
 
   return (
-    <article className="mb-1.5">
+    <article className="mb-1">
       <Link href={`/post/${post.slug}`} className="block">
         {post.cover_image_url ? (
           <div
             data-lite-hide
-            className="relative mb-[18px] h-[220px] w-full overflow-hidden rounded-xl"
+            className="relative mb-4 h-[198px] w-full overflow-hidden rounded-xl md:h-[208px]"
           >
             <Image
               src={post.cover_image_url}
               alt={post.title}
               fill
               sizes="(max-width: 1024px) 100vw, 66vw"
-              className="object-cover"
+              className="object-cover object-top"
               priority
             />
           </div>
         ) : (
-          <div className="mb-[18px] flex h-[220px] w-full items-end rounded-xl bg-gradient-to-br from-[#2D2C2A] to-[#444441] p-5">
+          <div className="mb-4 flex h-[198px] w-full items-end rounded-xl bg-gradient-to-br from-[#2D2C2A] to-[#444441] p-5 md:h-[208px]">
             <span className="font-display text-xs italic tracking-wide text-white/50">
               {typeLabel.toLowerCase()}
             </span>
@@ -70,14 +76,14 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
       </p>
 
       <Link href={`/post/${post.slug}`}>
-        <h2 className="font-display mb-2.5 text-[26px] font-semibold leading-[1.2] text-ink transition-colors hover:text-gray-700">
+        <h2 className="font-display mb-2 text-[25px] font-semibold leading-[1.18] text-ink transition-colors hover:text-gray-700">
           {post.title}
         </h2>
       </Link>
 
-      {post.excerpt ? (
-        <p className="font-display mb-4 text-base italic leading-[1.65] text-gray-500">
-          {post.excerpt}
+      {excerpt ? (
+        <p className="font-display mb-3.5 line-clamp-3 text-[15px] italic leading-[1.6] text-gray-500">
+          {excerpt}
         </p>
       ) : null}
 

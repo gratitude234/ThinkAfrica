@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   formatRelativeTime,
   POST_TYPE_LABELS,
+  sanitizePostExcerpt,
   type PostType,
 } from "@/lib/utils";
 
@@ -72,7 +73,8 @@ export default function PostCard({
   const author = post.profiles;
   const displayDate = post.published_at ?? post.created_at;
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
-  const readTime = estimateReadTime(post.excerpt);
+  const excerpt = sanitizePostExcerpt(post.excerpt);
+  const readTime = estimateReadTime(excerpt);
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
   const authorHref = author?.username ? `/${author.username}` : null;
   const coAuthorCount = post.co_authors?.length ?? 0;
@@ -107,9 +109,9 @@ export default function PostCard({
             </h2>
           </Link>
 
-          {post.excerpt ? (
+          {excerpt ? (
             <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-gray-500">
-              {post.excerpt}
+              {excerpt}
             </p>
           ) : null}
 

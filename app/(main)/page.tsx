@@ -5,7 +5,6 @@ import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import { getActivationState, type ActivationState } from "@/lib/activation";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import DailyBriefStrip from "./DailyBriefStrip";
 import EditorPicksRow from "./EditorPicksRow";
@@ -46,13 +45,31 @@ interface FeaturedPostRaw {
 
 interface VoicePostRaw {
   author_id: string;
+  published_at: string | null;
   profiles: VoiceProfile | VoiceProfile[] | null;
 }
 
 interface UpcomingWebinar {
   id: string;
   title: string;
+  status: string;
   scheduled_at: string;
+  attendee_count: number | null;
+  tags: string[] | null;
+  profiles:
+    | {
+        username: string | null;
+        full_name: string | null;
+        university: string | null;
+        avatar_url: string | null;
+      }
+    | Array<{
+        username: string | null;
+        full_name: string | null;
+        university: string | null;
+        avatar_url: string | null;
+      }>
+    | null;
 }
 
 interface VoiceProfile {
@@ -138,8 +155,11 @@ export default async function HomePage({ searchParams }: PageProps) {
 
     supabase
       .from("debates")
-      .select("id, title, debate_arguments(count)")
+      .select(
+        "id, title, status, ends_at, motion_for_count, motion_against_count, debate_arguments(count)"
+      )
       .in("status", ["open", "active"])
+      .order("status", { ascending: true })
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -174,9 +194,12 @@ export default async function HomePage({ searchParams }: PageProps) {
 
     supabase
       .from("webinars")
-      .select("id, title, scheduled_at")
-      .eq("status", "scheduled")
+      .select(
+        "id, title, status, scheduled_at, attendee_count, tags, profiles!webinars_host_id_fkey (username, full_name, university, avatar_url)"
+      )
+      .in("status", ["scheduled", "live"])
       .gte("scheduled_at", new Date().toISOString())
+      .order("status", { ascending: true })
       .order("scheduled_at", { ascending: true })
       .limit(1)
       .maybeSingle(),
@@ -186,6 +209,7 @@ export default async function HomePage({ searchParams }: PageProps) {
       .select(
         `
         author_id,
+        published_at,
         profiles!posts_author_id_fkey (username, full_name, university, avatar_url)
       `
       )
@@ -209,17 +233,29 @@ export default async function HomePage({ searchParams }: PageProps) {
       : 0
     : 0;
 
-  const activeDebate: DebateInterludeData | null = FEATURE_FLAGS.debates && hotDebateRaw
+  const homeDebate: DebateInterludeData | null = hotDebateRaw
     ? {
         id: hotDebateRaw.id,
         title: hotDebateRaw.title,
+        status: hotDebateRaw.status,
+        endsAt: hotDebateRaw.ends_at,
         argumentCount: hotDebateArgumentCount,
+        motionForCount: hotDebateRaw.motion_for_count ?? 0,
+        motionAgainstCount: hotDebateRaw.motion_against_count ?? 0,
       }
     : null;
 
   const featuredPostsRaw = (featuredPostsResult.data ?? []) as FeaturedPostRaw[];
-  const upcomingWebinar =
+  const upcomingWebinarRaw =
     (upcomingWebinarResult.data as UpcomingWebinar | null) ?? null;
+  const upcomingWebinar = upcomingWebinarRaw
+    ? {
+        ...upcomingWebinarRaw,
+        profiles: Array.isArray(upcomingWebinarRaw.profiles)
+          ? upcomingWebinarRaw.profiles[0] ?? null
+          : upcomingWebinarRaw.profiles,
+      }
+    : null;
   const newVoiceRaw = (newVoiceResult.data ?? []) as VoicePostRaw[];
 
   const featuredPostsNorm = featuredPostsRaw.map((post) => ({
@@ -229,11 +265,36 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   const [featuredPost = null, ...editorPicksRaw] = featuredPostsNorm;
   const editorPicks = editorPicksRaw.slice(0, 2);
+  const newVoiceAuthorIds = Array.from(
+    new Set(
+      newVoiceRaw
+        .map((row) => row.author_id)
+        .filter((authorId) => authorId && authorId !== featuredPost?.author_id)
+    )
+  );
+  const { data: newVoiceTotalRows } =
+    newVoiceAuthorIds.length > 0
+      ? await supabase
+          .from("posts")
+          .select("author_id")
+          .eq("status", "published")
+          .in("author_id", newVoiceAuthorIds)
+      : { data: [] };
+  const totalPostsByAuthor = (newVoiceTotalRows ?? []).reduce(
+    (acc: Record<string, number>, row: { author_id?: string }) => {
+      if (!row.author_id) return acc;
+      acc[row.author_id] = (acc[row.author_id] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
 
   const voiceCounts = new Map<
     string,
     {
       count: number;
+      totalPosts: number;
+      firstPublishedAt: string | null;
       profile: VoiceProfile | null;
     }
   >();
@@ -246,13 +307,29 @@ export default async function HomePage({ searchParams }: PageProps) {
     const existing = voiceCounts.get(row.author_id);
     voiceCounts.set(row.author_id, {
       count: (existing?.count ?? 0) + 1,
+      totalPosts: totalPostsByAuthor[row.author_id] ?? existing?.totalPosts ?? 1,
+      firstPublishedAt:
+        !existing?.firstPublishedAt ||
+        (row.published_at &&
+          new Date(row.published_at).getTime() <
+            new Date(existing.firstPublishedAt).getTime())
+          ? row.published_at
+          : existing.firstPublishedAt,
       profile,
     });
   }
 
   const newVoice =
-    Array.from(voiceCounts.values()).sort((left, right) => right.count - left.count)[0] ??
-    null;
+    Array.from(voiceCounts.values()).sort((left, right) => {
+      if (left.totalPosts !== right.totalPosts) {
+        return left.totalPosts - right.totalPosts;
+      }
+      if (left.count !== right.count) return right.count - left.count;
+      return (
+        new Date(right.firstPublishedAt ?? 0).getTime() -
+        new Date(left.firstPublishedAt ?? 0).getTime()
+      );
+    })[0] ?? null;
 
   let peopleResult: SuggestedPeopleResult = { suggestions: [], reason: "" };
   let activationState: ActivationState | null = null;
@@ -288,7 +365,7 @@ export default async function HomePage({ searchParams }: PageProps) {
 
       <DailyBriefStrip
         featuredPost={featuredPost}
-        activeDebate={activeDebate}
+        activeDebate={homeDebate}
         points={userPoints}
       />
 
@@ -308,7 +385,7 @@ export default async function HomePage({ searchParams }: PageProps) {
               userUniversity={userUniversity}
               followedIds={followedIds}
               showFollowingEligible={showFollowingEligible}
-              activeDebate={activeDebate}
+              activeDebate={homeDebate}
               peopleSuggestions={peopleResult.suggestions}
               peopleSuggestionReason={peopleResult.reason}
               prioritizePeopleSuggestions={followCount < 3}
@@ -318,9 +395,9 @@ export default async function HomePage({ searchParams }: PageProps) {
 
         <aside className="hidden self-start lg:sticky lg:top-[76px] lg:block">
           <HomeSidebar
-            activeDebate={activeDebate}
+            activeDebate={homeDebate}
             newVoice={newVoice}
-            upcomingWebinar={FEATURE_FLAGS.webinars ? upcomingWebinar : null}
+            upcomingWebinar={upcomingWebinar}
             recentDraft={recentDraft ?? null}
             activationState={activationState}
             peopleSuggestions={peopleResult.suggestions}

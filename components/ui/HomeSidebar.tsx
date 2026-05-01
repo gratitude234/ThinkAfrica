@@ -2,12 +2,14 @@
 import type { ReactNode } from "react";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { ActivationState } from "@/lib/activation";
-import { formatDate, formatRelativeTime } from "@/lib/utils";
+import { formatDate, formatRelativeTime, formatTimeUntil } from "@/lib/utils";
 import FollowButton from "@/components/ui/FollowButton";
 import UserAvatar from "@/components/ui/UserAvatar";
 
 interface NewVoice {
   count: number;
+  totalPosts?: number;
+  firstPublishedAt?: string | null;
   profile: {
     username: string | null;
     full_name: string | null;
@@ -19,7 +21,16 @@ interface NewVoice {
 interface UpcomingWebinar {
   id: string;
   title: string;
+  status: string;
   scheduled_at: string;
+  attendee_count: number | null;
+  tags: string[] | null;
+  profiles: {
+    username: string | null;
+    full_name: string | null;
+    university: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 interface RecentDraft {
@@ -46,9 +57,17 @@ interface Props {
   currentUserId: string | null;
 }
 
-function SideKicker({ children }: { children: ReactNode }) {
+function SideKicker({
+  children,
+  className = "mb-2.5",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+    <p
+      className={`${className} flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted`}
+    >
       {children}
     </p>
   );
@@ -59,6 +78,47 @@ function SideCard({ children }: { children: ReactNode }) {
     <section className="rounded-xl border border-gray-200 bg-white p-4">
       {children}
     </section>
+  );
+}
+
+function getDebateShare(debate: DebateInterludeData) {
+  const forCount = debate.motionForCount ?? 0;
+  const againstCount = debate.motionAgainstCount ?? 0;
+  const total = forCount + againstCount;
+  const forPct = total > 0 ? Math.round((forCount / total) * 100) : 50;
+
+  return {
+    forPct,
+    againstPct: 100 - forPct,
+    total,
+  };
+}
+
+function PromptCard({
+  kicker,
+  title,
+  body,
+  href,
+  cta,
+}: {
+  kicker: string;
+  title: string;
+  body: string;
+  href: string;
+  cta: string;
+}) {
+  return (
+    <SideCard>
+      <SideKicker>{kicker}</SideKicker>
+      <p className="text-sm font-semibold leading-snug text-ink">{title}</p>
+      <p className="mt-1.5 text-xs leading-5 text-ink-muted">{body}</p>
+      <Link
+        href={href}
+        className="mt-3 inline-flex rounded-lg border border-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-brand transition-colors hover:bg-emerald-50"
+      >
+        {cta}
+      </Link>
+    </SideCard>
   );
 }
 
@@ -137,15 +197,16 @@ export default function HomeSidebar({
   peopleSuggestions,
   currentUserId,
 }: Props) {
-  const hasAnyCard =
-    (activationState && !activationState.activated) ||
-    recentDraft ||
-    activeDebate ||
-    newVoice?.profile?.username ||
-    upcomingWebinar ||
-    peopleSuggestions.length > 0;
-
-  if (!hasAnyCard) return null;
+  const debateShare = activeDebate ? getDebateShare(activeDebate) : null;
+  const debateRemaining = activeDebate
+    ? formatTimeUntil(activeDebate.endsAt ?? null)
+    : null;
+  const webinarHost = upcomingWebinar?.profiles;
+  const webinarTiming = upcomingWebinar
+    ? upcomingWebinar.status === "live"
+      ? "Live now"
+      : formatTimeUntil(upcomingWebinar.scheduled_at)
+    : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -174,72 +235,138 @@ export default function HomeSidebar({
       ) : null}
 
       {activeDebate ? (
-        <SideCard>
+        <section className="rounded-xl border border-gray-900 bg-gray-900 p-4 text-white shadow-sm">
           <SideKicker>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-brand" />
-            Happening now
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+            <span className="text-emerald-300">Happening now</span>
           </SideKicker>
           <Link href={`/debates/${activeDebate.id}`}>
-            <h3 className="font-display mb-1.5 text-sm font-semibold leading-snug text-ink transition-colors hover:text-gray-700">
+            <h3 className="font-display mb-2 text-sm font-semibold leading-snug text-white transition-colors hover:text-emerald-100">
               {activeDebate.title}
             </h3>
           </Link>
-          <p className="mb-2 text-xs text-ink-muted">
-            {activeDebate.argumentCount.toLocaleString()} arguments - live
+          <p className="mb-3 text-xs text-gray-400">
+            {activeDebate.argumentCount.toLocaleString()} arguments
+            {debateRemaining ? ` - ${debateRemaining}` : ""}
           </p>
-          <div className="mb-2 flex h-1 overflow-hidden rounded-full bg-gray-100">
-            <span className="h-full rounded-full bg-emerald-brand" style={{ width: "58%" }} />
-            <span className="h-full rounded-full bg-purple-accent" style={{ width: "42%" }} />
+          <div className="mb-2 flex h-1.5 overflow-hidden rounded-full bg-gray-700">
+            <span
+              className="h-full rounded-full bg-emerald-brand"
+              style={{ width: `${debateShare?.forPct ?? 50}%` }}
+            />
+            <span
+              className="h-full rounded-full bg-purple-accent"
+              style={{ width: `${debateShare?.againstPct ?? 50}%` }}
+            />
           </div>
           <div className="mb-2.5 flex justify-between text-[11px] font-medium">
-            <span className="text-emerald-brand">For - 58%</span>
-            <span className="text-purple-accent">Against - 42%</span>
+            <span className="text-emerald-300">For - {debateShare?.forPct ?? 50}%</span>
+            <span className="text-purple-300">
+              Against - {debateShare?.againstPct ?? 50}%
+            </span>
           </div>
+          {debateShare && debateShare.total === 0 ? (
+            <p className="mb-2.5 text-[11px] text-gray-400">
+              No motion votes yet. Be one of the first voices in.
+            </p>
+          ) : null}
           <Link
             href={`/debates/${activeDebate.id}`}
-            className="text-xs font-medium text-ink hover:underline"
+            className="inline-flex rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
           >
             Join the debate -&gt;
           </Link>
-        </SideCard>
-      ) : null}
+        </section>
+      ) : (
+        <PromptCard
+          kicker="Debate desk"
+          title="No live motion yet"
+          body="Start a focused argument and invite the network to take a side."
+          href="/debates/create"
+          cta="Start a debate"
+        />
+      )}
 
       {newVoice?.profile?.username ? (
         <SideCard>
-          <SideKicker>New voice this week</SideKicker>
+          <div className="mb-2.5 flex items-center justify-between gap-3">
+            <SideKicker className="mb-0">New voice this week</SideKicker>
+            {newVoice.totalPosts && newVoice.totalPosts <= 2 ? (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                New
+              </span>
+            ) : null}
+          </div>
           <Link
             href={`/${newVoice.profile.username}`}
-            className="group flex items-center gap-2.5"
+            className="group flex items-center gap-3"
           >
             <UserAvatar
               name={newVoice.profile.full_name ?? newVoice.profile.username}
               src={newVoice.profile.avatar_url}
-              size={40}
+              size={42}
             />
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium text-ink group-hover:text-gray-700">
                 {newVoice.profile.full_name ?? newVoice.profile.username}
               </span>
               <span className="mt-0.5 block truncate text-[11px] text-ink-muted">
-                {newVoice.count} {newVoice.count === 1 ? "essay" : "essays"} this month
+                {newVoice.count} recent {newVoice.count === 1 ? "piece" : "pieces"}
                 {newVoice.profile.university ? ` - ${newVoice.profile.university}` : ""}
               </span>
             </span>
           </Link>
+          <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-[11px] leading-5 text-ink-muted">
+            {newVoice.totalPosts && newVoice.totalPosts <= 1
+              ? "First publication on ThinkAfrica. Worth catching early."
+              : `${newVoice.totalPosts ?? newVoice.count} total publications, newly active this month.`}
+          </p>
         </SideCard>
       ) : null}
 
       {upcomingWebinar ? (
         <SideCard>
-          <SideKicker>Upcoming</SideKicker>
+          <div className="mb-2.5 flex items-center justify-between gap-3">
+            <SideKicker className="mb-0">
+              {upcomingWebinar.status === "live" ? (
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+              ) : null}
+              Upcoming webinar
+            </SideKicker>
+            {webinarTiming ? (
+              <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                {webinarTiming}
+              </span>
+            ) : null}
+          </div>
           <p className="mb-1 text-[11px] font-medium text-emerald-brand">
-            {formatDate(upcomingWebinar.scheduled_at)} - Webinar
+            {formatDate(upcomingWebinar.scheduled_at)}
           </p>
-          <Link href="/webinars">
+          <Link href={`/webinars/${upcomingWebinar.id}`}>
             <p className="font-display text-sm font-semibold leading-snug text-ink transition-colors hover:text-gray-700">
               {upcomingWebinar.title}
             </p>
           </Link>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-muted">
+            {webinarHost ? (
+              <span className="truncate">
+                Hosted by {webinarHost.full_name ?? webinarHost.username}
+              </span>
+            ) : null}
+            <span>{upcomingWebinar.attendee_count ?? 0} registered</span>
+          </div>
+          {upcomingWebinar.tags && upcomingWebinar.tags.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {upcomingWebinar.tags.slice(0, 2).map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <Link
             href={`/webinars/${upcomingWebinar.id}`}
             className="mt-2.5 inline-flex rounded-md border border-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-brand hover:bg-emerald-50"
@@ -247,12 +374,20 @@ export default function HomeSidebar({
             Register free
           </Link>
         </SideCard>
-      ) : null}
+      ) : (
+        <PromptCard
+          kicker="Events"
+          title="No session scheduled"
+          body="Host a focused webinar, workshop, or reading session for the network."
+          href="/webinars/create"
+          cta="Host a webinar"
+        />
+      )}
 
       {peopleSuggestions.length > 0 ? (
         <SideCard>
           <div className="mb-2.5 flex items-center justify-between">
-            <SideKicker>Writers to follow</SideKicker>
+            <SideKicker className="mb-0">Writers to follow</SideKicker>
             <Link
               href="/leaderboard"
               className="text-[11px] font-semibold text-emerald-brand hover:underline"
