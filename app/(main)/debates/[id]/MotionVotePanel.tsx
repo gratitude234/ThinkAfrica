@@ -65,7 +65,7 @@ export default function MotionVotePanel({
   };
 
   return (
-    <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
       <p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-400">
         {isClosed ? "Final community verdict" : "Vote on the motion"}
       </p>
@@ -91,8 +91,8 @@ export default function MotionVotePanel({
             disabled={loading}
             className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-colors disabled:opacity-50 ${
               userVote === "against"
-                ? "border-red-500 bg-red-500 text-white"
-                : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                ? "border-amber-500 bg-amber-500 text-white"
+                : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
             }`}
           >
             {userVote === "against" ? "Voted AGAINST" : "Vote AGAINST"}
@@ -116,7 +116,7 @@ export default function MotionVotePanel({
             style={{ width: `${forPct}%` }}
           />
           <div
-            className="bg-red-400 transition-all duration-500"
+            className="bg-amber-400 transition-all duration-500"
             style={{ width: `${againstPct}%` }}
           />
         </div>
@@ -127,7 +127,7 @@ export default function MotionVotePanel({
           {forPct}% FOR <span className="font-normal text-gray-400">({forCount})</span>
         </span>
         <span className="text-xs text-gray-400">{total} votes</span>
-        <span className="font-semibold text-red-700">
+        <span className="font-semibold text-amber-700">
           <span className="font-normal text-gray-400">({againstCount})</span>{" "}
           {againstPct}% AGAINST
         </span>
@@ -141,7 +141,7 @@ export default function MotionVotePanel({
             forCount > againstCount
               ? "bg-emerald-50 text-emerald-800"
               : againstCount > forCount
-                ? "bg-red-50 text-red-800"
+                ? "bg-amber-50 text-amber-800"
                 : "bg-gray-100 text-gray-600"
           }`}
         >

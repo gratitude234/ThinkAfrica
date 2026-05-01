@@ -125,7 +125,8 @@ export default function ArgumentForm({
           Choose your side to join the debate
         </p>
         <p className="mb-4 text-xs text-gray-400">
-          Your position is locked once you join. Choose carefully.
+          Your position is locked once you join. You can vote separately, but
+          your arguments will stay on this side.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -140,7 +141,7 @@ export default function ArgumentForm({
             type="button"
             onClick={() => void handleJoin("against")}
             disabled={joining}
-            className="flex items-center justify-center gap-2 rounded-xl border-2 border-red-300 bg-red-50 px-4 py-4 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-4 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
           >
             {joining && joiningStance === "against"
               ? "Joining..."
@@ -155,7 +156,7 @@ export default function ArgumentForm({
   const stanceColor =
     lockedStance === "for"
       ? "border-emerald-200 bg-emerald-100 text-emerald-700"
-      : "border-red-200 bg-red-100 text-red-700";
+      : "border-amber-200 bg-amber-100 text-amber-700";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">

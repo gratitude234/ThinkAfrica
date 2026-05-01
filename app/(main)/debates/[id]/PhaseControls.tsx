@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { type DebatePhase, PHASE_LABELS } from "@/lib/debatePhases";
-import { closeDebateAction } from "./actions";
+import { closeDebateAction, startDebateAction } from "./actions";
 
 interface PhaseControlsProps {
   debateId: string;
@@ -25,22 +25,57 @@ export default function PhaseControls({
 
   const isLastPhase = currentPhase === "closing";
   const isClosed = debateStatus === "closed";
+  const isOpen = debateStatus === "open";
   const nextPhase = PHASE_ORDER[PHASE_ORDER.indexOf(currentPhase) + 1];
 
   if (isClosed) return null;
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs font-bold uppercase tracking-wide text-amber-700">
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <span className="text-xs font-bold uppercase tracking-wide text-amber-700">
           Moderator
-        </span>
-        <span className="text-xs text-amber-600">
-          Current: {PHASE_LABELS[currentPhase]}
-        </span>
+          </span>
+          <p className="mt-1 text-sm font-semibold text-amber-950">
+            {isOpen
+              ? "Open motion: start the debate when both sides are ready."
+              : `Current phase: ${PHASE_LABELS[currentPhase]}`}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-amber-700">
+            {isOpen
+              ? "Starting locks the room into structured rounds and opens argument submission."
+              : "Advance the room only when the current phase has enough substantive arguments."}
+          </p>
+        </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {!isLastPhase ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {isOpen ? (
+            <button
+              type="button"
+              disabled={loading !== null}
+              onClick={async () => {
+                setLoading("advance");
+                setError(null);
+
+                try {
+                  await startDebateAction(debateId);
+                  router.refresh();
+                } catch (actionError) {
+                  setError(
+                    actionError instanceof Error
+                      ? actionError.message
+                      : "Failed to start debate."
+                  );
+                }
+
+                setLoading(null);
+              }}
+              className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            >
+              {loading === "advance" ? "Starting..." : "Start Debate"}
+            </button>
+          ) : !isLastPhase ? (
             <button
               type="button"
               disabled={loading !== null}
@@ -73,7 +108,7 @@ export default function PhaseControls({
             </span>
           )}
 
-          {isLastPhase ? (
+          {!isOpen && isLastPhase ? (
             <button
               type="button"
               disabled={loading !== null}

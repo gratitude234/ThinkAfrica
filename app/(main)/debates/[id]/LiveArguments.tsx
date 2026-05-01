@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { type DebatePhase, PHASE_LABELS } from "@/lib/debatePhases";
+import {
+  type DebatePhase,
+  PHASE_DESCRIPTIONS,
+  PHASE_LABELS,
+} from "@/lib/debatePhases";
 import Toast from "@/components/ui/Toast";
 import UpvoteButton from "./UpvoteButton";
 import ArgumentForm from "./ArgumentForm";
@@ -81,6 +85,12 @@ function sortByUpvotes(argumentsList: Argument[]) {
   return [...argumentsList].sort((a, b) => b.upvotes - a.upvotes);
 }
 
+function phaseForRound(roundNumber: number): DebatePhase {
+  if (roundNumber === 2) return "rebuttal";
+  if (roundNumber === 3) return "closing";
+  return "opening";
+}
+
 function upsertArgument(argumentsList: Argument[], argument: Argument) {
   if (argumentsList.some((item) => item.id === argument.id)) {
     return argumentsList;
@@ -107,14 +117,17 @@ function ArgumentCard({
   argument,
   hasVoted,
   currentUserId,
+  isClosed,
 }: {
   argument: Argument;
   hasVoted: boolean;
   currentUserId: string | null;
+  isClosed: boolean;
 }) {
   const author = argument.profiles;
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
   const actualStance = resolveStance(argument);
+  const argumentPhase = phaseForRound(argument.round_number);
   const borderClass =
     actualStance === "for"
       ? "border-l-4 border-emerald-500"
@@ -166,6 +179,9 @@ function ArgumentCard({
               <span className={`rounded px-1.5 text-[10px] font-bold ${badgeClass}`}>
                 {badgeLabel}
               </span>
+              <span className="rounded bg-gray-100 px-1.5 text-[10px] font-semibold text-gray-500">
+                {PHASE_LABELS[argumentPhase]}
+              </span>
             </div>
             {author?.university ? (
               <p className="truncate text-xs text-gray-400">{author.university}</p>
@@ -186,7 +202,7 @@ function ArgumentCard({
         argumentId={argument.id}
         initialCount={argument.upvotes}
         initialVoted={hasVoted}
-        disabled={!currentUserId}
+        disabled={!currentUserId || isClosed}
       />
     </div>
   );
@@ -299,7 +315,7 @@ export default function LiveArguments({
             setLocalDebateStatus((previousStatus) => {
               if (nextStatus !== previousStatus) {
                 if (previousStatus === "open" && nextStatus === "active") {
-                  setToastMessage("Debate is now LIVE — submit your argument!");
+                  setToastMessage("Debate is now LIVE - submit your argument!");
                 }
                 if (previousStatus === "active" && nextStatus === "closed") {
                   setToastMessage(
@@ -338,21 +354,69 @@ export default function LiveArguments({
   const forWidth = totalPoints === 0 ? 50 : (forPoints / totalPoints) * 100;
   const againstWidth = totalPoints === 0 ? 50 : (againstPoints / totalPoints) * 100;
   const isClosed = localDebateStatus === "closed";
+  const isOpen = localDebateStatus === "open";
+  const canSubmitArguments = localDebateStatus === "active";
+  const phases: DebatePhase[] = ["opening", "rebuttal", "closing"];
 
   return (
     <div>
-      <div className="mb-4 text-sm text-gray-500">
-        For: {sortedForArguments.length} - Against: {sortedAgainstArguments.length}
-      </div>
+      <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+              Room status
+            </p>
+            <p className="mt-1 text-sm font-semibold text-ink">
+              {isOpen
+                ? "Open for participants"
+                : isClosed
+                  ? "Debate closed"
+                  : PHASE_LABELS[localCurrentPhase]}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-gray-500">
+              {isOpen
+                ? "Choose a side and vote on the motion before the moderator starts rounds."
+                : isClosed
+                  ? "Voting and argument submission are closed. Read the strongest arguments below."
+                  : PHASE_DESCRIPTIONS[localCurrentPhase]}
+            </p>
+          </div>
 
-      <div className="mb-4 text-center">
-        <span className="rounded-full bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-600">
-          Phase: {PHASE_LABELS[localCurrentPhase]}
-        </span>
+          <div className="flex min-w-[220px] items-center gap-1.5">
+            {phases.map((phase, index) => {
+              const currentIndex = phases.indexOf(localCurrentPhase);
+              const active = !isOpen && index <= currentIndex;
+              const current = !isOpen && phase === localCurrentPhase && !isClosed;
+              return (
+                <div key={phase} className="flex flex-1 items-center gap-1.5">
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${
+                      active
+                        ? "bg-emerald-brand text-white"
+                        : "bg-gray-100 text-gray-400"
+                    } ${current ? "ring-2 ring-emerald-100" : ""}`}
+                    title={PHASE_LABELS[phase]}
+                  >
+                    {index + 1}
+                  </span>
+                  {index < phases.length - 1 ? (
+                    <span
+                      className={`h-0.5 flex-1 rounded-full ${
+                        index < currentIndex && !isOpen
+                          ? "bg-emerald-brand"
+                          : "bg-gray-200"
+                      }`}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {isModeratorOfDebate ? (
-        <div className="mb-4">
+        <div className="mb-5">
           <PhaseControls
             debateId={debateId}
             currentPhase={localCurrentPhase}
@@ -361,102 +425,148 @@ export default function LiveArguments({
         </div>
       ) : null}
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div>
-          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-emerald-700">
-            FOR
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+                Arguments
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
+                For: {sortedForArguments.length} - Against:{" "}
+                {sortedAgainstArguments.length}
+              </p>
+            </div>
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-500">
+              Ranked by upvotes
+            </span>
           </div>
 
-          {sortedForArguments.length === 0 ? (
-            <EmptyColumn message="No FOR arguments yet." />
-          ) : (
-            sortedForArguments.map((argument) => (
-              <ArgumentCard
-                key={argument.id}
-                argument={argument}
-                hasVoted={votedIds.has(argument.id)}
-                currentUserId={currentUserId}
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-emerald-700">
+                FOR
+              </div>
+
+              {sortedForArguments.length === 0 ? (
+                <EmptyColumn message="No FOR arguments yet." />
+              ) : (
+                sortedForArguments.map((argument) => (
+                  <ArgumentCard
+                    key={argument.id}
+                    argument={argument}
+                    hasVoted={votedIds.has(argument.id)}
+                    currentUserId={currentUserId}
+                    isClosed={isClosed}
+                  />
+                ))
+              )}
+            </div>
+
+            <div>
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-amber-700">
+                AGAINST
+              </div>
+
+              {sortedAgainstArguments.length === 0 ? (
+                <EmptyColumn message="No AGAINST arguments yet." />
+              ) : (
+                sortedAgainstArguments.map((argument) => (
+                  <ArgumentCard
+                    key={argument.id}
+                    argument={argument}
+                    hasVoted={votedIds.has(argument.id)}
+                    currentUserId={currentUserId}
+                    isClosed={isClosed}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">
+              Argument quality score
+            </p>
+            <div className="mb-3 flex items-center justify-between text-sm font-semibold text-gray-700">
+              <span>FOR</span>
+              <span>AGAINST</span>
+            </div>
+            <div className="flex h-3 overflow-hidden rounded-full bg-gray-100">
+              <div
+                className="bg-emerald-400 transition-all duration-300"
+                style={{ width: `${forWidth}%` }}
               />
-            ))
-          )}
-        </div>
-
-        <div>
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-red-700">
-            AGAINST
-          </div>
-
-          {sortedAgainstArguments.length === 0 ? (
-            <EmptyColumn message="No AGAINST arguments yet." />
-          ) : (
-            sortedAgainstArguments.map((argument) => (
-              <ArgumentCard
-                key={argument.id}
-                argument={argument}
-                hasVoted={votedIds.has(argument.id)}
-                currentUserId={currentUserId}
+              <div
+                className="bg-amber-400 transition-all duration-300"
+                style={{ width: `${againstWidth}%` }}
               />
-            ))
-          )}
-        </div>
-      </div>
-
-      <div className="mt-8">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">
-          Argument quality score
-        </p>
-        <div className="mb-3 flex items-center justify-between text-sm font-semibold text-gray-700">
-          <span>FOR</span>
-          <span>AGAINST</span>
-        </div>
-        <div className="flex h-3 overflow-hidden rounded-full bg-gray-100">
-          <div
-            className="bg-emerald-400 transition-all duration-300"
-            style={{ width: `${forWidth}%` }}
-          />
-          <div
-            className="bg-red-400 transition-all duration-300"
-            style={{ width: `${againstWidth}%` }}
-          />
-        </div>
-        <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
-          <span>{forPoints} pts</span>
-          <span>{againstPoints} pts</span>
-        </div>
-      </div>
-
-      <MotionVotePanel
-        debateId={debateId}
-        initialForCount={motionForCount}
-        initialAgainstCount={motionAgainstCount}
-        initialUserVote={userMotionVote}
-        isClosed={isClosed}
-        currentUserId={currentUserId}
-        motionTitle={debateTitle}
-      />
-
-      <div className="mt-8 border-t border-gray-200 pt-6">
-        <h3 className="mb-4 text-base font-semibold text-gray-900">
-          {isClosed ? "Debate Closed" : "Submit Your Argument"}
-        </h3>
-        {!currentUserId && !isClosed ? (
-          <div className="rounded-xl border border-gray-200 bg-canvas p-4 text-center text-sm text-gray-500">
-            <Link
-              href="/login"
-              className="font-medium text-emerald-600 hover:underline"
-            >
-              Sign in
-            </Link>{" "}
-            to participate in this debate.
+            </div>
+            <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
+              <span>{forPoints} pts</span>
+              <span>{againstPoints} pts</span>
+            </div>
           </div>
-        ) : (
-          <ArgumentForm
+        </div>
+
+        <div className="space-y-5 lg:sticky lg:top-[84px] lg:self-start">
+          <MotionVotePanel
             debateId={debateId}
-            disabled={isClosed}
-            userParticipant={userParticipant}
-            currentPhase={localCurrentPhase}
+            initialForCount={motionForCount}
+            initialAgainstCount={motionAgainstCount}
+            initialUserVote={userMotionVote}
+            isClosed={isClosed}
+            currentUserId={currentUserId}
+            motionTitle={debateTitle}
           />
-        )}
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+              {isClosed ? "Debate closed" : "Submit an argument"}
+            </p>
+            <h3 className="mt-1 text-base font-semibold text-gray-900">
+              {isOpen
+                ? "Waiting for moderator"
+                : isClosed
+                  ? "No new arguments"
+                  : `Write for ${PHASE_LABELS[localCurrentPhase]}`}
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-gray-500">
+              {isOpen
+                ? "You can choose a side and vote now. Argument submission opens when the debate starts."
+                : isClosed
+                  ? "The room is archived. Vote totals and strongest arguments remain visible."
+                  : PHASE_DESCRIPTIONS[localCurrentPhase]}
+            </p>
+
+            <div className="mt-4">
+              {!currentUserId && !isClosed ? (
+                <div className="rounded-xl border border-gray-200 bg-canvas p-4 text-center text-sm text-gray-500">
+                  <Link
+                    href="/login"
+                    className="font-medium text-emerald-600 hover:underline"
+                  >
+                    Sign in
+                  </Link>{" "}
+                  to vote, choose a side, or submit an argument.
+                </div>
+              ) : canSubmitArguments ? (
+                <ArgumentForm
+                  debateId={debateId}
+                  disabled={false}
+                  userParticipant={userParticipant}
+                  currentPhase={localCurrentPhase}
+                />
+              ) : (
+                <div className="rounded-xl border border-gray-200 bg-canvas p-4 text-sm text-gray-500">
+                  {isClosed
+                    ? "This debate is closed."
+                    : "Argument submission is not open yet."}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
       {toastMessage ? (
         <Toast message={toastMessage} onDone={() => setToastMessage(null)} />

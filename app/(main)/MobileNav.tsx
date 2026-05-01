@@ -21,6 +21,7 @@ interface MobileNavProps {
 const PRIMARY_LINKS = [
   { label: "Home", href: "/" },
   { label: "Discover", href: "/discover" },
+  { label: "Debates", href: "/debates" },
   { label: "Opportunities", href: "/opportunities" },
   { label: "Write", href: "/write" },
 ] as const;
@@ -47,7 +48,6 @@ export default function MobileNav({
     : pathname === "/settings" || pathname.startsWith("/settings/");
 
   const moreLinks = [
-    isEnabled("debates") ? { label: "Debates", href: "/debates" } : null,
     isEnabled("webinars") ? { label: "Webinars", href: "/webinars" } : null,
     isEnabled("fellowshipsSection") ? { label: "Fellowships", href: "/fellowships" } : null,
     isEnabled("ambassadors") ? { label: "Ambassadors", href: "/ambassadors" } : null,

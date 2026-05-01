@@ -1,8 +1,9 @@
 ﻿import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import type { DebatePhase } from "@/lib/debatePhases";
-import { formatRelativeTime } from "@/lib/utils";
+import { PHASE_LABELS, type DebatePhase } from "@/lib/debatePhases";
+import { formatDate, formatRelativeTime, formatTimeUntil } from "@/lib/utils";
 import LiveArguments from "./LiveArguments";
 import DebateRecap from "./DebateRecap";
 import DebateCountdown from "./DebateCountdown";
@@ -25,6 +26,16 @@ function resolveStance(argument: { stance?: string | null; round_number: number 
   }
 
   return argument.round_number % 2 === 1 ? "for" : "against";
+}
+
+function getVoteSplit(forCount: number, againstCount: number) {
+  const total = forCount + againstCount;
+  const forPct = total > 0 ? Math.round((forCount / total) * 100) : 50;
+  return {
+    total,
+    forPct,
+    againstPct: 100 - forPct,
+  };
 }
 
 export async function generateMetadata({
@@ -60,6 +71,14 @@ export default async function DebatePage({ params }: PageProps) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const { data: currentProfile } = user
+    ? await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle()
+    : { data: null };
 
   const { data: debate } = await supabase
     .from("debates")
@@ -131,7 +150,10 @@ export default async function DebatePage({ params }: PageProps) {
   const moderator = Array.isArray(debate.profiles)
     ? debate.profiles[0]
     : debate.profiles;
-  const isModeratorOfDebate = user?.id === debate.moderator_id;
+  const isModeratorOfDebate =
+    user?.id === debate.moderator_id ||
+    currentProfile?.role === "editor" ||
+    currentProfile?.role === "admin";
   const forArguments = argumentsWithProfiles.filter(
     (argument) => resolveStance(argument) === "for"
   );
@@ -139,74 +161,147 @@ export default async function DebatePage({ params }: PageProps) {
     (argument) => resolveStance(argument) === "against"
   );
   const argumentCount = argumentsWithProfiles.length;
+  const forVotes = debate.motion_for_count ?? 0;
+  const againstVotes = debate.motion_against_count ?? 0;
+  const voteSplit = getVoteSplit(forVotes, againstVotes);
+  const statusLabel =
+    status === "active" ? "Live" : status === "open" ? "Open" : "Closed";
+  const timeLabel =
+    status === "active"
+      ? formatTimeUntil(debate.ends_at)
+      : status === "open"
+        ? `Opened ${formatRelativeTime(debate.created_at)}`
+        : `Closed ${formatDate(debate.ends_at ?? debate.created_at)}`;
 
   return (
     <div>
-      <div className="sticky top-16 z-40 -mx-4 border-b border-gray-200 bg-white px-6 py-4 sm:-mx-6 lg:-mx-8">
-        <div className="mx-auto flex max-w-5xl flex-col gap-3 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center">
+      <div className="sticky top-16 z-40 -mx-4 border-b border-gray-200 bg-white/95 px-6 py-3 backdrop-blur-xl sm:-mx-6 lg:-mx-8">
+        <div className="mx-auto flex max-w-5xl flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            <h1 className="font-display line-clamp-1 text-xl font-bold text-ink">
+            <Link
+              href="/debates"
+              className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand hover:underline"
+            >
+              Debates
+            </Link>
+            <h1 className="font-display line-clamp-1 text-lg font-bold text-ink">
               {debate.title}
             </h1>
           </div>
 
-          <div className="flex items-center justify-start gap-3 md:justify-center">
+          <div className="flex flex-wrap items-center gap-3">
             <span
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_STYLES[status]}`}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[status]}`}
             >
-              {status}
+              {statusLabel}
             </span>
-            <span className="text-sm text-gray-500">
+            <span className="text-xs font-medium text-gray-500">
               {argumentCount} {argumentCount === 1 ? "argument" : "arguments"}
             </span>
-          </div>
-
-          <div className="flex justify-start md:justify-end">
-            {debate.ends_at && status !== "closed" ? (
+            {debate.ends_at && status === "active" ? (
               <DebateCountdown endsAt={debate.ends_at} />
+            ) : timeLabel ? (
+              <span className="text-xs font-medium text-gray-400">{timeLabel}</span>
             ) : null}
           </div>
         </div>
       </div>
 
       <div className="mx-auto max-w-5xl py-8">
-        {(debate.description || (debate.tags && debate.tags.length > 0) || moderator) && (
-          <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5">
-            {debate.description ? (
-              <p className="text-sm leading-relaxed text-gray-600">
-                {debate.description}
-              </p>
-            ) : null}
-
-            {debate.tags && debate.tags.length > 0 ? (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {debate.tags.map((tag: string) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4 text-xs text-gray-400">
-              <span>Started {formatRelativeTime(debate.created_at)}</span>
-              {debate.round_duration_minutes ? (
-                <span>{debate.round_duration_minutes} min rounds</span>
-              ) : null}
-              {moderator ? (
-                <span>
-                  Moderated by{" "}
-                  <span className="font-medium text-gray-600">
-                    {moderator.full_name ?? moderator.username}
-                  </span>
+        <section className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="p-6">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[status]}`}
+                >
+                  {statusLabel}
                 </span>
+                <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500">
+                  {PHASE_LABELS[currentPhase]}
+                </span>
+                {timeLabel ? (
+                  <span className="text-xs font-medium text-gray-400">
+                    {timeLabel}
+                  </span>
+                ) : null}
+              </div>
+              <h2 className="font-display text-3xl font-bold leading-tight text-ink">
+                {debate.title}
+              </h2>
+              {debate.description ? (
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
+                  {debate.description}
+                </p>
               ) : null}
+
+              {debate.tags && debate.tags.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {debate.tags.map((tag: string) => (
+                    <span
+                      key={tag}
+                      className="rounded-full bg-canvas px-2.5 py-1 text-xs font-medium text-gray-500"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-400">
+                <span>Opened {formatRelativeTime(debate.created_at)}</span>
+                {debate.round_duration_minutes ? (
+                  <span>{debate.round_duration_minutes} min phases</span>
+                ) : null}
+                {moderator ? (
+                  <span>
+                    Moderated by{" "}
+                    <span className="font-medium text-gray-600">
+                      {moderator.full_name ?? moderator.username}
+                    </span>
+                  </span>
+                ) : null}
+              </div>
             </div>
+
+            <aside className="border-t border-gray-100 bg-canvas p-5 lg:border-l lg:border-t-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+                Official verdict
+              </p>
+              <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-gray-200">
+                <span
+                  className="bg-emerald-brand"
+                  style={{ width: `${voteSplit.forPct}%` }}
+                />
+                <span
+                  className="bg-amber-500"
+                  style={{ width: `${voteSplit.againstPct}%` }}
+                />
+              </div>
+              <div className="mt-3 flex items-center justify-between text-sm font-semibold">
+                <span className="text-emerald-700">FOR {voteSplit.forPct}%</span>
+                <span className="text-amber-700">
+                  {voteSplit.againstPct}% AGAINST
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                {voteSplit.total} community {voteSplit.total === 1 ? "vote" : "votes"}
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-2 text-center">
+                <div className="rounded-xl bg-white p-3">
+                  <p className="text-lg font-bold text-ink">{argumentCount}</p>
+                  <p className="text-[11px] text-gray-400">arguments</p>
+                </div>
+                <div className="rounded-xl bg-white p-3">
+                  <p className="text-lg font-bold text-ink">
+                    {forArguments.length}/{againstArguments.length}
+                  </p>
+                  <p className="text-[11px] text-gray-400">for/against</p>
+                </div>
+              </div>
+            </aside>
           </div>
-        )}
+        </section>
 
         <LiveArguments
           debateId={id}
@@ -217,8 +312,8 @@ export default async function DebatePage({ params }: PageProps) {
           userVotedIds={userVotedIds}
           debateStatus={status}
           userParticipant={userParticipant}
-          motionForCount={debate.motion_for_count ?? 0}
-          motionAgainstCount={debate.motion_against_count ?? 0}
+          motionForCount={forVotes}
+          motionAgainstCount={againstVotes}
           userMotionVote={userMotionVote}
           currentPhase={currentPhase}
           isModeratorOfDebate={isModeratorOfDebate}
@@ -228,8 +323,8 @@ export default async function DebatePage({ params }: PageProps) {
           <DebateRecap
             recapText={debate.recap_text}
             generatedAt={debate.recap_generated_at ?? debate.created_at}
-            forVotes={debate.motion_for_count ?? 0}
-            againstVotes={debate.motion_against_count ?? 0}
+            forVotes={forVotes}
+            againstVotes={againstVotes}
           />
         ) : status === "closed" ? (
           <div className="mt-10 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">

@@ -3,6 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
+export async function startDebateAction(debateId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("start_debate", { p_debate_id: debateId });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/debates/${debateId}`);
+  revalidatePath("/debates");
+}
+
 export async function closeDebateAction(debateId: string) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("close_debate", { p_debate_id: debateId });
@@ -25,4 +37,5 @@ export async function closeDebateAction(debateId: string) {
   });
 
   revalidatePath(`/debates/${debateId}`);
+  revalidatePath("/debates");
 }

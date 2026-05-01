@@ -1,7 +1,7 @@
 // Single source of truth for what's surfaced in nav.
 // Toggle to true when the section has enough volume to feel alive.
 export const FEATURE_FLAGS = {
-  debates: false,
+  debates: true,
   webinars: false,
   fellowshipsSection: false,
   ambassadors: false,
