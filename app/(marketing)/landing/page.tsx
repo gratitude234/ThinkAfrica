@@ -179,8 +179,7 @@ export default async function LandingPage() {
               </h1>
 
               <p className="hero-animate hero-sub mt-6 mb-9 max-w-[480px] text-lg leading-[1.65] text-ink-muted">
-                Essays, research, and policy briefs written by university students across Africa —
-                rigorously argued and openly published.
+                Essays, research, and policy briefs written by university students across Africa, rigorously argued and openly published.
               </p>
 
               <div className="hero-animate hero-ctas flex flex-wrap gap-3">

@@ -12,3 +12,11 @@
  ✓ Compiled /middleware in 1262ms (125 modules)
  ○ Compiling /discover ...
  ✓ Compiled /discover in 11.8s (781 modules)
+ ✓ Compiled in 1423ms (355 modules)
+ ✓ Compiled in 143ms (341 modules)
+ GET /discover 200 in 16839ms
+ GET /discover 200 in 3911ms
+ GET /discover?tab=trending 200 in 1987ms
+ GET /discover?tab=topics 200 in 1511ms
+ GET /discover?tab=people 200 in 1903ms
+ ✓ Compiled in 1361ms (426 modules)
