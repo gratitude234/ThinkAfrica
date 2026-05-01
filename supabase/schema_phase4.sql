@@ -131,9 +131,11 @@ alter table public.sponsor_placements enable row level security;
 alter table public.contact_requests enable row level security;
 
 -- fellowships
+drop policy if exists "Fellowships are viewable by everyone" on public.fellowships;
 create policy "Fellowships are viewable by everyone"
   on public.fellowships for select using (true);
 
+drop policy if exists "Admins can insert fellowships" on public.fellowships;
 create policy "Admins can insert fellowships"
   on public.fellowships for insert
   with check (
@@ -141,6 +143,7 @@ create policy "Admins can insert fellowships"
     and exists (select 1 from auth.users where id = auth.uid() and email = current_setting('app.admin_email', true))
   );
 
+drop policy if exists "Admins can update fellowships" on public.fellowships;
 create policy "Admins can update fellowships"
   on public.fellowships for update
   using (
@@ -148,20 +151,24 @@ create policy "Admins can update fellowships"
   );
 
 -- fellowship_applications
+drop policy if exists "Users can read their own applications" on public.fellowship_applications;
 create policy "Users can read their own applications"
   on public.fellowship_applications for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Admins can read all applications" on public.fellowship_applications;
 create policy "Admins can read all applications"
   on public.fellowship_applications for select
   using (
     exists (select 1 from auth.users where id = auth.uid() and email = current_setting('app.admin_email', true))
   );
 
+drop policy if exists "Authenticated users can apply" on public.fellowship_applications;
 create policy "Authenticated users can apply"
   on public.fellowship_applications for insert
   with check (auth.role() = 'authenticated' and auth.uid() = user_id);
 
+drop policy if exists "Admins can update application status" on public.fellowship_applications;
 create policy "Admins can update application status"
   on public.fellowship_applications for update
   using (
@@ -169,9 +176,11 @@ create policy "Admins can update application status"
   );
 
 -- institutional_partners
+drop policy if exists "Partners are viewable by everyone" on public.institutional_partners;
 create policy "Partners are viewable by everyone"
   on public.institutional_partners for select using (true);
 
+drop policy if exists "Admins can manage partners" on public.institutional_partners;
 create policy "Admins can manage partners"
   on public.institutional_partners for all
   using (
@@ -179,20 +188,24 @@ create policy "Admins can manage partners"
   );
 
 -- talent_profiles
+drop policy if exists "Public talent profiles visible to all" on public.talent_profiles;
 create policy "Public talent profiles visible to all"
   on public.talent_profiles for select
   using (visibility = 'public' or auth.uid() = user_id);
 
+drop policy if exists "partners_only visible to authenticated" on public.talent_profiles;
 create policy "partners_only visible to authenticated"
   on public.talent_profiles for select
   using (visibility = 'partners_only' and auth.role() = 'authenticated');
 
+drop policy if exists "Users can manage their own talent profile" on public.talent_profiles;
 create policy "Users can manage their own talent profile"
   on public.talent_profiles for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
 -- talent_inquiries
+drop policy if exists "Anyone authenticated can send inquiries" on public.talent_inquiries;
 create policy "Anyone authenticated can send inquiries"
   on public.talent_inquiries for insert
   with check (
@@ -200,12 +213,14 @@ create policy "Anyone authenticated can send inquiries"
     and (sender_id is null or sender_id = auth.uid())
   );
 
+drop policy if exists "Talent can read their own inquiries" on public.talent_inquiries;
 create policy "Talent can read their own inquiries"
   on public.talent_inquiries for select
   using (
     exists (select 1 from public.talent_profiles where id = talent_id and user_id = auth.uid())
   );
 
+drop policy if exists "Talent can update their own inquiries" on public.talent_inquiries;
 create policy "Talent can update their own inquiries"
   on public.talent_inquiries for update
   using (
@@ -216,9 +231,11 @@ create policy "Talent can update their own inquiries"
   );
 
 -- sponsor_placements
+drop policy if exists "Sponsor placements viewable by everyone" on public.sponsor_placements;
 create policy "Sponsor placements viewable by everyone"
   on public.sponsor_placements for select using (true);
 
+drop policy if exists "Admins can manage sponsor placements" on public.sponsor_placements;
 create policy "Admins can manage sponsor placements"
   on public.sponsor_placements for all
   using (
@@ -226,9 +243,11 @@ create policy "Admins can manage sponsor placements"
   );
 
 -- contact_requests
+drop policy if exists "Anyone can submit contact requests" on public.contact_requests;
 create policy "Anyone can submit contact requests"
   on public.contact_requests for insert with check (true);
 
+drop policy if exists "Admins can read contact requests" on public.contact_requests;
 create policy "Admins can read contact requests"
   on public.contact_requests for select
   using (
