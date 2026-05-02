@@ -76,6 +76,7 @@ const TEAM_MEMBERS: TeamMember[] = [
     name: "Owolabi Malik Adebayo",
     role: "Co-Founder & COO",
     image: "/team/owolabi-malik-adebayo.jpeg",
+    imagePosition: "50% 48%",
     badgeClass: "bg-purple-50 text-purple-700",
     shortBio:
       "Law student and Co-Founder, driven by the belief that Africa's students have ideas worth hearing, publishing, debating, and acting on. Responsible for building ThinkAfrica's credibility infrastructure across institutions.",

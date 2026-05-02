@@ -1,29 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-interface ProfileVerifiedRow {
-  verified: boolean;
-}
-
 export async function getMessageEligibility(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   currentUserId: string,
   targetUserId: string
 ): Promise<{ eligible: boolean; reason: string | null }> {
   if (currentUserId === targetUserId) {
     return { eligible: false, reason: null };
-  }
-
-  const { data: myProfile } = await supabase
-    .from("profiles")
-    .select("verified")
-    .eq("id", currentUserId)
-    .maybeSingle<ProfileVerifiedRow>();
-
-  if (!myProfile?.verified) {
-    return {
-      eligible: false,
-      reason: "Verify your account to send messages",
-    };
   }
 
   return { eligible: true, reason: null };

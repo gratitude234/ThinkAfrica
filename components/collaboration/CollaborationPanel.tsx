@@ -133,7 +133,7 @@ export default function CollaborationPanel({
             Build from {authorName}&apos;s argument
           </h2>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-emerald-900">
-            Respond publicly, follow the writer, or start a verified conversation
+            Respond publicly, follow the writer, or start a direct conversation
             when there is a concrete academic reason to connect.
           </p>
         </div>
@@ -212,7 +212,7 @@ export default function CollaborationPanel({
 
       {!summary.viewerId ? (
         <p className="mt-3 text-xs text-emerald-900">
-          Reading as a guest. Sign in to follow, respond, or message verified writers.
+          Reading as a guest. Sign in to follow, respond, or message writers.
         </p>
       ) : null}
     </section>

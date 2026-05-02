@@ -60,3 +60,7 @@
  ✓ Compiled /opportunities in 2.9s (742 modules)
  GET /opportunities 200 in 6443ms
  GET /opportunities 200 in 3490ms
+ ✓ Compiled in 1346ms (360 modules)
+ ○ Compiling /about ...
+ ✓ Compiled /about in 4.4s (767 modules)
+ GET /about 200 in 9954ms

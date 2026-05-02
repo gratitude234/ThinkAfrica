@@ -7,6 +7,7 @@ export interface TeamMember {
   name: string;
   role: string;
   image: string;
+  imagePosition?: string;
   badgeClass: string;
   shortBio: string;
   fullBio: string[];
@@ -34,7 +35,8 @@ export default function AboutTeamCard({
           alt={member.name}
           fill
           sizes="(max-width: 1024px) 100vw, 320px"
-          className="object-cover object-top"
+          className="object-cover"
+          style={{ objectPosition: member.imagePosition ?? "top" }}
           priority={member.priority}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/10" />
