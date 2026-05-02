@@ -26,6 +26,7 @@ import ResponseStartLink from "@/components/post/ResponseStartLink";
 import { getCollaborationSummary } from "@/lib/collaboration";
 import { getMessageEligibility } from "@/lib/messaging";
 import { getPostQualitySummary } from "@/lib/postQuality";
+import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -400,11 +401,12 @@ export default async function PostPage({ params }: PageProps) {
         : []
   ) as Array<{ full_name: string | null; username: string }>;
 
-  const readTime = estimateReadTime(post.content ?? "");
-  const wordCount = countWords(post.content ?? "");
-  const headings = extractHeadings(post.content ?? "");
+  const sanitizedContent = sanitizePostHtml(post.content);
+  const readTime = estimateReadTime(sanitizedContent);
+  const wordCount = countWords(sanitizedContent);
+  const headings = extractHeadings(sanitizedContent);
   const contentWithIds = renderReferenceShortcodes(
-    injectHeadingIds(post.content ?? "")
+    injectHeadingIds(sanitizedContent)
   );
   const authorName = author?.full_name ?? author?.username ?? "Anonymous";
   const qualitySummary = getPostQualitySummary({
@@ -412,7 +414,7 @@ export default async function PostPage({ params }: PageProps) {
     status: post.status,
     title: post.title,
     excerpt: post.excerpt,
-    content: post.content,
+    content: sanitizedContent,
     wordCount,
     tags: post.tags ?? [],
     citationId: post.citation_id ?? null,

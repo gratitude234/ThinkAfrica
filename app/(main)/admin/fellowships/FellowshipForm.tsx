@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OPPORTUNITY_LABELS, OPPORTUNITY_TYPES } from "@/lib/opportunities";
-import { createClient } from "@/lib/supabase/client";
+import { createFellowship } from "./actions";
 
 export default function FellowshipForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -27,27 +28,34 @@ export default function FellowshipForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const supabase = createClient();
+    setError(null);
     const skills = form.skills
       .split(",")
       .map((skill) => skill.trim().toLowerCase())
       .filter(Boolean)
       .slice(0, 8);
 
-    await supabase.from("fellowships").insert([{
+    const result = await createFellowship({
       title: form.title,
-      description: form.description || null,
-      sponsor_name: form.sponsor_name || null,
-      amount: form.amount || null,
-      eligibility: form.eligibility || null,
-      deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
-      application_url: form.application_url || null,
+      description: form.description,
+      sponsor_name: form.sponsor_name,
+      amount: form.amount,
+      eligibility: form.eligibility,
+      deadline: form.deadline,
+      application_url: form.application_url,
       opportunity_type: form.opportunity_type,
       skills,
-      location: form.location || null,
+      location: form.location,
       featured: form.featured,
       status: form.status,
-    }]);
+    });
+
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+
     setLoading(false);
     setOpen(false);
     setForm({
@@ -167,6 +175,7 @@ export default function FellowshipForm() {
           Cancel
         </button>
       </div>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </form>
   );
 }

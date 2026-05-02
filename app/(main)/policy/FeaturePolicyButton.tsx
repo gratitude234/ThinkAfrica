@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { featurePolicyBrief } from "./actions";
 
 interface Props {
   postId: string;
@@ -13,23 +13,21 @@ export default function FeaturePolicyButton({ postId }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [institution, setInstitution] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    await supabase.from("policy_briefs_featured").insert([
-      {
-        post_id: postId,
-        featured_by: user.id,
-        institution_target: institution || null,
-      },
-    ]);
+    setError(null);
+    const result = await featurePolicyBrief({
+      postId,
+      institutionTarget: institution,
+    });
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
     setLoading(false);
     setShowModal(false);
     setInstitution("");
@@ -78,6 +76,7 @@ export default function FeaturePolicyButton({ postId }: Props) {
                   {loading ? "Featuring..." : "Confirm"}
                 </button>
               </div>
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
             </form>
           </div>
         </div>

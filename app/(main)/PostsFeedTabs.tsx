@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import PostFeed from "@/components/post/PostFeed";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { PostCardData } from "@/components/post/PostCard";
@@ -66,21 +67,21 @@ function EndStateCard({ topics }: { topics: string[] }) {
       </p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {topics.map((topic) => (
-          <a
+          <Link
             key={topic}
             href={`/topics/${encodeURIComponent(topic)}`}
             className="rounded-full border border-gray-200 bg-canvas px-3 py-1.5 text-sm text-gray-700 hover:border-gray-400 hover:text-ink"
           >
             + {topic}
-          </a>
+          </Link>
         ))}
       </div>
-      <a
+      <Link
         href="/?tab=latest"
         className="mt-3 inline-block text-sm font-medium text-ink hover:underline"
       >
         Or switch to Latest -&gt;
-      </a>
+      </Link>
     </div>
   );
 }

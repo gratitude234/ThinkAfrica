@@ -138,17 +138,13 @@ create policy "Fellowships are viewable by everyone"
 drop policy if exists "Admins can insert fellowships" on public.fellowships;
 create policy "Admins can insert fellowships"
   on public.fellowships for insert
-  with check (
-    auth.role() = 'authenticated'
-    and exists (select 1 from auth.users where id = auth.uid() and email = current_setting('app.admin_email', true))
-  );
+  with check (public.is_admin());
 
 drop policy if exists "Admins can update fellowships" on public.fellowships;
 create policy "Admins can update fellowships"
   on public.fellowships for update
-  using (
-    exists (select 1 from auth.users where id = auth.uid() and email = current_setting('app.admin_email', true))
-  );
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- fellowship_applications
 drop policy if exists "Users can read their own applications" on public.fellowship_applications;
@@ -159,9 +155,7 @@ create policy "Users can read their own applications"
 drop policy if exists "Admins can read all applications" on public.fellowship_applications;
 create policy "Admins can read all applications"
   on public.fellowship_applications for select
-  using (
-    exists (select 1 from auth.users where id = auth.uid() and email = current_setting('app.admin_email', true))
-  );
+  using (public.is_admin());
 
 drop policy if exists "Authenticated users can apply" on public.fellowship_applications;
 create policy "Authenticated users can apply"
@@ -171,9 +165,8 @@ create policy "Authenticated users can apply"
 drop policy if exists "Admins can update application status" on public.fellowship_applications;
 create policy "Admins can update application status"
   on public.fellowship_applications for update
-  using (
-    exists (select 1 from auth.users where id = auth.uid() and email = current_setting('app.admin_email', true))
-  );
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- institutional_partners
 drop policy if exists "Partners are viewable by everyone" on public.institutional_partners;
@@ -183,9 +176,8 @@ create policy "Partners are viewable by everyone"
 drop policy if exists "Admins can manage partners" on public.institutional_partners;
 create policy "Admins can manage partners"
   on public.institutional_partners for all
-  using (
-    exists (select 1 from auth.users where id = auth.uid() and email = current_setting('app.admin_email', true))
-  );
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- talent_profiles
 drop policy if exists "Public talent profiles visible to all" on public.talent_profiles;
@@ -238,9 +230,8 @@ create policy "Sponsor placements viewable by everyone"
 drop policy if exists "Admins can manage sponsor placements" on public.sponsor_placements;
 create policy "Admins can manage sponsor placements"
   on public.sponsor_placements for all
-  using (
-    exists (select 1 from auth.users where id = auth.uid() and email = current_setting('app.admin_email', true))
-  );
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- contact_requests
 drop policy if exists "Anyone can submit contact requests" on public.contact_requests;
@@ -250,6 +241,4 @@ create policy "Anyone can submit contact requests"
 drop policy if exists "Admins can read contact requests" on public.contact_requests;
 create policy "Admins can read contact requests"
   on public.contact_requests for select
-  using (
-    exists (select 1 from auth.users where id = auth.uid() and email = current_setting('app.admin_email', true))
-  );
+  using (public.is_admin());

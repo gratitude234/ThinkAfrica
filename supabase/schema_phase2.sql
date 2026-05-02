@@ -65,50 +65,64 @@ alter table public.debate_arguments enable row level security;
 alter table public.debate_votes enable row level security;
 alter table public.notifications enable row level security;
 
+create or replace function pg_temp.create_policy_if_missing(
+  target_schema text,
+  target_table text,
+  target_policy text,
+  statement text
+)
+returns void
+language plpgsql
+as $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = target_schema
+      and tablename = target_table
+      and policyname = target_policy
+  ) then
+    execute statement;
+  end if;
+end;
+$$;
+
 -- debates
-create policy "Debates are viewable by everyone"
-  on public.debates for select using (true);
+select pg_temp.create_policy_if_missing('public', 'debates', 'Debates are viewable by everyone',
+  $$create policy "Debates are viewable by everyone" on public.debates for select using (true)$$);
 
-create policy "Authenticated users can create debates"
-  on public.debates for insert
-  with check (auth.role() = 'authenticated' and auth.uid() = moderator_id);
+select pg_temp.create_policy_if_missing('public', 'debates', 'Authenticated users can create debates',
+  $$create policy "Authenticated users can create debates" on public.debates for insert with check (auth.role() = 'authenticated' and auth.uid() = moderator_id)$$);
 
-create policy "Moderators can update their debates"
-  on public.debates for update
-  using (auth.uid() = moderator_id);
+select pg_temp.create_policy_if_missing('public', 'debates', 'Moderators can update their debates',
+  $$create policy "Moderators can update their debates" on public.debates for update using (auth.uid() = moderator_id)$$);
 
 -- debate_arguments
-create policy "Debate arguments are viewable by everyone"
-  on public.debate_arguments for select using (true);
+select pg_temp.create_policy_if_missing('public', 'debate_arguments', 'Debate arguments are viewable by everyone',
+  $$create policy "Debate arguments are viewable by everyone" on public.debate_arguments for select using (true)$$);
 
-create policy "Authenticated users can submit arguments"
-  on public.debate_arguments for insert
-  with check (auth.role() = 'authenticated' and auth.uid() = author_id);
+select pg_temp.create_policy_if_missing('public', 'debate_arguments', 'Authenticated users can submit arguments',
+  $$create policy "Authenticated users can submit arguments" on public.debate_arguments for insert with check (auth.role() = 'authenticated' and auth.uid() = author_id)$$);
 
 -- debate_votes
-create policy "Debate votes are viewable by everyone"
-  on public.debate_votes for select using (true);
+select pg_temp.create_policy_if_missing('public', 'debate_votes', 'Debate votes are viewable by everyone',
+  $$create policy "Debate votes are viewable by everyone" on public.debate_votes for select using (true)$$);
 
-create policy "Authenticated users can vote"
-  on public.debate_votes for insert
-  with check (auth.role() = 'authenticated' and auth.uid() = user_id);
+select pg_temp.create_policy_if_missing('public', 'debate_votes', 'Authenticated users can vote',
+  $$create policy "Authenticated users can vote" on public.debate_votes for insert with check (auth.role() = 'authenticated' and auth.uid() = user_id)$$);
 
-create policy "Users can remove their own votes"
-  on public.debate_votes for delete
-  using (auth.uid() = user_id);
+select pg_temp.create_policy_if_missing('public', 'debate_votes', 'Users can remove their own votes',
+  $$create policy "Users can remove their own votes" on public.debate_votes for delete using (auth.uid() = user_id)$$);
 
 -- notifications
-create policy "Users can read their own notifications"
-  on public.notifications for select
-  using (auth.uid() = user_id);
+select pg_temp.create_policy_if_missing('public', 'notifications', 'Users can read their own notifications',
+  $$create policy "Users can read their own notifications" on public.notifications for select using (auth.uid() = user_id)$$);
 
-create policy "Users can update their own notifications"
-  on public.notifications for update
-  using (auth.uid() = user_id);
+select pg_temp.create_policy_if_missing('public', 'notifications', 'Users can update their own notifications',
+  $$create policy "Users can update their own notifications" on public.notifications for update using (auth.uid() = user_id)$$);
 
-create policy "System can insert notifications"
-  on public.notifications for insert
-  with check (true);
+select pg_temp.create_policy_if_missing('public', 'notifications', 'System can insert notifications',
+  $$create policy "System can insert notifications" on public.notifications for insert with check (true)$$);
 
 -- ============================================================
 -- RPC: toggle debate vote

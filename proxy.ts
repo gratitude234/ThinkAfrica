@@ -1,12 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { LITE_MODE_COOKIE } from "@/lib/liteMode";
 
-export async function middleware(request: NextRequest) {
-  if (request.cookies.has(LITE_MODE_COOKIE)) {
-    request.cookies.delete(LITE_MODE_COOKIE);
-  }
-
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -17,7 +12,13 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+        setAll(
+          cookiesToSet: {
+            name: string;
+            value: string;
+            options: CookieOptions;
+          }[]
+        ) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
@@ -35,11 +36,21 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const protectedPaths = ["/write", "/admin", "/debates/create", "/webinars/create", "/onboarding", "/stats", "/dashboard", "/settings", "/bookmarks", "/notifications", "/edit"];
+  const protectedPaths = [
+    "/write",
+    "/admin",
+    "/debates/create",
+    "/webinars/create",
+    "/onboarding",
+    "/stats",
+    "/dashboard",
+    "/settings",
+    "/bookmarks",
+    "/notifications",
+    "/edit",
+  ];
 
-  const isProtected = protectedPaths.some((path) =>
-    pathname.startsWith(path)
-  );
+  const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
 
   if (isProtected && !user) {
     const loginUrl = request.nextUrl.clone();
@@ -47,8 +58,6 @@ export async function middleware(request: NextRequest) {
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
   }
-
-  supabaseResponse.cookies.delete(LITE_MODE_COOKIE);
 
   return supabaseResponse;
 }

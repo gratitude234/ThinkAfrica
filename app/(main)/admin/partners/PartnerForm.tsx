@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createPartner } from "./actions";
 
 export default function PartnerForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     type: "university",
@@ -20,8 +21,13 @@ export default function PartnerForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const supabase = createClient();
-    await supabase.from("institutional_partners").insert([form]);
+    setError(null);
+    const result = await createPartner(form);
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
     setLoading(false);
     setOpen(false);
     setForm({ name: "", type: "university", country: "", description: "", website_url: "", active: true });
@@ -80,6 +86,7 @@ export default function PartnerForm() {
         <button type="button" onClick={() => setOpen(false)}
           className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
       </div>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </form>
   );
 }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { canPublish } from "@/lib/roles";
 import {
   getEditorialReviewState,
@@ -12,16 +13,16 @@ import {
 import type { EditorDecision } from "@/lib/types";
 
 async function requireEditorAccess() {
-  const supabase = await createClient();
+  const authClient = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (!user) {
-    return { supabase, user: null, error: "You must be signed in." };
+    return { supabase: authClient, user: null, error: "You must be signed in." };
   }
 
-  const { data: profile } = await supabase
+  const { data: profile } = await authClient
     .from("profiles")
     .select("role")
     .eq("id", user.id)
@@ -34,10 +35,10 @@ async function requireEditorAccess() {
     (profile?.role ? canPublish(profile.role) : false);
 
   if (!isBootstrapAdmin && !hasEditorialRole) {
-    return { supabase, user, error: "You do not have permission to review posts." };
+    return { supabase: authClient, user, error: "You do not have permission to review posts." };
   }
 
-  return { supabase, user, error: null };
+  return { supabase: createAdminClient(), user, error: null };
 }
 
 function revalidateEditorialPaths(slug?: string | null, citationId?: string | null) {
@@ -102,6 +103,41 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
 
   revalidateEditorialPaths(post.slug);
   return { error: null };
+}
+
+export async function toggleFeaturedPost(postId: string, nextFeatured: boolean) {
+  const { supabase, error: accessError } = await requireEditorAccess();
+  if (accessError) return { error: accessError, featured: !nextFeatured };
+
+  if (nextFeatured) {
+    const { error: unfeatureError } = await supabase
+      .from("posts")
+      .update({ featured: false })
+      .eq("featured", true);
+
+    if (unfeatureError) {
+      return { error: unfeatureError.message, featured: !nextFeatured };
+    }
+  }
+
+  const { data: post, error } = await supabase
+    .from("posts")
+    .update({ featured: nextFeatured })
+    .eq("id", postId)
+    .select("slug")
+    .single();
+
+  if (error) {
+    return { error: error.message, featured: !nextFeatured };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin/review");
+  if (post?.slug) {
+    revalidatePath(`/post/${post.slug}`);
+  }
+
+  return { error: null, featured: nextFeatured };
 }
 
 export async function submitEditorialDecision(input: {

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { AdminAccessError, createCheckedAdminClient } from "@/lib/supabase/admin";
 import SponsorForm from "./SponsorForm";
 import SponsorToggle from "./SponsorToggle";
 
@@ -11,12 +11,11 @@ const PLACEMENT_LABELS: Record<string, string> = {
 };
 
 export default async function AdminSponsorsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail || user.email !== adminEmail) {
+  let supabase: Awaited<ReturnType<typeof createCheckedAdminClient>> | null = null;
+  try {
+    supabase = await createCheckedAdminClient();
+  } catch (error) {
+    if (error instanceof AdminAccessError && error.status === 401) redirect("/login");
     return <div className="max-w-2xl mx-auto py-20 text-center text-gray-500">Access denied.</div>;
   }
 

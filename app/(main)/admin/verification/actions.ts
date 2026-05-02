@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, requireAdmin } from "@/lib/supabase/admin";
 import type { AppRole, VerificationType } from "@/lib/types";
 
 function normalizeRole(
@@ -20,26 +20,15 @@ export async function updateVerificationStatus(input: {
   verifiedType: VerificationType | null;
   role: AppRole;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: "You must be signed in." };
-  }
-
-  const { data: currentProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const isBootstrapAdmin = user.email === process.env.ADMIN_EMAIL;
-  const isRoleAdmin = currentProfile?.role === "admin";
-
-  if (!isBootstrapAdmin && !isRoleAdmin) {
-    return { error: "You do not have permission to update verification." };
+  try {
+    await requireAdmin();
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "You do not have permission to update verification.",
+    };
   }
 
   const nextVerifiedType = input.verified ? input.verifiedType : null;
@@ -47,7 +36,8 @@ export async function updateVerificationStatus(input: {
     ? normalizeRole(nextVerifiedType, input.role)
     : "student";
 
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("profiles")
     .update({
       verified: input.verified,

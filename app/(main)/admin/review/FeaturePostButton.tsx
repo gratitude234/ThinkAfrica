@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { toggleFeaturedPost } from "./actions";
 
 interface Props {
   postId: string;
@@ -18,39 +18,13 @@ export default function FeaturePostButton({ postId, initialFeatured }: Props) {
     setError(null);
 
     try {
-      const supabase = createClient();
+      const result = await toggleFeaturedPost(postId, !featured);
 
-      if (!featured) {
-        // Unfeature any currently featured posts, then feature this one
-        const { error: unfeatureError } = await supabase
-          .from("posts")
-          .update({ featured: false })
-          .eq("featured", true);
-
-        if (unfeatureError) {
-          throw unfeatureError;
-        }
-
-        const { error: featureError } = await supabase
-          .from("posts")
-          .update({ featured: true })
-          .eq("id", postId);
-
-        if (featureError) {
-          throw featureError;
-        }
-      } else {
-        const { error: clearError } = await supabase
-          .from("posts")
-          .update({ featured: false })
-          .eq("id", postId);
-
-        if (clearError) {
-          throw clearError;
-        }
+      if (result.error) {
+        throw new Error(result.error);
       }
 
-      setFeatured(!featured);
+      setFeatured(result.featured);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update featured post.");
     } finally {

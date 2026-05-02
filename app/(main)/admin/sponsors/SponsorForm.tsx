@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createSponsorPlacement } from "./actions";
 
 export default function SponsorForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     sponsor_name: "",
     placement_type: "leaderboard",
@@ -19,8 +20,13 @@ export default function SponsorForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const supabase = createClient();
-    await supabase.from("sponsor_placements").insert([form]);
+    setError(null);
+    const result = await createSponsorPlacement(form);
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
     setLoading(false);
     setOpen(false);
     setForm({ sponsor_name: "", placement_type: "leaderboard", content: "", link_url: "", active: true });
@@ -76,6 +82,7 @@ export default function SponsorForm() {
         <button type="button" onClick={() => setOpen(false)}
           className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
       </div>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </form>
   );
 }

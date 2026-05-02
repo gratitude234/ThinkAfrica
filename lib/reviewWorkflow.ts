@@ -1,6 +1,7 @@
 import "server-only";
 
 import { generateCitationId } from "@/lib/citationId";
+import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   EditorDecision,
@@ -278,7 +279,7 @@ export async function createVersionSnapshot(input: {
     version_kind: input.versionKind,
     title: post.title,
     excerpt: post.excerpt,
-    content: post.content ?? "",
+    content: sanitizePostHtml(post.content),
     author_note: input.authorNote?.trim() || null,
     submitted_by: input.submittedBy ?? null,
     references,

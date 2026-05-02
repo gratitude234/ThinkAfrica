@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canReview } from "@/lib/roles";
+import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import Badge from "@/components/ui/Badge";
 import SubmitReviewForm from "../SubmitReviewForm";
 
@@ -88,6 +89,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
   if (!post) notFound();
 
+  const sanitizedContent = sanitizePostHtml(post.content);
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const orderedAuthors = ((authors ?? []) as Array<Record<string, unknown>>)
     .map((authorRow) => ({
@@ -148,7 +150,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
         <div
           className="prose prose-gray max-w-none prose-a:text-emerald-brand"
-          dangerouslySetInnerHTML={{ __html: post.content ?? "" }}
+          dangerouslySetInnerHTML={{ __html: sanitizedContent }}
         />
 
         {references && references.length > 0 ? (

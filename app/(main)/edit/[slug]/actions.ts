@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { createVersionSnapshot, requiresEditorialWorkflow } from "@/lib/reviewWorkflow";
 import type { PostReferenceRecord, PostStatus } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
@@ -166,13 +167,14 @@ export async function saveEditedPost(input: {
     input.currentStatus === "pending_revision" ? "pending" : input.currentStatus;
   const nextRound =
     input.currentStatus === "pending_revision" ? input.currentRound + 1 : input.currentRound;
+  const sanitizedContent = sanitizePostHtml(input.content);
 
   const { error } = await supabase
     .from("posts")
     .update({
       title: input.title.trim(),
       excerpt: input.excerpt,
-      content: input.content,
+      content: sanitizedContent,
       tags: input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean),
       type: input.postType,
       cover_image_url: input.coverImageUrl || null,

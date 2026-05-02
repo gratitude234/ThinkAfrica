@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -76,12 +77,12 @@ export default function AmbassadorApplyPage() {
         <p className="text-gray-500 mb-6">
           Thank you for applying to become a ThinkAfrica Campus Ambassador. We&apos;ll review your application and get back to you soon.
         </p>
-        <a
+        <Link
           href="/ambassadors"
           className="inline-flex items-center px-5 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors"
         >
           Back to Ambassadors
-        </a>
+        </Link>
       </div>
     );
   }

@@ -36,7 +36,7 @@ export default async function MainLayout({
     !!user &&
     (user.email === process.env.ADMIN_EMAIL || profileData?.role === "admin");
   const canAccessReview = !!profileData?.role && canReview(profileData.role);
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const isLite = isLiteModeServer(cookieStore.toString());
 
   return (

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { recordActivationEvent } from "@/lib/activationServer";
 import {
   createVersionSnapshot,
@@ -292,6 +293,7 @@ export async function ensureDraft(input: {
   });
   const slug = `${slugBase || "untitled"}-${Date.now().toString(36)}`;
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  const sanitizedContent = sanitizePostHtml(input.content);
 
   if (input.draftId) {
     const { error } = await supabase
@@ -299,7 +301,7 @@ export async function ensureDraft(input: {
       .update({
         title: input.title || "Untitled draft",
         excerpt: input.excerpt,
-        content: input.content,
+        content: sanitizedContent,
         tags: normalizedTags,
         type: input.postType,
         cover_image_url: input.coverImageUrl || null,
@@ -318,7 +320,7 @@ export async function ensureDraft(input: {
       title: input.title || "Untitled draft",
       slug,
       excerpt: input.excerpt,
-      content: input.content,
+      content: sanitizedContent,
       tags: normalizedTags,
       type: input.postType,
       status: "draft",
@@ -406,6 +408,7 @@ export async function publishPost(input: {
     input.postType === "blog" || input.postType === "essay" ? "published" : "pending";
   const publishedAt = submitStatus === "published" ? now : null;
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  const sanitizedContent = sanitizePostHtml(input.content);
 
   let postId = input.draftId;
   let responseParentPath: string | null = null;
@@ -416,7 +419,7 @@ export async function publishPost(input: {
       .update({
         title: input.title.trim(),
         excerpt: input.excerpt,
-        content: input.content,
+        content: sanitizedContent,
         tags: normalizedTags,
         type: input.postType,
         cover_image_url: input.coverImageUrl || null,
@@ -441,7 +444,7 @@ export async function publishPost(input: {
         author_id: user.id,
         title: input.title.trim(),
         slug,
-        content: input.content,
+        content: sanitizedContent,
         excerpt: input.excerpt,
         type: input.postType,
         tags: normalizedTags,
@@ -575,7 +578,7 @@ export async function publishPost(input: {
       body: JSON.stringify({
         postId,
         title: input.title.trim(),
-        content: input.content,
+        content: sanitizedContent,
         authorName: ownerProfile?.full_name ?? "A ThinkAfrica author",
         postType: input.postType,
       }),

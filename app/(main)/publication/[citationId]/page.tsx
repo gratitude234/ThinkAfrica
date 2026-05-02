@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Badge from "@/components/ui/Badge";
 import type { PostReferenceRecord, VersionAuthorRecord } from "@/lib/types";
+import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import CiteThis from "../../post/[slug]/CiteThis";
 
 interface PageProps {
@@ -61,6 +62,7 @@ export default async function PublicationArchivePage({ params }: PageProps) {
   const references = (Array.isArray(version.references)
     ? version.references
     : []) as PostReferenceRecord[];
+  const sanitizedContent = sanitizePostHtml(version.content);
   const citationAuthors =
     archivedAuthors.length > 0
       ? archivedAuthors.map((author) => ({
@@ -139,7 +141,7 @@ export default async function PublicationArchivePage({ params }: PageProps) {
       <article className="rounded-xl border border-gray-200 bg-white p-6">
         <div
           className="prose prose-gray max-w-none prose-a:text-emerald-brand"
-          dangerouslySetInnerHTML={{ __html: version.content ?? "" }}
+          dangerouslySetInnerHTML={{ __html: sanitizedContent }}
         />
       </article>
 

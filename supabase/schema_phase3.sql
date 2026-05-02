@@ -85,80 +85,74 @@ alter table public.webinar_questions enable row level security;
 alter table public.campus_ambassadors enable row level security;
 alter table public.policy_briefs_featured enable row level security;
 
+create or replace function pg_temp.create_policy_if_missing(
+  target_schema text,
+  target_table text,
+  target_policy text,
+  statement text
+)
+returns void
+language plpgsql
+as $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = target_schema
+      and tablename = target_table
+      and policyname = target_policy
+  ) then
+    execute statement;
+  end if;
+end;
+$$;
+
 -- webinars
-create policy "Webinars are viewable by everyone"
-  on public.webinars for select using (true);
+select pg_temp.create_policy_if_missing('public', 'webinars', 'Webinars are viewable by everyone',
+  $$create policy "Webinars are viewable by everyone" on public.webinars for select using (true)$$);
 
-create policy "Authenticated users can create webinars"
-  on public.webinars for insert
-  with check (auth.role() = 'authenticated' and auth.uid() = host_id);
+select pg_temp.create_policy_if_missing('public', 'webinars', 'Authenticated users can create webinars',
+  $$create policy "Authenticated users can create webinars" on public.webinars for insert with check (auth.role() = 'authenticated' and auth.uid() = host_id)$$);
 
-create policy "Hosts can update their webinars"
-  on public.webinars for update
-  using (auth.uid() = host_id);
+select pg_temp.create_policy_if_missing('public', 'webinars', 'Hosts can update their webinars',
+  $$create policy "Hosts can update their webinars" on public.webinars for update using (auth.uid() = host_id)$$);
 
 -- webinar_attendees
-create policy "Webinar attendees are viewable by everyone"
-  on public.webinar_attendees for select using (true);
+select pg_temp.create_policy_if_missing('public', 'webinar_attendees', 'Webinar attendees are viewable by everyone',
+  $$create policy "Webinar attendees are viewable by everyone" on public.webinar_attendees for select using (true)$$);
 
-create policy "Authenticated users can register for webinars"
-  on public.webinar_attendees for insert
-  with check (auth.role() = 'authenticated' and auth.uid() = user_id);
+select pg_temp.create_policy_if_missing('public', 'webinar_attendees', 'Authenticated users can register for webinars',
+  $$create policy "Authenticated users can register for webinars" on public.webinar_attendees for insert with check (auth.role() = 'authenticated' and auth.uid() = user_id)$$);
 
-create policy "Users can unregister themselves"
-  on public.webinar_attendees for delete
-  using (auth.uid() = user_id);
+select pg_temp.create_policy_if_missing('public', 'webinar_attendees', 'Users can unregister themselves',
+  $$create policy "Users can unregister themselves" on public.webinar_attendees for delete using (auth.uid() = user_id)$$);
 
 -- webinar_questions
-create policy "Webinar questions are viewable by everyone"
-  on public.webinar_questions for select using (true);
+select pg_temp.create_policy_if_missing('public', 'webinar_questions', 'Webinar questions are viewable by everyone',
+  $$create policy "Webinar questions are viewable by everyone" on public.webinar_questions for select using (true)$$);
 
-create policy "Authenticated users can submit questions"
-  on public.webinar_questions for insert
-  with check (auth.role() = 'authenticated' and auth.uid() = author_id);
+select pg_temp.create_policy_if_missing('public', 'webinar_questions', 'Authenticated users can submit questions',
+  $$create policy "Authenticated users can submit questions" on public.webinar_questions for insert with check (auth.role() = 'authenticated' and auth.uid() = author_id)$$);
 
-create policy "Webinar hosts can update questions (mark answered)"
-  on public.webinar_questions for update
-  using (
-    exists (
-      select 1 from public.webinars
-      where id = webinar_id and host_id = auth.uid()
-    )
-  );
+select pg_temp.create_policy_if_missing('public', 'webinar_questions', 'Webinar hosts can update questions (mark answered)',
+  $$create policy "Webinar hosts can update questions (mark answered)" on public.webinar_questions for update using (exists (select 1 from public.webinars where id = webinar_id and host_id = auth.uid()))$$);
 
 -- campus_ambassadors
-create policy "Active ambassadors are viewable by everyone"
-  on public.campus_ambassadors for select
-  using (status = 'active' or auth.uid() = user_id);
+select pg_temp.create_policy_if_missing('public', 'campus_ambassadors', 'Active ambassadors are viewable by everyone',
+  $$create policy "Active ambassadors are viewable by everyone" on public.campus_ambassadors for select using (status = 'active' or auth.uid() = user_id)$$);
 
-create policy "Authenticated users can apply to become ambassador"
-  on public.campus_ambassadors for insert
-  with check (auth.role() = 'authenticated' and auth.uid() = user_id);
+select pg_temp.create_policy_if_missing('public', 'campus_ambassadors', 'Authenticated users can apply to become ambassador',
+  $$create policy "Authenticated users can apply to become ambassador" on public.campus_ambassadors for insert with check (auth.role() = 'authenticated' and auth.uid() = user_id)$$);
 
-create policy "Admins can update ambassador status"
-  on public.campus_ambassadors for update
-  using (
-    exists (
-      select 1 from auth.users
-      where id = auth.uid()
-        and email = current_setting('app.admin_email', true)
-    )
-  );
+select pg_temp.create_policy_if_missing('public', 'campus_ambassadors', 'Admins can update ambassador status',
+  $$create policy "Admins can update ambassador status" on public.campus_ambassadors for update using (public.is_admin()) with check (public.is_admin())$$);
 
 -- policy_briefs_featured
-create policy "Featured policy briefs are viewable by everyone"
-  on public.policy_briefs_featured for select using (true);
+select pg_temp.create_policy_if_missing('public', 'policy_briefs_featured', 'Featured policy briefs are viewable by everyone',
+  $$create policy "Featured policy briefs are viewable by everyone" on public.policy_briefs_featured for select using (true)$$);
 
-create policy "Admins can feature policy briefs"
-  on public.policy_briefs_featured for insert
-  with check (
-    auth.role() = 'authenticated'
-    and exists (
-      select 1 from auth.users
-      where id = auth.uid()
-        and email = current_setting('app.admin_email', true)
-    )
-  );
+select pg_temp.create_policy_if_missing('public', 'policy_briefs_featured', 'Admins can feature policy briefs',
+  $$create policy "Admins can feature policy briefs" on public.policy_briefs_featured for insert with check (public.is_admin())$$);
 
 -- ============================================================
 -- RPC: toggle webinar question upvote

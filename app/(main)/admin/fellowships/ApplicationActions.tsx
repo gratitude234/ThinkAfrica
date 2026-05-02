@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { updateFellowshipApplicationStatus } from "./actions";
 
 interface Props {
   applicationId: string;
@@ -12,15 +12,17 @@ interface Props {
 export default function ApplicationActions({ applicationId, currentStatus }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const update = async (status: string) => {
     setLoading(status);
-    const supabase = createClient();
-    await supabase
-      .from("fellowship_applications")
-      .update({ status })
-      .eq("id", applicationId);
+    setError(null);
+    const result = await updateFellowshipApplicationStatus(applicationId, status);
     setLoading(null);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
     router.refresh();
   };
 
@@ -31,19 +33,22 @@ export default function ApplicationActions({ applicationId, currentStatus }: Pro
   ];
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {statuses.map((s) => (
-        currentStatus !== s.value && (
-          <button
-            key={s.value}
-            onClick={() => update(s.value)}
-            disabled={loading !== null}
-            className={`px-2.5 py-1 text-xs font-medium rounded-lg border disabled:opacity-50 transition-colors ${s.style}`}
-          >
-            {loading === s.value ? "..." : s.label}
-          </button>
-        )
-      ))}
-    </div>
+    <>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {statuses.map((s) => (
+          currentStatus !== s.value && (
+            <button
+              key={s.value}
+              onClick={() => update(s.value)}
+              disabled={loading !== null}
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg border disabled:opacity-50 transition-colors ${s.style}`}
+            >
+              {loading === s.value ? "..." : s.label}
+            </button>
+          )
+        ))}
+      </div>
+      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+    </>
   );
 }
