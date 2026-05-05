@@ -49,7 +49,11 @@ export default async function MainLayout({
         hasActiveDebate={(activeDebateCount ?? 0) > 0}
       />
 
-      <main className="mx-auto max-w-[1152px] px-5 pb-24 pt-6 md:pb-16">
+      <main
+        className={`mx-auto max-w-[1152px] px-5 pt-6 md:pb-16 ${
+          user ? "pb-24" : "pb-40"
+        }`}
+      >
         {children}
       </main>
 

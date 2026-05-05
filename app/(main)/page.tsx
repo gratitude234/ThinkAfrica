@@ -350,7 +350,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   const activeTab =
     tab === "following" && showFollowingEligible
       ? "following"
-      : tab === "latest"
+      : tab === "latest" || (!user && !tab)
         ? "latest"
         : "home";
 
@@ -363,17 +363,19 @@ export default async function HomePage({ searchParams }: PageProps) {
         />
       ) : null}
 
-      <DailyBriefStrip
-        featuredPost={featuredPost}
-        activeDebate={homeDebate}
-        points={userPoints}
-      />
+      {user ? (
+        <DailyBriefStrip
+          featuredPost={featuredPost}
+          activeDebate={homeDebate}
+          points={userPoints}
+        />
+      ) : null}
 
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_296px]">
         <div className="min-w-0">
           <FeaturedPostLead post={featuredPost} />
 
-          <EditorPicksRow picks={editorPicks} />
+          {user ? <EditorPicksRow picks={editorPicks} /> : null}
 
           <Suspense fallback={<FeedSkeleton />}>
             <PostsFeedSection

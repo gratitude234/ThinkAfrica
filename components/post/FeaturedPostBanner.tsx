@@ -1,5 +1,5 @@
-﻿import Image from "next/image";
 import Link from "next/link";
+import PostCover from "@/components/post/PostCover";
 import { formatDate } from "@/lib/utils";
 
 interface FeaturedPost {
@@ -28,21 +28,15 @@ export default function FeaturedPostBanner({ post }: Props) {
 
   return (
     <div className="mb-6 rounded-xl border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50 p-5">
-      {post.cover_image_url ? (
-        <div
-          data-lite-hide
-          className="relative mb-4 h-48 overflow-hidden rounded-lg"
-        >
-          <Image
-            src={post.cover_image_url}
-            alt={post.title}
-            fill
-            sizes="(max-width: 768px) 100vw, 66vw"
-            className="object-cover"
-            priority={true}
-          />
-        </div>
-      ) : null}
+      <PostCover
+        src={post.cover_image_url}
+        alt={post.title}
+        type={post.type}
+        sizes="(max-width: 768px) 100vw, 66vw"
+        priority
+        className="mb-4 h-48 rounded-lg"
+        imageClassName="object-cover"
+      />
 
       <p className="mb-2 text-xs font-semibold text-amber-600">
         Featured by ThinkAfrica

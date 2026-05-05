@@ -215,7 +215,7 @@ export function getPostQualitySummary(
     reviewLabel,
     reviewTone,
     referenceLabel:
-      referenceCount > 0 ? pluralize(referenceCount, "reference") : "No references",
+      referenceCount > 0 ? pluralize(referenceCount, "reference") : "References optional",
     minWords,
     wordCount,
     requiresReview,
@@ -232,7 +232,7 @@ export function getPostQualitySummary(
       },
       {
         label: "University",
-        value: author?.university ?? "Not provided",
+        value: author?.university ?? "Not listed",
         tone: author?.university ? "neutral" : "warning",
       },
       {
@@ -241,7 +241,7 @@ export function getPostQualitySummary(
           ? author.verified_type
             ? `Verified ${author.verified_type}`
             : "Verified"
-          : "Not verified",
+          : "Profile listed",
         tone: author?.verified ? "good" : "neutral",
       },
       { label: "Content type", value: contentLabel },
@@ -267,7 +267,7 @@ export function getPostQualitySummary(
       },
       {
         label: "Citation ID",
-        value: input.citationId ?? "Not assigned",
+        value: input.citationId ?? (requiresReview ? "Pending" : "Not required"),
         tone: input.citationId ? "good" : "neutral",
       },
       {

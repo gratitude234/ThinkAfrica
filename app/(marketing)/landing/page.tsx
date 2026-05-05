@@ -1,6 +1,6 @@
-﻿import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import Footer from "@/components/ui/Footer";
+import PostCover from "@/components/post/PostCover";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
@@ -142,8 +142,12 @@ export default async function LandingPage() {
   const displayUserCount = userCount ?? 0;
 
   const stats = [
-    { value: displayUserCount > 50 ? displayUserCount : 4200, suffix: "+", label: "Student writers" },
-    { value: displayPostCount > 50 ? displayPostCount : 11800, suffix: "+", label: "Published posts" },
+    ...(displayUserCount > 0
+      ? [{ value: displayUserCount, suffix: "", label: "Student writers" }]
+      : []),
+    ...(displayPostCount > 0
+      ? [{ value: displayPostCount, suffix: "", label: "Published posts" }]
+      : []),
     { value: 142, suffix: "", label: "Universities represented" },
     { value: 38,  suffix: "", label: "African countries" },
   ];
@@ -181,6 +185,28 @@ export default async function LandingPage() {
               <p className="hero-animate hero-sub mt-6 mb-9 max-w-[480px] text-lg leading-[1.65] text-ink-muted">
                 Essays, research, and policy briefs written by university students across Africa, rigorously argued and openly published.
               </p>
+
+              {leadPost ? (
+                <LandingTrackedLink
+                  href={`/post/${leadPost.slug}`}
+                  event="landing_read_clicked"
+                  metadata={{ source: "mobile_featured_read", postId: leadPost.id }}
+                  className="hero-animate mb-7 block rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:hidden"
+                >
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-600">
+                    Featured read
+                  </p>
+                  <h2 className="font-display line-clamp-2 text-[18px] font-semibold leading-snug text-ink">
+                    {leadPost.title}
+                  </h2>
+                  <p className="mt-2 text-xs text-ink-muted">
+                    {authorLine(leadPost).name}
+                    {authorLine(leadPost).university
+                      ? ` / ${authorLine(leadPost).university}`
+                      : ""}
+                  </p>
+                </LandingTrackedLink>
+              ) : null}
 
               <div className="hero-animate hero-ctas flex flex-wrap gap-3">
                 <LandingTrackedLink
@@ -220,11 +246,17 @@ export default async function LandingPage() {
                   ))}
                 </div>
                 <p className="text-sm text-ink-muted">
-                  Join{" "}
-                  <strong className="text-ink">
-                    {displayUserCount > 100 ? `${displayUserCount.toLocaleString()}+` : "4,200+"}
-                  </strong>{" "}
-                  students already publishing
+                  {displayUserCount > 0 ? (
+                    <>
+                      Join{" "}
+                      <strong className="text-ink">
+                        {displayUserCount.toLocaleString()}
+                      </strong>{" "}
+                      students already publishing
+                    </>
+                  ) : (
+                    "Read student essays, research, and policy briefs already live on ThinkAfrica"
+                  )}
                 </p>
               </div>
             </div>
@@ -252,17 +284,14 @@ export default async function LandingPage() {
                     metadata={{ source: "hero_rail", postId: leadPost.id, position: "lead" }}
                     className="mb-2 block overflow-hidden rounded-[10px] border border-gray-200 transition-shadow hover:shadow-md"
                   >
-                    {leadPost.cover_image_url ? (
-                      <div className="relative h-[156px] border-b border-gray-100">
-                        <Image src={leadPost.cover_image_url} alt={leadPost.title} fill sizes="440px" className="object-cover" />
-                      </div>
-                    ) : (
-                      <div className={`flex h-[156px] items-center justify-center bg-gradient-to-br ${typeGradient(leadPost.type)} border-b border-gray-100`}>
-                        <span className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-50">
-                          {typeBadge(leadPost.type).label}
-                        </span>
-                      </div>
-                    )}
+                    <PostCover
+                      src={leadPost.cover_image_url}
+                      alt={leadPost.title}
+                      type={leadPost.type}
+                      sizes="440px"
+                      className="h-[156px] border-b border-gray-100"
+                      imageClassName="object-cover"
+                    />
                     <div className="p-3.5">
                       <div className="mb-2 flex items-center justify-between">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${typeBadge(leadPost.type).classes}`}>

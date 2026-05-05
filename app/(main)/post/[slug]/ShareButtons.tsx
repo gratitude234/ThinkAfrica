@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Props {
   title: string;
@@ -16,10 +16,12 @@ export default function ShareButtons({
   authorName,
 }: Props) {
   const [copied, setCopied] = useState(false);
-  const url =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/post/${slug}`
-      : `/post/${slug}`;
+  const relativeUrl = `/post/${slug}`;
+  const [url, setUrl] = useState(relativeUrl);
+
+  useEffect(() => {
+    setUrl(`${window.location.origin}${relativeUrl}`);
+  }, [relativeUrl]);
 
   const whatsappText = [
     `📖 *${title}*`,

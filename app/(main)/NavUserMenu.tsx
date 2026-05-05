@@ -87,7 +87,7 @@ export default function NavUserMenu({
 
   if (!user) {
     return (
-      <div className="flex items-center gap-3">
+      <div className="hidden items-center gap-2 sm:flex">
         <Link href="/login">
           <Button variant="ghost" size="sm">
             Sign in

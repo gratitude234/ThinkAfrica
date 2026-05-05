@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import PostCover from "@/components/post/PostCover";
 import {
   formatRelativeTime,
   POST_TYPE_LABELS,
@@ -46,13 +46,6 @@ interface PostCardProps {
   variant?: "standard" | "featured";
 }
 
-const THUMB_STYLES: Record<string, string> = {
-  blog: "from-emerald-900 to-emerald-700 text-emerald-100/50",
-  essay: "from-amber-950 to-amber-700 text-amber-100/45",
-  research: "from-purple-950 to-purple-700 text-purple-100/45",
-  policy_brief: "from-blue-950 to-blue-700 text-blue-100/45",
-};
-
 const VERIFIED_COLORS: Record<string, string> = {
   student: "bg-emerald-brand",
   researcher: "bg-purple-accent",
@@ -80,7 +73,6 @@ export default function PostCard({
   const coAuthorCount = post.co_authors?.length ?? 0;
   const authorLine =
     coAuthorCount > 0 ? `${authorName} + ${coAuthorCount} others` : authorName;
-  const thumbStyle = THUMB_STYLES[post.type] ?? THUMB_STYLES.blog;
   const verifiedBg =
     VERIFIED_COLORS[author?.verified_type ?? "student"] ?? "bg-emerald-brand";
 
@@ -151,29 +143,16 @@ export default function PostCard({
           </div>
         </div>
 
-        {post.cover_image_url ? (
-          <Link
-            href={`/post/${post.slug}`}
-            data-lite-hide
-            className="shrink-0 self-start"
-          >
-            <Image
-              src={post.cover_image_url}
-              alt={post.title}
-              width={88}
-              height={88}
-              className="h-[88px] w-[88px] rounded-[9px] object-cover"
-            />
-          </Link>
-        ) : (
-          <Link
-            href={`/post/${post.slug}`}
-            data-lite-hide
-            className={`flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-[9px] bg-gradient-to-br ${thumbStyle} text-[10px] font-bold uppercase tracking-[0.1em]`}
-          >
-            {typeLabel.slice(0, 3)}
-          </Link>
-        )}
+        <Link href={`/post/${post.slug}`} className="shrink-0 self-start">
+          <PostCover
+            src={post.cover_image_url}
+            alt={post.title}
+            type={post.type}
+            sizes="88px"
+            className="h-[88px] w-[88px] rounded-[9px]"
+            imageClassName="object-cover"
+          />
+        </Link>
       </div>
     </article>
   );

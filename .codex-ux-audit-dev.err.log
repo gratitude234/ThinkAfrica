@@ -1,0 +1,524 @@
+[activation] persistence skipped TypeError: fetch failed
+Error [TimeoutError]: The operation was aborted due to timeout
+    at ignore-listed frames {
+  code: 23,
+  INDEX_SIZE_ERR: 1,
+  DOMSTRING_SIZE_ERR: 2,
+  HIERARCHY_REQUEST_ERR: 3,
+  WRONG_DOCUMENT_ERR: 4,
+  INVALID_CHARACTER_ERR: 5,
+  NO_DATA_ALLOWED_ERR: 6,
+  NO_MODIFICATION_ALLOWED_ERR: 7,
+  NOT_FOUND_ERR: 8,
+  NOT_SUPPORTED_ERR: 9,
+  INUSE_ATTRIBUTE_ERR: 10,
+  INVALID_STATE_ERR: 11,
+  SYNTAX_ERR: 12,
+  INVALID_MODIFICATION_ERR: 13,
+  NAMESPACE_ERR: 14,
+  INVALID_ACCESS_ERR: 15,
+  VALIDATION_ERR: 16,
+  TYPE_MISMATCH_ERR: 17,
+  SECURITY_ERR: 18,
+  NETWORK_ERR: 19,
+  ABORT_ERR: 20,
+  URL_MISMATCH_ERR: 21,
+  QUOTA_EXCEEDED_ERR: 22,
+  TIMEOUT_ERR: 23,
+  INVALID_NODE_TYPE_ERR: 24,
+  DATA_CLONE_ERR: 25
+}
+Error [TimeoutError]: The operation was aborted due to timeout
+    at ignore-listed frames {
+  code: 23,
+  INDEX_SIZE_ERR: 1,
+  DOMSTRING_SIZE_ERR: 2,
+  HIERARCHY_REQUEST_ERR: 3,
+  WRONG_DOCUMENT_ERR: 4,
+  INVALID_CHARACTER_ERR: 5,
+  NO_DATA_ALLOWED_ERR: 6,
+  NO_MODIFICATION_ALLOWED_ERR: 7,
+  NOT_FOUND_ERR: 8,
+  NOT_SUPPORTED_ERR: 9,
+  INUSE_ATTRIBUTE_ERR: 10,
+  INVALID_STATE_ERR: 11,
+  SYNTAX_ERR: 12,
+  INVALID_MODIFICATION_ERR: 13,
+  NAMESPACE_ERR: 14,
+  INVALID_ACCESS_ERR: 15,
+  VALIDATION_ERR: 16,
+  TYPE_MISMATCH_ERR: 17,
+  SECURITY_ERR: 18,
+  NETWORK_ERR: 19,
+  ABORT_ERR: 20,
+  URL_MISMATCH_ERR: 21,
+  QUOTA_EXCEEDED_ERR: 22,
+  TIMEOUT_ERR: 23,
+  INVALID_NODE_TYPE_ERR: 24,
+  DATA_CLONE_ERR: 25
+}
+Error [TimeoutError]: The operation was aborted due to timeout
+    at ignore-listed frames {
+  code: 23,
+  INDEX_SIZE_ERR: 1,
+  DOMSTRING_SIZE_ERR: 2,
+  HIERARCHY_REQUEST_ERR: 3,
+  WRONG_DOCUMENT_ERR: 4,
+  INVALID_CHARACTER_ERR: 5,
+  NO_DATA_ALLOWED_ERR: 6,
+  NO_MODIFICATION_ALLOWED_ERR: 7,
+  NOT_FOUND_ERR: 8,
+  NOT_SUPPORTED_ERR: 9,
+  INUSE_ATTRIBUTE_ERR: 10,
+  INVALID_STATE_ERR: 11,
+  SYNTAX_ERR: 12,
+  INVALID_MODIFICATION_ERR: 13,
+  NAMESPACE_ERR: 14,
+  INVALID_ACCESS_ERR: 15,
+  VALIDATION_ERR: 16,
+  TYPE_MISMATCH_ERR: 17,
+  SECURITY_ERR: 18,
+  NETWORK_ERR: 19,
+  ABORT_ERR: 20,
+  URL_MISMATCH_ERR: 21,
+  QUOTA_EXCEEDED_ERR: 22,
+  TIMEOUT_ERR: 23,
+  INVALID_NODE_TYPE_ERR: 24,
+  DATA_CLONE_ERR: 25
+}
+Error [TimeoutError]: The operation was aborted due to timeout
+    at ignore-listed frames {
+  code: 23,
+  INDEX_SIZE_ERR: 1,
+  DOMSTRING_SIZE_ERR: 2,
+  HIERARCHY_REQUEST_ERR: 3,
+  WRONG_DOCUMENT_ERR: 4,
+  INVALID_CHARACTER_ERR: 5,
+  NO_DATA_ALLOWED_ERR: 6,
+  NO_MODIFICATION_ALLOWED_ERR: 7,
+  NOT_FOUND_ERR: 8,
+  NOT_SUPPORTED_ERR: 9,
+  INUSE_ATTRIBUTE_ERR: 10,
+  INVALID_STATE_ERR: 11,
+  SYNTAX_ERR: 12,
+  INVALID_MODIFICATION_ERR: 13,
+  NAMESPACE_ERR: 14,
+  INVALID_ACCESS_ERR: 15,
+  VALIDATION_ERR: 16,
+  TYPE_MISMATCH_ERR: 17,
+  SECURITY_ERR: 18,
+  NETWORK_ERR: 19,
+  ABORT_ERR: 20,
+  URL_MISMATCH_ERR: 21,
+  QUOTA_EXCEEDED_ERR: 22,
+  TIMEOUT_ERR: 23,
+  INVALID_NODE_TYPE_ERR: 24,
+  DATA_CLONE_ERR: 25
+}
+Error [TimeoutError]: The operation was aborted due to timeout
+    at ignore-listed frames {
+  code: 23,
+  INDEX_SIZE_ERR: 1,
+  DOMSTRING_SIZE_ERR: 2,
+  HIERARCHY_REQUEST_ERR: 3,
+  WRONG_DOCUMENT_ERR: 4,
+  INVALID_CHARACTER_ERR: 5,
+  NO_DATA_ALLOWED_ERR: 6,
+  NO_MODIFICATION_ALLOWED_ERR: 7,
+  NOT_FOUND_ERR: 8,
+  NOT_SUPPORTED_ERR: 9,
+  INUSE_ATTRIBUTE_ERR: 10,
+  INVALID_STATE_ERR: 11,
+  SYNTAX_ERR: 12,
+  INVALID_MODIFICATION_ERR: 13,
+  NAMESPACE_ERR: 14,
+  INVALID_ACCESS_ERR: 15,
+  VALIDATION_ERR: 16,
+  TYPE_MISMATCH_ERR: 17,
+  SECURITY_ERR: 18,
+  NETWORK_ERR: 19,
+  ABORT_ERR: 20,
+  URL_MISMATCH_ERR: 21,
+  QUOTA_EXCEEDED_ERR: 22,
+  TIMEOUT_ERR: 23,
+  INVALID_NODE_TYPE_ERR: 24,
+  DATA_CLONE_ERR: 25
+}
+Error [TimeoutError]: The operation was aborted due to timeout
+    at ignore-listed frames {
+  code: 23,
+  INDEX_SIZE_ERR: 1,
+  DOMSTRING_SIZE_ERR: 2,
+  HIERARCHY_REQUEST_ERR: 3,
+  WRONG_DOCUMENT_ERR: 4,
+  INVALID_CHARACTER_ERR: 5,
+  NO_DATA_ALLOWED_ERR: 6,
+  NO_MODIFICATION_ALLOWED_ERR: 7,
+  NOT_FOUND_ERR: 8,
+  NOT_SUPPORTED_ERR: 9,
+  INUSE_ATTRIBUTE_ERR: 10,
+  INVALID_STATE_ERR: 11,
+  SYNTAX_ERR: 12,
+  INVALID_MODIFICATION_ERR: 13,
+  NAMESPACE_ERR: 14,
+  INVALID_ACCESS_ERR: 15,
+  VALIDATION_ERR: 16,
+  TYPE_MISMATCH_ERR: 17,
+  SECURITY_ERR: 18,
+  NETWORK_ERR: 19,
+  ABORT_ERR: 20,
+  URL_MISMATCH_ERR: 21,
+  QUOTA_EXCEEDED_ERR: 22,
+  TIMEOUT_ERR: 23,
+  INVALID_NODE_TYPE_ERR: 24,
+  DATA_CLONE_ERR: 25
+}
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RedirectErrorBoundary router={{...}}>
+      <InnerLayoutRouter url="/post/can-..." tree={[...]} params={{slug:"can-..."}} cacheNode={{rsc:{...}, ...}} ...>
+        <SegmentViewNode type="page" pagePath="(main)/pos...">
+          <SegmentTrieNode>
+          <PostPage>
+            <div className="relative">
+              <ReadingBar>
+              <ReadingProgressBar>
+              <ViewTracker>
+              <PublishedToast>
+              <div className="mx-auto ma...">
+                <div className="grid grid-...">
+                  <div className="lg:col-span-3">
+                    <div className="max-w-3xl">
+                      <div>
+                      <header>
+                      <div>
+                      <hr>
+                      <div>
+                      <div className="mb-8 flex ...">
+                        <div className="flex items...">
+                          <LikeButton>
+                          <BookmarkButton>
+                          <ShareButtons title="Can Africa..." slug="can-africa..." excerpt="Body:For m..." ...>
+                            <div className="flex flex-...">
+                              <span>
+                              <a
++                               href="https://wa.me/?text=%F0%9F%93%96%20*Can%20African%20Universities%20Truly%20Produ..."
+-                               href="https://wa.me/?text=%F0%9F%93%96%20*Can%20African%20Universities%20Truly%20Produ..."
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 rounded-lg bg-green-500 px-3 py-2 text-sm font-me..."
+                                aria-label="Share on WhatsApp"
+                              >
+                              <a
++                               href={"https://twitter.com/intent/tweet?text=Can%20African%20Universities%20Truly%20P..."}
+-                               href={"https://twitter.com/intent/tweet?text=Can%20African%20Universities%20Truly%20P..."}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-med..."
+                                aria-label="Share on X (Twitter)"
+                              >
+                              <a
++                               href="https://www.linkedin.com/sharing/share-offsite/?url=http%3A%2F%2Flocalhost%3A300..."
+-                               href="https://www.linkedin.com/sharing/share-offsite/?url=%2Fpost%2Fcan-african-univer..."
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-med..."
+                                aria-label="Share on LinkedIn"
+                              >
+                              ...
+                        ...
+                      ...
+                      ...
+                  ...
+        ...
+      ...
+ 
+Error [TimeoutError]: The operation was aborted due to timeout
+    at ignore-listed frames {
+  code: 23,
+  INDEX_SIZE_ERR: 1,
+  DOMSTRING_SIZE_ERR: 2,
+  HIERARCHY_REQUEST_ERR: 3,
+  WRONG_DOCUMENT_ERR: 4,
+  INVALID_CHARACTER_ERR: 5,
+  NO_DATA_ALLOWED_ERR: 6,
+  NO_MODIFICATION_ALLOWED_ERR: 7,
+  NOT_FOUND_ERR: 8,
+  NOT_SUPPORTED_ERR: 9,
+  INUSE_ATTRIBUTE_ERR: 10,
+  INVALID_STATE_ERR: 11,
+  SYNTAX_ERR: 12,
+  INVALID_MODIFICATION_ERR: 13,
+  NAMESPACE_ERR: 14,
+  INVALID_ACCESS_ERR: 15,
+  VALIDATION_ERR: 16,
+  TYPE_MISMATCH_ERR: 17,
+  SECURITY_ERR: 18,
+  NETWORK_ERR: 19,
+  ABORT_ERR: 20,
+  URL_MISMATCH_ERR: 21,
+  QUOTA_EXCEEDED_ERR: 22,
+  TIMEOUT_ERR: 23,
+  INVALID_NODE_TYPE_ERR: 24,
+  DATA_CLONE_ERR: 25
+}
+⨯ ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:496:20)
+  494 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  495 |                 >
+> 496 |                   <Image
+      |                    ^
+  497 |                     fill
+  498 |                     sizes="100vw"
+  499 |                     priority={true} {
+  digest: '4128231059'
+}
+⨯ ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:496:20)
+  494 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  495 |                 >
+> 496 |                   <Image
+      |                    ^
+  497 |                     fill
+  498 |                     sizes="100vw"
+  499 |                     priority={true} {
+  digest: '887835024'
+}
+⨯ ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:496:20)
+  494 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  495 |                 >
+> 496 |                   <Image
+      |                    ^
+  497 |                     fill
+  498 |                     sizes="100vw"
+  499 |                     priority={true} {
+  digest: '887835024'
+}
+⨯ ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:496:20)
+  494 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  495 |                 >
+> 496 |                   <Image
+      |                    ^
+  497 |                     fill
+  498 |                     sizes="100vw"
+  499 |                     priority={true} {
+  digest: '4128231059'
+}
+⨯ ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:496:20)
+  494 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  495 |                 >
+> 496 |                   <Image
+      |                    ^
+  497 |                     fill
+  498 |                     sizes="100vw"
+  499 |                     priority={true} {
+  digest: '1545999741'
+}
+⨯ ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:496:20)
+  494 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  495 |                 >
+> 496 |                   <Image
+      |                    ^
+  497 |                     fill
+  498 |                     sizes="100vw"
+  499 |                     priority={true} {
+  digest: '887835024'
+}
+⨯ ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:496:20)
+  494 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  495 |                 >
+> 496 |                   <Image
+      |                    ^
+  497 |                     fill
+  498 |                     sizes="100vw"
+  499 |                     priority={true} {
+  digest: '887835024'
+}
+[browser] Uncaught ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:496:20)
+  494 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  495 |                 >
+> 496 |                   <Image
+      |                    ^
+  497 |                     fill
+  498 |                     sizes="100vw"
+  499 |                     priority={true}
+⨯ ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:497:20)
+  495 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  496 |                 >
+> 497 |                   <Image
+      |                    ^
+  498 |                     fill
+  499 |                     sizes="100vw"
+  500 |                     priority={true} {
+  digest: '4100315708'
+}
+[browser] Uncaught ReferenceError: Image is not defined
+    at PostPage (app\(main)\post\[slug]\page.tsx:497:20)
+  495 |                   className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[...
+  496 |                 >
+> 497 |                   <Image
+      |                    ^
+  498 |                     fill
+  499 |                     sizes="100vw"
+  500 |                     priority={true}
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RedirectErrorBoundary router={{...}}>
+      <InnerLayoutRouter url="/post/can-..." tree={[...]} params={{slug:"can-..."}} cacheNode={{rsc:{...}, ...}} ...>
+        <SegmentViewNode type="page" pagePath="(main)/pos...">
+          <SegmentTrieNode>
+          <PostPage>
+            <div className="relative">
+              <ReadingBar>
+              <ReadingProgressBar>
+              <ViewTracker>
+              <PublishedToast>
+              <div className="mx-auto ma...">
+                <div className="grid grid-...">
+                  <div className="lg:col-span-3">
+                    <div className="max-w-3xl">
+                      <PostCover>
+                      <header>
+                      <div>
+                      <hr>
+                      <div>
+                      <div className="mb-8 flex ...">
+                        <div className="flex items...">
+                          <LikeButton>
+                          <BookmarkButton>
+                          <ShareButtons title="Can Africa..." slug="can-africa..." excerpt="Body:For m..." ...>
+                            <div className="flex flex-...">
+                              <span>
+                              <a
++                               href="https://wa.me/?text=%F0%9F%93%96%20*Can%20African%20Universities%20Truly%20Produ..."
+-                               href="https://wa.me/?text=%F0%9F%93%96%20*Can%20African%20Universities%20Truly%20Produ..."
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 rounded-lg bg-green-500 px-3 py-2 text-sm font-me..."
+                                aria-label="Share on WhatsApp"
+                              >
+                              <a
++                               href={"https://twitter.com/intent/tweet?text=Can%20African%20Universities%20Truly%20P..."}
+-                               href={"https://twitter.com/intent/tweet?text=Can%20African%20Universities%20Truly%20P..."}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-med..."
+                                aria-label="Share on X (Twitter)"
+                              >
+                              <a
++                               href="https://www.linkedin.com/sharing/share-offsite/?url=http%3A%2F%2Flocalhost%3A300..."
+-                               href="https://www.linkedin.com/sharing/share-offsite/?url=%2Fpost%2Fcan-african-univer..."
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-med..."
+                                aria-label="Share on LinkedIn"
+                              >
+                              ...
+                        ...
+                      ...
+                      ...
+                  ...
+        ...
+      ...
+ 
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RedirectErrorBoundary router={{...}}>
+      <InnerLayoutRouter url="/post/can-..." tree={[...]} params={{slug:"can-..."}} cacheNode={{rsc:{...}, ...}} ...>
+        <SegmentViewNode type="page" pagePath="(main)/pos...">
+          <SegmentTrieNode>
+          <PostPage>
+            <div className="relative">
+              <ReadingBar>
+              <ReadingProgressBar>
+              <ViewTracker>
+              <PublishedToast>
+              <div className="mx-auto ma...">
+                <div className="grid grid-...">
+                  <div className="lg:col-span-3">
+                    <div className="max-w-3xl">
+                      <PostCover>
+                      <header>
+                      <div>
+                      <hr>
+                      <div>
+                      <div className="mb-8 flex ...">
+                        <div className="flex items...">
+                          <LikeButton>
+                          <BookmarkButton>
+                          <ShareButtons title="Can Africa..." slug="can-africa..." excerpt="For many y..." ...>
+                            <div className="flex flex-...">
+                              <span>
+                              <a
++                               href="https://wa.me/?text=%F0%9F%93%96%20*Can%20African%20Universities%20Truly%20Produ..."
+-                               href="https://wa.me/?text=%F0%9F%93%96%20*Can%20African%20Universities%20Truly%20Produ..."
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 rounded-lg bg-green-500 px-3 py-2 text-sm font-me..."
+                                aria-label="Share on WhatsApp"
+                              >
+                              <a
++                               href={"https://twitter.com/intent/tweet?text=Can%20African%20Universities%20Truly%20P..."}
+-                               href={"https://twitter.com/intent/tweet?text=Can%20African%20Universities%20Truly%20P..."}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-med..."
+                                aria-label="Share on X (Twitter)"
+                              >
+                              <a
++                               href="https://www.linkedin.com/sharing/share-offsite/?url=http%3A%2F%2Flocalhost%3A300..."
+-                               href="https://www.linkedin.com/sharing/share-offsite/?url=%2Fpost%2Fcan-african-univer..."
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-med..."
+                                aria-label="Share on LinkedIn"
+                              >
+                              ...
+                        ...
+                      ...
+                      ...
+                  ...
+        ...
+      ...
+ 

@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import PostCover from "@/components/post/PostCover";
 import Badge from "@/components/ui/Badge";
 
 interface FeaturedPost {
@@ -15,28 +15,6 @@ interface FeaturedPost {
 interface FeaturedWorkProps {
   posts: FeaturedPost[];
 }
-
-const PLACEHOLDER_STYLES: Record<
-  string,
-  { gradient: string; accent: string }
-> = {
-  blog: {
-    gradient: "from-emerald-50 to-emerald-100",
-    accent: "text-emerald-600",
-  },
-  essay: {
-    gradient: "from-amber-50 to-amber-100",
-    accent: "text-amber-600",
-  },
-  research: {
-    gradient: "from-purple-50 to-purple-100",
-    accent: "text-purple-600",
-  },
-  policy_brief: {
-    gradient: "from-blue-50 to-blue-100",
-    accent: "text-blue-600",
-  },
-};
 
 function estimateReadTime(excerpt: string | null): number {
   return Math.max(
@@ -59,8 +37,6 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {posts.map((post) => {
-          const placeholder =
-            PLACEHOLDER_STYLES[post.type] ?? PLACEHOLDER_STYLES.blog;
           const readTime = estimateReadTime(post.excerpt);
 
           return (
@@ -69,30 +45,14 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
               href={`/post/${post.slug}`}
               className="group overflow-hidden rounded-xl border border-gray-200/70 bg-white transition-shadow hover:shadow-lg"
             >
-              <div
-                data-lite-hide={post.cover_image_url ? "" : undefined}
-                className="relative aspect-video overflow-hidden"
-              >
-                {post.cover_image_url ? (
-                  <Image
-                    src={post.cover_image_url}
-                    alt={post.title}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                    className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                  />
-                ) : (
-                  <div
-                    className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${placeholder.gradient}`}
-                  >
-                    <span
-                      className={`text-sm font-semibold uppercase tracking-[0.2em] ${placeholder.accent}`}
-                    >
-                      {post.type.replace("_", " ")}
-                    </span>
-                  </div>
-                )}
-              </div>
+              <PostCover
+                src={post.cover_image_url}
+                alt={post.title}
+                type={post.type}
+                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                className="aspect-video"
+                imageClassName="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              />
 
               <div className="space-y-3 p-5">
                 <Badge type={post.type} />

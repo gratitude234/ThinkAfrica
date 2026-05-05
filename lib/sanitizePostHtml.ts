@@ -55,8 +55,20 @@ function normalizeImage(
   return { tagName, attribs: nextAttribs };
 }
 
+function removeDraftSectionLabels(content: string) {
+  return content
+    .replace(
+      /<p>\s*(?:<strong>)?\s*Body:\s*(?:<\/strong>)?\s*<\/p>\s*/i,
+      ""
+    )
+    .replace(
+      /<p>\s*(?:<strong>)?\s*Body:\s*(?:<\/strong>)?\s*/i,
+      "<p>"
+    );
+}
+
 export function sanitizePostHtml(content: string | null | undefined): string {
-  return sanitizeHtml(content ?? "", {
+  const sanitized = sanitizeHtml(content ?? "", {
     allowedTags,
     allowedAttributes: {
       a: ["href"],
@@ -73,4 +85,6 @@ export function sanitizePostHtml(content: string | null | undefined): string {
       img: normalizeImage,
     },
   });
+
+  return removeDraftSectionLabels(sanitized);
 }

@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -9,16 +9,26 @@ const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 const BRAND_ITEMS = [
-  { icon: "✏️", text: "Publish research, essays & policy briefs" },
-  { icon: "⚡", text: "Debate the issues that shape Africa" },
-  { icon: "🏆", text: "Earn points, badges and fellowships" },
+  { marker: "01", text: "Return to drafts, responses, and saved reading" },
+  { marker: "02", text: "Follow writers and keep your feed focused" },
+  { marker: "03", text: "Build a public profile around your ideas" },
 ];
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", password: "" });
+  const redirectParam = searchParams.get("redirectTo");
+  const redirectTo =
+    redirectParam?.startsWith("/") && !redirectParam.startsWith("//")
+      ? redirectParam
+      : "/";
+  const isWritingRedirect = redirectTo.startsWith("/write");
+  const introCopy = isWritingRedirect
+    ? "Sign in to start your draft and keep autosave tied to your profile."
+    : "Sign in to continue reading, responding, and building your profile.";
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
@@ -41,12 +51,12 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
+    router.push(redirectTo);
     router.refresh();
   };
 
   return (
-    <div className="fixed inset-0 z-10 grid min-h-screen grid-cols-1 bg-white md:grid-cols-2">
+    <div className="fixed inset-0 z-10 grid min-h-dvh grid-cols-1 overflow-y-auto bg-white md:grid-cols-2">
       <div className="hidden flex-col justify-between bg-emerald-brand p-12 text-white md:flex">
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -56,7 +66,7 @@ export default function LoginPage() {
             className="mb-12 h-10 w-auto brightness-0 invert"
           />
           <blockquote className="mb-6 text-xl font-medium italic leading-relaxed text-white/90">
-            &quot;The pen is mightier than the sword, and the African intellectual is mightier still.&quot;
+            &quot;Serious ideas deserve a place where readers can find, test, and build on them.&quot;
           </blockquote>
           <p className="text-sm text-white/60">
             ThinkAfrica · Africa&apos;s Intellectual Network
@@ -68,25 +78,30 @@ export default function LoginPage() {
               key={item.text}
               className="flex items-center gap-3 text-sm text-white/80"
             >
-              <span className="text-lg">{item.icon}</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-xs font-semibold">
+                {item.marker}
+              </span>
               <span>{item.text}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="flex flex-col justify-center bg-white px-8 py-12 sm:px-16">
+      <div className="flex flex-col justify-center bg-white px-6 py-10 sm:px-16">
         <div className="mx-auto w-full max-w-md">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png"
-            alt="ThinkAfrica"
-            className="mb-8 h-8 w-auto md:hidden"
-          />
+          <Link
+            href="/landing"
+            className="mb-8 inline-flex font-display text-[24px] font-bold leading-none md:hidden"
+          >
+            <span className="text-emerald-brand">Think</span>
+            <span className="text-purple-accent">Africa</span>
+          </Link>
           <h1 className="font-display mb-1 text-2xl font-bold text-ink">
             Welcome back
           </h1>
-          <p className="mb-8 text-sm text-gray-500">Sign in to continue</p>
+          <p className="mb-8 text-sm leading-relaxed text-gray-500">
+            {introCopy}
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -130,9 +145,13 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-xl bg-emerald-brand py-3 font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
+
+          <div className="mt-7 rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-xs leading-relaxed text-gray-500">
+            ThinkAfrica keeps your byline, drafts, follows, and saved posts in one academic profile.
+          </div>
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Don&apos;t have an account?{" "}

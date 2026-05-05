@@ -17,14 +17,18 @@ function navLinkClass(isCurrent: boolean) {
 
 export default function BottomNav({
   username,
+  userId,
 }: BottomNavProps) {
   const pathname = usePathname();
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
-  const profileHref = username ? `/${username}` : "/settings";
-  const profileActive = username
-    ? pathname === profileHref || pathname.startsWith(`${profileHref}/`)
-    : pathname === "/settings" || pathname.startsWith("/settings/");
+  const profileHref = userId ? (username ? `/${username}` : "/settings") : "/signup";
+  const profileActive = userId
+    ? username
+      ? pathname === profileHref || pathname.startsWith(`${profileHref}/`)
+      : pathname === "/settings" || pathname.startsWith("/settings/")
+    : pathname === "/signup";
+  const profileLabel = userId ? "Me" : "Join";
 
   return (
     <nav
@@ -144,7 +148,7 @@ export default function BottomNav({
               d="M20 21a8 8 0 10-16 0m12-11a4 4 0 11-8 0 4 4 0 018 0z"
             />
           </svg>
-          <span className="text-[10px] font-medium">Me</span>
+          <span className="text-[10px] font-medium">{profileLabel}</span>
         </Link>
       </div>
     </nav>

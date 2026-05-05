@@ -1,4 +1,3 @@
-﻿import Image from "next/image";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -6,7 +5,12 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import Tag from "@/components/ui/Tag";
 import UserAvatar from "@/components/ui/UserAvatar";
-import { formatDate, POST_POINTS, type PostType } from "@/lib/utils";
+import {
+  formatDate,
+  POST_POINTS,
+  sanitizePostExcerpt,
+  type PostType,
+} from "@/lib/utils";
 import LikeButton from "./LikeButton";
 import BookmarkButton from "./BookmarkButton";
 import CommentsLoader from "./CommentsLoader";
@@ -20,6 +24,7 @@ import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
 import CiteThis from "./CiteThis";
 import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
+import PostCover from "@/components/post/PostCover";
 import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
@@ -137,6 +142,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
+  const description = sanitizePostExcerpt(post.excerpt);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://thinkafrica.com";
   const ogImageUrl = `${appUrl}/api/og?${new URLSearchParams({
     title: post.title,
@@ -148,10 +154,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return {
     title: `${post.title} - ThinkAfrica`,
-    description: post.excerpt ?? `Read this post by ${author?.full_name} on ThinkAfrica`,
+    description: description ?? `Read this post by ${author?.full_name} on ThinkAfrica`,
     openGraph: {
       title: post.title,
-      description: post.excerpt ?? "",
+      description: description ?? "",
       url: `${appUrl}/post/${post.slug}`,
       siteName: "ThinkAfrica",
       images: [{ url: ogImage, width: 1200, height: 630 }],
@@ -160,7 +166,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     twitter: {
       card: "summary_large_image",
       title: post.title,
-      description: post.excerpt ?? "",
+      description: description ?? "",
       images: [ogImage],
     },
   };
@@ -402,6 +408,7 @@ export default async function PostPage({ params }: PageProps) {
   ) as Array<{ full_name: string | null; username: string }>;
 
   const sanitizedContent = sanitizePostHtml(post.content);
+  const sanitizedExcerpt = sanitizePostExcerpt(post.excerpt);
   const readTime = estimateReadTime(sanitizedContent);
   const wordCount = countWords(sanitizedContent);
   const headings = extractHeadings(sanitizedContent);
@@ -489,21 +496,15 @@ export default async function PostPage({ params }: PageProps) {
                 </div>
               ) : null}
 
-              {coverImageUrl ? (
-                <div
-                  data-lite-hide
-                  className="relative mb-8 h-64 overflow-hidden rounded-xl sm:h-80 lg:h-[400px]"
-                >
-                  <Image
-                    fill
-                    sizes="100vw"
-                    priority={true}
-                    alt={post.title}
-                    src={coverImageUrl}
-                    className="object-cover"
-                  />
-                </div>
-              ) : null}
+              <PostCover
+                src={coverImageUrl}
+                alt={post.title}
+                type={post.type}
+                sizes="(max-width: 1024px) 100vw, 768px"
+                priority
+                className="mb-8 h-64 rounded-xl sm:h-80 lg:h-[400px]"
+                imageClassName="object-cover"
+              />
 
               <header className="mb-8">
                 {/* Kicker - post type + word count + read time */}
@@ -545,9 +546,9 @@ export default async function PostPage({ params }: PageProps) {
                 </h1>
 
                 {/* Deck / standfirst - rendered from excerpt if present */}
-                {post.excerpt ? (
+                {sanitizedExcerpt ? (
                   <p className="font-display mb-6 text-xl font-normal italic leading-relaxed text-gray-600 sm:text-2xl">
-                    {post.excerpt}
+                    {sanitizedExcerpt}
                   </p>
                 ) : null}
 
@@ -728,7 +729,7 @@ export default async function PostPage({ params }: PageProps) {
                       <ShareButtons
                         title={post.title}
                         slug={post.slug}
-                        excerpt={post.excerpt ?? null}
+                        excerpt={sanitizedExcerpt}
                         authorName={author?.full_name ?? null}
                       />
                     </div>

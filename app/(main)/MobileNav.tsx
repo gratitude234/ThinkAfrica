@@ -54,9 +54,9 @@ export default function MobileNav({
     { label: "Leaderboard", href: "/leaderboard" },
     { label: "Alumni", href: "/alumni" },
     isEnabled("talentMarketplace") ? { label: "People", href: "/talent" } : null,
-    { label: "Bookmarks", href: "/bookmarks" },
     { label: "Partners", href: "/partners" },
-    { label: "Dashboard", href: "/dashboard" },
+    user ? { label: "Bookmarks", href: "/bookmarks" } : null,
+    user ? { label: "Dashboard", href: "/dashboard" } : null,
     canAccessReview ? { label: "Review", href: "/review" } : null,
   ].filter(Boolean) as { label: string; href: string }[];
 
@@ -119,13 +119,39 @@ export default function MobileNav({
               );
             })}
 
-            <Link
-              href={profileHref}
-              onClick={() => setOpen(false)}
-              className={itemClass(profileActive)}
-            >
-              Me
-            </Link>
+            {user ? (
+              <Link
+                href={profileHref}
+                onClick={() => setOpen(false)}
+                className={itemClass(profileActive)}
+              >
+                Me
+              </Link>
+            ) : null}
+
+            {!user ? (
+              <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                <p className="text-xs leading-relaxed text-emerald-900">
+                  Create a profile to follow writers, save posts, and publish your first argument.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Link
+                    href="/signup"
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg bg-emerald-brand px-3 py-2 text-center text-sm font-semibold text-white"
+                  >
+                    Join free
+                  </Link>
+                  <Link
+                    href="/login"
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-center text-sm font-semibold text-emerald-700"
+                  >
+                    Sign in
+                  </Link>
+                </div>
+              </div>
+            ) : null}
 
             <div className="border-t border-gray-100 pt-3">
               <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">

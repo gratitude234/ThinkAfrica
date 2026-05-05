@@ -1,0 +1,273 @@
+
+> think-africa@0.1.0 dev
+> next dev --hostname 127.0.0.1 --port 3001
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://127.0.0.1:3001
+- Network:       http://127.0.0.1:3001
+- Environments: .env.local
+✓ Ready in 2.7s
+Creating turbopack project { dir: 'C:\\dev\\Think_Africa', testMode: true }
+
+○ Compiling /landing ...
+ GET /landing 200 in 41s (next.js: 25.9s, proxy.ts: 620ms, application-code: 14.3s)
+○ Compiling /api/activation ...
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 0, visiblePosts: 0, userId: null },
+  at: '2026-05-05T08:43:54.512Z'
+}
+ POST /api/activation 200 in 14.1s (next.js: 3.3s, proxy.ts: 34ms, application-code: 10.7s)
+ GET /landing 200 in 3.1s (next.js: 17ms, proxy.ts: 20ms, application-code: 3.1s)
+ GET /landing 200 in 1813ms (next.js: 39ms, proxy.ts: 20ms, application-code: 1754ms)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T08:44:30.440Z'
+}
+ POST /api/activation 200 in 383ms (next.js: 24ms, proxy.ts: 20ms, application-code: 339ms)
+○ Compiling / ...
+ GET /?guest=1 200 in 13.9s (next.js: 5.1s, proxy.ts: 26ms, application-code: 8.7s)
+○ Compiling /_error ...
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2Fdd9e54fb-9787-4eb4-999d-77c0cd14a55a%2F1776853314658-8ukkajjupwt.png&w=96&q=75 500 in 13.4s (next.js: 13.2s, application-code: 217ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2Fdd9e54fb-9787-4eb4-999d-77c0cd14a55a%2F1776853314658-8ukkajjupwt.png&w=96&q=75 500 in 13.4s (next.js: 13.2s, application-code: 218ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2F49d68305-e878-454d-9d98-af5b2c41c1ea%2F1777062854161-7ewgaycpwui.png&w=96&q=75 500 in 12.1s (next.js: 12.0s, application-code: 55ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2F49d68305-e878-454d-9d98-af5b2c41c1ea%2F1777062854161-7ewgaycpwui.png&w=96&q=75 500 in 12.1s (next.js: 12.0s, application-code: 56ms)
+ GET /landing 200 in 1754ms (next.js: 18ms, proxy.ts: 22ms, application-code: 1714ms)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T08:47:27.419Z'
+}
+ POST /api/activation 200 in 375ms (next.js: 10ms, proxy.ts: 20ms, application-code: 345ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2Fdd9e54fb-9787-4eb4-999d-77c0cd14a55a%2F1776853314658-8ukkajjupwt.png&w=640&q=75 500 in 8.9s (next.js: 8.8s, application-code: 148ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2Fdd9e54fb-9787-4eb4-999d-77c0cd14a55a%2F1776853314658-8ukkajjupwt.png&w=640&q=75 500 in 8.9s (next.js: 8.8s, application-code: 149ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2F8633f82a-6271-4f01-b18c-ef5d1f56cb95%2F1776721859957-pkbgl4er9zt.jpeg&w=256&q=75 500 in 8.9s (next.js: 8.8s, application-code: 92ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2F8633f82a-6271-4f01-b18c-ef5d1f56cb95%2F1776721859957-pkbgl4er9zt.jpeg&w=256&q=75 500 in 8.9s (next.js: 8.8s, application-code: 93ms)
+ GET /?guest=1 200 in 19.5s (next.js: 6ms, proxy.ts: 11ms, application-code: 19.5s)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2Fdd9e54fb-9787-4eb4-999d-77c0cd14a55a%2F1776853314658-8ukkajjupwt.png&w=96&q=75 500 in 7.3s (next.js: 7.1s, application-code: 170ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2Fdd9e54fb-9787-4eb4-999d-77c0cd14a55a%2F1776853314658-8ukkajjupwt.png&w=96&q=75 500 in 7.3s (next.js: 7.1s, application-code: 172ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2F49d68305-e878-454d-9d98-af5b2c41c1ea%2F1777062854161-7ewgaycpwui.png&w=96&q=75 500 in 7.3s (next.js: 7.2s, application-code: 79ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2F49d68305-e878-454d-9d98-af5b2c41c1ea%2F1777062854161-7ewgaycpwui.png&w=96&q=75 500 in 7.3s (next.js: 7.2s, application-code: 80ms)
+ GET /login?type=blog&starter=1&redirectTo=%2Fwrite 200 in 3.3s (next.js: 2.9s, proxy.ts: 18ms, application-code: 333ms)
+ GET /signup 200 in 1592ms (next.js: 1378ms, proxy.ts: 33ms, application-code: 181ms)
+ GET /gratitude 200 in 9.0s (next.js: 4.7s, proxy.ts: 8ms, application-code: 4.3s)
+○ Compiling /post/[slug] ...
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 10.1s (next.js: 5.4s, proxy.ts: 34ms, application-code: 4.6s)
+[activation] {
+  event: 'post_opened',
+  metadata: {
+    slug: 'can-african-universities-truly-produce-entrepreneurs-mobu8o7m',
+    userId: null
+  },
+  at: '2026-05-05T08:53:33.587Z'
+}
+[activation] {
+  event: 'collaboration_panel_viewed',
+  metadata: {
+    postId: '9e765182-8e1e-4e8a-acfa-c9ff76363da5',
+    responseCount: 1,
+    coauthorCount: 0,
+    userId: null
+  },
+  at: '2026-05-05T08:53:33.623Z'
+}
+ POST /api/activation 200 in 455ms (next.js: 53ms, proxy.ts: 62ms, application-code: 340ms)
+ POST /api/activation 200 in 438ms (next.js: 126ms, proxy.ts: 46ms, application-code: 266ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2Fdd9e54fb-9787-4eb4-999d-77c0cd14a55a%2F1776853314658-8ukkajjupwt.png&w=1920&q=75 500 in 7.9s (next.js: 7.8s, application-code: 84ms)
+ GET /_next/image?url=https%3A%2F%2Ffmlaswzrvsuiyzjaeldm.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpost-images%2Fcovers%2Fdd9e54fb-9787-4eb4-999d-77c0cd14a55a%2F1776853314658-8ukkajjupwt.png&w=1920&q=75 500 in 7.9s (next.js: 7.8s, application-code: 87ms)
+✓ Compiled in 881ms
+✓ Compiled in 728ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.4s (next.js: 629ms, proxy.ts: 510ms, application-code: 2.2s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1680ms (next.js: 28ms, proxy.ts: 94ms, application-code: 1557ms)
+✓ Compiled in 566ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.4s (next.js: 199ms, proxy.ts: 235ms, application-code: 1967ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1634ms (next.js: 15ms, proxy.ts: 116ms, application-code: 1504ms)
+✓ Compiled in 700ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.0s (next.js: 331ms, proxy.ts: 307ms, application-code: 2.4s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.0s (next.js: 16ms, proxy.ts: 68ms, application-code: 1941ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.5s (next.js: 32ms, proxy.ts: 21ms, application-code: 2.4s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.5s (next.js: 515ms, proxy.ts: 24ms, application-code: 1935ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.5s (next.js: 367ms, proxy.ts: 23ms, application-code: 2.1s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1803ms (next.js: 370ms, proxy.ts: 304ms, application-code: 1129ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.3s (next.js: 386ms, proxy.ts: 492ms, application-code: 2.4s)
+✓ Compiled in 817ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 4.3s (next.js: 447ms, proxy.ts: 1173ms, application-code: 2.7s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.3s (next.js: 38ms, proxy.ts: 25ms, application-code: 2.2s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.0s (next.js: 13ms, proxy.ts: 13ms, application-code: 2.9s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.7s (next.js: 648ms, proxy.ts: 27ms, application-code: 2.0s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.8s (next.js: 767ms, proxy.ts: 29ms, application-code: 1955ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.8s (next.js: 95ms, proxy.ts: 26ms, application-code: 2.7s)
+✓ Compiled in 2s
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1285ms (next.js: 281ms, proxy.ts: 183ms, application-code: 820ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 398ms (next.js: 17ms, proxy.ts: 35ms, application-code: 346ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1773ms (next.js: 35ms, proxy.ts: 18ms, application-code: 1720ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1747ms (next.js: 95ms, proxy.ts: 350ms, application-code: 1302ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1433ms (next.js: 389ms, proxy.ts: 53ms, application-code: 990ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1431ms (next.js: 514ms, proxy.ts: 56ms, application-code: 861ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1431ms (next.js: 917ms, proxy.ts: 59ms, application-code: 454ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 4.1s (next.js: 1035ms, proxy.ts: 16ms, application-code: 3.1s)
+✓ Compiled in 1470ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 5.7s (next.js: 390ms, proxy.ts: 305ms, application-code: 5.0s)
+[activation] {
+  event: 'post_opened',
+  metadata: {
+    slug: 'can-african-universities-truly-produce-entrepreneurs-mobu8o7m',
+    userId: null
+  },
+  at: '2026-05-05T09:52:23.389Z'
+}
+[activation] {
+  event: 'collaboration_panel_viewed',
+  metadata: {
+    postId: '9e765182-8e1e-4e8a-acfa-c9ff76363da5',
+    responseCount: 1,
+    coauthorCount: 0,
+    userId: null
+  },
+  at: '2026-05-05T09:52:23.397Z'
+}
+ POST /api/activation 200 in 633ms (next.js: 312ms, proxy.ts: 27ms, application-code: 293ms)
+ POST /api/activation 200 in 645ms (next.js: 279ms, proxy.ts: 27ms, application-code: 340ms)
+✓ Compiled in 2.5s
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 7.4s (next.js: 41ms, proxy.ts: 150ms, application-code: 7.2s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 9.3s (next.js: 397ms, proxy.ts: 339ms, application-code: 8.5s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 802ms (next.js: 58ms, proxy.ts: 20ms, application-code: 723ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 8.1s (next.js: 74ms, proxy.ts: 39ms, application-code: 8.0s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 8.1s (next.js: 932ms, proxy.ts: 47ms, application-code: 7.2s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 8.1s (next.js: 207ms, proxy.ts: 41ms, application-code: 7.9s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 8.1s (next.js: 305ms, proxy.ts: 44ms, application-code: 7.8s)
+✓ Compiled in 828ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1485ms (next.js: 95ms, proxy.ts: 10ms, application-code: 1380ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 18.9s (next.js: 191ms, proxy.ts: 186ms, application-code: 18.5s)
+✓ Compiled in 2.5s
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.4s (next.js: 276ms, proxy.ts: 232ms, application-code: 2.9s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.1s (next.js: 364ms, proxy.ts: 34ms, application-code: 1666ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.6s (next.js: 44ms, proxy.ts: 26ms, application-code: 2.6s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.4s (next.js: 49ms, proxy.ts: 30ms, application-code: 2.3s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.6s (next.js: 480ms, proxy.ts: 36ms, application-code: 2.1s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.6s (next.js: 607ms, proxy.ts: 38ms, application-code: 1975ms)
+✓ Compiled in 1172ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 4.1s (next.js: 394ms, proxy.ts: 244ms, application-code: 3.5s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.2s (next.js: 27ms, proxy.ts: 96ms, application-code: 3.1s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.1s (next.js: 115ms, proxy.ts: 36ms, application-code: 2.9s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.1s (next.js: 56ms, proxy.ts: 33ms, application-code: 3.0s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.1s (next.js: 1305ms, proxy.ts: 45ms, application-code: 1744ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 832ms (next.js: 91ms, proxy.ts: 17ms, application-code: 724ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.4s (next.js: 223ms, proxy.ts: 41ms, application-code: 3.2s)
+✓ Compiled in 1339ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.8s (next.js: 398ms, proxy.ts: 267ms, application-code: 2.1s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1717ms (next.js: 30ms, proxy.ts: 128ms, application-code: 1559ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1380ms (next.js: 244ms, proxy.ts: 22ms, application-code: 1114ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1675ms (next.js: 24ms, proxy.ts: 21ms, application-code: 1630ms)
+✓ Compiled in 991ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.4s (next.js: 430ms, proxy.ts: 331ms, application-code: 2.6s)
+✓ Compiled in 1022ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1569ms (next.js: 324ms, proxy.ts: 281ms, application-code: 964ms)
+✓ Compiled in 1097ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.9s (next.js: 475ms, proxy.ts: 452ms, application-code: 1963ms)
+✓ Compiled in 693ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1931ms (next.js: 613ms, proxy.ts: 190ms, application-code: 1129ms)
+✓ Compiled in 1971ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.0s (next.js: 375ms, proxy.ts: 244ms, application-code: 1388ms)
+✓ Compiled in 1149ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.5s (next.js: 586ms, proxy.ts: 309ms, application-code: 1564ms)
+✓ Compiled in 540ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.6s (next.js: 339ms, proxy.ts: 212ms, application-code: 2.0s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1150ms (next.js: 68ms, proxy.ts: 143ms, application-code: 939ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1954ms (next.js: 52ms, proxy.ts: 101ms, application-code: 1801ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1533ms (next.js: 504ms, proxy.ts: 33ms, application-code: 996ms)
+✓ Compiled in 367ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.7s (next.js: 409ms, proxy.ts: 254ms, application-code: 2.0s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1947ms (next.js: 22ms, proxy.ts: 85ms, application-code: 1841ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1777ms (next.js: 34ms, proxy.ts: 23ms, application-code: 1719ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1776ms (next.js: 133ms, proxy.ts: 29ms, application-code: 1615ms)
+✓ Compiled in 561ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1890ms (next.js: 344ms, proxy.ts: 256ms, application-code: 1290ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1021ms (next.js: 14ms, proxy.ts: 89ms, application-code: 918ms)
+✓ Compiled in 1065ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1626ms (next.js: 57ms, proxy.ts: 15ms, application-code: 1554ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1726ms (next.js: 241ms, proxy.ts: 233ms, application-code: 1252ms)
+✓ Compiled in 705ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.2s (next.js: 517ms, proxy.ts: 244ms, application-code: 1480ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1887ms (next.js: 326ms, proxy.ts: 143ms, application-code: 1417ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.2s (next.js: 523ms, proxy.ts: 297ms, application-code: 1375ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.8s (next.js: 1234ms, proxy.ts: 23ms, application-code: 1555ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1402ms (next.js: 33ms, proxy.ts: 370ms, application-code: 999ms)
+✓ Compiled in 643ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 5.0s (next.js: 500ms, proxy.ts: 318ms, application-code: 4.2s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.9s (next.js: 12ms, proxy.ts: 76ms, application-code: 3.8s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.2s (next.js: 959ms, proxy.ts: 22ms, application-code: 1265ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1679ms (next.js: 13ms, proxy.ts: 315ms, application-code: 1351ms)
+✓ Compiled in 629ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.7s (next.js: 577ms, proxy.ts: 390ms, application-code: 1745ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1353ms (next.js: 30ms, proxy.ts: 116ms, application-code: 1206ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.1s (next.js: 1148ms, proxy.ts: 14ms, application-code: 1936ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1565ms (next.js: 13ms, proxy.ts: 310ms, application-code: 1242ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.2s (next.js: 1252ms, proxy.ts: 15ms, application-code: 1960ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 1948ms (next.js: 18ms, proxy.ts: 365ms, application-code: 1565ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.7s (next.js: 897ms, proxy.ts: 16ms, application-code: 2.8s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.4s (next.js: 15ms, proxy.ts: 419ms, application-code: 2.0s)
+ GET /landing 200 in 4.8s (next.js: 698ms, proxy.ts: 12ms, application-code: 4.1s)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T10:09:42.815Z'
+}
+ POST /api/activation 200 in 692ms (next.js: 312ms, proxy.ts: 44ms, application-code: 336ms)
+ GET /?guest=1 200 in 8.3s (next.js: 435ms, proxy.ts: 14ms, application-code: 7.9s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 5.8s (next.js: 96ms, proxy.ts: 20ms, application-code: 5.7s)
+[activation] {
+  event: 'post_opened',
+  metadata: {
+    slug: 'can-african-universities-truly-produce-entrepreneurs-mobu8o7m',
+    userId: null
+  },
+  at: '2026-05-05T10:23:04.492Z'
+}
+[activation] {
+  event: 'collaboration_panel_viewed',
+  metadata: {
+    postId: '9e765182-8e1e-4e8a-acfa-c9ff76363da5',
+    responseCount: 1,
+    coauthorCount: 0,
+    userId: null
+  },
+  at: '2026-05-05T10:23:04.503Z'
+}
+ POST /api/activation 200 in 487ms (next.js: 22ms, proxy.ts: 155ms, application-code: 310ms)
+ POST /api/activation 200 in 488ms (next.js: 37ms, proxy.ts: 158ms, application-code: 294ms)
+✓ Compiled in 987ms
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.4s (next.js: 357ms, proxy.ts: 204ms, application-code: 1861ms)
+[activation] {
+  event: 'post_opened',
+  metadata: {
+    slug: 'can-african-universities-truly-produce-entrepreneurs-mobu8o7m',
+    userId: null
+  },
+  at: '2026-05-05T10:29:19.302Z'
+}
+[activation] {
+  event: 'collaboration_panel_viewed',
+  metadata: {
+    postId: '9e765182-8e1e-4e8a-acfa-c9ff76363da5',
+    responseCount: 1,
+    coauthorCount: 0,
+    userId: null
+  },
+  at: '2026-05-05T10:29:19.336Z'
+}
+ POST /api/activation 200 in 566ms (next.js: 194ms, proxy.ts: 26ms, application-code: 346ms)
+ POST /api/activation 200 in 561ms (next.js: 233ms, proxy.ts: 20ms, application-code: 308ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 5.5s (next.js: 49ms, proxy.ts: 25ms, application-code: 5.5s)
+ GET /signup 200 in 1105ms (next.js: 439ms, proxy.ts: 30ms, application-code: 637ms)
+✓ Compiled in 621ms
+ GET /signup 200 in 1253ms (next.js: 570ms, proxy.ts: 504ms, application-code: 180ms)
+ GET /signup 200 in 900ms (next.js: 368ms, proxy.ts: 408ms, application-code: 123ms)
+ GET /landing 200 in 3.5s (next.js: 292ms, proxy.ts: 31ms, application-code: 3.2s)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T10:40:52.072Z'
+}
+ POST /api/activation 200 in 1029ms (next.js: 563ms, proxy.ts: 28ms, application-code: 437ms)

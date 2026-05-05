@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import PostCover from "@/components/post/PostCover";
 import {
   POST_TYPE_LABELS,
   sanitizePostExcerpt,
@@ -21,13 +21,6 @@ interface PickPost {
   } | null;
 }
 
-const COVER_COLORS: Record<string, string> = {
-  research: "bg-[#534AB7]",
-  policy_brief: "bg-[#1D4ED8]",
-  essay: "bg-[#444441]",
-  blog: "bg-[#047857]",
-};
-
 function estimateReadTime(excerpt: string | null): number {
   return Math.max(
     1,
@@ -47,7 +40,6 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
         {picks.map((pick) => {
           const author = pick.profiles;
           const typeLabel = POST_TYPE_LABELS[pick.type as PostType] ?? pick.type;
-          const coverBg = COVER_COLORS[pick.type] ?? "bg-[#444441]";
           const readTime = estimateReadTime(sanitizePostExcerpt(pick.excerpt));
 
           return (
@@ -56,23 +48,14 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
               href={`/post/${pick.slug}`}
               className="group overflow-hidden rounded-[10px] border border-gray-200/80 bg-white transition-shadow hover:shadow-md"
             >
-              {pick.cover_image_url ? (
-                <div data-lite-hide className="relative h-[72px] w-full">
-                  <Image
-                    src={pick.cover_image_url}
-                    alt={pick.title}
-                    fill
-                    sizes="(max-width: 1024px) 50vw, 33vw"
-                    className="object-cover"
-                  />
-                </div>
-              ) : (
-                <div className={`flex h-[72px] w-full items-end ${coverBg} px-2.5 py-2`}>
-                  <span className="font-display text-[11px] italic text-white/45">
-                    {typeLabel.toLowerCase()}
-                  </span>
-                </div>
-              )}
+              <PostCover
+                src={pick.cover_image_url}
+                alt={pick.title}
+                type={pick.type}
+                sizes="(max-width: 1024px) 50vw, 33vw"
+                className="h-[72px] w-full"
+                imageClassName="object-cover"
+              />
               <div className="px-3 py-2.5">
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">
                   {typeLabel} {"\u00B7"} {readTime} min

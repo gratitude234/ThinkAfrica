@@ -10,9 +10,9 @@ const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 const BRAND_ITEMS = [
-  { marker: "01", text: "Publish research, essays, and policy briefs" },
-  { marker: "02", text: "Debate the issues that shape Africa" },
-  { marker: "03", text: "Build a profile that travels with your work" },
+  { marker: "01", text: "Claim a byline readers can trust" },
+  { marker: "02", text: "Publish quick takes, essays, research, and briefs" },
+  { marker: "03", text: "Follow writers, debates, and opportunities" },
 ];
 
 export default function SignupPage() {
@@ -57,7 +57,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="fixed inset-0 z-10 grid min-h-screen grid-cols-1 bg-white md:grid-cols-2">
+    <div className="fixed inset-0 z-10 grid min-h-dvh grid-cols-1 overflow-y-auto bg-white md:grid-cols-2">
       <div className="hidden flex-col justify-between bg-emerald-brand p-12 text-white md:flex">
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -67,7 +67,7 @@ export default function SignupPage() {
             className="mb-12 h-10 w-auto brightness-0 invert"
           />
           <blockquote className="mb-6 text-xl font-medium italic leading-relaxed text-white/90">
-            &quot;The pen is mightier than the sword, and the African intellectual is mightier still.&quot;
+            &quot;Turn your strongest campus ideas into work other students can read, cite, and respond to.&quot;
           </blockquote>
           <p className="text-sm text-white/60">
             ThinkAfrica - Africa&apos;s Intellectual Network
@@ -88,20 +88,21 @@ export default function SignupPage() {
         </div>
       </div>
 
-      <div className="flex flex-col justify-center bg-white px-8 py-12 sm:px-16">
+      <div className="flex flex-col justify-center bg-white px-6 py-10 sm:px-16">
         <div className="mx-auto w-full max-w-md">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png"
-            alt="ThinkAfrica"
-            className="mb-8 h-8 w-auto md:hidden"
-          />
+          <Link
+            href="/landing"
+            className="mb-8 inline-flex font-display text-[24px] font-bold leading-none md:hidden"
+          >
+            <span className="text-emerald-brand">Think</span>
+            <span className="text-purple-accent">Africa</span>
+          </Link>
           <h1 className="font-display mb-1 text-2xl font-bold text-ink">
-            Create your account
+            Claim your academic profile
           </h1>
-          <p className="mb-8 text-sm text-gray-500">
-            Join ThinkAfrica in under a minute. We will shape your academic
-            profile next.
+          <p className="mb-8 text-sm leading-relaxed text-gray-500">
+            Start with your name and university email. Next, we will shape your
+            interests, follows, and first contribution.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -165,6 +166,10 @@ export default function SignupPage() {
               {loading ? "Creating account..." : "Create account"}
             </button>
           </form>
+
+          <div className="mt-7 rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-xs leading-relaxed text-gray-500">
+            Your profile links your byline, university, topics, saved posts, and published work.
+          </div>
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{" "}

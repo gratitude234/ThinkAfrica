@@ -1,5 +1,5 @@
-﻿import Image from "next/image";
 import Link from "next/link";
+import PostCover from "@/components/post/PostCover";
 import {
   formatDate,
   POST_TYPE_LABELS,
@@ -43,27 +43,15 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
   return (
     <article className="mb-1">
       <Link href={`/post/${post.slug}`} className="block">
-        {post.cover_image_url ? (
-          <div
-            data-lite-hide
-            className="relative mb-4 h-[198px] w-full overflow-hidden rounded-xl md:h-[208px]"
-          >
-            <Image
-              src={post.cover_image_url}
-              alt={post.title}
-              fill
-              sizes="(max-width: 1024px) 100vw, 66vw"
-              className="object-cover object-top"
-              priority
-            />
-          </div>
-        ) : (
-          <div className="mb-4 flex h-[198px] w-full items-end rounded-xl bg-gradient-to-br from-[#2D2C2A] to-[#444441] p-5 md:h-[208px]">
-            <span className="font-display text-xs italic tracking-wide text-white/50">
-              {typeLabel.toLowerCase()}
-            </span>
-          </div>
-        )}
+        <PostCover
+          src={post.cover_image_url}
+          alt={post.title}
+          type={post.type}
+          sizes="(max-width: 1024px) 100vw, 66vw"
+          priority
+          className="mb-4 h-[198px] w-full rounded-xl md:h-[208px]"
+          imageClassName="object-cover object-top"
+        />
       </Link>
 
       <p className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-brand">
