@@ -21,7 +21,7 @@ export default function GuestBanner() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl bg-emerald-brand px-3.5 py-3 text-white shadow-lg md:bottom-4 md:w-[92%] md:max-w-xl md:px-4">
+    <div className="mb-5 rounded-xl bg-emerald-brand px-3.5 py-3 text-white shadow-sm md:fixed md:bottom-4 md:left-1/2 md:z-40 md:mb-0 md:w-[92%] md:max-w-xl md:-translate-x-1/2 md:px-4 md:shadow-lg">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm leading-snug">
           Reading as a guest.{" "}
@@ -40,7 +40,7 @@ export default function GuestBanner() {
           aria-label="Dismiss"
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
         >
-          x
+          <span aria-hidden="true">x</span>
         </button>
       </div>
     </div>

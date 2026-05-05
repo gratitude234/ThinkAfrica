@@ -23,7 +23,7 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+      className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
         active
           ? "border-ink bg-ink text-canvas"
           : "border-gray-200 bg-white text-ink-muted hover:border-gray-400 hover:text-ink"
@@ -42,7 +42,7 @@ export default function FeedFilterChips({
   onTypeChange: (value: TypeFilter) => void;
 }) {
   return (
-    <div className="mb-5 flex flex-wrap gap-1.5">
+    <div className="-mx-5 mb-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {TYPE_OPTIONS.map((option) => (
         <Chip
           key={option.value}

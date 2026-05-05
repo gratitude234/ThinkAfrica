@@ -77,15 +77,15 @@ export default function PostCard({
     VERIFIED_COLORS[author?.verified_type ?? "student"] ?? "bg-emerald-brand";
 
   return (
-    <article className="mb-2 rounded-xl border border-gray-200/80 bg-white px-5 py-[18px] transition-all duration-300 hover:-translate-y-px hover:shadow-md">
-      <div className="flex gap-4">
+    <article className="mb-3 rounded-xl border border-gray-200/80 bg-white px-4 py-4 transition-all duration-300 hover:-translate-y-px hover:shadow-md sm:px-5 sm:py-[18px]">
+      <div className="flex gap-3 sm:gap-4">
         <div className="min-w-0 flex-1">
           <div className="mb-1.5 flex items-center gap-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-muted">
+            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-muted sm:tracking-[0.18em]">
               {typeLabel}
             </span>
             <span className="text-gray-300">{"\u00B7"}</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-muted">
+            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-muted sm:tracking-[0.18em]">
               {readTime} min read
             </span>
             {post.in_response_to ? (
@@ -96,7 +96,7 @@ export default function PostCard({
           </div>
 
           <Link href={`/post/${post.slug}`}>
-            <h2 className="font-display line-clamp-2 text-lg font-semibold leading-tight text-ink transition-colors hover:text-gray-700">
+            <h2 className="font-display line-clamp-2 text-[17px] font-semibold leading-tight text-ink transition-colors hover:text-gray-700 sm:text-lg">
               {post.title}
             </h2>
           </Link>
@@ -107,7 +107,7 @@ export default function PostCard({
             </p>
           ) : null}
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-gray-100 pt-2.5 text-xs text-ink-muted">
+          <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-gray-100 pt-2.5 text-[11px] text-ink-muted sm:text-xs">
             {authorHref ? (
               <Link
                 href={authorHref}

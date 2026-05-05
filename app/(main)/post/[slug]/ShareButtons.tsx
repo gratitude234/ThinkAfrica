@@ -46,14 +46,16 @@ export default function ShareButtons({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="mr-1 text-sm text-gray-500">Share this post</span>
+    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+      <span className="col-span-2 text-sm text-gray-500 sm:mr-1 sm:w-auto">
+        Share this post
+      </span>
 
       <a
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1.5 rounded-lg bg-green-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-600"
+        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-green-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-600"
         aria-label="Share on WhatsApp"
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
@@ -66,7 +68,7 @@ export default function ShareButtons({
         href={twitterUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
+        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
         aria-label="Share on X (Twitter)"
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
@@ -79,7 +81,7 @@ export default function ShareButtons({
         href={linkedinUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
+        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
         aria-label="Share on LinkedIn"
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
@@ -91,7 +93,7 @@ export default function ShareButtons({
       <button
         type="button"
         onClick={copyLink}
-        className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
+        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
         aria-label="Copy link"
       >
         {copied ? (

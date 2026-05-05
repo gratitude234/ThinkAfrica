@@ -271,3 +271,187 @@ Creating turbopack project { dir: 'C:\\dev\\Think_Africa', testMode: true }
   at: '2026-05-05T10:40:52.072Z'
 }
  POST /api/activation 200 in 1029ms (next.js: 563ms, proxy.ts: 28ms, application-code: 437ms)
+ GET / 200 in 2.4s (next.js: 117ms, proxy.ts: 1306ms, application-code: 971ms)
+ GET /landing 200 in 1296ms (next.js: 9ms, proxy.ts: 12ms, application-code: 1275ms)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T11:26:48.387Z'
+}
+ POST /api/activation 200 in 347ms (next.js: 5ms, proxy.ts: 8ms, application-code: 334ms)
+ GET /sw.js?v=1775844010425 200 in 1145ms (next.js: 354ms, proxy.ts: 6ms, application-code: 786ms)
+ GET /login 200 in 235ms (next.js: 165ms, proxy.ts: 16ms, application-code: 54ms)
+ GET / 200 in 5.2s (next.js: 5ms, proxy.ts: 282ms, application-code: 4.9s)
+ GET / 200 in 5.0s (next.js: 6ms, proxy.ts: 274ms, application-code: 4.7s)
+[activation] {
+  event: 'home_viewed',
+  metadata: {
+    tab: 'home',
+    activated: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:27:14.487Z'
+}
+[activation] {
+  event: 'home_viewed',
+  metadata: {
+    tab: 'home',
+    activated: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:27:14.528Z'
+}
+ POST /api/activation 200 in 2.2s (next.js: 5ms, proxy.ts: 1018ms, application-code: 1173ms)
+ POST /api/activation 200 in 2.2s (next.js: 8ms, proxy.ts: 987ms, application-code: 1213ms)
+○ Compiling /discover ...
+ GET /discover 200 in 8.9s (next.js: 5.3s, proxy.ts: 1129ms, application-code: 2.4s)
+[activation] {
+  event: 'discover_viewed',
+  metadata: {
+    tab: 'for-you',
+    signedIn: true,
+    interests: 7,
+    following: 0,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:27:41.352Z'
+}
+[activation] {
+  event: 'discover_viewed',
+  metadata: {
+    tab: 'for-you',
+    signedIn: true,
+    interests: 7,
+    following: 0,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:27:41.409Z'
+}
+ POST /api/activation 200 in 898ms (next.js: 13ms, proxy.ts: 323ms, application-code: 562ms)
+ POST /api/activation 200 in 907ms (next.js: 15ms, proxy.ts: 371ms, application-code: 521ms)
+ GET /opportunities 200 in 1830ms (next.js: 900ms, proxy.ts: 291ms, application-code: 640ms)
+[activation] {
+  event: 'opportunity_readiness_viewed',
+  metadata: {
+    source: 'opportunities',
+    score: 40,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:27:51.644Z'
+}
+[activation] {
+  event: 'opportunity_readiness_viewed',
+  metadata: {
+    source: 'opportunities',
+    score: 40,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:27:51.780Z'
+}
+[activation] {
+  event: 'opportunity_profile_viewed',
+  metadata: {
+    source: 'opportunities',
+    hasProfile: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:27:51.795Z'
+}
+[activation] {
+  event: 'opportunity_profile_viewed',
+  metadata: {
+    source: 'opportunities',
+    hasProfile: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:27:51.801Z'
+}
+ POST /api/activation 200 in 742ms (next.js: 7ms, proxy.ts: 240ms, application-code: 494ms)
+ POST /api/activation 200 in 820ms (next.js: 15ms, proxy.ts: 295ms, application-code: 511ms)
+ POST /api/activation 200 in 838ms (next.js: 6ms, proxy.ts: 258ms, application-code: 574ms)
+ POST /api/activation 200 in 833ms (next.js: 7ms, proxy.ts: 280ms, application-code: 546ms)
+ GET /tguy7738 200 in 3.1s (next.js: 31ms, proxy.ts: 309ms, application-code: 2.8s)
+[activation] {
+  event: 'opportunity_readiness_viewed',
+  metadata: {
+    source: 'profile',
+    score: 40,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:28:03.129Z'
+}
+[activation] {
+  event: 'opportunity_profile_viewed',
+  metadata: {
+    source: 'profile',
+    hasProfile: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:28:03.162Z'
+}
+ POST /api/activation 200 in 795ms (next.js: 8ms, proxy.ts: 257ms, application-code: 530ms)
+ POST /api/activation 200 in 771ms (next.js: 8ms, proxy.ts: 279ms, application-code: 483ms)
+[activation] {
+  event: 'opportunity_readiness_viewed',
+  metadata: {
+    source: 'profile',
+    score: 40,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:28:03.495Z'
+}
+ POST /api/activation 200 in 1121ms (next.js: 10ms, proxy.ts: 615ms, application-code: 496ms)
+[activation] {
+  event: 'opportunity_profile_viewed',
+  metadata: {
+    source: 'profile',
+    hasProfile: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:28:04.079Z'
+}
+ POST /api/activation 200 in 1704ms (next.js: 5ms, proxy.ts: 809ms, application-code: 890ms)
+[activation] {
+  event: 'home_viewed',
+  metadata: {
+    tab: 'home',
+    activated: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:28:22.108Z'
+}
+ POST /api/activation 200 in 745ms (next.js: 4ms, proxy.ts: 254ms, application-code: 487ms)
+ GET / 200 in 4.1s (next.js: 4ms, proxy.ts: 379ms, application-code: 3.7s)
+[activation] {
+  event: 'home_viewed',
+  metadata: {
+    tab: 'home',
+    activated: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:28:22.527Z'
+}
+ POST /api/activation 200 in 881ms (next.js: 3ms, proxy.ts: 270ms, application-code: 607ms)
+ GET /write 200 in 3.4s (next.js: 3.0s, proxy.ts: 304ms, application-code: 46ms)
+[activation] {
+  event: 'home_viewed',
+  metadata: {
+    tab: 'home',
+    activated: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:28:45.201Z'
+}
+[activation] {
+  event: 'home_viewed',
+  metadata: {
+    tab: 'home',
+    activated: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T11:28:45.259Z'
+}
+ POST /api/activation 200 in 900ms (next.js: 3ms, proxy.ts: 417ms, application-code: 480ms)
+ POST /api/activation 200 in 1070ms (next.js: 8ms, proxy.ts: 373ms, application-code: 689ms)
+ GET / 200 in 4.5s (next.js: 4ms, proxy.ts: 288ms, application-code: 4.2s)
+ GET /sw.js?v=1775844010425 200 in 2.5s (next.js: 32ms, proxy.ts: 794ms, application-code: 1643ms)

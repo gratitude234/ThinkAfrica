@@ -18,14 +18,6 @@ interface MobileNavProps {
   canAccessReview?: boolean;
 }
 
-const PRIMARY_LINKS = [
-  { label: "Home", href: "/" },
-  { label: "Discover", href: "/discover" },
-  { label: "Debates", href: "/debates" },
-  { label: "Opportunities", href: "/opportunities" },
-  { label: "Write", href: "/write" },
-] as const;
-
 function itemClass(isActive: boolean) {
   return `block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
     isActive
@@ -51,6 +43,7 @@ export default function MobileNav({
     isEnabled("webinars") ? { label: "Webinars", href: "/webinars" } : null,
     isEnabled("fellowshipsSection") ? { label: "Fellowships", href: "/fellowships" } : null,
     isEnabled("ambassadors") ? { label: "Ambassadors", href: "/ambassadors" } : null,
+    { label: "Debates", href: "/debates" },
     { label: "Leaderboard", href: "/leaderboard" },
     { label: "Alumni", href: "/alumni" },
     isEnabled("talentMarketplace") ? { label: "People", href: "/talent" } : null,
@@ -65,7 +58,7 @@ export default function MobileNav({
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 md:hidden"
-        aria-label="Toggle menu"
+        aria-label="Open more menu"
       >
         {open ? (
           <svg
@@ -101,32 +94,19 @@ export default function MobileNav({
       {open ? (
         <div className="absolute left-0 right-0 top-16 z-40 border-b border-gray-200 bg-white shadow-lg md:hidden">
           <nav className="space-y-1 px-4 py-3">
-            {PRIMARY_LINKS.map((item) => {
-              const isActive =
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={itemClass(isActive)}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-
             {user ? (
-              <Link
-                href={profileHref}
-                onClick={() => setOpen(false)}
-                className={itemClass(profileActive)}
-              >
-                Me
-              </Link>
+              <div className="rounded-xl border border-gray-100 bg-canvas p-2">
+                <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Account
+                </p>
+                <Link
+                  href={profileHref}
+                  onClick={() => setOpen(false)}
+                  className={itemClass(profileActive)}
+                >
+                  Profile
+                </Link>
+              </div>
             ) : null}
 
             {!user ? (

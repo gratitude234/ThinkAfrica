@@ -54,7 +54,7 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
         />
       </Link>
 
-      <p className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-brand">
+      <p className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.13em] text-emerald-brand sm:tracking-[0.18em]">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-brand" />
         <span>{typeLabel}</span>
         <span className="font-medium text-gray-300">{"\u00B7"}</span>

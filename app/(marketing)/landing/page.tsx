@@ -162,9 +162,9 @@ export default async function LandingPage() {
       />
 
       {/* ── Hero ──────────────────────────────────────────────────── */}
-      <section className="border-b border-gray-200 py-16 sm:py-20">
+      <section className="border-b border-gray-200 py-10 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid items-center gap-16 lg:grid-cols-[1fr_440px]">
+          <div className="grid items-center gap-8 lg:grid-cols-[1fr_440px] lg:gap-16">
 
             {/* Copy */}
             <div>
@@ -175,14 +175,14 @@ export default async function LandingPage() {
                 </span>
               </div>
 
-              <h1 className="hero-animate hero-h1 font-display text-[52px] leading-[1.02] tracking-tight text-ink sm:text-[64px]">
+              <h1 className="hero-animate hero-h1 font-display text-[44px] leading-[1.04] tracking-tight text-ink sm:text-[64px]">
                 Where Africa&apos;s<br />
                 best student<br />
                 ideas{" "}
                 <em className="text-emerald-500">live.</em>
               </h1>
 
-              <p className="hero-animate hero-sub mt-6 mb-9 max-w-[480px] text-lg leading-[1.65] text-ink-muted">
+              <p className="hero-animate hero-sub mt-5 mb-7 max-w-[480px] text-base leading-[1.65] text-ink-muted sm:mt-6 sm:mb-9 sm:text-lg">
                 Essays, research, and policy briefs written by university students across Africa, rigorously argued and openly published.
               </p>
 
@@ -208,12 +208,12 @@ export default async function LandingPage() {
                 </LandingTrackedLink>
               ) : null}
 
-              <div className="hero-animate hero-ctas flex flex-wrap gap-3">
+              <div className="hero-animate hero-ctas flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <LandingTrackedLink
                   href={primaryHref}
                   event="landing_read_clicked"
                   metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, postType: leadPost?.type ?? null, position: "primary" }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-7 py-3.5 text-base font-medium text-white transition-colors hover:bg-emerald-600"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-7 py-3.5 text-base font-medium text-white transition-colors hover:bg-emerald-600"
                 >
                   Start reading
                   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
@@ -222,14 +222,14 @@ export default async function LandingPage() {
                   href="/signup"
                   event="landing_signup_clicked"
                   metadata={{ source: "hero_secondary" }}
-                  className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-7 py-3.5 text-base font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                  className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-7 py-3.5 text-base font-medium text-gray-700 transition-colors hover:bg-gray-50"
                 >
                   Claim your handle
                 </LandingTrackedLink>
               </div>
 
               {/* Social proof */}
-              <div className="hero-animate hero-proof mt-8 flex items-center gap-4">
+              <div className="hero-animate hero-proof mt-7 flex items-center gap-3 sm:mt-8 sm:gap-4">
                 <div className="flex">
                   {[
                     { i: "A", c: "bg-emerald-100 text-emerald-800" },
@@ -262,7 +262,7 @@ export default async function LandingPage() {
             </div>
 
             {/* Reading rail */}
-            <div className="hero-animate hero-rail rounded-2xl border border-gray-200 bg-white p-3">
+            <div className="hero-animate hero-rail hidden rounded-2xl border border-gray-200 bg-white p-3 lg:block">
               <div className="mb-3 flex items-center justify-between px-1">
                 <span className="text-[13px] font-semibold text-ink">Start reading</span>
                 <LandingTrackedLink
@@ -358,9 +358,9 @@ export default async function LandingPage() {
       {/* ── Stats bar ─────────────────────────────────────────────── */}
       <div id="stats-bar" className="border-b border-gray-200 bg-white py-5">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-center divide-x divide-gray-200">
+          <div className="grid grid-cols-2 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:divide-x sm:divide-gray-200">
             {stats.map(({ value, suffix, label }) => (
-              <div key={label} className="stat-item px-8 py-1 text-center sm:px-10">
+              <div key={label} className="stat-item px-4 py-1 text-center sm:px-10">
                 <div className="text-[28px] font-bold tracking-tight text-ink" data-target={value}>
                   {value >= 1000 ? value.toLocaleString() : value}{suffix}
                 </div>
@@ -373,13 +373,13 @@ export default async function LandingPage() {
 
       {/* ── Latest posts ──────────────────────────────────────────── */}
       {gridPosts.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20">
-          <div className="section-head mb-8 flex items-end justify-between">
+        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
+          <div className="section-head mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
                 Real work, real bylines
               </p>
-              <h2 className="font-display text-[32px] font-medium text-ink">Latest from students</h2>
+              <h2 className="font-display text-[28px] font-medium text-ink sm:text-[32px]">Latest from students</h2>
             </div>
             <LandingTrackedLink
               href="/?guest=1"
@@ -457,12 +457,12 @@ export default async function LandingPage() {
       )}
 
       {/* ── Topics ────────────────────────────────────────────────── */}
-      <section className="border-y border-gray-200 bg-white py-14">
+      <section className="border-y border-gray-200 bg-white py-12 sm:py-14">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="section-head mb-6 flex items-end justify-between">
             <div>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">Browse by topic</p>
-              <h2 className="font-display text-[26px] font-medium text-ink">Find ideas that interest you</h2>
+              <h2 className="font-display text-[24px] font-medium text-ink sm:text-[26px]">Find ideas that interest you</h2>
             </div>
           </div>
           <div id="topics-grid" className="flex flex-wrap gap-2.5">
@@ -483,9 +483,9 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Debates ───────────────────────────────────────────────── */}
-      <section className="border-b border-gray-200 bg-white py-20">
+      <section className="border-b border-gray-200 bg-white py-14 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid items-center gap-16 lg:grid-cols-2">
+          <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
 
             {/* Copy */}
             <div id="debates-copy">
@@ -493,7 +493,7 @@ export default async function LandingPage() {
                 <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-400" />
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Live feature</span>
               </div>
-              <h2 className="mb-4 font-display text-[40px] font-medium leading-[1.1] text-ink">
+              <h2 className="mb-4 font-display text-[32px] font-medium leading-[1.1] text-ink sm:text-[40px]">
                 Argue the motion.<br />Move the debate.
               </h2>
               <p className="mb-7 max-w-[420px] text-base leading-[1.7] text-ink-muted">
@@ -584,11 +584,11 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Value props ───────────────────────────────────────────── */}
-      <section className="border-b border-gray-200 bg-white py-14">
+      <section className="border-b border-gray-200 bg-white py-12 sm:py-14">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">How it works</p>
-            <h2 className="font-display text-[36px] font-medium text-ink">Built for intellectual seriousness</h2>
+            <h2 className="font-display text-[30px] font-medium text-ink sm:text-[36px]">Built for intellectual seriousness</h2>
           </div>
           <div id="value-grid" className="grid grid-cols-1 divide-y md:grid-cols-3 md:divide-x md:divide-y-0 divide-gray-200">
             {VALUE_PROPS.map(({ num, numStyle, title, desc }, i) => (
@@ -608,9 +608,9 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Dual CTA ──────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20">
+      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
         <div id="dual-cta" className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <div className="cta-card rounded-2xl bg-gray-900 px-10 py-11 text-white">
+          <div className="cta-card rounded-2xl bg-gray-900 px-6 py-8 text-white sm:px-10 sm:py-11">
             <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For readers</p>
             <h2 className="mb-3 font-display text-[30px] font-medium leading-[1.1]">
               Start exploring student ideas today
@@ -630,7 +630,7 @@ export default async function LandingPage() {
             </LandingTrackedLink>
           </div>
 
-          <div className="cta-card rounded-2xl bg-emerald-500 px-10 py-11 text-white">
+          <div className="cta-card rounded-2xl bg-emerald-500 px-6 py-8 text-white sm:px-10 sm:py-11">
             <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For writers</p>
             <h2 className="mb-3 font-display text-[30px] font-medium leading-[1.1]">
               Publish your research and build your profile

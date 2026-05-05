@@ -502,13 +502,13 @@ export default async function PostPage({ params }: PageProps) {
                 type={post.type}
                 sizes="(max-width: 1024px) 100vw, 768px"
                 priority
-                className="mb-8 h-64 rounded-xl sm:h-80 lg:h-[400px]"
-                imageClassName="object-cover"
+                fit="contain"
+                className="mb-6 h-[236px] rounded-xl border border-gray-100 sm:mb-8 sm:h-80 lg:h-[400px]"
               />
 
-              <header className="mb-8">
+              <header className="mb-7 sm:mb-8">
                 {/* Kicker - post type + word count + read time */}
-                <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-brand">
+                <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-brand sm:mb-5 sm:tracking-[0.2em]">
                   {qualitySummary.contentLabel}
                   <span className="mx-2 text-gray-300">/</span>
                   <span className="text-ink-muted">
@@ -541,19 +541,19 @@ export default async function PostPage({ params }: PageProps) {
                 ) : null}
 
                 {/* Title - enlarged to match journal scale */}
-                <h1 className="font-display mb-5 text-4xl font-medium leading-[1.05] tracking-tight text-ink sm:text-5xl">
+                <h1 className="font-display mb-4 text-[34px] font-medium leading-[1.05] tracking-tight text-ink sm:mb-5 sm:text-5xl">
                   {post.title}
                 </h1>
 
                 {/* Deck / standfirst - rendered from excerpt if present */}
                 {sanitizedExcerpt ? (
-                  <p className="font-display mb-6 text-xl font-normal italic leading-relaxed text-gray-600 sm:text-2xl">
+                  <p className="font-display mb-5 text-lg font-normal italic leading-relaxed text-gray-600 sm:mb-6 sm:text-2xl">
                     {sanitizedExcerpt}
                   </p>
                 ) : null}
 
                 {author ? (
-                  <div className="flex flex-wrap items-center gap-4 border-y border-gray-200 py-4">
+                  <div className="flex flex-wrap items-center gap-3 border-y border-gray-200 py-4 sm:gap-4">
                     <Link
                       href={`/${author.username}`}
                       className="group flex items-center gap-3"
@@ -618,7 +618,7 @@ export default async function PostPage({ params }: PageProps) {
                 ) : null}
               </header>
 
-              <div className="mb-8 lg:hidden">
+              <div className="mb-7 lg:hidden">
                 <CredibilityPanel
                   postId={post.id}
                   summary={qualitySummary}
@@ -713,8 +713,8 @@ export default async function PostPage({ params }: PageProps) {
               {isPublished ? (
                 <>
                   {/* Unified action strip - like, bookmark, share consolidated here */}
-                  <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-y border-gray-200 py-4">
-                    <div className="flex items-center gap-3">
+                  <div className="mb-8 flex flex-col gap-4 border-y border-gray-200 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-3">
                       <LikeButton
                         postId={post.id}
                         initialLiked={userLiked}
@@ -726,13 +726,13 @@ export default async function PostPage({ params }: PageProps) {
                         initialBookmarked={userBookmarked}
                         userId={user?.id ?? null}
                       />
-                      <ShareButtons
-                        title={post.title}
-                        slug={post.slug}
-                        excerpt={sanitizedExcerpt}
-                        authorName={author?.full_name ?? null}
-                      />
                     </div>
+                    <ShareButtons
+                      title={post.title}
+                      slug={post.slug}
+                      excerpt={sanitizedExcerpt}
+                      authorName={author?.full_name ?? null}
+                    />
                     <span className="text-xs text-gray-400">
                       {post.view_count?.toLocaleString()}{" "}
                       {post.view_count === 1 ? "view" : "views"}

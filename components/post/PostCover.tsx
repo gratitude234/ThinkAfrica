@@ -10,6 +10,7 @@ interface PostCoverProps {
   type?: string | null;
   className?: string;
   imageClassName?: string;
+  fit?: "cover" | "contain";
   sizes?: string;
   priority?: boolean;
   unoptimized?: boolean;
@@ -54,7 +55,8 @@ export default function PostCover({
   alt,
   type,
   className = "",
-  imageClassName = "object-cover",
+  imageClassName,
+  fit = "cover",
   sizes = "100vw",
   priority = false,
   unoptimized,
@@ -67,6 +69,9 @@ export default function PostCover({
     () => unoptimized ?? shouldBypassOptimizer(src),
     [src, unoptimized]
   );
+  const resolvedImageClassName =
+    imageClassName ?? (fit === "contain" ? "object-contain" : "object-cover");
+  const containerClassName = fit === "contain" ? `bg-white ${className}` : className;
 
   if (!src || failed) {
     return (
@@ -82,7 +87,7 @@ export default function PostCover({
 
   return (
     <div
-      className={`relative overflow-hidden ${className}`}
+      className={`relative overflow-hidden ${containerClassName}`}
       data-lite-placeholder={`${typeLabel} cover image`}
     >
       <Image
@@ -90,9 +95,10 @@ export default function PostCover({
         alt={alt}
         fill
         sizes={sizes}
-        priority={priority}
+        preload={priority}
+        fetchPriority={priority ? "high" : undefined}
         unoptimized={imageUnoptimized}
-        className={imageClassName}
+        className={resolvedImageClassName}
         onError={() => setFailed(true)}
       />
     </div>

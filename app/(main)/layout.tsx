@@ -49,15 +49,10 @@ export default async function MainLayout({
         hasActiveDebate={(activeDebateCount ?? 0) > 0}
       />
 
-      <main
-        className={`mx-auto max-w-[1152px] px-5 pt-6 md:pb-16 ${
-          user ? "pb-24" : "pb-40"
-        }`}
-      >
+      <main className="mx-auto max-w-[1152px] px-5 pb-28 pt-6 md:pb-16">
+        {!user ? <GuestBanner /> : null}
         {children}
       </main>
-
-      {!user ? <GuestBanner /> : null}
     </div>
   );
 }

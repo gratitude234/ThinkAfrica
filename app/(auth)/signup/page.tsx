@@ -19,6 +19,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -88,11 +89,11 @@ export default function SignupPage() {
         </div>
       </div>
 
-      <div className="flex flex-col justify-center bg-white px-6 py-10 sm:px-16">
+      <div className="flex flex-col justify-start bg-white px-6 pb-8 pt-8 sm:px-16 md:justify-center md:py-10">
         <div className="mx-auto w-full max-w-md">
           <Link
             href="/landing"
-            className="mb-8 inline-flex font-display text-[24px] font-bold leading-none md:hidden"
+            className="mb-7 inline-flex font-display text-[24px] font-bold leading-none md:hidden"
           >
             <span className="text-emerald-brand">Think</span>
             <span className="text-purple-accent">Africa</span>
@@ -116,6 +117,7 @@ export default function SignupPage() {
                 value={form.fullName}
                 onChange={handleChange}
                 required
+                autoComplete="name"
                 placeholder="e.g. Amara Diallo"
                 className={INPUT_STYLES}
               />
@@ -131,6 +133,8 @@ export default function SignupPage() {
                 value={form.email}
                 onChange={handleChange}
                 required
+                autoComplete="email"
+                inputMode="email"
                 placeholder="you@university.edu"
                 className={INPUT_STYLES}
               />
@@ -140,16 +144,26 @@ export default function SignupPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Password
               </label>
-              <input
-                type="password"
-                name="password"
-                value={form.password}
-                onChange={handleChange}
-                required
-                minLength={6}
-                placeholder="At least 6 characters"
-                className={INPUT_STYLES}
-              />
+              <div className="relative">
+                <input
+                  type={passwordVisible ? "text" : "password"}
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  placeholder="At least 6 characters"
+                  className={`${INPUT_STYLES} pr-20`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setPasswordVisible((current) => !current)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                >
+                  {passwordVisible ? "Hide" : "Show"}
+                </button>
+              </div>
             </div>
 
             {error ? (

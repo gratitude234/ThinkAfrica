@@ -243,7 +243,7 @@ export default function PostsFeedTabs({
 
   return (
     <div>
-      <div className="mb-5 flex items-center border-b border-gray-200">
+      <div className="-mx-5 mb-5 flex items-center overflow-x-auto border-b border-gray-200 px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {(["home", "following", "latest"] as const)
           .filter((tab) => tab !== "following" || showFollowingTab)
           .map((tab) => {

@@ -83,7 +83,7 @@ export default function PostFeed({
             />
           ) : null}
 
-          <div className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+          <div className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-gray-400 sm:tracking-[0.18em]">
             Latest in your feed
           </div>
 
