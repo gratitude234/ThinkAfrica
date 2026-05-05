@@ -20,6 +20,8 @@ export default function BottomNav({
   userId,
 }: BottomNavProps) {
   const pathname = usePathname();
+  if (!userId || pathname.startsWith("/post/")) return null;
+
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
   const profileHref = userId ? (username ? `/${username}` : "/settings") : "/signup";

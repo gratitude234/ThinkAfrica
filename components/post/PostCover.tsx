@@ -97,6 +97,7 @@ export default function PostCover({
         sizes={sizes}
         preload={priority}
         fetchPriority={priority ? "high" : undefined}
+        loading={priority ? "eager" : undefined}
         unoptimized={imageUnoptimized}
         className={resolvedImageClassName}
         onError={() => setFailed(true)}

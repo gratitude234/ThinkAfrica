@@ -455,3 +455,324 @@ Creating turbopack project { dir: 'C:\\dev\\Think_Africa', testMode: true }
  POST /api/activation 200 in 1070ms (next.js: 8ms, proxy.ts: 373ms, application-code: 689ms)
  GET / 200 in 4.5s (next.js: 4ms, proxy.ts: 288ms, application-code: 4.2s)
  GET /sw.js?v=1775844010425 200 in 2.5s (next.js: 32ms, proxy.ts: 794ms, application-code: 1643ms)
+ GET /landing 200 in 5.3s (next.js: 9ms, proxy.ts: 9ms, application-code: 5.3s)
+ GET / 200 in 4.3s (next.js: 6ms, proxy.ts: 7ms, application-code: 4.3s)
+ GET /landing 200 in 1021ms (next.js: 4ms, proxy.ts: 7ms, application-code: 1010ms)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T11:34:38.409Z'
+}
+ POST /api/activation 200 in 361ms (next.js: 7ms, proxy.ts: 11ms, application-code: 343ms)
+ GET /?guest=1 200 in 4.4s (next.js: 27ms, proxy.ts: 15ms, application-code: 4.3s)
+ GET /sw.js?v=1775844010425 200 in 2.0s (next.js: 32ms, proxy.ts: 641ms, application-code: 1375ms)
+[activation] {
+  event: 'post_opened',
+  metadata: {
+    slug: 'can-african-universities-truly-produce-entrepreneurs-mobu8o7m',
+    userId: null
+  },
+  at: '2026-05-05T11:37:22.434Z'
+}
+[activation] {
+  event: 'collaboration_panel_viewed',
+  metadata: {
+    postId: '9e765182-8e1e-4e8a-acfa-c9ff76363da5',
+    responseCount: 1,
+    coauthorCount: 0,
+    userId: null
+  },
+  at: '2026-05-05T11:37:22.438Z'
+}
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.5s (next.js: 209ms, proxy.ts: 8ms, application-code: 2.2s)
+ POST /api/activation 200 in 291ms (next.js: 9ms, proxy.ts: 13ms, application-code: 269ms)
+ POST /api/activation 200 in 293ms (next.js: 16ms, proxy.ts: 14ms, application-code: 263ms)
+ GET /signup 200 in 178ms (next.js: 13ms, proxy.ts: 13ms, application-code: 152ms)
+ GET /?guest=1 200 in 7.1s (next.js: 9ms, proxy.ts: 12ms, application-code: 7.1s)
+ GET /sw.js?v=1775844010425 200 in 2.2s (next.js: 40ms, proxy.ts: 865ms, application-code: 1249ms)
+ GET /sw.js?v=1775844010425 200 in 2.3s (next.js: 36ms, proxy.ts: 816ms, application-code: 1449ms)
+ GET /sw.js?v=1775844010425 200 in 2.4s (next.js: 30ms, proxy.ts: 862ms, application-code: 1471ms)
+ GET /sw.js?v=1775844010425 200 in 2.0s (next.js: 34ms, proxy.ts: 665ms, application-code: 1303ms)
+✓ Compiled in 3.2s
+ GET /?guest=1 200 in 9.4s (next.js: 2.6s, proxy.ts: 11ms, application-code: 6.8s)
+ GET /?guest=1 200 in 5.3s (next.js: 624ms, proxy.ts: 701ms, application-code: 4.0s)
+ GET /?guest=1 200 in 3.7s (next.js: 64ms, proxy.ts: 59ms, application-code: 3.5s)
+ GET /?guest=1 200 in 4.2s (next.js: 487ms, proxy.ts: 239ms, application-code: 3.4s)
+ GET /?guest=1 200 in 4.0s (next.js: 1068ms, proxy.ts: 71ms, application-code: 2.8s)
+ GET /?guest=1 200 in 4.2s (next.js: 107ms, proxy.ts: 235ms, application-code: 3.8s)
+ GET / 200 in 8.5s (next.js: 239ms, proxy.ts: 2.1s, application-code: 6.2s)
+ GET / 200 in 5.6s (next.js: 422ms, proxy.ts: 1122ms, application-code: 4.0s)
+ GET /?guest=1 200 in 3.8s (next.js: 19ms, proxy.ts: 31ms, application-code: 3.8s)
+ GET /?guest=1 200 in 3.8s (next.js: 131ms, proxy.ts: 20ms, application-code: 3.7s)
+ GET /?guest=1 200 in 3.7s (next.js: 322ms, proxy.ts: 295ms, application-code: 3.1s)
+ GET /?guest=1 200 in 3.3s (next.js: 218ms, proxy.ts: 519ms, application-code: 2.6s)
+ GET /?guest=1 200 in 3.3s (next.js: 363ms, proxy.ts: 520ms, application-code: 2.5s)
+ GET /?guest=1 200 in 3.0s (next.js: 960ms, proxy.ts: 284ms, application-code: 1784ms)
+ GET / 200 in 4.8s (next.js: 414ms, proxy.ts: 480ms, application-code: 3.9s)
+ GET / 200 in 5.3s (next.js: 266ms, proxy.ts: 868ms, application-code: 4.2s)
+ GET / 200 in 5.3s (next.js: 412ms, proxy.ts: 867ms, application-code: 4.0s)
+ GET / 200 in 5.3s (next.js: 314ms, proxy.ts: 863ms, application-code: 4.1s)
+ GET /?guest=1 200 in 2.0s (next.js: 51ms, proxy.ts: 20ms, application-code: 1965ms)
+ GET /?guest=1 200 in 2.0s (next.js: 116ms, proxy.ts: 45ms, application-code: 1872ms)
+ GET /?guest=1 200 in 1978ms (next.js: 28ms, proxy.ts: 178ms, application-code: 1771ms)
+ GET /?guest=1 200 in 1677ms (next.js: 391ms, proxy.ts: 404ms, application-code: 882ms)
+ GET / 200 in 2.6s (next.js: 144ms, proxy.ts: 846ms, application-code: 1644ms)
+ GET / 200 in 2.1s (next.js: 188ms, proxy.ts: 265ms, application-code: 1602ms)
+ GET / 200 in 3.5s (next.js: 7ms, proxy.ts: 867ms, application-code: 2.7s)
+ GET / 200 in 2.8s (next.js: 67ms, proxy.ts: 427ms, application-code: 2.3s)
+ GET / 200 in 2.8s (next.js: 18ms, proxy.ts: 430ms, application-code: 2.4s)
+ GET / 200 in 2.8s (next.js: 504ms, proxy.ts: 374ms, application-code: 1904ms)
+ GET / 200 in 2.9s (next.js: 130ms, proxy.ts: 515ms, application-code: 2.3s)
+ GET / 200 in 2.8s (next.js: 593ms, proxy.ts: 370ms, application-code: 1825ms)
+ GET / 200 in 1182ms (next.js: 6ms, proxy.ts: 224ms, application-code: 953ms)
+ GET / 200 in 1166ms (next.js: 8ms, proxy.ts: 430ms, application-code: 727ms)
+[activation] {
+  event: 'home_viewed',
+  metadata: {
+    tab: 'home',
+    activated: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T12:01:23.055Z'
+}
+[activation] {
+  event: 'home_viewed',
+  metadata: {
+    tab: 'home',
+    activated: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T12:01:23.077Z'
+}
+ POST /api/activation 200 in 1029ms (next.js: 211ms, proxy.ts: 243ms, application-code: 575ms)
+ POST /api/activation 200 in 1019ms (next.js: 264ms, proxy.ts: 231ms, application-code: 524ms)
+✓ Compiled in 481ms
+ GET /?guest=1 200 in 5.0s (next.js: 384ms, proxy.ts: 283ms, application-code: 4.4s)
+ GET / 200 in 5.2s (next.js: 6ms, proxy.ts: 2.3s, application-code: 2.9s)
+✓ Compiled in 624ms
+ GET /?guest=1 200 in 7.5s (next.js: 9ms, proxy.ts: 17ms, application-code: 7.4s)
+ GET /?guest=1 200 in 7.5s (next.js: 555ms, proxy.ts: 14ms, application-code: 6.9s)
+ GET / 200 in 7.8s (next.js: 12ms, proxy.ts: 2.7s, application-code: 5.1s)
+ GET / 200 in 4.7s (next.js: 6ms, proxy.ts: 2.4s, application-code: 2.3s)
+✓ Compiled in 528ms
+ GET /?guest=1 200 in 5.9s (next.js: 301ms, proxy.ts: 187ms, application-code: 5.4s)
+ GET /?guest=1 200 in 5.5s (next.js: 12ms, proxy.ts: 48ms, application-code: 5.5s)
+ GET / 200 in 6.4s (next.js: 5ms, proxy.ts: 2.7s, application-code: 3.7s)
+ GET / 200 in 5.9s (next.js: 8ms, proxy.ts: 834ms, application-code: 5.1s)
+ GET /sw.js?v=1775844010425 200 in 3.1s (next.js: 429ms, proxy.ts: 545ms, application-code: 2.1s)
+✓ Compiled in 1397ms
+✓ Compiled in 580ms
+ GET /?guest=1 200 in 4.8s (next.js: 8ms, proxy.ts: 19ms, application-code: 4.8s)
+ GET /?guest=1 200 in 4.5s (next.js: 246ms, proxy.ts: 234ms, application-code: 4.0s)
+ GET / 200 in 3.4s (next.js: 10ms, proxy.ts: 866ms, application-code: 2.6s)
+ GET / 200 in 4.6s (next.js: 7ms, proxy.ts: 840ms, application-code: 3.8s)
+✓ Compiled in 432ms
+ GET /?guest=1 200 in 2.4s (next.js: 7ms, proxy.ts: 35ms, application-code: 2.3s)
+ GET /?guest=1 200 in 1603ms (next.js: 573ms, proxy.ts: 34ms, application-code: 995ms)
+ GET / 200 in 2.5s (next.js: 176ms, proxy.ts: 1328ms, application-code: 980ms)
+ GET / 200 in 1007ms (next.js: 7ms, proxy.ts: 419ms, application-code: 582ms)
+✓ Compiled in 666ms
+ GET /?guest=1 200 in 1346ms (next.js: 251ms, proxy.ts: 193ms, application-code: 902ms)
+ GET / 200 in 1430ms (next.js: 124ms, proxy.ts: 457ms, application-code: 850ms)
+✓ Compiled in 301ms
+ GET /?guest=1 200 in 1204ms (next.js: 244ms, proxy.ts: 251ms, application-code: 709ms)
+ GET / 200 in 1619ms (next.js: 5ms, proxy.ts: 896ms, application-code: 719ms)
+ GET /?guest=1 200 in 3.2s (next.js: 230ms, proxy.ts: 194ms, application-code: 2.8s)
+ GET / 200 in 3.0s (next.js: 5ms, proxy.ts: 601ms, application-code: 2.4s)
+✓ Compiled in 547ms
+ GET /?guest=1 200 in 1228ms (next.js: 278ms, proxy.ts: 238ms, application-code: 712ms)
+ GET /?guest=1 200 in 1071ms (next.js: 13ms, proxy.ts: 114ms, application-code: 944ms)
+ GET / 200 in 2.1s (next.js: 436ms, proxy.ts: 556ms, application-code: 1120ms)
+ GET / 200 in 1159ms (next.js: 209ms, proxy.ts: 413ms, application-code: 537ms)
+✓ Compiled in 1537ms
+✓ Finished filesystem cache database compaction in 10.4s
+✓ Compiled in 1583ms
+✓ Compiled in 1406ms
+ GET /sw.js?v=1775844010425 200 in 2.3s (next.js: 126ms, proxy.ts: 640ms, application-code: 1487ms)
+○ Compiling /api/feed ...
+ GET /api/feed?tab=following&page=1&pageSize=20 200 in 6.6s (next.js: 4.7s, proxy.ts: 612ms, application-code: 1271ms)
+ GET /api/feed?tab=latest&page=1&pageSize=20 200 in 2.2s (next.js: 4ms, proxy.ts: 337ms, application-code: 1816ms)
+ GET /sw.js?v=1775844010425 200 in 1716ms (next.js: 43ms, proxy.ts: 558ms, application-code: 1115ms)
+ GET /sw.js?v=1775844010425 200 in 3.1s (next.js: 25ms, proxy.ts: 687ms, application-code: 2.4s)
+ GET /sw.js?v=1775844010425 200 in 3.3s (next.js: 69ms, proxy.ts: 1171ms, application-code: 2.0s)
+ GET /sw.js?v=1775844010425 200 in 6.1s (next.js: 27ms, proxy.ts: 4.7s, application-code: 1332ms)
+ GET /sw.js?v=1775844010425 200 in 4.9s (next.js: 33ms, proxy.ts: 2.8s, application-code: 2.0s)
+ GET /sw.js?v=1775844010425 200 in 8.2s (next.js: 40ms, proxy.ts: 677ms, application-code: 7.5s)
+ GET /sw.js?v=1775844010425 200 in 3.5s (next.js: 22ms, proxy.ts: 772ms, application-code: 2.7s)
+ GET /sw.js?v=1775844010425 200 in 78s (next.js: 38ms, proxy.ts: 26.4s, application-code: 52s)
+ GET /sw.js?v=1775844010425 200 in 5.0s (next.js: 47ms, proxy.ts: 2.6s, application-code: 2.3s)
+ GET /sw.js?v=1775844010425 200 in 4.3s (next.js: 57ms, proxy.ts: 1252ms, application-code: 3.0s)
+✓ Compiled in 1615ms
+ GET /?guest=1 200 in 10.4s (next.js: 3.4s, proxy.ts: 2.1s, application-code: 4.9s)
+ GET /?tab=latest 200 in 14.9s (next.js: 53ms, proxy.ts: 8.9s, application-code: 6.0s)
+[activation] {
+  event: 'home_viewed',
+  metadata: {
+    tab: 'latest',
+    activated: false,
+    userId: '999b3611-ffb2-40b9-af05-949683e6c0ae'
+  },
+  at: '2026-05-05T14:23:40.972Z'
+}
+ POST /api/activation 200 in 3.0s (next.js: 1875ms, proxy.ts: 312ms, application-code: 850ms)
+ GET /sw.js?v=1775844010425 200 in 5.9s (next.js: 796ms, proxy.ts: 548ms, application-code: 4.6s)
+ GET /landing 200 in 3.0s (next.js: 1354ms, proxy.ts: 21ms, application-code: 1641ms)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T14:26:26.911Z'
+}
+ POST /api/activation 200 in 339ms (next.js: 4ms, proxy.ts: 11ms, application-code: 324ms)
+ GET /?guest=1 200 in 6.4s (next.js: 10ms, proxy.ts: 13ms, application-code: 6.4s)
+✓ Compiled in 1120ms
+ GET /?guest=1 200 in 4.0s (next.js: 500ms, proxy.ts: 326ms, application-code: 3.2s)
+ GET /?guest=1 200 in 4.3s (next.js: 581ms, proxy.ts: 329ms, application-code: 3.4s)
+ GET /?guest=1 200 in 4.5s (next.js: 27ms, proxy.ts: 82ms, application-code: 4.4s)
+ GET /?guest=1 200 in 4.5s (next.js: 271ms, proxy.ts: 66ms, application-code: 4.2s)
+ GET /?guest=1 200 in 3.6s (next.js: 885ms, proxy.ts: 108ms, application-code: 2.6s)
+ GET /?guest=1 200 in 5.5s (next.js: 110ms, proxy.ts: 117ms, application-code: 5.3s)
+ GET /?guest=1 200 in 5.5s (next.js: 482ms, proxy.ts: 120ms, application-code: 4.9s)
+ GET /?guest=1 200 in 5.5s (next.js: 623ms, proxy.ts: 122ms, application-code: 4.7s)
+ GET /?guest=1 200 in 5.4s (next.js: 929ms, proxy.ts: 114ms, application-code: 4.4s)
+ GET /?guest=1 200 in 5.4s (next.js: 972ms, proxy.ts: 118ms, application-code: 4.3s)
+ GET /?tab=latest 200 in 7.7s (next.js: 117ms, proxy.ts: 3.7s, application-code: 3.9s)
+ GET /?tab=latest 200 in 4.4s (next.js: 330ms, proxy.ts: 3.2s, application-code: 838ms)
+ GET /?tab=latest 200 in 2.5s (next.js: 7ms, proxy.ts: 509ms, application-code: 1977ms)
+ GET /?tab=latest 200 in 2.2s (next.js: 5ms, proxy.ts: 600ms, application-code: 1637ms)
+ GET /?tab=latest 200 in 2.3s (next.js: 6ms, proxy.ts: 458ms, application-code: 1789ms)
+ GET /?guest=1 200 in 3.6s (next.js: 14ms, proxy.ts: 22ms, application-code: 3.6s)
+ GET /sw.js?v=1775844010425 200 in 4.6s (next.js: 429ms, proxy.ts: 1137ms, application-code: 3.0s)
+[activation] {
+  event: 'post_opened',
+  metadata: {
+    slug: 'can-african-universities-truly-produce-entrepreneurs-mobu8o7m',
+    userId: null
+  },
+  at: '2026-05-05T14:31:06.605Z'
+}
+[activation] {
+  event: 'collaboration_panel_viewed',
+  metadata: {
+    postId: '9e765182-8e1e-4e8a-acfa-c9ff76363da5',
+    responseCount: 1,
+    coauthorCount: 0,
+    userId: null
+  },
+  at: '2026-05-05T14:31:06.614Z'
+}
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 6.5s (next.js: 1064ms, proxy.ts: 21ms, application-code: 5.4s)
+ POST /api/activation 200 in 517ms (next.js: 142ms, proxy.ts: 12ms, application-code: 364ms)
+ POST /api/activation 200 in 520ms (next.js: 155ms, proxy.ts: 13ms, application-code: 353ms)
+✓ Compiled in 1077ms
+ GET /?guest=1 200 in 3.4s (next.js: 351ms, proxy.ts: 237ms, application-code: 2.8s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.6s (next.js: 524ms, proxy.ts: 543ms, application-code: 2.5s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.3s (next.js: 31ms, proxy.ts: 99ms, application-code: 2.2s)
+ GET /?guest=1 200 in 3.7s (next.js: 11ms, proxy.ts: 33ms, application-code: 3.7s)
+ GET /?tab=latest 200 in 4.3s (next.js: 5ms, proxy.ts: 2.6s, application-code: 1657ms)
+ GET /?tab=latest 200 in 1504ms (next.js: 5ms, proxy.ts: 617ms, application-code: 882ms)
+[activation] {
+  event: 'post_opened',
+  metadata: {
+    slug: 'can-african-universities-truly-produce-entrepreneurs-mobu8o7m',
+    userId: null
+  },
+  at: '2026-05-05T14:32:29.698Z'
+}
+[activation] {
+  event: 'collaboration_panel_viewed',
+  metadata: {
+    postId: '9e765182-8e1e-4e8a-acfa-c9ff76363da5',
+    responseCount: 1,
+    coauthorCount: 0,
+    userId: null
+  },
+  at: '2026-05-05T14:32:29.718Z'
+}
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 2.7s (next.js: 80ms, proxy.ts: 20ms, application-code: 2.6s)
+ POST /api/activation 200 in 689ms (next.js: 150ms, proxy.ts: 17ms, application-code: 522ms)
+ POST /api/activation 200 in 697ms (next.js: 208ms, proxy.ts: 16ms, application-code: 473ms)
+ GET /signup 200 in 1423ms (next.js: 454ms, proxy.ts: 24ms, application-code: 945ms)
+ GET /landing 200 in 3.5s (next.js: 814ms, proxy.ts: 20ms, application-code: 2.6s)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T14:35:24.936Z'
+}
+ POST /api/activation 200 in 364ms (next.js: 10ms, proxy.ts: 10ms, application-code: 344ms)
+ GET /?guest=1 200 in 12.9s (next.js: 345ms, proxy.ts: 6ms, application-code: 12.6s)
+ GET /landing 200 in 4.1s (next.js: 14ms, proxy.ts: 20ms, application-code: 4.1s)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T14:36:24.686Z'
+}
+ GET /sw.js?v=1775844010425 200 in 4.4s (next.js: 405ms, proxy.ts: 1892ms, application-code: 2.1s)
+ POST /api/activation 200 in 1618ms (next.js: 8ms, proxy.ts: 34ms, application-code: 1576ms)
+ GET /landing 200 in 2.4s (next.js: 5ms, proxy.ts: 6ms, application-code: 2.3s)
+[activation] {
+  event: 'landing_viewed',
+  metadata: { source: 'landing', postCount: 12, visiblePosts: 7, userId: null },
+  at: '2026-05-05T14:36:31.029Z'
+}
+ POST /api/activation 200 in 370ms (next.js: 6ms, proxy.ts: 15ms, application-code: 349ms)
+ GET /?guest=1 200 in 13.7s (next.js: 63ms, proxy.ts: 99ms, application-code: 13.5s)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 3.7s (next.js: 44ms, proxy.ts: 9ms, application-code: 3.6s)
+[activation] {
+  event: 'post_opened',
+  metadata: {
+    slug: 'can-african-universities-truly-produce-entrepreneurs-mobu8o7m',
+    userId: null
+  },
+  at: '2026-05-05T14:36:48.434Z'
+}
+[activation] {
+  event: 'collaboration_panel_viewed',
+  metadata: {
+    postId: '9e765182-8e1e-4e8a-acfa-c9ff76363da5',
+    responseCount: 1,
+    coauthorCount: 0,
+    userId: null
+  },
+  at: '2026-05-05T14:36:48.458Z'
+}
+ POST /api/activation 200 in 864ms (next.js: 8ms, proxy.ts: 30ms, application-code: 826ms)
+ POST /api/activation 200 in 872ms (next.js: 21ms, proxy.ts: 30ms, application-code: 821ms)
+ GET /?guest=1 200 in 17.7s (next.js: 10ms, proxy.ts: 7ms, application-code: 17.7s)
+ GET /signup 200 in 99ms (next.js: 7ms, proxy.ts: 6ms, application-code: 86ms)
+ GET /post/can-african-universities-truly-produce-entrepreneurs-mobu8o7m 200 in 6.0s (next.js: 81ms, proxy.ts: 18ms, application-code: 6.0s)
+[activation] {
+  event: 'post_opened',
+  metadata: {
+    slug: 'can-african-universities-truly-produce-entrepreneurs-mobu8o7m',
+    userId: null
+  },
+  at: '2026-05-05T14:37:10.602Z'
+}
+[activation] {
+  event: 'collaboration_panel_viewed',
+  metadata: {
+    postId: '9e765182-8e1e-4e8a-acfa-c9ff76363da5',
+    responseCount: 1,
+    coauthorCount: 0,
+    userId: null
+  },
+  at: '2026-05-05T14:37:10.615Z'
+}
+ POST /api/activation 200 in 972ms (next.js: 25ms, proxy.ts: 20ms, application-code: 928ms)
+ POST /api/activation 200 in 1177ms (next.js: 14ms, proxy.ts: 21ms, application-code: 1143ms)
+ GET /signup 200 in 178ms (next.js: 10ms, proxy.ts: 13ms, application-code: 156ms)
+ GET /?guest=1 200 in 5.5s (next.js: 15ms, proxy.ts: 20ms, application-code: 5.5s)
+✓ Compiled in 785ms
+ GET /signup 200 in 1139ms (next.js: 499ms, proxy.ts: 227ms, application-code: 413ms)
+ GET /signup 200 in 1142ms (next.js: 644ms, proxy.ts: 228ms, application-code: 269ms)
+ GET /?guest=1 200 in 4.6s (next.js: 394ms, proxy.ts: 227ms, application-code: 4.0s)
+ GET /?guest=1 200 in 4.6s (next.js: 695ms, proxy.ts: 226ms, application-code: 3.7s)
+ GET /?tab=latest 200 in 4.4s (next.js: 32ms, proxy.ts: 2.1s, application-code: 2.2s)
+ GET /?guest=1 200 in 8.9s (next.js: 11ms, proxy.ts: 13ms, application-code: 8.8s)
+ GET /sw.js?v=1775844010425 200 in 8.7s (next.js: 1010ms, proxy.ts: 5.1s, application-code: 2.6s)
+✓ Compiled in 1165ms
+ GET /signup 200 in 1984ms (next.js: 1349ms, proxy.ts: 525ms, application-code: 109ms)
+ GET /?guest=1 200 in 5.7s (next.js: 721ms, proxy.ts: 536ms, application-code: 4.4s)
+ GET /?guest=1 200 in 5.7s (next.js: 965ms, proxy.ts: 537ms, application-code: 4.2s)
+ GET /?guest=1 200 in 5.7s (next.js: 1044ms, proxy.ts: 538ms, application-code: 4.1s)
+ GET /?tab=latest 200 in 5.6s (next.js: 10ms, proxy.ts: 3.0s, application-code: 2.6s)

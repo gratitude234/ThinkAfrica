@@ -18,6 +18,13 @@ interface MobileNavProps {
   canAccessReview?: boolean;
 }
 
+const GUEST_PRIMARY_LINKS = [
+  { label: "Home", href: "/?guest=1" },
+  { label: "Discover", href: "/discover" },
+  { label: "Debates", href: "/debates" },
+  { label: "Opportunities", href: "/opportunities" },
+] as const;
+
 function itemClass(isActive: boolean) {
   return `block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
     isActive
@@ -43,7 +50,7 @@ export default function MobileNav({
     isEnabled("webinars") ? { label: "Webinars", href: "/webinars" } : null,
     isEnabled("fellowshipsSection") ? { label: "Fellowships", href: "/fellowships" } : null,
     isEnabled("ambassadors") ? { label: "Ambassadors", href: "/ambassadors" } : null,
-    { label: "Debates", href: "/debates" },
+    user ? { label: "Debates", href: "/debates" } : null,
     { label: "Leaderboard", href: "/leaderboard" },
     { label: "Alumni", href: "/alumni" },
     isEnabled("talentMarketplace") ? { label: "People", href: "/talent" } : null,
@@ -94,6 +101,31 @@ export default function MobileNav({
       {open ? (
         <div className="absolute left-0 right-0 top-16 z-40 border-b border-gray-200 bg-white shadow-lg md:hidden">
           <nav className="space-y-1 px-4 py-3">
+            {!user ? (
+              <div className="rounded-xl border border-gray-100 bg-canvas p-2">
+                <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Explore
+                </p>
+                {GUEST_PRIMARY_LINKS.map((item) => {
+                  const isActive =
+                    item.href === "/?guest=1"
+                      ? pathname === "/"
+                      : pathname.startsWith(item.href);
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={itemClass(isActive)}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : null}
+
             {user ? (
               <div className="rounded-xl border border-gray-100 bg-canvas p-2">
                 <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
