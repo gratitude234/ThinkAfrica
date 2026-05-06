@@ -24,6 +24,7 @@ import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
 import CiteThis from "./CiteThis";
 import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
+import PostCover from "@/components/post/PostCover";
 import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
@@ -242,6 +243,7 @@ export default async function PostPage({ params }: PageProps) {
 
   const isPublished = post.status === "published";
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+  const coverImageUrl = (post as { cover_image_url?: string | null }).cover_image_url;
   const audioSummaryUrl = (
     post as typeof post & { audio_summary_url?: string | null }
   ).audio_summary_url ?? null;
@@ -538,6 +540,17 @@ export default async function PostPage({ params }: PageProps) {
                   <p className="font-display mb-6 text-lg font-normal italic leading-[1.45] text-gray-600 sm:text-[21px]">
                     {sanitizedExcerpt}
                   </p>
+                ) : null}
+
+                {coverImageUrl ? (
+                  <PostCover
+                    src={coverImageUrl}
+                    alt=""
+                    type={post.type}
+                    sizes="(max-width: 1024px) 100vw, 760px"
+                    className="mb-6 h-[150px] rounded-xl border border-gray-100 bg-white sm:h-[180px] lg:h-[210px]"
+                    imageClassName="object-cover object-bottom"
+                  />
                 ) : null}
 
                 {author ? (
