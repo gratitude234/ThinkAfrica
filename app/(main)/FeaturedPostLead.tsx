@@ -42,19 +42,7 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
 
   return (
     <article className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-px hover:shadow-md">
-      <div className="grid md:grid-cols-[260px_minmax(0,1fr)]">
-        <Link href={`/post/${post.slug}`} className="block">
-          <PostCover
-            src={post.cover_image_url}
-            alt={post.title}
-            type={post.type}
-            sizes="(max-width: 1024px) 100vw, 66vw"
-            priority
-            className="h-[188px] w-full border-b border-gray-100 md:h-full md:min-h-[236px] md:border-b-0 md:border-r"
-            imageClassName="object-cover object-top"
-          />
-        </Link>
-
+      <div className="grid md:grid-cols-[minmax(0,1fr)_280px]">
         <div className="flex min-w-0 flex-col justify-between p-5 sm:p-6">
           <div>
             <p className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.15em] text-emerald-brand">
@@ -107,6 +95,18 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
             </div>
           ) : null}
         </div>
+
+        <Link href={`/post/${post.slug}`} className="block md:order-last">
+          <PostCover
+            src={post.cover_image_url}
+            alt={post.title}
+            type={post.type}
+            sizes="(max-width: 768px) 100vw, 280px"
+            priority
+            className="h-[188px] w-full border-t border-gray-100 md:h-full md:min-h-[236px] md:border-l md:border-t-0"
+            imageClassName="object-cover object-center"
+          />
+        </Link>
       </div>
     </article>
   );
