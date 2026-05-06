@@ -93,17 +93,9 @@ export default function PostCard({
     VERIFIED_COLORS[author?.verified_type ?? "student"] ?? "bg-emerald-brand";
   const accentClass = TYPE_ACCENTS[post.type] ?? "bg-emerald-brand";
   const badgeClass = TYPE_BADGES[post.type] ?? "bg-emerald-100 text-emerald-800";
-  const engagementItems = [
-    typeof post.view_count === "number"
-      ? `${post.view_count.toLocaleString()} reads`
-      : null,
-    typeof post.comment_count === "number"
-      ? `${post.comment_count.toLocaleString()} replies`
-      : null,
-    typeof post.like_count === "number"
-      ? `${post.like_count.toLocaleString()} likes`
-      : null,
-  ].filter(Boolean);
+  const likeCount = typeof post.like_count === "number" ? post.like_count : null;
+  const commentCount = typeof post.comment_count === "number" ? post.comment_count : null;
+  const viewCount = typeof post.view_count === "number" ? post.view_count : null;
 
   return (
     <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-4 transition-all duration-300 hover:-translate-y-px hover:shadow-md sm:px-5 sm:py-[18px]">
@@ -139,49 +131,63 @@ export default function PostCard({
             </p>
           ) : null}
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-gray-100 pt-2.5 text-[11px] text-ink-muted sm:text-xs">
+          <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-2.5">
+            {/* Avatar + author line */}
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800">
               {authorName.charAt(0).toUpperCase()}
             </span>
-
-            {authorHref ? (
-              <Link
-                href={authorHref}
-                className="inline-flex min-w-0 items-center gap-1 font-medium text-gray-700 transition-colors hover:text-ink"
-              >
-                <span className="truncate">{authorLine}</span>
-                {author?.verified ? (
-                  <span
-                    title={
-                      author.verified_type
-                        ? `Verified ${author.verified_type}`
-                        : "Verified"
-                    }
-                    className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-full ${verifiedBg} text-[7px] font-bold text-white`}
-                  >
-                    {"\u2713"}
-                  </span>
-                ) : null}
-              </Link>
-            ) : (
-              <span className="font-medium text-gray-700">{authorLine}</span>
-            )}
-
-            {author?.university ? (
-              <>
-                <span aria-hidden="true">{"\u00B7"}</span>
-                <span className="max-w-[160px] truncate">{author.university}</span>
-              </>
-            ) : null}
-
-            <span aria-hidden="true">{"\u00B7"}</span>
-            <span>{formatRelativeTime(displayDate)}</span>
-            {engagementItems.length > 0 ? (
-              <>
-                <span aria-hidden="true">{"\u00B7"}</span>
-                <span className="truncate">{engagementItems.slice(0, 2).join(" / ")}</span>
-              </>
-            ) : null}
+            <div className="min-w-0 flex-1 text-[11px] text-ink-muted">
+              {authorHref ? (
+                <Link
+                  href={authorHref}
+                  className="inline-flex items-center gap-1 font-semibold text-gray-700 transition-colors hover:text-emerald-700"
+                >
+                  <span className="truncate">{authorLine}</span>
+                  {author?.verified ? (
+                    <span
+                      title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
+                      className={`inline-flex h-3 w-3 items-center justify-center rounded-full ${verifiedBg} text-[6px] font-bold text-white`}
+                    >
+                      {"\u2713"}
+                    </span>
+                  ) : null}
+                </Link>
+              ) : (
+                <span className="font-semibold text-gray-700">{authorLine}</span>
+              )}
+              {author?.university ? (
+                <span className="ml-1 truncate text-gray-400">{"\u00B7"} {author.university}</span>
+              ) : null}
+              <span className="ml-1 text-gray-400">{"\u00B7"} {formatRelativeTime(displayDate)}</span>
+            </div>
+            {/* Engagement icon row */}
+            <div className="ml-auto flex shrink-0 items-center gap-3 text-gray-400">
+              {likeCount !== null ? (
+                <span className="flex items-center gap-1 text-[11px]">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  {likeCount > 0 ? likeCount : null}
+                </span>
+              ) : null}
+              {commentCount !== null ? (
+                <span className="flex items-center gap-1 text-[11px]">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {commentCount > 0 ? commentCount : null}
+                </span>
+              ) : null}
+              {viewCount !== null ? (
+                <span className="flex items-center gap-1 text-[11px]">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  {viewCount > 0 ? viewCount.toLocaleString() : null}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
 

@@ -543,42 +543,43 @@ export default async function PostPage({ params }: PageProps) {
                 ) : null}
 
                 {author ? (
-                  <div className="flex flex-wrap items-center gap-3 border-y border-gray-200 py-4 sm:gap-4">
-                    <Link
-                      href={`/${author.username}`}
-                      className="group flex items-center gap-3"
-                    >
+                  <div className="flex items-center gap-4 border-y border-gray-100 py-4">
+                    <Link href={`/${author.username}`} className="shrink-0">
                       <UserAvatar
                         name={authorName}
                         src={author.avatar_url}
-                        size={44}
+                        size={48}
                         className="flex-shrink-0"
                       />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900 transition-colors group-hover:text-emerald-brand">
-                          {authorName}
-                          {author.verified ? (
-                            <span
-                              title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
-                              className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-brand text-[9px] font-bold text-white"
-                              aria-label="Verified"
-                            >
-                              {"\u2713"}
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {author.field_of_study ? `${author.field_of_study} / ` : ""}
-                          {author.university}
-                        </p>
-                      </div>
                     </Link>
-
-                    <div className="ml-auto text-right">
-                      <p className="text-sm font-semibold text-gray-900">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/${author.username}`}
+                          className="text-[14px] font-semibold text-gray-900 transition-colors hover:text-emerald-700"
+                        >
+                          {authorName}
+                        </Link>
+                        {author.verified ? (
+                          <span
+                            title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
+                            className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-semibold text-white"
+                          >
+                            {"\u2713"} {author.verified_type ? author.verified_type.charAt(0).toUpperCase() + author.verified_type.slice(1) : "Verified"}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 text-[12px] text-gray-500">
+                        {[author.field_of_study, author.university].filter(Boolean).join(" \u00b7 ")}
+                      </p>
+                    </div>
+                    <div className="ml-auto shrink-0 text-right">
+                      <p className="text-[12.5px] font-semibold text-gray-700">
                         {formatDate(post.published_at ?? post.created_at)}
                       </p>
-                      <p className="text-xs text-gray-400">Published</p>
+                      {post.view_count ? (
+                        <p className="text-[11px] text-gray-400">{post.view_count.toLocaleString()} reads</p>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -657,46 +658,44 @@ export default async function PostPage({ params }: PageProps) {
                       {references.length} listed
                     </span>
                   </div>
-                  <ol className="space-y-3">
+                  <ol>
                     {references.map((reference, index) => (
                       <li
                         key={reference.id}
                         id={`ref-${index + 1}`}
-                        className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-600"
+                        className="flex gap-3 border-t border-gray-100 py-3 text-sm leading-relaxed text-gray-600 first:border-t-0"
                       >
-                        <div className="flex gap-3">
-                          <span className="shrink-0 font-semibold text-emerald-700">
-                            [{index + 1}]
-                          </span>
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {reference.title}
+                        <span className="min-w-[2rem] shrink-0 font-bold text-emerald-600">
+                          [{index + 1}]
+                        </span>
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {reference.title}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {[reference.authors, reference.year, reference.source]
+                              .filter(Boolean)
+                              .join(" / ") || "Reference details not provided"}
+                          </p>
+                          {reference.doi || reference.url ? (
+                            <p className="mt-1 text-xs">
+                              {reference.doi ? (
+                                <span className="mr-2 text-gray-500">
+                                  DOI: {reference.doi}
+                                </span>
+                              ) : null}
+                              {reference.url ? (
+                                <a
+                                  href={reference.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-medium text-emerald-700 hover:underline"
+                                >
+                                  Open source
+                                </a>
+                              ) : null}
                             </p>
-                            <p className="mt-1 text-xs text-gray-500">
-                              {[reference.authors, reference.year, reference.source]
-                                .filter(Boolean)
-                                .join(" / ") || "Reference details not provided"}
-                            </p>
-                            {reference.doi || reference.url ? (
-                              <p className="mt-1 text-xs">
-                                {reference.doi ? (
-                                  <span className="mr-2 text-gray-500">
-                                    DOI: {reference.doi}
-                                  </span>
-                                ) : null}
-                                {reference.url ? (
-                                  <a
-                                    href={reference.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium text-emerald-700 hover:underline"
-                                  >
-                                    Open source
-                                  </a>
-                                ) : null}
-                              </p>
-                            ) : null}
-                          </div>
+                          ) : null}
                         </div>
                       </li>
                     ))}
@@ -777,37 +776,34 @@ export default async function PostPage({ params }: PageProps) {
 
               {relatedPosts.length > 0 ? (
                 <section className="mb-8">
-                  <h2 className="mb-4 text-lg font-semibold text-gray-900">
-                    Related Posts
+                  <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+                    Related
                   </h2>
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
                     {relatedPosts.map((item) => (
                       <Link
                         key={item.id}
                         href={`/post/${item.slug}`}
-                        className="group flex items-center justify-between gap-3 rounded-lg p-3 transition-colors hover:bg-canvas"
+                        className="group flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md"
                       >
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 transition-colors group-hover:text-emerald-brand">
+                        <div className="h-[96px] overflow-hidden">
+                          <PostCover
+                            src={null}
+                            alt={item.title}
+                            type={item.type}
+                            sizes="200px"
+                            className="h-full w-full"
+                            imageClassName="object-cover"
+                          />
+                        </div>
+                        <div className="flex flex-1 flex-col p-3">
+                          <p className="line-clamp-2 text-[12px] font-semibold leading-snug text-gray-900 transition-colors group-hover:text-emerald-brand">
                             {item.title}
                           </p>
-                          <p className="mt-0.5 text-xs text-gray-400">
-                            {item.profiles?.full_name} / {formatDate(item.published_at ?? item.created_at)}
+                          <p className="mt-auto pt-2 text-[10px] text-gray-400">
+                            {item.profiles?.full_name ?? item.profiles?.username}
                           </p>
                         </div>
-                        <svg
-                          className="h-4 w-4 shrink-0 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
                       </Link>
                     ))}
                   </div>

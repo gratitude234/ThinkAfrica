@@ -39,7 +39,7 @@ export default function BottomNav({
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Primary navigation"
     >
-      <div className="flex h-[68px] items-center justify-around px-2">
+      <div className="flex h-[60px] items-center justify-around px-2">
         <Link
           href="/"
           className={navLinkClass(isActive("/"))}
@@ -87,7 +87,7 @@ export default function BottomNav({
           className={navLinkClass(isActive("/write"))}
           aria-current={isActive("/write") ? "page" : undefined}
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-brand text-white shadow-sm">
+          <div className="-mt-5 flex h-[50px] w-[50px] items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_8px_18px_-4px_rgb(16_185_129/0.55)]">
             <svg
               className="h-6 w-6"
               fill="none"

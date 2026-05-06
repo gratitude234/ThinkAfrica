@@ -1,7 +1,6 @@
 import Link from "next/link";
 import PostCover from "@/components/post/PostCover";
 import {
-  formatDate,
   POST_TYPE_LABELS,
   sanitizePostExcerpt,
   type PostType,
@@ -31,6 +30,14 @@ function estimateReadTime(excerpt: string | null): number {
   );
 }
 
+const STAMP: Record<string, string> = {
+  research: "R",
+  essay: "E",
+  policy_brief: "P",
+  blog: "B",
+  quick_take: "Q",
+};
+
 export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }) {
   if (!post) return null;
 
@@ -39,72 +46,111 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
   const readTime = estimateReadTime(post.excerpt);
   const excerpt = sanitizePostExcerpt(post.excerpt);
+  const stamp = STAMP[post.type] ?? "T";
+  const initials = authorName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
-    <article className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-px hover:shadow-md">
-      <Link href={`/post/${post.slug}`} className="block">
-        <PostCover
-          src={post.cover_image_url}
-          alt={post.title}
-          type={post.type}
-          sizes="(max-width: 1024px) 100vw, 760px"
-          priority
-          className="h-[220px] w-full border-b border-gray-100 sm:h-[260px] lg:h-[300px]"
-          imageClassName="object-cover object-center"
-        />
-      </Link>
+    <article className="group mb-5 overflow-hidden rounded-xl border border-gray-200 bg-white transition-[transform,box-shadow] duration-250 ease-[cubic-bezier(0.25,0,0,1)] hover:-translate-y-0.5 hover:shadow-[0_8px_16px_-4px_rgb(0_0_0/0.09),0_3px_6px_-3px_rgb(0_0_0/0.06)]">
+      {/* Stacked on mobile, side-by-side on desktop */}
+      <div className="flex flex-col sm:grid sm:grid-cols-[340px_1fr]">
 
-      <div className="flex min-w-0 flex-col justify-between p-5 sm:p-6">
-        <div>
-          <p className="mb-3 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.15em] text-emerald-brand">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-brand" />
-            <span>{typeLabel}</span>
-            <span className="font-medium text-gray-300">{"\u00B7"}</span>
-            <span className="font-medium normal-case tracking-normal text-ink-muted">
-              {readTime} min read / Editor&apos;s pick
-            </span>
-          </p>
+        {/* Cover — full width on mobile, fixed left column on desktop */}
+        <Link href={`/post/${post.slug}`} className="relative block overflow-hidden sm:rounded-none">
+          <div className="h-[196px] sm:h-full sm:min-h-[280px]">
+            <PostCover
+              src={post.cover_image_url}
+              alt={post.title}
+              type={post.type}
+              sizes="(max-width: 640px) 100vw, 340px"
+              priority
+              className="h-full w-full"
+              imageClassName="object-cover object-center"
+            />
+          </div>
+          {/* Frosted category badge */}
+          <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-white/18 px-2.5 py-1 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md">
+            {typeLabel}
+            <span className="opacity-60">·</span>
+            {readTime} min
+          </div>
+          {/* Type-stamp watermark */}
+          <span className="absolute bottom-3 right-3 font-display text-[56px] font-semibold leading-none text-white/[0.16] select-none">
+            {stamp}
+          </span>
+        </Link>
 
-          <Link href={`/post/${post.slug}`}>
-            <h2 className="font-display mb-2 text-[25px] font-semibold leading-[1.15] text-ink transition-colors hover:text-gray-700 sm:text-[28px]">
-              {post.title}
-            </h2>
-          </Link>
-
-          {excerpt ? (
-            <p className="font-display mb-4 line-clamp-3 text-[15px] italic leading-[1.6] text-gray-500">
-              {excerpt}
+        {/* Body */}
+        <div className="flex flex-col justify-between p-5 sm:p-7">
+          <div>
+            <p className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+              Editor&apos;s pick
             </p>
-          ) : null}
-        </div>
 
-        {author ? (
-          <div className="flex items-center gap-2.5 border-t border-gray-100 pt-3.5 text-sm text-ink-muted">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-semibold text-emerald-800">
-              {authorName.charAt(0).toUpperCase()}
-            </div>
-            {author.username ? (
-              <Link
-                href={`/${author.username}`}
-                className="text-[13px] font-medium text-ink transition-colors hover:text-gray-700"
-              >
-                {authorName}
-              </Link>
-            ) : (
-              <span className="text-[13px] font-medium text-ink">{authorName}</span>
-            )}
-            {author.university ? (
-              <span className="truncate text-xs text-ink-muted">
-                {"\u00B7"} {author.university}
-              </span>
-            ) : null}
-            {post.published_at ? (
-              <span className="ml-auto flex-shrink-0 text-xs text-gray-400">
-                {formatDate(post.published_at)}
-              </span>
+            <Link href={`/post/${post.slug}`}>
+              <h2 className="font-display mb-3 text-[22px] font-semibold leading-[1.18] tracking-[-0.005em] text-gray-900 transition-colors group-hover:text-gray-700 sm:text-[26px]">
+                {post.title}
+              </h2>
+            </Link>
+
+            {excerpt ? (
+              <p className="font-display mb-4 line-clamp-3 text-[15px] italic leading-[1.5] text-gray-500 sm:mb-5">
+                {excerpt}
+              </p>
             ) : null}
           </div>
-        ) : null}
+
+          {author ? (
+            <div className="flex items-center gap-2.5 border-t border-gray-100 pt-4">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-800">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                {author.username ? (
+                  <Link
+                    href={`/${author.username}`}
+                    className="block truncate text-[13px] font-semibold text-gray-900 transition-colors hover:text-emerald-700"
+                  >
+                    {authorName}
+                    {author.verified ? (
+                      <span className="ml-1.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-[7px] font-bold text-white">
+                        ✓
+                      </span>
+                    ) : null}
+                  </Link>
+                ) : (
+                  <span className="block truncate text-[13px] font-semibold text-gray-900">{authorName}</span>
+                )}
+                {author.university ? (
+                  <p className="truncate text-[11.5px] text-gray-400">{author.university}</p>
+                ) : null}
+              </div>
+              {/* Engagement icons */}
+              <div className="ml-auto flex shrink-0 items-center gap-3 text-gray-400">
+                <span className="flex items-center gap-1 text-[11.5px]">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                </span>
+                <span className="flex items-center gap-1 text-[11.5px]">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                  </svg>
+                </span>
+                <span className="flex items-center gap-1 text-[11.5px]">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                    <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
+                  </svg>
+                </span>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </article>
   );

@@ -17,10 +17,10 @@ interface PostCoverProps {
 }
 
 const FALLBACK_STYLES: Record<string, string> = {
-  blog: "from-emerald-900 to-emerald-700 text-emerald-100/55",
-  essay: "from-amber-100 to-amber-200 text-amber-900/45",
-  research: "from-purple-100 to-purple-200 text-purple-900/45",
-  policy_brief: "from-blue-100 to-blue-200 text-blue-900/45",
+  blog: "from-emerald-900 to-emerald-700 text-emerald-100/45",
+  essay: "from-amber-900 to-amber-700 text-amber-100/45",
+  research: "from-purple-900 to-purple-700 text-purple-100/45",
+  policy_brief: "from-blue-900 to-blue-700 text-blue-100/45",
 };
 
 function normalizeType(type: string | null | undefined): PostType {

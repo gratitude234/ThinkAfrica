@@ -243,7 +243,7 @@ export default function PostsFeedTabs({
 
   return (
     <div>
-      <div className="mb-5 flex items-center overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mb-5 flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1.5 w-fit">
         {(["home", "following", "latest"] as const)
           .filter((tab) => tab !== "following" || showFollowingTab)
           .map((tab) => {
@@ -254,10 +254,10 @@ export default function PostsFeedTabs({
                 key={tab}
                 type="button"
                 onClick={() => updateState(tab, typeFilter, timeframe)}
-                className={`mb-[-1px] border-b-2 px-3.5 py-3 text-[13.5px] font-semibold transition-colors ${
+                className={`rounded-[8px] px-3.5 py-2 text-[13px] font-semibold transition-colors ${
                   activeTab === tab
-                    ? "border-emerald-brand text-ink"
-                    : "border-transparent text-gray-500 hover:text-ink"
+                    ? "bg-canvas text-ink"
+                    : "text-gray-500 hover:text-ink"
                 }`}
               >
                 {label}
