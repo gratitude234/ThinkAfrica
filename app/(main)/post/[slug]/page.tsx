@@ -542,6 +542,20 @@ export default async function PostPage({ params }: PageProps) {
                   </p>
                 ) : null}
 
+                {coverImageUrl ? (
+                  <div className="mb-6 overflow-hidden rounded-2xl">
+                    <PostCover
+                      src={coverImageUrl}
+                      alt={post.title}
+                      type={post.type}
+                      sizes="(max-width: 760px) 100vw, 760px"
+                      priority
+                      className="aspect-[16/9] w-full"
+                      imageClassName="object-cover object-center"
+                    />
+                  </div>
+                ) : null}
+
                 {author ? (
                   <div className="flex items-center gap-4 border-y border-gray-100 py-4">
                     <Link href={`/${author.username}`} className="shrink-0">
@@ -584,22 +598,6 @@ export default async function PostPage({ params }: PageProps) {
                   </div>
                 ) : null}
 
-                {coverImageUrl ? (
-                  <figure className="mt-5 max-w-[360px] overflow-hidden rounded-xl border border-gray-200 bg-white">
-                    <PostCover
-                      src={coverImageUrl}
-                      alt=""
-                      type={post.type}
-                      sizes="360px"
-                      className="aspect-[16/9]"
-                      imageClassName="object-cover object-bottom"
-                    />
-                    <figcaption className="border-t border-gray-100 px-3 py-2 text-[11px] font-medium text-ink-muted">
-                      Article cover
-                    </figcaption>
-                  </figure>
-                ) : null}
-
                 {coAuthors.length > 0 ? (
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     {coAuthors.map((coAuthor) => (
@@ -613,15 +611,6 @@ export default async function PostPage({ params }: PageProps) {
                       </Link>
                     ))}
                   </div>
-                ) : null}
-
-                {isPublished ? (
-                  <ResponseStartLink
-                    postId={post.id}
-                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100"
-                  >
-                    Write a response
-                  </ResponseStartLink>
                 ) : null}
               </header>
 
