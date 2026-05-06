@@ -42,7 +42,7 @@ export default function PublicationsSection({
 
   if (posts.length === 0) {
     return (
-      <section className="rounded-xl border border-gray-200/70 bg-white p-8 text-center">
+      <section className="rounded-xl border border-gray-200 bg-white p-8 text-center">
         <h2 className="text-lg font-semibold text-gray-900">Publications</h2>
         <p className="mt-2 text-sm text-gray-500">
           {fullName} hasn&apos;t published anything yet.
@@ -54,10 +54,12 @@ export default function PublicationsSection({
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Publications</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Organized by format so the strongest signal is easy to scan.
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+          Publications
         </p>
+        <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
+          Organized by format so the strongest signal is easy to scan.
+        </h2>
       </div>
 
       {GROUP_CONFIG.map(({ type, label }) => {
@@ -70,7 +72,7 @@ export default function PublicationsSection({
         return (
           <div
             key={type}
-            className="rounded-xl border border-gray-200/70 bg-white p-5"
+            className="rounded-xl border border-gray-200 bg-white p-5"
           >
             <div className="mb-4 flex items-center justify-between gap-3">
               <h3 className="text-base font-semibold text-gray-900">

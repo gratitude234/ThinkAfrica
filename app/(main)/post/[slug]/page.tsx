@@ -473,10 +473,10 @@ export default async function PostPage({ params }: PageProps) {
         username={author?.username ?? ""}
       />
 
-      <div className="mx-auto max-w-6xl">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
-          <div className="lg:col-span-3">
-            <div className="max-w-3xl">
+      <div className="mx-auto max-w-[1180px]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="min-w-0">
+            <div className="max-w-[760px]">
               {post.status === "draft" ? (
                 <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
                   This post is a <strong>draft</strong> and is only visible to you.{" "}
@@ -503,12 +503,12 @@ export default async function PostPage({ params }: PageProps) {
                 sizes="(max-width: 1024px) 100vw, 768px"
                 priority
                 fit="contain"
-                className="mb-6 h-[236px] rounded-xl border border-gray-100 sm:mb-8 sm:h-80 lg:h-[400px]"
+                className="mb-6 h-[236px] rounded-xl border border-gray-100 bg-white sm:mb-8 sm:h-80 lg:h-[380px]"
               />
 
               <header className="mb-7 sm:mb-8">
                 {/* Kicker - post type + word count + read time */}
-                <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-brand sm:mb-5 sm:tracking-[0.2em]">
+                <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-brand sm:mb-5">
                   {qualitySummary.contentLabel}
                   <span className="mx-2 text-gray-300">/</span>
                   <span className="text-ink-muted">
@@ -541,13 +541,13 @@ export default async function PostPage({ params }: PageProps) {
                 ) : null}
 
                 {/* Title - enlarged to match journal scale */}
-                <h1 className="font-display mb-4 text-[34px] font-medium leading-[1.05] tracking-tight text-ink sm:mb-5 sm:text-5xl">
+                <h1 className="font-display mb-4 text-[36px] font-semibold leading-[1.06] tracking-tight text-ink sm:mb-5 sm:text-[46px]">
                   {post.title}
                 </h1>
 
                 {/* Deck / standfirst - rendered from excerpt if present */}
                 {sanitizedExcerpt ? (
-                  <p className="font-display mb-5 text-lg font-normal italic leading-relaxed text-gray-600 sm:mb-6 sm:text-2xl">
+                  <p className="font-display mb-6 text-lg font-normal italic leading-[1.45] text-gray-600 sm:text-[21px]">
                     {sanitizedExcerpt}
                   </p>
                 ) : null}
@@ -565,7 +565,7 @@ export default async function PostPage({ params }: PageProps) {
                         className="flex-shrink-0"
                       />
                       <div>
-                        <p className="font-medium text-gray-900 transition-colors group-hover:text-emerald-brand">
+                        <p className="text-sm font-semibold text-gray-900 transition-colors group-hover:text-emerald-brand">
                           {authorName}
                           {author.verified ? (
                             <span
@@ -585,7 +585,7 @@ export default async function PostPage({ params }: PageProps) {
                     </Link>
 
                     <div className="ml-auto text-right">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-semibold text-gray-900">
                         {formatDate(post.published_at ?? post.created_at)}
                       </p>
                       <p className="text-xs text-gray-400">Published</p>
@@ -636,15 +636,15 @@ export default async function PostPage({ params }: PageProps) {
                 <HighlightShare containerId="post-article-prose" />
                 <div
                   id="post-article-prose"
-                  className="article-journal-body prose prose-gray max-w-none prose-lg prose-a:text-emerald-brand prose-headings:font-medium prose-headings:tracking-tight prose-headings:text-gray-900"
+                  className="article-journal-body prose prose-gray max-w-none prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-gray-900"
                   dangerouslySetInnerHTML={{ __html: contentWithIds }}
                 />
               </div>
 
               {references.length > 0 ? (
-                <section className="mb-8">
+                <section className="mb-8 border-t border-gray-200 pt-6">
                   <div className="mb-4 flex items-center justify-between gap-3">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
                       References
                     </h2>
                     <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
@@ -889,7 +889,7 @@ export default async function PostPage({ params }: PageProps) {
             </div>
           </div>
 
-          <aside className="hidden lg:col-span-1 lg:block">
+          <aside className="hidden lg:block">
             <div className="space-y-4">
               <TableOfContents headings={headings} />
               <CredibilityPanel

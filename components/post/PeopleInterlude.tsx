@@ -22,10 +22,10 @@ export default function PeopleInterlude({
   currentUserId: string | null;
 }) {
   return (
-    <section className="my-2 rounded-xl border border-gray-200 bg-white px-5 py-[18px]">
+    <section className="my-3 rounded-xl border border-gray-200 bg-white px-5 py-[18px]">
       <div className="mb-3.5 flex items-center justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
             Writers to follow
           </p>
           <h3 className="mt-0.5 text-base font-semibold text-ink">

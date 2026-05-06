@@ -435,7 +435,7 @@ export default async function UserProfilePage({ params }: PageProps) {
       Boolean(talentProfile));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-[1180px] space-y-6">
       {showOwnOpportunityReadiness ? (
         <RetentionEventTracker
           event="opportunity_readiness_viewed"
@@ -453,6 +453,13 @@ export default async function UserProfilePage({ params }: PageProps) {
         talentProfileId={talentProfile?.id ?? null}
         writingSince={formatMonthYear(profile.created_at)}
         messagingEligibility={messagingEligibility}
+        stats={{
+          postCount: mergedPosts.length,
+          followerCount: followerCount ?? 0,
+          followingCount: followingCount ?? 0,
+          totalViews,
+          points: profile.points,
+        }}
       />
 
       <OpportunityBanner

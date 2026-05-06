@@ -58,7 +58,7 @@ async function fetchFeed(
 
 function EndStateCard({ topics }: { topics: string[] }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
+    <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
       <p className="text-base font-semibold text-gray-900">
         You&apos;re all caught up.
       </p>
@@ -78,7 +78,7 @@ function EndStateCard({ topics }: { topics: string[] }) {
       </div>
       <Link
         href="/?tab=latest"
-        className="mt-3 inline-block text-sm font-medium text-ink hover:underline"
+        className="mt-3 inline-block text-sm font-semibold text-emerald-brand hover:underline"
       >
         Or switch to Latest -&gt;
       </Link>
@@ -243,7 +243,7 @@ export default function PostsFeedTabs({
 
   return (
     <div>
-      <div className="-mx-5 mb-5 flex items-center overflow-x-auto border-b border-gray-200 px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mb-5 flex items-center overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {(["home", "following", "latest"] as const)
           .filter((tab) => tab !== "following" || showFollowingTab)
           .map((tab) => {
@@ -254,7 +254,7 @@ export default function PostsFeedTabs({
                 key={tab}
                 type="button"
                 onClick={() => updateState(tab, typeFilter, timeframe)}
-                className={`mb-[-1px] border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors ${
+                className={`mb-[-1px] border-b-2 px-3.5 py-3 text-[13.5px] font-semibold transition-colors ${
                   activeTab === tab
                     ? "border-emerald-brand text-ink"
                     : "border-transparent text-gray-500 hover:text-ink"

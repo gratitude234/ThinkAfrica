@@ -53,6 +53,22 @@ const VERIFIED_COLORS: Record<string, string> = {
   institution: "bg-blue-600",
 };
 
+const TYPE_ACCENTS: Record<string, string> = {
+  research: "bg-purple-accent",
+  essay: "bg-gold",
+  policy_brief: "bg-blue-600",
+  blog: "bg-emerald-brand",
+  quick_take: "bg-emerald-brand",
+};
+
+const TYPE_BADGES: Record<string, string> = {
+  research: "bg-purple-100 text-purple-800",
+  essay: "bg-amber-100 text-amber-800",
+  policy_brief: "bg-blue-100 text-blue-800",
+  blog: "bg-emerald-100 text-emerald-800",
+  quick_take: "bg-emerald-100 text-emerald-800",
+};
+
 function estimateReadTime(excerpt: string | null): number {
   return Math.max(
     1,
@@ -75,17 +91,33 @@ export default function PostCard({
     coAuthorCount > 0 ? `${authorName} + ${coAuthorCount} others` : authorName;
   const verifiedBg =
     VERIFIED_COLORS[author?.verified_type ?? "student"] ?? "bg-emerald-brand";
+  const accentClass = TYPE_ACCENTS[post.type] ?? "bg-emerald-brand";
+  const badgeClass = TYPE_BADGES[post.type] ?? "bg-emerald-100 text-emerald-800";
+  const engagementItems = [
+    typeof post.view_count === "number"
+      ? `${post.view_count.toLocaleString()} reads`
+      : null,
+    typeof post.comment_count === "number"
+      ? `${post.comment_count.toLocaleString()} replies`
+      : null,
+    typeof post.like_count === "number"
+      ? `${post.like_count.toLocaleString()} likes`
+      : null,
+  ].filter(Boolean);
 
   return (
-    <article className="mb-3 rounded-xl border border-gray-200/80 bg-white px-4 py-4 transition-all duration-300 hover:-translate-y-px hover:shadow-md sm:px-5 sm:py-[18px]">
-      <div className="flex gap-3 sm:gap-4">
+    <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-4 transition-all duration-300 hover:-translate-y-px hover:shadow-md sm:px-5 sm:py-[18px]">
+      <span
+        className={`absolute bottom-4 left-0 top-4 w-1 rounded-r-full ${accentClass}`}
+        aria-hidden="true"
+      />
+      <div className="flex gap-3 pl-1 sm:gap-4">
         <div className="min-w-0 flex-1">
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-muted sm:tracking-[0.18em]">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold ${badgeClass}`}>
               {typeLabel}
             </span>
-            <span className="text-gray-300">{"\u00B7"}</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-muted sm:tracking-[0.18em]">
+            <span className="text-[11px] font-medium text-ink-muted">
               {readTime} min read
             </span>
             {post.in_response_to ? (
@@ -96,7 +128,7 @@ export default function PostCard({
           </div>
 
           <Link href={`/post/${post.slug}`}>
-            <h2 className="font-display line-clamp-2 text-[17px] font-semibold leading-tight text-ink transition-colors hover:text-gray-700 sm:text-lg">
+            <h2 className="font-display line-clamp-2 text-[18px] font-semibold leading-[1.22] text-ink transition-colors group-hover:text-gray-700">
               {post.title}
             </h2>
           </Link>
@@ -108,6 +140,10 @@ export default function PostCard({
           ) : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-gray-100 pt-2.5 text-[11px] text-ink-muted sm:text-xs">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800">
+              {authorName.charAt(0).toUpperCase()}
+            </span>
+
             {authorHref ? (
               <Link
                 href={authorHref}
@@ -140,6 +176,12 @@ export default function PostCard({
 
             <span aria-hidden="true">{"\u00B7"}</span>
             <span>{formatRelativeTime(displayDate)}</span>
+            {engagementItems.length > 0 ? (
+              <>
+                <span aria-hidden="true">{"\u00B7"}</span>
+                <span className="truncate">{engagementItems.slice(0, 2).join(" / ")}</span>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -148,8 +190,8 @@ export default function PostCard({
             src={post.cover_image_url}
             alt={post.title}
             type={post.type}
-            sizes="88px"
-            className="h-[88px] w-[88px] rounded-[9px]"
+            sizes="112px"
+            className="h-[92px] w-[92px] rounded-[10px] sm:h-[112px] sm:w-[112px]"
             imageClassName="object-cover"
           />
         </Link>

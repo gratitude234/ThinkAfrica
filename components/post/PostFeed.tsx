@@ -38,7 +38,7 @@ export default function PostFeed({
     <div>
       {posts.length === 0 ? (
         activeTab === "following" ? (
-          <div className="rounded-[14px] border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
+          <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
             <p className="text-sm text-gray-500">
               You&apos;re not following anyone yet.
             </p>
@@ -50,7 +50,7 @@ export default function PostFeed({
             </Link>
           </div>
         ) : (
-          <div className="rounded-[14px] border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
+          <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
             <p className="mb-1 text-lg font-medium text-gray-900">
               No posts match this view yet.
             </p>
@@ -83,8 +83,9 @@ export default function PostFeed({
             />
           ) : null}
 
-          <div className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-gray-400 sm:tracking-[0.18em]">
+          <div className="mb-3.5 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
             Latest in your feed
+            <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
           </div>
 
           {posts.map((post, index) => (

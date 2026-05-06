@@ -820,3 +820,433 @@ Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
 Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
 Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
 Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+Error [AuthRetryableFetchError]: fetch failed
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 0,
+  code: undefined
+}
+Error [AuthRetryableFetchError]: fetch failed
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 0,
+  code: undefined
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+Error [AuthRetryableFetchError]: fetch failed
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 0,
+  code: undefined
+}
+Error [AuthRetryableFetchError]: fetch failed
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 0,
+  code: undefined
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+Error [AuthRetryableFetchError]: fetch failed
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 0,
+  code: undefined
+}
+Error [AuthRetryableFetchError]: fetch failed
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 0,
+  code: undefined
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+Error [AuthRetryableFetchError]: fetch failed
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 0,
+  code: undefined
+}
+Error [AuthRetryableFetchError]: fetch failed
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 0,
+  code: undefined
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND fmlaswzrvsuiyzjaeldm.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fmlaswzrvsuiyzjaeldm.supabase.co'
+  }
+}
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Failed to set fetch cache https://fmlaswzrvsuiyzjaeldm.supabase.co/rest/v1/posts?select=author_id%2Cpublished_at%2Cprofiles%21posts_author_id_fkey%28username%2Cfull_name%2Cuniversity%2Cavatar_url%29&status=eq.published&published_at=gte.2026-04-06T08%3A56%3A56.512Z&limit=50 TypeError: terminated
+    at ignore-listed frames {
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+[browser] Image with src "https://fmlaswzrvsuiyzjaeldm.supabase.co/storage/v1/object/public/post-images/covers/49d68305-e878-454d-9d98-af5b2c41c1ea/1777062854161-7ewgaycpwui.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] Image with src "https://fmlaswzrvsuiyzjaeldm.supabase.co/storage/v1/object/public/post-images/covers/8633f82a-6271-4f01-b18c-ef5d1f56cb95/1776721859957-pkbgl4er9zt.jpeg" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] Image with src "https://fmlaswzrvsuiyzjaeldm.supabase.co/storage/v1/object/public/post-images/covers/dd9e54fb-9787-4eb4-999d-77c0cd14a55a/1776853314658-8ukkajjupwt.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] Image with src "https://fmlaswzrvsuiyzjaeldm.supabase.co/storage/v1/object/public/post-images/covers/dd9e54fb-9787-4eb4-999d-77c0cd14a55a/1776853314658-8ukkajjupwt.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] Image with src "https://fmlaswzrvsuiyzjaeldm.supabase.co/storage/v1/object/public/post-images/covers/999b3611-ffb2-40b9-af05-949683e6c0ae/1775827668507-h61uwnc92q5.svg" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] Image with src "https://fmlaswzrvsuiyzjaeldm.supabase.co/storage/v1/object/public/post-images/covers/8633f82a-6271-4f01-b18c-ef5d1f56cb95/1777673985767-pv7vx82ud3.jfif" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] Image with src "https://fmlaswzrvsuiyzjaeldm.supabase.co/storage/v1/object/public/post-images/covers/dd9e54fb-9787-4eb4-999d-77c0cd14a55a/1776853314658-8ukkajjupwt.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.

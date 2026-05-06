@@ -29,10 +29,12 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Featured Work</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          The work most worth reading first.
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+          Featured work
         </p>
+        <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
+          The work most worth reading first.
+        </h2>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -43,7 +45,7 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
             <Link
               key={post.id}
               href={`/post/${post.slug}`}
-              className="group overflow-hidden rounded-xl border border-gray-200/70 bg-white transition-shadow hover:shadow-lg"
+              className="group overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-px hover:shadow-md"
             >
               <PostCover
                 src={post.cover_image_url}
@@ -54,9 +56,9 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
                 imageClassName="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
               />
 
-              <div className="space-y-3 p-5">
+              <div className="space-y-3 p-4">
                 <Badge type={post.type} />
-                <h3 className="font-display line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors group-hover:text-emerald-brand">
+                <h3 className="font-display line-clamp-2 text-[17px] font-semibold leading-snug text-ink transition-colors group-hover:text-emerald-brand">
                   {post.title}
                 </h3>
                 {post.excerpt ? (

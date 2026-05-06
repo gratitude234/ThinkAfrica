@@ -66,7 +66,7 @@ function SideKicker({
 }) {
   return (
     <p
-      className={`${className} flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted`}
+      className={`${className} flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-muted`}
     >
       {children}
     </p>
@@ -75,7 +75,7 @@ function SideKicker({
 
 function SideCard({ children }: { children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
+    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02]">
       {children}
     </section>
   );
@@ -110,11 +110,11 @@ function PromptCard({
   return (
     <SideCard>
       <SideKicker>{kicker}</SideKicker>
-      <p className="text-sm font-semibold leading-snug text-ink">{title}</p>
+      <p className="font-display text-base font-semibold leading-snug text-ink">{title}</p>
       <p className="mt-1.5 text-xs leading-5 text-ink-muted">{body}</p>
       <Link
         href={href}
-        className="mt-3 inline-flex rounded-lg border border-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-brand transition-colors hover:bg-emerald-50"
+        className="mt-3 inline-flex rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-brand transition-colors hover:bg-emerald-50"
       >
         {cta}
       </Link>
@@ -129,7 +129,7 @@ function ActivationCard({ state }: { state: ActivationState }) {
   const pct = Math.round((doneCount / state.tasks.length) * 100);
 
   return (
-    <section className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-4">
+    <section className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm shadow-black/[0.02]">
       <div className="mb-3">
         <h2 className="text-[13px] font-semibold text-ink">Complete your profile</h2>
         <p className="mt-1 text-xs leading-5 text-ink-muted">
@@ -235,13 +235,13 @@ export default function HomeSidebar({
       ) : null}
 
       {activeDebate ? (
-        <section className="rounded-xl border border-gray-900 bg-gray-900 p-4 text-white shadow-sm">
+        <section className="rounded-xl bg-gray-900 p-4 text-white shadow-sm">
           <SideKicker>
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
             <span className="text-emerald-300">Happening now</span>
           </SideKicker>
           <Link href={`/debates/${activeDebate.id}`}>
-            <h3 className="font-display mb-2 text-sm font-semibold leading-snug text-white transition-colors hover:text-emerald-100">
+            <h3 className="font-display mb-2 text-base font-semibold leading-snug text-white transition-colors hover:text-emerald-100">
               {activeDebate.title}
             </h3>
           </Link>
@@ -272,7 +272,7 @@ export default function HomeSidebar({
           ) : null}
           <Link
             href={`/debates/${activeDebate.id}`}
-            className="inline-flex rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
+            className="inline-flex w-full justify-center rounded-lg bg-emerald-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
           >
             Join the debate -&gt;
           </Link>
@@ -369,7 +369,7 @@ export default function HomeSidebar({
           ) : null}
           <Link
             href={`/webinars/${upcomingWebinar.id}`}
-            className="mt-2.5 inline-flex rounded-md border border-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-brand hover:bg-emerald-50"
+            className="mt-2.5 inline-flex rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-brand hover:bg-emerald-50"
           >
             Register free
           </Link>

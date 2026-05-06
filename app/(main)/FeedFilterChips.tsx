@@ -23,10 +23,10 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+      className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
         active
-          ? "border-ink bg-ink text-canvas"
-          : "border-gray-200 bg-white text-ink-muted hover:border-gray-400 hover:text-ink"
+          ? "border-ink bg-ink text-white"
+          : "border-gray-200 bg-white text-ink-muted hover:border-emerald-brand hover:bg-emerald-50 hover:text-emerald-brand"
       }`}
     >
       {children}
@@ -42,7 +42,7 @@ export default function FeedFilterChips({
   onTypeChange: (value: TypeFilter) => void;
 }) {
   return (
-    <div className="-mx-5 mb-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="-mx-1 mb-5 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {TYPE_OPTIONS.map((option) => (
         <Chip
           key={option.value}

@@ -18,6 +18,7 @@ function navLinkClass(isCurrent: boolean) {
 export default function BottomNav({
   username,
   userId,
+  hasActiveDebate,
 }: BottomNavProps) {
   const pathname = usePathname();
   if (!userId || pathname.startsWith("/post/")) return null;
@@ -110,9 +111,9 @@ export default function BottomNav({
         </Link>
 
         <Link
-          href="/opportunities"
-          className={navLinkClass(isActive("/opportunities"))}
-          aria-current={isActive("/opportunities") ? "page" : undefined}
+          href="/debates"
+          className={navLinkClass(isActive("/debates"))}
+          aria-current={isActive("/debates") ? "page" : undefined}
         >
           <div className="relative">
             <svg
@@ -125,11 +126,14 @@ export default function BottomNav({
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M12 6v12m6-6H6m11.5 7h-11A2.5 2.5 0 014 16.5v-9A2.5 2.5 0 016.5 5h11A2.5 2.5 0 0120 7.5v9a2.5 2.5 0 01-2.5 2.5z"
+                d="M7 8h10M7 12h6m-8 7 3.5-3.5H18A2.5 2.5 0 0020.5 13V7A2.5 2.5 0 0018 4.5H6A2.5 2.5 0 003.5 7v6A2.5 2.5 0 006 15.5h1V19z"
               />
             </svg>
+            {hasActiveDebate ? (
+              <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full border border-white bg-emerald-brand" />
+            ) : null}
           </div>
-          <span className="text-[10px] font-medium">Opportunities</span>
+          <span className="text-[10px] font-medium">Debates</span>
         </Link>
 
         <Link

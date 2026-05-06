@@ -24,14 +24,14 @@ export default function DailyBriefStrip({
   const pointsToNext = nextTier ? Math.max(0, nextTier.min - (points ?? 0)) : 0;
 
   return (
-    <section className="mb-5 flex items-center gap-3 rounded-[11px] border border-gray-200 border-l-[3px] border-l-emerald-brand bg-white px-4 py-3">
-      <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.15em] text-emerald-brand">
+    <section className="mb-5 flex flex-col gap-3 rounded-xl border border-gray-200 border-l-[3px] border-l-emerald-brand bg-white px-4 py-3.5 sm:flex-row sm:items-center">
+      <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-brand">
         {today}
       </span>
-      <span className="h-5 w-px shrink-0 bg-gray-200" aria-hidden="true" />
+      <span className="hidden h-5 w-px shrink-0 bg-gray-200 sm:block" aria-hidden="true" />
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1">
         {featuredPost ? (
-          <span className="max-w-[260px] truncate text-[13px] text-gray-700">
+          <span className="max-w-full truncate text-[13px] text-gray-700 sm:max-w-[280px]">
             <strong className="font-medium text-ink">Top post:</strong>{" "}
             {featuredPost.title}
           </span>
@@ -50,7 +50,7 @@ export default function DailyBriefStrip({
         ) : null}
       </div>
       {tier ? (
-        <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+        <span className="inline-flex shrink-0 items-center gap-1 self-start rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 sm:ml-auto sm:self-auto">
           <span aria-hidden="true">*</span>
           {tier.name}
           {nextTier ? ` - ${pointsToNext} pts to ${nextTier.name}` : ""}

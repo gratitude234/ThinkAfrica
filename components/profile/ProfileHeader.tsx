@@ -31,6 +31,7 @@ interface ProfileHeaderProps {
     cover_image_url?: string | null;
     verified: boolean;
     verified_type: string | null;
+    points: number;
     created_at: string;
   };
   isOwnProfile: boolean;
@@ -41,6 +42,20 @@ interface ProfileHeaderProps {
   talentProfileId: string | null;
   writingSince: string;
   messagingEligibility?: { eligible: boolean; reason: string | null } | null;
+  stats: {
+    postCount: number;
+    followerCount: number;
+    followingCount: number;
+    totalViews: number;
+    points: number;
+  };
+}
+
+function formatStat(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
+  if (value >= 10_000) return `${Math.round(value / 1_000)}k`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return value.toLocaleString();
 }
 
 export default function ProfileHeader({
@@ -53,6 +68,7 @@ export default function ProfileHeader({
   talentProfileId,
   writingSince,
   messagingEligibility,
+  stats,
 }: ProfileHeaderProps) {
   const router = useRouter();
   const [showInquiry, setShowInquiry] = useState(false);
@@ -64,6 +80,13 @@ export default function ProfileHeader({
       ? `Graduated ${profile.graduation_year}`
       : `Writing since ${writingSince}`,
   ].filter(Boolean);
+  const statsItems = [
+    { label: "Posts", value: stats.postCount },
+    { label: "Followers", value: stats.followerCount },
+    { label: "Following", value: stats.followingCount },
+    { label: "Reads", value: stats.totalViews },
+    { label: "Points", value: stats.points },
+  ];
 
   return (
     <>
@@ -78,17 +101,17 @@ export default function ProfileHeader({
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8">
+      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm shadow-black/[0.02] md:p-7">
         <div className="flex flex-col gap-6 md:flex-row md:items-start">
           <UserAvatar
             name={displayName}
             src={profile.avatar_url}
-            size={96}
+            size={88}
             className="border border-gray-100"
           />
 
           <div className="min-w-0 flex-1">
-            <h1 className="font-display flex flex-wrap items-center gap-2 text-2xl font-bold text-ink">
+            <h1 className="font-display flex flex-wrap items-center gap-2 text-[30px] font-semibold leading-tight text-ink">
               <span>{displayName}</span>
               {profile.verified ? (
                 <span
@@ -116,13 +139,13 @@ export default function ProfileHeader({
             <p className="mt-1 text-sm text-gray-500">@{profile.username}</p>
 
             {profile.bio ? (
-              <p className="mt-2 max-w-prose text-base italic text-gray-700">
+              <p className="mt-3 max-w-prose text-[15px] leading-6 text-gray-700">
                 {profile.bio}
               </p>
             ) : null}
 
             {affiliationBits.length > 0 ? (
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-3 text-sm text-gray-500">
                 {affiliationBits.join(" / ")}
               </p>
             ) : null}
@@ -180,6 +203,20 @@ export default function ProfileHeader({
               </>
             )}
           </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 border-t border-gray-100 pt-5 sm:grid-cols-5">
+          {statsItems.map((item) => (
+            <div
+              key={item.label}
+              className="border-b border-gray-100 py-3 text-center last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"
+            >
+              <div className="text-lg font-semibold text-ink">
+                {formatStat(item.value)}
+              </div>
+              <div className="mt-0.5 text-xs text-ink-muted">{item.label}</div>
+            </div>
+          ))}
         </div>
       </section>
 

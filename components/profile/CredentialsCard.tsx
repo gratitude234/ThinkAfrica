@@ -44,13 +44,18 @@ export default function CredentialsCard({
     : "Student";
 
   return (
-    <aside className="rounded-2xl border border-gray-200 bg-white p-6">
-      <h2 className="text-lg font-semibold text-gray-900">Credentials</h2>
+    <aside className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+        Credentials
+      </p>
+      <h2 className="font-display mt-1 text-lg font-semibold text-gray-900">
+        Public profile signal
+      </h2>
 
       <div className="mt-5 space-y-4">
         {profile.verified ? (
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
               Verified
             </p>
             <p
@@ -65,15 +70,15 @@ export default function CredentialsCard({
         ) : null}
 
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Tier
-          </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+              Tier
+            </p>
           <p className="mt-1 text-sm font-medium text-gray-900">{tier.name}</p>
         </div>
 
         {badges.length > 0 ? (
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
               Recognition
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -92,9 +97,9 @@ export default function CredentialsCard({
         ) : null}
 
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Public metrics
-          </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+              Public metrics
+            </p>
           <div className="mt-2 grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-canvas p-3">
               <p className="text-lg font-semibold text-gray-900">
