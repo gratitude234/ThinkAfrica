@@ -33,8 +33,11 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
           Featured work
         </p>
         <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
-          The work most worth reading first.
+          Work worth reading first
         </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          The strongest public pieces from this profile.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

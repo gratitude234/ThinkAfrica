@@ -209,7 +209,7 @@ export default function ProfileHeader({
           {statsItems.map((item) => (
             <div
               key={item.label}
-              className="border-b border-gray-100 py-3 text-center last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"
+              className="border-b border-gray-100 py-3 text-center last:col-span-2 last:border-b-0 sm:border-b-0 sm:border-r sm:last:col-span-1 sm:last:border-r-0"
             >
               <div className="text-lg font-semibold text-ink">
                 {formatStat(item.value)}

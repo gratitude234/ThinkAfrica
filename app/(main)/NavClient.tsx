@@ -94,7 +94,7 @@ export default function NavClient({
             <button
               type="button"
               onClick={onOpenSearch}
-              className="ml-auto hidden w-full max-w-[340px] items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3.5 py-2 text-[13px] text-ink-muted transition-colors hover:border-gray-300 hover:bg-white hover:text-ink md:flex"
+              className="ml-auto hidden w-full max-w-[340px] items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3.5 py-2 text-[13px] text-ink-muted transition-colors hover:border-gray-300 hover:bg-white hover:text-ink lg:flex"
               aria-label="Open search"
             >
               <svg
@@ -118,7 +118,7 @@ export default function NavClient({
             <button
               type="button"
               onClick={onOpenSearch}
-              className="rounded-lg p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink md:hidden"
+              className="rounded-lg p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink lg:hidden"
               aria-label="Open search"
             >
               <svg

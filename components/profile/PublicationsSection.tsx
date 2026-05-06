@@ -58,8 +58,11 @@ export default function PublicationsSection({
           Publications
         </p>
         <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
-          Organized by format so the strongest signal is easy to scan.
+          Published work
         </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Organized by format so the strongest signal is easy to scan.
+        </p>
       </div>
 
       {GROUP_CONFIG.map(({ type, label }) => {
