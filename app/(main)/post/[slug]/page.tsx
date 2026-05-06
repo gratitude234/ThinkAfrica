@@ -632,7 +632,7 @@ export default async function PostPage({ params }: PageProps) {
                 <HighlightShare containerId="post-article-prose" />
                 <div
                   id="post-article-prose"
-                  className="article-journal-body prose prose-gray max-w-none prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-gray-900"
+                  className="article-journal-body prose prose-gray max-w-[65ch] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-gray-900"
                   dangerouslySetInnerHTML={{ __html: contentWithIds }}
                 />
               </div>

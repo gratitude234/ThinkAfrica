@@ -12,10 +12,16 @@ const PANEL_SIGNALS = new Set([
   "Responses",
 ]);
 
-function toneClass(tone: QualityTone | undefined) {
-  if (tone === "good") return "text-emerald-700";
-  if (tone === "warning") return "text-amber-700";
-  return "text-gray-700";
+function toneChipClass(tone: QualityTone | undefined) {
+  if (tone === "good") return "bg-emerald-50 text-emerald-700";
+  if (tone === "warning") return "bg-amber-50 text-amber-700";
+  return "bg-gray-100 text-gray-500";
+}
+
+function toneIconClass(tone: QualityTone | undefined) {
+  if (tone === "good") return "text-emerald-500";
+  if (tone === "warning") return "text-amber-500";
+  return "text-gray-300";
 }
 
 export default function CredibilityPanel({
@@ -36,41 +42,42 @@ export default function CredibilityPanel({
     )
     .slice(0, 3);
 
+  const overallGood = summary.missingItems.length === 0;
+
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4">
+      {/* Mobile compact view */}
       <div className="sm:hidden">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
               Credibility
             </p>
-            <h2 className="mt-1 text-sm font-semibold text-gray-900">
+            <h2 className="mt-0.5 text-sm font-semibold text-gray-900">
               Trust signals
             </h2>
           </div>
-          {summary.missingItems.length > 0 ? (
-            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700">
-              More context helps
-            </span>
-          ) : (
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-              Ready
-            </span>
-          )}
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+              overallGood
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-amber-50 text-amber-700"
+            }`}
+          >
+            {overallGood ? "Strong" : "Needs context"}
+          </span>
         </div>
 
-        <dl className="mt-3 grid grid-cols-3 gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {compactSignals.map((signal) => (
             <div key={signal.label} className="rounded-lg bg-canvas px-2.5 py-2">
-              <dt className="truncate text-[10px] text-gray-400">
-                {signal.label}
-              </dt>
-              <dd className={`mt-1 truncate text-xs font-semibold ${toneClass(signal.tone)}`}>
+              <p className="truncate text-[10px] text-gray-400">{signal.label}</p>
+              <p className={`mt-1 truncate text-[11px] font-semibold ${toneChipClass(signal.tone).split(" ")[1]}`}>
                 {signal.value}
-              </dd>
+              </p>
             </div>
           ))}
-        </dl>
+        </div>
 
         {isPublished ? (
           <ResponseStartLink
@@ -83,21 +90,51 @@ export default function CredibilityPanel({
         ) : null}
       </div>
 
+      {/* Desktop full view */}
       <div className="hidden sm:block">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-            Credibility
-          </p>
-          <h2 className="mt-1 text-sm font-semibold text-gray-900">
-            Trust signals for this post
-          </h2>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+              Credibility
+            </p>
+            <h2 className="mt-0.5 text-[13px] font-semibold text-gray-900">
+              Trust signals
+            </h2>
+          </div>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+              overallGood
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-amber-50 text-amber-700"
+            }`}
+          >
+            <svg
+              className={`h-2.5 w-2.5 ${overallGood ? "text-emerald-500" : "text-amber-500"}`}
+              viewBox="0 0 8 8"
+              fill="currentColor"
+            >
+              <circle cx="4" cy="4" r="4" />
+            </svg>
+            {overallGood ? "Strong" : "Needs context"}
+          </span>
         </div>
 
-        <dl className="mt-4 space-y-3">
+        <dl className="space-y-2.5">
           {signals.map((signal) => (
-            <div key={signal.label} className="flex items-start justify-between gap-3">
-              <dt className="text-xs text-gray-400">{signal.label}</dt>
-              <dd className={`max-w-[62%] text-right text-xs font-medium ${toneClass(signal.tone)}`}>
+            <div key={signal.label} className="flex items-center justify-between gap-3">
+              <dt className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                <svg
+                  className={`h-2 w-2 shrink-0 ${toneIconClass(signal.tone)}`}
+                  viewBox="0 0 8 8"
+                  fill="currentColor"
+                >
+                  <circle cx="4" cy="4" r="4" />
+                </svg>
+                {signal.label}
+              </dt>
+              <dd
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${toneChipClass(signal.tone)}`}
+              >
                 {signal.value}
               </dd>
             </div>
@@ -105,11 +142,11 @@ export default function CredibilityPanel({
         </dl>
 
         {summary.missingItems.length > 0 ? (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-            <p className="text-xs font-medium text-amber-900">
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <p className="text-[11px] font-semibold text-amber-900">
               More context can help
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-amber-800">
+            <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
               {summary.missingItems.slice(0, 2).join(", ")}
             </p>
           </div>
