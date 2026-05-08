@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import CreateLauncher from "./CreateLauncher";
 
 interface BottomNavProps {
   username: string | null;
@@ -21,7 +22,7 @@ export default function BottomNav({
   hasActiveDebate,
 }: BottomNavProps) {
   const pathname = usePathname();
-  if (!userId || pathname.startsWith("/post/")) return null;
+  if (pathname.startsWith("/post/")) return null;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -35,26 +36,7 @@ export default function BottomNav({
 
   return (
     <>
-      <Link
-        href="/write"
-        className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_12px_24px_-8px_rgb(16_185_129/0.65)] transition-colors hover:bg-emerald-600 md:hidden"
-        aria-label="Write"
-      >
-        <svg
-          className="h-6 w-6"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 5v14M5 12h14"
-          />
-        </svg>
-      </Link>
+      <CreateLauncher userId={userId} variant="mobileFab" />
 
       <nav
         className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur md:hidden"

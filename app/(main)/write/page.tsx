@@ -16,7 +16,9 @@ import ContinueDraftBanner from "./ContinueDraftBanner";
 import { useDraftManager } from "./DraftManager";
 import MyDrafts from "./MyDrafts";
 import PublishDrawer from "./PublishDrawer";
+import WriteReadinessPanel from "./WriteReadinessPanel";
 import { ensureDraft, savePostReferences } from "./actions";
+import { STARTER_TEMPLATES, WRITE_FORMATS, isPostType } from "./writeConfig";
 import { composeContentWithSubtitle } from "./writeUtils";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
@@ -25,94 +27,6 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
     <div className="min-h-[400px] animate-pulse rounded-lg border border-gray-200 bg-canvas" />
   ),
 });
-
-const POST_TYPES = [
-  {
-    type: "blog",
-    label: "Quick take",
-    minWords: 50,
-    readTime: "~10 min to write",
-    review: "No editorial review",
-    desc: "One clear thought, example, or response",
-  },
-  {
-    type: "essay",
-    label: "Essay",
-    minWords: 800,
-    readTime: "~45 min to write",
-    review: "Light editorial review",
-    desc: "Structured argument, cultural commentary, analysis",
-  },
-  {
-    type: "policy_brief",
-    label: "Policy brief",
-    minWords: 500,
-    readTime: "~30 min to write",
-    review: "Editorial review",
-    desc: "Evidence-based recommendations for policymakers",
-  },
-  {
-    type: "research",
-    label: "Research paper",
-    minWords: 3000,
-    readTime: "Multiple sessions",
-    review: "Full peer review process",
-    desc: "Original research with citations and methodology",
-  },
-] as const;
-
-const STARTER_TEMPLATES: Record<
-  PostType,
-  {
-    title: string;
-    subtitle: string;
-    excerpt: string;
-    tags: string[];
-    content: string;
-  }
-> = {
-  blog: {
-    title: "One thing I think about [topic]",
-    subtitle: "A quick take from my current reading and experience",
-    excerpt: "A concise point on a question worth discussing.",
-    tags: ["quick take"],
-    content:
-      "<p><strong>My point:</strong> State the idea you want readers to leave with.</p><p><strong>Why it matters:</strong> Explain the campus, community, or African context in plain language.</p><p><strong>One example:</strong> Add a concrete example, source, or lived observation.</p><p><strong>What should happen next:</strong> End with a question or recommendation.</p>",
-  },
-  essay: {
-    title: "Rethinking [issue] in Africa",
-    subtitle: "An argument with context, evidence, and a clear position",
-    excerpt: "This essay argues for a more careful way to understand the issue.",
-    tags: ["essay"],
-    content:
-      "<h2>Opening claim</h2><p>Introduce the issue and your position.</p><h2>Context</h2><p>Explain the background readers need before they can judge the argument.</p><h2>Evidence</h2><p>Bring in examples, data, readings, or cases.</p><h2>Counterargument</h2><p>Address the strongest objection to your view.</p><h2>Conclusion</h2><p>Close with what your argument changes.</p>",
-  },
-  policy_brief: {
-    title: "Policy brief: Improving [issue]",
-    subtitle: "Problem, evidence, options, and recommendations",
-    excerpt: "A short policy brief with practical recommendations.",
-    tags: ["policy"],
-    content:
-      "<h2>Problem</h2><p>Define the policy problem and who is affected.</p><h2>Evidence</h2><p>Summarize the strongest facts, cases, or research.</p><h2>Policy options</h2><p>Compare two or three realistic choices.</p><h2>Recommendation</h2><p>State what decision-makers should do and why.</p>",
-  },
-  research: {
-    title: "Research: [question]",
-    subtitle: "A study of [topic, place, or population]",
-    excerpt: "This research examines a focused question using evidence and method.",
-    tags: ["research"],
-    content:
-      "<h2>Abstract</h2><p>Summarize the question, method, finding, and contribution.</p><h2>Introduction</h2><p>Explain the research problem and why it matters.</p><h2>Literature and context</h2><p>Position your work in existing debates.</p><h2>Method</h2><p>Describe your data, sources, or analytical approach.</p><h2>Findings</h2><p>Present the main results clearly.</p><h2>Conclusion</h2><p>Explain implications and limits.</p>",
-  },
-};
-
-function isPostType(value: string | null): value is PostType {
-  return (
-    value === "blog" ||
-    value === "essay" ||
-    value === "policy_brief" ||
-    value === "research"
-  );
-}
 
 interface DraftPayload {
   title: string;
@@ -179,6 +93,7 @@ export default function WritePage() {
   const [wordCount, setWordCount] = useState(0);
   const [isPublishDrawerOpen, setIsPublishDrawerOpen] = useState(false);
   const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [publishDraftId, setPublishDraftId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -388,7 +303,7 @@ export default function WritePage() {
     !!currentUserId &&
     !loadingProfileInfo;
   const selectedPostType =
-    POST_TYPES.find((item) => item.type === postType) ?? POST_TYPES[0];
+    WRITE_FORMATS.find((item) => item.type === postType) ?? WRITE_FORMATS[0];
   const wordProgress = Math.min(
     100,
     (wordCount / selectedPostType.minWords) * 100
@@ -429,6 +344,7 @@ export default function WritePage() {
     }
 
     setIsPublishDrawerOpen(true);
+    setIsDetailsOpen(false);
   };
 
   const applyTemplate = (templateType: PostType) => {
@@ -461,8 +377,29 @@ export default function WritePage() {
     );
   }
 
+  const readinessPanel = (
+    <WriteReadinessPanel
+      postType={postType}
+      title={title}
+      content={content}
+      excerpt={excerpt}
+      tags={tags}
+      references={references}
+      coAuthors={coAuthors}
+      profileInfo={profileInfo}
+      inResponseToTitle={inResponseToTitle}
+      saveStatusText={saveStatusText}
+      wordCount={wordCount}
+      estimatedReadTime={estimatedReadTime}
+      wordProgress={wordProgress}
+      canOpenPublish={canOpenPublish}
+      onChangeFormat={() => setShowChooser(true)}
+      onReadyToPublish={handleReadyToPublish}
+    />
+  );
+
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-6xl pb-24 lg:pb-0">
       <div className="mb-6 flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/" className="text-sm font-semibold tracking-wide text-gray-900">
           ThinkAfrica
@@ -510,6 +447,14 @@ export default function WritePage() {
       <ContinueDraftBanner activeDraftId={draftId} />
       <MyDrafts activeDraftId={draftId} />
 
+      <div
+        className={
+          showChooser
+            ? ""
+            : "grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]"
+        }
+      >
+        <div className="min-w-0">
       {showChooser ? (
         <div className="py-6">
           <div className="mb-6">
@@ -517,12 +462,12 @@ export default function WritePage() {
               Choose format
             </p>
             <h1 className="mt-2 text-2xl font-bold text-gray-900">
-              What are you writing?
+              What are you creating?
             </h1>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {POST_TYPES.map((type) => {
+            {WRITE_FORMATS.map((type) => {
               const selected = postType === type.type;
 
               return (
@@ -576,7 +521,7 @@ export default function WritePage() {
             onClick={() => setShowChooser(true)}
             className="mb-5 text-sm font-medium text-emerald-600 hover:underline"
           >
-            {"<-"} Change type
+            {"<-"} Change format
           </button>
 
           {inResponseToId && inResponseToTitle ? (
@@ -640,7 +585,7 @@ export default function WritePage() {
                 ) : null}
               </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {POST_TYPES.map((type) => (
+                {WRITE_FORMATS.map((type) => (
                   <button
                     key={type.type}
                     type="button"
@@ -668,7 +613,7 @@ export default function WritePage() {
               setTitle(event.target.value);
               saveDraft(getCurrentData({ title: event.target.value }));
             }}
-            placeholder="What are you writing about?"
+            placeholder="What are you creating?"
             className="mb-4 w-full border-none px-0 text-3xl font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
           />
 
@@ -704,7 +649,7 @@ export default function WritePage() {
               }
             }}
           />
-          <div className="sticky bottom-0 z-20 border-t border-gray-100 bg-white px-4 py-3 shadow-[0_-8px_20px_rgba(15,23,42,0.04)]">
+          <div className="sticky bottom-0 z-20 border-t border-gray-100 bg-white px-4 py-3 shadow-[0_-8px_20px_rgba(15,23,42,0.04)] lg:hidden">
             <div className="mb-2 h-2 overflow-hidden rounded-full bg-gray-100">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
@@ -720,9 +665,72 @@ export default function WritePage() {
               {selectedPostType.minWords.toLocaleString()} words /{" "}
               {selectedPostType.label} / {estimatedReadTime} min read
             </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDetailsOpen(true)}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700"
+              >
+                Details
+              </button>
+              <button
+                type="button"
+                disabled={!canOpenPublish}
+                onClick={handleReadyToPublish}
+                className="rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Ready
+              </button>
+            </div>
           </div>
         </div>
       </div>
+      ) : null}
+        </div>
+
+        {!showChooser ? (
+          <div className="hidden lg:sticky lg:top-[76px] lg:block">
+            {readinessPanel}
+          </div>
+        ) : null}
+      </div>
+
+      {isDetailsOpen ? (
+        <div className="fixed inset-0 z-50 bg-black/40 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setIsDetailsOpen(false)}
+            aria-label="Close details"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="write-details-title"
+            className="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-3xl bg-canvas px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-4 shadow-2xl"
+          >
+            <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-gray-200" />
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="write-details-title" className="text-lg font-semibold text-ink">
+                  Details
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Format, readiness, and publish checks.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDetailsOpen(false)}
+                className="rounded-lg px-2 py-1 text-2xl leading-none text-gray-400 hover:bg-white hover:text-gray-600"
+                aria-label="Close details"
+              >
+                x
+              </button>
+            </div>
+            {readinessPanel}
+          </div>
+        </div>
       ) : null}
 
       {currentUserId ? (

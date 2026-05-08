@@ -289,6 +289,18 @@ export default function PublishDrawer({
     return `Publish ${POST_TYPE_LABELS[postType]}`;
   }, [postType, wordCount]);
 
+  const reviewTitle = useMemo(() => {
+    if (postType === "research" || postType === "policy_brief") {
+      return "Ready for editorial review?";
+    }
+
+    if (isQuickTake(postType, wordCount)) {
+      return "Ready to publish this Quick Take?";
+    }
+
+    return `Ready to publish this ${POST_TYPE_LABELS[postType]}?`;
+  }, [postType, wordCount]);
+
   const softWarning = useMemo(
     () => getSoftWarning(postType, inferredType, wordCount),
     [inferredType, postType, wordCount]
@@ -465,7 +477,7 @@ export default function PublishDrawer({
               id="publish-drawer-title"
               className="text-lg font-semibold text-gray-900"
             >
-              Ready to publish?
+              {reviewTitle}
             </h2>
             <p className="text-xs text-gray-400">
               Choose the essentials now. Refine the rest only if you want to.
