@@ -48,10 +48,10 @@ function countWords(value: string) {
 }
 
 function getBodyPlaceholder(postType: PostType) {
-  if (postType === "essay") return "Open with your claim.";
-  if (postType === "policy_brief") return "Define the problem.";
-  if (postType === "research") return "Start with your abstract.";
-  return "Start with the one point you want readers to remember.";
+  if (postType === "essay") return "Open with the question your essay answers.";
+  if (postType === "policy_brief") return "State the policy problem in one sentence.";
+  if (postType === "research") return "Introduce your research question and methodology.";
+  return "Lead with your argument — the one point you want readers to leave with.";
 }
 
 export default function WritePage() {
@@ -429,7 +429,9 @@ export default function WritePage() {
         <Link href="/" className="text-sm font-semibold tracking-wide text-gray-900">
           ThinkAfrica
         </Link>
-        <p className="text-xs text-gray-400">{saveStatusText}</p>
+        <p className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}>
+          {saveStatusText}
+        </p>
         <div className="flex items-center gap-3 sm:justify-end">
           <Button variant="ghost" type="button" onClick={() => router.push("/")}>
             Cancel
@@ -444,6 +446,20 @@ export default function WritePage() {
           </Button>
         </div>
       </div>
+
+      {!loadingProfileInfo && currentUserId && !profileInfo?.username ? (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+          <span className="text-amber-800">
+            You&apos;ll need a complete profile to publish. You can still draft now.
+          </span>
+          <Link
+            href="/settings"
+            className="ml-4 shrink-0 font-medium text-amber-700 underline hover:text-amber-900"
+          >
+            Complete profile →
+          </Link>
+        </div>
+      ) : null}
 
       {localBackup ? (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
@@ -599,18 +615,16 @@ export default function WritePage() {
             className="mb-3 w-full border-none px-0 text-4xl font-semibold leading-tight text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
           />
 
-          {title.trim().length > 0 ? (
-            <input
-              type="text"
-              value={subtitle}
-              onChange={(event) => {
-                setSubtitle(event.target.value);
-                saveDraft(getCurrentData({ subtitle: event.target.value }));
-              }}
-              placeholder="Add a subtitle (optional)"
-              className="mb-5 w-full border-none px-0 text-lg text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-0"
-            />
-          ) : null}
+          <input
+            type="text"
+            value={subtitle}
+            onChange={(event) => {
+              setSubtitle(event.target.value);
+              saveDraft(getCurrentData({ subtitle: event.target.value }));
+            }}
+            placeholder="Add a subtitle (optional)"
+            className="mb-5 w-full border-none px-0 text-lg text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-0"
+          />
 
           {showStructureStrip ? (
             <div className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">

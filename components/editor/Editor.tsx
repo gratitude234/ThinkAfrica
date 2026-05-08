@@ -50,6 +50,7 @@ export default function Editor({
   onAutoSave,
 }: EditorProps) {
   const [imageUploading, setImageUploading] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [rawWordCount, setRawWordCount] = useState(() =>
     countWordsFromHtml(content)
   );
@@ -163,9 +164,15 @@ export default function Editor({
       const json = await response.json();
       if (json.url) {
         editor.chain().focus().setImage({ src: json.url }).run();
+        setImageUploadError(null);
+      } else {
+        const msg = json.error ?? "Upload failed. Check the file type and size.";
+        setImageUploadError(msg);
+        setTimeout(() => setImageUploadError(null), 6000);
       }
     } catch {
-      // silently fail
+      setImageUploadError("Couldn't upload image. Check your connection and try again.");
+      setTimeout(() => setImageUploadError(null), 6000);
     } finally {
       setImageUploading(false);
       if (imageInputRef.current) imageInputRef.current.value = "";
@@ -423,6 +430,19 @@ export default function Editor({
         className="hidden"
         onChange={handleImageFileChange}
       />
+
+      {imageUploadError ? (
+        <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+          {imageUploadError}
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            className="ml-2 font-medium underline hover:text-red-900"
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
 
       <EditorContent editor={editor} className="min-h-[400px]" />
 
