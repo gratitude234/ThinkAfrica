@@ -27,7 +27,7 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
   if (posts.length === 0) return null;
 
   return (
-    <section className="space-y-4">
+    <section className="min-w-0 space-y-4">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
           Featured work
@@ -40,7 +40,7 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {posts.map((post) => {
           const readTime = estimateReadTime(post.excerpt);
 
@@ -48,7 +48,7 @@ export default function FeaturedWork({ posts }: FeaturedWorkProps) {
             <Link
               key={post.id}
               href={`/post/${post.slug}`}
-              className="group overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-px hover:shadow-md"
+              className="group min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-px hover:shadow-md"
             >
               <PostCover
                 src={post.cover_image_url}

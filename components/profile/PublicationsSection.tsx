@@ -52,7 +52,7 @@ export default function PublicationsSection({
   }
 
   return (
-    <section className="space-y-6">
+    <section className="min-w-0 space-y-6">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
           Publications
@@ -75,7 +75,7 @@ export default function PublicationsSection({
         return (
           <div
             key={type}
-            className="rounded-xl border border-gray-200 bg-white p-5"
+            className="min-w-0 rounded-xl border border-gray-200 bg-white p-5"
           >
             <div className="mb-4 flex items-center justify-between gap-3">
               <h3 className="text-base font-semibold text-gray-900">
@@ -104,7 +104,7 @@ export default function PublicationsSection({
                   <Link
                     key={post.id}
                     href={`/post/${post.slug}`}
-                    className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 transition-colors hover:text-emerald-brand md:flex-row md:items-start md:justify-between"
+                    className="flex min-w-0 flex-col gap-3 py-4 first:pt-0 last:pb-0 transition-colors hover:text-emerald-brand md:flex-row md:items-start md:justify-between"
                   >
                     <div className="min-w-0">
                       <h4 className="truncate text-sm font-semibold text-gray-900">

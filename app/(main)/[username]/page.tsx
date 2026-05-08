@@ -345,9 +345,12 @@ export default async function UserProfilePage({ params }: PageProps) {
     0
   );
 
-  const featuredPosts = [...normalizedPosts]
-    .sort((left, right) => (right.view_count ?? 0) - (left.view_count ?? 0))
-    .slice(0, 3);
+  const featuredPosts =
+    normalizedPosts.length > 1
+      ? [...normalizedPosts]
+          .sort((left, right) => (right.view_count ?? 0) - (left.view_count ?? 0))
+          .slice(0, 3)
+      : [];
 
   const normalizedTopArguments = (
     (topArguments ?? []) as unknown as TopArgumentRow[]
@@ -486,8 +489,8 @@ export default async function UserProfilePage({ params }: PageProps) {
         </>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
           <FeaturedWork posts={featuredPosts} />
 
           <PublicationsSection posts={mergedPosts} fullName={displayName} />

@@ -64,15 +64,15 @@ export default function CredentialsCard({
                 "text-emerald-600"
               }`}
             >
-              ✓ Verified {verifiedLabel}
+              Verified {verifiedLabel}
             </p>
           </div>
         ) : null}
 
         <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-              Tier
-            </p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            Tier
+          </p>
           <p className="mt-1 text-sm font-medium text-gray-900">{tier.name}</p>
         </div>
 
@@ -97,9 +97,9 @@ export default function CredentialsCard({
         ) : null}
 
         <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-              Public metrics
-            </p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            Public metrics
+          </p>
           <div className="mt-2 grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-canvas p-3">
               <p className="text-lg font-semibold text-gray-900">
@@ -124,7 +124,7 @@ export default function CredentialsCard({
         >
           {followerCount.toLocaleString()} followers
         </Link>
-        <span className="mx-2">·</span>
+        <span className="mx-2">/</span>
         <Link
           href={`/${profile.username}/following`}
           className="transition-colors hover:text-gray-600"

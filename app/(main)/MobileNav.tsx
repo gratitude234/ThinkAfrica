@@ -65,7 +65,8 @@ export default function MobileNav({
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 md:hidden"
-        aria-label="Open more menu"
+        aria-label={open ? "Close menu" : "Open more menu"}
+        aria-expanded={open}
       >
         {open ? (
           <svg
@@ -99,7 +100,7 @@ export default function MobileNav({
       </button>
 
       {open ? (
-        <div className="absolute left-0 right-0 top-16 z-40 border-b border-gray-200 bg-white shadow-lg md:hidden">
+        <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-0 right-0 top-[60px] z-40 overflow-y-auto border-b border-gray-200 bg-white shadow-lg md:hidden">
           <nav className="space-y-1 px-4 py-3">
             {!user ? (
               <div className="rounded-xl border border-gray-100 bg-canvas p-2">

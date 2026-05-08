@@ -24,7 +24,7 @@ export default function TopArguments({ argumentsList }: TopArgumentsProps) {
   if (argumentsList.length === 0) return null;
 
   return (
-    <section className="space-y-4">
+    <section className="min-w-0 space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-gray-900">Top Arguments</h2>
         <p className="mt-1 text-sm text-gray-500">
@@ -45,7 +45,7 @@ export default function TopArguments({ argumentsList }: TopArgumentsProps) {
           return (
             <article
               key={argument.id}
-              className="rounded-2xl border border-gray-200 bg-white p-5"
+              className="min-w-0 rounded-2xl border border-gray-200 bg-white p-5"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -63,7 +63,7 @@ export default function TopArguments({ argumentsList }: TopArgumentsProps) {
                   </div>
                 </div>
                 <span className="shrink-0 text-sm font-medium text-gray-500">
-                  ↑ {(argument.upvotes ?? 0).toLocaleString()}
+                  {(argument.upvotes ?? 0).toLocaleString()} upvotes
                 </span>
               </div>
 
