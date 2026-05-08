@@ -51,12 +51,7 @@ export default function BottomNav({
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M13.5 5.5l5 5M5 19l3.5-.5L18 9l-5-5-9.5 9.5L3 17l2 2z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M18.5 3.5v4m-2-2h4"
+            d="M12 5v14M5 12h14"
           />
         </svg>
       </Link>
