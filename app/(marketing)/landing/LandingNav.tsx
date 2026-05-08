@@ -5,6 +5,12 @@ import Link from "next/link";
 
 export default function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
+  const navLinks = [
+    { label: "Discover", href: "/?guest=1" },
+    { label: "Debates", href: "/debates" },
+    { label: "Opportunities", href: "/opportunities" },
+    { label: "About", href: "/about" },
+  ];
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -14,11 +20,11 @@ export default function LandingNav() {
 
   return (
     <nav
-      className={`sticky top-0 z-50 h-[60px] border-b border-gray-200 bg-white/92 backdrop-blur-md transition-shadow duration-300 ${
+      className={`sticky top-0 z-50 border-b border-gray-200 bg-white/92 backdrop-blur-md transition-shadow duration-300 ${
         scrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
       }`}
     >
-      <div className="mx-auto flex h-full max-w-6xl items-center gap-8 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-[60px] max-w-6xl items-center gap-8 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex-shrink-0 font-display text-[22px] font-bold">
           <span className="text-emerald-500">Think</span>
@@ -27,12 +33,7 @@ export default function LandingNav() {
 
         {/* Nav links */}
         <div className="hidden items-center gap-1 md:flex">
-          {[
-            { label: "Discover", href: "/?guest=1" },
-            { label: "Debates",  href: "/debates" },
-            { label: "Opportunities", href: "/opportunities" },
-            { label: "About",    href: "/about" },
-          ].map(({ label, href }) => (
+          {navLinks.map(({ label, href }) => (
             <Link
               key={label}
               href={href}
@@ -57,6 +58,19 @@ export default function LandingNav() {
           >
             Join free
           </Link>
+        </div>
+      </div>
+      <div className="border-t border-gray-100 md:hidden">
+        <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {navLinks.map(({ label, href }) => (
+            <Link
+              key={label}
+              href={href}
+              className="shrink-0 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-[12px] font-semibold text-gray-600"
+            >
+              {label}
+            </Link>
+          ))}
         </div>
       </div>
     </nav>

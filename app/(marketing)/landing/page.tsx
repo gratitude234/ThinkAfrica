@@ -69,15 +69,6 @@ const VALUE_PROPS = [
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function typeGradient(type: string) {
-  switch (type) {
-    case "essay":        return "from-amber-50 to-amber-100";
-    case "research":     return "from-purple-50 to-purple-100";
-    case "policy_brief": return "from-blue-50 to-blue-100";
-    default:             return "from-emerald-50 to-emerald-100";
-  }
-}
-
 function typeBadge(type: string): { classes: string; label: string } {
   switch (type) {
     case "essay":        return { classes: "bg-amber-100 text-amber-800",     label: "Essay" };
@@ -162,27 +153,27 @@ export default async function LandingPage() {
       />
 
       {/* ── Hero ──────────────────────────────────────────────────── */}
-      <section className="border-b border-gray-200 py-10 sm:py-16 lg:py-20">
+      <section className="border-b border-gray-200 py-8 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid items-center gap-8 lg:grid-cols-[1fr_440px] lg:gap-16">
+          <div className="grid items-center gap-7 lg:grid-cols-[1fr_440px] lg:gap-16">
 
             {/* Copy */}
             <div>
-              <div className="hero-animate hero-eyebrow mb-6 flex items-center gap-2.5">
+              <div className="hero-animate hero-eyebrow mb-4 flex items-center gap-2.5 sm:mb-6">
                 <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
                   Africa&apos;s intellectual social network
                 </span>
               </div>
 
-              <h1 className="hero-animate hero-h1 font-display text-[44px] leading-[1.04] tracking-tight text-ink sm:text-[64px]">
+              <h1 className="hero-animate hero-h1 max-w-[11ch] font-display text-[40px] leading-[1.02] tracking-normal text-ink sm:max-w-none sm:text-[64px]">
                 Where Africa&apos;s<br />
                 best student<br />
                 ideas{" "}
                 <em className="text-emerald-500">live.</em>
               </h1>
 
-              <p className="hero-animate hero-sub mt-5 mb-7 max-w-[480px] text-base leading-[1.65] text-ink-muted sm:mt-6 sm:mb-9 sm:text-lg">
+              <p className="hero-animate hero-sub mt-4 mb-6 max-w-[480px] text-[15px] leading-[1.65] text-ink-muted sm:mt-6 sm:mb-9 sm:text-lg">
                 Essays, research, and policy briefs written by university students across Africa, rigorously argued and openly published.
               </p>
 
@@ -191,29 +182,39 @@ export default async function LandingPage() {
                   href={`/post/${leadPost.slug}`}
                   event="landing_read_clicked"
                   metadata={{ source: "mobile_featured_read", postId: leadPost.id }}
-                  className="hero-animate mb-7 block rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:hidden"
+                  className="hero-animate mb-6 grid grid-cols-[88px_1fr] items-stretch gap-3 border-y border-gray-200 py-3.5 lg:hidden"
                 >
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-600">
-                    Featured read
-                  </p>
-                  <h2 className="font-display line-clamp-2 text-[18px] font-semibold leading-snug text-ink">
-                    {leadPost.title}
-                  </h2>
-                  <p className="mt-2 text-xs text-ink-muted">
-                    {authorLine(leadPost).name}
-                    {authorLine(leadPost).university
-                      ? ` / ${authorLine(leadPost).university}`
-                      : ""}
-                  </p>
+                  <PostCover
+                    src={leadPost.cover_image_url}
+                    alt={leadPost.title}
+                    type={leadPost.type}
+                    sizes="88px"
+                    className="h-[92px] rounded-[10px]"
+                    imageClassName="object-cover"
+                  />
+                  <div className="min-w-0 py-0.5">
+                    <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-emerald-600">
+                      Featured read
+                    </p>
+                    <h2 className="font-display line-clamp-2 text-[18px] font-semibold leading-snug text-ink">
+                      {leadPost.title}
+                    </h2>
+                    <p className="mt-2 line-clamp-1 text-xs text-ink-muted">
+                      {authorLine(leadPost).name}
+                      {authorLine(leadPost).university
+                        ? ` / ${authorLine(leadPost).university}`
+                        : ""}
+                    </p>
+                  </div>
                 </LandingTrackedLink>
               ) : null}
 
-              <div className="hero-animate hero-ctas flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <div className="hero-animate hero-ctas grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
                 <LandingTrackedLink
                   href={primaryHref}
                   event="landing_read_clicked"
                   metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, postType: leadPost?.type ?? null, position: "primary" }}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-7 py-3.5 text-base font-medium text-white transition-colors hover:bg-emerald-600"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-5 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-emerald-600 sm:px-7 sm:text-base"
                 >
                   Start reading
                   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
@@ -222,14 +223,14 @@ export default async function LandingPage() {
                   href="/signup"
                   event="landing_signup_clicked"
                   metadata={{ source: "hero_secondary" }}
-                  className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-7 py-3.5 text-base font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                  className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-3.5 text-[15px] font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:px-7 sm:text-base"
                 >
                   Claim your handle
                 </LandingTrackedLink>
               </div>
 
               {/* Social proof */}
-              <div className="hero-animate hero-proof mt-7 flex items-center gap-3 sm:mt-8 sm:gap-4">
+              <div className="hero-animate hero-proof mt-6 flex items-start gap-3 sm:mt-8 sm:items-center sm:gap-4">
                 <div className="flex">
                   {[
                     { i: "A", c: "bg-emerald-100 text-emerald-800" },
@@ -245,7 +246,7 @@ export default async function LandingPage() {
                     </div>
                   ))}
                 </div>
-                <p className="text-sm text-ink-muted">
+                <p className="text-sm leading-snug text-ink-muted">
                   {displayUserCount > 0 ? (
                     <>
                       Join{" "}
@@ -356,15 +357,15 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Stats bar ─────────────────────────────────────────────── */}
-      <div id="stats-bar" className="border-b border-gray-200 bg-white py-5">
+      <div id="stats-bar" className="border-b border-gray-200 bg-white py-4 sm:py-5">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:divide-x sm:divide-gray-200">
             {stats.map(({ value, suffix, label }) => (
-              <div key={label} className="stat-item px-4 py-1 text-center sm:px-10">
-                <div className="text-[28px] font-bold tracking-tight text-ink" data-target={value}>
+              <div key={label} className="stat-item px-3 py-1 text-center sm:px-10">
+                <div className="text-[24px] font-bold tracking-tight text-ink sm:text-[28px]" data-target={value}>
                   {value >= 1000 ? value.toLocaleString() : value}{suffix}
                 </div>
-                <div className="mt-0.5 text-xs text-ink-muted">{label}</div>
+                <div className="mx-auto mt-0.5 max-w-[9rem] text-[11px] leading-snug text-ink-muted sm:text-xs">{label}</div>
               </div>
             ))}
           </div>
@@ -394,7 +395,6 @@ export default async function LandingPage() {
           <div id="post-grid" className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {gridPosts.map((post, i) => {
               const badge    = typeBadge(post.type);
-              const gradient = typeGradient(post.type);
               const author   = authorLine(post);
               const isWide   = i === 0;
 
@@ -408,15 +408,20 @@ export default async function LandingPage() {
                 >
                   {isWide ? (
                     <div className="grid md:grid-cols-[280px_1fr]">
-                      <div className={`flex items-center justify-center bg-gradient-to-br ${gradient} min-h-[200px] border-b border-gray-100 md:rounded-l-xl md:rounded-r-none md:border-b-0 md:border-r`}>
-                        <span className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-50">{badge.label}</span>
-                      </div>
-                      <div className="flex flex-col justify-between p-6">
+                      <PostCover
+                        src={post.cover_image_url}
+                        alt={post.title}
+                        type={post.type}
+                        sizes="(max-width: 768px) 100vw, 280px"
+                        className="h-[188px] border-b border-gray-100 md:h-full md:min-h-[240px] md:border-b-0 md:border-r"
+                        imageClassName="object-cover"
+                      />
+                      <div className="flex flex-col justify-between p-5 sm:p-6">
                         <div>
                           <div className="mb-2.5 flex items-center">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
                           </div>
-                          <h2 className="mb-2 line-clamp-3 font-display text-[22px] font-semibold leading-snug text-ink">{post.title}</h2>
+                          <h2 className="mb-2 line-clamp-3 font-display text-[20px] font-semibold leading-snug text-ink sm:text-[22px]">{post.title}</h2>
                           {post.excerpt && (
                             <p className="mb-3 line-clamp-2 text-sm leading-relaxed text-ink-muted">{post.excerpt}</p>
                           )}
@@ -430,9 +435,14 @@ export default async function LandingPage() {
                     </div>
                   ) : (
                     <>
-                      <div className={`flex h-[140px] items-center justify-center bg-gradient-to-br ${gradient} border-b border-gray-100`}>
-                        <span className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-50">{badge.label}</span>
-                      </div>
+                      <PostCover
+                        src={post.cover_image_url}
+                        alt={post.title}
+                        type={post.type}
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        className="h-[150px] border-b border-gray-100"
+                        imageClassName="object-cover"
+                      />
                       <div className="p-4">
                         <div className="mb-2.5">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
@@ -465,19 +475,21 @@ export default async function LandingPage() {
               <h2 className="font-display text-[24px] font-medium text-ink sm:text-[26px]">Find ideas that interest you</h2>
             </div>
           </div>
-          <div id="topics-grid" className="flex flex-wrap gap-2.5">
+          <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div id="topics-grid" className="flex w-max gap-2.5 sm:w-auto sm:flex-wrap">
             {TOPICS.map(({ label, count }) => (
               <LandingTrackedLink
                 key={label}
                 href={`/?guest=1&topic=${encodeURIComponent(label)}`}
                 event="landing_read_clicked"
                 metadata={{ source: "topics_grid", topic: label }}
-                className="topic-pill inline-flex cursor-pointer items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[13px] font-medium text-gray-700 transition-all hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-600"
+                className="topic-pill inline-flex min-h-9 shrink-0 cursor-pointer items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[13px] font-medium text-gray-700 transition-all hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-600"
               >
                 {label}
                 <span className="ml-1.5 text-[11px] text-ink-muted">{count}</span>
               </LandingTrackedLink>
             ))}
+          </div>
           </div>
         </div>
       </section>
@@ -562,7 +574,7 @@ export default async function LandingPage() {
                 <p className="font-display text-[18px] font-semibold leading-snug text-ink">
                   Is IMF conditionality still a legitimate development tool in Africa?
                 </p>
-                <p className="text-xs text-ink-muted">Opening round · submissions open until May 3</p>
+                <p className="text-xs text-ink-muted">Opening round · submissions open this week</p>
               </div>
 
               {/* Closed */}

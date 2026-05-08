@@ -98,7 +98,7 @@ export default function PostCard({
   const viewCount = typeof post.view_count === "number" ? post.view_count : null;
 
   return (
-    <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-4 transition-all duration-300 hover:-translate-y-px hover:shadow-md sm:px-5 sm:py-[18px]">
+    <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-3.5 transition-all duration-300 hover:-translate-y-px hover:shadow-md sm:px-5 sm:py-[18px]">
       <span
         className={`absolute bottom-4 left-0 top-4 w-1 rounded-r-full ${accentClass}`}
         aria-hidden="true"
@@ -120,23 +120,23 @@ export default function PostCard({
           </div>
 
           <Link href={`/post/${post.slug}`}>
-            <h2 className="font-display line-clamp-2 text-[18px] font-semibold leading-[1.22] text-ink transition-colors group-hover:text-gray-700">
+            <h2 className="font-display line-clamp-2 text-[17px] font-semibold leading-[1.22] text-ink transition-colors group-hover:text-gray-700 sm:text-[18px]">
               {post.title}
             </h2>
           </Link>
 
           {excerpt ? (
-            <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-gray-500">
+            <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-gray-500 max-[359px]:hidden">
               {excerpt}
             </p>
           ) : null}
 
-          <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-2.5">
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-2.5">
             {/* Avatar + author line */}
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800">
               {authorName.charAt(0).toUpperCase()}
             </span>
-            <div className="min-w-0 flex-1 text-[11px] text-ink-muted">
+            <div className="min-w-0 flex-1 basis-[calc(100%-2rem)] text-[11px] text-ink-muted min-[420px]:basis-0">
               {authorHref ? (
                 <Link
                   href={authorHref}
@@ -161,7 +161,7 @@ export default function PostCard({
               <span className="ml-1 text-gray-400">{"\u00B7"} {formatRelativeTime(displayDate)}</span>
             </div>
             {/* Engagement icon row */}
-            <div className="ml-auto flex shrink-0 items-center gap-3 text-gray-400">
+            <div className="flex w-full shrink-0 items-center gap-3 pl-8 text-gray-400 min-[420px]:ml-auto min-[420px]:w-auto min-[420px]:pl-0">
               {likeCount !== null ? (
                 <span className="flex items-center gap-1 text-[11px]">
                   <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -197,7 +197,7 @@ export default function PostCard({
             alt={post.title}
             type={post.type}
             sizes="112px"
-            className="h-[92px] w-[92px] rounded-[10px] sm:h-[112px] sm:w-[112px]"
+            className="h-[84px] w-[84px] rounded-[10px] min-[420px]:h-[92px] min-[420px]:w-[92px] sm:h-[112px] sm:w-[112px]"
             imageClassName="object-cover"
           />
         </Link>
