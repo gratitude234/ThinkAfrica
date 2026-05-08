@@ -5,9 +5,18 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { PostReferenceRecord, ReferenceType } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
+
+export interface EditorHandle {
+  toggleBold: () => void;
+  toggleItalic: () => void;
+  toggleH2: () => void;
+  toggleBulletList: () => void;
+  toggleBlockquote: () => void;
+  isActive: (name: string, attrs?: Record<string, unknown>) => boolean;
+}
 
 interface EditorProps {
   content?: string;
@@ -39,7 +48,7 @@ function wordCountMessage(count: number, minWords: number) {
   return "Target reached";
 }
 
-export default function Editor({
+const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   content = "",
   placeholder = "Start writing your piece...",
   minWords = 0,
@@ -48,7 +57,7 @@ export default function Editor({
   onReferencesChange,
   onUpdate,
   onAutoSave,
-}: EditorProps) {
+}, ref) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [rawWordCount, setRawWordCount] = useState(() =>
@@ -93,6 +102,15 @@ export default function Editor({
     },
     immediatelyRender: false,
   });
+
+  useImperativeHandle(ref, () => ({
+    toggleBold: () => editor?.chain().focus().toggleBold().run(),
+    toggleItalic: () => editor?.chain().focus().toggleItalic().run(),
+    toggleH2: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
+    toggleBulletList: () => editor?.chain().focus().toggleBulletList().run(),
+    toggleBlockquote: () => editor?.chain().focus().toggleBlockquote().run(),
+    isActive: (name, attrs) => editor?.isActive(name, attrs) ?? false,
+  }));
 
   useEffect(() => {
     return () => {
@@ -535,7 +553,9 @@ export default function Editor({
       ) : null}
     </div>
   );
-}
+});
+
+export default Editor;
 
 function ToolbarButton({
   onClick,
