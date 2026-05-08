@@ -1,5 +1,4 @@
-"use client";
-
+import type { ReactNode } from "react";
 import type { PostReferenceRecord } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
 import { WRITE_FORMATS } from "./writeConfig";
@@ -26,6 +25,7 @@ interface WriteReadinessPanelProps {
   canOpenPublish: boolean;
   onChangeFormat: () => void;
   onReadyToPublish: () => void;
+  children?: ReactNode;
 }
 
 function stripHtml(value: string) {
@@ -40,7 +40,11 @@ function CheckIcon({ done }: { done: boolean }) {
       }`}
       aria-hidden="true"
     >
-      {done ? "Y" : ""}
+      {done ? (
+        <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      ) : null}
     </span>
   );
 }
@@ -62,11 +66,48 @@ export default function WriteReadinessPanel({
   canOpenPublish,
   onChangeFormat,
   onReadyToPublish,
+  children,
 }: WriteReadinessPanelProps) {
   const selectedFormat =
     WRITE_FORMATS.find((item) => item.type === postType) ?? WRITE_FORMATS[0];
   const needsReferences = postType === "research" || postType === "policy_brief";
   const bodyStarted = stripHtml(content).length > 0;
+  const nextStep = (() => {
+    if (!title.trim()) {
+      return {
+        title: "Title your idea",
+        body: "Start by naming the question, claim, or observation you want readers to notice.",
+      };
+    }
+    if (!bodyStarted) {
+      return {
+        title: "Write the first paragraph",
+        body: "Get one clear point down. Structure and metadata can wait until the draft has shape.",
+      };
+    }
+    if (!profileInfo?.username) {
+      return {
+        title: "Complete your profile",
+        body: "Add a username before publishing so readers can find your work.",
+      };
+    }
+    if (needsReferences && references.length === 0) {
+      return {
+        title: "Add at least one source",
+        body: "Formal submissions need a reference before they can enter review.",
+      };
+    }
+    if (tags.length === 0) {
+      return {
+        title: "Review publish details",
+        body: "Open the publish review to add topics and confirm how this will appear in the feed.",
+      };
+    }
+    return {
+      title: "Ready for final review",
+      body: "Open details to confirm tags, summary, authorship, and publication settings.",
+    };
+  })();
   const checklist = [
     {
       label: "Title added",
@@ -129,7 +170,7 @@ export default function WriteReadinessPanel({
   ];
 
   return (
-    <aside className="space-y-4">
+    <aside className="space-y-3">
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -183,6 +224,18 @@ export default function WriteReadinessPanel({
         </div>
       </section>
 
+      <section className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+          Next step
+        </p>
+        <h3 className="mt-1 text-sm font-semibold text-ink">{nextStep.title}</h3>
+        <p className="mt-1 text-xs leading-5 text-emerald-900/75">
+          {nextStep.body}
+        </p>
+      </section>
+
+      {children ? <div className="space-y-3">{children}</div> : null}
+
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -214,9 +267,9 @@ export default function WriteReadinessPanel({
           type="button"
           disabled={!canOpenPublish}
           onClick={onReadyToPublish}
-          className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-5 inline-flex w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Ready to publish
+          Review details
         </button>
       </section>
     </aside>

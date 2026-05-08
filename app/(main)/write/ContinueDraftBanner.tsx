@@ -13,10 +13,12 @@ interface Draft {
 
 interface ContinueDraftBannerProps {
   activeDraftId: string | null;
+  variant?: "default" | "panel";
 }
 
 export default function ContinueDraftBanner({
   activeDraftId,
+  variant = "default",
 }: ContinueDraftBannerProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
 
@@ -50,11 +52,14 @@ export default function ContinueDraftBanner({
   }, [activeDraftId]);
 
   if (!draft || activeDraftId) return null;
+  const compact = variant === "panel";
 
   return (
     <Link
       href={`/write?draft=${draft.id}`}
-      className="mb-6 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100"
+      className={`flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 transition-colors hover:bg-emerald-100 ${
+        compact ? "p-3" : "mb-6 p-4"
+      }`}
     >
       <div className="min-w-0">
         <p className="mb-0.5 text-xs font-semibold uppercase text-emerald-700">

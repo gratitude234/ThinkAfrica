@@ -47,6 +47,13 @@ function countWords(value: string) {
     .filter(Boolean).length;
 }
 
+function getBodyPlaceholder(postType: PostType) {
+  if (postType === "essay") return "Open with your claim.";
+  if (postType === "policy_brief") return "Define the problem.";
+  if (postType === "research") return "Start with your abstract.";
+  return "Start with the one point you want readers to remember.";
+}
+
 export default function WritePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -377,6 +384,22 @@ export default function WritePage() {
     );
   }
 
+  const showStructureStrip =
+    starterParam === "1" || (!draftParam && wordCount === 0);
+  const supportTools = (
+    <>
+      <ContinueDraftBanner activeDraftId={draftId} variant="panel" />
+      <MyDrafts activeDraftId={draftId} variant="panel" />
+      {currentUserId ? (
+        <CoAuthorPicker
+          userId={currentUserId}
+          value={coAuthors}
+          onChange={setCoAuthors}
+          source="write"
+        />
+      ) : null}
+    </>
+  );
   const readinessPanel = (
     <WriteReadinessPanel
       postType={postType}
@@ -395,7 +418,9 @@ export default function WritePage() {
       canOpenPublish={canOpenPublish}
       onChangeFormat={() => setShowChooser(true)}
       onReadyToPublish={handleReadyToPublish}
-    />
+    >
+      {supportTools}
+    </WriteReadinessPanel>
   );
 
   return (
@@ -443,9 +468,6 @@ export default function WritePage() {
           </div>
         </div>
       ) : null}
-
-      <ContinueDraftBanner activeDraftId={draftId} />
-      <MyDrafts activeDraftId={draftId} />
 
       <div
         className={
@@ -516,13 +538,23 @@ export default function WritePage() {
       {!showChooser ? (
       <div className="space-y-4">
         <div>
-          <button
-            type="button"
-            onClick={() => setShowChooser(true)}
-            className="mb-5 text-sm font-medium text-emerald-600 hover:underline"
-          >
-            {"<-"} Change format
-          </button>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand">
+                {selectedPostType.label}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {selectedPostType.desc}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowChooser(true)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+            >
+              Change format
+            </button>
+          </div>
 
           {inResponseToId && inResponseToTitle ? (
             <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -556,35 +588,48 @@ export default function WritePage() {
             </div>
           ) : null}
 
-          {currentUserId ? (
-            <div className="mb-6">
-              <CoAuthorPicker
-                userId={currentUserId}
-                value={coAuthors}
-                onChange={setCoAuthors}
-                source="write"
-              />
-            </div>
+          <input
+            type="text"
+            value={title}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              saveDraft(getCurrentData({ title: event.target.value }));
+            }}
+            placeholder="Title your idea"
+            className="mb-3 w-full border-none px-0 text-4xl font-semibold leading-tight text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
+          />
+
+          {title.trim().length > 0 ? (
+            <input
+              type="text"
+              value={subtitle}
+              onChange={(event) => {
+                setSubtitle(event.target.value);
+                saveDraft(getCurrentData({ subtitle: event.target.value }));
+              }}
+              placeholder="Add a subtitle (optional)"
+              className="mb-5 w-full border-none px-0 text-lg text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-0"
+            />
           ) : null}
 
-          {(starterParam === "1" || (!draftParam && wordCount === 0)) ? (
-            <div className="mb-6 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          {showStructureStrip ? (
+            <div className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-emerald-900">
-                    Start with a guided template
+                    Start with structure
                   </p>
-                  <p className="mt-1 text-xs leading-relaxed text-emerald-800">
-                    Choose a structure and replace the prompts with your own argument.
+                  <p className="text-xs leading-relaxed text-emerald-800">
+                    Add a starter outline, then replace the prompts with your own argument.
                   </p>
                 </div>
                 {draftId ? (
                   <p className="text-xs font-medium text-emerald-700">
-                    Draft saved. Add your words, then use Ready to publish.
+                    Draft saved
                   </p>
                 ) : null}
               </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
                 {WRITE_FORMATS.map((type) => (
                   <button
                     key={type.type}
@@ -597,43 +642,16 @@ export default function WritePage() {
                     }`}
                   >
                     <span className="block font-medium">{type.label}</span>
-                    <span className="mt-0.5 block text-xs opacity-80">
-                      Use starter structure
-                    </span>
                   </button>
                 ))}
               </div>
             </div>
           ) : null}
 
-          <input
-            type="text"
-            value={title}
-            onChange={(event) => {
-              setTitle(event.target.value);
-              saveDraft(getCurrentData({ title: event.target.value }));
-            }}
-            placeholder="What are you creating?"
-            className="mb-4 w-full border-none px-0 text-3xl font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
-          />
-
-          {title.trim().length > 0 ? (
-            <input
-              type="text"
-              value={subtitle}
-              onChange={(event) => {
-                setSubtitle(event.target.value);
-                saveDraft(getCurrentData({ subtitle: event.target.value }));
-              }}
-              placeholder="Add a subtitle (optional)"
-              className="mb-6 w-full border-none px-0 text-lg text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-0"
-            />
-          ) : null}
-
           <Editor
-            key={publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}
+            key={`${publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}-${postType}`}
             content={content}
-            placeholder="Start writing..."
+            placeholder={getBodyPlaceholder(postType)}
             minWords={selectedPostType.minWords}
             postType={postType}
             references={references}
