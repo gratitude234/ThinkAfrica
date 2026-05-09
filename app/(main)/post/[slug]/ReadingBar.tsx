@@ -93,8 +93,11 @@ export default function ReadingBar({
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom))] left-0 right-0 z-40 border-t border-gray-200 bg-white shadow-lg md:hidden">
-      <div className="flex items-center justify-around px-4 py-3">
+    <div
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 shadow-lg backdrop-blur md:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <div className="flex min-h-[64px] items-center justify-around px-4 py-2">
         <button
           onClick={handleLike}
           className={`flex flex-col items-center gap-0.5 ${
