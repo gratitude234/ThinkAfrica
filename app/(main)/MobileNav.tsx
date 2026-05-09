@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -40,11 +41,29 @@ export default function MobileNav({
   canAccessReview,
 }: MobileNavProps) {
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   const pathname = usePathname();
   const profileHref = profile?.username ? `/${profile.username}` : "/settings";
   const profileActive = profile?.username
     ? pathname === profileHref || pathname.startsWith(`${profileHref}/`)
     : pathname === "/settings" || pathname.startsWith("/settings/");
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   const moreLinks = [
     isEnabled("webinars") ? { label: "Webinars", href: "/webinars" } : null,
@@ -60,12 +79,115 @@ export default function MobileNav({
     canAccessReview ? { label: "Review", href: "/review" } : null,
   ].filter(Boolean) as { label: string; href: string }[];
 
+  const menuPanel = open ? (
+    <div
+      id={panelId}
+      className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-0 right-0 top-[60px] z-40 overflow-y-auto border-b border-gray-200 bg-white shadow-lg md:hidden"
+    >
+      <nav className="space-y-1 px-4 py-3" aria-label="More navigation">
+        {!user ? (
+          <div className="rounded-xl border border-gray-100 bg-canvas p-2">
+            <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Explore
+            </p>
+            {GUEST_PRIMARY_LINKS.map((item) => {
+              const isActive =
+                item.href === "/?guest=1"
+                  ? pathname === "/"
+                  : pathname.startsWith(item.href);
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className={itemClass(isActive)}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {user ? (
+          <div className="rounded-xl border border-gray-100 bg-canvas p-2">
+            <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Account
+            </p>
+            <Link
+              href={profileHref}
+              onClick={() => setOpen(false)}
+              className={itemClass(profileActive)}
+            >
+              Profile
+            </Link>
+          </div>
+        ) : null}
+
+        {!user ? (
+          <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+            <p className="text-xs leading-relaxed text-emerald-900">
+              Create a profile to follow writers, save posts, and publish your first argument.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link
+                href="/signup"
+                onClick={() => setOpen(false)}
+                className="rounded-lg bg-emerald-brand px-3 py-2 text-center text-sm font-semibold text-white"
+              >
+                Join free
+              </Link>
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-center text-sm font-semibold text-emerald-700"
+              >
+                Sign in
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="border-t border-gray-100 pt-3">
+          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            More
+          </p>
+          <div className="space-y-1">
+            {moreLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className={itemClass(
+                  pathname === item.href || pathname.startsWith(`${item.href}/`)
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+            {user && isAdmin ? (
+              <Link
+                href="/admin/review"
+                onClick={() => setOpen(false)}
+                className={itemClass(pathname.startsWith("/admin"))}
+              >
+                Admin
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      </nav>
+    </div>
+  ) : null;
+
   return (
     <>
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 md:hidden"
         aria-label={open ? "Close menu" : "Open more menu"}
+        aria-controls={open ? panelId : undefined}
         aria-expanded={open}
       >
         {open ? (
@@ -99,104 +221,9 @@ export default function MobileNav({
         )}
       </button>
 
-      {open ? (
-        <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-0 right-0 top-[60px] z-40 overflow-y-auto border-b border-gray-200 bg-white shadow-lg md:hidden">
-          <nav className="space-y-1 px-4 py-3">
-            {!user ? (
-              <div className="rounded-xl border border-gray-100 bg-canvas p-2">
-                <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Explore
-                </p>
-                {GUEST_PRIMARY_LINKS.map((item) => {
-                  const isActive =
-                    item.href === "/?guest=1"
-                      ? pathname === "/"
-                      : pathname.startsWith(item.href);
-
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setOpen(false)}
-                      className={itemClass(isActive)}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            {user ? (
-              <div className="rounded-xl border border-gray-100 bg-canvas p-2">
-                <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Account
-                </p>
-                <Link
-                  href={profileHref}
-                  onClick={() => setOpen(false)}
-                  className={itemClass(profileActive)}
-                >
-                  Profile
-                </Link>
-              </div>
-            ) : null}
-
-            {!user ? (
-              <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-                <p className="text-xs leading-relaxed text-emerald-900">
-                  Create a profile to follow writers, save posts, and publish your first argument.
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Link
-                    href="/signup"
-                    onClick={() => setOpen(false)}
-                    className="rounded-lg bg-emerald-brand px-3 py-2 text-center text-sm font-semibold text-white"
-                  >
-                    Join free
-                  </Link>
-                  <Link
-                    href="/login"
-                    onClick={() => setOpen(false)}
-                    className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-center text-sm font-semibold text-emerald-700"
-                  >
-                    Sign in
-                  </Link>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="border-t border-gray-100 pt-3">
-              <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                More
-              </p>
-              <div className="space-y-1">
-                {moreLinks.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    className={itemClass(
-                      pathname === item.href || pathname.startsWith(`${item.href}/`)
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-                {user && isAdmin ? (
-                  <Link
-                    href="/admin/review"
-                    onClick={() => setOpen(false)}
-                    className={itemClass(pathname.startsWith("/admin"))}
-                  >
-                    Admin
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-          </nav>
-        </div>
-      ) : null}
+      {typeof document !== "undefined"
+        ? createPortal(menuPanel, document.body)
+        : menuPanel}
     </>
   );
 }
