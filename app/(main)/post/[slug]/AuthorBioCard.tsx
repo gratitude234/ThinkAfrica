@@ -9,9 +9,9 @@ import UserAvatar from "@/components/ui/UserAvatar";
 interface Author {
   id: string;
   username: string;
-  full_name: string;
-  university: string;
-  field_of_study: string;
+  full_name: string | null;
+  university: string | null;
+  field_of_study: string | null;
   bio: string | null;
   avatar_url: string | null;
 }

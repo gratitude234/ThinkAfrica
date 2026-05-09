@@ -75,7 +75,7 @@ export default function PublishedToast({
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-emerald-brand px-5 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-emerald-600"
+        className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] left-4 right-4 z-50 flex items-center justify-center gap-2 rounded-full bg-emerald-brand px-5 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-emerald-600 sm:bottom-6 sm:left-auto sm:right-6"
       >
         ✓ {isLive ? "Published" : "Submitted"} · Share →
       </button>
@@ -83,7 +83,7 @@ export default function PublishedToast({
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[320px] rounded-2xl border border-gray-200 bg-white p-5 shadow-xl">
+    <div className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] left-4 right-4 z-50 rounded-2xl border border-gray-200 bg-white p-5 shadow-xl sm:bottom-6 sm:left-auto sm:right-6 sm:w-[320px]">
       <div className="mb-3 flex items-start justify-between">
         <p className="text-sm font-semibold text-gray-900">
           {isLive ? "Share your post" : "Awaiting review"}

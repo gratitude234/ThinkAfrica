@@ -16,49 +16,36 @@ export default async function CommentsLoader({ postId, userId, userProfileId }: 
       "id, content, created_at, upvotes, parent_id, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
     )
     .eq("post_id", postId)
-    .is("parent_id", null)
     .order("created_at", { ascending: true });
 
-  const topLevelComments = (commentsRaw ?? []).map((comment) => ({
+  const normalizedComments = (commentsRaw ?? []).map((comment) => ({
     ...comment,
     upvotes: (comment as { upvotes?: number }).upvotes ?? 0,
-    parent_id: null,
+    parent_id: comment.parent_id as string | null,
     profiles: Array.isArray(comment.profiles) ? comment.profiles[0] : comment.profiles,
   }));
 
-  const repliesByParent = await Promise.all(
-    topLevelComments.map(async (comment) => {
-      const { data: repliesRaw } = await supabase
-        .from("comments")
-        .select(
-          "id, content, created_at, upvotes, parent_id, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
-        )
-        .eq("post_id", postId)
-        .eq("parent_id", comment.id)
-        .order("created_at", { ascending: true });
-
-      return {
-        parentId: comment.id,
-        replies: (repliesRaw ?? []).map((reply) => ({
-          ...reply,
-          upvotes: (reply as { upvotes?: number }).upvotes ?? 0,
-          parent_id: reply.parent_id as string | null,
-          profiles: Array.isArray(reply.profiles) ? reply.profiles[0] : reply.profiles,
-        })),
-      };
-    })
+  const repliesByParent = normalizedComments.reduce(
+    (acc, comment) => {
+      if (!comment.parent_id) return acc;
+      acc[comment.parent_id] = [...(acc[comment.parent_id] ?? []), comment];
+      return acc;
+    },
+    {} as Record<string, typeof normalizedComments>
   );
 
-  const initialComments: CommentItem[] = topLevelComments.map((comment) => {
-    const replies =
-      repliesByParent.find((entry) => entry.parentId === comment.id)?.replies ?? [];
+  const initialComments: CommentItem[] = normalizedComments
+    .filter((comment) => !comment.parent_id)
+    .map((comment) => {
+      const replies = repliesByParent[comment.id] ?? [];
 
-    return {
-      ...comment,
-      replies,
-      replyCount: replies.length,
-    };
-  });
+      return {
+        ...comment,
+        parent_id: null,
+        replies,
+        replyCount: replies.length,
+      };
+    });
 
   const allCommentIds = initialComments.flatMap((comment) => [
     comment.id,

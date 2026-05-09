@@ -37,6 +37,65 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+interface AuthorProfile {
+  id: string;
+  username: string;
+  full_name: string | null;
+  university: string | null;
+  field_of_study: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  verified?: boolean;
+  verified_type?: string | null;
+}
+
+interface ParentPostRef {
+  id: string;
+  title: string;
+  slug: string;
+}
+
+interface PostRecord {
+  id: string;
+  title: string;
+  slug: string;
+  content: string | null;
+  excerpt: string | null;
+  type: string;
+  tags: string[] | null;
+  status: string;
+  author_id: string;
+  created_at: string;
+  published_at: string | null;
+  view_count: number | null;
+  cover_image_url: string | null;
+  citation_id: string | null;
+  in_response_to: string | null;
+  audio_summary_url: string | null;
+  profiles: AuthorProfile | AuthorProfile[] | null;
+}
+
+interface ReferenceRecord {
+  id: string;
+  title: string | null;
+  authors: string | null;
+  year: number | null;
+  source: string | null;
+  doi: string | null;
+  url: string | null;
+}
+
+interface CoAuthorRecord {
+  user_id: string;
+  display_order: number;
+  corresponding_author: boolean;
+  accepted_at: string | null;
+  profile: {
+    username: string;
+    full_name: string | null;
+  } | null;
+}
+
 interface ResponsePostRow {
   id: string;
   title: string;
@@ -44,24 +103,44 @@ interface ResponsePostRow {
   excerpt: string | null;
   published_at: string | null;
   profiles:
-    | {
-        username: string;
-        full_name: string | null;
-        avatar_url: string | null;
-        verified?: boolean;
-      }
-    | {
-        username: string;
-        full_name: string | null;
-        avatar_url: string | null;
-        verified?: boolean;
-      }[];
+    | ResponsePostProfile
+    | ResponsePostProfile[]
+    | null;
 }
 
-interface ParentPostRef {
+interface ResponsePostProfile {
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  verified?: boolean;
+}
+
+interface RelatedPost {
   id: string;
   title: string;
   slug: string;
+  type: string;
+  published_at: string | null;
+  created_at: string;
+  profiles: { full_name: string | null; username: string } | null;
+}
+
+interface SecondaryData {
+  references: ReferenceRecord[];
+  coAuthors: CoAuthorRecord[];
+  responsePosts: Array<Omit<ResponsePostRow, "profiles"> & { profiles: ResponsePostProfile | null }>;
+  reviews: Array<{ submitted_at: string | null }>;
+  likeCount: number;
+  commentCount: number;
+  bookmarkCount: number;
+  relatedPosts: RelatedPost[];
+}
+
+interface ViewerData {
+  userLiked: boolean;
+  userBookmarked: boolean;
+  userFollowsAuthor: boolean;
+  messageEligibility: { eligible: boolean; reason: string | null } | null;
 }
 
 function estimateReadTime(content: string): number {
@@ -104,9 +183,812 @@ function renderReferenceShortcodes(content: string): string {
   );
 }
 
+function getAuthor(post: PostRecord): AuthorProfile | null {
+  return Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles;
+}
+
 function throwPostQueryError(slug: string, stage: "metadata" | "page", error: unknown): never {
   console.error(`[post/${slug}] ${stage} query failed`, error);
   throw new Error(`Failed to load post "${slug}".`);
+}
+
+function getBasicQualitySummary({
+  post,
+  author,
+  sanitizedContent,
+  wordCount,
+  parentPostId,
+}: {
+  post: PostRecord;
+  author: AuthorProfile | null;
+  sanitizedContent: string;
+  wordCount: number;
+  parentPostId: string | null;
+}) {
+  return getPostQualitySummary({
+    type: post.type,
+    status: post.status,
+    title: post.title,
+    excerpt: post.excerpt,
+    content: sanitizedContent,
+    wordCount,
+    tags: post.tags ?? [],
+    citationId: post.citation_id ?? null,
+    isResponse: Boolean(parentPostId),
+    author,
+    referenceCount: 0,
+    responseCount: 0,
+    reviewCount: 0,
+    completedReviewCount: 0,
+    commentCount: 0,
+    likeCount: 0,
+    bookmarkCount: 0,
+  });
+}
+
+function getFullQualitySummary({
+  post,
+  author,
+  sanitizedContent,
+  wordCount,
+  parentPostId,
+  secondary,
+}: {
+  post: PostRecord;
+  author: AuthorProfile | null;
+  sanitizedContent: string;
+  wordCount: number;
+  parentPostId: string | null;
+  secondary: SecondaryData;
+}) {
+  return getPostQualitySummary({
+    type: post.type,
+    status: post.status,
+    title: post.title,
+    excerpt: post.excerpt,
+    content: sanitizedContent,
+    wordCount,
+    tags: post.tags ?? [],
+    citationId: post.citation_id ?? null,
+    isResponse: Boolean(parentPostId),
+    author,
+    referenceCount: secondary.references.length,
+    responseCount: secondary.responsePosts.length,
+    reviewCount: secondary.reviews.length,
+    completedReviewCount: secondary.reviews.filter((review) =>
+      Boolean(review.submitted_at)
+    ).length,
+    commentCount: secondary.commentCount,
+    likeCount: secondary.likeCount,
+    bookmarkCount: secondary.bookmarkCount,
+  });
+}
+
+async function getSecondaryData(
+  postId: string,
+  tags: string[],
+  isPublished: boolean
+): Promise<SecondaryData> {
+  const supabase = await createClient();
+
+  const [
+    { count: likeCount },
+    { data: referencesRaw },
+    { data: coAuthorsRaw },
+    { data: responsePostsRaw },
+    { data: reviewsRaw },
+    { count: commentCount },
+    { count: bookmarkCount },
+    relatedResult,
+  ] = await Promise.all([
+    supabase
+      .from("likes")
+      .select("*", { count: "exact", head: true })
+      .eq("post_id", postId),
+    supabase
+      .from("post_references")
+      .select("*")
+      .eq("post_id", postId)
+      .order("display_order", { ascending: true }),
+    supabase
+      .from("post_authors")
+      .select(
+        "user_id, display_order, corresponding_author, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name)"
+      )
+      .eq("post_id", postId)
+      .not("accepted_at", "is", null)
+      .order("display_order", { ascending: true }),
+    supabase
+      .from("posts")
+      .select(
+        "id, title, slug, excerpt, published_at, profiles!posts_author_id_fkey(username, full_name, avatar_url, verified)"
+      )
+      .eq("in_response_to", postId)
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(10),
+    supabase.from("post_reviews").select("submitted_at").eq("post_id", postId),
+    supabase
+      .from("comments")
+      .select("*", { count: "exact", head: true })
+      .eq("post_id", postId),
+    supabase
+      .from("bookmarks")
+      .select("*", { count: "exact", head: true })
+      .eq("post_id", postId),
+    isPublished && tags.length > 0
+      ? supabase
+          .from("posts")
+          .select(
+            "id, title, slug, type, published_at, created_at, profiles!posts_author_id_fkey (full_name, username)"
+          )
+          .eq("status", "published")
+          .neq("id", postId)
+          .overlaps("tags", tags)
+          .order("published_at", { ascending: false })
+          .limit(3)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const coAuthors = ((coAuthorsRaw ?? []) as Array<
+    Omit<CoAuthorRecord, "profile"> & {
+      profile:
+        | { username: string; full_name: string | null }
+        | Array<{ username: string; full_name: string | null }>
+        | null;
+    }
+  >).map((item) => ({
+    ...item,
+    profile: Array.isArray(item.profile) ? item.profile[0] ?? null : item.profile,
+  }));
+
+  const responsePosts = ((responsePostsRaw ?? []) as ResponsePostRow[]).map(
+    (response) => ({
+      ...response,
+      profiles: Array.isArray(response.profiles)
+        ? response.profiles[0] ?? null
+        : response.profiles,
+    })
+  );
+
+  const relatedPosts = ((relatedResult.data ?? []) as Array<
+    Omit<RelatedPost, "profiles"> & {
+      profiles:
+        | { full_name: string | null; username: string }
+        | Array<{ full_name: string | null; username: string }>
+        | null;
+    }
+  >).map((item) => ({
+    ...item,
+    profiles: Array.isArray(item.profiles) ? item.profiles[0] ?? null : item.profiles,
+  }));
+
+  return {
+    references: (referencesRaw ?? []) as ReferenceRecord[],
+    coAuthors,
+    responsePosts,
+    reviews: (reviewsRaw ?? []) as Array<{ submitted_at: string | null }>,
+    likeCount: likeCount ?? 0,
+    commentCount: commentCount ?? 0,
+    bookmarkCount: bookmarkCount ?? 0,
+    relatedPosts,
+  };
+}
+
+async function getViewerData({
+  postId,
+  userId,
+  authorId,
+  supabase,
+}: {
+  postId: string;
+  userId: string | null;
+  authorId: string | null;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}): Promise<ViewerData> {
+  if (!userId) {
+    return {
+      userLiked: false,
+      userBookmarked: false,
+      userFollowsAuthor: false,
+      messageEligibility: null,
+    };
+  }
+
+  const [
+    { data: existingLike },
+    { data: existingBookmark },
+    { data: followData },
+    messageEligibility,
+  ] = await Promise.all([
+    supabase
+      .from("likes")
+      .select("user_id")
+      .eq("post_id", postId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("bookmarks")
+      .select("user_id")
+      .eq("post_id", postId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+    authorId
+      ? supabase
+          .from("follows")
+          .select("follower_id")
+          .eq("follower_id", userId)
+          .eq("following_id", authorId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    authorId
+      ? getMessageEligibility(supabase, userId, authorId)
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    userLiked: Boolean(existingLike),
+    userBookmarked: Boolean(existingBookmark),
+    userFollowsAuthor: Boolean(followData),
+    messageEligibility,
+  };
+}
+
+function SectionSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="animate-pulse space-y-3">
+      <div className="h-4 w-24 rounded bg-gray-200" />
+      {[...Array(rows)].map((_, index) => (
+        <div key={index} className="h-4 rounded bg-gray-100" />
+      ))}
+    </div>
+  );
+}
+
+function CommentsSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4">
+      <div className="h-5 w-24 rounded bg-gray-200" />
+      {[...Array(3)].map((_, index) => (
+        <div key={index} className="flex gap-3">
+          <div className="h-8 w-8 shrink-0 rounded-full bg-gray-200" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-28 rounded bg-gray-200" />
+            <div className="h-3 w-full rounded bg-gray-100" />
+            <div className="h-3 w-4/5 rounded bg-gray-100" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+async function ParentPostLink({
+  parentPostId,
+}: {
+  parentPostId: string | null;
+}) {
+  if (!parentPostId) return null;
+  const supabase = await createClient();
+  const { data: parentPost, error } = await supabase
+    .from("posts")
+    .select("id, title, slug")
+    .eq("id", parentPostId)
+    .eq("status", "published")
+    .maybeSingle();
+
+  if (error || !parentPost) return null;
+
+  return (
+    <Link
+      href={`/post/${(parentPost as ParentPostRef).slug}`}
+      className="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-600"
+    >
+      <span aria-hidden="true">{"\u21A9"}</span>
+      <span>
+        In response to:{" "}
+        <span className="font-medium text-gray-600">
+          {(parentPost as ParentPostRef).title}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+async function HeaderCoAuthors({
+  authorId,
+  secondaryDataPromise,
+}: {
+  authorId: string | null;
+  secondaryDataPromise: Promise<SecondaryData>;
+}) {
+  const { coAuthors } = await secondaryDataPromise;
+  const displayAuthors = coAuthors.filter((record) => record.user_id !== authorId);
+
+  if (displayAuthors.length === 0) return null;
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2">
+      {displayAuthors.map((coAuthor) => (
+        <Link
+          key={coAuthor.user_id}
+          href={`/${coAuthor.profile?.username}`}
+          className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-brand"
+        >
+          {coAuthor.corresponding_author ? "Corresponding / " : ""}
+          {coAuthor.profile?.full_name ?? coAuthor.profile?.username}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+async function PostReadingChrome({
+  post,
+  userId,
+  isPublished,
+  secondaryDataPromise,
+  viewerDataPromise,
+}: {
+  post: PostRecord;
+  userId: string | null;
+  isPublished: boolean;
+  secondaryDataPromise: Promise<SecondaryData>;
+  viewerDataPromise: Promise<ViewerData>;
+}) {
+  if (!isPublished) return null;
+  const [secondary, viewer] = await Promise.all([
+    secondaryDataPromise,
+    viewerDataPromise,
+  ]);
+
+  return (
+    <ReadingBar
+      postId={post.id}
+      userId={userId}
+      initialLiked={viewer.userLiked}
+      initialLikeCount={secondary.likeCount}
+      initialBookmarked={viewer.userBookmarked}
+      title={post.title}
+      slug={post.slug}
+    />
+  );
+}
+
+async function MobileCredibilitySection({
+  post,
+  author,
+  sanitizedContent,
+  wordCount,
+  parentPostId,
+  isPublished,
+  secondaryDataPromise,
+}: {
+  post: PostRecord;
+  author: AuthorProfile | null;
+  sanitizedContent: string;
+  wordCount: number;
+  parentPostId: string | null;
+  isPublished: boolean;
+  secondaryDataPromise: Promise<SecondaryData>;
+}) {
+  const secondary = await secondaryDataPromise;
+  const summary = getFullQualitySummary({
+    post,
+    author,
+    sanitizedContent,
+    wordCount,
+    parentPostId,
+    secondary,
+  });
+
+  return (
+    <div className="mb-8 lg:hidden">
+      <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} />
+    </div>
+  );
+}
+
+async function PostReferencesAndCitation({
+  post,
+  author,
+  secondaryDataPromise,
+}: {
+  post: PostRecord;
+  author: AuthorProfile | null;
+  secondaryDataPromise: Promise<SecondaryData>;
+}) {
+  const { references, coAuthors } = await secondaryDataPromise;
+  const citationAuthors = (
+    coAuthors.length > 0
+      ? coAuthors.map((authorRecord) => ({
+          full_name: authorRecord.profile?.full_name ?? null,
+          username: authorRecord.profile?.username ?? "author",
+        }))
+      : author
+        ? [
+            {
+              full_name: author.full_name ?? null,
+              username: author.username,
+            },
+          ]
+        : []
+  ) as Array<{ full_name: string | null; username: string }>;
+
+  return (
+    <>
+      {references.length > 0 ? (
+        <section className="mb-8 border-t border-gray-200 pt-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+              References
+            </h2>
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
+              {references.length} listed
+            </span>
+          </div>
+          <ol>
+            {references.map((reference, index) => (
+              <li
+                key={reference.id}
+                id={`ref-${index + 1}`}
+                className="flex gap-3 border-t border-gray-100 py-3 text-sm leading-relaxed text-gray-600 first:border-t-0"
+              >
+                <span className="min-w-[2rem] shrink-0 font-bold text-emerald-600">
+                  [{index + 1}]
+                </span>
+                <div>
+                  <p className="font-medium text-gray-900">{reference.title}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {[reference.authors, reference.year, reference.source]
+                      .filter(Boolean)
+                      .join(" / ") || "Reference details not provided"}
+                  </p>
+                  {reference.doi || reference.url ? (
+                    <p className="mt-1 text-xs">
+                      {reference.doi ? (
+                        <span className="mr-2 text-gray-500">
+                          DOI: {reference.doi}
+                        </span>
+                      ) : null}
+                      {reference.url ? (
+                        <a
+                          href={reference.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-emerald-700 hover:underline"
+                        >
+                          Open source
+                        </a>
+                      ) : null}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      {post.status === "published" && post.citation_id ? (
+        <div className="mb-8">
+          <CiteThis
+            citationId={post.citation_id}
+            citationPath={`/publication/${post.citation_id}`}
+            title={post.title}
+            publishedAt={post.published_at ?? post.created_at}
+            authors={citationAuthors}
+          />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+async function PostEngagementSection({
+  post,
+  author,
+  userId,
+  sanitizedExcerpt,
+  secondaryDataPromise,
+  viewerDataPromise,
+}: {
+  post: PostRecord;
+  author: AuthorProfile | null;
+  userId: string | null;
+  sanitizedExcerpt: string | null;
+  secondaryDataPromise: Promise<SecondaryData>;
+  viewerDataPromise: Promise<ViewerData>;
+}) {
+  if (post.status !== "published") return null;
+  const [secondary, viewer] = await Promise.all([
+    secondaryDataPromise,
+    viewerDataPromise,
+  ]);
+
+  return (
+    <div className="mb-8 flex flex-col gap-4 border-y border-gray-200 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center gap-3">
+        <LikeButton
+          postId={post.id}
+          initialLiked={viewer.userLiked}
+          initialCount={secondary.likeCount}
+          userId={userId}
+        />
+        <BookmarkButton
+          postId={post.id}
+          initialBookmarked={viewer.userBookmarked}
+          userId={userId}
+        />
+      </div>
+      <ShareButtons
+        title={post.title}
+        slug={post.slug}
+        excerpt={sanitizedExcerpt}
+        authorName={author?.full_name ?? null}
+      />
+      <span className="text-xs text-gray-400">
+        {post.view_count?.toLocaleString()}{" "}
+        {post.view_count === 1 ? "view" : "views"}
+      </span>
+    </div>
+  );
+}
+
+async function AuthorAndCollaborationSection({
+  post,
+  author,
+  userId,
+  authorName,
+  secondaryDataPromise,
+  viewerDataPromise,
+}: {
+  post: PostRecord;
+  author: AuthorProfile | null;
+  userId: string | null;
+  authorName: string;
+  secondaryDataPromise: Promise<SecondaryData>;
+  viewerDataPromise: Promise<ViewerData>;
+}) {
+  if (!author) return null;
+  const [secondary, viewer] = await Promise.all([
+    secondaryDataPromise,
+    viewerDataPromise,
+  ]);
+  const primaryAuthorRecord =
+    secondary.coAuthors.find((record) => record.user_id === author.id) ?? null;
+  const coAuthors = secondary.coAuthors.filter((record) => record.user_id !== author.id);
+  const collaborationSummary = getCollaborationSummary({
+    postId: post.id,
+    postSlug: post.slug,
+    authorId: author.id,
+    viewerId: userId,
+    responseCount: secondary.responsePosts.length,
+    coauthorCount: coAuthors.length,
+    isFollowingAuthor: viewer.userFollowsAuthor,
+    messageEligible: viewer.messageEligibility?.eligible ?? false,
+    messageReason: viewer.messageEligibility?.reason ?? null,
+  });
+
+  return (
+    <>
+      {post.status === "published" ? (
+        <CollaborationPanel summary={collaborationSummary} authorName={authorName} />
+      ) : null}
+      <AuthorBioCard
+        author={author}
+        userId={userId}
+        initialFollowing={viewer.userFollowsAuthor}
+        isCorrespondingAuthor={primaryAuthorRecord?.corresponding_author ?? false}
+        coAuthors={coAuthors
+          .filter((coAuthor) => coAuthor.profile?.username)
+          .map((coAuthor) => ({
+            user_id: coAuthor.user_id,
+            corresponding_author: coAuthor.corresponding_author,
+            profile: {
+              username: coAuthor.profile?.username ?? "",
+              full_name: coAuthor.profile?.full_name ?? null,
+            },
+          }))}
+      />
+    </>
+  );
+}
+
+async function PostRelatedSection({
+  secondaryDataPromise,
+}: {
+  secondaryDataPromise: Promise<SecondaryData>;
+}) {
+  const { relatedPosts } = await secondaryDataPromise;
+  if (relatedPosts.length === 0) return null;
+
+  return (
+    <section className="mb-8">
+      <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+        Related
+      </h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {relatedPosts.map((item) => (
+          <Link
+            key={item.id}
+            href={`/post/${item.slug}`}
+            className="group flex overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md sm:flex-col"
+          >
+            <div className="h-[92px] w-[112px] shrink-0 overflow-hidden sm:h-[96px] sm:w-full">
+              <PostCover
+                src={null}
+                alt={item.title}
+                type={item.type}
+                sizes="200px"
+                className="h-full w-full"
+                imageClassName="object-cover"
+              />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col p-3">
+              <p className="line-clamp-2 text-[12px] font-semibold leading-snug text-gray-900 transition-colors group-hover:text-emerald-brand">
+                {item.title}
+              </p>
+              <p className="mt-auto pt-2 text-[10px] text-gray-400">
+                {item.profiles?.full_name ?? item.profiles?.username}
+              </p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+async function PostResponsesSection({
+  secondaryDataPromise,
+}: {
+  secondaryDataPromise: Promise<SecondaryData>;
+}) {
+  const { responsePosts } = await secondaryDataPromise;
+  if (responsePosts.length === 0) return null;
+
+  return (
+    <section id="responses" className="mt-10 scroll-mt-24">
+      <h2 className="mb-4 text-lg font-semibold text-gray-900">
+        Responses ({responsePosts.length})
+      </h2>
+      <div className="space-y-4">
+        {responsePosts.map((response) => {
+          const responseAuthor = response.profiles;
+
+          return (
+            <Link
+              key={response.id}
+              href={`/post/${response.slug}`}
+              className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
+            >
+              <div className="w-1 flex-shrink-0 self-stretch rounded-full bg-emerald-400" />
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center gap-2">
+                  <UserAvatar
+                    name={
+                      responseAuthor?.full_name ??
+                      responseAuthor?.username ??
+                      "Unknown"
+                    }
+                    src={responseAuthor?.avatar_url ?? null}
+                    size={20}
+                  />
+                  <span className="text-xs text-gray-500">
+                    <span className="font-medium text-gray-700">
+                      {responseAuthor?.full_name ?? responseAuthor?.username ?? "Unknown"}
+                    </span>
+                    {" / "}
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 italic">
+                      Response
+                    </span>
+                  </span>
+                </div>
+                <p className="text-sm font-semibold leading-snug text-gray-900">
+                  {response.title}
+                </p>
+                {response.excerpt ? (
+                  <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                    {response.excerpt}
+                  </p>
+                ) : null}
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+async function PostSidebar({
+  post,
+  author,
+  userId,
+  headings,
+  sanitizedContent,
+  sanitizedExcerpt,
+  wordCount,
+  parentPostId,
+  isPublished,
+  secondaryDataPromise,
+  viewerDataPromise,
+}: {
+  post: PostRecord;
+  author: AuthorProfile | null;
+  userId: string | null;
+  headings: { id: string; text: string; level: number }[];
+  sanitizedContent: string;
+  sanitizedExcerpt: string | null;
+  wordCount: number;
+  parentPostId: string | null;
+  isPublished: boolean;
+  secondaryDataPromise: Promise<SecondaryData>;
+  viewerDataPromise: Promise<ViewerData>;
+}) {
+  const [secondary, viewer] = await Promise.all([
+    secondaryDataPromise,
+    viewerDataPromise,
+  ]);
+  const summary = getFullQualitySummary({
+    post,
+    author,
+    sanitizedContent,
+    wordCount,
+    parentPostId,
+    secondary,
+  });
+
+  return (
+    <aside className="hidden lg:block">
+      <div className="sticky top-24 space-y-4">
+        <TableOfContents headings={headings} />
+        {isPublished ? (
+          <section className="rounded-xl border border-gray-200 bg-white p-4">
+            <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+              Reader actions
+            </h2>
+            <div className="space-y-2">
+              <LikeButton
+                postId={post.id}
+                initialLiked={viewer.userLiked}
+                initialCount={secondary.likeCount}
+                userId={userId}
+              />
+              <BookmarkButton
+                postId={post.id}
+                initialBookmarked={viewer.userBookmarked}
+                userId={userId}
+              />
+              <ShareButtons
+                title={post.title}
+                slug={post.slug}
+                excerpt={sanitizedExcerpt}
+                authorName={author?.full_name ?? null}
+              />
+              {post.citation_id ? (
+                <Link
+                  href={`/publication/${post.citation_id}`}
+                  className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  Cite this
+                </Link>
+              ) : null}
+              <ResponseStartLink
+                postId={post.id}
+                source="post_sidebar"
+                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+              >
+                Write a response
+              </ResponseStartLink>
+            </div>
+          </section>
+        ) : null}
+        <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} />
+      </div>
+    </aside>
+  );
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -130,7 +1012,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   if (!post) return { title: "Post not found - ThinkAfrica" };
-  // Drafts and in-review posts are only visible to the author (and assigned reviewers/co-authors)
   if (
     (post.status === "draft" ||
       post.status === "pending" ||
@@ -180,7 +1061,7 @@ export default async function PostPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: post, error: postError } = await supabase
+  const { data: postRaw, error: postError } = await supabase
     .from("posts")
     .select(
       `
@@ -199,9 +1080,9 @@ export default async function PostPage({ params }: PageProps) {
     throwPostQueryError(slug, "page", postError);
   }
 
-  if (!post) notFound();
+  if (!postRaw) notFound();
+  const post = postRaw as PostRecord;
 
-  // Draft posts: only visible to the author
   if (post.status === "draft" && user?.id !== post.author_id) notFound();
 
   if (
@@ -242,171 +1123,7 @@ export default async function PostPage({ params }: PageProps) {
   }
 
   const isPublished = post.status === "published";
-  const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
-  const coverImageUrl = (post as { cover_image_url?: string | null }).cover_image_url;
-  const audioSummaryUrl = (
-    post as typeof post & { audio_summary_url?: string | null }
-  ).audio_summary_url ?? null;
-  const parentPostId = (post as typeof post & { in_response_to?: string | null })
-    .in_response_to ?? null;
-  let parentPost: ParentPostRef | null = null;
-
-  if (parentPostId) {
-    const { data: parentPostData, error: parentPostError } = await supabase
-      .from("posts")
-      .select("id, title, slug")
-      .eq("id", parentPostId)
-      .eq("status", "published")
-      .maybeSingle();
-
-    if (parentPostError) {
-      console.error(`[post/${slug}] parent post query failed`, parentPostError);
-    } else {
-      parentPost = parentPostData;
-    }
-  }
-
-  const [
-    { count: likeCount },
-    { data: referencesRaw },
-    { data: coAuthorsRaw },
-    { data: responsePostsRaw },
-    { data: reviewsRaw },
-    { count: commentCount },
-    { count: bookmarkCount },
-  ] = await Promise.all([
-    supabase
-      .from("likes")
-      .select("*", { count: "exact", head: true })
-      .eq("post_id", post.id),
-    supabase
-      .from("post_references")
-      .select("*")
-      .eq("post_id", post.id)
-      .order("display_order", { ascending: true }),
-    supabase
-      .from("post_authors")
-      .select(
-        "user_id, display_order, corresponding_author, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name)"
-      )
-      .eq("post_id", post.id)
-      .not("accepted_at", "is", null)
-      .order("display_order", { ascending: true }),
-    supabase
-      .from("posts")
-      .select(
-        "id, title, slug, excerpt, published_at, profiles!posts_author_id_fkey(username, full_name, avatar_url, verified)"
-      )
-      .eq("in_response_to", post.id)
-      .eq("status", "published")
-      .order("published_at", { ascending: false })
-      .limit(10),
-    supabase.from("post_reviews").select("submitted_at").eq("post_id", post.id),
-    supabase
-      .from("comments")
-      .select("*", { count: "exact", head: true })
-      .eq("post_id", post.id),
-    supabase
-      .from("bookmarks")
-      .select("*", { count: "exact", head: true })
-      .eq("post_id", post.id),
-  ]);
-
-  let userLiked = false;
-  let userBookmarked = false;
-  if (user) {
-    const [{ data: existingLike }, { data: existingBookmark }] = await Promise.all([
-      supabase
-        .from("likes")
-        .select("user_id")
-        .eq("post_id", post.id)
-        .eq("user_id", user.id)
-        .single(),
-      supabase
-        .from("bookmarks")
-        .select("user_id")
-        .eq("post_id", post.id)
-        .eq("user_id", user.id)
-        .single(),
-    ]);
-    userLiked = !!existingLike;
-    userBookmarked = !!existingBookmark;
-  }
-
-  const userProfileId: string | null = user?.id ?? null;
-
-  let relatedPosts: Array<{
-    id: string;
-    title: string;
-    slug: string;
-    type: string;
-    published_at: string | null;
-    created_at: string;
-    profiles: { full_name: string; username: string } | null;
-  }> = [];
-  if (isPublished && post.tags && post.tags.length > 0) {
-    const { data: relatedRaw } = await supabase
-      .from("posts")
-      .select(
-        "id, title, slug, type, published_at, created_at, profiles!posts_author_id_fkey (full_name, username)"
-      )
-      .eq("status", "published")
-      .neq("id", post.id)
-      .overlaps("tags", post.tags)
-      .order("published_at", { ascending: false })
-      .limit(3);
-
-    relatedPosts = (relatedRaw ?? []).map((item) => ({
-      ...item,
-      profiles: Array.isArray(item.profiles) ? item.profiles[0] : item.profiles,
-    }));
-  }
-
-  let userFollowsAuthor = false;
-  if (user && author) {
-    const { data: followData } = await supabase
-      .from("follows")
-      .select("follower_id")
-      .eq("follower_id", user.id)
-      .eq("following_id", author.id)
-      .single();
-    userFollowsAuthor = !!followData;
-  }
-
-  const messageEligibility =
-    user && author ? await getMessageEligibility(supabase, user.id, author.id) : null;
-
-  const references = referencesRaw ?? [];
-  const acceptedAuthors = (coAuthorsRaw ?? []).map((item) => ({
-    ...item,
-    profile: Array.isArray(item.profile) ? item.profile[0] : item.profile,
-  }));
-  const responsePosts = ((responsePostsRaw ?? []) as ResponsePostRow[]).map(
-    (response) => ({
-      ...response,
-      profiles: Array.isArray(response.profiles)
-        ? response.profiles[0]
-        : response.profiles,
-    })
-  );
-  const primaryAuthorRecord = acceptedAuthors.find((record) => record.user_id === author?.id) ?? null;
-  const coAuthors = acceptedAuthors.filter((record) => record.user_id !== author?.id);
-  const citationAuthors = (
-    acceptedAuthors.length > 0
-      ? acceptedAuthors.map((authorRecord) => ({
-          full_name: authorRecord.profile?.full_name ?? null,
-          username: authorRecord.profile?.username ?? "author",
-        }))
-      : author
-        ? [
-            {
-              full_name: author.full_name ?? null,
-              username: author.username,
-            },
-          ]
-        : []
-  ) as Array<{ full_name: string | null; username: string }>;
-
+  const author = getAuthor(post);
   const sanitizedContent = sanitizePostHtml(post.content);
   const sanitizedExcerpt = sanitizePostExcerpt(post.excerpt);
   const readTime = estimateReadTime(sanitizedContent);
@@ -416,51 +1133,36 @@ export default async function PostPage({ params }: PageProps) {
     injectHeadingIds(sanitizedContent)
   );
   const authorName = author?.full_name ?? author?.username ?? "Anonymous";
-  const qualitySummary = getPostQualitySummary({
-    type: post.type,
-    status: post.status,
-    title: post.title,
-    excerpt: post.excerpt,
-    content: sanitizedContent,
-    wordCount,
-    tags: post.tags ?? [],
-    citationId: post.citation_id ?? null,
-    isResponse: Boolean(parentPostId),
+  const parentPostId = post.in_response_to ?? null;
+  const basicQualitySummary = getBasicQualitySummary({
+    post,
     author,
-    referenceCount: references.length,
-    responseCount: responsePosts.length,
-    reviewCount: reviewsRaw?.length ?? 0,
-    completedReviewCount:
-      reviewsRaw?.filter((review) => Boolean(review.submitted_at)).length ?? 0,
-    commentCount: commentCount ?? 0,
-    likeCount: likeCount ?? 0,
-    bookmarkCount: bookmarkCount ?? 0,
+    sanitizedContent,
+    wordCount,
+    parentPostId,
   });
-  const collaborationSummary = getCollaborationSummary({
+  const userId = user?.id ?? null;
+  const secondaryDataPromise = getSecondaryData(post.id, post.tags ?? [], isPublished);
+  const viewerDataPromise = getViewerData({
     postId: post.id,
-    postSlug: post.slug,
+    userId,
     authorId: author?.id ?? null,
-    viewerId: user?.id ?? null,
-    responseCount: responsePosts.length,
-    coauthorCount: coAuthors.length,
-    isFollowingAuthor: userFollowsAuthor,
-    messageEligible: messageEligibility?.eligible ?? false,
-    messageReason: messageEligibility?.reason ?? null,
+    supabase,
   });
 
   return (
     <div className="relative">
       {isPublished ? (
         <>
-          <ReadingBar
-            postId={post.id}
-            userId={user?.id ?? null}
-            initialLiked={userLiked}
-            initialLikeCount={likeCount ?? 0}
-            initialBookmarked={userBookmarked}
-            title={post.title}
-            slug={post.slug}
-          />
+          <Suspense fallback={null}>
+            <PostReadingChrome
+              post={post}
+              userId={userId}
+              isPublished={isPublished}
+              secondaryDataPromise={secondaryDataPromise}
+              viewerDataPromise={viewerDataPromise}
+            />
+          </Suspense>
           <ReadingProgressBar />
           <ViewTracker slug={slug} />
         </>
@@ -497,29 +1199,18 @@ export default async function PostPage({ params }: PageProps) {
               ) : null}
 
               <header className="mb-7 sm:mb-8">
-                {/* Kicker - post type + word count + read time */}
                 <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-brand sm:mb-5">
-                  {qualitySummary.contentLabel}
+                  {basicQualitySummary.contentLabel}
                   <span className="mx-2 text-gray-300">/</span>
                   <span className="text-ink-muted">
                     {wordCount.toLocaleString()} words / {readTime} min read
                   </span>
                 </p>
 
-                {parentPost ? (
-                  <Link
-                    href={`/post/${parentPost.slug}`}
-                    className="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-600"
-                  >
-                    <span aria-hidden="true">{"\u21A9"}</span>
-                    <span>
-                      In response to:{" "}
-                      <span className="font-medium text-gray-600">{parentPost.title}</span>
-                    </span>
-                  </Link>
-                ) : null}
+                <Suspense fallback={null}>
+                  <ParentPostLink parentPostId={parentPostId} />
+                </Suspense>
 
-                {/* Tags - moved below kicker, before title */}
                 {post.tags && post.tags.length > 0 ? (
                   <div className="mb-4 flex flex-wrap gap-1.5">
                     {post.tags.map((tag: string) => (
@@ -530,22 +1221,20 @@ export default async function PostPage({ params }: PageProps) {
                   </div>
                 ) : null}
 
-                {/* Title - enlarged to match journal scale */}
                 <h1 className="font-display mb-4 text-[36px] font-semibold leading-[1.06] tracking-tight text-ink sm:mb-5 sm:text-[46px]">
                   {post.title}
                 </h1>
 
-                {/* Deck / standfirst - rendered from excerpt if present */}
                 {sanitizedExcerpt ? (
                   <p className="font-display mb-6 text-lg font-normal italic leading-[1.45] text-gray-600 sm:text-[21px]">
                     {sanitizedExcerpt}
                   </p>
                 ) : null}
 
-                {coverImageUrl ? (
+                {post.cover_image_url ? (
                   <div className="mb-6 overflow-hidden rounded-2xl">
                     <PostCover
-                      src={coverImageUrl}
+                      src={post.cover_image_url}
                       alt={post.title}
                       type={post.type}
                       sizes="(max-width: 760px) 100vw, 760px"
@@ -598,32 +1287,16 @@ export default async function PostPage({ params }: PageProps) {
                   </div>
                 ) : null}
 
-                {coAuthors.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {coAuthors.map((coAuthor) => (
-                      <Link
-                        key={coAuthor.user_id}
-                        href={`/${coAuthor.profile?.username}`}
-                        className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-brand"
-                      >
-                        {coAuthor.corresponding_author ? "Corresponding / " : ""}
-                        {coAuthor.profile?.full_name ?? coAuthor.profile?.username}
-                      </Link>
-                    ))}
-                  </div>
-                ) : null}
+                <Suspense fallback={null}>
+                  <HeaderCoAuthors
+                    authorId={author?.id ?? null}
+                    secondaryDataPromise={secondaryDataPromise}
+                  />
+                </Suspense>
               </header>
 
-              <div className="mb-7 lg:hidden">
-                <CredibilityPanel
-                  postId={post.id}
-                  summary={qualitySummary}
-                  isPublished={isPublished}
-                />
-              </div>
-
-              {audioSummaryUrl ? (
-                <AudioSummaryPlayer audioUrl={audioSummaryUrl} />
+              {post.audio_summary_url ? (
+                <AudioSummaryPlayer audioUrl={post.audio_summary_url} />
               ) : null}
 
               <hr className="mb-8 border-gray-200" />
@@ -637,259 +1310,94 @@ export default async function PostPage({ params }: PageProps) {
                 />
               </div>
 
-              {references.length > 0 ? (
-                <section className="mb-8 border-t border-gray-200 pt-6">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-                      References
-                    </h2>
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                      {references.length} listed
-                    </span>
-                  </div>
-                  <ol>
-                    {references.map((reference, index) => (
-                      <li
-                        key={reference.id}
-                        id={`ref-${index + 1}`}
-                        className="flex gap-3 border-t border-gray-100 py-3 text-sm leading-relaxed text-gray-600 first:border-t-0"
-                      >
-                        <span className="min-w-[2rem] shrink-0 font-bold text-emerald-600">
-                          [{index + 1}]
-                        </span>
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {reference.title}
-                          </p>
-                          <p className="mt-0.5 text-xs text-gray-500">
-                            {[reference.authors, reference.year, reference.source]
-                              .filter(Boolean)
-                              .join(" / ") || "Reference details not provided"}
-                          </p>
-                          {reference.doi || reference.url ? (
-                            <p className="mt-1 text-xs">
-                              {reference.doi ? (
-                                <span className="mr-2 text-gray-500">
-                                  DOI: {reference.doi}
-                                </span>
-                              ) : null}
-                              {reference.url ? (
-                                <a
-                                  href={reference.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="font-medium text-emerald-700 hover:underline"
-                                >
-                                  Open source
-                                </a>
-                              ) : null}
-                            </p>
-                          ) : null}
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              ) : null}
-
-              {isPublished && post.citation_id ? (
-                <div className="mb-8">
-                  <CiteThis
-                    citationId={post.citation_id}
-                    citationPath={`/publication/${post.citation_id}`}
-                    title={post.title}
-                    publishedAt={post.published_at ?? post.created_at}
-                    authors={citationAuthors}
-                  />
-                </div>
-              ) : null}
-
-              {isPublished ? (
-                <>
-                  {/* Unified action strip - like, bookmark, share consolidated here */}
-                  <div className="mb-8 flex flex-col gap-4 border-y border-gray-200 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <LikeButton
-                        postId={post.id}
-                        initialLiked={userLiked}
-                        initialCount={likeCount ?? 0}
-                        userId={user?.id ?? null}
-                      />
-                      <BookmarkButton
-                        postId={post.id}
-                        initialBookmarked={userBookmarked}
-                        userId={user?.id ?? null}
-                      />
-                    </div>
-                    <ShareButtons
-                      title={post.title}
-                      slug={post.slug}
-                      excerpt={sanitizedExcerpt}
-                      authorName={author?.full_name ?? null}
-                    />
-                    <span className="text-xs text-gray-400">
-                      {post.view_count?.toLocaleString()}{" "}
-                      {post.view_count === 1 ? "view" : "views"}
-                    </span>
-                  </div>
-
-                  {author ? (
-                    <CollaborationPanel
-                      summary={collaborationSummary}
-                      authorName={authorName}
-                    />
-                  ) : null}
-                </>
-              ) : null}
-
-              {author ? (
-                <AuthorBioCard
+              <Suspense fallback={<SectionSkeleton rows={2} />}>
+                <MobileCredibilitySection
+                  post={post}
                   author={author}
-                  userId={user?.id ?? null}
-                  initialFollowing={userFollowsAuthor}
-                  isCorrespondingAuthor={primaryAuthorRecord?.corresponding_author ?? false}
-                  coAuthors={coAuthors
-                    .filter((coAuthor) => coAuthor.profile?.username)
-                    .map((coAuthor) => ({
-                      user_id: coAuthor.user_id,
-                      corresponding_author: coAuthor.corresponding_author,
-                      profile: {
-                        username: coAuthor.profile?.username ?? "",
-                        full_name: coAuthor.profile?.full_name ?? null,
-                      },
-                    }))}
-                />
-              ) : null}
-
-              <hr className="my-8 border-gray-200" />
-
-              {relatedPosts.length > 0 ? (
-                <section className="mb-8">
-                  <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-                    Related
-                  </h2>
-                  <div className="grid grid-cols-3 gap-3">
-                    {relatedPosts.map((item) => (
-                      <Link
-                        key={item.id}
-                        href={`/post/${item.slug}`}
-                        className="group flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md"
-                      >
-                        <div className="h-[96px] overflow-hidden">
-                          <PostCover
-                            src={null}
-                            alt={item.title}
-                            type={item.type}
-                            sizes="200px"
-                            className="h-full w-full"
-                            imageClassName="object-cover"
-                          />
-                        </div>
-                        <div className="flex flex-1 flex-col p-3">
-                          <p className="line-clamp-2 text-[12px] font-semibold leading-snug text-gray-900 transition-colors group-hover:text-emerald-brand">
-                            {item.title}
-                          </p>
-                          <p className="mt-auto pt-2 text-[10px] text-gray-400">
-                            {item.profiles?.full_name ?? item.profiles?.username}
-                          </p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              <hr className="mb-8 border-gray-200" />
-
-              <Suspense
-                fallback={
-                  <div className="animate-pulse space-y-4">
-                    <div className="h-5 w-24 rounded bg-gray-200" />
-                    {[...Array(3)].map((_, index) => (
-                      <div key={index} className="flex gap-3">
-                        <div className="h-8 w-8 shrink-0 rounded-full bg-gray-200" />
-                        <div className="flex-1 space-y-2">
-                          <div className="h-3 w-28 rounded bg-gray-200" />
-                          <div className="h-3 w-full rounded bg-gray-100" />
-                          <div className="h-3 w-4/5 rounded bg-gray-100" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                }
-              >
-                <CommentsLoader
-                  postId={post.id}
-                  userId={user?.id ?? null}
-                  userProfileId={userProfileId}
+                  sanitizedContent={sanitizedContent}
+                  wordCount={wordCount}
+                  parentPostId={parentPostId}
+                  isPublished={isPublished}
+                  secondaryDataPromise={secondaryDataPromise}
                 />
               </Suspense>
 
-              {responsePosts.length > 0 ? (
-                <section id="responses" className="mt-10 scroll-mt-24">
-                  <h2 className="mb-4 text-lg font-semibold text-gray-900">
-                    Responses ({responsePosts.length})
-                  </h2>
-                  <div className="space-y-4">
-                    {responsePosts.map((response) => {
-                      const responseAuthor = response.profiles;
+              <Suspense fallback={<SectionSkeleton rows={4} />}>
+                <PostReferencesAndCitation
+                  post={post}
+                  author={author}
+                  secondaryDataPromise={secondaryDataPromise}
+                />
+              </Suspense>
 
-                      return (
-                        <Link
-                          key={response.id}
-                          href={`/post/${response.slug}`}
-                          className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
-                        >
-                          <div className="w-1 flex-shrink-0 self-stretch rounded-full bg-emerald-400" />
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex items-center gap-2">
-                              <UserAvatar
-                                name={
-                                  responseAuthor?.full_name ??
-                                  responseAuthor?.username ??
-                                  "Unknown"
-                                }
-                                src={responseAuthor?.avatar_url ?? null}
-                                size={20}
-                              />
-                              <span className="text-xs text-gray-500">
-                                <span className="font-medium text-gray-700">
-                                  {responseAuthor?.full_name ?? responseAuthor?.username ?? "Unknown"}
-                                </span>
-                                {" / "}
-                                <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 italic">
-                                  Response
-                                </span>
-                              </span>
-                            </div>
-                            <p className="text-sm font-semibold leading-snug text-gray-900">
-                              {response.title}
-                            </p>
-                            {response.excerpt ? (
-                              <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                                {response.excerpt}
-                              </p>
-                            ) : null}
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </section>
-              ) : null}
+              <Suspense fallback={<SectionSkeleton rows={2} />}>
+                <PostEngagementSection
+                  post={post}
+                  author={author}
+                  userId={userId}
+                  sanitizedExcerpt={sanitizedExcerpt}
+                  secondaryDataPromise={secondaryDataPromise}
+                  viewerDataPromise={viewerDataPromise}
+                />
+              </Suspense>
+
+              <Suspense fallback={<SectionSkeleton rows={3} />}>
+                <AuthorAndCollaborationSection
+                  post={post}
+                  author={author}
+                  userId={userId}
+                  authorName={authorName}
+                  secondaryDataPromise={secondaryDataPromise}
+                  viewerDataPromise={viewerDataPromise}
+                />
+              </Suspense>
+
+              <hr className="my-8 border-gray-200" />
+
+              <Suspense fallback={<SectionSkeleton rows={3} />}>
+                <PostRelatedSection secondaryDataPromise={secondaryDataPromise} />
+              </Suspense>
+
+              <hr className="mb-8 border-gray-200" />
+
+              <Suspense fallback={<CommentsSkeleton />}>
+                <CommentsLoader
+                  postId={post.id}
+                  userId={userId}
+                  userProfileId={userId}
+                />
+              </Suspense>
+
+              <Suspense fallback={<SectionSkeleton rows={3} />}>
+                <PostResponsesSection secondaryDataPromise={secondaryDataPromise} />
+              </Suspense>
             </div>
           </div>
 
-          <aside className="hidden lg:block">
-            <div className="space-y-4">
-              <TableOfContents headings={headings} />
-              <CredibilityPanel
-                postId={post.id}
-                summary={qualitySummary}
-                isPublished={isPublished}
-              />
-            </div>
-          </aside>
+          <Suspense
+            fallback={
+              <aside className="hidden lg:block">
+                <div className="sticky top-24 space-y-4">
+                  <SectionSkeleton rows={5} />
+                  <SectionSkeleton rows={4} />
+                </div>
+              </aside>
+            }
+          >
+            <PostSidebar
+              post={post}
+              author={author}
+              userId={userId}
+              headings={headings}
+              sanitizedContent={sanitizedContent}
+              sanitizedExcerpt={sanitizedExcerpt}
+              wordCount={wordCount}
+              parentPostId={parentPostId}
+              isPublished={isPublished}
+              secondaryDataPromise={secondaryDataPromise}
+              viewerDataPromise={viewerDataPromise}
+            />
+          </Suspense>
         </div>
       </div>
     </div>
