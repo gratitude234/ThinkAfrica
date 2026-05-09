@@ -304,6 +304,7 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
             userId={user.id}
             talentProfile={currentTalentProfile}
             source="opportunities"
+            mobileCollapsed
           />
         </section>
       ) : (

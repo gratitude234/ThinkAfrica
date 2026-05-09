@@ -75,7 +75,7 @@ function SearchEntry({ activeTab }: { activeTab: DiscoverTab }) {
 
 function DiscoverTabs({ activeTab }: { activeTab: DiscoverTab }) {
   return (
-    <div className="mb-6 overflow-x-auto border-b border-gray-200">
+    <div className="mb-5 overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mb-6">
       <div className="flex min-w-max gap-1">
         {TABS.map((tab) => {
           const active = activeTab === tab.value;
@@ -168,7 +168,7 @@ function TopicStrip({ data }: { data: DiscoverData }) {
           View all topics
         </DiscoverTrackedLink>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {topics.map((topic) => (
           <DiscoverTrackedLink
             key={topic.tag}
@@ -541,15 +541,15 @@ export default async function DiscoverPage({ searchParams }: PageProps) {
         }}
       />
 
-      <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+      <div className="mb-5 grid gap-4 sm:mb-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
             Discover
           </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-normal text-ink">
+          <h1 className="mt-2 text-[28px] font-bold leading-tight tracking-normal text-ink sm:text-3xl">
             Find ideas, people, and opportunities worth your attention
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted sm:block">
             Explore the strongest work across ThinkAfrica, then follow the
             topics and writers that should shape your feed.
           </p>

@@ -61,7 +61,7 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
 
         {/* Cover — full width on mobile, fixed left column on desktop */}
         <Link href={`/post/${post.slug}`} className="relative block overflow-hidden sm:rounded-none">
-          <div className="h-[196px] sm:h-full sm:min-h-[280px]">
+          <div className="h-[150px] sm:h-full sm:min-h-[280px]">
             <PostCover
               src={post.cover_image_url}
               alt={post.title}
@@ -85,27 +85,27 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
         </Link>
 
         {/* Body */}
-        <div className="flex flex-col justify-between p-5 sm:p-7">
+        <div className="flex flex-col justify-between p-4 sm:p-7">
           <div>
-            <p className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+            <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-emerald-700 sm:mb-3">
               Editor&apos;s pick
             </p>
 
             <Link href={`/post/${post.slug}`}>
-              <h2 className="font-display mb-3 text-[22px] font-semibold leading-[1.18] tracking-[-0.005em] text-gray-900 transition-colors group-hover:text-gray-700 sm:text-[26px]">
+              <h2 className="font-display mb-2 text-[21px] font-semibold leading-[1.14] tracking-[-0.005em] text-gray-900 transition-colors group-hover:text-gray-700 sm:mb-3 sm:text-[26px]">
                 {post.title}
               </h2>
             </Link>
 
             {excerpt ? (
-              <p className="font-display mb-4 line-clamp-3 text-[15px] italic leading-[1.5] text-gray-500 sm:mb-5">
+              <p className="font-display mb-3 line-clamp-2 text-[14px] italic leading-[1.45] text-gray-500 sm:mb-5 sm:line-clamp-3 sm:text-[15px]">
                 {excerpt}
               </p>
             ) : null}
           </div>
 
           {author ? (
-            <div className="flex items-center gap-2.5 border-t border-gray-100 pt-4">
+            <div className="flex items-center gap-2.5 border-t border-gray-100 pt-3 sm:pt-4">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-800">
                 {initials}
               </div>

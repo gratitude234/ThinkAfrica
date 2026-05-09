@@ -226,6 +226,64 @@ function DebateCard({ debate }: { debate: DebateRow }) {
   );
 }
 
+function FeaturedDebateHero({ debate }: { debate: DebateRow }) {
+  const split = getVoteSplit(debate);
+  const argCount = getArgumentCount(debate.debate_arguments);
+  const timeLabel =
+    debate.status === "active"
+      ? formatTimeUntil(debate.ends_at)
+      : debate.status === "open"
+        ? `Opened ${formatRelativeTime(debate.created_at)}`
+        : `Closed ${formatDate(debate.ends_at ?? debate.created_at)}`;
+
+  return (
+    <Link
+      href={`/debates/${debate.id}`}
+      className="block overflow-hidden rounded-2xl bg-gray-950 p-5 text-white shadow-[0_18px_36px_-22px_rgb(15_23_42/0.9)] transition-transform hover:-translate-y-0.5"
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+          {debate.status === "active" ? "Live debate" : "Open motion"}
+        </span>
+        <span className="text-xs font-medium text-white/50">{timeLabel}</span>
+      </div>
+
+      <h2 className="font-display text-xl font-semibold leading-snug">
+        {debate.title}
+      </h2>
+      {debate.description ? (
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/65">
+          {debate.description}
+        </p>
+      ) : null}
+
+      <div className="mt-5 grid grid-cols-2 gap-2">
+        <div className="rounded-xl bg-emerald-500/90 px-4 py-3 text-center">
+          <p className="text-xs font-bold">For</p>
+          <p className="mt-1 text-2xl font-bold">{split.forPct}%</p>
+        </div>
+        <div className="rounded-xl bg-amber-500/90 px-4 py-3 text-center">
+          <p className="text-xs font-bold">Against</p>
+          <p className="mt-1 text-2xl font-bold">{split.againstPct}%</p>
+        </div>
+      </div>
+
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/15">
+        <div
+          className="h-full rounded-full bg-emerald-400"
+          style={{ width: `${split.forPct}%` }}
+        />
+      </div>
+
+      <div className="mt-3 flex items-center justify-between text-xs font-medium text-white/55">
+        <span>{split.total.toLocaleString()} votes</span>
+        <span>{argCount.toLocaleString()} {argCount === 1 ? "argument" : "arguments"}</span>
+      </div>
+    </Link>
+  );
+}
+
 export default async function DebatesPage({ searchParams }: PageProps) {
   const { status } = await searchParams;
   const filter = getFilter(status);
@@ -301,18 +359,39 @@ export default async function DebatesPage({ searchParams }: PageProps) {
 
   const { data: debatesRaw } = await query;
   const debates = (debatesRaw ?? []) as DebateRow[];
+  let openHeroDebate: DebateRow | null = null;
+
+  if (filter === "live" && debates.length === 0 && (counts.open ?? 0) > 0) {
+    const { data: openHeroRaw } = await supabase
+      .from("debates")
+      .select(
+        `
+        id, title, description, status, current_phase, round_duration_minutes,
+        tags, created_at, ends_at, motion_for_count, motion_against_count,
+        recap_text, recap_generated_at,
+        debate_arguments(count),
+        profiles!debates_moderator_id_fkey(username, full_name, university)
+      `
+      )
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    openHeroDebate = (openHeroRaw as DebateRow | null) ?? null;
+  }
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+      <div className="mb-6 flex flex-col gap-5 rounded-2xl bg-gray-950 p-5 text-white shadow-sm md:mb-7 md:flex-row md:items-end md:justify-between md:bg-transparent md:p-0 md:text-ink md:shadow-none">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300 md:text-emerald-brand">
             Debate room
           </p>
-          <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-ink md:text-4xl">
+          <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-white md:text-4xl md:text-ink">
             Argue ideas in public, with structure
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65 md:text-gray-500">
             Pick a side, vote on the motion, and make the strongest case while
             moderators guide each room through opening, rebuttal, and closing.
           </p>
@@ -323,13 +402,13 @@ export default async function DebatesPage({ searchParams }: PageProps) {
             className={`inline-flex w-fit items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               canCreate || !user
                 ? "bg-emerald-brand text-white hover:bg-emerald-600"
-                : "border border-gray-200 bg-white text-gray-600 hover:bg-white"
+                : "border border-white/15 bg-white/5 text-white hover:bg-white/10 md:border-gray-200 md:bg-white md:text-gray-600 md:hover:bg-white"
             }`}
           >
             {canCreate || !user ? "Start a debate" : "Verify to start one"}
           </Link>
           {!canCreate && user ? (
-            <p className="max-w-xs text-xs leading-5 text-gray-500 md:text-right">
+            <p className="max-w-xs text-xs leading-5 text-white/55 md:text-right md:text-gray-500">
               Verified members, editors, and admins can moderate new motions.
             </p>
           ) : null}
@@ -345,7 +424,7 @@ export default async function DebatesPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="mb-6 overflow-x-auto border-b border-gray-200">
+      <div className="mb-6 overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max gap-1">
           {TABS.map((tab) => {
             const active = filter === tab.value;
@@ -375,7 +454,9 @@ export default async function DebatesPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      {debates.length === 0 ? (
+      {debates.length === 0 && openHeroDebate ? (
+        <FeaturedDebateHero debate={openHeroDebate} />
+      ) : debates.length === 0 ? (
         <EmptyDebates filter={filter} signedIn={Boolean(user)} />
       ) : (
         <div className="space-y-4">

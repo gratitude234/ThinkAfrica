@@ -3,9 +3,10 @@
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { isEnabled } from "@/lib/featureFlags";
+import { createClient } from "@/lib/supabase/client";
 
 interface MobileNavProps {
   user: User | null;
@@ -43,10 +44,22 @@ export default function MobileNav({
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const pathname = usePathname();
+  const router = useRouter();
   const profileHref = profile?.username ? `/${profile.username}` : "/settings";
+  const displayName =
+    profile?.full_name ?? user?.email?.split("@")[0] ?? "ThinkAfrica";
+  const points = profile?.points ?? 0;
   const profileActive = profile?.username
     ? pathname === profileHref || pathname.startsWith(`${profileHref}/`)
     : pathname === "/settings" || pathname.startsWith("/settings/");
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setOpen(false);
+    router.push("/login");
+    router.refresh();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -65,18 +78,24 @@ export default function MobileNav({
     };
   }, [open]);
 
+  const accountLinks = [
+    user ? { label: "Profile", href: profileHref } : null,
+    user ? { label: "Messages", href: "/messages" } : null,
+    user ? { label: "Dashboard", href: "/dashboard" } : null,
+    user ? { label: "Bookmarks", href: "/bookmarks" } : null,
+    user ? { label: "Settings", href: "/settings" } : null,
+    canAccessReview ? { label: "Review", href: "/review" } : null,
+    user && isAdmin ? { label: "Admin", href: "/admin/review" } : null,
+  ].filter(Boolean) as { label: string; href: string }[];
+
   const moreLinks = [
     isEnabled("webinars") ? { label: "Webinars", href: "/webinars" } : null,
     isEnabled("fellowshipsSection") ? { label: "Fellowships", href: "/fellowships" } : null,
     isEnabled("ambassadors") ? { label: "Ambassadors", href: "/ambassadors" } : null,
-    user ? { label: "Debates", href: "/debates" } : null,
     { label: "Leaderboard", href: "/leaderboard" },
     { label: "Alumni", href: "/alumni" },
     isEnabled("talentMarketplace") ? { label: "People", href: "/talent" } : null,
     { label: "Partners", href: "/partners" },
-    user ? { label: "Bookmarks", href: "/bookmarks" } : null,
-    user ? { label: "Dashboard", href: "/dashboard" } : null,
-    canAccessReview ? { label: "Review", href: "/review" } : null,
   ].filter(Boolean) as { label: string; href: string }[];
 
   const menuPanel = open ? (
@@ -111,17 +130,46 @@ export default function MobileNav({
         ) : null}
 
         {user ? (
-          <div className="rounded-xl border border-gray-100 bg-canvas p-2">
+          <div className="rounded-xl border border-gray-100 bg-canvas p-3">
+            <div className="mb-3 flex items-center gap-3 rounded-xl bg-white px-3 py-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-800">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-gray-900">
+                  {displayName}
+                </p>
+                <p className="text-xs font-medium text-emerald-700">
+                  {points.toLocaleString()} pts
+                </p>
+              </div>
+            </div>
             <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
               Account
             </p>
-            <Link
-              href={profileHref}
-              onClick={() => setOpen(false)}
-              className={itemClass(profileActive)}
-            >
-              Profile
-            </Link>
+            <div className="space-y-1">
+              {accountLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className={itemClass(
+                    item.href === profileHref
+                      ? profileActive
+                      : pathname === item.href || pathname.startsWith(`${item.href}/`)
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="block w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+              >
+                Sign out
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -166,15 +214,6 @@ export default function MobileNav({
                 {item.label}
               </Link>
             ))}
-            {user && isAdmin ? (
-              <Link
-                href="/admin/review"
-                onClick={() => setOpen(false)}
-                className={itemClass(pathname.startsWith("/admin"))}
-              >
-                Admin
-              </Link>
-            ) : null}
           </div>
         </div>
       </nav>

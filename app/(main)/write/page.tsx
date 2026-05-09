@@ -40,6 +40,16 @@ interface DraftPayload {
   inResponseToId: string | null;
 }
 
+const MOBILE_TOOLBAR_BUTTONS = [
+  { label: "B", title: "Bold", action: "bold", italic: false },
+  { label: "I", title: "Italic", action: "italic", italic: true },
+  { label: "H2", title: "Heading", action: "heading", italic: false },
+  { label: "—", title: "List", action: "list", italic: false },
+  { label: "❝", title: "Quote", action: "quote", italic: false },
+] as const;
+
+type MobileToolbarAction = (typeof MOBILE_TOOLBAR_BUTTONS)[number]["action"];
+
 function countWords(value: string) {
   return value
     .replace(/<[^>]*>/g, " ")
@@ -393,6 +403,14 @@ export default function WritePage() {
     void saveDraft(nextData);
   };
 
+  const runMobileToolbarAction = (action: MobileToolbarAction) => {
+    if (action === "bold") editorRef.current?.toggleBold();
+    if (action === "italic") editorRef.current?.toggleItalic();
+    if (action === "heading") editorRef.current?.toggleH2();
+    if (action === "list") editorRef.current?.toggleBulletList();
+    if (action === "quote") editorRef.current?.toggleBlockquote();
+  };
+
   if (loadingDraft) {
     return (
       <div className="mx-auto max-w-3xl py-12 text-center text-gray-400">
@@ -728,18 +746,12 @@ export default function WritePage() {
             <div className="sticky bottom-0 z-20 border-t border-gray-100 bg-white shadow-[0_-8px_20px_rgba(15,23,42,0.04)] lg:hidden">
               {/* Formatting toolbar row — large touch targets, stays near keyboard */}
               <div className="flex items-center gap-0.5 border-b border-gray-100 px-2 py-1.5">
-                {[
-                  { label: "B", title: "Bold", action: () => editorRef.current?.toggleBold(), italic: false },
-                  { label: "I", title: "Italic", action: () => editorRef.current?.toggleItalic(), italic: true },
-                  { label: "H2", title: "Heading", action: () => editorRef.current?.toggleH2(), italic: false },
-                  { label: "—", title: "List", action: () => editorRef.current?.toggleBulletList(), italic: false },
-                  { label: "❝", title: "Quote", action: () => editorRef.current?.toggleBlockquote(), italic: false },
-                ].map((btn) => (
+                {MOBILE_TOOLBAR_BUTTONS.map((btn) => (
                   <button
                     key={btn.title}
                     type="button"
                     title={btn.title}
-                    onClick={btn.action}
+                    onClick={() => runMobileToolbarAction(btn.action)}
                     className="flex h-10 min-w-[40px] items-center justify-center rounded-lg px-3 text-sm font-medium text-gray-600 transition-colors active:bg-emerald-100"
                   >
                     {btn.italic ? <em>{btn.label}</em> : btn.label}

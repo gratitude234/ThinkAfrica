@@ -21,12 +21,15 @@ export default function OpportunityProfileEditor({
   userId,
   talentProfile,
   source,
+  mobileCollapsed = false,
 }: {
   userId: string;
   talentProfile: TalentProfile | null;
   source: "dashboard" | "profile" | "opportunities";
+  mobileCollapsed?: boolean;
 }) {
   const router = useRouter();
+  const [mobileExpanded, setMobileExpanded] = useState(!mobileCollapsed);
   const [form, setForm] = useState({
     open_to_opportunities: talentProfile?.open_to_opportunities ?? false,
     opportunity_types: talentProfile?.opportunity_types ?? [],
@@ -122,7 +125,32 @@ export default function OpportunityProfileEditor({
         ) : null}
       </div>
 
-      <div className="space-y-5">
+      {mobileCollapsed ? (
+        <button
+          type="button"
+          onClick={() => setMobileExpanded((current) => !current)}
+          className="mb-4 flex w-full items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-left md:hidden"
+          aria-expanded={mobileExpanded}
+          aria-controls="opportunity-profile-fields"
+        >
+          <span>
+            <span className="block text-sm font-semibold text-emerald-950">
+              {mobileExpanded ? "Hide setup fields" : "Edit opportunity profile"}
+            </span>
+            <span className="mt-0.5 block text-xs text-emerald-800">
+              Add skills, links, visibility, and opportunity types.
+            </span>
+          </span>
+          <span className="text-lg font-semibold text-emerald-brand">
+            {mobileExpanded ? "-" : "+"}
+          </span>
+        </button>
+      ) : null}
+
+      <div
+        id="opportunity-profile-fields"
+        className={`space-y-5 ${mobileCollapsed && !mobileExpanded ? "hidden md:block" : ""}`}
+      >
         <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-100 bg-canvas px-4 py-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">

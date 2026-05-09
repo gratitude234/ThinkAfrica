@@ -91,7 +91,7 @@ export default function ProfileHeader({
   return (
     <>
       {profile.cover_image_url ? (
-        <div className="mb-4 overflow-hidden rounded-2xl border border-gray-200">
+        <div className="mb-4 hidden overflow-hidden rounded-2xl border border-gray-200 md:block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={profile.cover_image_url}
@@ -101,17 +101,32 @@ export default function ProfileHeader({
         </div>
       ) : null}
 
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm shadow-black/[0.02] md:p-7">
-        <div className="flex flex-col gap-6 md:flex-row md:items-start">
+      <section className="overflow-hidden rounded-xl border border-gray-200 bg-gray-950 text-white shadow-sm shadow-black/[0.02] md:bg-white md:p-7 md:text-ink">
+        {profile.cover_image_url ? (
+          <div className="h-24 overflow-hidden md:hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={profile.cover_image_url}
+              alt={`${displayName} cover`}
+              className="h-full w-full object-cover opacity-70"
+            />
+          </div>
+        ) : (
+          <div className="h-14 bg-[radial-gradient(circle_at_20%_0%,rgba(16,185,129,0.28),transparent_35%),linear-gradient(135deg,#0A3D2E,#111827)] md:hidden" />
+        )}
+
+        <div className="flex flex-col gap-5 p-6 md:flex-row md:items-start md:p-0">
           <UserAvatar
             name={displayName}
             src={profile.avatar_url}
             size={88}
-            className="border border-gray-100"
+            className={`border-2 border-white md:border-gray-100 ${
+              profile.cover_image_url ? "-mt-14 md:mt-0" : "-mt-12 md:mt-0"
+            }`}
           />
 
           <div className="min-w-0 flex-1">
-            <h1 className="font-display flex flex-wrap items-center gap-2 text-[30px] font-semibold leading-tight text-ink">
+            <h1 className="font-display flex flex-wrap items-center gap-2 text-[30px] font-semibold leading-tight text-white md:text-ink">
               <span>{displayName}</span>
               {profile.verified ? (
                 <span
@@ -136,16 +151,16 @@ export default function ProfileHeader({
               ) : null}
             </h1>
 
-            <p className="mt-1 text-sm text-gray-500">@{profile.username}</p>
+            <p className="mt-1 text-sm text-white/55 md:text-gray-500">@{profile.username}</p>
 
             {profile.bio ? (
-              <p className="mt-3 max-w-prose text-[15px] leading-6 text-gray-700">
+              <p className="mt-3 max-w-prose text-[15px] leading-6 text-white/80 md:text-gray-700">
                 {profile.bio}
               </p>
             ) : null}
 
             {affiliationBits.length > 0 ? (
-              <p className="mt-3 text-sm text-gray-500">
+              <p className="mt-3 text-sm text-white/55 md:text-gray-500">
                 {affiliationBits.join(" / ")}
               </p>
             ) : null}
@@ -205,16 +220,16 @@ export default function ProfileHeader({
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 border-t border-gray-100 pt-5 sm:grid-cols-5">
+        <div className="grid grid-cols-2 border-t border-white/10 px-6 pb-5 pt-2 sm:grid-cols-5 md:mt-6 md:border-gray-100 md:px-0 md:pb-0 md:pt-5">
           {statsItems.map((item) => (
             <div
               key={item.label}
-              className="border-b border-gray-100 py-3 text-center last:col-span-2 last:border-b-0 sm:border-b-0 sm:border-r sm:last:col-span-1 sm:last:border-r-0"
+              className="border-b border-white/10 py-3 text-center last:col-span-2 last:border-b-0 sm:border-b-0 sm:border-r sm:last:col-span-1 sm:last:border-r-0 md:border-gray-100"
             >
-              <div className="text-lg font-semibold text-ink">
+              <div className="text-lg font-semibold text-white md:text-ink">
                 {formatStat(item.value)}
               </div>
-              <div className="mt-0.5 text-xs text-ink-muted">{item.label}</div>
+              <div className="mt-0.5 text-xs text-white/55 md:text-ink-muted">{item.label}</div>
             </div>
           ))}
         </div>

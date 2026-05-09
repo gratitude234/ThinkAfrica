@@ -142,13 +142,15 @@ export default function NavClient({
               variant="desktop"
               isActive={isWriteActive}
             />
-            <NavUserMenu
-              user={user}
-              profile={profile}
-              points={profile?.points ?? 0}
-              isAdmin={isAdmin}
-              canAccessReview={canAccessReview}
-            />
+            <div className="hidden md:block">
+              <NavUserMenu
+                user={user}
+                profile={profile}
+                points={profile?.points ?? 0}
+                isAdmin={isAdmin}
+                canAccessReview={canAccessReview}
+              />
+            </div>
             <MobileNav
               user={user}
               profile={profile}
