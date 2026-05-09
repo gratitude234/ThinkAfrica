@@ -27,43 +27,54 @@ export default function DailyBriefStrip({
 
   return (
     <>
-      <section className="mb-5 overflow-hidden rounded-2xl bg-gradient-to-br from-[#0A3D2E] to-emerald-brand p-4 text-white shadow-[0_14px_30px_-18px_rgb(10_61_46/0.75)] sm:hidden">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">
-            Daily brief - {today}
+      <section className="mb-5 overflow-hidden rounded-xl border border-gray-200 border-l-[3px] border-l-emerald-brand bg-white px-4 py-3.5 shadow-sm sm:hidden">
+        <div className="flex items-start justify-between gap-3">
+          <p className="min-w-0 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-brand">
+            Daily brief
+            <span className="ml-1 text-gray-400">- {today}</span>
           </p>
           {tier ? (
-            <span className="shrink-0 rounded-full bg-white/14 px-2 py-1 text-[10px] font-semibold text-white">
+            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-800">
               {tier.name}
             </span>
           ) : null}
         </div>
 
-        {featuredPost ? (
-          <Link
-            href={featuredPost.slug ? `/post/${featuredPost.slug}` : "/"}
-            className="block font-display text-[18px] font-semibold leading-snug"
-          >
-            {featuredPost.title}
-          </Link>
-        ) : (
-          <p className="font-display text-[18px] font-semibold leading-snug">
-            New essays, research, and quick takes from the network
-          </p>
-        )}
+        <div className="mt-3 space-y-1.5">
+          {featuredPost ? (
+            <p className="flex min-w-0 gap-1.5 text-[13px] leading-5 text-gray-700">
+              <span className="shrink-0 font-semibold text-ink">Top post:</span>
+              <Link
+                href={featuredPost.slug ? `/post/${featuredPost.slug}` : "/"}
+                className="min-w-0 truncate hover:text-emerald-brand"
+              >
+                {featuredPost.title}
+              </Link>
+            </p>
+          ) : (
+            <p className="text-[13px] font-medium leading-5 text-gray-700">
+              New essays, research, and quick takes from the network
+            </p>
+          )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium text-white/75">
-          <span>Top post today</span>
           {activeDebate ? (
-            <Link
-              href={`/debates/${activeDebate.id}`}
-              className="max-w-full truncate text-white"
-            >
-              Live debate: {activeDebate.title}
-            </Link>
+            <p className="flex min-w-0 gap-1.5 text-[13px] leading-5 text-gray-700">
+              <span className="shrink-0 font-semibold text-ink">Live debate:</span>
+              <Link
+                href={`/debates/${activeDebate.id}`}
+                className="min-w-0 truncate hover:text-emerald-brand"
+              >
+                {activeDebate.title}
+              </Link>
+            </p>
           ) : null}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-medium text-gray-500">
           {nextTier ? (
-            <span>{pointsToNext} pts to {nextTier.name}</span>
+            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-700">
+              {pointsToNext} pts to {nextTier.name}
+            </span>
           ) : null}
         </div>
       </section>
