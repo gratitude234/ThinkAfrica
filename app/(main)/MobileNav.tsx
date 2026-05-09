@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { isEnabled } from "@/lib/featureFlags";
 import { createClient } from "@/lib/supabase/client";
 
 interface MobileNavProps {
@@ -86,16 +85,6 @@ export default function MobileNav({
     user ? { label: "Settings", href: "/settings" } : null,
     canAccessReview ? { label: "Review", href: "/review" } : null,
     user && isAdmin ? { label: "Admin", href: "/admin/review" } : null,
-  ].filter(Boolean) as { label: string; href: string }[];
-
-  const moreLinks = [
-    isEnabled("webinars") ? { label: "Webinars", href: "/webinars" } : null,
-    isEnabled("fellowshipsSection") ? { label: "Fellowships", href: "/fellowships" } : null,
-    isEnabled("ambassadors") ? { label: "Ambassadors", href: "/ambassadors" } : null,
-    { label: "Leaderboard", href: "/leaderboard" },
-    { label: "Alumni", href: "/alumni" },
-    isEnabled("talentMarketplace") ? { label: "People", href: "/talent" } : null,
-    { label: "Partners", href: "/partners" },
   ].filter(Boolean) as { label: string; href: string }[];
 
   const menuPanel = open ? (
@@ -197,25 +186,6 @@ export default function MobileNav({
           </div>
         ) : null}
 
-        <div className="border-t border-gray-100 pt-3">
-          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-            More
-          </p>
-          <div className="space-y-1">
-            {moreLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className={itemClass(
-                  pathname === item.href || pathname.startsWith(`${item.href}/`)
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </div>
       </nav>
     </div>
   ) : null;
