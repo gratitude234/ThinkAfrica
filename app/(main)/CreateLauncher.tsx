@@ -71,17 +71,21 @@ export default function CreateLauncher({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_12px_24px_-8px_rgb(16_185_129/0.65)] transition-colors hover:bg-emerald-600"
+          className="group fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_12px_24px_-8px_rgb(16_185_129/0.65)] transition-[background-color,transform] duration-200 hover:bg-emerald-600 active:scale-95 motion-reduce:transition-none"
           aria-label="Create"
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
         >
-          <PlusIcon className="h-6 w-6" />
+          <PlusIcon
+            className={`h-6 w-6 transition-transform duration-200 motion-reduce:transition-none ${
+              open ? "rotate-45" : "group-active:rotate-45"
+            }`}
+          />
         </button>
 
         {open ? (
-          <div className="fixed inset-0 z-[70] bg-black/40">
+          <div className="fixed inset-0 z-[70] animate-fade-in bg-black/40 motion-reduce:animate-none">
             <button
               type="button"
               className="absolute inset-0 cursor-default"
@@ -93,7 +97,7 @@ export default function CreateLauncher({
               role="dialog"
               aria-modal="true"
               aria-labelledby={`${panelId}-title`}
-              className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-3xl bg-white px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-4 shadow-2xl"
+              className="absolute inset-x-0 bottom-0 max-h-[82vh] animate-create-sheet-up overflow-y-auto rounded-t-3xl bg-white px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-4 shadow-2xl motion-reduce:animate-none"
             >
               <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-gray-200" />
               <div className="mb-4 flex items-start justify-between gap-4">
@@ -115,12 +119,13 @@ export default function CreateLauncher({
                 </button>
               </div>
               <div className="space-y-2">
-                {CREATE_ACTIONS.map((action) => (
+                {CREATE_ACTIONS.map((action, index) => (
                   <Link
                     key={action.id}
                     href={getCreateHref(action.href, userId)}
                     onClick={() => setOpen(false)}
-                    className="block rounded-2xl border border-gray-200 bg-white p-4 transition-colors hover:border-emerald-200 hover:bg-canvas"
+                    className="block animate-create-item-in rounded-2xl border border-gray-200 bg-white p-4 opacity-0 transition-colors hover:border-emerald-200 hover:bg-canvas motion-reduce:animate-none motion-reduce:opacity-100"
+                    style={{ animationDelay: `${index * 35}ms` }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -169,7 +174,7 @@ export default function CreateLauncher({
         <div
           id={panelId}
           role="menu"
-          className="absolute right-0 top-[calc(100%+10px)] z-[80] w-[380px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+          className="absolute right-0 top-[calc(100%+10px)] z-[80] w-[380px] animate-create-menu-in overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl motion-reduce:animate-none"
         >
           <div className="border-b border-gray-100 px-4 py-3">
             <p className="text-sm font-semibold text-ink">Create on ThinkAfrica</p>
@@ -178,13 +183,14 @@ export default function CreateLauncher({
             </p>
           </div>
           <div className="grid gap-1 p-2">
-            {CREATE_ACTIONS.map((action) => (
+            {CREATE_ACTIONS.map((action, index) => (
               <Link
                 key={action.id}
                 role="menuitem"
                 href={getCreateHref(action.href, userId)}
                 onClick={() => setOpen(false)}
-                className="rounded-xl px-3 py-3 transition-colors hover:bg-canvas"
+                className="animate-create-item-in rounded-xl px-3 py-3 opacity-0 transition-colors hover:bg-canvas motion-reduce:animate-none motion-reduce:opacity-100"
+                style={{ animationDelay: `${index * 25}ms` }}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
