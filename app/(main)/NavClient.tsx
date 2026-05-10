@@ -7,6 +7,7 @@ import NavUserMenu from "./NavUserMenu";
 import MobileNav from "./MobileNav";
 import CreateLauncher from "./CreateLauncher";
 import NotificationBell from "@/components/ui/NotificationBell";
+import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 
 interface NavClientProps {
   user: User | null;
@@ -29,6 +30,25 @@ function navItemClass(isActive: boolean) {
   }`;
 }
 
+function MessageIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8 10h8M8 14h5m7-2a8 8 0 11-3.05-6.28L21 5l-.72 4.05A7.97 7.97 0 0120 12z"
+      />
+    </svg>
+  );
+}
+
 export default function NavClient({
   user,
   profile,
@@ -45,6 +65,9 @@ export default function NavClient({
   const isOpportunitiesActive =
     pathname === "/opportunities" || pathname.startsWith("/opportunities/");
   const isWriteActive = pathname.startsWith("/write");
+  const messagesHref = user
+    ? "/messages"
+    : `/login?redirectTo=${encodeURIComponent("/messages")}`;
 
   return (
     <nav
@@ -116,26 +139,16 @@ export default function NavClient({
           </div>
 
           <div className="ml-auto flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={onOpenSearch}
-              className="rounded-lg p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink lg:hidden"
-              aria-label="Open search"
+            <Link
+              href={messagesHref}
+              className="relative rounded-lg p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink lg:hidden"
+              aria-label="Open messages"
             >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </button>
+              <MessageIcon />
+              {user ? (
+                <MessagesUnreadBadge userId={user.id} className="-right-0.5 -top-0.5" />
+              ) : null}
+            </Link>
             {user ? <NotificationBell userId={user.id} /> : null}
             <CreateLauncher
               userId={user?.id ?? null}
