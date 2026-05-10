@@ -78,9 +78,7 @@ export default function MobileNav({
   }, [open]);
 
   const accountLinks = [
-    user ? { label: "Profile", href: profileHref } : null,
-    user ? { label: "Messages", href: "/messages" } : null,
-    user ? { label: "Dashboard", href: "/dashboard" } : null,
+    user ? { label: "My writing", href: "/dashboard" } : null,
     user ? { label: "Bookmarks", href: "/bookmarks" } : null,
     user ? { label: "Settings", href: "/settings" } : null,
     canAccessReview ? { label: "Review", href: "/review" } : null,
