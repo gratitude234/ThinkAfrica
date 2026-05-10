@@ -1,19 +1,30 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import {
+  AuthShell,
+  INPUT_STYLES,
+  PRIMARY_BUTTON_STYLES,
+  SECONDARY_LINK_STYLES,
+} from "../AuthShell";
+import { formatAuthError } from "../authMessages";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { createClient } from "@/lib/supabase/client";
 
-const INPUT_STYLES =
-  "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
-
-const BRAND_ITEMS = [
-  { marker: "01", text: "Claim a byline readers can trust" },
-  { marker: "02", text: "Publish quick takes, essays, research, and briefs" },
-  { marker: "03", text: "Follow writers, debates, and opportunities" },
+const PROOF_ITEMS = [
+  "Claim a trusted student byline",
+  "Publish quick takes and long-form work",
+  "Follow people, topics, and debates",
 ];
+
+function getPasswordHint(password: string) {
+  if (!password) return "Use at least 6 characters.";
+  if (password.length < 6) return "Add a few more characters.";
+  if (password.length < 10) return "Good start. Longer passwords are stronger.";
+  return "Strong enough to create your account.";
+}
 
 export default function SignupPage() {
   const router = useRouter();
@@ -26,6 +37,8 @@ export default function SignupPage() {
     password: "",
   });
 
+  const passwordReady = form.password.length >= 6;
+
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
@@ -37,17 +50,17 @@ export default function SignupPage() {
 
     const supabase = createClient();
     const { error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
+      email: form.email.trim(),
       password: form.password,
       options: {
         data: {
-          full_name: form.fullName,
+          full_name: form.fullName.trim(),
         },
       },
     });
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError(formatAuthError(signUpError.message));
       setLoading(false);
       return;
     }
@@ -58,144 +71,131 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="fixed inset-0 z-10 grid min-h-dvh grid-cols-1 overflow-y-auto bg-white md:grid-cols-2">
-      <div className="hidden flex-col justify-between bg-emerald-brand p-12 text-white md:flex">
-        <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png"
-            alt="ThinkAfrica"
-            className="mb-12 h-10 w-auto brightness-0 invert"
-          />
-          <blockquote className="mb-6 text-xl font-medium italic leading-relaxed text-white/90">
-            &quot;Turn your strongest campus ideas into work other students can read, cite, and respond to.&quot;
-          </blockquote>
-          <p className="text-sm text-white/60">
-            ThinkAfrica - Africa&apos;s Intellectual Network
-          </p>
-        </div>
-        <div className="space-y-4">
-          {BRAND_ITEMS.map((item) => (
-            <div
-              key={item.text}
-              className="flex items-center gap-3 text-sm text-white/80"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-xs font-semibold">
-                {item.marker}
-              </span>
-              <span>{item.text}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col justify-start bg-white px-6 pb-8 pt-8 sm:px-16 md:justify-center md:py-10">
-        <div className="mx-auto w-full max-w-md">
-          <Link
-            href="/landing"
-            className="mb-7 inline-flex font-display text-[24px] font-bold leading-none md:hidden"
-          >
-            <span className="text-emerald-brand">Think</span>
-            <span className="text-purple-accent">Africa</span>
+    <AuthShell
+      eyebrow="Create your profile"
+      title="Join Africa's student intellectual network."
+      subtitle="Start with your name and email. Next, we will shape your country, university, interests, and first follows."
+      proofItems={PROOF_ITEMS}
+      quote="Turn your strongest campus ideas into work other students can read, cite, and respond to."
+      quoteSource="ThinkAfrica onboarding promise"
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link href="/login" className={SECONDARY_LINK_STYLES}>
+            Sign in
           </Link>
-          <h1 className="font-display mb-1 text-2xl font-bold text-ink">
-            Claim your academic profile
-          </h1>
-          <p className="mb-8 text-sm leading-relaxed text-gray-500">
-            Start with your name and university email. Next, we will shape your
-            interests, follows, and first contribution.
-          </p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Full name
-              </label>
-              <input
-                type="text"
-                name="fullName"
-                value={form.fullName}
-                onChange={handleChange}
-                required
-                autoComplete="name"
-                placeholder="e.g. Amara Diallo"
-                className={INPUT_STYLES}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                required
-                autoComplete="email"
-                inputMode="email"
-                placeholder="you@university.edu"
-                className={INPUT_STYLES}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={passwordVisible ? "text" : "password"}
-                  name="password"
-                  value={form.password}
-                  onChange={handleChange}
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                  placeholder="At least 6 characters"
-                  className={`${INPUT_STYLES} pr-20`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setPasswordVisible((current) => !current)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-                >
-                  {passwordVisible ? "Hide" : "Show"}
-                </button>
-              </div>
-            </div>
-
-            {error ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-emerald-brand py-3 font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? "Creating account..." : "Create account"}
-            </button>
-          </form>
-
-          <div className="mt-7 rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-xs leading-relaxed text-gray-500">
-            Your profile links your byline, university, topics, saved posts, and published work.
-          </div>
-
-          <p className="mt-6 text-center text-sm text-gray-500">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-emerald-600 hover:underline"
-            >
-              Sign in
-            </Link>
-          </p>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label
+            htmlFor="fullName"
+            className="mb-2 block text-sm font-semibold text-gray-800"
+          >
+            Full name
+          </label>
+          <input
+            id="fullName"
+            type="text"
+            name="fullName"
+            value={form.fullName}
+            onChange={handleChange}
+            required
+            autoComplete="name"
+            placeholder="e.g. Amara Diallo"
+            className={INPUT_STYLES}
+          />
         </div>
+
+        <div>
+          <label
+            htmlFor="email"
+            className="mb-2 block text-sm font-semibold text-gray-800"
+          >
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={handleChange}
+            required
+            autoComplete="email"
+            inputMode="email"
+            placeholder="you@university.edu"
+            className={INPUT_STYLES}
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="password"
+            className="mb-2 block text-sm font-semibold text-gray-800"
+          >
+            Password
+          </label>
+          <div className="relative">
+            <input
+              id="password"
+              type={passwordVisible ? "text" : "password"}
+              name="password"
+              value={form.password}
+              onChange={handleChange}
+              required
+              minLength={6}
+              autoComplete="new-password"
+              placeholder="At least 6 characters"
+              className={`${INPUT_STYLES} pr-20`}
+              aria-describedby="password-hint"
+            />
+            <button
+              type="button"
+              onClick={() => setPasswordVisible((current) => !current)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+              aria-label={passwordVisible ? "Hide password" : "Show password"}
+            >
+              {passwordVisible ? "Hide" : "Show"}
+            </button>
+          </div>
+          <div className="mt-2 flex items-center gap-2" id="password-hint">
+            <span
+              className={`h-1.5 w-10 rounded-full ${
+                passwordReady ? "bg-emerald-brand" : "bg-gray-200"
+              }`}
+            />
+            <p className="text-xs text-ink-muted">
+              {getPasswordHint(form.password)}
+            </p>
+          </div>
+        </div>
+
+        {error ? (
+          <div
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700"
+            role="alert"
+            aria-live="assertive"
+          >
+            {error}
+          </div>
+        ) : null}
+
+        <button type="submit" disabled={loading} className={PRIMARY_BUTTON_STYLES}>
+          {loading ? "Creating account..." : "Create account"}
+        </button>
+      </form>
+
+      <div className="mt-7 grid grid-cols-3 gap-2 rounded-xl border border-gray-200 bg-canvas p-2 text-center">
+        {["Profile", "Topics", "Follows"].map((step, index) => (
+          <div key={step} className="rounded-lg bg-white px-2 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-brand">
+              Step {index + 1}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-gray-800">{step}</p>
+          </div>
+        ))}
       </div>
-    </div>
+    </AuthShell>
   );
 }
