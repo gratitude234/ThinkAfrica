@@ -42,22 +42,6 @@ export const CREATE_ACTIONS: CreateAction[] = [
     href: "/write?type=research&starter=1",
     category: "write",
   },
-  {
-    id: "debate-motion",
-    label: "Debate Motion",
-    description: "Propose a structured public argument.",
-    badge: "Verified users",
-    href: "/debates/create",
-    category: "community",
-  },
-  {
-    id: "opportunity-profile",
-    label: "Opportunity Profile",
-    description: "Make yourself discoverable for roles and projects.",
-    badge: "Profile update",
-    href: "/opportunities?intent=profile",
-    category: "profile",
-  },
 ];
 
 export function getCreateHref(href: string, userId: string | null) {
