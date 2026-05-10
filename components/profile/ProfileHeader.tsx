@@ -47,6 +47,10 @@ interface ProfileHeaderProps {
     followerCount: number;
     followingCount: number;
     totalViews: number;
+    totalLikes: number;
+    debateContributionCount: number;
+    topicCount: number;
+    badgeCount: number;
     points: number;
   };
 }
@@ -81,11 +85,11 @@ export default function ProfileHeader({
       : `Writing since ${writingSince}`,
   ].filter(Boolean);
   const statsItems = [
-    { label: "Posts", value: stats.postCount },
-    { label: "Followers", value: stats.followerCount },
-    { label: "Following", value: stats.followingCount },
+    { label: "Articles", value: stats.postCount },
+    { label: "Debates", value: stats.debateContributionCount },
     { label: "Reads", value: stats.totalViews },
-    { label: "Points", value: stats.points },
+    { label: "Topics", value: stats.topicCount },
+    { label: "Badges", value: stats.badgeCount },
   ];
 
   return (

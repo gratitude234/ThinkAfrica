@@ -15,6 +15,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text unique,
   full_name text,
+  country text,
   university text,
   field_of_study text,
   bio text,
@@ -25,7 +26,8 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles
-  add column if not exists role text not null default 'student';
+  add column if not exists role text not null default 'student',
+  add column if not exists country text;
 
 alter table public.profiles
   drop constraint if exists profiles_role_check;
@@ -49,6 +51,17 @@ create table if not exists public.posts (
   view_count integer not null default 0,
   created_at timestamptz not null default now(),
   published_at timestamptz
+);
+
+-- post_authors
+create table if not exists public.post_authors (
+  post_id uuid not null references public.posts(id) on delete cascade,
+  user_id uuid not null references public.profiles(id),
+  display_order integer not null default 0,
+  corresponding_author boolean not null default false,
+  invited_at timestamptz not null default now(),
+  accepted_at timestamptz,
+  primary key (post_id, user_id)
 );
 
 -- comments
@@ -92,6 +105,28 @@ create table if not exists public.user_badges (
   primary key (user_id, badge_id)
 );
 
+-- universities: country-scoped school directory for onboarding/settings
+create table if not exists public.universities (
+  id uuid primary key default uuid_generate_v4(),
+  country text not null,
+  name text not null,
+  aliases text[] not null default '{}',
+  website_url text,
+  verified boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (country, name)
+);
+
+-- profile_featured_posts
+create table if not exists public.profile_featured_posts (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  post_id uuid not null references public.posts(id) on delete cascade,
+  position integer not null check (position between 1 and 3),
+  created_at timestamptz not null default now(),
+  primary key (user_id, post_id),
+  unique (user_id, position)
+);
+
 -- ============================================================
 -- INDEXES
 -- ============================================================
@@ -101,6 +136,73 @@ create index if not exists posts_status_idx on public.posts(status);
 create index if not exists posts_slug_idx on public.posts(slug);
 create index if not exists comments_post_id_idx on public.comments(post_id);
 create index if not exists likes_post_id_idx on public.likes(post_id);
+create index if not exists profiles_country_idx on public.profiles(country);
+create index if not exists universities_country_name_idx on public.universities(country, name);
+
+insert into public.universities (country, name)
+values
+  ('Algeria', 'University of Algiers'),
+  ('Botswana', 'University of Botswana'),
+  ('Egypt', 'Ain Shams University'),
+  ('Egypt', 'Assiut University'),
+  ('Egypt', 'Cairo University'),
+  ('Egypt', 'University of Alexandria'),
+  ('Ethiopia', 'Addis Ababa University'),
+  ('Ghana', 'Kwame Nkrumah University of Science and Technology'),
+  ('Ghana', 'University of Ghana'),
+  ('Kenya', 'Egerton University'),
+  ('Kenya', 'Kenyatta University'),
+  ('Kenya', 'Moi University'),
+  ('Kenya', 'Strathmore University'),
+  ('Kenya', 'USIU Africa'),
+  ('Kenya', 'University of Nairobi'),
+  ('Mauritius', 'African Leadership University'),
+  ('Mauritius', 'University of Mauritius'),
+  ('Morocco', 'Mohammed V University'),
+  ('Nigeria', 'Ahmadu Bello University'),
+  ('Nigeria', 'Babcock University'),
+  ('Nigeria', 'Covenant University'),
+  ('Nigeria', 'Delta State University'),
+  ('Nigeria', 'Federal University of Technology Akure'),
+  ('Nigeria', 'Joseph Ayo Babalola University'),
+  ('Nigeria', 'Lagos State University'),
+  ('Nigeria', 'Nnamdi Azikiwe University'),
+  ('Nigeria', 'Obafemi Awolowo University'),
+  ('Nigeria', 'Pan-African University'),
+  ('Nigeria', 'Rivers State University'),
+  ('Nigeria', 'University of Abuja'),
+  ('Nigeria', 'University of Benin'),
+  ('Nigeria', 'University of Ibadan'),
+  ('Nigeria', 'University of Lagos'),
+  ('Nigeria', 'University of Nigeria Nsukka'),
+  ('Nigeria', 'University of Port Harcourt'),
+  ('Rwanda', 'African Leadership University'),
+  ('Rwanda', 'National University of Rwanda'),
+  ('Senegal', 'Cheikh Anta Diop University'),
+  ('South Africa', 'Durban University of Technology'),
+  ('South Africa', 'Nelson Mandela University'),
+  ('South Africa', 'North-West University'),
+  ('South Africa', 'Rhodes University'),
+  ('South Africa', 'Stellenbosch University'),
+  ('South Africa', 'Tshwane University of Technology'),
+  ('South Africa', 'University of Cape Town'),
+  ('South Africa', 'University of Johannesburg'),
+  ('South Africa', 'University of KwaZulu-Natal'),
+  ('South Africa', 'University of Limpopo'),
+  ('South Africa', 'University of Pretoria'),
+  ('South Africa', 'University of Western Cape'),
+  ('South Africa', 'University of Witwatersrand'),
+  ('South Africa', 'University of the Free State'),
+  ('Sudan', 'University of Khartoum'),
+  ('Tanzania', 'University of Dar es Salaam'),
+  ('Tunisia', 'University of Tunis'),
+  ('Uganda', 'Makerere University'),
+  ('Zambia', 'University of Zambia'),
+  ('Zimbabwe', 'University of Zimbabwe')
+on conflict (country, name) do update
+set verified = true;
+create index if not exists profile_featured_posts_user_position_idx on public.profile_featured_posts(user_id, position);
+create index if not exists profile_featured_posts_post_idx on public.profile_featured_posts(post_id);
 
 -- ============================================================
 -- TRIGGER: auto-create profile on signup
@@ -127,11 +229,12 @@ begin
     final_username := base_username || counter::text;
   end loop;
 
-  insert into public.profiles (id, username, full_name, university)
+  insert into public.profiles (id, username, full_name, country, university)
   values (
     new.id,
     final_username,
     coalesce(new.raw_user_meta_data->>'full_name', ''),
+    nullif(new.raw_user_meta_data->>'country', ''),
     coalesce(new.raw_user_meta_data->>'university', '')
   )
   on conflict (id) do nothing;
@@ -191,6 +294,8 @@ alter table public.likes enable row level security;
 alter table public.follows enable row level security;
 alter table public.badges enable row level security;
 alter table public.user_badges enable row level security;
+alter table public.universities enable row level security;
+alter table public.profile_featured_posts enable row level security;
 
 -- ---- profiles ----
 create or replace function pg_temp.create_policy_if_missing(
@@ -223,6 +328,10 @@ select pg_temp.create_policy_if_missing('public', 'profiles', 'Users can insert 
 
 select pg_temp.create_policy_if_missing('public', 'profiles', 'Users can update their own profile',
   $$create policy "Users can update their own profile" on public.profiles for update using (auth.uid() = id)$$);
+
+-- ---- universities ----
+select pg_temp.create_policy_if_missing('public', 'universities', 'Universities are viewable by everyone',
+  $$create policy "Universities are viewable by everyone" on public.universities for select using (true)$$);
 
 -- ---- posts ----
 select pg_temp.create_policy_if_missing('public', 'posts', 'Published posts are viewable by everyone',
@@ -277,6 +386,51 @@ select pg_temp.create_policy_if_missing('public', 'badges', 'Badges are viewable
 -- ---- user_badges ----
 select pg_temp.create_policy_if_missing('public', 'user_badges', 'User badges are viewable by everyone',
   $$create policy "User badges are viewable by everyone" on public.user_badges for select using (true)$$);
+
+-- ---- profile_featured_posts ----
+select pg_temp.create_policy_if_missing('public', 'profile_featured_posts', 'Featured profile work is viewable by everyone',
+  $$create policy "Featured profile work is viewable by everyone" on public.profile_featured_posts for select using (true)$$);
+
+select pg_temp.create_policy_if_missing('public', 'profile_featured_posts', 'Users can feature their eligible published work',
+  $$create policy "Users can feature their eligible published work" on public.profile_featured_posts for insert with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.posts
+      where posts.id = profile_featured_posts.post_id
+        and posts.status = 'published'
+        and (
+          posts.author_id = profile_featured_posts.user_id
+          or exists (
+            select 1 from public.post_authors
+            where post_authors.post_id = profile_featured_posts.post_id
+              and post_authors.user_id = profile_featured_posts.user_id
+              and post_authors.accepted_at is not null
+          )
+        )
+    )
+  )$$);
+
+select pg_temp.create_policy_if_missing('public', 'profile_featured_posts', 'Users can update their featured profile work',
+  $$create policy "Users can update their featured profile work" on public.profile_featured_posts for update using (auth.uid() = user_id) with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.posts
+      where posts.id = profile_featured_posts.post_id
+        and posts.status = 'published'
+        and (
+          posts.author_id = profile_featured_posts.user_id
+          or exists (
+            select 1 from public.post_authors
+            where post_authors.post_id = profile_featured_posts.post_id
+              and post_authors.user_id = profile_featured_posts.user_id
+              and post_authors.accepted_at is not null
+          )
+        )
+    )
+  )$$);
+
+select pg_temp.create_policy_if_missing('public', 'profile_featured_posts', 'Users can remove their featured profile work',
+  $$create policy "Users can remove their featured profile work" on public.profile_featured_posts for delete using (auth.uid() = user_id)$$);
 
 -- ============================================================
 -- SEED: default badges

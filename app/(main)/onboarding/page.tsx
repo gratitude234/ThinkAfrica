@@ -8,6 +8,7 @@ import UniversitySelect from "@/components/ui/UniversitySelect";
 import UserAvatar from "@/components/ui/UserAvatar";
 import AvatarUploader from "../settings/AvatarUploader";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { AFRICAN_COUNTRIES, inferCountryFromUniversity } from "@/lib/academicIdentity";
 
 const INTEREST_OPTIONS = [
   "Law & Justice",
@@ -77,6 +78,7 @@ export default function OnboardingPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
+  const [country, setCountry] = useState("");
   const [university, setUniversity] = useState("");
   const [fieldOfStudy, setFieldOfStudy] = useState("");
   const [graduationYear, setGraduationYear] = useState("");
@@ -99,6 +101,16 @@ export default function OnboardingPage() {
       router.replace(`/onboarding?step=${nextStep}`);
     },
     [router]
+  );
+
+  const handleCountryChange = useCallback(
+    (nextCountry: string) => {
+      if (nextCountry !== country) {
+        setUniversity("");
+      }
+      setCountry(nextCountry);
+    },
+    [country]
   );
 
   const loadSuggestions = useCallback(
@@ -161,6 +173,7 @@ export default function OnboardingPage() {
 
       const metadata = user.user_metadata as {
         full_name?: string;
+        country?: string;
         university?: string;
         field_of_study?: string;
         graduation_year?: string | number;
@@ -169,7 +182,7 @@ export default function OnboardingPage() {
       const { data: profile } = await supabase
         .from("profiles")
         .select(
-          "full_name, username, avatar_url, interests, onboarding_completed, graduation_year, university, field_of_study"
+          "full_name, username, avatar_url, interests, onboarding_completed, graduation_year, country, university, field_of_study"
         )
         .eq("id", user.id)
         .single();
@@ -186,7 +199,13 @@ export default function OnboardingPage() {
       setUsername(profile?.username || normalizeUsername(emailUsername));
       setAvatarUrl(profile?.avatar_url ?? null);
       setInterests((profile?.interests as string[] | null) ?? []);
-      setUniversity(profile?.university || metadata.university || "");
+      const nextUniversity = profile?.university || metadata.university || "";
+      setCountry(
+        profile?.country ||
+          metadata.country ||
+          inferCountryFromUniversity(nextUniversity)
+      );
+      setUniversity(nextUniversity);
       setFieldOfStudy(profile?.field_of_study || metadata.field_of_study || "");
       setGraduationYear(
         profile?.graduation_year || metadata.graduation_year
@@ -206,8 +225,14 @@ export default function OnboardingPage() {
 
   const saveIdentity = async () => {
     if (!userId) return;
-    if (!fullName.trim() || !username.trim() || !university.trim() || !fieldOfStudy) {
-      setError("Add your name, username, university, and field of study.");
+    if (
+      !fullName.trim() ||
+      !username.trim() ||
+      !country.trim() ||
+      !university.trim() ||
+      !fieldOfStudy
+    ) {
+      setError("Add your name, username, country, university, and field of study.");
       return;
     }
 
@@ -219,6 +244,7 @@ export default function OnboardingPage() {
       .update({
         full_name: fullName.trim(),
         username: normalizeUsername(username),
+        country: country.trim(),
         university: university.trim(),
         field_of_study: fieldOfStudy,
         graduation_year: graduationYear ? parseInt(graduationYear, 10) : null,
@@ -354,9 +380,31 @@ export default function OnboardingPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
+                Country
+              </label>
+              <select
+                value={country}
+                onChange={(event) => handleCountryChange(event.target.value)}
+                className={INPUT_STYLES}
+              >
+                <option value="">Select country</option>
+                {AFRICAN_COUNTRIES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 University
               </label>
-              <UniversitySelect value={university} onChange={setUniversity} />
+              <UniversitySelect
+                value={university}
+                onChange={setUniversity}
+                country={country}
+                disabled={!country}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">

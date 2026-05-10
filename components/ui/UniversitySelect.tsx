@@ -1,75 +1,26 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useId } from "react";
-
-const AFRICAN_UNIVERSITIES = [
-  "Addis Ababa University",
-  "African Leadership University",
-  "Ahmadu Bello University",
-  "Ain Shams University",
-  "Assiut University",
-  "Babcock University",
-  "Cairo University",
-  "Cheikh Anta Diop University",
-  "Covenant University",
-  "Delta State University",
-  "Durban University of Technology",
-  "Egerton University",
-  "Federal University of Technology Akure",
-  "Joseph Ayo Babalola University",
-  "Kenyatta University",
-  "Kwame Nkrumah University of Science and Technology",
-  "Lagos State University",
-  "Makerere University",
-  "Mohammed V University",
-  "Moi University",
-  "National University of Rwanda",
-  "Nelson Mandela University",
-  "Nnamdi Azikiwe University",
-  "North-West University",
-  "Obafemi Awolowo University",
-  "Pan-African University",
-  "Rhodes University",
-  "Rivers State University",
-  "Stellenbosch University",
-  "Strathmore University",
-  "Tshwane University of Technology",
-  "USIU Africa",
-  "University of Abuja",
-  "University of Algiers",
-  "University of Alexandria",
-  "University of Benin",
-  "University of Botswana",
-  "University of Cape Town",
-  "University of Dar es Salaam",
-  "University of Ghana",
-  "University of Ibadan",
-  "University of Johannesburg",
-  "University of KwaZulu-Natal",
-  "University of Khartoum",
-  "University of Lagos",
-  "University of Limpopo",
-  "University of Mauritius",
-  "University of Nairobi",
-  "University of Nigeria Nsukka",
-  "University of Port Harcourt",
-  "University of Pretoria",
-  "University of Tunis",
-  "University of Western Cape",
-  "University of Witwatersrand",
-  "University of Zambia",
-  "University of Zimbabwe",
-  "University of the Free State",
-  "Other",
-];
+import { getUniversitiesForCountry } from "@/lib/academicIdentity";
+import { createClient } from "@/lib/supabase/client";
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
+  country?: string;
+  disabled?: boolean;
+  placeholder?: string;
   className?: string;
 }
 
-export default function UniversitySelect({ value, onChange, className = "" }: Props) {
+export default function UniversitySelect({
+  value,
+  onChange,
+  country,
+  disabled = false,
+  placeholder,
+  className = "",
+}: Props) {
   const [inputValue, setInputValue] = useState(value);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -77,14 +28,61 @@ export default function UniversitySelect({ value, onChange, className = "" }: Pr
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const listId = useId();
+  const [directoryUniversities, setDirectoryUniversities] = useState<string[]>([]);
+  const fallbackUniversities = getUniversitiesForCountry(country);
 
-  const filtered = AFRICAN_UNIVERSITIES.filter((u) =>
+  const fallbackFiltered = fallbackUniversities.filter((u) =>
     u.toLowerCase().includes(inputValue.toLowerCase())
   ).slice(0, 8);
+  const filtered = directoryUniversities.length > 0
+    ? directoryUniversities
+    : fallbackFiltered;
 
   useEffect(() => {
     setInputValue(value);
   }, [value]);
+
+  useEffect(() => {
+    if (!country || disabled) {
+      setDirectoryUniversities([]);
+      return;
+    }
+
+    let isActive = true;
+    const timeoutId = window.setTimeout(async () => {
+      const supabase = createClient();
+      const searchTerm = inputValue.trim();
+      let query = supabase
+        .from("universities")
+        .select("name")
+        .eq("country", country)
+        .order("name", { ascending: true })
+        .limit(12);
+
+      if (searchTerm) {
+        query = query.ilike("name", `%${searchTerm}%`);
+      }
+
+      const { data, error } = await query;
+      if (!isActive) return;
+
+      if (error) {
+        setDirectoryUniversities([]);
+        return;
+      }
+
+      setDirectoryUniversities(
+        ((data ?? []) as Array<{ name: string | null }>)
+          .map((item) => item.name)
+          .filter((name): name is string => Boolean(name))
+      );
+    }, 150);
+
+    return () => {
+      isActive = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [country, disabled, inputValue]);
 
   useEffect(() => {
     function handleOutsideClick(e: MouseEvent) {
@@ -109,7 +107,7 @@ export default function UniversitySelect({ value, onChange, className = "" }: Pr
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
-    setOpen(true);
+    setOpen(!disabled);
     setActiveIndex(-1);
   };
 
@@ -122,6 +120,7 @@ export default function UniversitySelect({ value, onChange, className = "" }: Pr
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return;
     if (!open && e.key !== "Escape") {
       setOpen(true);
     }
@@ -161,10 +160,11 @@ export default function UniversitySelect({ value, onChange, className = "" }: Pr
         type="text"
         value={inputValue}
         onChange={handleInputChange}
-        onFocus={() => setOpen(true)}
+        onFocus={() => setOpen(!disabled)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        placeholder="Search university..."
+        placeholder={placeholder ?? (country ? "Search university..." : "Select country first")}
+        disabled={disabled}
         autoComplete="off"
         role="combobox"
         aria-autocomplete="list"
@@ -174,9 +174,9 @@ export default function UniversitySelect({ value, onChange, className = "" }: Pr
         aria-activedescendant={
           activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined
         }
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
       />
-      {open && filtered.length > 0 && (
+      {open && !disabled && filtered.length > 0 && (
         <ul
           id={listId}
           ref={listRef}

@@ -7,6 +7,8 @@ import Toast from "@/components/ui/Toast";
 import { isUniversityEmail } from "@/lib/universityDomains";
 import AvatarUploader from "./AvatarUploader";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import UniversitySelect from "@/components/ui/UniversitySelect";
+import { AFRICAN_COUNTRIES, inferCountryFromUniversity } from "@/lib/academicIdentity";
 
 const COMMON_INTERESTS = [
   "economics",
@@ -36,6 +38,7 @@ interface Profile {
   username: string;
   full_name: string | null;
   bio: string | null;
+  country: string | null;
   university: string | null;
   field_of_study: string | null;
   graduation_year: number | null;
@@ -56,6 +59,9 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const [fullName, setFullName] = useState(profile.full_name ?? "");
   const [username, setUsername] = useState(profile.username);
   const [bio, setBio] = useState(profile.bio ?? "");
+  const [country, setCountry] = useState(
+    profile.country ?? inferCountryFromUniversity(profile.university)
+  );
   const [university, setUniversity] = useState(profile.university ?? "");
   const [fieldOfStudy, setFieldOfStudy] = useState(profile.field_of_study ?? "");
   const [graduationYear, setGraduationYear] = useState<string>(
@@ -95,6 +101,13 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         ? prev.filter((item) => item !== interest)
         : [...prev, interest]
     );
+  };
+
+  const handleCountryChange = (nextCountry: string) => {
+    if (nextCountry !== country) {
+      setUniversity("");
+    }
+    setCountry(nextCountry);
   };
 
   // FIX: Auto-save avatar URL to DB immediately on upload
@@ -158,6 +171,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         full_name: fullName,
         username,
         bio,
+        country,
         university,
         field_of_study: fieldOfStudy,
         graduation_year: parsedYear,
@@ -255,14 +269,31 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
+            Country
+          </label>
+          <select
+            value={country}
+            onChange={(e) => handleCountryChange(e.target.value)}
+            className={INPUT_STYLES}
+          >
+            <option value="">Select country</option>
+            {AFRICAN_COUNTRIES.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             University
           </label>
-          <input
-            type="text"
+          <UniversitySelect
             value={university}
-            onChange={(e) => setUniversity(e.target.value)}
-            placeholder="e.g. University of Lagos"
-            className={INPUT_STYLES}
+            onChange={setUniversity}
+            country={country}
+            disabled={!country}
           />
         </div>
 

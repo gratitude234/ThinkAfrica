@@ -24,7 +24,9 @@ export default function PublishedToast({
 
   const [open, setOpen] = useState(justPublished);
   const [expanded, setExpanded] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copiedTarget, setCopiedTarget] = useState<"post" | "profile" | null>(
+    null
+  );
 
   useEffect(() => {
     if (!justPublished) return;
@@ -40,6 +42,7 @@ export default function PublishedToast({
   if (!open) return null;
 
   const url = `https://thinkafrica.com/post/${slug}`;
+  const profileUrl = username ? `https://thinkafrica.com/${username}` : "";
   const shareText = `I just published "${title}" on ThinkAfrica`;
 
   const onWhatsApp = () =>
@@ -64,10 +67,13 @@ export default function PublishedToast({
       "_blank",
       "noopener,noreferrer"
     );
-  const onCopy = async () => {
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const onCopy = async (target: "post" | "profile") => {
+    const nextUrl = target === "post" ? url : profileUrl;
+    if (!nextUrl) return;
+
+    await navigator.clipboard.writeText(nextUrl);
+    setCopiedTarget(target);
+    setTimeout(() => setCopiedTarget(null), 2000);
   };
 
   if (!expanded) {
@@ -99,6 +105,16 @@ export default function PublishedToast({
 
       {isLive ? (
         <>
+          <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+            <p className="text-sm font-semibold text-emerald-950">
+              Added to your academic portfolio
+            </p>
+            <p className="mt-1 text-xs leading-5 text-emerald-700">
+              You earned +{points} points. This publication now strengthens
+              your public ThinkAfrica profile.
+            </p>
+          </div>
+
           <div className="mb-3 grid grid-cols-3 gap-2">
             <button
               type="button"
@@ -124,25 +140,46 @@ export default function PublishedToast({
           </div>
           <button
             type="button"
-            onClick={onCopy}
+            onClick={() => void onCopy("post")}
             className="mb-3 w-full rounded-lg border border-gray-200 py-2 text-xs font-medium transition-colors hover:bg-canvas"
           >
-            {copied ? "Copied!" : "Copy link"}
+            {copiedTarget === "post" ? "Post copied!" : "Copy post link"}
           </button>
-          <p className="text-xs text-gray-500">
-            You earned +{points} points ·{" "}
-            <Link
-              href={`/${username}`}
-              className="font-medium text-emerald-brand"
-            >
-              View your profile →
-            </Link>
-          </p>
+
+          {username ? (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void onCopy("profile")}
+                className="rounded-lg border border-gray-200 py-2 text-xs font-medium transition-colors hover:bg-canvas"
+              >
+                {copiedTarget === "profile" ? "Profile copied!" : "Share profile"}
+              </button>
+              <Link
+                href={`/${username}#featured-work`}
+                className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
+              >
+                Manage portfolio
+              </Link>
+            </div>
+          ) : null}
         </>
       ) : (
-        <p className="text-xs text-gray-500">
-          We&apos;ll notify you when it goes live. Usually within 48 hours.
-        </p>
+        <>
+          <p className="text-xs leading-5 text-gray-500">
+            We&apos;ll notify you when it goes live. Usually within 48 hours.
+            Once accepted, this publication will strengthen your academic
+            portfolio.
+          </p>
+          {username ? (
+            <Link
+              href={`/${username}`}
+              className="mt-3 inline-flex text-xs font-medium text-emerald-brand"
+            >
+              View your profile
+            </Link>
+          ) : null}
+        </>
       )}
     </div>
   );

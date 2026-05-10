@@ -11,6 +11,8 @@ interface Badge {
 interface CredentialsCardProps {
   profile: {
     username: string;
+    university?: string | null;
+    field_of_study?: string | null;
     points: number;
     verified: boolean;
     verified_type: string | null;
@@ -18,6 +20,9 @@ interface CredentialsCardProps {
   badges: Badge[];
   postCount: number;
   totalViews: number;
+  totalLikes: number;
+  debateContributionCount: number;
+  topicStats: Array<{ tag: string; count: number }>;
   followerCount: number;
   followingCount: number;
 }
@@ -34,6 +39,9 @@ export default function CredentialsCard({
   badges,
   postCount,
   totalViews,
+  totalLikes,
+  debateContributionCount,
+  topicStats,
   followerCount,
   followingCount,
 }: CredentialsCardProps) {
@@ -98,7 +106,7 @@ export default function CredentialsCard({
 
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-            Public metrics
+            Portfolio metrics
           </p>
           <div className="mt-2 grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-canvas p-3">
@@ -113,8 +121,49 @@ export default function CredentialsCard({
               </p>
               <p className="text-xs text-gray-500">Publications</p>
             </div>
+            <div className="rounded-xl bg-canvas p-3">
+              <p className="text-lg font-semibold text-gray-900">
+                {debateContributionCount.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500">Debate contributions</p>
+            </div>
+            <div className="rounded-xl bg-canvas p-3">
+              <p className="text-lg font-semibold text-gray-900">
+                {totalLikes.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500">Likes</p>
+            </div>
           </div>
         </div>
+
+        {profile.university || profile.field_of_study ? (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+              Institution
+            </p>
+            <p className="mt-1 text-sm font-medium text-gray-900">
+              {[profile.field_of_study, profile.university].filter(Boolean).join(" / ")}
+            </p>
+          </div>
+        ) : null}
+
+        {topicStats.length > 0 ? (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+              Topics written on
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {topicStats.slice(0, 8).map((topic) => (
+                <span
+                  key={topic.tag}
+                  className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+                >
+                  {topic.tag} {topic.count > 1 ? topic.count : ""}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-6 border-t border-gray-100 pt-4 text-xs text-gray-400">

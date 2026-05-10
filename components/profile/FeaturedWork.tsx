@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import PostCover from "@/components/post/PostCover";
 import Badge from "@/components/ui/Badge";
 
@@ -14,6 +15,8 @@ interface FeaturedPost {
 
 interface FeaturedWorkProps {
   posts: FeaturedPost[];
+  action?: ReactNode;
+  curated?: boolean;
 }
 
 function estimateReadTime(excerpt: string | null): number {
@@ -23,21 +26,30 @@ function estimateReadTime(excerpt: string | null): number {
   );
 }
 
-export default function FeaturedWork({ posts }: FeaturedWorkProps) {
+export default function FeaturedWork({
+  posts,
+  action,
+  curated = false,
+}: FeaturedWorkProps) {
   if (posts.length === 0) return null;
 
   return (
-    <section className="min-w-0 space-y-4">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-          Featured work
-        </p>
-        <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
-          Work worth reading first
-        </h2>
-        <p className="mt-1 text-sm text-gray-500">
-          The strongest public pieces from this profile.
-        </p>
+    <section id="featured-work" className="min-w-0 scroll-mt-24 space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+            Featured work
+          </p>
+          <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
+            Work worth reading first
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {curated
+              ? "Selected by this profile as their strongest public work."
+              : "Automatically showing the strongest public pieces by reads."}
+          </p>
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
       <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">

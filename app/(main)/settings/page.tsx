@@ -12,7 +12,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, username, full_name, bio, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, signup_email, avatar_url, interests, cover_image_url")
+    .select("id, username, full_name, bio, country, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, signup_email, avatar_url, interests, cover_image_url")
     .eq("id", user.id)
     .single();
 
@@ -20,6 +20,7 @@ export default async function SettingsPage() {
 
   const missingFields: string[] = [];
   if (!profile.bio) missingFields.push("bio");
+  if (!profile.country) missingFields.push("country");
   if (!profile.field_of_study) missingFields.push("field of study");
   if (!profile.avatar_url) missingFields.push("profile photo");
   if (!((profile.interests as string[] | null)?.length ?? 0)) {
@@ -52,6 +53,7 @@ export default async function SettingsPage() {
             username: profile.username,
             full_name: profile.full_name ?? null,
             bio: profile.bio ?? null,
+            country: profile.country ?? null,
             university: profile.university ?? null,
             field_of_study: profile.field_of_study ?? null,
             graduation_year: profile.graduation_year ?? null,

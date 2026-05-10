@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import CredentialsCard from "@/components/profile/CredentialsCard";
 import FeaturedWork from "@/components/profile/FeaturedWork";
+import FeaturedWorkManager from "@/components/profile/FeaturedWorkManager";
 import OpportunityBanner from "@/components/profile/OpportunityBanner";
 import OpportunityProfileEditor from "@/components/opportunities/OpportunityProfileEditor";
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
@@ -220,6 +221,8 @@ export default async function UserProfilePage({ params }: PageProps) {
     { count: followingCount },
     { data: talentProfile },
     { data: topArguments },
+    { data: featuredRows },
+    { count: debateContributionCount },
     activityData,
     followStatus,
   ] = await Promise.all([
@@ -234,7 +237,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("post_authors")
       .select(
-        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, in_response_to, excerpt, type, tags, citation_id, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
+        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, in_response_to, excerpt, type, status, tags, citation_id, created_at, published_at, view_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
       )
       .eq("user_id", profile.id)
       .not("accepted_at", "is", null),
@@ -265,6 +268,15 @@ export default async function UserProfilePage({ params }: PageProps) {
       .eq("author_id", profile.id)
       .order("upvotes", { ascending: false })
       .limit(3),
+    supabase
+      .from("profile_featured_posts")
+      .select("post_id, position")
+      .eq("user_id", profile.id)
+      .order("position", { ascending: true }),
+    supabase
+      .from("debate_arguments")
+      .select("id", { count: "exact", head: true })
+      .eq("author_id", profile.id),
     isOwnProfile
       ? Promise.all([
           supabase
@@ -318,7 +330,13 @@ export default async function UserProfilePage({ params }: PageProps) {
   const normalizedCoAuthoredPosts = (coAuthoredPosts ?? [])
     .map((row) => {
       const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
-      if (!post || (post as { author_id?: string }).author_id === profile.id) return null;
+      if (
+        !post ||
+        (post as { author_id?: string }).author_id === profile.id ||
+        (post as { status?: string }).status !== "published"
+      ) {
+        return null;
+      }
       return {
         ...post,
         profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
@@ -334,23 +352,53 @@ export default async function UserProfilePage({ params }: PageProps) {
     ),
   ];
 
+  const portfolioPostIds = mergedPosts.map((post) => post.id);
+  const { data: portfolioLikes } =
+    portfolioPostIds.length > 0
+      ? await supabase.from("likes").select("post_id").in("post_id", portfolioPostIds)
+      : { data: [] };
+
   const badges = (userBadges ?? [])
     .map((userBadge) =>
       Array.isArray(userBadge.badges) ? userBadge.badges[0] : userBadge.badges
     )
     .filter(Boolean) as Badge[];
 
-  const totalViews = normalizedPosts.reduce(
+  const totalViews = mergedPosts.reduce(
     (sum, post) => sum + (post.view_count ?? 0),
     0
   );
+  const totalLikes = (portfolioLikes ?? []).length;
+  const topicMap = mergedPosts
+    .flatMap((post) => post.tags ?? [])
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean)
+    .reduce((acc, tag) => {
+      acc.set(tag, (acc.get(tag) ?? 0) + 1);
+      return acc;
+    }, new Map<string, number>());
+  const topicStats: Array<{ tag: string; count: number }> = [];
+  topicMap.forEach((count: number, tag: string) => {
+    topicStats.push({ tag, count });
+  });
+  topicStats.sort(
+    (left, right) => right.count - left.count || left.tag.localeCompare(right.tag)
+  );
 
+  const postsById = new Map(mergedPosts.map((post) => [post.id, post]));
+  const featuredPostIds = ((featuredRows ?? []) as Array<{
+    post_id: string;
+    position: number;
+  }>).map((row) => row.post_id);
+  const curatedFeaturedPosts = featuredPostIds
+    .map((postId) => postsById.get(postId))
+    .filter((post): post is (typeof mergedPosts)[number] => Boolean(post));
   const featuredPosts =
-    normalizedPosts.length > 1
-      ? [...normalizedPosts]
+    curatedFeaturedPosts.length > 0
+      ? curatedFeaturedPosts
+      : [...mergedPosts]
           .sort((left, right) => (right.view_count ?? 0) - (left.view_count ?? 0))
-          .slice(0, 3)
-      : [];
+          .slice(0, 3);
 
   const normalizedTopArguments = (
     (topArguments ?? []) as unknown as TopArgumentRow[]
@@ -461,6 +509,10 @@ export default async function UserProfilePage({ params }: PageProps) {
           followerCount: followerCount ?? 0,
           followingCount: followingCount ?? 0,
           totalViews,
+          totalLikes,
+          debateContributionCount: debateContributionCount ?? 0,
+          topicCount: topicStats.length,
+          badgeCount: badges.length,
           points: profile.points,
         }}
       />
@@ -491,7 +543,18 @@ export default async function UserProfilePage({ params }: PageProps) {
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
-          <FeaturedWork posts={featuredPosts} />
+          <FeaturedWork
+            posts={featuredPosts}
+            curated={curatedFeaturedPosts.length > 0}
+            action={
+              isOwnProfile ? (
+                <FeaturedWorkManager
+                  options={mergedPosts}
+                  initialPostIds={curatedFeaturedPosts.map((post) => post.id)}
+                />
+              ) : null
+            }
+          />
 
           <PublicationsSection posts={mergedPosts} fullName={displayName} />
 
@@ -501,6 +564,9 @@ export default async function UserProfilePage({ params }: PageProps) {
               badges={badges}
               postCount={mergedPosts.length}
               totalViews={totalViews}
+              totalLikes={totalLikes}
+              debateContributionCount={debateContributionCount ?? 0}
+              topicStats={topicStats}
               followerCount={followerCount ?? 0}
               followingCount={followingCount ?? 0}
             />
@@ -556,6 +622,9 @@ export default async function UserProfilePage({ params }: PageProps) {
             badges={badges}
             postCount={mergedPosts.length}
             totalViews={totalViews}
+            totalLikes={totalLikes}
+            debateContributionCount={debateContributionCount ?? 0}
+            topicStats={topicStats}
             followerCount={followerCount ?? 0}
             followingCount={followingCount ?? 0}
           />
