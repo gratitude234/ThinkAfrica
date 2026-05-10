@@ -1,7 +1,8 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Badge from "@/components/ui/Badge";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -19,6 +20,14 @@ interface PostResult {
     full_name: string | null;
     university: string | null;
   } | null;
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={null}>
+      <SearchPageContent />
+    </Suspense>
+  );
 }
 
 interface PersonResult {
@@ -83,8 +92,10 @@ function TrendingButtons({
   );
 }
 
-export default function SearchPage() {
-  const [query, setQuery] = useState("");
+function SearchPageContent() {
+  const searchParams = useSearchParams();
+  const queryParam = searchParams.get("q") ?? "";
+  const [query, setQuery] = useState(queryParam);
   const [posts, setPosts] = useState<PostResult[]>([]);
   const [people, setPeople] = useState<PersonResult[]>([]);
   const [topics, setTopics] = useState<TopicResult[]>([]);
@@ -149,6 +160,7 @@ export default function SearchPage() {
       trackActivationEvent({
         event: "search_performed",
         metadata: {
+          surface: "search",
           queryLength: trimmed.length,
           resultCount:
             normalizedPosts.length +
@@ -159,6 +171,10 @@ export default function SearchPage() {
     },
     [allTopics]
   );
+
+  useEffect(() => {
+    setQuery(queryParam);
+  }, [queryParam]);
 
   useEffect(() => {
     if (debounceRef.current) {
@@ -207,7 +223,17 @@ export default function SearchPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">Search</h1>
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+          Search
+        </p>
+        <h1 className="mt-2 text-2xl font-bold text-gray-900">
+          Search across ThinkAfrica
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-gray-500">
+          Find posts, people, topics, and universities from one place.
+        </p>
+      </div>
 
       <div className="relative mb-3">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
@@ -224,7 +250,7 @@ export default function SearchPage() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search posts, people, universities..."
+          placeholder="Search posts, people, topics, universities..."
           autoFocus
           className="w-full rounded-2xl border border-gray-200 bg-white py-3.5 pl-12 pr-10 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
@@ -272,7 +298,8 @@ export default function SearchPage() {
                 No results for &ldquo;{query.trim()}&rdquo;
               </p>
               <p className="mt-2 text-sm text-gray-400">
-                Try a different keyword or browse trending topics.
+                Try a topic like policy, history, education, or browse what is
+                trending now.
               </p>
               {trending.length > 0 ? (
                 <div className="mt-5">

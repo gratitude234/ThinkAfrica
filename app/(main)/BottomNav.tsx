@@ -26,6 +26,11 @@ export default function BottomNav({
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const isExploreActive =
+    pathname === "/explore" ||
+    pathname.startsWith("/explore/") ||
+    pathname === "/discover" ||
+    pathname.startsWith("/discover/");
   const profileHref = userId ? (username ? `/${username}` : "/settings") : "/signup";
   const profileActive = userId
     ? username
@@ -66,9 +71,9 @@ export default function BottomNav({
           </Link>
 
           <Link
-            href="/discover"
-            className={navLinkClass(isActive("/discover"))}
-            aria-current={isActive("/discover") ? "page" : undefined}
+            href="/explore"
+            className={navLinkClass(isExploreActive)}
+            aria-current={isExploreActive ? "page" : undefined}
           >
             <svg
               className="h-5 w-5"
@@ -83,7 +88,7 @@ export default function BottomNav({
                 d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
               />
             </svg>
-            <span className="text-[10px] font-medium">Discover</span>
+            <span className="text-[10px] font-medium">Explore</span>
           </Link>
 
           <Link

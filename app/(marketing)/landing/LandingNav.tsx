@@ -6,7 +6,7 @@ import Link from "next/link";
 export default function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
   const navLinks = [
-    { label: "Discover", href: "/?guest=1" },
+    { label: "Explore", href: "/explore" },
     { label: "Debates", href: "/debates" },
     { label: "Opportunities", href: "/opportunities" },
     { label: "About", href: "/about" },

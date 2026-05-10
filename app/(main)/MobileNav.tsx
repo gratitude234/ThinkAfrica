@@ -21,7 +21,7 @@ interface MobileNavProps {
 
 const GUEST_PRIMARY_LINKS = [
   { label: "Home", href: "/?guest=1" },
-  { label: "Discover", href: "/discover" },
+  { label: "Explore", href: "/explore" },
   { label: "Debates", href: "/debates" },
   { label: "Opportunities", href: "/opportunities" },
 ] as const;
