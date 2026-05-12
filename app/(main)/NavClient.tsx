@@ -30,20 +30,20 @@ function navItemClass(isActive: boolean) {
   }`;
 }
 
-function MessageIcon({ className = "h-4 w-4" }: { className?: string }) {
+function MessageIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth={2}
+      strokeWidth={2.25}
       viewBox="0 0 24 24"
       aria-hidden="true"
     >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M8 10h8M8 14h5m7-2a8 8 0 11-3.05-6.28L21 5l-.72 4.05A7.97 7.97 0 0120 12z"
+        d="M20.25 11.5a8.25 8.25 0 11-3.5-6.75M20.25 11.5a8.24 8.24 0 01-8.25 8.25 8.4 8.4 0 01-3.5-.77L4 20l1.02-4.5A8.4 8.4 0 014.25 12a8.24 8.24 0 018.25-8.25M8.25 10.25h7.5M8.25 14h5"
       />
     </svg>
   );
