@@ -165,9 +165,18 @@ export default function PostCard({
 
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-2.5">
             {/* Avatar + author line */}
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800">
-              {authorName.charAt(0).toUpperCase()}
-            </span>
+            {author?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={author.avatar_url}
+                alt={authorName}
+                className="h-6 w-6 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800">
+                {authorName.charAt(0).toUpperCase()}
+              </span>
+            )}
             <div className="min-w-0 flex-1 basis-[calc(100%-2rem)] text-[11px] text-ink-muted min-[420px]:basis-0">
               {authorHref ? (
                 <Link

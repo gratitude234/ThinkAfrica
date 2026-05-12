@@ -106,9 +106,18 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
 
           {author ? (
             <div className="flex items-center gap-2.5 border-t border-gray-100 pt-3 sm:pt-4">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-800">
-                {initials}
-              </div>
+              {author.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={author.avatar_url}
+                  alt={authorName}
+                  className="h-8 w-8 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-800">
+                  {initials}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 {author.username ? (
                   <Link
