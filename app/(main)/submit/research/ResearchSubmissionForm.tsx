@@ -60,6 +60,29 @@ function emptyReference(): PostReferenceRecord {
   };
 }
 
+function TimelineDot({
+  done,
+  current,
+}: {
+  done: boolean;
+  current: boolean;
+}) {
+  return (
+    <span
+      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
+        done
+          ? "border-emerald-500 bg-emerald-500 text-white"
+          : current
+            ? "border-purple-400 bg-purple-50 text-purple-700"
+            : "border-gray-200 bg-white text-gray-300"
+      }`}
+      aria-hidden="true"
+    >
+      {done ? "OK" : ""}
+    </span>
+  );
+}
+
 export default function ResearchSubmissionForm({
   userId,
   initialDraft,
@@ -86,6 +109,55 @@ export default function ResearchSubmissionForm({
   const status = initialDraft?.status ?? "draft";
   const currentRound = initialDraft?.currentRound ?? 1;
   const needsAuthorNote = status === "pending_revision";
+  const metadataReady =
+    title.trim().length > 0 && abstract.trim().length > 0 && tags.length > 0;
+  const pdfUploaded = Boolean(document.documentPath);
+  const pdfAttached = Boolean(document.documentPath && draftId);
+  const referencesReady = references.some((ref) => ref.title?.trim());
+  const submittedForReview = status === "pending" || status === "pending_revision";
+  const reviewerDecision =
+    status === "pending_revision" || status === "published" || status === "rejected";
+  const citationArchived = status === "published";
+  const timeline = [
+    {
+      label: "Metadata",
+      helper: "Title, abstract, and topics",
+      done: metadataReady,
+      current: !metadataReady,
+    },
+    {
+      label: "PDF uploaded",
+      helper: "Final manuscript PDF",
+      done: pdfUploaded,
+      current: metadataReady && !pdfUploaded,
+    },
+    {
+      label: "References added",
+      helper: "Sources reviewers can verify",
+      done: referencesReady,
+      current: metadataReady && pdfUploaded && !referencesReady,
+    },
+    {
+      label: needsAuthorNote ? "Revision response" : "Submitted for review",
+      helper: needsAuthorNote
+        ? "Explain changes before resubmission"
+        : "Enters editorial workflow",
+      done: submittedForReview && !needsAuthorNote,
+      current: metadataReady && pdfUploaded && referencesReady && !submittedForReview,
+    },
+    {
+      label: "Reviewer decision",
+      helper: "Accept, revise, or reject",
+      done: reviewerDecision,
+      current: status === "pending",
+    },
+    {
+      label: "Citation archive",
+      helper: "Accepted PDF is preserved",
+      done: citationArchived,
+      current: false,
+    },
+  ];
 
   const payload = {
     draftId,
@@ -196,8 +268,13 @@ export default function ResearchSubmissionForm({
           Upload a research paper
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-purple-950/75">
-          Research papers are reviewed from a submitted PDF. The abstract,
-          authors, references, and accepted document become the citable archive.
+          Research papers are reviewed from a submitted PDF. Use PDF for final
+          submission because it preserves formatting for review, citation, and
+          archiving.
+        </p>
+        <p className="mt-2 max-w-3xl text-xs leading-5 text-purple-900/70">
+          From Word or Google Docs? Export or download the final manuscript as a
+          PDF before submitting.
         </p>
       </div>
 
@@ -248,6 +325,17 @@ export default function ResearchSubmissionForm({
               Upload the final manuscript as a PDF. Accepted research keeps this
               document attached to the citation archive.
             </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-purple-50 px-2.5 py-1 font-medium text-purple-700">
+                PDF only
+              </span>
+              <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-600">
+                Max 20MB
+              </span>
+              <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-600">
+                Final manuscript version
+              </span>
+            </div>
             <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-canvas px-4 py-5">
               <input
                 type="file"
@@ -273,9 +361,18 @@ export default function ResearchSubmissionForm({
                     >
                       Open uploaded PDF
                     </a>
-                  ) : null}
+                  ) : (
+                    <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-800">
+                      Save the draft to attach this PDF to the submission record.
+                    </p>
+                  )}
                 </div>
               ) : null}
+              <p className="mt-3 text-xs leading-5 text-gray-500">
+                DOCX is fine for drafting, but the review packet requires PDF so
+                every reviewer sees the same formatting, tables, references, and
+                page breaks.
+              </p>
             </div>
           </section>
 
@@ -347,8 +444,12 @@ export default function ResearchSubmissionForm({
           {needsAuthorNote ? (
             <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
               <h2 className="text-lg font-semibold text-amber-950">
-                Revision response
+                Revision requested
               </h2>
+              <p className="mt-1 text-sm leading-6 text-amber-900/80">
+                Upload the revised PDF if needed, then explain what changed before
+                resubmitting to reviewers.
+              </p>
               <textarea
                 value={authorNote}
                 onChange={(event) => setAuthorNote(event.target.value)}
@@ -367,6 +468,31 @@ export default function ResearchSubmissionForm({
             onChange={setCoAuthors}
             source="write"
           />
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-purple-700">
+              Review journey
+            </p>
+            <div className="mt-4 space-y-3">
+              {timeline.map((item) => (
+                <div key={item.label} className="flex gap-3">
+                  <TimelineDot done={item.done} current={item.current} />
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm font-medium ${
+                        item.done || item.current ? "text-gray-900" : "text-gray-400"
+                      }`}
+                    >
+                      {item.label}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-5 text-gray-500">
+                      {item.helper}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
@@ -389,6 +515,13 @@ export default function ResearchSubmissionForm({
                 References {references.some((ref) => ref.title?.trim()) ? "added" : "needed"}
               </p>
             </div>
+
+            {pdfUploaded && !pdfAttached ? (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                PDF uploaded, but not attached yet. Save the draft before leaving
+                this page.
+              </div>
+            ) : null}
 
             {notice ? (
               <p className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -420,6 +553,18 @@ export default function ResearchSubmissionForm({
               >
                 Submit for review
               </Button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+              What reviewers see
+            </p>
+            <div className="mt-3 space-y-2 text-sm text-gray-600">
+              <p>PDF manuscript</p>
+              <p>Title and abstract</p>
+              <p>References and topics</p>
+              <p>Co-authors and author response notes</p>
             </div>
           </section>
         </aside>

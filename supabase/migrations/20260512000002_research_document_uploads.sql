@@ -1,3 +1,8 @@
+-- Research document setup checklist:
+-- 1. Apply this migration before enabling /submit/research in production.
+-- 2. Confirm the research-documents bucket remains private.
+-- 3. Research PDFs are served through signed URLs from the app, not public storage URLs.
+
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('research-documents', 'research-documents', false)
 ON CONFLICT (id) DO UPDATE

@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const MAX_RESEARCH_PDF_BYTES = 20 * 1024 * 1024;
+const SETUP_ERROR =
+  "Research document storage is not set up yet. Apply the research document migration.";
 
 function isPdf(buffer: Buffer) {
   return buffer.length >= 5 && buffer.subarray(0, 5).toString("utf8") === "%PDF-";
@@ -25,18 +27,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) {
+    return NextResponse.json(
+      {
+        error:
+          "Research papers must be submitted as PDF. Word or Google Docs files are fine for drafting, but export the final paper as PDF so formatting stays stable for review, citation, and archiving.",
+      },
+      { status: 400 }
+    );
+  }
+
   if (file.size > MAX_RESEARCH_PDF_BYTES) {
-    return NextResponse.json({ error: "PDF must be under 20MB" }, { status: 400 });
+    return NextResponse.json(
+      { error: "PDF must be under 20MB. Compress the final manuscript and try again." },
+      { status: 400 }
+    );
   }
 
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
   if (!isPdf(buffer)) {
-    return NextResponse.json({ error: "Upload a valid PDF file." }, { status: 400 });
+    return NextResponse.json(
+      {
+        error:
+          "Upload a valid PDF file. PDF is required because it preserves formatting for review, citation, and archiving.",
+      },
+      { status: 400 }
+    );
   }
 
   const admin = createAdminClient();
+  const { data: bucket } = await admin.storage.getBucket("research-documents");
+  if (!bucket) {
+    return NextResponse.json({ error: SETUP_ERROR }, { status: 503 });
+  }
+
   const path = `research/${user.id}/${crypto.randomUUID()}.pdf`;
   const { error: uploadError } = await admin.storage
     .from("research-documents")
@@ -46,7 +73,12 @@ export async function POST(request: NextRequest) {
     });
 
   if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    const message =
+      uploadError.message.includes("Bucket not found") ||
+      uploadError.message.includes("bucket")
+        ? SETUP_ERROR
+        : uploadError.message;
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 
   return NextResponse.json({

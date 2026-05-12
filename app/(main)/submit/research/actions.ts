@@ -39,6 +39,27 @@ interface ResearchPayload {
   currentRound?: number;
 }
 
+const RESEARCH_SETUP_ERROR =
+  "Research document storage is not set up yet. Apply the research document migration.";
+
+function isResearchSetupError(message: string | null | undefined) {
+  if (!message) return false;
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("document_path") ||
+    normalized.includes("document_original_name") ||
+    normalized.includes("document_mime_type") ||
+    normalized.includes("document_size_bytes") ||
+    normalized.includes("schema cache") ||
+    normalized.includes("column") ||
+    normalized.includes("research-documents")
+  );
+}
+
+function userSafeDatabaseError(message: string | null | undefined) {
+  return isResearchSetupError(message) ? RESEARCH_SETUP_ERROR : message;
+}
+
 async function getCurrentUser() {
   const supabase = await createClient();
   const {
@@ -73,28 +94,34 @@ function normalizeReferences(references: ReferenceInput[]) {
 }
 
 function validateResearchPayload(input: ResearchPayload, forSubmit: boolean) {
-  if (!input.title.trim()) return "Add a research title.";
-  if (!input.abstract.trim()) return "Add an abstract before continuing.";
-  if (input.tags.length === 0) return "Add at least one topic.";
+  if (!input.title.trim()) {
+    return "Add a research title so reviewers can identify the paper.";
+  }
+  if (!input.abstract.trim()) {
+    return "Add an abstract that summarizes the question, method, findings, and contribution.";
+  }
+  if (input.tags.length === 0) {
+    return "Add at least one topic so editors can route the submission.";
+  }
 
   if (forSubmit && !input.document.documentPath) {
-    return "Upload the research PDF before submitting for review.";
+    return "Upload the final research PDF before submitting for review. Word or Google Docs files should be exported as PDF first.";
   }
 
   if (input.document.documentPath && input.document.mimeType !== "application/pdf") {
-    return "Research documents must be PDF files.";
+    return "Research documents must be PDF files because the accepted manuscript is archived for citation.";
   }
 
   const normalized = normalizeReferences(input.references);
   for (const reference of normalized) {
-    if (!reference.title) return "Each reference needs a title.";
+    if (!reference.title) return "Each reference needs a title reviewers can verify.";
     if (!reference.source && !reference.url && !reference.doi && !reference.raw) {
-      return "Each reference needs a source, URL, DOI, or note.";
+      return "Each reference needs a source, URL, DOI, or note so reviewers can verify it.";
     }
   }
 
   if (forSubmit && normalized.length === 0) {
-    return "Research submissions need at least one structured reference.";
+    return "Add at least one structured reference before submitting the research paper for review.";
   }
 
   if (
@@ -102,7 +129,7 @@ function validateResearchPayload(input: ResearchPayload, forSubmit: boolean) {
     input.currentStatus === "pending_revision" &&
     !input.authorNote?.trim()
   ) {
-    return "Add an author response note before resubmitting this revision.";
+    return "Add an author response note explaining what changed before resubmitting this revision.";
   }
 
   return null;
@@ -300,7 +327,13 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
       .eq("author_id", user.id);
 
     if (error) {
-      return { error: error.message, postId: null, slug: null };
+      return {
+        error:
+          userSafeDatabaseError(error.message) ??
+          "Failed to save research submission.",
+        postId: null,
+        slug: null,
+      };
     }
   } else {
     slug = `${slugify(input.title, { lower: true, strict: true }) || "research"}-${Date.now().toString(36)}`;
@@ -326,7 +359,13 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
       .single();
 
     if (error || !data) {
-      return { error: error?.message ?? "Failed to save research submission.", postId: null, slug: null };
+      return {
+        error:
+          userSafeDatabaseError(error?.message) ??
+          "Failed to save research submission.",
+        postId: null,
+        slug: null,
+      };
     }
 
     postId = data.id;
@@ -336,8 +375,19 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
     return { error: "Unable to resolve research submission.", postId: null, slug: null };
   }
 
-  await syncReferences(supabase, postId, input.references);
-  await syncAuthors(supabase, postId, user.id, input.coAuthors);
+  try {
+    await syncReferences(supabase, postId, input.references);
+    await syncAuthors(supabase, postId, user.id, input.coAuthors);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : null;
+    return {
+      error:
+        userSafeDatabaseError(message) ??
+        "Failed to save research authors or references.",
+      postId: null,
+      slug: null,
+    };
+  }
 
   if (status === "pending") {
     const admin = createAdminClient();
@@ -353,14 +403,25 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
       .maybeSingle();
 
     if (!existingVersion) {
-      await createVersionSnapshot({
-        admin,
-        postId,
-        round: input.currentStatus === "pending_revision" ? input.currentRound ?? 1 : 1,
-        versionKind: input.currentStatus === "pending_revision" ? "revision" : "submission",
-        authorNote: input.authorNote,
-        submittedBy: user.id,
-      });
+      try {
+        await createVersionSnapshot({
+          admin,
+          postId,
+          round: input.currentStatus === "pending_revision" ? input.currentRound ?? 1 : 1,
+          versionKind: input.currentStatus === "pending_revision" ? "revision" : "submission",
+          authorNote: input.authorNote,
+          submittedBy: user.id,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : null;
+        return {
+          error:
+            userSafeDatabaseError(message) ??
+            "Failed to capture the research submission snapshot.",
+          postId: null,
+          slug: null,
+        };
+      }
     }
 
     await recordActivationEvent({
