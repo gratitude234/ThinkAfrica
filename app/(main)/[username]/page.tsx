@@ -12,7 +12,10 @@ import PublicationsSection from "@/components/profile/PublicationsSection";
 import TopArguments from "@/components/profile/TopArguments";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import { getMessageEligibility } from "@/lib/messaging";
-import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
+import {
+  getOpportunityReadinessSummary,
+  type OpportunityReadinessSummary,
+} from "@/lib/opportunityReadiness";
 import { createClient } from "@/lib/supabase/server";
 import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
 
@@ -84,6 +87,26 @@ interface ProfilePostRow extends Omit<ProfilePost, "profiles"> {
     | NonNullable<ProfilePost["profiles"]>[];
 }
 
+type PortfolioPost = ProfilePost & {
+  isCoAuthor?: boolean;
+  co_authors?: Array<{
+    user_id: string;
+    profile: { username: string; full_name: string | null } | null;
+  }>;
+};
+
+interface PortfolioSummaryStats {
+  publishedCount: number;
+  citableCount: number;
+  reviewedCount: number;
+  coAuthoredCount: number;
+  debateContributionCount: number;
+  recognitionCount: number;
+  readiness: OpportunityReadinessSummary;
+  isOpenToOpportunities: boolean;
+  opportunityVisible: boolean;
+}
+
 interface TopArgumentRecord {
   id: string;
   content: string;
@@ -133,6 +156,96 @@ function getBioFirstLine(bio: string | null) {
 function clampText(value: string, maxLength: number) {
   if (value.length <= maxLength) return value;
   return `${value.slice(0, maxLength - 3).trimEnd()}...`;
+}
+
+function isReviewedWork(post: { type?: string | null; citation_id?: string | null }) {
+  return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+}
+
+function PortfolioSummary({
+  stats,
+  profileUsername,
+  isOwnProfile,
+}: {
+  stats: PortfolioSummaryStats;
+  profileUsername: string;
+  isOwnProfile: boolean;
+}) {
+  const tiles = [
+    {
+      label: "Published work",
+      value: stats.publishedCount.toLocaleString(),
+      detail: "Public pieces attached to this profile",
+    },
+    {
+      label: "Citable / reviewed",
+      value: `${stats.citableCount.toLocaleString()} / ${stats.reviewedCount.toLocaleString()}`,
+      detail: "Archived citations and high-signal formats",
+    },
+    {
+      label: "Debate contributions",
+      value: stats.debateContributionCount.toLocaleString(),
+      detail: "Arguments contributed in public debates",
+    },
+    {
+      label: "Recognition",
+      value: stats.recognitionCount.toLocaleString(),
+      detail: "Badges and verified academic identity",
+    },
+    {
+      label: "Opportunity readiness",
+      value: `${stats.readiness.score}%`,
+      detail: stats.isOpenToOpportunities
+        ? stats.readiness.statusLabel
+        : "Not currently open to opportunities",
+    },
+  ];
+
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02]">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+            Portfolio summary
+          </p>
+          <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
+            Proof for selectors and collaborators
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
+            A quick read on this profile&apos;s academic output, recognition, and opportunity signal.
+          </p>
+        </div>
+
+        {isOwnProfile && stats.readiness.nextAction ? (
+          <Link
+            href={stats.readiness.nextAction.actionHref}
+            className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100"
+          >
+            {stats.readiness.nextAction.actionLabel}
+          </Link>
+        ) : stats.opportunityVisible ? (
+          <Link
+            href={`/${profileUsername}#featured-work`}
+            className="text-sm font-semibold text-emerald-brand transition-colors hover:text-emerald-700"
+          >
+            Review portfolio
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {tiles.map((tile) => (
+          <div key={tile.label} className="rounded-xl border border-gray-100 bg-canvas p-4">
+            <p className="text-2xl font-semibold text-gray-900">{tile.value}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+              {tile.label}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-gray-500">{tile.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -350,7 +463,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     ...normalizedCoAuthoredPosts.filter(
       (post) => !normalizedPosts.some((ownedPost) => ownedPost.id === post?.id)
     ),
-  ];
+  ] as PortfolioPost[];
 
   const portfolioPostIds = mergedPosts.map((post) => post.id);
   const { data: portfolioLikes } =
@@ -369,6 +482,9 @@ export default async function UserProfilePage({ params }: PageProps) {
     0
   );
   const totalLikes = (portfolioLikes ?? []).length;
+  const citableWorkCount = mergedPosts.filter((post) => Boolean(post.citation_id)).length;
+  const reviewedWorkCount = mergedPosts.filter(isReviewedWork).length;
+  const coAuthoredWorkCount = mergedPosts.filter((post) => post.isCoAuthor).length;
   const topicMap = mergedPosts
     .flatMap((post) => post.tags ?? [])
     .map((tag) => tag.trim().toLowerCase())
@@ -484,6 +600,17 @@ export default async function UserProfilePage({ params }: PageProps) {
     (mergedPosts.length > 0 ||
       Boolean(talentProfile?.open_to_opportunities) ||
       Boolean(talentProfile));
+  const portfolioSummary: PortfolioSummaryStats = {
+    publishedCount: mergedPosts.length,
+    citableCount: citableWorkCount,
+    reviewedCount: reviewedWorkCount,
+    coAuthoredCount: coAuthoredWorkCount,
+    debateContributionCount: debateContributionCount ?? 0,
+    recognitionCount: badges.length + (profile.verified ? 1 : 0),
+    readiness: opportunityReadiness,
+    isOpenToOpportunities: Boolean(talentProfile?.open_to_opportunities),
+    opportunityVisible,
+  };
 
   return (
     <div className="mx-auto max-w-[1180px] space-y-6">
@@ -506,6 +633,9 @@ export default async function UserProfilePage({ params }: PageProps) {
         messagingEligibility={messagingEligibility}
         stats={{
           postCount: mergedPosts.length,
+          citableCount: citableWorkCount,
+          reviewedCount: reviewedWorkCount,
+          coAuthoredCount: coAuthoredWorkCount,
           followerCount: followerCount ?? 0,
           followingCount: followingCount ?? 0,
           totalViews,
@@ -515,6 +645,12 @@ export default async function UserProfilePage({ params }: PageProps) {
           badgeCount: badges.length,
           points: profile.points,
         }}
+      />
+
+      <PortfolioSummary
+        stats={portfolioSummary}
+        profileUsername={profile.username}
+        isOwnProfile={isOwnProfile}
       />
 
       <OpportunityBanner
@@ -546,6 +682,8 @@ export default async function UserProfilePage({ params }: PageProps) {
           <FeaturedWork
             posts={featuredPosts}
             curated={curatedFeaturedPosts.length > 0}
+            isOwnProfile={isOwnProfile}
+            profileName={displayName}
             action={
               isOwnProfile ? (
                 <FeaturedWorkManager
@@ -565,10 +703,16 @@ export default async function UserProfilePage({ params }: PageProps) {
               postCount={mergedPosts.length}
               totalViews={totalViews}
               totalLikes={totalLikes}
+              citableWorkCount={citableWorkCount}
+              reviewedWorkCount={reviewedWorkCount}
+              coAuthoredWorkCount={coAuthoredWorkCount}
               debateContributionCount={debateContributionCount ?? 0}
               topicStats={topicStats}
               followerCount={followerCount ?? 0}
               followingCount={followingCount ?? 0}
+              isOpenToOpportunities={Boolean(talentProfile?.open_to_opportunities)}
+              opportunityVisible={opportunityVisible}
+              opportunityReadinessStatus={opportunityReadiness.statusLabel}
             />
           </div>
 
@@ -623,10 +767,16 @@ export default async function UserProfilePage({ params }: PageProps) {
             postCount={mergedPosts.length}
             totalViews={totalViews}
             totalLikes={totalLikes}
+            citableWorkCount={citableWorkCount}
+            reviewedWorkCount={reviewedWorkCount}
+            coAuthoredWorkCount={coAuthoredWorkCount}
             debateContributionCount={debateContributionCount ?? 0}
             topicStats={topicStats}
             followerCount={followerCount ?? 0}
             followingCount={followingCount ?? 0}
+            isOpenToOpportunities={Boolean(talentProfile?.open_to_opportunities)}
+            opportunityVisible={opportunityVisible}
+            opportunityReadinessStatus={opportunityReadiness.statusLabel}
           />
         </div>
       </div>

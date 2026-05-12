@@ -44,6 +44,9 @@ interface ProfileHeaderProps {
   messagingEligibility?: { eligible: boolean; reason: string | null } | null;
   stats: {
     postCount: number;
+    citableCount: number;
+    reviewedCount: number;
+    coAuthoredCount: number;
     followerCount: number;
     followingCount: number;
     totalViews: number;
@@ -85,12 +88,16 @@ export default function ProfileHeader({
       : `Writing since ${writingSince}`,
   ].filter(Boolean);
   const statsItems = [
-    { label: "Articles", value: stats.postCount },
-    { label: "Debates", value: stats.debateContributionCount },
+    { label: "Publications", value: stats.postCount },
+    { label: "Citable", value: stats.citableCount },
+    { label: "Reviewed", value: stats.reviewedCount },
+    { label: "Co-authored", value: stats.coAuthoredCount },
     { label: "Reads", value: stats.totalViews },
-    { label: "Topics", value: stats.topicCount },
-    { label: "Badges", value: stats.badgeCount },
   ];
+  const verifiedLabel = profile.verified_type
+    ? profile.verified_type.charAt(0).toUpperCase() +
+      profile.verified_type.slice(1)
+    : "Verified";
 
   return (
     <>
@@ -130,6 +137,29 @@ export default function ProfileHeader({
           />
 
           <div className="min-w-0 flex-1">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {profile.verified ? (
+                <span
+                  className={`inline-flex items-center rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-xs font-semibold md:border-emerald-100 md:bg-emerald-50 ${
+                    VERIFIED_COLORS[profile.verified_type ?? "student"] ??
+                    "text-emerald-600"
+                  }`}
+                >
+                  Verified {verifiedLabel}
+                </span>
+              ) : null}
+              {isOpenToOpportunities ? (
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  Open to opportunities
+                </span>
+              ) : null}
+              {profile.is_alumni && profile.graduation_year ? (
+                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                  Alumni &apos;{String(profile.graduation_year).slice(-2)}
+                </span>
+              ) : null}
+            </div>
+
             <h1 className="font-display flex flex-wrap items-center gap-2 text-[30px] font-semibold leading-tight text-white md:text-ink">
               <span>{displayName}</span>
               {profile.verified ? (
@@ -145,12 +175,6 @@ export default function ProfileHeader({
                   }`}
                 >
                   {"\u2713"}
-                </span>
-              ) : null}
-              {profile.is_alumni && profile.graduation_year ? (
-                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
-                  {"\uD83C\uDF93"} Alumni &apos;
-                  {String(profile.graduation_year).slice(-2)}
                 </span>
               ) : null}
             </h1>
@@ -183,6 +207,21 @@ export default function ProfileHeader({
               </>
             ) : (
               <>
+                {isOpenToOpportunities && canContact ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!currentUserId) {
+                        router.push("/login");
+                        return;
+                      }
+                      setShowInquiry(true);
+                    }}
+                    className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+                  >
+                    Contact about opportunities
+                  </button>
+                ) : null}
                 <FollowButton
                   targetUserId={profile.id}
                   currentUserId={currentUserId}
@@ -204,21 +243,6 @@ export default function ProfileHeader({
                   )
                 ) : null}
                 <ShareButton className="w-full" />
-                {isOpenToOpportunities && canContact ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!currentUserId) {
-                        router.push("/login");
-                        return;
-                      }
-                      setShowInquiry(true);
-                    }}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:text-gray-900"
-                  >
-                    Contact
-                  </button>
-                ) : null}
               </>
             )}
           </div>

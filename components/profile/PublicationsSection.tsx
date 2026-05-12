@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { formatDate } from "@/lib/utils";
 
 interface PublicationPost {
@@ -10,6 +10,7 @@ interface PublicationPost {
   slug: string;
   excerpt: string | null;
   type: string;
+  citation_id?: string | null;
   created_at: string;
   published_at: string | null;
   view_count?: number | null;
@@ -31,6 +32,33 @@ const GROUP_CONFIG = [
   { type: "essay", label: "Essays" },
   { type: "blog", label: "Quick Takes" },
 ] as const;
+
+function isReviewedWork(post: PublicationPost) {
+  return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+}
+
+function PublicationSignalBadge({
+  children,
+  variant = "gray",
+}: {
+  children: ReactNode;
+  variant?: "gray" | "sky" | "purple" | "emerald";
+}) {
+  const styles = {
+    gray: "border-gray-200 bg-gray-50 text-gray-600",
+    sky: "border-sky-200 bg-sky-50 text-sky-700",
+    purple: "border-purple-200 bg-purple-50 text-purple-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  };
+
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${styles[variant]}`}
+    >
+      {children}
+    </span>
+  );
+}
 
 export default function PublicationsSection({
   posts,
@@ -101,20 +129,38 @@ export default function PublicationsSection({
               {visiblePosts.map((post) => {
                 const publishedDate = post.published_at ?? post.created_at;
                 return (
-                  <Link
+                  <article
                     key={post.id}
-                    href={`/post/${post.slug}`}
-                    className="flex min-w-0 flex-col gap-3 py-4 first:pt-0 last:pb-0 transition-colors hover:text-emerald-brand md:flex-row md:items-start md:justify-between"
+                    className="flex min-w-0 flex-col gap-3 py-4 first:pt-0 last:pb-0 md:flex-row md:items-start md:justify-between"
                   >
                     <div className="min-w-0">
-                      <h4 className="truncate text-sm font-semibold text-gray-900">
+                      <Link
+                        href={`/post/${post.slug}`}
+                        className="block transition-colors hover:text-emerald-brand"
+                      >
+                        <h4 className="truncate text-sm font-semibold text-gray-900">
                         {post.title}
-                        {post.isCoAuthor ? (
-                          <span className="ml-2 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-purple-700">
-                            Co-author
-                          </span>
+                        </h4>
+                      </Link>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {isReviewedWork(post) ? (
+                          <PublicationSignalBadge variant="emerald">
+                            Reviewed
+                          </PublicationSignalBadge>
                         ) : null}
-                      </h4>
+                        {post.citation_id ? (
+                          <Link href={`/publication/${post.citation_id}`}>
+                            <PublicationSignalBadge variant="sky">
+                              Citable
+                            </PublicationSignalBadge>
+                          </Link>
+                        ) : null}
+                        {post.isCoAuthor ? (
+                          <PublicationSignalBadge variant="purple">
+                            Co-author
+                          </PublicationSignalBadge>
+                        ) : null}
+                      </div>
                       {post.excerpt ? (
                         <p className="mt-1 line-clamp-1 text-sm text-gray-500">
                           {post.excerpt}
@@ -136,8 +182,11 @@ export default function PublicationsSection({
                     </div>
                     <div className="shrink-0 text-sm text-gray-400 md:text-right">
                       <p>{formatDate(publishedDate)}</p>
+                      <p className="mt-1 text-xs">
+                        {(post.view_count ?? 0).toLocaleString()} reads
+                      </p>
                     </div>
-                  </Link>
+                  </article>
                 );
               })}
             </div>

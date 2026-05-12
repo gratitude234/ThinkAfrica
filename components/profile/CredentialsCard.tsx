@@ -21,10 +21,16 @@ interface CredentialsCardProps {
   postCount: number;
   totalViews: number;
   totalLikes: number;
+  citableWorkCount: number;
+  reviewedWorkCount: number;
+  coAuthoredWorkCount: number;
   debateContributionCount: number;
   topicStats: Array<{ tag: string; count: number }>;
   followerCount: number;
   followingCount: number;
+  isOpenToOpportunities: boolean;
+  opportunityVisible: boolean;
+  opportunityReadinessStatus: string;
 }
 
 const VERIFIED_COLORS: Record<string, string> = {
@@ -40,10 +46,16 @@ export default function CredentialsCard({
   postCount,
   totalViews,
   totalLikes,
+  citableWorkCount,
+  reviewedWorkCount,
+  coAuthoredWorkCount,
   debateContributionCount,
   topicStats,
   followerCount,
   followingCount,
+  isOpenToOpportunities,
+  opportunityVisible,
+  opportunityReadinessStatus,
 }: CredentialsCardProps) {
   const tier = getPointTier(profile.points);
   const verifiedLabel = profile.verified_type
@@ -54,10 +66,10 @@ export default function CredentialsCard({
   return (
     <aside className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02]">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-        Credentials
+        Academic signal
       </p>
       <h2 className="font-display mt-1 text-lg font-semibold text-gray-900">
-        Public profile signal
+        External proof points
       </h2>
 
       <div className="mt-5 space-y-4">
@@ -76,6 +88,22 @@ export default function CredentialsCard({
             </p>
           </div>
         ) : null}
+
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            Opportunity status
+          </p>
+          <p className="mt-1 text-sm font-medium text-gray-900">
+            {isOpenToOpportunities
+              ? opportunityVisible
+                ? "Open and discoverable"
+                : "Open with limited visibility"
+              : "Not currently open"}
+          </p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {opportunityReadinessStatus}
+          </p>
+        </div>
 
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
@@ -111,27 +139,39 @@ export default function CredentialsCard({
           <div className="mt-2 grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-canvas p-3">
               <p className="text-lg font-semibold text-gray-900">
-                {totalViews.toLocaleString()}
-              </p>
-              <p className="text-xs text-gray-500">Total reads</p>
-            </div>
-            <div className="rounded-xl bg-canvas p-3">
-              <p className="text-lg font-semibold text-gray-900">
                 {postCount.toLocaleString()}
               </p>
               <p className="text-xs text-gray-500">Publications</p>
             </div>
             <div className="rounded-xl bg-canvas p-3">
               <p className="text-lg font-semibold text-gray-900">
-                {debateContributionCount.toLocaleString()}
+                {reviewedWorkCount.toLocaleString()}
               </p>
-              <p className="text-xs text-gray-500">Debate contributions</p>
+              <p className="text-xs text-gray-500">Reviewed work</p>
             </div>
             <div className="rounded-xl bg-canvas p-3">
               <p className="text-lg font-semibold text-gray-900">
-                {totalLikes.toLocaleString()}
+                {citableWorkCount.toLocaleString()}
               </p>
-              <p className="text-xs text-gray-500">Likes</p>
+              <p className="text-xs text-gray-500">Citable work</p>
+            </div>
+            <div className="rounded-xl bg-canvas p-3">
+              <p className="text-lg font-semibold text-gray-900">
+                {coAuthoredWorkCount.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500">Co-authored</p>
+            </div>
+            <div className="rounded-xl bg-canvas p-3">
+              <p className="text-lg font-semibold text-gray-900">
+                {debateContributionCount.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500">Debate arguments</p>
+            </div>
+            <div className="rounded-xl bg-canvas p-3">
+              <p className="text-lg font-semibold text-gray-900">
+                {totalViews.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500">Reads</p>
             </div>
           </div>
         </div>
@@ -167,6 +207,8 @@ export default function CredentialsCard({
       </div>
 
       <div className="mt-6 border-t border-gray-100 pt-4 text-xs text-gray-400">
+        <span>{totalLikes.toLocaleString()} likes</span>
+        <span className="mx-2">/</span>
         <Link
           href={`/${profile.username}/followers`}
           className="transition-colors hover:text-gray-600"
