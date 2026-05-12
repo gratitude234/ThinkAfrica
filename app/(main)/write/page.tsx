@@ -589,6 +589,12 @@ export default function WritePage() {
                         {type.label}
                       </p>
                       <p className="mt-1 text-sm text-gray-500">{type.desc}</p>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                        {type.signalLabel}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-gray-600">
+                        {type.portfolioValue}
+                      </p>
                     </div>
                     <span className="shrink-0 rounded-full bg-canvas px-2.5 py-1 text-xs font-medium text-gray-600">
                       min. {type.minWords.toLocaleString()} words
@@ -600,6 +606,9 @@ export default function WritePage() {
                     </span>
                     <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">
                       {type.review}
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">
+                      {type.requirementsSummary}
                     </span>
                   </div>
                 </button>

@@ -31,14 +31,14 @@ export default function QualitySignals({
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-            Quality signals
+            Portfolio signals
           </p>
           <h2 className="mt-1 text-lg font-semibold text-gray-900">
-            Improve the work readers are judging
+            Improve the work selectors are judging
           </h2>
         </div>
         <p className="text-xs text-gray-500">
-          References, responses, comments, saves, likes, and review status.
+          References, review status, discussion, saves, and likes.
         </p>
       </div>
 
@@ -102,7 +102,7 @@ export default function QualitySignals({
 
               <div className="mt-3 flex items-center justify-between gap-3">
                 <p className="text-xs text-gray-500">
-                  Next improvement:{" "}
+                  Portfolio next step:{" "}
                   <span className="font-medium text-gray-700">{missing}</span>
                 </p>
                 <Link

@@ -8,6 +8,9 @@ export const WRITE_FORMATS = [
     readTime: "~10 min to write",
     review: "Fast publish",
     desc: "One clear thought, example, or response",
+    signalLabel: "Fastest publishing signal",
+    portfolioValue: "Adds visible activity and gives others a reason to respond.",
+    requirementsSummary: "Title, body, and at least one topic.",
   },
   {
     type: "essay",
@@ -16,6 +19,9 @@ export const WRITE_FORMATS = [
     readTime: "~45 min to write",
     review: "Publish directly",
     desc: "Structured argument, cultural commentary, analysis",
+    signalLabel: "Stronger portfolio depth",
+    portfolioValue: "Shows sustained argument and helps selectors judge your thinking.",
+    requirementsSummary: "Clear thesis, useful summary, topics, and enough depth.",
   },
   {
     type: "policy_brief",
@@ -24,6 +30,9 @@ export const WRITE_FORMATS = [
     readTime: "~30 min to write",
     review: "Editorial review",
     desc: "Evidence-based recommendations for policymakers",
+    signalLabel: "Review-eligible work",
+    portfolioValue: "Builds a source-backed public record for policy audiences.",
+    requirementsSummary: "Problem, evidence, recommendation, references, and topics.",
   },
   {
     type: "research",
@@ -32,6 +41,9 @@ export const WRITE_FORMATS = [
     readTime: "Multiple sessions",
     review: "Full review",
     desc: "Original research with citations and methodology",
+    signalLabel: "Strongest citation path",
+    portfolioValue: "Creates the clearest route to reviewed and citable academic proof.",
+    requirementsSummary: "Question, method, findings, references, and enough depth.",
   },
 ] as const satisfies ReadonlyArray<{
   type: PostType;
@@ -40,6 +52,9 @@ export const WRITE_FORMATS = [
   readTime: string;
   review: string;
   desc: string;
+  signalLabel: string;
+  portfolioValue: string;
+  requirementsSummary: string;
 }>;
 
 export const STARTER_TEMPLATES: Record<

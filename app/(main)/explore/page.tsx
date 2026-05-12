@@ -23,19 +23,31 @@ interface PageProps {
   }>;
 }
 
-const TABS: Array<{ value: DiscoverTab; label: string; href: string }> = [
+const TABS: Array<{
+  value: DiscoverTab;
+  label: string;
+  mobileLabel?: string;
+  href: string;
+}> = [
   { value: "for-you", label: "For you", href: "/explore" },
   { value: "trending", label: "Trending", href: "/explore?tab=trending" },
-  { value: "citable", label: "Citable Works", href: "/explore?tab=citable" },
+  {
+    value: "citable",
+    label: "Citable Works",
+    mobileLabel: "Citable",
+    href: "/explore?tab=citable",
+  },
   { value: "topics", label: "Topics", href: "/explore?tab=topics" },
   { value: "people", label: "People", href: "/explore?tab=people" },
 ];
 
 function sectionTitle(title: string, subtitle: string) {
   return (
-    <div className="mb-4">
-      <h2 className="text-lg font-semibold text-ink">{title}</h2>
-      <p className="mt-1 text-sm text-ink-muted">{subtitle}</p>
+    <div className="mb-3 sm:mb-4">
+      <h2 className="text-[17px] font-semibold text-ink sm:text-lg">{title}</h2>
+      <p className="mt-1 text-[13px] leading-5 text-ink-muted sm:text-sm">
+        {subtitle}
+      </p>
     </div>
   );
 }
@@ -50,11 +62,11 @@ function SearchEntry({
   const quickTopics = topics.slice(0, 6);
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-      <form action="/search" className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
+    <section className="min-w-0 max-w-full rounded-xl border border-gray-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-3">
+      <form action="/search" className="relative min-w-0">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 sm:pl-4">
           <svg
-            className="h-5 w-5"
+            className="h-4 w-4 sm:h-5 sm:w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -72,12 +84,12 @@ function SearchEntry({
           name="q"
           aria-label="Search ThinkAfrica"
           placeholder="Search posts, people, topics, universities..."
-          className="h-12 w-full rounded-xl border border-gray-200 bg-canvas pl-12 pr-4 text-sm text-ink outline-none transition-colors placeholder:text-gray-400 focus:border-emerald-brand focus:bg-white focus:ring-4 focus:ring-emerald-100"
+          className="h-11 w-full rounded-lg border border-gray-200 bg-canvas pl-10 pr-3 text-[13px] text-ink outline-none transition-colors placeholder:text-gray-400 focus:border-emerald-brand focus:bg-white focus:ring-4 focus:ring-emerald-100 sm:h-12 sm:rounded-xl sm:pl-12 sm:pr-4 sm:text-sm"
         />
       </form>
 
       {quickTopics.length > 0 ? (
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-2.5 flex max-w-full gap-2 overflow-x-auto pb-1 pr-2 [scrollbar-width:none] sm:mt-3 [&::-webkit-scrollbar]:hidden">
           {quickTopics.map((topic) => (
             <DiscoverTrackedLink
               key={topic.tag}
@@ -88,7 +100,7 @@ function SearchEntry({
                 tag: topic.tag,
                 surface: "explore",
               }}
-              className="shrink-0 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-emerald-brand hover:text-emerald-brand"
+              className="shrink-0 rounded-full border border-gray-200 px-3 py-1.5 text-[12px] font-medium leading-none text-gray-600 transition-colors hover:border-emerald-brand hover:text-emerald-brand"
             >
               #{topic.tag}
             </DiscoverTrackedLink>
@@ -101,8 +113,8 @@ function SearchEntry({
 
 function DiscoverTabs({ activeTab }: { activeTab: DiscoverTab }) {
   return (
-    <div className="mb-5 overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mb-6">
-      <div className="flex min-w-max gap-1">
+    <div className="mb-4 max-w-full overflow-x-auto border-b border-gray-200 [scrollbar-width:none] sm:mb-6 [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-max gap-0.5 pr-2 sm:gap-1">
         {TABS.map((tab) => {
           const active = activeTab === tab.value;
           return (
@@ -112,13 +124,20 @@ function DiscoverTabs({ activeTab }: { activeTab: DiscoverTab }) {
               event="discover_tab_changed"
               metadata={{ tab: tab.value, surface: "explore" }}
               ariaCurrent={active ? "page" : undefined}
-              className={`mb-[-1px] border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors ${
+              className={`mb-[-1px] border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors sm:px-3.5 sm:text-sm ${
                 active
                   ? "border-emerald-brand text-ink"
                   : "border-transparent text-gray-500 hover:text-ink"
               }`}
             >
-              {tab.label}
+              {tab.mobileLabel ? (
+                <>
+                  <span className="sm:hidden">{tab.mobileLabel}</span>
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </>
+              ) : (
+                tab.label
+              )}
             </DiscoverTrackedLink>
           );
         })}
@@ -181,7 +200,7 @@ function TopicStrip({ data }: { data: DiscoverData }) {
   if (topics.length === 0) return null;
 
   return (
-    <section className="mb-6">
+    <section className="mb-5 min-w-0 max-w-full sm:mb-6">
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
           Topic signals
@@ -194,13 +213,13 @@ function TopicStrip({ data }: { data: DiscoverData }) {
           View all topics
         </DiscoverTrackedLink>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex max-w-full gap-2 overflow-x-auto pb-1 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {topics.map((topic) => (
           <DiscoverTrackedLink
             key={topic.tag}
             href={`/topics/${encodeURIComponent(topic.tag)}`}
             metadata={{ item: "topic_strip", tag: topic.tag }}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] leading-none transition-colors sm:text-sm ${
               topic.followed
                 ? "border-emerald-100 bg-emerald-50 text-emerald-brand"
                 : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
@@ -408,8 +427,8 @@ function DiscoverHighlights({
 
 function ActiveNowStrip({ data }: { data: DiscoverData }) {
   return (
-    <section className="mb-6 lg:hidden">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="mb-5 min-w-0 max-w-full lg:hidden">
+      <div className="mb-2.5 flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
           Active now
         </p>
@@ -420,10 +439,10 @@ function ActiveNowStrip({ data }: { data: DiscoverData }) {
           See debates
         </Link>
       </div>
-      <div className="flex snap-x gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex max-w-full snap-x snap-mandatory gap-3 overflow-x-auto pb-1 pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <DiscoverHighlights
           data={data}
-          cardClassName="min-w-[260px] snap-start"
+          cardClassName="w-[min(82vw,320px)] shrink-0 snap-start"
         />
       </div>
     </section>
@@ -622,7 +641,7 @@ export default async function ExplorePage({ searchParams }: PageProps) {
   const data = await getDiscoverData(supabase, user?.id ?? null);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto min-w-0 max-w-full overflow-hidden lg:max-w-6xl">
       <RetentionEventTracker
         event="discover_viewed"
         metadata={{
@@ -634,17 +653,22 @@ export default async function ExplorePage({ searchParams }: PageProps) {
         }}
       />
 
-      <div className="mb-5 grid gap-4 sm:mb-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
-        <div>
+      <div className="mb-4 grid min-w-0 max-w-full gap-3 sm:mb-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
             Explore
           </p>
-          <h1 className="mt-2 text-[28px] font-bold leading-tight tracking-normal text-ink sm:text-3xl">
+          <h1 className="mt-1.5 text-[25px] font-bold leading-[1.12] tracking-normal text-ink sm:mt-2 sm:text-3xl">
             Search, follow, read, and join what matters
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted sm:block">
-            Find posts, writers, topics, debates, and opportunities across
-            ThinkAfrica, then follow the signals that should shape your feed.
+          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-ink-muted sm:text-sm sm:leading-6">
+            <span className="sm:hidden">
+              Find posts, writers, topics, debates, and opportunities across ThinkAfrica.
+            </span>
+            <span className="hidden sm:inline">
+              Find posts, writers, topics, debates, and opportunities across
+              ThinkAfrica, then follow the signals that should shape your feed.
+            </span>
           </p>
         </div>
         <SearchEntry activeTab={activeTab} topics={data.topics} />
@@ -654,7 +678,7 @@ export default async function ExplorePage({ searchParams }: PageProps) {
 
       <DiscoverTabs activeTab={activeTab} />
 
-      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_312px]">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_312px] lg:gap-8">
         <main className="min-w-0">
           <ActiveSection
             activeTab={activeTab}

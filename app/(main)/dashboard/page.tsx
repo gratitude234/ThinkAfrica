@@ -5,6 +5,10 @@ import StatsBar from "./StatsBar";
 import PostsTable from "./PostsTable";
 import type { DashboardPost } from "./PostsTable";
 import QualitySignals, { type DashboardQualityItem } from "./QualitySignals";
+import PortfolioProgressCard, {
+  type PortfolioNextAction,
+  type PortfolioProgressItem,
+} from "./PortfolioProgressCard";
 import CollaborationDashboardCard from "@/components/collaboration/CollaborationDashboardCard";
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
@@ -120,12 +124,6 @@ export default async function DashboardPage() {
       {} as Record<string, number>
     );
   }
-
-  // Follower count
-  const { count: followerCount } = await supabase
-    .from("follows")
-    .select("*", { count: "exact", head: true })
-    .eq("following_id", user.id);
 
   const [{ data: authorProfile }, { data: talentProfile }] = await Promise.all([
     supabase
@@ -359,8 +357,25 @@ export default async function DashboardPage() {
 
   const revisionPosts = posts.filter((post) => post.status === "pending_revision");
   const publishedPosts = posts.filter((p) => p.status === "published");
+  const profileHref = authorProfile?.username
+    ? `/${authorProfile.username}`
+    : "/settings";
+  const profileBasicsComplete = Boolean(
+    authorProfile?.username && authorProfile?.full_name && authorProfile?.university
+  );
+  const reviewedOrCitableCount = publishedPosts.filter(
+    (post) =>
+      post.citation_id ||
+      post.type === "research" ||
+      post.type === "policy_brief"
+  ).length;
+  const coAuthoredCount = posts.filter(
+    (post) => (post.co_authors ?? []).length > 0
+  ).length;
+  const sourceBackedCount = posts.filter(
+    (post) => (referenceCounts[post.id] ?? 0) > 0
+  ).length;
   const totalViews = publishedPosts.reduce((sum, p) => sum + p.view_count, 0);
-  const totalLikes = publishedPosts.reduce((sum, p) => sum + p.like_count, 0);
   const opportunityReadiness = getOpportunityReadinessSummary({
     profile: authorProfile,
     talentProfile,
@@ -371,6 +386,105 @@ export default async function DashboardPage() {
       referenceCount: referenceCounts[post.id] ?? 0,
     })),
   });
+  const reviewedDraftMissingReferences = posts.find(
+    (post) =>
+      post.status === "draft" &&
+      (post.type === "research" || post.type === "policy_brief") &&
+      (referenceCounts[post.id] ?? 0) === 0
+  );
+  const reviewedDraftReady = posts.find(
+    (post) =>
+      post.status === "draft" &&
+      (post.type === "research" || post.type === "policy_brief") &&
+      (referenceCounts[post.id] ?? 0) > 0
+  );
+  const citablePost = publishedPosts.find((post) => post.citation_id);
+  const portfolioItems: PortfolioProgressItem[] = [
+    {
+      key: "published",
+      label: "Published",
+      value: publishedPosts.length,
+      helper: "Public work visible on your profile.",
+      done: publishedPosts.length > 0,
+    },
+    {
+      key: "reviewed",
+      label: "Reviewed/citable",
+      value: reviewedOrCitableCount,
+      helper: "Research, policy, or archived work.",
+      done: reviewedOrCitableCount > 0,
+    },
+    {
+      key: "coauthored",
+      label: "Co-authored",
+      value: coAuthoredCount,
+      helper: "Accepted shared authorship.",
+      done: coAuthoredCount > 0,
+    },
+    {
+      key: "source_backed",
+      label: "Source-backed",
+      value: sourceBackedCount,
+      helper: "Work with structured references.",
+      done: sourceBackedCount > 0,
+    },
+    {
+      key: "opportunities",
+      label: "Opportunity ready",
+      value: opportunityReadiness.score,
+      target: 100,
+      helper: "Profile setup for selectors.",
+      done: opportunityReadiness.score >= 100,
+    },
+  ];
+  const portfolioNextAction: PortfolioNextAction = !profileBasicsComplete
+    ? {
+        label: "Complete your profile basics",
+        body: "Add name, username, and university so every publication has a credible author line.",
+        href: "/settings",
+        cta: "Complete profile",
+      }
+    : publishedPosts.length === 0
+      ? {
+          label: "Publish your first portfolio piece",
+          body: "Start with a Quick Take or Essay, then build toward reviewed formats.",
+          href: "/write",
+          cta: "Start writing",
+        }
+      : reviewedDraftMissingReferences
+        ? {
+            label: "Add references to reviewed-format draft",
+            body: "Research and policy briefs need sources before they can enter review.",
+            href: `/write?draft=${reviewedDraftMissingReferences.id}`,
+            cta: "Add sources",
+          }
+        : reviewedDraftReady
+          ? {
+              label: "Submit reviewed work",
+              body: "Your reviewed-format draft has sources. Open publish review to submit it.",
+              href: `/write?draft=${reviewedDraftReady.id}`,
+              cta: "Continue draft",
+            }
+          : citablePost
+            ? {
+                label: "Feature your citable work",
+                body: "Put your strongest archived or citable piece near the top of your profile.",
+                href: profileHref,
+                cta: "Manage profile",
+              }
+            : opportunityReadiness.nextAction
+              ? {
+                  label: opportunityReadiness.nextAction.label,
+                  body: "Finish opportunity readiness so selectors know what you are open to.",
+                  href: opportunityReadiness.nextAction.actionHref,
+                  cta: opportunityReadiness.nextAction.actionLabel,
+                }
+              : {
+                  label: "Keep building portfolio proof",
+                  body: "Add another source-backed or co-authored piece to make your record stronger.",
+                  href: "/write",
+                  cta: "Write next piece",
+                };
   const opportunityInquiries = opportunityInquiriesRaw ?? [];
 
   return (
@@ -400,6 +514,11 @@ export default async function DashboardPage() {
       ) : (
         <ActivationChecklist state={activationState} />
       )}
+
+      <PortfolioProgressCard
+        items={portfolioItems}
+        nextAction={portfolioNextAction}
+      />
 
       <CollaborationDashboardCard
         pendingInvites={pendingInvites}
@@ -452,9 +571,9 @@ export default async function DashboardPage() {
 
       <StatsBar
         totalViews={totalViews}
-        totalLikes={totalLikes}
         publishedCount={publishedPosts.length}
-        followerCount={followerCount ?? 0}
+        reviewedCount={reviewedOrCitableCount}
+        sourceBackedCount={sourceBackedCount}
       />
 
       <PostsTable posts={posts} userId={user.id} />

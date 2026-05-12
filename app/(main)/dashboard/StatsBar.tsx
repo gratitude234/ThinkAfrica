@@ -1,8 +1,8 @@
 interface StatsBarProps {
   totalViews: number;
-  totalLikes: number;
   publishedCount: number;
-  followerCount: number;
+  reviewedCount: number;
+  sourceBackedCount: number;
 }
 
 function StatCard({
@@ -26,16 +26,16 @@ function StatCard({
 
 export default function StatsBar({
   totalViews,
-  totalLikes,
   publishedCount,
-  followerCount,
+  reviewedCount,
+  sourceBackedCount,
 }: StatsBarProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <StatCard label="Total Views" value={totalViews} />
-      <StatCard label="Total Likes" value={totalLikes} color="text-red-500" />
       <StatCard label="Published" value={publishedCount} color="text-emerald-brand" />
-      <StatCard label="Followers" value={followerCount} color="text-blue-600" />
+      <StatCard label="Reviewed / Citable" value={reviewedCount} color="text-blue-600" />
+      <StatCard label="Source-backed" value={sourceBackedCount} color="text-amber-600" />
+      <StatCard label="Total Views" value={totalViews} />
     </div>
   );
 }

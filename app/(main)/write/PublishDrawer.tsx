@@ -29,8 +29,10 @@ import {
 } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary } from "@/lib/postQuality";
+import DraftSignalPreview from "./DraftSignalPreview";
 import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
 import { publishPost } from "./actions";
+import { WRITE_FORMATS } from "./writeConfig";
 
 interface PublishDrawerProps {
   open: boolean;
@@ -72,6 +74,10 @@ interface TagRow {
 
 function readTimeFromText(text: string) {
   return Math.max(1, Math.ceil(text.trim().split(/\s+/).filter(Boolean).length / 200));
+}
+
+function stripHtml(value: string) {
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function getSoftWarning(
@@ -346,6 +352,8 @@ export default function PublishDrawer({
   const isInstantPublish = postType === "blog" || postType === "essay";
   const authorName = profile?.full_name ?? "You";
   const authorUniversity = profile?.university ?? "ThinkAfrica";
+  const currentFormat =
+    WRITE_FORMATS.find((item) => item.type === postType) ?? WRITE_FORMATS[0];
   const normalizedSlug = customSlug.trim()
     ? slugify(customSlug.trim(), { lower: true, strict: true })
     : "";
@@ -494,6 +502,19 @@ export default function PublishDrawer({
         </div>
 
         <div className="space-y-6 px-5 py-5">
+          <DraftSignalPreview
+            postType={postType}
+            title={title}
+            contentStarted={stripHtml(content).length > 0}
+            tags={tags}
+            excerpt={excerpt}
+            references={refs}
+            coAuthors={coAuthors}
+            profileComplete={Boolean(profile?.full_name && profile?.university)}
+            wordCount={wordCount}
+            compact
+          />
+
           <section className="space-y-3">
             <div>
               <p className="text-sm font-medium text-gray-900">Authorship</p>
@@ -721,6 +742,9 @@ export default function PublishDrawer({
                 <p className="mt-1 text-xs text-gray-500">
                   {POST_TYPE_INTENTS[postType]}
                 </p>
+                <p className="mt-1 text-xs text-gray-400">
+                  {currentFormat.requirementsSummary}
+                </p>
                 {postType === inferredType ? (
                   <p className="mt-1 text-[11px] text-gray-400">
                     Suggested from your {wordCount.toLocaleString()} words.
@@ -758,6 +782,9 @@ export default function PublishDrawer({
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
                       {POST_TYPE_INTENTS[type]}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-emerald-700">
+                      {WRITE_FORMATS.find((item) => item.type === type)?.signalLabel}
                     </p>
                   </button>
                 ))}

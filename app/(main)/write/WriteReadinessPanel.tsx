@@ -5,6 +5,7 @@ import type { PostReferenceRecord } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
 import { WRITE_FORMATS } from "./writeConfig";
 import type { CoAuthorProfile } from "@/components/collaboration/CoAuthorPicker";
+import DraftSignalPreview from "./DraftSignalPreview";
 
 interface WriteReadinessPanelProps {
   postType: PostType;
@@ -189,6 +190,9 @@ export default function WriteReadinessPanel({
             <p className="mt-1 text-sm leading-5 text-gray-500">
               {selectedFormat.desc}
             </p>
+            <p className="mt-2 text-xs leading-5 text-gray-400">
+              {selectedFormat.requirementsSummary}
+            </p>
           </div>
           <button
             type="button"
@@ -239,6 +243,18 @@ export default function WriteReadinessPanel({
           {nextStep.body}
         </p>
       </section>
+
+      <DraftSignalPreview
+        postType={postType}
+        title={title}
+        contentStarted={bodyStarted}
+        tags={tags}
+        excerpt={excerpt}
+        references={references}
+        coAuthors={coAuthors}
+        profileComplete={Boolean(profileInfo?.username)}
+        wordCount={wordCount}
+      />
 
       {children ? <div className="space-y-3">{children}</div> : null}
 
