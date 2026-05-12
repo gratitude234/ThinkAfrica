@@ -123,13 +123,19 @@ export default function ProfileHeader({
           <div className="h-12 bg-[radial-gradient(circle_at_18%_0%,rgba(16,185,129,0.14),transparent_38%),linear-gradient(135deg,#FFFFFF,#FAF8F5)] sm:h-14" />
         )}
 
-        <div className="flex flex-col gap-5 p-5 pt-0 sm:p-6 sm:pt-0 md:flex-row md:items-start md:p-7 md:pt-0">
-          <UserAvatar
-            name={displayName}
-            src={profile.avatar_url}
-            size={88}
-            className="-mt-11 border-4 border-white shadow-sm md:-mt-12"
-          />
+        <div
+          className={`flex flex-col gap-5 p-5 sm:p-6 md:flex-row md:items-start md:p-7 ${
+            profile.avatar_url ? "pt-0 sm:pt-0 md:pt-0" : ""
+          }`}
+        >
+          {profile.avatar_url ? (
+            <UserAvatar
+              name={displayName}
+              src={profile.avatar_url}
+              size={88}
+              className="-mt-11 border-4 border-white shadow-sm md:-mt-12"
+            />
+          ) : null}
 
           <div className="min-w-0 flex-1">
             <div className="mb-3 flex flex-wrap items-center gap-2">
