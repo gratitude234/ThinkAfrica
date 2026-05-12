@@ -43,17 +43,7 @@ function MessageIcon({ className = "h-5 w-5" }: { className?: string }) {
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M7.25 8.5h7.5M7.25 12h4.5"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M5 16.25V7.75A3.25 3.25 0 018.25 4.5h7.5A3.25 3.25 0 0119 7.75v4.5a3.25 3.25 0 01-3.25 3.25H9.5L5 19.5v-3.25z"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M8.75 18.5h6.5L19 21.5v-3A3.5 3.5 0 0021.5 15V9.5"
+        d="M7 8.5h10M7 12.25h6.5M5.75 19 9 15.75h8.25A2.75 2.75 0 0020 13V7.75A2.75 2.75 0 0017.25 5H6.75A2.75 2.75 0 004 7.75V13a2.75 2.75 0 002.75 2.75H7V19z"
       />
     </svg>
   );

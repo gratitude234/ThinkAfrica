@@ -17,6 +17,13 @@ const VERIFIED_COLORS: Record<string, string> = {
   institution: "text-blue-600",
 };
 
+const VERIFIED_CHIP_COLORS: Record<string, string> = {
+  student: "border-emerald-100 bg-emerald-50 text-emerald-700",
+  researcher: "border-purple-100 bg-purple-50 text-purple-700",
+  faculty: "border-amber-100 bg-amber-50 text-amber-700",
+  institution: "border-blue-100 bg-blue-50 text-blue-700",
+};
+
 interface ProfileHeaderProps {
   profile: {
     id: string;
@@ -98,51 +105,39 @@ export default function ProfileHeader({
     ? profile.verified_type.charAt(0).toUpperCase() +
       profile.verified_type.slice(1)
     : "Verified";
+  const verifiedType = profile.verified_type ?? "student";
 
   return (
     <>
-      {profile.cover_image_url ? (
-        <div className="mb-4 hidden overflow-hidden rounded-2xl border border-gray-200 md:block">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={profile.cover_image_url}
-            alt={`${displayName} cover`}
-            className="h-20 w-full object-cover"
-          />
-        </div>
-      ) : null}
-
-      <section className="overflow-hidden rounded-xl border border-gray-200 bg-gray-950 text-white shadow-sm shadow-black/[0.02] md:bg-white md:p-7 md:text-ink">
+      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02]">
         {profile.cover_image_url ? (
-          <div className="h-24 overflow-hidden md:hidden">
+          <div className="h-20 overflow-hidden bg-canvas sm:h-24">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={profile.cover_image_url}
               alt={`${displayName} cover`}
-              className="h-full w-full object-cover opacity-70"
+              className="h-full w-full object-cover"
             />
           </div>
         ) : (
-          <div className="h-14 bg-[radial-gradient(circle_at_20%_0%,rgba(16,185,129,0.28),transparent_35%),linear-gradient(135deg,#0A3D2E,#111827)] md:hidden" />
+          <div className="h-12 bg-[radial-gradient(circle_at_18%_0%,rgba(16,185,129,0.14),transparent_38%),linear-gradient(135deg,#FFFFFF,#FAF8F5)] sm:h-14" />
         )}
 
-        <div className="flex flex-col gap-5 p-6 md:flex-row md:items-start md:p-0">
+        <div className="flex flex-col gap-5 p-5 pt-0 sm:p-6 sm:pt-0 md:flex-row md:items-start md:p-7 md:pt-0">
           <UserAvatar
             name={displayName}
             src={profile.avatar_url}
             size={88}
-            className={`border-2 border-white md:border-gray-100 ${
-              profile.cover_image_url ? "-mt-14 md:mt-0" : "-mt-12 md:mt-0"
-            }`}
+            className="-mt-11 border-4 border-white shadow-sm md:-mt-12"
           />
 
           <div className="min-w-0 flex-1">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               {profile.verified ? (
                 <span
-                  className={`inline-flex items-center rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-xs font-semibold md:border-emerald-100 md:bg-emerald-50 ${
-                    VERIFIED_COLORS[profile.verified_type ?? "student"] ??
-                    "text-emerald-600"
+                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                    VERIFIED_CHIP_COLORS[verifiedType] ??
+                    "border-emerald-100 bg-emerald-50 text-emerald-700"
                   }`}
                 >
                   Verified {verifiedLabel}
@@ -160,7 +155,7 @@ export default function ProfileHeader({
               ) : null}
             </div>
 
-            <h1 className="font-display flex flex-wrap items-center gap-2 text-[30px] font-semibold leading-tight text-white md:text-ink">
+            <h1 className="font-display flex flex-wrap items-center gap-2 text-[28px] font-semibold leading-tight text-ink sm:text-[30px]">
               <span>{displayName}</span>
               {profile.verified ? (
                 <span
@@ -170,7 +165,7 @@ export default function ProfileHeader({
                       : "Verified"
                   }
                   className={`text-sm font-bold ${
-                    VERIFIED_COLORS[profile.verified_type ?? "student"] ??
+                    VERIFIED_COLORS[verifiedType] ??
                     "text-emerald-600"
                   }`}
                 >
@@ -179,16 +174,16 @@ export default function ProfileHeader({
               ) : null}
             </h1>
 
-            <p className="mt-1 text-sm text-white/55 md:text-gray-500">@{profile.username}</p>
+            <p className="mt-1 text-sm text-gray-500">@{profile.username}</p>
 
             {profile.bio ? (
-              <p className="mt-3 max-w-prose text-[15px] leading-6 text-white/80 md:text-gray-700">
+              <p className="mt-3 max-w-prose text-[15px] leading-6 text-gray-700">
                 {profile.bio}
               </p>
             ) : null}
 
             {affiliationBits.length > 0 ? (
-              <p className="mt-3 text-sm text-white/55 md:text-gray-500">
+              <p className="mt-3 text-sm text-gray-500">
                 {affiliationBits.join(" / ")}
               </p>
             ) : null}
@@ -248,16 +243,16 @@ export default function ProfileHeader({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 border-t border-white/10 px-6 pb-5 pt-2 sm:grid-cols-5 md:mt-6 md:border-gray-100 md:px-0 md:pb-0 md:pt-5">
+        <div className="grid grid-cols-2 gap-2 border-t border-gray-100 bg-white px-5 pb-5 pt-4 sm:grid-cols-5 sm:px-6 md:px-7">
           {statsItems.map((item) => (
             <div
               key={item.label}
-              className="border-b border-white/10 py-3 text-center last:col-span-2 last:border-b-0 sm:border-b-0 sm:border-r sm:last:col-span-1 sm:last:border-r-0 md:border-gray-100"
+              className="rounded-lg bg-canvas px-3 py-3 text-left last:col-span-2 sm:last:col-span-1"
             >
-              <div className="text-lg font-semibold text-white md:text-ink">
+              <div className="text-lg font-semibold text-ink">
                 {formatStat(item.value)}
               </div>
-              <div className="mt-0.5 text-xs text-white/55 md:text-ink-muted">{item.label}</div>
+              <div className="mt-0.5 text-xs text-ink-muted">{item.label}</div>
             </div>
           ))}
         </div>
