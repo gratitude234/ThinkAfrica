@@ -123,6 +123,14 @@ export default function WritePage() {
   const [publishDraftId, setPublishDraftId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (typeParam === "research") {
+      router.replace(
+        draftParam ? `/submit/research?draft=${draftParam}` : "/submit/research"
+      );
+    }
+  }, [draftParam, router, typeParam]);
+
+  useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       setCurrentUserId(user?.id ?? null);
@@ -145,6 +153,13 @@ export default function WritePage() {
 
   useEffect(() => {
     if (initialData) {
+      if (initialData.postType === "research") {
+        router.replace(
+          draftParam ? `/submit/research?draft=${draftParam}` : "/submit/research"
+        );
+        return;
+      }
+
       setPostType((initialData.postType as PostType) ?? "blog");
       setTitle(initialData.title);
       setSubtitle(initialData.subtitle ?? "");
@@ -155,7 +170,7 @@ export default function WritePage() {
       setInResponseToId(initialData.inResponseToId);
       setWordCount(countWords(initialData.content));
     }
-  }, [initialData]);
+  }, [draftParam, initialData, router]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -382,6 +397,11 @@ export default function WritePage() {
   };
 
   const applyTemplate = (templateType: PostType) => {
+    if (templateType === "research") {
+      router.push("/submit/research");
+      return;
+    }
+
     const template = STARTER_TEMPLATES[templateType];
     const nextData = getCurrentData({
       title: template.title,
@@ -571,6 +591,11 @@ export default function WritePage() {
                   key={type.type}
                   type="button"
                   onClick={() => {
+                    if (type.type === "research") {
+                      router.push("/submit/research");
+                      return;
+                    }
+
                     setPostType(type.type);
                     setShowChooser(false);
                     if (draftId) {

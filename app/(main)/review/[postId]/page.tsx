@@ -48,7 +48,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     supabase
       .from("posts")
       .select(
-        "id, title, excerpt, content, type, tags, current_round, profiles!posts_author_id_fkey(full_name, username, university)"
+        "id, title, excerpt, content, type, tags, current_round, document_path, document_original_name, document_size_bytes, profiles!posts_author_id_fkey(full_name, username, university)"
       )
       .eq("id", postId)
       .single(),
@@ -148,10 +148,36 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           </section>
         ) : null}
 
-        <div
-          className="prose prose-gray max-w-none prose-a:text-emerald-brand"
-          dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-        />
+        {post.type === "research" ? (
+          <section className="rounded-xl border border-purple-100 bg-purple-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">
+              Research PDF
+            </p>
+            <p className="mt-1 text-sm font-medium text-gray-900">
+              {(post as { document_original_name?: string | null })
+                .document_original_name ?? "Uploaded research paper"}
+            </p>
+            {(post as { document_path?: string | null }).document_path ? (
+              <a
+                href={`/api/research-document/${post.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex rounded-lg bg-purple-700 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-800"
+              >
+                Open PDF for review
+              </a>
+            ) : (
+              <p className="mt-2 text-sm text-amber-700">
+                No PDF is attached to this research submission.
+              </p>
+            )}
+          </section>
+        ) : (
+          <div
+            className="prose prose-gray max-w-none prose-a:text-emerald-brand"
+            dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+          />
+        )}
 
         {references && references.length > 0 ? (
           <section>

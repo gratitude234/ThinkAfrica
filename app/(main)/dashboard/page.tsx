@@ -41,6 +41,7 @@ export default async function DashboardPage() {
       `
       id, author_id, title, slug, content, excerpt, tags, type, status, view_count,
       created_at, published_at, revision_due_at, citation_id, in_response_to,
+      document_path, document_original_name, document_mime_type, document_size_bytes,
       post_reviews(assigned_at, submitted_at, recommendation),
       post_editor_decisions(decision, created_at),
       post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
@@ -281,6 +282,13 @@ export default async function DashboardPage() {
     like_count: likeCounts[p.id] ?? 0,
     revision_due_at: p.revision_due_at ?? null,
     citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
+    document_path: (p as { document_path?: string | null }).document_path ?? null,
+    document_original_name:
+      (p as { document_original_name?: string | null }).document_original_name ?? null,
+    document_mime_type:
+      (p as { document_mime_type?: string | null }).document_mime_type ?? null,
+    document_size_bytes:
+      (p as { document_size_bytes?: number | null }).document_size_bytes ?? null,
     post_reviews: p.post_reviews ?? [],
     post_editor_decisions: p.post_editor_decisions ?? [],
     co_authors: Array.isArray((p as { post_authors?: unknown[] }).post_authors)

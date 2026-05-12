@@ -239,44 +239,44 @@ function FeaturedDebateHero({ debate }: { debate: DebateRow }) {
   return (
     <Link
       href={`/debates/${debate.id}`}
-      className="block overflow-hidden rounded-2xl bg-gray-950 p-5 text-white shadow-[0_18px_36px_-22px_rgb(15_23_42/0.9)] transition-transform hover:-translate-y-0.5"
+      className="block overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] transition-all hover:-translate-y-px hover:border-gray-300 hover:shadow-md"
     >
       <div className="mb-4 flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-brand" />
           {debate.status === "active" ? "Live debate" : "Open motion"}
         </span>
-        <span className="text-xs font-medium text-white/50">{timeLabel}</span>
+        <span className="text-xs font-medium text-gray-400">{timeLabel}</span>
       </div>
 
-      <h2 className="font-display text-xl font-semibold leading-snug">
+      <h2 className="font-display text-xl font-semibold leading-snug text-ink">
         {debate.title}
       </h2>
       {debate.description ? (
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/65">
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-500">
           {debate.description}
         </p>
       ) : null}
 
       <div className="mt-5 grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-emerald-500/90 px-4 py-3 text-center">
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center text-emerald-800">
           <p className="text-xs font-bold">For</p>
           <p className="mt-1 text-2xl font-bold">{split.forPct}%</p>
         </div>
-        <div className="rounded-xl bg-amber-500/90 px-4 py-3 text-center">
+        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-center text-amber-800">
           <p className="text-xs font-bold">Against</p>
           <p className="mt-1 text-2xl font-bold">{split.againstPct}%</p>
         </div>
       </div>
 
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/15">
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
         <div
-          className="h-full rounded-full bg-emerald-400"
+          className="h-full rounded-full bg-emerald-brand"
           style={{ width: `${split.forPct}%` }}
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-between text-xs font-medium text-white/55">
+      <div className="mt-3 flex items-center justify-between text-xs font-medium text-gray-500">
         <span>{split.total.toLocaleString()} votes</span>
         <span>{argCount.toLocaleString()} {argCount === 1 ? "argument" : "arguments"}</span>
       </div>
@@ -383,15 +383,15 @@ export default async function DebatesPage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-6 flex flex-col gap-5 rounded-2xl bg-gray-950 p-5 text-white shadow-sm md:mb-7 md:flex-row md:items-end md:justify-between md:bg-transparent md:p-0 md:text-ink md:shadow-none">
+      <div className="mb-6 flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] md:mb-7 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300 md:text-emerald-brand">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
             Debate room
           </p>
-          <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-white md:text-4xl md:text-ink">
+          <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-ink md:text-4xl">
             Argue ideas in public, with structure
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65 md:text-gray-500">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
             Pick a side, vote on the motion, and make the strongest case while
             moderators guide each room through opening, rebuttal, and closing.
           </p>
@@ -402,13 +402,13 @@ export default async function DebatesPage({ searchParams }: PageProps) {
             className={`inline-flex w-fit items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               canCreate || !user
                 ? "bg-emerald-brand text-white hover:bg-emerald-600"
-                : "border border-white/15 bg-white/5 text-white hover:bg-white/10 md:border-gray-200 md:bg-white md:text-gray-600 md:hover:bg-white"
+                : "border border-gray-200 bg-canvas text-gray-600 hover:border-gray-300 hover:bg-white"
             }`}
           >
             {canCreate || !user ? "Start a debate" : "Verify to start one"}
           </Link>
           {!canCreate && user ? (
-            <p className="max-w-xs text-xs leading-5 text-white/55 md:text-right md:text-gray-500">
+            <p className="max-w-xs text-xs leading-5 text-gray-500 md:text-right">
               Verified members, editors, and admins can moderate new motions.
             </p>
           ) : null}

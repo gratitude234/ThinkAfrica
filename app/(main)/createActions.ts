@@ -37,9 +37,9 @@ export const CREATE_ACTIONS: CreateAction[] = [
   {
     id: "research-paper",
     label: "Research Paper",
-    description: "Submit serious academic work with references.",
-    badge: "Peer review",
-    href: "/write?type=research&starter=1",
+    description: "Upload a finished research manuscript as a PDF.",
+    badge: "PDF review",
+    href: "/submit/research",
     category: "write",
   },
 ];

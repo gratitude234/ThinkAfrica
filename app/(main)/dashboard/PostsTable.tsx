@@ -30,6 +30,10 @@ export interface DashboardPost {
   type: string;
   status: string;
   citation_id?: string | null;
+  document_path?: string | null;
+  document_original_name?: string | null;
+  document_mime_type?: string | null;
+  document_size_bytes?: number | null;
   view_count: number;
   like_count: number;
   created_at: string;
@@ -74,6 +78,13 @@ function normalizePost(
     type: record.type ?? existing?.type ?? "blog",
     status: record.status ?? existing?.status ?? "draft",
     citation_id: record.citation_id ?? existing?.citation_id ?? null,
+    document_path: record.document_path ?? existing?.document_path ?? null,
+    document_original_name:
+      record.document_original_name ?? existing?.document_original_name ?? null,
+    document_mime_type:
+      record.document_mime_type ?? existing?.document_mime_type ?? null,
+    document_size_bytes:
+      record.document_size_bytes ?? existing?.document_size_bytes ?? null,
     view_count: record.view_count ?? existing?.view_count ?? 0,
     like_count: existing?.like_count ?? 0,
     created_at: record.created_at ?? existing?.created_at ?? new Date().toISOString(),
@@ -322,6 +333,13 @@ export default function PostsTable({
                                   "coauthor"
                               )
                               .join(", ")}
+                          </p>
+                        ) : null}
+                        {post.type === "research" ? (
+                          <p className="mt-1 truncate text-xs text-purple-600">
+                            {post.document_path
+                              ? `PDF attached${post.document_original_name ? ` / ${post.document_original_name}` : ""}`
+                              : "PDF missing"}
                           </p>
                         ) : null}
                         {reviewStatus ? (

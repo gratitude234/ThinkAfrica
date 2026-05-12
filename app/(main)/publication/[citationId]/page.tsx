@@ -30,6 +30,12 @@ function formatReference(reference: {
     .join(" ");
 }
 
+function formatDocumentSize(value: number | null | undefined) {
+  if (!value) return null;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default async function PublicationArchivePage({ params }: PageProps) {
   const { citationId } = await params;
   const supabase = await createClient();
@@ -49,7 +55,7 @@ export default async function PublicationArchivePage({ params }: PageProps) {
 
   const { data: version } = await supabase
     .from("post_versions")
-    .select("id, title, excerpt, content, version_number, round, created_at, references, authors")
+    .select("id, title, excerpt, content, version_number, round, created_at, references, authors, document_path, document_original_name, document_mime_type, document_size_bytes")
     .eq("id", post.published_version_id)
     .single();
 
@@ -63,6 +69,15 @@ export default async function PublicationArchivePage({ params }: PageProps) {
     ? version.references
     : []) as PostReferenceRecord[];
   const sanitizedContent = sanitizePostHtml(version.content);
+  const archivedDocument = {
+    path: (version as { document_path?: string | null }).document_path ?? null,
+    originalName:
+      (version as { document_original_name?: string | null })
+        .document_original_name ?? null,
+    sizeBytes:
+      (version as { document_size_bytes?: number | null }).document_size_bytes ??
+      null,
+  };
   const citationAuthors =
     archivedAuthors.length > 0
       ? archivedAuthors.map((author) => ({
@@ -138,12 +153,37 @@ export default async function PublicationArchivePage({ params }: PageProps) {
         </section>
       ) : null}
 
-      <article className="rounded-xl border border-gray-200 bg-white p-6">
-        <div
-          className="prose prose-gray max-w-none prose-a:text-emerald-brand"
-          dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-        />
-      </article>
+      {post.type === "research" && archivedDocument.path ? (
+        <section className="rounded-xl border border-purple-100 bg-purple-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">
+            Archived research PDF
+          </p>
+          <h2 className="mt-2 text-lg font-semibold text-gray-900">
+            {archivedDocument.originalName ?? "Research paper PDF"}
+          </h2>
+          <p className="mt-1 text-sm text-purple-950/75">
+            Accepted document snapshot
+            {formatDocumentSize(archivedDocument.sizeBytes)
+              ? ` / ${formatDocumentSize(archivedDocument.sizeBytes)}`
+              : ""}
+          </p>
+          <a
+            href={`/api/research-document/${post.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 inline-flex rounded-lg bg-purple-700 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-800"
+          >
+            View / download paper
+          </a>
+        </section>
+      ) : (
+        <article className="rounded-xl border border-gray-200 bg-white p-6">
+          <div
+            className="prose prose-gray max-w-none prose-a:text-emerald-brand"
+            dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+          />
+        </article>
+      )}
 
       {references.length > 0 ? (
         <section className="rounded-xl border border-gray-200 bg-white p-5">

@@ -384,6 +384,13 @@ export async function publishPost(input: {
     return { error: "You must be signed in.", slug: null as string | null };
   }
 
+  if (input.postType === "research") {
+    return {
+      error: "Research papers must be uploaded through the research submission flow.",
+      slug: null as string | null,
+    };
+  }
+
   const track = await getSubmissionTrack(input.postType);
   if (!track) {
     return { error: "Submission track is not configured for this format.", slug: null as string | null };

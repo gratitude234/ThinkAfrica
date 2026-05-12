@@ -73,6 +73,10 @@ interface PostRecord {
   citation_id: string | null;
   in_response_to: string | null;
   audio_summary_url: string | null;
+  document_path: string | null;
+  document_original_name: string | null;
+  document_mime_type: string | null;
+  document_size_bytes: number | null;
   profiles: AuthorProfile | AuthorProfile[] | null;
 }
 
@@ -215,6 +219,47 @@ function PublicationSignalPill({
       </p>
       <p className="mt-0.5 text-sm font-semibold">{value}</p>
     </div>
+  );
+}
+
+function formatDocumentSize(value: number | null | undefined) {
+  if (!value) return null;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function ResearchDocumentPanel({ post }: { post: PostRecord }) {
+  if (post.type !== "research") return null;
+
+  const size = formatDocumentSize(post.document_size_bytes);
+
+  return (
+    <section className="mb-8 rounded-2xl border border-purple-100 bg-purple-50 p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-purple-700">
+        Research manuscript
+      </p>
+      <h2 className="mt-2 text-lg font-semibold text-gray-900">
+        {post.document_original_name ?? "Uploaded research paper"}
+      </h2>
+      <p className="mt-1 text-sm leading-6 text-purple-950/75">
+        This research paper is reviewed from the uploaded PDF. The accepted
+        document is preserved with the citation archive after publication.
+      </p>
+      {post.document_path ? (
+        <a
+          href={`/api/research-document/${post.id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-4 inline-flex items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-800"
+        >
+          Open PDF{size ? ` / ${size}` : ""}
+        </a>
+      ) : (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          No PDF is attached to this research submission yet.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -1172,6 +1217,7 @@ export default async function PostPage({ params }: PageProps) {
       created_at, published_at, view_count, cover_image_url, citation_id,
       in_response_to,
       audio_summary_url,
+      document_path, document_original_name, document_mime_type, document_size_bytes,
       profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url, verified, verified_type)
     `
     )
@@ -1306,7 +1352,9 @@ export default async function PostPage({ params }: PageProps) {
                   {basicQualitySummary.contentLabel}
                   <span className="mx-2 text-gray-300">/</span>
                   <span className="text-ink-muted">
-                    {wordCount.toLocaleString()} words / {readTime} min read
+                    {post.type === "research"
+                      ? "PDF manuscript"
+                      : `${wordCount.toLocaleString()} words / ${readTime} min read`}
                   </span>
                 </p>
 
@@ -1412,14 +1460,18 @@ export default async function PostPage({ params }: PageProps) {
 
               <hr className="mb-8 border-gray-200" />
 
-              <div className="article-journal-body relative mb-8">
-                <HighlightShare containerId="post-article-prose" />
-                <div
-                  id="post-article-prose"
-                  className="article-journal-body prose prose-gray max-w-[65ch] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-gray-900"
-                  dangerouslySetInnerHTML={{ __html: contentWithIds }}
-                />
-              </div>
+              <ResearchDocumentPanel post={post} />
+
+              {post.type !== "research" ? (
+                <div className="article-journal-body relative mb-8">
+                  <HighlightShare containerId="post-article-prose" />
+                  <div
+                    id="post-article-prose"
+                    className="article-journal-body prose prose-gray max-w-[65ch] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-gray-900"
+                    dangerouslySetInnerHTML={{ __html: contentWithIds }}
+                  />
+                </div>
+              ) : null}
 
               <Suspense fallback={<SectionSkeleton rows={2} />}>
                 <MobileCredibilitySection
