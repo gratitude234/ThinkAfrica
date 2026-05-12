@@ -26,7 +26,7 @@ interface FeedOptions {
 }
 
 const POST_SELECT =
-  "id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, author_id";
+  "id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, citation_id, published_version_id, author_id";
 
 function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   if (timeframe === "week") {
@@ -182,6 +182,49 @@ async function enrichPosts(
       comment_count: commentCounts[id] ?? 0,
     } as PostCardData;
   });
+}
+
+export async function fetchCitableFeed(
+  supabase: {
+    from: (table: string) => any;
+  },
+  pageSize = 8
+): Promise<PostCardData[]> {
+  const reader = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createAdminClient()
+    : supabase;
+  const safePageSize = Math.min(Math.max(pageSize, 1), 30);
+
+  const { data: citableRows } = await reader
+    .from("posts")
+    .select(POST_SELECT)
+    .eq("status", "published")
+    .not("citation_id", "is", null)
+    .order("published_at", { ascending: false })
+    .limit(safePageSize);
+
+  const rows = [...(citableRows ?? [])];
+
+  if (rows.length < safePageSize) {
+    const existingIds = new Set(rows.map((post: { id?: string }) => post.id));
+    const { data: reviewedRows } = await reader
+      .from("posts")
+      .select(POST_SELECT)
+      .eq("status", "published")
+      .in("type", ["research", "policy_brief"])
+      .order("published_at", { ascending: false })
+      .limit(safePageSize * 2);
+
+    for (const row of reviewedRows ?? []) {
+      if (rows.length >= safePageSize) break;
+      if (!existingIds.has(row.id)) {
+        rows.push(row);
+        existingIds.add(row.id);
+      }
+    }
+  }
+
+  return enrichPosts(reader, rows.slice(0, safePageSize));
 }
 
 function applyPostFilters(

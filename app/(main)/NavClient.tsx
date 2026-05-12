@@ -36,14 +36,14 @@ function MessageIcon({ className = "h-5 w-5" }: { className?: string }) {
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth={2.25}
+      strokeWidth={2.2}
       viewBox="0 0 24 24"
       aria-hidden="true"
     >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M20.25 11.5a8.25 8.25 0 11-3.5-6.75M20.25 11.5a8.24 8.24 0 01-8.25 8.25 8.4 8.4 0 01-3.5-.77L4 20l1.02-4.5A8.4 8.4 0 014.25 12a8.24 8.24 0 018.25-8.25M8.25 10.25h7.5M8.25 14h5"
+        d="M5 20V7a3 3 0 013-3h8a3 3 0 013 3v5.5a3 3 0 01-3 3H9.25L5 20zM8.25 8.5h7.5M8.25 12h5.5"
       />
     </svg>
   );

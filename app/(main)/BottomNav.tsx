@@ -119,17 +119,16 @@ export default function BottomNav({
           >
             <div className="relative">
               <svg
-                className="h-6 w-6"
+                className="h-5 w-5"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth={2.25}
+                strokeWidth={2}
                 viewBox="0 0 24 24"
-                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M20.25 11.5a8.25 8.25 0 11-3.5-6.75M20.25 11.5a8.24 8.24 0 01-8.25 8.25 8.4 8.4 0 01-3.5-.77L4 20l1.02-4.5A8.4 8.4 0 014.25 12a8.24 8.24 0 018.25-8.25M8.25 10.25h7.5M8.25 14h5"
+                  d="M7 8h10M7 12h6m-8 7 3.5-3.5H18A2.5 2.5 0 0020.5 13V7A2.5 2.5 0 0018 4.5H6A2.5 2.5 0 003.5 7v6A2.5 2.5 0 006 15.5h1V19z"
                 />
               </svg>
               {hasActiveDebate ? (
