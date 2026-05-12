@@ -22,6 +22,8 @@ export interface PostCardData {
   bookmark_count?: number;
   comment_count?: number;
   view_count?: number;
+  citation_id?: string | null;
+  published_version_id?: string | null;
   cover_image_url?: string | null;
   score?: number;
   co_authors?: Array<{
@@ -69,6 +71,12 @@ const TYPE_BADGES: Record<string, string> = {
   quick_take: "bg-emerald-100 text-emerald-800",
 };
 
+const SIGNAL_BADGES = {
+  reviewed: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  citable: "border-sky-200 bg-sky-50 text-sky-700",
+  coauthor: "border-purple-200 bg-purple-50 text-purple-700",
+};
+
 function estimateReadTime(excerpt: string | null): number {
   return Math.max(
     1,
@@ -87,6 +95,8 @@ export default function PostCard({
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
   const authorHref = author?.username ? `/${author.username}` : null;
   const coAuthorCount = post.co_authors?.length ?? 0;
+  const isReviewed =
+    Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
   const authorLine =
     coAuthorCount > 0 ? `${authorName} + ${coAuthorCount} others` : authorName;
   const verifiedBg =
@@ -115,6 +125,28 @@ export default function PostCard({
             {post.in_response_to ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
                 {"\u21A9"} Response
+              </span>
+            ) : null}
+            {isReviewed ? (
+              <span
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${SIGNAL_BADGES.reviewed}`}
+              >
+                Reviewed
+              </span>
+            ) : null}
+            {post.citation_id ? (
+              <Link
+                href={`/publication/${post.citation_id}`}
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold transition-colors hover:border-sky-300 hover:text-sky-800 ${SIGNAL_BADGES.citable}`}
+              >
+                Citable
+              </Link>
+            ) : null}
+            {coAuthorCount > 0 ? (
+              <span
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${SIGNAL_BADGES.coauthor}`}
+              >
+                Co-author
               </span>
             ) : null}
           </div>

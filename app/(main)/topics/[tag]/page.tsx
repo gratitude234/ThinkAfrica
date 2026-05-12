@@ -16,8 +16,9 @@ export default async function TopicPage({ params }: PageProps) {
   const { data: postsRaw } = await supabase
     .from("posts")
     .select(`
-      id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url,
-      profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)
+      id, author_id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, citation_id, published_version_id,
+      profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
+      post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
     `)
     .eq("status", "published")
     .contains("tags", [decodedTag])
@@ -28,6 +29,17 @@ export default async function TopicPage({ params }: PageProps) {
   const posts = postsRaw.map((p) => ({
     ...p,
     profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
+    co_authors: Array.isArray((p as { post_authors?: unknown[] }).post_authors)
+      ? ((p as { post_authors?: Array<Record<string, unknown>> }).post_authors ?? [])
+          .filter((row) => !!row.accepted_at)
+          .filter((row) => row.user_id !== (p as { author_id?: string }).author_id)
+          .map((row) => ({
+            user_id: row.user_id as string,
+            profile: Array.isArray(row.profile)
+              ? (row.profile[0] as { username: string; full_name: string | null })
+              : (row.profile as { username: string; full_name: string | null }),
+          }))
+      : [],
   }));
 
   // Top contributors for this tag
@@ -88,9 +100,21 @@ export default async function TopicPage({ params }: PageProps) {
                   created_at: post.created_at,
                   published_at: post.published_at,
                   view_count: post.view_count,
+                  citation_id:
+                    (post as { citation_id?: string | null }).citation_id ?? null,
+                  published_version_id:
+                    (post as { published_version_id?: string | null })
+                      .published_version_id ?? null,
                   cover_image_url:
                     (post as { cover_image_url?: string | null })
                       .cover_image_url ?? null,
+                  co_authors:
+                    (post as {
+                      co_authors?: Array<{
+                        user_id: string;
+                        profile: { username: string; full_name: string | null } | null;
+                      }>;
+                    }).co_authors ?? [],
                   profiles: post.profiles as {
                     username: string;
                     full_name: string | null;

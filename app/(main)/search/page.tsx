@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -14,6 +15,8 @@ interface PostResult {
   slug: string;
   excerpt: string | null;
   type: string;
+  citation_id?: string | null;
+  published_version_id?: string | null;
   published_at: string | null;
   profiles: {
     username: string;
@@ -51,6 +54,31 @@ type RawPostResult = Omit<PostResult, "profiles"> & {
 type TrendingRow = {
   tags: string[] | null;
 };
+
+function isReviewedWork(post: { type?: string | null; citation_id?: string | null }) {
+  return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+}
+
+function SearchSignalBadge({
+  children,
+  variant = "emerald",
+}: {
+  children: ReactNode;
+  variant?: "emerald" | "sky";
+}) {
+  const styles = {
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    sky: "border-sky-200 bg-sky-50 text-sky-700",
+  };
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${styles[variant]}`}
+    >
+      {children}
+    </span>
+  );
+}
 
 function ResultSkeleton() {
   return (
@@ -126,7 +154,7 @@ function SearchPageContent() {
         supabase
           .from("posts")
           .select(
-            "id, title, slug, excerpt, type, published_at, profiles!posts_author_id_fkey(username, full_name, university)"
+            "id, title, slug, excerpt, type, citation_id, published_version_id, published_at, profiles!posts_author_id_fkey(username, full_name, university)"
           )
           .eq("status", "published")
           .or(`title.ilike.%${trimmed}%,excerpt.ilike.%${trimmed}%`)
@@ -353,16 +381,29 @@ function SearchPageContent() {
               </h2>
               <div className="space-y-3">
                 {posts.map((post) => (
-                  <Link
+                  <article
                     key={post.id}
-                    href={`/post/${post.slug}`}
                     className="rounded-xl border border-gray-200/70 bg-white p-5 transition-shadow hover:shadow-md"
                   >
-                    <Badge type={post.type} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge type={post.type} />
+                      {isReviewedWork(post) ? (
+                        <SearchSignalBadge>Reviewed</SearchSignalBadge>
+                      ) : null}
+                      {post.citation_id ? (
+                        <Link href={`/publication/${post.citation_id}`}>
+                          <SearchSignalBadge variant="sky">
+                            Citable
+                          </SearchSignalBadge>
+                        </Link>
+                      ) : null}
+                    </div>
                     <div className="min-w-0">
-                      <p className="font-display mt-3 line-clamp-2 text-xl font-semibold leading-snug text-ink">
-                        {post.title}
-                      </p>
+                      <Link href={`/post/${post.slug}`}>
+                        <p className="font-display mt-3 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
+                          {post.title}
+                        </p>
+                      </Link>
                       <p className="mt-3 text-xs text-gray-500">
                         {post.profiles
                           ? `${post.profiles.full_name ?? post.profiles.username}${
@@ -378,7 +419,7 @@ function SearchPageContent() {
                         </p>
                       ) : null}
                     </div>
-                  </Link>
+                  </article>
                 ))}
               </div>
             </section>

@@ -7,6 +7,7 @@ import Tag from "@/components/ui/Tag";
 import UserAvatar from "@/components/ui/UserAvatar";
 import {
   formatDate,
+  POST_TYPE_LABELS,
   POST_POINTS,
   sanitizePostExcerpt,
   type PostType,
@@ -185,6 +186,36 @@ function renderReferenceShortcodes(content: string): string {
 
 function getAuthor(post: PostRecord): AuthorProfile | null {
   return Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles;
+}
+
+function isReviewedWork(post: { type?: string | null; citation_id?: string | null }) {
+  return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+}
+
+function PublicationSignalPill({
+  label,
+  value,
+  tone = "gray",
+}: {
+  label: string;
+  value: string;
+  tone?: "gray" | "emerald" | "sky" | "purple";
+}) {
+  const toneClass = {
+    gray: "border-gray-200 bg-gray-50 text-gray-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    sky: "border-sky-200 bg-sky-50 text-sky-700",
+    purple: "border-purple-200 bg-purple-50 text-purple-700",
+  };
+
+  return (
+    <div className={`rounded-xl border px-3 py-2 ${toneClass[tone]}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-semibold">{value}</p>
+    </div>
+  );
 }
 
 function throwPostQueryError(slug: string, stage: "metadata" | "page", error: unknown): never {
@@ -520,6 +551,78 @@ async function HeaderCoAuthors({
         </Link>
       ))}
     </div>
+  );
+}
+
+async function PublicationSignalBlock({
+  post,
+  authorId,
+  secondaryDataPromise,
+}: {
+  post: PostRecord;
+  authorId: string | null;
+  secondaryDataPromise: Promise<SecondaryData>;
+}) {
+  if (post.status !== "published") return null;
+
+  const { coAuthors, references, reviews } = await secondaryDataPromise;
+  const displayCoAuthors = coAuthors.filter((record) => record.user_id !== authorId);
+  const completedReviewCount = reviews.filter((review) =>
+    Boolean(review.submitted_at)
+  ).length;
+  const reviewed = isReviewedWork(post);
+  const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
+
+  return (
+    <section className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+            Publication signal
+          </p>
+          <p className="mt-1 text-sm leading-6 text-gray-500">
+            Academic trust markers attached to this work.
+          </p>
+        </div>
+        {post.citation_id ? (
+          <Link
+            href={`/publication/${post.citation_id}`}
+            className="inline-flex items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 transition-colors hover:border-sky-300 hover:text-sky-800"
+          >
+            Open citation archive
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <PublicationSignalPill label="Format" value={typeLabel} />
+        <PublicationSignalPill
+          label="Review status"
+          value={reviewed ? "Reviewed" : "Community post"}
+          tone={reviewed ? "emerald" : "gray"}
+        />
+        <PublicationSignalPill
+          label="Citation"
+          value={post.citation_id ?? "Not archived"}
+          tone={post.citation_id ? "sky" : "gray"}
+        />
+        <PublicationSignalPill
+          label="Co-authors"
+          value={displayCoAuthors.length.toLocaleString()}
+          tone={displayCoAuthors.length > 0 ? "purple" : "gray"}
+        />
+        <PublicationSignalPill
+          label="References"
+          value={references.length.toLocaleString()}
+          tone={references.length > 0 ? "emerald" : "gray"}
+        />
+        <PublicationSignalPill
+          label="Completed reviews"
+          value={completedReviewCount.toLocaleString()}
+          tone={completedReviewCount > 0 ? "emerald" : "gray"}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -1289,6 +1392,14 @@ export default async function PostPage({ params }: PageProps) {
 
                 <Suspense fallback={null}>
                   <HeaderCoAuthors
+                    authorId={author?.id ?? null}
+                    secondaryDataPromise={secondaryDataPromise}
+                  />
+                </Suspense>
+
+                <Suspense fallback={null}>
+                  <PublicationSignalBlock
+                    post={post}
                     authorId={author?.id ?? null}
                     secondaryDataPromise={secondaryDataPromise}
                   />

@@ -11,6 +11,26 @@ import FeedFilterChips from "./FeedFilterChips";
 type TabKey = "home" | "following" | "latest";
 type TypeFilter = "all" | "research" | "essay" | "policy_brief" | "blog";
 
+const EMPTY_POSTS: PostCardData[] = [];
+
+interface FeedResponse {
+  posts: PostCardData[];
+  hasMore: boolean;
+}
+
+interface FeedCacheEntry extends FeedResponse {
+  page: number;
+  emptyPageCount: number;
+}
+
+function feedCacheKey(
+  tab: TabKey,
+  type: TypeFilter,
+  timeframe: FeedTimeframe
+) {
+  return `${tab}:${type}:${timeframe}`;
+}
+
 function buildFeedUrl(tab: TabKey, type: TypeFilter, timeframe: FeedTimeframe) {
   const params = new URLSearchParams(window.location.search);
   params.set("tab", tab);
@@ -34,7 +54,7 @@ async function fetchFeed(
   type: TypeFilter,
   timeframe: FeedTimeframe,
   page: number
-) {
+): Promise<FeedResponse> {
   const params = new URLSearchParams();
   params.set("tab", tab);
   params.set("page", page.toString());
@@ -50,10 +70,7 @@ async function fetchFeed(
     throw new Error("Failed to load feed");
   }
 
-  return (await response.json()) as {
-    posts: PostCardData[];
-    hasMore: boolean;
-  };
+  return (await response.json()) as FeedResponse;
 }
 
 function EndStateCard({ topics }: { topics: string[] }) {
@@ -100,6 +117,43 @@ function deriveSuggestedTopics(posts: PostCardData[]) {
     .map(([tag]) => tag);
 }
 
+function PostFeedSkeleton() {
+  return (
+    <div aria-hidden="true">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <article
+          key={index}
+          className="relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-3.5 sm:px-5 sm:py-[18px]"
+        >
+          <span className="absolute bottom-4 left-0 top-4 w-1 rounded-r-full bg-gray-200" />
+          <div className="flex gap-3 pl-1 sm:gap-4">
+            <div className="min-w-0 flex-1 animate-pulse">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="h-5 w-16 rounded-full bg-gray-100" />
+                <div className="h-3 w-14 rounded-full bg-gray-100" />
+                <div className="h-5 w-20 rounded-full bg-gray-100" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-5 w-11/12 rounded bg-gray-100" />
+                <div className="h-5 w-3/5 rounded bg-gray-100" />
+              </div>
+              <div className="mt-3 space-y-2 max-[359px]:hidden">
+                <div className="h-3 w-full rounded bg-gray-100" />
+                <div className="h-3 w-2/3 rounded bg-gray-100" />
+              </div>
+              <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-2.5">
+                <div className="h-6 w-6 rounded-full bg-gray-100" />
+                <div className="h-3 w-40 rounded bg-gray-100" />
+              </div>
+            </div>
+            <div className="h-[84px] w-[84px] shrink-0 animate-pulse rounded-[10px] bg-gray-100 min-[420px]:h-[92px] min-[420px]:w-[92px] sm:h-[112px] sm:w-[112px]" />
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 export default function PostsFeedTabs({
   initialTab,
   initialType,
@@ -134,23 +188,39 @@ export default function PostsFeedTabs({
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>(initialType);
   const [timeframe, setTimeframe] = useState<FeedTimeframe>(initialTimeframe);
-  const [posts, setPosts] = useState<PostCardData[]>(initialPosts);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(initialHasMore);
-  const [loading, setLoading] = useState(false);
+  const [feedCache, setFeedCache] = useState<Record<string, FeedCacheEntry>>(() => ({
+    [feedCacheKey(initialTab, initialType, initialTimeframe)]: {
+      posts: initialPosts,
+      hasMore: initialHasMore,
+      page: 1,
+      emptyPageCount: initialPosts.length === 0 ? 1 : 0,
+    },
+  }));
+  const [isSwitching, setIsSwitching] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [emptyPageCount, setEmptyPageCount] = useState(0);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const inFlightRef = useRef(new Map<string, Promise<FeedResponse>>());
+  const activeRequestRef = useRef(0);
+  const loadMoreRequestRef = useRef(0);
 
   useEffect(() => {
+    const nextKey = feedCacheKey(initialTab, initialType, initialTimeframe);
     setActiveTab(initialTab);
     setTypeFilter(initialType);
     setTimeframe(initialTimeframe);
-    setPosts(initialPosts);
-    setPage(1);
-    setHasMore(initialHasMore);
+    setFeedCache((current) => ({
+      ...current,
+      [nextKey]: {
+        posts: initialPosts,
+        hasMore: initialHasMore,
+        page: 1,
+        emptyPageCount: initialPosts.length === 0 ? 1 : 0,
+      },
+    }));
+    setIsSwitching(false);
+    setIsLoadingMore(false);
     setError(null);
-    setEmptyPageCount(0);
   }, [initialHasMore, initialPosts, initialTab, initialTimeframe, initialType]);
 
   const syncUrl = useCallback(
@@ -164,66 +234,182 @@ export default function PostsFeedTabs({
     []
   );
 
-  const reloadFeed = useCallback(
-    async (
+  const requestFeedPage = useCallback(
+    (
       nextTab: TabKey,
       nextType: TypeFilter,
-      nextTimeframe: FeedTimeframe
+      nextTimeframe: FeedTimeframe,
+      nextPage: number
     ) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const result = await fetchFeed(nextTab, nextType, nextTimeframe, 1);
-        setPosts(result.posts);
-        setHasMore(result.hasMore);
-        setPage(1);
-        setEmptyPageCount(result.posts.length === 0 ? 1 : 0);
-      } catch (fetchError) {
-        setError(
-          fetchError instanceof Error ? fetchError.message : "Failed to load feed"
-        );
-      } finally {
-        setLoading(false);
-      }
+      const key = feedCacheKey(nextTab, nextType, nextTimeframe);
+      const requestKey = `${key}:${nextPage}`;
+      const existing = inFlightRef.current.get(requestKey);
+      if (existing) return existing;
+
+      const request = fetchFeed(nextTab, nextType, nextTimeframe, nextPage).finally(
+        () => {
+          inFlightRef.current.delete(requestKey);
+        }
+      );
+      inFlightRef.current.set(requestKey, request);
+      return request;
     },
     []
   );
 
+  const writeFeedPage = useCallback(
+    (
+      key: string,
+      result: FeedResponse,
+      nextPage: number,
+      append: boolean
+    ) => {
+      setFeedCache((current) => {
+        const previous = current[key];
+        const emptyPageCount =
+          result.posts.length === 0
+            ? nextPage === 1
+              ? 1
+              : (previous?.emptyPageCount ?? 0) + 1
+            : 0;
+
+        return {
+          ...current,
+          [key]: {
+            posts: append ? [...(previous?.posts ?? []), ...result.posts] : result.posts,
+            hasMore: result.hasMore,
+            page: nextPage,
+            emptyPageCount,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const reloadFeed = useCallback(
+    async (
+      nextTab: TabKey,
+      nextType: TypeFilter,
+      nextTimeframe: FeedTimeframe,
+      {
+        requestId,
+        showError,
+        showSkeleton,
+      }: {
+        requestId: number;
+        showError: boolean;
+        showSkeleton: boolean;
+      }
+    ) => {
+      const key = feedCacheKey(nextTab, nextType, nextTimeframe);
+      if (showSkeleton) setIsSwitching(true);
+      try {
+        const result = await requestFeedPage(nextTab, nextType, nextTimeframe, 1);
+        writeFeedPage(key, result, 1, false);
+      } catch (fetchError) {
+        if (activeRequestRef.current === requestId && showError) {
+          setError(
+            fetchError instanceof Error ? fetchError.message : "Failed to load feed"
+          );
+        }
+      } finally {
+        if (activeRequestRef.current === requestId && showSkeleton) {
+          setIsSwitching(false);
+        }
+      }
+    },
+    [requestFeedPage, writeFeedPage]
+  );
+
   const updateState = useCallback(
     (nextTab: TabKey, nextType: TypeFilter, nextTimeframe: FeedTimeframe) => {
+      const nextKey = feedCacheKey(nextTab, nextType, nextTimeframe);
+      const hasCachedFeed = Boolean(feedCache[nextKey]);
+      const requestId = activeRequestRef.current + 1;
+      activeRequestRef.current = requestId;
+
       setActiveTab(nextTab);
       setTypeFilter(nextType);
       setTimeframe(nextTimeframe);
+      setError(null);
+      setIsSwitching(!hasCachedFeed);
       syncUrl(nextTab, nextType, nextTimeframe);
-      void reloadFeed(nextTab, nextType, nextTimeframe);
+      void reloadFeed(nextTab, nextType, nextTimeframe, {
+        requestId,
+        showError: !hasCachedFeed,
+        showSkeleton: !hasCachedFeed,
+      });
     },
-    [reloadFeed, syncUrl]
+    [feedCache, reloadFeed, syncUrl]
   );
 
   const loadMore = useCallback(async () => {
-    if (loading || !hasMore) return;
-    setLoading(true);
+    const key = feedCacheKey(activeTab, typeFilter, timeframe);
+    const currentFeed = feedCache[key];
+    if (isSwitching || isLoadingMore || !currentFeed?.hasMore) return;
+
+    const requestId = loadMoreRequestRef.current + 1;
+    loadMoreRequestRef.current = requestId;
+    setIsLoadingMore(true);
     setError(null);
     try {
-      const nextPage = page + 1;
-      const result = await fetchFeed(activeTab, typeFilter, timeframe, nextPage);
-      setPosts((current) => [...current, ...result.posts]);
-      setHasMore(result.hasMore);
-      setPage(nextPage);
-      setEmptyPageCount((current) =>
-        result.posts.length === 0 ? current + 1 : 0
-      );
+      const nextPage = currentFeed.page + 1;
+      const result = await requestFeedPage(activeTab, typeFilter, timeframe, nextPage);
+      writeFeedPage(key, result, nextPage, true);
     } catch (fetchError) {
       setError(
         fetchError instanceof Error ? fetchError.message : "Failed to load feed"
       );
     } finally {
-      setLoading(false);
+      if (loadMoreRequestRef.current === requestId) {
+        setIsLoadingMore(false);
+      }
     }
-  }, [activeTab, hasMore, loading, page, timeframe, typeFilter]);
+  }, [
+    activeTab,
+    feedCache,
+    isLoadingMore,
+    isSwitching,
+    requestFeedPage,
+    timeframe,
+    typeFilter,
+    writeFeedPage,
+  ]);
 
   useEffect(() => {
-    if (!sentinelRef.current || !hasMore) return;
+    const tabsToPrefetch: TabKey[] = currentUserId
+      ? showFollowingTab
+        ? ["following", "latest"]
+        : ["latest"]
+      : ["latest"];
+
+    for (const tab of tabsToPrefetch) {
+      const key = feedCacheKey(tab, typeFilter, timeframe);
+      if (tab === activeTab || feedCache[key]) continue;
+
+      void requestFeedPage(tab, typeFilter, timeframe, 1)
+        .then((result) => {
+          writeFeedPage(key, result, 1, false);
+        })
+        .catch(() => {
+          // Prefetch failures should not interrupt the active feed.
+        });
+    }
+  }, [
+    activeTab,
+    currentUserId,
+    feedCache,
+    requestFeedPage,
+    showFollowingTab,
+    timeframe,
+    typeFilter,
+    writeFeedPage,
+  ]);
+
+  useEffect(() => {
+    const currentFeed = feedCache[feedCacheKey(activeTab, typeFilter, timeframe)];
+    if (!sentinelRef.current || !currentFeed?.hasMore || isSwitching) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -236,10 +422,17 @@ export default function PostsFeedTabs({
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loadMore]);
+  }, [activeTab, feedCache, isSwitching, loadMore, timeframe, typeFilter]);
 
+  const activeKey = feedCacheKey(activeTab, typeFilter, timeframe);
+  const currentFeed = feedCache[activeKey];
+  const posts = currentFeed?.posts ?? EMPTY_POSTS;
+  const hasMore = currentFeed?.hasMore ?? false;
+  const emptyPageCount = currentFeed?.emptyPageCount ?? 0;
   const suggestedTopics = useMemo(() => deriveSuggestedTopics(posts), [posts]);
-  const showEndState = !hasMore || emptyPageCount >= 3;
+  const showSkeleton = isSwitching && !currentFeed;
+  const showEndState =
+    !showSkeleton && !isLoadingMore && posts.length > 0 && (!hasMore || emptyPageCount >= 3);
 
   return (
     <div>
@@ -277,21 +470,27 @@ export default function PostsFeedTabs({
         </div>
       ) : null}
 
-      <PostFeed
-        posts={posts}
-        activeTab={activeTab}
-        activeDebate={activeDebate}
-        peopleSuggestions={peopleSuggestions}
-        peopleSuggestionReason={peopleSuggestionReason}
-        prioritizePeopleSuggestions={prioritizePeopleSuggestions}
-        currentUserId={currentUserId}
-      />
+      <div aria-busy={showSkeleton || isLoadingMore}>
+        {showSkeleton ? (
+          <PostFeedSkeleton />
+        ) : (
+          <PostFeed
+            posts={posts}
+            activeTab={activeTab}
+            activeDebate={activeDebate}
+            peopleSuggestions={peopleSuggestions}
+            peopleSuggestionReason={peopleSuggestionReason}
+            prioritizePeopleSuggestions={prioritizePeopleSuggestions}
+            currentUserId={currentUserId}
+          />
+        )}
+      </div>
 
-      {loading ? (
+      {isLoadingMore ? (
         <div className="py-6 text-center text-sm text-gray-400">Loading more...</div>
       ) : null}
 
-      {!loading && showEndState && posts.length > 0 ? (
+      {showEndState ? (
         <div className="mt-6">
           <EndStateCard topics={suggestedTopics} />
         </div>

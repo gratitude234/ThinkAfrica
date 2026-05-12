@@ -1,5 +1,6 @@
 import type { PostCardData } from "@/components/post/PostCard";
 import {
+  fetchCitableFeed,
   fetchFeedPage,
   type FeedTimeframe,
   type FeedTabKey,
@@ -9,7 +10,7 @@ import {
   type SuggestedPerson,
 } from "@/lib/suggestedPeople";
 
-export type DiscoverTab = "for-you" | "trending" | "topics" | "people";
+export type DiscoverTab = "for-you" | "trending" | "citable" | "topics" | "people";
 
 export interface DiscoverTopic {
   tag: string;
@@ -57,6 +58,7 @@ export interface DiscoverData {
   followedIds: string[];
   forYouPosts: PostCardData[];
   trendingPosts: PostCardData[];
+  citablePosts: PostCardData[];
   topics: DiscoverTopic[];
   people: DiscoverPerson[];
   peopleReason: string;
@@ -377,6 +379,7 @@ export async function getDiscoverData(
   const [
     forYouPosts,
     trendingPosts,
+    citablePosts,
     topics,
     peopleResult,
     activeDebate,
@@ -401,6 +404,7 @@ export async function getDiscoverData(
       followedIds: [],
       pageSize: 8,
     }),
+    fetchCitableFeed(supabase, 8),
     getTopics(supabase, userContext.interests),
     getPeople(supabase, {
       userId,
@@ -421,6 +425,7 @@ export async function getDiscoverData(
     followedIds: userContext.followedIds,
     forYouPosts,
     trendingPosts,
+    citablePosts,
     topics,
     people: peopleResult.people,
     peopleReason: peopleResult.reason,
@@ -435,6 +440,7 @@ export function getDiscoverTab(value: string | null | undefined): DiscoverTab {
   if (
     value === "for-you" ||
     value === "trending" ||
+    value === "citable" ||
     value === "topics" ||
     value === "people"
   ) {

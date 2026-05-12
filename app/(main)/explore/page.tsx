@@ -26,6 +26,7 @@ interface PageProps {
 const TABS: Array<{ value: DiscoverTab; label: string; href: string }> = [
   { value: "for-you", label: "For you", href: "/explore" },
   { value: "trending", label: "Trending", href: "/explore?tab=trending" },
+  { value: "citable", label: "Citable Works", href: "/explore?tab=citable" },
   { value: "topics", label: "Topics", href: "/explore?tab=topics" },
   { value: "people", label: "People", href: "/explore?tab=people" },
 ];
@@ -511,6 +512,24 @@ function TrendingSection({
   );
 }
 
+function CitableSection({
+  data,
+  signedIn,
+}: {
+  data: DiscoverData;
+  signedIn: boolean;
+}) {
+  return (
+    <>
+      {sectionTitle(
+        "Citable works",
+        "Archived publications, research, and policy briefs with the strongest academic signal."
+      )}
+      <PostList posts={data.citablePosts} signedIn={signedIn} />
+    </>
+  );
+}
+
 function TopicsSection({
   data,
   userId,
@@ -575,6 +594,10 @@ function ActiveSection({
 }) {
   if (activeTab === "trending") {
     return <TrendingSection data={data} signedIn={Boolean(userId)} />;
+  }
+
+  if (activeTab === "citable") {
+    return <CitableSection data={data} signedIn={Boolean(userId)} />;
   }
 
   if (activeTab === "topics") {

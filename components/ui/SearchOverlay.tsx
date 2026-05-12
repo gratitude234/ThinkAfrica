@@ -11,6 +11,7 @@ interface SearchResult {
   title: string;
   slug: string;
   type: string;
+  citation_id?: string | null;
   url: string;
   profiles: { full_name: string | null; username: string } | null;
 }
@@ -58,7 +59,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     const { data } = await supabase
       .from("posts")
       .select(
-        "id, title, slug, type, profiles!posts_author_id_fkey(full_name, username)"
+        "id, title, slug, type, citation_id, profiles!posts_author_id_fkey(full_name, username)"
       )
       .eq("status", "published")
       .ilike("title", `%${q}%`)
@@ -231,7 +232,16 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   </p>
                 ) : null}
               </div>
-              <Badge type={result.type} />
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <Badge type={result.type} />
+                {result.citation_id ||
+                result.type === "research" ||
+                result.type === "policy_brief" ? (
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    {result.citation_id ? "Citable" : "Reviewed"}
+                  </span>
+                ) : null}
+              </div>
             </Link>
           ))}
         </div>
