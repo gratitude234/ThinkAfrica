@@ -26,7 +26,7 @@ export default async function EditPage({ params }: PageProps) {
   const { data: post } = await supabase
     .from("posts")
     .select(
-      "id, title, excerpt, content, type, status, tags, cover_image_url, author_id, current_round, revision_due_at, citation_id, published_version_id"
+      "id, title, slug, excerpt, content, type, status, tags, cover_image_url, author_id, current_round, revision_due_at, citation_id, published_version_id"
     )
     .eq("slug", slug)
     .single();
@@ -39,6 +39,12 @@ export default async function EditPage({ params }: PageProps) {
         <p className="mb-2 text-2xl font-bold text-gray-900">Access denied</p>
         <p className="text-gray-500">You don&apos;t have permission to edit this post.</p>
       </div>
+    );
+  }
+
+  if (post.type === "research") {
+    redirect(
+      post.status === "published" ? `/post/${post.slug}` : `/submit/research?draft=${post.id}`
     );
   }
 

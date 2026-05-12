@@ -60,7 +60,7 @@ interface PublishDrawerProps {
   onCoAuthorsChange?: (coAuthors: CoAuthorProfile[]) => void;
 }
 
-const POST_TYPES: PostType[] = ["blog", "essay", "policy_brief", "research"];
+const POST_TYPES: PostType[] = ["blog", "essay", "policy_brief"];
 
 interface ProfileRow {
   full_name: string | null;

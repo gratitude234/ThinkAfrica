@@ -141,6 +141,12 @@ export async function saveEditedPost(input: {
     return { error: "You do not have permission to edit this post." };
   }
 
+  if (post.type === "research") {
+    return {
+      error: "Research papers must be revised through the research submission flow.",
+    };
+  }
+
   if (post.status === "published" && requiresEditorialWorkflow(post.type)) {
     return {
       error:

@@ -31,6 +31,10 @@ type PostRecord = {
   current_round: number;
   citation_id: string | null;
   published_version_id: string | null;
+  document_path: string | null;
+  document_original_name: string | null;
+  document_mime_type: string | null;
+  document_size_bytes: number | null;
 };
 
 export const REVIEWED_POST_TYPES: PostType[] = ["research", "policy_brief"];
@@ -54,7 +58,7 @@ async function getPostRecord(admin: AdminClient, postId: string) {
   const { data } = await admin
     .from("posts")
     .select(
-      "id, author_id, slug, title, excerpt, content, type, status, current_round, citation_id, published_version_id"
+      "id, author_id, slug, title, excerpt, content, type, status, current_round, citation_id, published_version_id, document_path, document_original_name, document_mime_type, document_size_bytes"
     )
     .eq("id", postId)
     .single();
@@ -161,7 +165,7 @@ export async function getPostVersions(admin: AdminClient, postId: string) {
   const { data } = await admin
     .from("post_versions")
     .select(
-      "id, post_id, version_number, round, version_kind, content, title, excerpt, author_note, submitted_by, references, authors, created_at"
+      "id, post_id, version_number, round, version_kind, content, title, excerpt, author_note, submitted_by, references, authors, created_at, document_path, document_original_name, document_mime_type, document_size_bytes"
     )
     .eq("post_id", postId)
     .order("version_number", { ascending: false });
@@ -288,13 +292,17 @@ export async function createVersionSnapshot(input: {
         ? authors.filter((author) => author.accepted_at)
         : authors
     ),
+    document_path: post.document_path,
+    document_original_name: post.document_original_name,
+    document_mime_type: post.document_mime_type,
+    document_size_bytes: post.document_size_bytes,
   };
 
   const { data, error } = await admin
     .from("post_versions")
     .insert(payload)
     .select(
-      "id, post_id, version_number, round, version_kind, content, title, excerpt, author_note, submitted_by, references, authors, created_at"
+      "id, post_id, version_number, round, version_kind, content, title, excerpt, author_note, submitted_by, references, authors, created_at, document_path, document_original_name, document_mime_type, document_size_bytes"
     )
     .single();
 

@@ -67,6 +67,10 @@ export interface PostVersionRecord {
   references: PostReferenceRecord[];
   authors: VersionAuthorRecord[];
   created_at: string;
+  document_path?: string | null;
+  document_original_name?: string | null;
+  document_mime_type?: string | null;
+  document_size_bytes?: number | null;
 }
 
 export interface PostAuthorRecord {
@@ -134,6 +138,10 @@ export interface ExtendedPostRecord {
   revision_due_at: string | null;
   published_version_id?: string | null;
   in_response_to?: string | null;
+  document_path?: string | null;
+  document_original_name?: string | null;
+  document_mime_type?: string | null;
+  document_size_bytes?: number | null;
 }
 
 export interface PostContributorSummary extends ProfileSummary {

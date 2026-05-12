@@ -105,6 +105,7 @@ export default async function AdminReviewPage() {
       .select(
         `
         id, title, excerpt, content, type, status, tags, created_at, author_id, current_round,
+        document_path, document_original_name, document_size_bytes,
         post_references(id),
         profiles!posts_author_id_fkey (username, full_name, university)
       `
@@ -299,6 +300,31 @@ export default async function AdminReviewPage() {
                               <p className="mt-2 line-clamp-2 text-sm text-gray-500">
                                 {post.excerpt}
                               </p>
+                            ) : null}
+                            {post.type === "research" ? (
+                              <div className="mt-3 rounded-lg border border-purple-100 bg-purple-50 px-3 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">
+                                  Research PDF
+                                </p>
+                                <p className="mt-1 text-sm font-medium text-gray-900">
+                                  {(post as { document_original_name?: string | null })
+                                    .document_original_name ?? "Uploaded research paper"}
+                                </p>
+                                {(post as { document_path?: string | null }).document_path ? (
+                                  <a
+                                    href={`/api/research-document/${post.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-2 inline-flex rounded-lg bg-purple-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-800"
+                                  >
+                                    Open PDF
+                                  </a>
+                                ) : (
+                                  <p className="mt-1 text-xs text-amber-700">
+                                    Missing PDF
+                                  </p>
+                                )}
+                              </div>
                             ) : null}
                             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-400">
                               <span>

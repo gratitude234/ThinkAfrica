@@ -36,14 +36,14 @@ export const WRITE_FORMATS = [
   },
   {
     type: "research",
-    label: "Research paper",
+    label: "Research paper upload",
     minWords: 3000,
-    readTime: "Multiple sessions",
+    readTime: "Upload PDF",
     review: "Full review",
-    desc: "Original research with citations and methodology",
+    desc: "Submit a finished research manuscript as a PDF",
     signalLabel: "Strongest citation path",
     portfolioValue: "Creates the clearest route to reviewed and citable academic proof.",
-    requirementsSummary: "Question, method, findings, references, and enough depth.",
+    requirementsSummary: "PDF, abstract, authors, topics, and references.",
   },
 ] as const satisfies ReadonlyArray<{
   type: PostType;
