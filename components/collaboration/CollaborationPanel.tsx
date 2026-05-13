@@ -123,7 +123,7 @@ export default function CollaborationPanel({
   const responseHref = summary.viewerId ? summary.responseHref : summary.signInHref;
 
   return (
-    <section className="mb-8 rounded-xl border border-emerald-100 bg-emerald-50 px-5 py-5">
+    <section className="mb-8 rounded-xl border border-emerald-100 bg-white px-5 py-5 shadow-sm shadow-emerald-950/[0.03]">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
@@ -132,24 +132,24 @@ export default function CollaborationPanel({
           <h2 className="mt-1 text-lg font-semibold text-gray-900">
             Build from {authorName}&apos;s argument
           </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-emerald-900">
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-gray-600">
             Respond publicly, follow the writer, or start a direct conversation
             when there is a concrete academic reason to connect.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 text-center sm:min-w-[160px]">
-          <div className="rounded-lg bg-white px-3 py-2">
+          <div className="rounded-lg bg-emerald-50 px-3 py-2">
             <p className="text-lg font-bold text-gray-900">{summary.responseCount}</p>
             <p className="text-[11px] text-gray-500">responses</p>
           </div>
-          <div className="rounded-lg bg-white px-3 py-2">
+          <div className="rounded-lg bg-emerald-50 px-3 py-2">
             <p className="text-lg font-bold text-gray-900">{summary.coauthorCount}</p>
             <p className="text-[11px] text-gray-500">coauthors</p>
           </div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Link
           href={responseHref}
           onClick={() => {
@@ -164,7 +164,7 @@ export default function CollaborationPanel({
               });
             }
           }}
-          className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
         >
           Write a response
         </Link>
@@ -172,7 +172,7 @@ export default function CollaborationPanel({
           type="button"
           onClick={handleFollow}
           disabled={followLoading || summary.isOwnPost}
-          className="rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {followLoading ? "Saving..." : following ? "Following" : "Follow author"}
         </button>
@@ -180,7 +180,7 @@ export default function CollaborationPanel({
           type="button"
           onClick={handleMessage}
           disabled={messageLoading || summary.isOwnPost}
-          className="rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {messageLoading ? "Opening..." : "Message author"}
         </button>
@@ -197,7 +197,7 @@ export default function CollaborationPanel({
                 },
               });
             }}
-            className="rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:border-emerald-300"
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-700"
           >
             View related responses
           </Link>
@@ -211,7 +211,7 @@ export default function CollaborationPanel({
       ) : null}
 
       {!summary.viewerId ? (
-        <p className="mt-3 text-xs text-emerald-900">
+        <p className="mt-3 text-xs text-gray-500">
           Reading as a guest. Sign in to follow, respond, or message writers.
         </p>
       ) : null}

@@ -45,7 +45,7 @@ export default function CredibilityPanel({
   const overallGood = summary.missingItems.length === 0;
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
+    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02]">
       {/* Mobile compact view */}
       <div className="sm:hidden">
         <div className="flex items-start justify-between gap-3">

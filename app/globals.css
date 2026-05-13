@@ -80,8 +80,14 @@
 .article-journal-body .prose p,
 .article-journal-body .prose li {
   font-family: var(--font-display), Georgia, serif;
-  font-size: 1.0625rem;
-  line-height: 1.75;
+  font-size: 1.075rem;
+  line-height: 1.78;
+  color: #242424;
+}
+
+.article-journal-body .prose p {
+  margin-top: 1.2rem;
+  margin-bottom: 1.2rem;
 }
 
 /* Pull quote — add the class "ta-pullquote" to a <blockquote> in Tiptap */
@@ -90,11 +96,11 @@
   border-right: none;
   border-top: none;
   border-bottom: none;
-  padding: 4px 0 4px 1.5rem;
-  margin: 2.25rem 0;
+  padding: 6px 0 6px 1.5rem;
+  margin: 2.5rem 0;
   font-family: var(--font-display), Georgia, serif;
-  font-size: 1.25rem;
-  line-height: 1.45;
+  font-size: 1.2rem;
+  line-height: 1.55;
   font-style: italic;
   color: #1A1A1A;
   background: transparent;
@@ -113,8 +119,38 @@
 .article-journal-body .prose h2,
 .article-journal-body .prose h3 {
   font-family: var(--font-display), Georgia, serif;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
   font-weight: 500;
+  line-height: 1.16;
+  margin-top: 2.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.article-journal-body .prose img {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  margin-top: 2rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 639px) {
+  .article-journal-body .prose p,
+  .article-journal-body .prose li {
+    font-size: 1rem;
+    line-height: 1.72;
+  }
+
+  .article-journal-body .prose blockquote {
+    margin: 2rem 0;
+    padding-left: 1rem;
+    font-size: 1.08rem;
+  }
+
+  .article-journal-body .prose h2,
+  .article-journal-body .prose h3 {
+    margin-top: 2rem;
+  }
 }
 
 /* ── Landing page animations ────────────────────────────────────────── */

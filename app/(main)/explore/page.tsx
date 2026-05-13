@@ -62,7 +62,7 @@ function SearchEntry({
   const quickTopics = topics.slice(0, 6);
 
   return (
-    <section className="min-w-0 max-w-full rounded-xl border border-gray-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-3">
+    <section className="min-w-0 max-w-full rounded-xl border border-gray-200 bg-white p-2.5 shadow-sm ring-1 ring-black/[0.01] sm:rounded-2xl sm:p-3">
       <form action="/search" className="relative min-w-0">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 sm:pl-4">
           <svg
@@ -89,8 +89,8 @@ function SearchEntry({
       </form>
 
       {quickTopics.length > 0 ? (
-        <div className="mt-2.5 flex max-w-full gap-2 overflow-x-auto pb-1 pr-2 [scrollbar-width:none] sm:mt-3 [&::-webkit-scrollbar]:hidden">
-          {quickTopics.map((topic) => (
+        <div className="mt-2.5 flex max-w-full snap-x gap-2 overflow-x-auto pb-1 pr-6 [scrollbar-width:none] sm:mt-3 sm:flex-wrap sm:overflow-visible sm:pr-0 [&::-webkit-scrollbar]:hidden">
+          {quickTopics.map((topic, index) => (
             <DiscoverTrackedLink
               key={topic.tag}
               href={`/search?q=${encodeURIComponent(topic.tag)}`}
@@ -100,7 +100,9 @@ function SearchEntry({
                 tag: topic.tag,
                 surface: "explore",
               }}
-              className="shrink-0 rounded-full border border-gray-200 px-3 py-1.5 text-[12px] font-medium leading-none text-gray-600 transition-colors hover:border-emerald-brand hover:text-emerald-brand"
+              className={`shrink-0 snap-start rounded-full border border-gray-200 px-3 py-1.5 text-[12px] font-medium leading-none text-gray-600 transition-colors hover:border-emerald-brand hover:text-emerald-brand ${
+                index >= 4 ? "hidden sm:inline-flex" : "inline-flex"
+              }`}
             >
               #{topic.tag}
             </DiscoverTrackedLink>
@@ -113,7 +115,7 @@ function SearchEntry({
 
 function DiscoverTabs({ activeTab }: { activeTab: DiscoverTab }) {
   return (
-    <div className="mb-4 max-w-full overflow-x-auto border-b border-gray-200 [scrollbar-width:none] sm:mb-6 [&::-webkit-scrollbar]:hidden">
+    <div className="sticky top-[60px] z-30 -mx-4 mb-4 max-w-[calc(100%+2rem)] overflow-x-auto border-b border-gray-200 bg-canvas/95 px-4 pt-1 backdrop-blur [scrollbar-width:none] sm:-mx-6 sm:mb-6 sm:max-w-[calc(100%+3rem)] sm:px-6 lg:static lg:mx-0 lg:max-w-full lg:bg-transparent lg:px-0 lg:pt-0 lg:backdrop-blur-none [&::-webkit-scrollbar]:hidden">
       <div className="flex min-w-max gap-0.5 pr-2 sm:gap-1">
         {TABS.map((tab) => {
           const active = activeTab === tab.value;
@@ -203,23 +205,24 @@ function TopicStrip({ data }: { data: DiscoverData }) {
     <section className="mb-5 min-w-0 max-w-full sm:mb-6">
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-          Topic signals
+          Popular topics
         </p>
         <DiscoverTrackedLink
           href="/topics"
           metadata={{ item: "view_all_topics" }}
           className="shrink-0 text-xs font-semibold text-emerald-brand hover:underline"
         >
-          View all topics
+          <span className="sm:hidden">All topics</span>
+          <span className="hidden sm:inline">View all topics</span>
         </DiscoverTrackedLink>
       </div>
-      <div className="flex max-w-full gap-2 overflow-x-auto pb-1 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex max-w-full snap-x gap-2 overflow-x-auto pb-1 pr-8 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pr-0 [&::-webkit-scrollbar]:hidden">
         {topics.map((topic) => (
           <DiscoverTrackedLink
             key={topic.tag}
             href={`/topics/${encodeURIComponent(topic.tag)}`}
             metadata={{ item: "topic_strip", tag: topic.tag }}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-[13px] leading-none transition-colors sm:text-sm ${
+            className={`shrink-0 snap-start rounded-full border px-3 py-1.5 text-[13px] leading-none transition-colors sm:text-sm ${
               topic.followed
                 ? "border-emerald-100 bg-emerald-50 text-emerald-brand"
                 : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
@@ -334,7 +337,7 @@ function SpotlightCard({
   className?: string;
 }) {
   return (
-    <section className={`rounded-xl border border-gray-200 bg-white p-4 ${className}`}>
+    <section className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02] ${className}`}>
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
         {kicker}
       </p>
@@ -427,10 +430,10 @@ function DiscoverHighlights({
 
 function ActiveNowStrip({ data }: { data: DiscoverData }) {
   return (
-    <section className="mb-5 min-w-0 max-w-full lg:hidden">
+    <section className="mt-5 min-w-0 max-w-full lg:hidden">
       <div className="mb-2.5 flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-          Active now
+          Live now
         </p>
         <Link
           href="/debates"
@@ -439,10 +442,10 @@ function ActiveNowStrip({ data }: { data: DiscoverData }) {
           See debates
         </Link>
       </div>
-      <div className="flex max-w-full snap-x snap-mandatory gap-3 overflow-x-auto pb-1 pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex max-w-full snap-x snap-mandatory gap-3 overflow-x-auto pb-1 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <DiscoverHighlights
           data={data}
-          cardClassName="w-[min(82vw,320px)] shrink-0 snap-start"
+          cardClassName="w-[calc(100vw-2rem)] shrink-0 snap-start sm:w-[min(82vw,340px)]"
         />
       </div>
     </section>
@@ -505,7 +508,7 @@ function ForYouSection({
       {sectionTitle(
         signedIn ? "Recommended reads" : "Start with what is active now",
         signedIn
-          ? "Posts ranked with your interests, follows, university, and engagement signals."
+          ? "Ranked with your interests, follows, and engagement signals."
           : "Popular community work you can read before signing in."
       )}
       <PostList posts={data.forYouPosts} signedIn={signedIn} />
@@ -658,10 +661,10 @@ export default async function ExplorePage({ searchParams }: PageProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
             Explore
           </p>
-          <h1 className="mt-1.5 text-[25px] font-bold leading-[1.12] tracking-normal text-ink sm:mt-2 sm:text-3xl">
+          <h1 className="mt-1 text-[24px] font-bold leading-[1.12] tracking-normal text-ink sm:mt-2 sm:text-3xl">
             Search, follow, read, and join what matters
           </h1>
-          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-ink-muted sm:text-sm sm:leading-6">
+          <p className="mt-1.5 max-w-2xl text-[13px] leading-5 text-ink-muted sm:mt-2 sm:text-sm sm:leading-6">
             <span className="sm:hidden">
               Find posts, writers, topics, debates, and opportunities across ThinkAfrica.
             </span>
@@ -674,8 +677,6 @@ export default async function ExplorePage({ searchParams }: PageProps) {
         <SearchEntry activeTab={activeTab} topics={data.topics} />
       </div>
 
-      <ActiveNowStrip data={data} />
-
       <DiscoverTabs activeTab={activeTab} />
 
       <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_312px] lg:gap-8">
@@ -685,6 +686,7 @@ export default async function ExplorePage({ searchParams }: PageProps) {
             data={data}
             userId={user?.id ?? null}
           />
+          <ActiveNowStrip data={data} />
         </main>
         <DiscoverAside data={data} />
       </div>

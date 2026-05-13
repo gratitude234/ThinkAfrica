@@ -127,6 +127,7 @@ interface RelatedPost {
   type: string;
   published_at: string | null;
   created_at: string;
+  cover_image_url: string | null;
   profiles: { full_name: string | null; username: string } | null;
 }
 
@@ -213,11 +214,11 @@ function PublicationSignalPill({
   };
 
   return (
-    <div className={`rounded-xl border px-3 py-2 ${toneClass[tone]}`}>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+    <div className={`rounded-lg border px-2.5 py-2 sm:min-w-[108px] ${toneClass[tone]}`}>
+      <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] opacity-70">
         {label}
       </p>
-      <p className="mt-0.5 text-sm font-semibold">{value}</p>
+      <p className="mt-0.5 truncate text-xs font-semibold">{value}</p>
     </div>
   );
 }
@@ -396,7 +397,7 @@ async function getSecondaryData(
       ? supabase
           .from("posts")
           .select(
-            "id, title, slug, type, published_at, created_at, profiles!posts_author_id_fkey (full_name, username)"
+            "id, title, slug, type, published_at, created_at, cover_image_url, profiles!posts_author_id_fkey (full_name, username)"
           )
           .eq("status", "published")
           .neq("id", postId)
@@ -601,71 +602,46 @@ async function HeaderCoAuthors({
 
 async function PublicationSignalBlock({
   post,
-  authorId,
   secondaryDataPromise,
 }: {
   post: PostRecord;
-  authorId: string | null;
   secondaryDataPromise: Promise<SecondaryData>;
 }) {
   if (post.status !== "published") return null;
 
-  const { coAuthors, references, reviews } = await secondaryDataPromise;
-  const displayCoAuthors = coAuthors.filter((record) => record.user_id !== authorId);
-  const completedReviewCount = reviews.filter((review) =>
-    Boolean(review.submitted_at)
-  ).length;
+  const { references } = await secondaryDataPromise;
   const reviewed = isReviewedWork(post);
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
 
   return (
-    <section className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-            Publication signal
-          </p>
-          <p className="mt-1 text-sm leading-6 text-gray-500">
-            Academic trust markers attached to this work.
-          </p>
+    <section className="mt-5 rounded-xl border border-gray-200 bg-white/80 px-3 py-3 shadow-sm shadow-black/[0.02] sm:px-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <PublicationSignalPill label="Format" value={typeLabel} />
+          <PublicationSignalPill
+            label="Review"
+            value={reviewed ? "Reviewed" : "Community"}
+            tone={reviewed ? "emerald" : "gray"}
+          />
+          <PublicationSignalPill
+            label="Citation"
+            value={post.citation_id ? "Archived" : "Not archived"}
+            tone={post.citation_id ? "sky" : "gray"}
+          />
+          <PublicationSignalPill
+            label="Sources"
+            value={references.length > 0 ? `${references.length} refs` : "No refs"}
+            tone={references.length > 0 ? "emerald" : "gray"}
+          />
         </div>
         {post.citation_id ? (
           <Link
             href={`/publication/${post.citation_id}`}
-            className="inline-flex items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 transition-colors hover:border-sky-300 hover:text-sky-800"
+            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-700 transition-colors hover:border-sky-300 hover:text-sky-800"
           >
-            Open citation archive
+            Citation archive
           </Link>
         ) : null}
-      </div>
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        <PublicationSignalPill label="Format" value={typeLabel} />
-        <PublicationSignalPill
-          label="Review status"
-          value={reviewed ? "Reviewed" : "Community post"}
-          tone={reviewed ? "emerald" : "gray"}
-        />
-        <PublicationSignalPill
-          label="Citation"
-          value={post.citation_id ?? "Not archived"}
-          tone={post.citation_id ? "sky" : "gray"}
-        />
-        <PublicationSignalPill
-          label="Co-authors"
-          value={displayCoAuthors.length.toLocaleString()}
-          tone={displayCoAuthors.length > 0 ? "purple" : "gray"}
-        />
-        <PublicationSignalPill
-          label="References"
-          value={references.length.toLocaleString()}
-          tone={references.length > 0 ? "emerald" : "gray"}
-        />
-        <PublicationSignalPill
-          label="Completed reviews"
-          value={completedReviewCount.toLocaleString()}
-          tone={completedReviewCount > 0 ? "emerald" : "gray"}
-        />
       </div>
     </section>
   );
@@ -855,8 +831,8 @@ async function PostEngagementSection({
   ]);
 
   return (
-    <div className="mb-8 flex flex-col gap-4 border-y border-gray-200 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="mb-8 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm shadow-black/[0.02] sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center gap-2">
         <LikeButton
           postId={post.id}
           initialLiked={viewer.userLiked}
@@ -875,10 +851,12 @@ async function PostEngagementSection({
         excerpt={sanitizedExcerpt}
         authorName={author?.full_name ?? null}
       />
-      <span className="text-xs text-gray-400">
-        {post.view_count?.toLocaleString()}{" "}
-        {post.view_count === 1 ? "view" : "views"}
-      </span>
+      {typeof post.view_count === "number" ? (
+        <span className="text-xs font-medium text-gray-400">
+          {post.view_count.toLocaleString()}{" "}
+          {post.view_count === 1 ? "view" : "views"}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -952,20 +930,23 @@ async function PostRelatedSection({
   if (relatedPosts.length === 0) return null;
 
   return (
-    <section className="mb-8">
-      <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-        Related
-      </h2>
+    <section className="mb-9">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+          Related
+        </h2>
+        <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {relatedPosts.map((item) => (
           <Link
             key={item.id}
             href={`/post/${item.slug}`}
-            className="group flex overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md sm:flex-col"
+            className="group flex overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm shadow-black/[0.015] transition-all hover:-translate-y-px hover:shadow-md sm:flex-col"
           >
             <div className="h-[92px] w-[112px] shrink-0 overflow-hidden sm:h-[96px] sm:w-full">
               <PostCover
-                src={null}
+                src={item.cover_image_url}
                 alt={item.title}
                 type={item.type}
                 sizes="200px"
@@ -974,7 +955,7 @@ async function PostRelatedSection({
               />
             </div>
             <div className="flex min-w-0 flex-1 flex-col p-3">
-              <p className="line-clamp-2 text-[12px] font-semibold leading-snug text-gray-900 transition-colors group-hover:text-emerald-brand">
+              <p className="line-clamp-2 text-[12.5px] font-semibold leading-snug text-gray-900 transition-colors group-hover:text-emerald-brand">
                 {item.title}
               </p>
               <p className="mt-auto pt-2 text-[10px] text-gray-400">
@@ -998,7 +979,7 @@ async function PostResponsesSection({
 
   return (
     <section id="responses" className="mt-10 scroll-mt-24">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">
+      <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
         Responses ({responsePosts.length})
       </h2>
       <div className="space-y-4">
@@ -1009,9 +990,9 @@ async function PostResponsesSection({
             <Link
               key={response.id}
               href={`/post/${response.slug}`}
-              className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
+              className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.015] transition-shadow hover:shadow-md"
             >
-              <div className="w-1 flex-shrink-0 self-stretch rounded-full bg-emerald-400" />
+              <div className="w-1 flex-shrink-0 self-stretch rounded-full bg-emerald-brand" />
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex items-center gap-2">
                   <UserAvatar
@@ -1091,9 +1072,8 @@ async function PostSidebar({
   return (
     <aside className="hidden lg:block">
       <div className="sticky top-24 space-y-4">
-        <TableOfContents headings={headings} />
         {isPublished ? (
-          <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02]">
             <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
               Reader actions
             </h2>
@@ -1134,6 +1114,7 @@ async function PostSidebar({
           </section>
         ) : null}
         <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} />
+        <TableOfContents headings={headings} />
       </div>
     </aside>
   );
@@ -1325,9 +1306,9 @@ export default async function PostPage({ params }: PageProps) {
       />
 
       <div className="mx-auto max-w-[1180px]">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,780px)_280px] lg:justify-between">
           <div className="min-w-0">
-            <div className="max-w-[760px]">
+            <div className="max-w-[780px]">
               {post.status === "draft" ? (
                 <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
                   This post is a <strong>draft</strong> and is only visible to you.{" "}
@@ -1347,16 +1328,21 @@ export default async function PostPage({ params }: PageProps) {
                 </div>
               ) : null}
 
-              <header className="mb-7 sm:mb-8">
-                <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-brand sm:mb-5">
-                  {basicQualitySummary.contentLabel}
-                  <span className="mx-2 text-gray-300">/</span>
-                  <span className="text-ink-muted">
-                    {post.type === "research"
-                      ? "PDF manuscript"
-                      : `${wordCount.toLocaleString()} words / ${readTime} min read`}
+              <header className="mb-8 sm:mb-10">
+                <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted sm:mb-5">
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                    {basicQualitySummary.contentLabel}
                   </span>
-                </p>
+                  {post.type === "research" ? (
+                    <span>PDF manuscript</span>
+                  ) : (
+                    <>
+                      <span>{wordCount.toLocaleString()} words</span>
+                      <span className="h-1 w-1 rounded-full bg-gray-300" aria-hidden="true" />
+                      <span>{readTime} min read</span>
+                    </>
+                  )}
+                </div>
 
                 <Suspense fallback={null}>
                   <ParentPostLink parentPostId={parentPostId} />
@@ -1372,32 +1358,32 @@ export default async function PostPage({ params }: PageProps) {
                   </div>
                 ) : null}
 
-                <h1 className="font-display mb-4 text-[36px] font-semibold leading-[1.06] tracking-tight text-ink sm:mb-5 sm:text-[46px]">
+                <h1 className="font-display mb-4 text-[34px] font-semibold leading-[1.08] tracking-normal text-ink sm:mb-5 sm:text-[46px] lg:text-[52px]">
                   {post.title}
                 </h1>
 
                 {sanitizedExcerpt ? (
-                  <p className="font-display mb-6 text-lg font-normal italic leading-[1.45] text-gray-600 sm:text-[21px]">
+                  <p className="font-display mb-6 max-w-[680px] text-lg font-normal italic leading-[1.5] text-gray-600 sm:text-[21px]">
                     {sanitizedExcerpt}
                   </p>
                 ) : null}
 
                 {post.cover_image_url ? (
-                  <div className="mb-6 overflow-hidden rounded-2xl">
+                  <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm shadow-black/[0.03] sm:rounded-2xl">
                     <PostCover
                       src={post.cover_image_url}
                       alt={post.title}
                       type={post.type}
                       sizes="(max-width: 760px) 100vw, 760px"
                       priority
-                      className="aspect-[16/9] w-full"
+                      className="aspect-[16/9] w-full sm:aspect-[1.9/1]"
                       imageClassName="object-cover object-center"
                     />
                   </div>
                 ) : null}
 
                 {author ? (
-                  <div className="flex items-center gap-4 border-y border-gray-100 py-4">
+                  <div className="flex flex-wrap items-center gap-3 border-y border-gray-100 py-4 sm:flex-nowrap sm:gap-4">
                     <Link href={`/${author.username}`} className="shrink-0">
                       <UserAvatar
                         name={authorName}
@@ -1427,7 +1413,7 @@ export default async function PostPage({ params }: PageProps) {
                         {[author.field_of_study, author.university].filter(Boolean).join(" \u00b7 ")}
                       </p>
                     </div>
-                    <div className="ml-auto shrink-0 text-right">
+                    <div className="w-full shrink-0 text-left sm:ml-auto sm:w-auto sm:text-right">
                       <p className="text-[12.5px] font-semibold text-gray-700">
                         {formatDate(post.published_at ?? post.created_at)}
                       </p>
@@ -1448,7 +1434,6 @@ export default async function PostPage({ params }: PageProps) {
                 <Suspense fallback={null}>
                   <PublicationSignalBlock
                     post={post}
-                    authorId={author?.id ?? null}
                     secondaryDataPromise={secondaryDataPromise}
                   />
                 </Suspense>
@@ -1458,16 +1443,16 @@ export default async function PostPage({ params }: PageProps) {
                 <AudioSummaryPlayer audioUrl={post.audio_summary_url} />
               ) : null}
 
-              <hr className="mb-8 border-gray-200" />
+              <hr className="mb-8 border-gray-200/80" />
 
               <ResearchDocumentPanel post={post} />
 
               {post.type !== "research" ? (
-                <div className="article-journal-body relative mb-8">
+                <div className="article-journal-body relative mb-10">
                   <HighlightShare containerId="post-article-prose" />
                   <div
                     id="post-article-prose"
-                    className="article-journal-body prose prose-gray max-w-[65ch] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-gray-900"
+                    className="article-journal-body prose prose-gray max-w-[68ch] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-normal prose-headings:text-gray-900"
                     dangerouslySetInnerHTML={{ __html: contentWithIds }}
                   />
                 </div>
@@ -1515,13 +1500,13 @@ export default async function PostPage({ params }: PageProps) {
                 />
               </Suspense>
 
-              <hr className="my-8 border-gray-200" />
+              <hr className="my-9 border-gray-200/80" />
 
               <Suspense fallback={<SectionSkeleton rows={3} />}>
                 <PostRelatedSection secondaryDataPromise={secondaryDataPromise} />
               </Suspense>
 
-              <hr className="mb-8 border-gray-200" />
+              <hr className="mb-8 border-gray-200/80" />
 
               <Suspense fallback={<CommentsSkeleton />}>
                 <CommentsLoader
