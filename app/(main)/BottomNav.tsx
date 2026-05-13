@@ -11,8 +11,14 @@ interface BottomNavProps {
 }
 
 function navLinkClass(isCurrent: boolean) {
-  return `flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 ${
-    isCurrent ? "text-emerald-brand" : "text-gray-500"
+  return `flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 transition-colors duration-150 ${
+    isCurrent ? "text-emerald-brand" : "text-gray-500 hover:text-gray-700"
+  }`;
+}
+
+function navPillClass(isCurrent: boolean) {
+  return `flex flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1 transition-colors duration-150 ${
+    isCurrent ? "bg-emerald-50" : ""
   }`;
 }
 
@@ -44,7 +50,7 @@ export default function BottomNav({
       {userId ? <CreateLauncher userId={userId} variant="mobileFab" /> : null}
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white/96 shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] backdrop-blur-lg md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="Primary navigation"
       >
@@ -54,20 +60,22 @@ export default function BottomNav({
             className={navLinkClass(isActive("/"))}
             aria-current={isActive("/") ? "page" : undefined}
           >
-            <svg
-              className="h-5 w-5"
-              fill={isActive("/") ? "currentColor" : "none"}
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 10.75L12 3l9 7.75V21H14.75v-5.5h-5.5V21H3V10.75z"
-              />
-            </svg>
-            <span className="text-[10px] font-medium">Home</span>
+            <span className={navPillClass(isActive("/"))}>
+              <svg
+                className="h-[22px] w-[22px]"
+                fill={isActive("/") ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 10.75L12 3l9 7.75V21H14.75v-5.5h-5.5V21H3V10.75z"
+                />
+              </svg>
+              <span className="text-[11px] font-medium">Home</span>
+            </span>
           </Link>
 
           <Link
@@ -75,51 +83,9 @@ export default function BottomNav({
             className={navLinkClass(isExploreActive)}
             aria-current={isExploreActive ? "page" : undefined}
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
-              />
-            </svg>
-            <span className="text-[10px] font-medium">Explore</span>
-          </Link>
-
-          <Link
-            href="/opportunities"
-            className={navLinkClass(isActive("/opportunities"))}
-            aria-current={isActive("/opportunities") ? "page" : undefined}
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 6.5V5a2 2 0 012-2h2a2 2 0 012 2v1.5M4.5 9A2.5 2.5 0 017 6.5h10A2.5 2.5 0 0119.5 9v8A2.5 2.5 0 0117 19.5H7A2.5 2.5 0 014.5 17V9zM4.5 12.5h15"
-              />
-            </svg>
-            <span className="text-[10px] font-medium">Opportunities</span>
-          </Link>
-
-          <Link
-            href="/debates"
-            className={navLinkClass(isActive("/debates"))}
-            aria-current={isActive("/debates") ? "page" : undefined}
-          >
-            <div className="relative">
+            <span className={navPillClass(isExploreActive)}>
               <svg
-                className="h-5 w-5"
+                className="h-[22px] w-[22px]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={2}
@@ -128,14 +94,62 @@ export default function BottomNav({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M7 8h10M7 12h6m-8 7 3.5-3.5H18A2.5 2.5 0 0020.5 13V7A2.5 2.5 0 0018 4.5H6A2.5 2.5 0 003.5 7v6A2.5 2.5 0 006 15.5h1V19z"
+                  d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
                 />
               </svg>
-              {hasActiveDebate ? (
-                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full border border-white bg-emerald-brand" />
-              ) : null}
-            </div>
-            <span className="text-[10px] font-medium">Debates</span>
+              <span className="text-[11px] font-medium">Explore</span>
+            </span>
+          </Link>
+
+          <Link
+            href="/opportunities"
+            className={navLinkClass(isActive("/opportunities"))}
+            aria-current={isActive("/opportunities") ? "page" : undefined}
+          >
+            <span className={navPillClass(isActive("/opportunities"))}>
+              <svg
+                className="h-[22px] w-[22px]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 6.5V5a2 2 0 012-2h2a2 2 0 012 2v1.5M4.5 9A2.5 2.5 0 017 6.5h10A2.5 2.5 0 0119.5 9v8A2.5 2.5 0 0117 19.5H7A2.5 2.5 0 014.5 17V9zM4.5 12.5h15"
+                />
+              </svg>
+              <span className="text-[11px] font-medium">Opportunities</span>
+            </span>
+          </Link>
+
+          <Link
+            href="/debates"
+            className={navLinkClass(isActive("/debates"))}
+            aria-current={isActive("/debates") ? "page" : undefined}
+          >
+            <span className={navPillClass(isActive("/debates"))}>
+              <div className="relative">
+                <svg
+                  className="h-[22px] w-[22px]"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M7 8h10M7 12h6m-8 7 3.5-3.5H18A2.5 2.5 0 0020.5 13V7A2.5 2.5 0 0018 4.5H6A2.5 2.5 0 003.5 7v6A2.5 2.5 0 006 15.5h1V19z"
+                  />
+                </svg>
+                {hasActiveDebate ? (
+                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full border border-white bg-emerald-brand" />
+                ) : null}
+              </div>
+              <span className="text-[11px] font-medium">Debates</span>
+            </span>
           </Link>
 
           <Link
@@ -143,20 +157,22 @@ export default function BottomNav({
             className={navLinkClass(profileActive)}
             aria-current={profileActive ? "page" : undefined}
           >
-            <svg
-              className="h-5 w-5"
-              fill={profileActive ? "currentColor" : "none"}
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M20 21a8 8 0 10-16 0m12-11a4 4 0 11-8 0 4 4 0 018 0z"
-              />
-            </svg>
-            <span className="text-[10px] font-medium">{profileLabel}</span>
+            <span className={navPillClass(profileActive)}>
+              <svg
+                className="h-[22px] w-[22px]"
+                fill={profileActive ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M20 21a8 8 0 10-16 0m12-11a4 4 0 11-8 0 4 4 0 018 0z"
+                />
+              </svg>
+              <span className="text-[11px] font-medium">{profileLabel}</span>
+            </span>
           </Link>
         </div>
       </nav>

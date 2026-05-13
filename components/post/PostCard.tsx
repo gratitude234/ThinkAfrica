@@ -108,7 +108,7 @@ export default function PostCard({
   const viewCount = typeof post.view_count === "number" ? post.view_count : null;
 
   return (
-    <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-3.5 transition-all duration-300 hover:-translate-y-px hover:shadow-md sm:px-5 sm:py-[18px]">
+    <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-3.5 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08),0_2px_5px_-2px_rgb(0_0_0/0.05)] sm:px-5 sm:py-[18px]">
       <span
         className={`absolute bottom-4 left-0 top-4 w-1 rounded-r-full ${accentClass}`}
         aria-hidden="true"
@@ -170,14 +170,14 @@ export default function PostCard({
               <img
                 src={author.avatar_url}
                 alt={authorName}
-                className="h-6 w-6 shrink-0 rounded-full object-cover"
+                className="h-7 w-7 shrink-0 rounded-full object-cover"
               />
             ) : (
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-semibold text-emerald-800">
                 {authorName.charAt(0).toUpperCase()}
               </span>
             )}
-            <div className="min-w-0 flex-1 basis-[calc(100%-2rem)] text-[11px] text-ink-muted min-[420px]:basis-0">
+            <div className="min-w-0 flex-1 basis-[calc(100%-1.875rem)] text-[11px] text-ink-muted sm:basis-0">
               {authorHref ? (
                 <Link
                   href={authorHref}
@@ -202,26 +202,26 @@ export default function PostCard({
               <span className="ml-1 text-gray-400">{"\u00B7"} {formatRelativeTime(displayDate)}</span>
             </div>
             {/* Engagement icon row */}
-            <div className="flex w-full shrink-0 items-center gap-3 pl-8 text-gray-400 min-[420px]:ml-auto min-[420px]:w-auto min-[420px]:pl-0">
+            <div className="flex w-full shrink-0 items-center gap-3 pl-7 text-gray-500 sm:ml-auto sm:w-auto sm:pl-0">
               {likeCount !== null ? (
-                <span className="flex items-center gap-1 text-[11px]">
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <span className="flex items-center gap-1 text-[11.5px]">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                   </svg>
                   {likeCount > 0 ? likeCount : null}
                 </span>
               ) : null}
               {commentCount !== null ? (
-                <span className="flex items-center gap-1 text-[11px]">
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <span className="flex items-center gap-1 text-[11.5px]">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                   {commentCount > 0 ? commentCount : null}
                 </span>
               ) : null}
               {viewCount !== null ? (
-                <span className="flex items-center gap-1 text-[11px]">
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <span className="flex items-center gap-1 text-[11.5px]">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                     <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                     <circle cx="12" cy="12" r="3" />
                   </svg>
@@ -238,7 +238,7 @@ export default function PostCard({
             alt={post.title}
             type={post.type}
             sizes="112px"
-            className="h-[84px] w-[84px] rounded-[10px] min-[420px]:h-[92px] min-[420px]:w-[92px] sm:h-[112px] sm:w-[112px]"
+            className="h-[84px] w-[84px] rounded-xl sm:h-[100px] sm:w-[100px] md:h-[112px] md:w-[112px]"
             imageClassName="object-cover"
           />
         </Link>

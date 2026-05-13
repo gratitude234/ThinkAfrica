@@ -129,11 +129,17 @@ function ActivationCard({ state }: { state: ActivationState }) {
   const pct = Math.round((doneCount / state.tasks.length) * 100);
 
   return (
-    <section className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm shadow-black/[0.02]">
+    <section className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 shadow-sm shadow-black/[0.02]">
       <div className="mb-3">
-        <h2 className="text-[13px] font-semibold text-ink">Complete your profile</h2>
+        <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+          First contribution
+        </p>
+        <h2 className="text-[13px] font-semibold text-ink">
+          {state.nextTask?.label ?? "Keep building momentum"}
+        </h2>
         <p className="mt-1 text-xs leading-5 text-ink-muted">
-          Unlock your full intellectual profile on ThinkAfrica.
+          {state.nextTask?.description ??
+            "Complete the first steps that make your profile useful."}
         </p>
       </div>
       <div className="flex justify-between text-[11px] text-ink-muted">
@@ -181,7 +187,7 @@ function ActivationCard({ state }: { state: ActivationState }) {
           href={state.nextTask.href}
           className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-emerald-600"
         >
-          Continue setup
+          {state.nextTask.key === "start" ? "Start quick take" : "Continue setup"}
         </Link>
       ) : null}
     </section>
@@ -219,8 +225,10 @@ export default function HomeSidebar({
             href={`/write?draft=${recentDraft.id}`}
             className="flex items-center gap-2.5 rounded-[9px] bg-canvas p-3 transition-colors hover:bg-[#F5F3EE]"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-sm text-ink-muted">
-              {"\u270E"}
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-ink-muted">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a4 4 0 01-2.828 1.172H7v-2a4 4 0 011.172-2.828z" />
+              </svg>
             </span>
             <span className="min-w-0">
               <span className="line-clamp-2 text-[13px] font-medium leading-snug text-ink">
@@ -405,7 +413,7 @@ export default function HomeSidebar({
                   <UserAvatar
                     name={person.full_name ?? person.username}
                     src={person.avatar_url}
-                    size={34}
+                    size={38}
                   />
                 </Link>
                 <div className="min-w-0 flex-1">

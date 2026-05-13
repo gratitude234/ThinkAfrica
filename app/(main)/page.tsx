@@ -6,6 +6,7 @@ import RetentionEventTracker from "@/components/retention/RetentionEventTracker"
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import { getActivationState, type ActivationState } from "@/lib/activation";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
+import ActivationFocusPanel from "./ActivationFocusPanel";
 import DailyBriefStrip from "./DailyBriefStrip";
 import EditorPicksRow from "./EditorPicksRow";
 import FeaturedPostLead from "./FeaturedPostLead";
@@ -369,6 +370,10 @@ export default async function HomePage({ searchParams }: PageProps) {
           activeDebate={homeDebate}
           points={userPoints}
         />
+      ) : null}
+
+      {user && activationState && !activationState.activated ? (
+        <ActivationFocusPanel state={activationState} />
       ) : null}
 
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_296px]">

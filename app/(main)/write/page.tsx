@@ -725,10 +725,11 @@ export default function WritePage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-emerald-900">
-                    Start with structure
+                    Start with one clear point
                   </p>
                   <p className="text-xs leading-relaxed text-emerald-800">
-                    Add a starter outline, then replace the prompts with your own argument.
+                    A strong quick take only needs a point, why it matters, one
+                    example, and a question for readers.
                   </p>
                 </div>
                 {draftId ? (

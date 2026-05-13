@@ -94,10 +94,10 @@ export default function ReadingBar({
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 shadow-lg backdrop-blur md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-100 bg-white/96 shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] backdrop-blur-lg md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="flex min-h-[64px] items-center justify-around px-4 py-2">
+      <div className="flex h-[60px] items-center justify-around px-4">
         <button
           onClick={handleLike}
           className={`flex flex-col items-center gap-0.5 ${
@@ -105,7 +105,7 @@ export default function ReadingBar({
           }`}
         >
           <svg
-            className="h-5 w-5"
+            className="h-[22px] w-[22px]"
             fill={liked ? "currentColor" : "none"}
             stroke="currentColor"
             strokeWidth={2}
@@ -117,7 +117,7 @@ export default function ReadingBar({
               d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
             />
           </svg>
-          <span className="text-[10px] font-medium">{likeCount}</span>
+          <span className="text-[11px] font-medium">{likeCount}</span>
         </button>
 
         <button
@@ -127,7 +127,7 @@ export default function ReadingBar({
           }`}
         >
           <svg
-            className="h-5 w-5"
+            className="h-[22px] w-[22px]"
             fill={bookmarked ? "currentColor" : "none"}
             stroke="currentColor"
             strokeWidth={2}
@@ -139,7 +139,7 @@ export default function ReadingBar({
               d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
             />
           </svg>
-          <span className="text-[10px] font-medium">
+          <span className="text-[11px] font-medium">
             {bookmarked ? "Saved" : "Save"}
           </span>
         </button>
@@ -149,7 +149,7 @@ export default function ReadingBar({
           className="flex flex-col items-center gap-0.5 text-gray-500"
         >
           <svg
-            className="h-5 w-5"
+            className="h-[22px] w-[22px]"
             fill="none"
             stroke="currentColor"
             strokeWidth={2}
@@ -161,7 +161,7 @@ export default function ReadingBar({
               d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"
             />
           </svg>
-          <span className="text-[10px] font-medium">Share</span>
+          <span className="text-[11px] font-medium">Share</span>
         </button>
       </div>
     </div>

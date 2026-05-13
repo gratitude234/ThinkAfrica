@@ -68,12 +68,12 @@ export const STARTER_TEMPLATES: Record<
   }
 > = {
   blog: {
-    title: "One thing I think about [topic]",
-    subtitle: "A quick take from my current reading and experience",
-    excerpt: "A concise point on a question worth discussing.",
-    tags: ["quick take"],
+    title: "One thing I noticed about [campus, country, or topic]",
+    subtitle: "A quick take from class, campus, reading, or lived experience",
+    excerpt: "A short argument about one issue worth discussing.",
+    tags: ["quick take", "student voice"],
     content:
-      "<p><strong>My point:</strong> State the idea you want readers to leave with.</p><p><strong>Why it matters:</strong> Explain the campus, community, or African context in plain language.</p><p><strong>One example:</strong> Add a concrete example, source, or lived observation.</p><p><strong>What should happen next:</strong> End with a question or recommendation.</p>",
+      "<p><strong>My point:</strong> State the one idea you want readers to remember.</p><p><strong>Why it matters:</strong> Connect it to your campus, country, community, or Africa more broadly.</p><p><strong>One example:</strong> Add a class discussion, source, statistic, news item, or lived observation.</p><p><strong>Question for others:</strong> End with the question you want classmates or readers to answer.</p>",
   },
   essay: {
     title: "Rethinking [issue] in Africa",

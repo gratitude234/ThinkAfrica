@@ -33,7 +33,7 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
 
   return (
     <section>
-      <p className="mb-3 border-t border-gray-100 pt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+      <p className="mb-3 border-t border-gray-100 pt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
         Also picked this week
       </p>
       <div className={`mb-6 grid gap-2.5 ${picks.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
@@ -46,18 +46,18 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
             <Link
               key={pick.id}
               href={`/post/${pick.slug}`}
-              className="group overflow-hidden rounded-[10px] border border-gray-200/80 bg-white transition-shadow hover:shadow-md"
+              className="group overflow-hidden rounded-xl border border-gray-200 bg-white transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)]"
             >
               <PostCover
                 src={pick.cover_image_url}
                 alt={pick.title}
                 type={pick.type}
                 sizes="(max-width: 1024px) 50vw, 33vw"
-                className="h-[72px] w-full"
+                className="h-[88px] w-full"
                 imageClassName="object-cover"
               />
               <div className="px-3 py-2.5">
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500">
                   {typeLabel} {"\u00B7"} {readTime} min
                 </p>
                 <h3 className="font-display line-clamp-2 text-[13px] font-semibold leading-[1.3] text-ink transition-colors group-hover:text-gray-700">

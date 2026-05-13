@@ -362,10 +362,10 @@ export default async function LandingPage() {
           <div className="grid grid-cols-2 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:divide-x sm:divide-gray-200">
             {stats.map(({ value, suffix, label }) => (
               <div key={label} className="stat-item px-3 py-1 text-center sm:px-10">
-                <div className="text-[24px] font-bold tracking-tight text-ink sm:text-[28px]" data-target={value}>
+                <div className="font-display text-[26px] font-bold tracking-[-0.02em] text-ink sm:text-[30px]" data-target={value}>
                   {value >= 1000 ? value.toLocaleString() : value}{suffix}
                 </div>
-                <div className="mx-auto mt-0.5 max-w-[9rem] text-[11px] leading-snug text-ink-muted sm:text-xs">{label}</div>
+                <div className="mx-auto mt-1 max-w-[9rem] text-[11px] font-medium leading-snug text-gray-500 sm:text-xs">{label}</div>
               </div>
             ))}
           </div>
@@ -483,7 +483,7 @@ export default async function LandingPage() {
                 href={`/?guest=1&topic=${encodeURIComponent(label)}`}
                 event="landing_read_clicked"
                 metadata={{ source: "topics_grid", topic: label }}
-                className="topic-pill inline-flex min-h-9 shrink-0 cursor-pointer items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[13px] font-medium text-gray-700 transition-all hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-600"
+                className="topic-pill inline-flex min-h-9 shrink-0 cursor-pointer items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[13px] font-medium text-gray-700 transition-[border-color,background-color,color,box-shadow] duration-150 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-1"
               >
                 {label}
                 <span className="ml-1.5 text-[11px] text-ink-muted">{count}</span>
@@ -599,7 +599,7 @@ export default async function LandingPage() {
       <section className="border-b border-gray-200 bg-white py-12 sm:py-14">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">How it works</p>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">How it works</p>
             <h2 className="font-display text-[30px] font-medium text-ink sm:text-[36px]">Built for intellectual seriousness</h2>
           </div>
           <div id="value-grid" className="grid grid-cols-1 divide-y md:grid-cols-3 md:divide-x md:divide-y-0 divide-gray-200">

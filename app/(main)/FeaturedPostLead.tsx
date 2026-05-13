@@ -39,7 +39,9 @@ const STAMP: Record<string, string> = {
 };
 
 export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }) {
-  if (!post) return null;
+  if (!post) return (
+    <div className="mb-5 h-[200px] animate-pulse rounded-xl border border-gray-200 bg-gray-100 sm:h-[280px]" aria-hidden="true" />
+  );
 
   const author = post.profiles;
   const authorName = author?.full_name ?? author?.username ?? "ThinkAfrica";
@@ -61,7 +63,7 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
 
         {/* Cover — full width on mobile, fixed left column on desktop */}
         <Link href={`/post/${post.slug}`} className="relative block overflow-hidden sm:rounded-none">
-          <div className="h-[150px] sm:h-full sm:min-h-[280px]">
+          <div className="h-[180px] sm:h-full sm:min-h-[280px]">
             <PostCover
               src={post.cover_image_url}
               alt={post.title}

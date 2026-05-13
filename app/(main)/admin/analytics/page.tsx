@@ -179,6 +179,7 @@ export default async function AdminAnalyticsPage() {
     { count: totalTalentInquiries },
     { count: acceptedCoauthorCount },
     { count: totalMessages },
+    { data: debateArgumentsRaw },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -232,6 +233,7 @@ export default async function AdminAnalyticsPage() {
       .not("accepted_at", "is", null)
       .gt("display_order", 0),
     supabase.from("messages").select("*", { count: "exact", head: true }),
+    supabase.from("debate_arguments").select("author_id").limit(10000),
   ]);
 
   const profiles = (profilesRaw ?? []) as ProfileRow[];
@@ -307,7 +309,18 @@ export default async function AdminAnalyticsPage() {
   const onboardingCompleted = uniqueUsersForEvent(activationEvents, "onboarding_completed");
   const postOpened = uniqueUsersForEvent(activationEvents, "post_opened");
   const draftStarted = uniqueUsersForEvent(activationEvents, "draft_started");
+  const responseStarted = uniqueUsersForEvent(activationEvents, "response_started");
   const postSubmitted = uniqueUsersForEvent(activationEvents, "post_submitted");
+  const debateArgumentUsers = new Set(
+    (debateArgumentsRaw ?? [])
+      .map((argument) => argument.author_id)
+      .filter(Boolean) as string[]
+  );
+  const firstContributionStarted = new Set([
+    ...Array.from(draftStarted),
+    ...Array.from(responseStarted),
+    ...Array.from(debateArgumentUsers),
+  ]);
 
   const followCounts = new Map<string, number>();
   for (const follow of followsRaw ?? []) {
@@ -319,18 +332,11 @@ export default async function AdminAnalyticsPage() {
       .map(([userId]) => userId)
   );
 
-  const postOpenCounts = new Map<string, number>();
-  for (const event of activationEvents) {
-    if (event.user_id && event.event_name === "post_opened") {
-      postOpenCounts.set(event.user_id, (postOpenCounts.get(event.user_id) ?? 0) + 1);
-    }
-  }
-
   const activatedCount = profiles.filter((profile) => {
     const hasFollowedThree = followedThreeUsers.has(profile.id);
-    const hasReading = (postOpenCounts.get(profile.id) ?? 0) >= 2;
-    const hasContribution = draftStarted.has(profile.id) || postSubmitted.has(profile.id);
-    return isProfileComplete(profile) && hasFollowedThree && (hasReading || hasContribution);
+    const hasContribution =
+      firstContributionStarted.has(profile.id) || postSubmitted.has(profile.id);
+    return isProfileComplete(profile) && hasFollowedThree && hasContribution;
   }).length;
 
   const activationFunnel = [
@@ -338,7 +344,7 @@ export default async function AdminAnalyticsPage() {
     { stage: "Onboarded", count: onboardingCompleted.size },
     { stage: "Followed 3+", count: followedThreeUsers.size },
     { stage: "Opened post", count: postOpened.size },
-    { stage: "Started draft", count: draftStarted.size },
+    { stage: "First contribution", count: firstContributionStarted.size },
     { stage: "Submitted", count: postSubmitted.size },
     { stage: "Activated", count: activatedCount },
   ];

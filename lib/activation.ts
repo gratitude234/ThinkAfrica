@@ -17,6 +17,9 @@ export interface ActivationState {
   profileComplete: boolean;
   followCount: number;
   meaningfulEngagementCount: number;
+  firstContributionStarted: boolean;
+  firstContributionLabel: string | null;
+  responseStartedCount: number;
   submittedPostCount: number;
   draftCount: number;
   debateArgumentCount: number;
@@ -67,6 +70,7 @@ export async function getActivationState(
     postOpenCount,
     bookmarkCount,
     commentCount,
+    responseStartedCount,
     submittedPostCount,
     draftCount,
     debateArgumentCount,
@@ -110,6 +114,16 @@ export async function getActivationState(
         error?: unknown;
       }>
     ),
+    countRowsSafe(
+      supabase
+        .from("activation_events")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("event_name", "response_started") as unknown as Promise<{
+        count?: number | null;
+        error?: unknown;
+      }>
+    ),
     countRows(
       supabase
         .from("posts")
@@ -135,7 +149,16 @@ export async function getActivationState(
   ]);
 
   const profileComplete = isProfileComplete(profile);
-  const hasStartedContribution = draftCount > 0 || debateArgumentCount > 0;
+  const firstContributionStarted =
+    draftCount > 0 || debateArgumentCount > 0 || responseStartedCount > 0;
+  const firstContributionLabel =
+    draftCount > 0
+      ? "Draft started"
+      : debateArgumentCount > 0
+        ? "Debate argument started"
+        : responseStartedCount > 0
+          ? "Response started"
+          : null;
   const meaningfulEngagementCount = postOpenCount + bookmarkCount + commentCount;
   const hasMeaningfulEngagement = meaningfulEngagementCount >= 2;
   const hasSubmittedContribution =
@@ -158,7 +181,7 @@ export async function getActivationState(
     },
     {
       key: "read",
-      label: "Read something relevant",
+      label: "Read or respond to something relevant",
       description: "Open, save, or discuss a few posts so ThinkAfrica can learn what matters to you.",
       href: "/?tab=latest",
       done: hasMeaningfulEngagement,
@@ -166,26 +189,38 @@ export async function getActivationState(
     {
       key: "start",
       label: "Start a quick take",
-      description: "Turn one clear point into a short draft. You can publish now or keep polishing.",
-      href: "/write?type=blog&starter=1",
-      done: hasStartedContribution,
+      description: firstContributionLabel
+        ? `${firstContributionLabel}. Keep shaping it into a public idea.`
+        : "Turn one clear point from class, campus, or the news into a short draft.",
+      href: "/write?type=blog&starter=1&welcome=1",
+      done: firstContributionStarted,
     },
   ];
 
-  const nextTask = tasks.find((task) => !task.done) ?? null;
+  const orderedTasks: ActivationTask[] = [
+    tasks[0],
+    tasks[1],
+    tasks[3],
+    tasks[2],
+  ];
+
+  const nextTask = orderedTasks.find((task) => !task.done) ?? null;
 
   return {
     profileComplete,
     followCount,
     meaningfulEngagementCount,
+    firstContributionStarted,
+    firstContributionLabel,
+    responseStartedCount,
     submittedPostCount,
     draftCount,
     debateArgumentCount,
     activated:
       profileComplete &&
       followCount >= 3 &&
-      (hasMeaningfulEngagement || hasStartedContribution || hasSubmittedContribution),
-    tasks,
+      (firstContributionStarted || hasSubmittedContribution),
+    tasks: orderedTasks,
     nextTask,
   };
 }

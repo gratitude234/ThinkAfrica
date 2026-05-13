@@ -622,23 +622,28 @@ export default function OnboardingPage() {
             First contribution
           </p>
           <h1 className="mt-2 text-2xl font-bold text-gray-900">
-            Choose how you want to enter the conversation
+            Start with one clear idea
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            Start with one low-friction action. You can read first, respond to someone, or draft a short quick take.
+            A quick take is the fastest way to make your profile real. You can
+            publish today or keep it as a draft while you read more.
           </p>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-[1.4fr_1fr_1fr]">
             <button
               type="button"
-              onClick={() => completeOnboarding("/write?type=blog&starter=1")}
-              className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-left transition-colors hover:bg-emerald-100"
+              onClick={() => completeOnboarding("/write?type=blog&starter=1&welcome=1")}
+              className="rounded-xl border border-emerald-300 bg-emerald-50 p-5 text-left shadow-sm transition-colors hover:bg-emerald-100"
             >
-              <p className="text-sm font-semibold text-emerald-900">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                Recommended
+              </p>
+              <p className="mt-2 text-base font-semibold text-emerald-950">
                 Write a quick take
               </p>
-              <p className="mt-2 text-xs leading-relaxed text-emerald-800">
-                Use a beginner template for a clear point, example, and next question.
+              <p className="mt-2 text-sm leading-relaxed text-emerald-900">
+                Use a short structure: your point, why it matters, one example,
+                and the question others should answer.
               </p>
             </button>
             <button
@@ -650,7 +655,7 @@ export default function OnboardingPage() {
                 Read latest posts
               </p>
               <p className="mt-2 text-xs leading-relaxed text-gray-500">
-                See what students are publishing now and save what you want to revisit.
+                Browse first if you want more context before writing.
               </p>
             </button>
             <button
@@ -662,7 +667,7 @@ export default function OnboardingPage() {
                 Respond to a post
               </p>
               <p className="mt-2 text-xs leading-relaxed text-gray-500">
-                Open an essay, then use Write a response when you have a substantive reply.
+                Open an essay and add a response when you have a useful angle.
               </p>
             </button>
           </div>
