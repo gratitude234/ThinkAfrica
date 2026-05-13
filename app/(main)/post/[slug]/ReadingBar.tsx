@@ -94,17 +94,10 @@ export default function ReadingBar({
 
   return (
     <div
-<<<<<<< HEAD
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-100 bg-white/96 shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] backdrop-blur-lg md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-    >
-      <div className="flex h-[60px] items-center justify-around px-4">
-=======
       className="fixed inset-x-0 bottom-4 z-40 px-4 md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="mx-auto flex min-h-[56px] max-w-[360px] items-center justify-around rounded-full border border-gray-200 bg-white/95 px-4 py-2 shadow-[0_14px_30px_-14px_rgb(0_0_0/0.35)] backdrop-blur">
->>>>>>> b41e24a8a0e91c253f64b6af93f37568217af825
         <button
           onClick={handleLike}
           className={`flex min-w-[64px] flex-col items-center gap-0.5 rounded-full px-3 py-1.5 transition-colors ${

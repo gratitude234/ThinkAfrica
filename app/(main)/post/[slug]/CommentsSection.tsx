@@ -312,7 +312,7 @@ export default function CommentsSection({
             onClick={() => handleVote(comment.id)}
             disabled={!userId}
             aria-label={comment.userVoted ? "Remove upvote" : "Upvote this comment"}
-            className={`flex items-center gap-1 text-xs transition-colors ${
+            className={`flex items-center gap-1 text-[11.5px] transition-colors ${
               comment.userVoted
                 ? "text-emerald-600"
                 : "text-gray-400 hover:text-emerald-600"
@@ -349,7 +349,7 @@ export default function CommentsSection({
 
       <div className="mb-8 space-y-6">
         {totalCount === 0 ? (
-          <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/60 px-4 py-4">
+          <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-4 py-4">
             <p className="text-sm font-medium text-gray-900">
               Start the discussion with a useful move.
             </p>

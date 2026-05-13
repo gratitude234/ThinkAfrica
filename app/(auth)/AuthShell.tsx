@@ -104,13 +104,13 @@ export function AuthShell({
             </div>
 
             <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.03] sm:p-8 lg:rounded-none lg:border-0 lg:p-0 lg:shadow-none">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-brand">
                 {eyebrow}
               </p>
               <h1 className="font-display mt-3 text-[34px] font-semibold leading-[1.08] text-ink sm:text-[40px]">
                 {title}
               </h1>
-              <p className="mt-4 text-sm leading-6 text-ink-muted">
+              <p className="mt-4 text-sm leading-relaxed text-ink-muted">
                 {subtitle}
               </p>
 

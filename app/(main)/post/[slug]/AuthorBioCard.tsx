@@ -100,7 +100,7 @@ export default function AuthorBioCard({
               className={`min-h-9 flex-shrink-0 rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
                 following
                   ? "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                  : "bg-ink text-white hover:bg-gray-800"
+                  : "bg-emerald-brand text-white hover:bg-emerald-600"
               }`}
             >
               {following ? "Following" : "Follow"}

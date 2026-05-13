@@ -18,7 +18,13 @@ import MyDrafts from "./MyDrafts";
 import PublishDrawer from "./PublishDrawer";
 import WriteReadinessPanel from "./WriteReadinessPanel";
 import { ensureDraft, savePostReferences } from "./actions";
-import { STARTER_TEMPLATES, WRITE_FORMATS, isPostType } from "./writeConfig";
+import {
+  STARTER_TEMPLATES,
+  WRITE_FORMATS,
+  getResponseStarterTemplate,
+  isPostType,
+  isResponseIntent,
+} from "./writeConfig";
 import { composeContentWithSubtitle } from "./writeUtils";
 import type { EditorHandle } from "@/components/editor/Editor";
 
@@ -73,6 +79,7 @@ export default function WritePage() {
   const typeParam = searchParams.get("type");
   const draftParam = searchParams.get("draft");
   const starterParam = searchParams.get("starter");
+  const responseIntentParam = searchParams.get("responseIntent");
   const initialPostType = isPostType(typeParam) ? typeParam : "blog";
   const {
     draftId,
@@ -96,6 +103,13 @@ export default function WritePage() {
   const [postType, setPostType] = useState<PostType>(initialPostType);
   const [showChooser, setShowChooser] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [selectedResponseIntent] = useState(() =>
+    isResponseIntent(responseIntentParam)
+      ? responseIntentParam
+      : starterParam === "response"
+        ? "extend"
+        : null
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("write_sidebar_collapsed") === "1";
@@ -121,6 +135,7 @@ export default function WritePage() {
   const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [publishDraftId, setPublishDraftId] = useState<string | null>(null);
+  const responseStarterAppliedRef = useRef(false);
 
   useEffect(() => {
     if (typeParam === "research") {
@@ -286,6 +301,82 @@ export default function WritePage() {
     [title, subtitle, excerpt, content, tags, postType, coverImageUrl, inResponseToId]
   );
 
+  useEffect(() => {
+    if (responseStarterAppliedRef.current) return;
+    if (starterParam !== "response") return;
+    if (!selectedResponseIntent) return;
+    if (!inResponseToId || !inResponseToTitle) return;
+    if (draftParam || initialData || localBackup) return;
+
+    if (typeof window !== "undefined") {
+      try {
+        const savedBackup = window.localStorage.getItem(
+          "thinkafrica_draft_backup"
+        );
+
+        if (savedBackup) {
+          const parsedBackup = JSON.parse(savedBackup) as Partial<DraftPayload>;
+          const hasBackupContent =
+            (parsedBackup.title ?? "").trim().length > 0 ||
+            (parsedBackup.subtitle ?? "").trim().length > 0 ||
+            (parsedBackup.content ?? "")
+              .replace(/<[^>]*>/g, " ")
+              .trim().length > 0;
+
+          if (hasBackupContent) return;
+        }
+      } catch {
+        return;
+      }
+    }
+
+    const hasManualContent =
+      title.trim().length > 0 ||
+      subtitle.trim().length > 0 ||
+      content.replace(/<[^>]*>/g, " ").trim().length > 0 ||
+      tags.length > 0;
+
+    if (hasManualContent) return;
+
+    const template = getResponseStarterTemplate({
+      parentTitle: inResponseToTitle,
+      intent: selectedResponseIntent,
+    });
+    const nextData = getCurrentData({
+      title: template.title,
+      subtitle: template.subtitle,
+      excerpt: template.excerpt,
+      content: template.content,
+      tags: template.tags,
+      postType: "essay",
+      inResponseToId,
+    });
+
+    responseStarterAppliedRef.current = true;
+    setPostType("essay");
+    setTitle(template.title);
+    setSubtitle(template.subtitle);
+    setExcerpt(template.excerpt);
+    setTags(template.tags);
+    setContent(template.content);
+    setWordCount(countWords(template.content));
+    void saveDraft(nextData);
+  }, [
+    content,
+    draftParam,
+    getCurrentData,
+    inResponseToId,
+    inResponseToTitle,
+    initialData,
+    localBackup,
+    saveDraft,
+    selectedResponseIntent,
+    starterParam,
+    subtitle,
+    tags.length,
+    title,
+  ]);
+
   const handleEditorUpdate = useCallback((html: string, words: number) => {
     setContent(html);
     setWordCount(words);
@@ -358,6 +449,21 @@ export default function WritePage() {
     (wordCount / selectedPostType.minWords) * 100
   );
   const estimatedReadTime = Math.max(1, Math.ceil(wordCount / 200));
+  const responseStarterTemplate =
+    selectedResponseIntent && inResponseToTitle
+      ? getResponseStarterTemplate({
+          parentTitle: inResponseToTitle,
+          intent: selectedResponseIntent,
+        })
+      : null;
+  const responseIntentLabel =
+    selectedResponseIntent === "challenge"
+      ? "Challenge the argument"
+      : selectedResponseIntent === "evidence"
+        ? "Add evidence or an example"
+        : selectedResponseIntent === "extend"
+          ? "Extend this idea"
+          : null;
 
   const handleReadyToPublish = async () => {
     if (!canOpenPublish) return;
@@ -680,6 +786,21 @@ export default function WritePage() {
                     </span>
                   ) : null}
                 </p>
+                {responseStarterTemplate && responseIntentLabel ? (
+                  <div className="mt-2 rounded-lg border border-emerald-100 bg-white/70 px-3 py-2">
+                    <p className="text-xs font-semibold text-emerald-800">
+                      {responseIntentLabel}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-emerald-700">
+                      {responseStarterTemplate.hint}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs leading-relaxed text-emerald-700">
+                    Anchor your point in the original post, then add the
+                    evidence, question, or counterpoint readers should consider.
+                  </p>
+                )}
               </div>
               <button
                 type="button"

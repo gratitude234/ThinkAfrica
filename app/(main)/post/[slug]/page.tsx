@@ -28,7 +28,9 @@ import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
 import PostCover from "@/components/post/PostCover";
 import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
-import ResponseStartLink from "@/components/post/ResponseStartLink";
+import ResponseStartLink, {
+  type ResponseIntent,
+} from "@/components/post/ResponseStartLink";
 import { getCollaborationSummary } from "@/lib/collaboration";
 import { getMessageEligibility } from "@/lib/messaging";
 import { getPostQualitySummary } from "@/lib/postQuality";
@@ -112,6 +114,28 @@ interface ResponsePostRow {
     | ResponsePostProfile[]
     | null;
 }
+
+const RESPONSE_PROMPTS: Array<{
+  intent: ResponseIntent;
+  label: string;
+  body: string;
+}> = [
+  {
+    intent: "extend",
+    label: "Extend this idea",
+    body: "Build on the strongest point with another angle from class, campus, or your community.",
+  },
+  {
+    intent: "challenge",
+    label: "Challenge the argument",
+    body: "Respond with a respectful counterpoint, objection, or different interpretation.",
+  },
+  {
+    intent: "evidence",
+    label: "Add evidence or an example",
+    body: "Bring in a source, statistic, case, or lived observation that sharpens the discussion.",
+  },
+];
 
 interface ResponsePostProfile {
   username: string;
@@ -215,7 +239,7 @@ function PublicationSignalPill({
 
   return (
     <div className={`rounded-lg border px-2.5 py-2 sm:min-w-[108px] ${toneClass[tone]}`}>
-      <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] opacity-70">
+      <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] opacity-70">
         {label}
       </p>
       <p className="mt-0.5 truncate text-xs font-semibold">{value}</p>
@@ -236,7 +260,7 @@ function ResearchDocumentPanel({ post }: { post: PostRecord }) {
 
   return (
     <section className="mb-8 rounded-2xl border border-purple-100 bg-purple-50 p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-purple-700">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-purple-700">
         Research manuscript
       </p>
       <h2 className="mt-2 text-lg font-semibold text-gray-900">
@@ -614,7 +638,7 @@ async function PublicationSignalBlock({
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
 
   return (
-    <section className="mt-5 rounded-xl border border-gray-200 bg-white/80 px-3 py-3 shadow-sm shadow-black/[0.02] sm:px-4">
+    <section className="mt-5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm shadow-black/[0.02] sm:px-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <PublicationSignalPill label="Format" value={typeLabel} />
@@ -744,7 +768,7 @@ async function PostReferencesAndCitation({
       {references.length > 0 ? (
         <section className="mb-8 border-t border-gray-200 pt-6">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
               References
             </h2>
             <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
@@ -932,7 +956,7 @@ async function PostRelatedSection({
   return (
     <section className="mb-9">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
           Related
         </h2>
         <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
@@ -969,6 +993,86 @@ async function PostRelatedSection({
   );
 }
 
+async function PostPublishSuccessSection({
+  post,
+  author,
+  points,
+  secondaryDataPromise,
+}: {
+  post: PostRecord;
+  author: AuthorProfile | null;
+  points: number;
+  secondaryDataPromise: Promise<SecondaryData>;
+}) {
+  const { relatedPosts } = await secondaryDataPromise;
+  const related = relatedPosts[0] ?? null;
+
+  return (
+    <PublishedToast
+      postId={post.id}
+      postType={post.type}
+      title={post.title}
+      slug={post.slug}
+      points={points}
+      username={author?.username ?? ""}
+      relatedTarget={
+        related
+          ? {
+              id: related.id,
+              title: related.title,
+              slug: related.slug,
+            }
+          : null
+      }
+    />
+  );
+}
+
+function ResponsePromptPanel({ postId }: { postId: string }) {
+  return (
+    <section className="mb-10 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+            Respond to this idea
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-gray-950">
+            Add your argument to the thread
+          </h2>
+        </div>
+        <p className="max-w-sm text-sm leading-6 text-emerald-800">
+          Choose the angle that best fits what you want to say next.
+        </p>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {RESPONSE_PROMPTS.map((prompt) => (
+          <ResponseStartLink
+            key={prompt.intent}
+            postId={postId}
+            source="article_response_prompt"
+            starter="response"
+            responseIntent={prompt.intent}
+            className="group flex min-h-[132px] flex-col justify-between rounded-lg border border-emerald-100 bg-white p-4 text-left shadow-sm shadow-black/[0.015] transition-all hover:-translate-y-px hover:border-emerald-300 hover:shadow-md"
+          >
+            <span>
+              <span className="block text-sm font-semibold text-gray-950 transition-colors group-hover:text-emerald-700">
+                {prompt.label}
+              </span>
+              <span className="mt-2 block text-sm leading-6 text-gray-600">
+                {prompt.body}
+              </span>
+            </span>
+            <span className="mt-4 text-xs font-semibold text-emerald-700">
+              Start response
+            </span>
+          </ResponseStartLink>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 async function PostResponsesSection({
   secondaryDataPromise,
 }: {
@@ -979,7 +1083,7 @@ async function PostResponsesSection({
 
   return (
     <section id="responses" className="mt-10 scroll-mt-24">
-      <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+      <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
         Responses ({responsePosts.length})
       </h2>
       <div className="space-y-4">
@@ -1009,7 +1113,7 @@ async function PostResponsesSection({
                       {responseAuthor?.full_name ?? responseAuthor?.username ?? "Unknown"}
                     </span>
                     {" / "}
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 italic">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 not-italic">
                       Response
                     </span>
                   </span>
@@ -1298,17 +1402,19 @@ export default async function PostPage({ params }: PageProps) {
         </>
       ) : null}
 
-      <PublishedToast
-        title={post.title}
-        slug={post.slug}
-        points={POST_POINTS[(post.type as PostType) ?? "blog"] ?? 10}
-        username={author?.username ?? ""}
-      />
-
       <div className="mx-auto max-w-[1180px]">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,780px)_280px] lg:justify-between">
           <div className="min-w-0">
             <div className="max-w-[780px]">
+              <Suspense fallback={null}>
+                <PostPublishSuccessSection
+                  post={post}
+                  author={author}
+                  points={POST_POINTS[(post.type as PostType) ?? "blog"] ?? 10}
+                  secondaryDataPromise={secondaryDataPromise}
+                />
+              </Suspense>
+
               {post.status === "draft" ? (
                 <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
                   This post is a <strong>draft</strong> and is only visible to you.{" "}
@@ -1358,12 +1464,12 @@ export default async function PostPage({ params }: PageProps) {
                   </div>
                 ) : null}
 
-                <h1 className="font-display mb-4 text-[34px] font-semibold leading-[1.08] tracking-normal text-ink sm:mb-5 sm:text-[46px] lg:text-[52px]">
+                <h1 className="font-display mb-4 text-[34px] font-semibold leading-[1.12] tracking-normal text-ink sm:mb-5 sm:text-[46px] lg:text-[52px]">
                   {post.title}
                 </h1>
 
                 {sanitizedExcerpt ? (
-                  <p className="font-display mb-6 max-w-[680px] text-lg font-normal italic leading-[1.5] text-gray-600 sm:text-[21px]">
+                  <p className="font-display mb-6 max-w-[680px] text-lg font-normal italic leading-[1.5] text-gray-700 sm:text-[21px]">
                     {sanitizedExcerpt}
                   </p>
                 ) : null}
@@ -1448,7 +1554,7 @@ export default async function PostPage({ params }: PageProps) {
               <ResearchDocumentPanel post={post} />
 
               {post.type !== "research" ? (
-                <div className="article-journal-body relative mb-10">
+                <div className="article-journal-body relative mb-10 sm:mb-16">
                   <HighlightShare containerId="post-article-prose" />
                   <div
                     id="post-article-prose"
@@ -1456,6 +1562,10 @@ export default async function PostPage({ params }: PageProps) {
                     dangerouslySetInnerHTML={{ __html: contentWithIds }}
                   />
                 </div>
+              ) : null}
+
+              {isPublished && post.type !== "research" ? (
+                <ResponsePromptPanel postId={post.id} />
               ) : null}
 
               <Suspense fallback={<SectionSkeleton rows={2} />}>

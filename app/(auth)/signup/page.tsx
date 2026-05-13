@@ -161,7 +161,7 @@ export default function SignupPage() {
           </div>
           <div className="mt-2 flex items-center gap-2" id="password-hint">
             <span
-              className={`h-1.5 w-10 rounded-full ${
+              className={`h-1.5 w-10 rounded-full transition-[background-color] duration-300 ${
                 passwordReady ? "bg-emerald-brand" : "bg-gray-200"
               }`}
             />
@@ -186,7 +186,7 @@ export default function SignupPage() {
         </button>
       </form>
 
-      <div className="mt-7 grid grid-cols-3 gap-2 rounded-xl border border-gray-200 bg-canvas p-2 text-center">
+      <div className="mt-7 grid grid-cols-3 gap-3 rounded-xl border border-gray-200 bg-canvas p-2 text-center">
         {["Profile", "Topics", "Follows"].map((step, index) => (
           <div key={step} className="rounded-lg bg-white px-2 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-brand">

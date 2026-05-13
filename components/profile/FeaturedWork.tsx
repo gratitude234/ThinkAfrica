@@ -103,7 +103,7 @@ export default function FeaturedWork({
           return (
             <article
               key={post.id}
-              className="group min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-px hover:shadow-md"
+              className="group min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)]"
             >
               <Link href={`/post/${post.slug}`} className="block">
                 <PostCover

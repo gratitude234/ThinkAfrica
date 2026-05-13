@@ -111,7 +111,7 @@ export default function ProfileHeader({
     <>
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02]">
         {profile.cover_image_url ? (
-          <div className="h-20 overflow-hidden bg-canvas sm:h-24">
+          <div className="h-20 overflow-hidden bg-canvas sm:h-24 lg:h-32">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={profile.cover_image_url}
@@ -133,7 +133,7 @@ export default function ProfileHeader({
               name={displayName}
               src={profile.avatar_url}
               size={88}
-              className="-mt-11 border-4 border-white shadow-sm md:-mt-12"
+              className="-mt-11 border-4 border-white shadow-md md:-mt-12"
             />
           ) : null}
 
@@ -161,7 +161,7 @@ export default function ProfileHeader({
               ) : null}
             </div>
 
-            <h1 className="font-display flex flex-wrap items-center gap-2 text-[28px] font-semibold leading-tight text-ink sm:text-[30px]">
+            <h1 className="font-display flex flex-wrap items-center gap-2 text-3xl font-semibold leading-tight text-ink">
               <span>{displayName}</span>
               {profile.verified ? (
                 <span
@@ -200,7 +200,7 @@ export default function ProfileHeader({
               <>
                 <Link
                   href="/settings"
-                  className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+                  className="inline-flex items-center justify-center rounded-xl bg-emerald-brand px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
                 >
                   Edit profile
                 </Link>
@@ -218,7 +218,7 @@ export default function ProfileHeader({
                       }
                       setShowInquiry(true);
                     }}
-                    className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+                    className="inline-flex items-center justify-center rounded-xl bg-emerald-brand px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
                   >
                     Contact about opportunities
                   </button>
@@ -249,11 +249,11 @@ export default function ProfileHeader({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 border-t border-gray-100 bg-white px-5 pb-5 pt-4 sm:grid-cols-5 sm:px-6 md:px-7">
+        <div className="flex flex-wrap gap-3 border-t border-gray-100 bg-white px-5 pb-5 pt-4 sm:px-6 md:px-7">
           {statsItems.map((item) => (
             <div
               key={item.label}
-              className="rounded-lg bg-canvas px-3 py-3 text-left last:col-span-2 sm:last:col-span-1"
+              className="min-w-[80px] flex-1 rounded-lg bg-canvas px-3 py-3 text-left"
             >
               <div className="text-lg font-semibold text-ink">
                 {formatStat(item.value)}

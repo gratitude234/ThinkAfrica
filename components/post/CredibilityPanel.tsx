@@ -70,7 +70,7 @@ export default function CredibilityPanel({
 
         <div className="mt-3 grid grid-cols-3 gap-2">
           {compactSignals.map((signal) => (
-            <div key={signal.label} className="rounded-lg bg-canvas px-2.5 py-2">
+            <div key={signal.label} className="rounded-lg bg-white px-2.5 py-2 ring-1 ring-gray-100">
               <p className="truncate text-[10px] text-gray-400">{signal.label}</p>
               <p className={`mt-1 truncate text-[11px] font-semibold ${toneChipClass(signal.tone).split(" ")[1]}`}>
                 {signal.value}

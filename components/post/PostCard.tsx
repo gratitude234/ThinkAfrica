@@ -108,11 +108,7 @@ export default function PostCard({
   const viewCount = typeof post.view_count === "number" ? post.view_count : null;
 
   return (
-<<<<<<< HEAD
     <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-3.5 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08),0_2px_5px_-2px_rgb(0_0_0/0.05)] sm:px-5 sm:py-[18px]">
-=======
-    <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-3.5 shadow-sm shadow-black/[0.015] transition-all duration-300 hover:-translate-y-px hover:shadow-md sm:px-5 sm:py-[18px]">
->>>>>>> b41e24a8a0e91c253f64b6af93f37568217af825
       <span
         className={`absolute bottom-4 left-0 top-4 w-0.5 rounded-r-full opacity-80 sm:w-1 ${accentClass}`}
         aria-hidden="true"
@@ -128,7 +124,7 @@ export default function PostCard({
             </span>
             {post.in_response_to ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
-                {"\u21A9"} Response
+                {"↩"} Response
               </span>
             ) : null}
             {isReviewed ? (
@@ -168,85 +164,19 @@ export default function PostCard({
           ) : null}
 
           <div className="mt-3 border-t border-gray-100 pt-2.5">
-            {/* Avatar + author line */}
-<<<<<<< HEAD
-            {author?.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={author.avatar_url}
-                alt={authorName}
-                className="h-7 w-7 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-semibold text-emerald-800">
-                {authorName.charAt(0).toUpperCase()}
-              </span>
-            )}
-            <div className="min-w-0 flex-1 basis-[calc(100%-1.875rem)] text-[11px] text-ink-muted sm:basis-0">
-              {authorHref ? (
-                <Link
-                  href={authorHref}
-                  className="inline-flex items-center gap-1 font-semibold text-gray-700 transition-colors hover:text-emerald-700"
-                >
-                  <span className="truncate">{authorLine}</span>
-                  {author?.verified ? (
-                    <span
-                      title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
-                      className={`inline-flex h-3 w-3 items-center justify-center rounded-full ${verifiedBg} text-[6px] font-bold text-white`}
-                    >
-                      {"\u2713"}
-                    </span>
-                  ) : null}
-                </Link>
-=======
             <div className="flex min-w-0 items-center gap-2">
               {author?.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={author.avatar_url}
                   alt={authorName}
-                  className="h-6 w-6 shrink-0 rounded-full object-cover"
+                  className="h-7 w-7 shrink-0 rounded-full object-cover"
                 />
->>>>>>> b41e24a8a0e91c253f64b6af93f37568217af825
               ) : (
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-semibold text-emerald-800">
                   {authorName.charAt(0).toUpperCase()}
                 </span>
               )}
-<<<<<<< HEAD
-              {author?.university ? (
-                <span className="ml-1 truncate text-gray-400">{"\u00B7"} {author.university}</span>
-              ) : null}
-              <span className="ml-1 text-gray-400">{"\u00B7"} {formatRelativeTime(displayDate)}</span>
-            </div>
-            {/* Engagement icon row */}
-            <div className="flex w-full shrink-0 items-center gap-3 pl-7 text-gray-500 sm:ml-auto sm:w-auto sm:pl-0">
-              {likeCount !== null ? (
-                <span className="flex items-center gap-1 text-[11.5px]">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                  </svg>
-                  {likeCount > 0 ? likeCount : null}
-                </span>
-              ) : null}
-              {commentCount !== null ? (
-                <span className="flex items-center gap-1 text-[11.5px]">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  {commentCount > 0 ? commentCount : null}
-                </span>
-              ) : null}
-              {viewCount !== null ? (
-                <span className="flex items-center gap-1 text-[11.5px]">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  {viewCount > 0 ? viewCount.toLocaleString() : null}
-                </span>
-              ) : null}
-=======
               <div className="min-w-0 flex-1 text-[11px] leading-4 text-ink-muted">
                 {authorHref ? (
                   <Link
@@ -259,7 +189,7 @@ export default function PostCard({
                         title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
                         className={`inline-flex h-3 w-3 shrink-0 items-center justify-center rounded-full ${verifiedBg} text-[6px] font-bold text-white`}
                       >
-                        {"\u2713"}
+                        {"✓"}
                       </span>
                     ) : null}
                   </Link>
@@ -267,31 +197,31 @@ export default function PostCard({
                   <span className="font-semibold text-gray-700">{authorLine}</span>
                 )}
                 {author?.university ? (
-                  <span className="ml-1 hidden truncate text-gray-400 sm:inline">{"\u00B7"} {author.university}</span>
+                  <span className="ml-1 hidden truncate text-gray-400 sm:inline">{"·"} {author.university}</span>
                 ) : null}
-                <span className="ml-1 whitespace-nowrap text-gray-400">{"\u00B7"} {formatRelativeTime(displayDate)}</span>
+                <span className="ml-1 whitespace-nowrap text-gray-400">{"·"} {formatRelativeTime(displayDate)}</span>
               </div>
               {/* Engagement icon row */}
-              <div className="ml-auto flex shrink-0 items-center gap-2.5 text-gray-400 sm:gap-3">
+              <div className="ml-auto flex shrink-0 items-center gap-2.5 text-gray-500 sm:gap-3">
                 {likeCount !== null ? (
-                  <span className="flex items-center gap-1 text-[11px]">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <span className="flex items-center gap-1 text-[11.5px]">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                     </svg>
                     {likeCount > 0 ? likeCount : null}
                   </span>
                 ) : null}
                 {commentCount !== null ? (
-                  <span className="flex items-center gap-1 text-[11px]">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <span className="flex items-center gap-1 text-[11.5px]">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
                     {commentCount > 0 ? commentCount : null}
                   </span>
                 ) : null}
                 {viewCount !== null ? (
-                  <span className="flex items-center gap-1 text-[11px]">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <span className="flex items-center gap-1 text-[11.5px]">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                       <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
@@ -299,7 +229,6 @@ export default function PostCard({
                   </span>
                 ) : null}
               </div>
->>>>>>> b41e24a8a0e91c253f64b6af93f37568217af825
             </div>
           </div>
         </div>

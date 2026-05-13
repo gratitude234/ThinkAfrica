@@ -44,7 +44,7 @@ const TABS: Array<{
 function sectionTitle(title: string, subtitle: string) {
   return (
     <div className="mb-3 sm:mb-4">
-      <h2 className="text-[17px] font-semibold text-ink sm:text-lg">{title}</h2>
+      <h2 className="text-lg font-semibold text-ink">{title}</h2>
       <p className="mt-1 text-[13px] leading-5 text-ink-muted sm:text-sm">
         {subtitle}
       </p>
@@ -84,7 +84,7 @@ function SearchEntry({
           name="q"
           aria-label="Search ThinkAfrica"
           placeholder="Search posts, people, topics, universities..."
-          className="h-11 w-full rounded-lg border border-gray-200 bg-canvas pl-10 pr-3 text-[13px] text-ink outline-none transition-colors placeholder:text-gray-400 focus:border-emerald-brand focus:bg-white focus:ring-4 focus:ring-emerald-100 sm:h-12 sm:rounded-xl sm:pl-12 sm:pr-4 sm:text-sm"
+          className="h-12 w-full rounded-xl border border-gray-200 bg-canvas pl-10 pr-3 text-[13px] text-ink outline-none transition-colors placeholder:text-gray-400 focus:border-emerald-brand focus:bg-white focus:ring-4 focus:ring-emerald-100 sm:pl-12 sm:pr-4 sm:text-sm"
         />
       </form>
 
@@ -126,7 +126,7 @@ function DiscoverTabs({ activeTab }: { activeTab: DiscoverTab }) {
               event="discover_tab_changed"
               metadata={{ tab: tab.value, surface: "explore" }}
               ariaCurrent={active ? "page" : undefined}
-              className={`mb-[-1px] border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors sm:px-3.5 sm:text-sm ${
+              className={`mb-[-1px] border-b-2 px-3 py-3 text-[13px] font-medium transition-colors sm:px-3.5 sm:text-sm ${
                 active
                   ? "border-emerald-brand text-ink"
                   : "border-transparent text-gray-500 hover:text-ink"
@@ -204,7 +204,7 @@ function TopicStrip({ data }: { data: DiscoverData }) {
   return (
     <section className="mb-5 min-w-0 max-w-full sm:mb-6">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
           Popular topics
         </p>
         <DiscoverTrackedLink
@@ -338,7 +338,7 @@ function SpotlightCard({
 }) {
   return (
     <section className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02] ${className}`}>
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
         {kicker}
       </p>
       <h3 className="font-display text-sm font-semibold leading-snug text-ink">
@@ -432,7 +432,7 @@ function ActiveNowStrip({ data }: { data: DiscoverData }) {
   return (
     <section className="mt-5 min-w-0 max-w-full lg:hidden">
       <div className="mb-2.5 flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
           Live now
         </p>
         <Link
@@ -460,7 +460,7 @@ function DiscoverAside({ data }: { data: DiscoverData }) {
       {data.fellowships.length > 0 ? (
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
               Opportunities
             </p>
             <DiscoverTrackedLink

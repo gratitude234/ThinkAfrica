@@ -1,4 +1,5 @@
 import type { PostType } from "@/lib/utils";
+import type { ResponseIntent } from "@/components/post/ResponseStartLink";
 
 export const WRITE_FORMATS = [
   {
@@ -100,6 +101,91 @@ export const STARTER_TEMPLATES: Record<
       "<h2>Abstract</h2><p>Summarize the question, method, finding, and contribution.</p><h2>Introduction</h2><p>Explain the research problem and why it matters.</p><h2>Literature and context</h2><p>Position your work in existing debates.</p><h2>Method</h2><p>Describe your data, sources, or analytical approach.</p><h2>Findings</h2><p>Present the main results clearly.</p><h2>Conclusion</h2><p>Explain implications and limits.</p>",
   },
 };
+
+const RESPONSE_INTENT_COPY: Record<
+  ResponseIntent,
+  {
+    titlePrefix: string;
+    subtitle: string;
+    excerpt: string;
+    tags: string[];
+    claimPrompt: string;
+    connectionPrompt: string;
+    evidencePrompt: string;
+    questionPrompt: string;
+    hint: string;
+  }
+> = {
+  extend: {
+    titlePrefix: "Extending",
+    subtitle: "A response that builds on the original argument",
+    excerpt: "This response extends the original idea with another angle and example.",
+    tags: ["response", "student voice"],
+    claimPrompt: "State what you agree with, then name the extra idea you want to add.",
+    connectionPrompt: "Explain the part of the original post that your response builds from.",
+    evidencePrompt: "Add a campus example, reading, statistic, case, or lived observation.",
+    questionPrompt: "Ask what readers should consider next if your extension is right.",
+    hint: "Start by naming the part of the argument you want to build on.",
+  },
+  challenge: {
+    titlePrefix: "A response to",
+    subtitle: "A respectful challenge to the original argument",
+    excerpt: "This response challenges the original argument with a different reading of the issue.",
+    tags: ["response", "counterpoint"],
+    claimPrompt: "State the part of the argument you think needs more care or a different conclusion.",
+    connectionPrompt: "Quote or summarize the specific idea you are responding to.",
+    evidencePrompt: "Bring in evidence, context, or a counterexample that changes the interpretation.",
+    questionPrompt: "End with the question your challenge leaves open for readers.",
+    hint: "Challenge one specific claim, not the whole writer.",
+  },
+  evidence: {
+    titlePrefix: "Adding evidence to",
+    subtitle: "A response with an example, source, or case",
+    excerpt: "This response adds evidence or an example that helps readers judge the original idea.",
+    tags: ["response", "evidence"],
+    claimPrompt: "Name the evidence or example you are adding and what it shows.",
+    connectionPrompt: "Explain how it connects to the original post's argument.",
+    evidencePrompt: "Describe the source, case, class discussion, statistic, or observation clearly.",
+    questionPrompt: "Ask what more evidence would help settle the issue.",
+    hint: "Lead with the example, then explain why it changes the discussion.",
+  },
+};
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function getResponseStarterTemplate({
+  parentTitle,
+  intent,
+}: {
+  parentTitle: string;
+  intent: ResponseIntent;
+}) {
+  const copy = RESPONSE_INTENT_COPY[intent];
+  const safeTitle = escapeHtml(parentTitle);
+
+  return {
+    title: `${copy.titlePrefix} "${parentTitle}"`,
+    subtitle: copy.subtitle,
+    excerpt: copy.excerpt,
+    tags: copy.tags,
+    content:
+      `<h2>My response</h2><p>${copy.claimPrompt}</p>` +
+      `<h2>Connection to the original idea</h2><p>${copy.connectionPrompt} Original post: <strong>${safeTitle}</strong>.</p>` +
+      `<h2>Evidence or example</h2><p>${copy.evidencePrompt}</p>` +
+      `<h2>Question for readers</h2><p>${copy.questionPrompt}</p>`,
+    hint: copy.hint,
+  };
+}
+
+export function isResponseIntent(value: string | null): value is ResponseIntent {
+  return value === "extend" || value === "challenge" || value === "evidence";
+}
 
 export function isPostType(value: string | null): value is PostType {
   return (

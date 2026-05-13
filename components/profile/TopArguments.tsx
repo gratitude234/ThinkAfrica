@@ -45,7 +45,7 @@ export default function TopArguments({ argumentsList }: TopArgumentsProps) {
           return (
             <article
               key={argument.id}
-              className="min-w-0 rounded-2xl border border-gray-200 bg-white p-5"
+              className="min-w-0 rounded-xl border border-gray-200 bg-white p-5"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
