@@ -324,7 +324,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             onChange={(e) => setGraduationYear(e.target.value)}
             className={INPUT_STYLES}
           />
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-1 text-xs text-gray-500">
             We&apos;ll keep your profile active after you graduate.
           </p>
         </div>
@@ -333,7 +333,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
           <div className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
             <div>
               <p className="text-sm font-medium text-gray-800">Open to mentoring</p>
-              <p className="mt-0.5 text-xs text-gray-400">
+              <p className="mt-0.5 text-xs text-gray-500">
                 Students can find you in the alumni directory and reach out.
               </p>
             </div>
@@ -368,7 +368,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
               placeholder="Tell the community about your work and research interests"
               className={`${INPUT_STYLES} resize-none`}
             />
-            <span className="absolute bottom-2 right-2 text-xs text-gray-400">
+            <span className="absolute bottom-2 right-2 text-xs text-gray-500">
               {bio.length}/300
             </span>
           </div>
@@ -377,7 +377,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         <div>
           <label className="mb-2 block text-sm font-medium text-gray-700">
             Topics you write about
-            <span className="ml-1 text-xs font-normal text-gray-400">
+            <span className="ml-1 text-xs font-normal text-gray-500">
               (select all that apply)
             </span>
           </label>
@@ -387,7 +387,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                 key={interest}
                 type="button"
                 onClick={() => toggleInterest(interest)}
-                className={`rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                className={`rounded-full border px-3 py-2 text-sm font-medium capitalize transition-colors ${
                   interests.includes(interest)
                     ? "border-emerald-brand bg-emerald-brand text-white"
                     : "border-gray-200 bg-white text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"

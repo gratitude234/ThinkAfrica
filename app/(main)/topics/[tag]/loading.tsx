@@ -12,7 +12,7 @@ export default function Loading() {
           {[...Array(3)].map((_, index) => (
             <div
               key={index}
-              className="overflow-hidden rounded-2xl border border-gray-200 bg-white"
+              className="overflow-hidden rounded-xl border border-gray-200 bg-white"
             >
               <div className="aspect-video w-full bg-gray-100" />
               <div className="p-5 space-y-3">

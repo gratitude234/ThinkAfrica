@@ -46,7 +46,7 @@ export default function UpvoteButton({
       onClick={handleToggle}
       disabled={disabled || loading}
       aria-pressed={voted}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
         voted
           ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
           : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700"

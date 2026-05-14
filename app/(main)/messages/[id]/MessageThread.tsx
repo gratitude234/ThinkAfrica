@@ -190,7 +190,7 @@ export default function MessageThread({
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
-          <p className="mt-8 text-center text-sm text-gray-400">
+          <p className="mt-8 text-center text-sm text-gray-500">
             Send the first message.
           </p>
         ) : null}
@@ -214,7 +214,7 @@ export default function MessageThread({
                 </button>
               ) : null}
               <div
-                className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
+                className={`max-w-[75%] rounded-xl px-4 py-2.5 text-sm ${
                   message.deleted_at
                     ? "border border-dashed border-gray-200 bg-white italic text-gray-400"
                     : isMine
@@ -225,7 +225,7 @@ export default function MessageThread({
                 <p>{message.deleted_at ? "This message was deleted." : message.content}</p>
                 <p
                   className={`mt-0.5 text-right text-[10px] ${
-                    isMine ? "text-emerald-100" : "text-gray-400"
+                    isMine ? "text-emerald-100" : "text-gray-500"
                   }`}
                 >
                   {formatRelativeTime(message.created_at)}

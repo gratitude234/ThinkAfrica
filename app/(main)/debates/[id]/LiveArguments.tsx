@@ -108,7 +108,7 @@ function updateVoteCount(argumentsList: Argument[], id: string, upvotes: number)
 
 function EmptyColumn({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5 text-sm leading-6 text-gray-400">
+    <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5 text-sm leading-6 text-gray-500">
       {message}
     </div>
   );
@@ -150,7 +150,7 @@ function ArgumentCard({
 
   return (
     <article
-      className={`mb-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm shadow-gray-100/60 ${borderClass}`}
+      className={`mb-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-gray-100/60 ${borderClass}`}
     >
       <div className="mb-3 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
@@ -187,12 +187,12 @@ function ArgumentCard({
               </span>
             </div>
             {author?.university ? (
-              <p className="truncate text-xs text-gray-400">{author.university}</p>
+              <p className="truncate text-xs text-gray-500">{author.university}</p>
             ) : null}
           </div>
         </div>
 
-        <span className="flex-shrink-0 text-xs text-gray-400">
+        <span className="flex-shrink-0 text-xs text-gray-500">
           {timeAgo(argument.created_at)}
         </span>
       </div>
@@ -364,10 +364,10 @@ export default function LiveArguments({
 
   return (
     <div>
-      <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="mb-5 rounded-xl border border-gray-200 bg-white p-5">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
               Room status
             </p>
             <p className="mt-1 text-sm font-semibold text-ink">
@@ -407,7 +407,7 @@ export default function LiveArguments({
         <div className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                 Arguments
               </p>
               <p className="mt-1 text-sm text-gray-500">
@@ -491,7 +491,7 @@ export default function LiveArguments({
             </div>
           </div>
 
-          <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5">
+          <div className="mt-8 rounded-xl border border-gray-200 bg-white p-5">
             <StanceMeter
               forCount={forPoints}
               againstCount={againstPoints}
@@ -518,8 +518,8 @@ export default function LiveArguments({
             motionTitle={debateTitle}
           />
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+          <section className="rounded-xl border border-gray-200 bg-white p-5">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-gray-500">
               {isClosed ? "Debate closed" : "Join the room"}
             </p>
             <h3 className="mt-1 text-base font-semibold text-gray-900">

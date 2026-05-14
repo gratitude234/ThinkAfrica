@@ -86,7 +86,7 @@ function ResultSkeleton() {
       {[...Array(3)].map((_, index) => (
         <div
           key={index}
-          className="animate-pulse rounded-2xl border border-gray-200 bg-white p-4"
+          className="animate-pulse rounded-xl border border-gray-200 bg-white p-4"
         >
           <div className="h-5 w-20 rounded-full bg-gray-100" />
           <div className="mt-3 h-4 w-3/4 rounded bg-gray-200" />
@@ -252,7 +252,7 @@ function SearchPageContent() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand">
           Search
         </p>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">
@@ -280,7 +280,7 @@ function SearchPageContent() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search posts, people, topics, universities..."
           autoFocus
-          className="w-full rounded-2xl border border-gray-200 bg-white py-3.5 pl-12 pr-10 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full rounded-xl border border-gray-200 bg-white py-3.5 pl-12 pr-10 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
         {query ? (
           <button
@@ -309,7 +309,7 @@ function SearchPageContent() {
 
       {query.trim().length < 2 && trending.length > 0 ? (
         <div className="mb-8">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
             Trending topics
           </p>
           <TrendingButtons tags={trending} onSelect={setQuery} />
@@ -321,11 +321,11 @@ function SearchPageContent() {
       {showResults ? (
         <div className="space-y-6">
           {totalResults === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-canvas px-6 py-12 text-center">
+            <div className="rounded-xl border border-dashed border-gray-200 bg-canvas px-6 py-12 text-center">
               <p className="text-base font-medium text-gray-700">
                 No results for &ldquo;{query.trim()}&rdquo;
               </p>
-              <p className="mt-2 text-sm text-gray-400">
+              <p className="mt-2 text-sm text-gray-500">
                 Try a topic like policy, history, education, or browse what is
                 trending now.
               </p>
@@ -339,7 +339,7 @@ function SearchPageContent() {
 
           {people.length > 0 ? (
             <section>
-              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 People
               </h2>
               <div className="space-y-3">
@@ -348,7 +348,7 @@ function SearchPageContent() {
                     <Link
                       key={person.id}
                       href={`/${person.username}`}
-                      className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
+                      className="flex items-center gap-4 rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
                     >
                       <UserAvatar
                         name={person.full_name ?? person.username ?? "Anonymous"}
@@ -359,7 +359,7 @@ function SearchPageContent() {
                         <p className="truncate text-sm font-semibold text-gray-900">
                           {person.full_name ?? person.username}
                         </p>
-                        <p className="truncate text-xs text-gray-400">
+                        <p className="truncate text-xs text-gray-500">
                           @{person.username}
                           {person.university ? ` - ${person.university}` : ""}
                         </p>
@@ -376,7 +376,7 @@ function SearchPageContent() {
 
           {posts.length > 0 ? (
             <section>
-              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Posts
               </h2>
               <div className="space-y-3">
@@ -427,7 +427,7 @@ function SearchPageContent() {
 
           {topics.length > 0 ? (
             <section>
-              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Topics
               </h2>
               <div className="flex flex-wrap gap-2">
@@ -438,7 +438,7 @@ function SearchPageContent() {
                     className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 shadow-sm transition-colors hover:border-emerald-400 hover:text-emerald-700"
                   >
                     <span>#{topic.tag}</span>
-                    <span className="text-xs text-gray-400">{topic.count}</span>
+                    <span className="text-xs text-gray-500">{topic.count}</span>
                   </Link>
                 ))}
               </div>

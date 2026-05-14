@@ -89,7 +89,7 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
             <Link
               key={tab.label}
               href={tab.value ? `/fellowships?filter=${tab.value}` : "/fellowships"}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
                   ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
@@ -122,7 +122,7 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
       {/* Past opportunities */}
       {closed.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-400 mb-4">
+          <h2 className="text-lg font-semibold text-gray-500 mb-4">
             Past Opportunities
           </h2>
           <div className="space-y-3">
@@ -135,10 +135,10 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700">{f.title}</h3>
                     {f.sponsor_name && (
-                      <p className="text-xs text-gray-400">by {f.sponsor_name}</p>
+                      <p className="text-xs text-gray-500">by {f.sponsor_name}</p>
                     )}
                   </div>
-                  <span className="text-xs text-gray-400 flex-shrink-0">Closed</span>
+                  <span className="text-xs text-gray-500 flex-shrink-0">Closed</span>
                 </div>
               </div>
             ))}

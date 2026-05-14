@@ -554,7 +554,7 @@ export default async function DashboardPage() {
               <Link
                 key={post.id}
                 href={`/edit/${post.slug}`}
-                className="flex items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 text-sm text-gray-700 transition-colors hover:bg-amber-100/40"
+                className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-sm text-gray-700 transition-colors hover:bg-amber-100/40"
               >
                 <span className="font-medium text-gray-900">{post.title}</span>
                 <span className="text-right text-xs font-medium text-amber-700">
@@ -627,7 +627,7 @@ export default async function DashboardPage() {
                       {inquiry.contact_email ?? "No reply email provided"}
                     </p>
                   </div>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-500">
                     {new Date(inquiry.created_at).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -647,7 +647,7 @@ export default async function DashboardPage() {
                       <input type="hidden" name="status" value="read" />
                       <button
                         type="submit"
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-emerald-300 hover:text-emerald-700"
+                        className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-medium text-gray-600 transition-colors hover:border-emerald-300 hover:text-emerald-700"
                       >
                         Mark read
                       </button>
@@ -658,7 +658,7 @@ export default async function DashboardPage() {
                     <input type="hidden" name="status" value="archived" />
                     <button
                       type="submit"
-                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700"
+                      className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700"
                     >
                       Archive
                     </button>
@@ -709,7 +709,7 @@ export default async function DashboardPage() {
                             {app.fellowship.title}
                           </Link>
                         ) : (
-                          <span className="text-gray-400">No fellowship found</span>
+                          <span className="text-gray-500">No fellowship found</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">

@@ -110,7 +110,7 @@ export default async function AdminIndexPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-brand">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-brand">
           Admin
         </p>
         <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">

@@ -121,9 +121,9 @@ export default async function MessagesPage() {
       </div>
 
       {conversations.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
+        <div className="rounded-xl border border-gray-200 bg-white py-16 text-center">
           <p className="text-sm font-medium text-gray-700">No messages yet</p>
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-1 text-xs text-gray-500">
             Visit a public profile and start a direct conversation.
           </p>
           <Link
@@ -163,7 +163,7 @@ export default async function MessagesPage() {
                   </p>
                   <p className="truncate text-xs text-gray-500">{preview}</p>
                 </div>
-                <p className="flex-shrink-0 text-xs text-gray-400">
+                <p className="flex-shrink-0 text-xs text-gray-500">
                   {formatRelativeTime(conversation.last_message_at)}
                 </p>
               </Link>

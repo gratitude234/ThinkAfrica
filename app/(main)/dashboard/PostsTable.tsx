@@ -260,7 +260,7 @@ export default function PostsTable({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors capitalize whitespace-nowrap ${
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors capitalize whitespace-nowrap ${
               activeTab === tab
                 ? "bg-white text-gray-900 shadow-sm"
                 : "text-gray-500 hover:text-gray-700"
@@ -272,7 +272,7 @@ export default function PostsTable({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-12 text-gray-400 text-sm bg-white rounded-xl border border-gray-200">
+        <div className="text-center py-12 text-gray-500 text-sm bg-white rounded-xl border border-gray-200">
           No posts in this category yet.
         </div>
       ) : (
@@ -323,7 +323,7 @@ export default function PostsTable({
                           {post.title}
                         </p>
                         {post.co_authors && post.co_authors.length > 0 ? (
-                          <p className="mt-1 truncate text-xs text-gray-400">
+                          <p className="mt-1 truncate text-xs text-gray-500">
                             With{" "}
                             {post.co_authors
                               .map(
@@ -373,7 +373,7 @@ export default function PostsTable({
                       <td className="px-4 py-3 text-right text-gray-500 hidden md:table-cell">
                         {post.like_count.toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-400 text-xs hidden lg:table-cell">
+                      <td className="px-4 py-3 text-right text-gray-500 text-xs hidden lg:table-cell">
                         {formatDate(post.published_at ?? post.created_at)}
                       </td>
                       <td className="px-4 py-3 text-right">

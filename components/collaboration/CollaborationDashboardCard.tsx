@@ -1,5 +1,6 @@
 import Link from "next/link";
 import UserAvatar from "@/components/ui/UserAvatar";
+import TrackedActionLink from "@/components/retention/TrackedActionLink";
 import type { CollaborationSuggestion } from "@/lib/collaboration";
 
 interface PendingInvite {
@@ -81,7 +82,11 @@ export default function CollaborationDashboardCard({
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-lg border border-gray-100 bg-canvas p-4">
+          <div
+            className={`rounded-lg border border-gray-100 bg-canvas p-4 ${
+              recentResponses.length > 0 ? "lg:order-2" : "lg:order-1"
+            }`}
+          >
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-gray-900">
                 Coauthor invites
@@ -112,16 +117,23 @@ export default function CollaborationDashboardCard({
             )}
           </div>
 
-          <div className="rounded-lg border border-gray-100 bg-canvas p-4">
+          <div
+            className={`rounded-lg border border-gray-100 bg-canvas p-4 ${
+              recentResponses.length > 0 ? "lg:order-1" : "lg:order-2"
+            }`}
+          >
             <h3 className="mb-3 text-sm font-semibold text-gray-900">
               Responses to your work
             </h3>
             {recentResponses.length > 0 ? (
               <div className="space-y-2">
                 {recentResponses.map((response) => (
-                  <Link
+                  <TrackedActionLink
                     key={response.id}
                     href={`/post/${response.slug}`}
+                    actionKey="response_received"
+                    label="Open response to your work"
+                    source="dashboard_return_loop"
                     className="flex gap-2 rounded-lg bg-white px-3 py-2 text-sm hover:bg-emerald-50"
                   >
                     <UserAvatar
@@ -137,7 +149,7 @@ export default function CollaborationDashboardCard({
                         {response.authorName}
                       </span>
                     </span>
-                  </Link>
+                  </TrackedActionLink>
                 ))}
               </div>
             ) : (
@@ -145,7 +157,7 @@ export default function CollaborationDashboardCard({
             )}
           </div>
 
-          <div className="rounded-lg border border-gray-100 bg-canvas p-4">
+          <div className="rounded-lg border border-gray-100 bg-canvas p-4 lg:order-3">
             <h3 className="mb-3 text-sm font-semibold text-gray-900">
               Suggested collaborators
             </h3>

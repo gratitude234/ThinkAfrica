@@ -95,11 +95,11 @@ export default function NotificationsPageClient({
 
       {notifications.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-20 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
             All caught up
           </p>
           <p className="mt-2 font-medium text-gray-700">No notifications yet</p>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm text-gray-500">
             Return to the feed, follow credible writers, or keep building your next draft.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">

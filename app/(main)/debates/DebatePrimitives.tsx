@@ -72,17 +72,17 @@ export function StanceMeter({
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+      <div className="mb-2 flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">
         <span>{label}</span>
         <span>{split.total.toLocaleString()}</span>
       </div>
       <div className={`${compact ? "h-2" : "h-3"} flex overflow-hidden rounded-full bg-gray-200`}>
         <span
-          className="h-full bg-emerald-brand transition-all duration-500"
+          className="h-full bg-emerald-brand transition-[width] duration-500"
           style={{ width: `${split.forPct}%` }}
         />
         <span
-          className="h-full bg-amber-500 transition-all duration-500"
+          className="h-full bg-amber-500 transition-[width] duration-500"
           style={{ width: `${split.againstPct}%` }}
         />
       </div>
@@ -168,7 +168,7 @@ export function StatTile({
   return (
     <div className="rounded-xl border border-gray-100 bg-white px-3 py-3">
       <p className={`text-lg font-bold leading-none ${toneClass}`}>{value}</p>
-      <p className="mt-1 text-[11px] font-medium text-gray-400">{label}</p>
+      <p className="mt-1 text-[11px] font-medium text-gray-500">{label}</p>
     </div>
   );
 }

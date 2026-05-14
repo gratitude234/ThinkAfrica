@@ -329,7 +329,7 @@ export default function OnboardingPage() {
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-gray-100">
           <div
-            className="h-full rounded-full bg-emerald-500 transition-all"
+            className="h-full rounded-full bg-emerald-500 transition-[width]"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -337,7 +337,7 @@ export default function OnboardingPage() {
 
       {step === "identity" ? (
         <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
             Academic identity
           </p>
           <h1 className="mt-2 text-2xl font-bold text-gray-900">
@@ -459,7 +459,7 @@ export default function OnboardingPage() {
 
       {step === "interests" ? (
         <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
             Interests
           </p>
           <h1 className="mt-2 text-2xl font-bold text-gray-900">
@@ -512,7 +512,7 @@ export default function OnboardingPage() {
         <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
                 First network
               </p>
               <h1 className="mt-2 text-2xl font-bold text-gray-900">
@@ -528,18 +528,18 @@ export default function OnboardingPage() {
                 trackStepCompleted("follow");
                 goToStep("contribute");
               }}
-              className="text-sm text-gray-400 transition-colors hover:text-gray-600"
+              className="text-sm text-gray-500 transition-colors hover:text-gray-600"
             >
               Skip for now
             </button>
           </div>
 
           {loadingSuggestions ? (
-            <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
+            <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500">
               Finding suggested people...
             </div>
           ) : suggestions.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
+            <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500">
               No suggestions yet. You can still continue and explore the latest posts.
             </div>
           ) : (
@@ -561,7 +561,7 @@ export default function OnboardingPage() {
                         {profile.full_name ?? profile.username ?? "Anonymous"}
                       </p>
                       {profile.university ? (
-                        <p className="mt-0.5 line-clamp-2 text-xs text-gray-400">
+                        <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
                           {profile.university}
                         </p>
                       ) : null}
@@ -618,7 +618,7 @@ export default function OnboardingPage() {
 
       {step === "contribute" ? (
         <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
             First contribution
           </p>
           <h1 className="mt-2 text-2xl font-bold text-gray-900">

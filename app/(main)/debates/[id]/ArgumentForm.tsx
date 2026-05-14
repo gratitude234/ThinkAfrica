@@ -181,7 +181,7 @@ export default function ArgumentForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-        <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+        <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
           {PHASE_LABELS[currentPhase]}
         </p>
         <p className="mt-0.5 text-xs text-gray-500">
@@ -206,7 +206,7 @@ export default function ArgumentForm({
                 ? "text-red-500"
                 : wordCount > maxWords * 0.85
                   ? "text-amber-500"
-                  : "text-gray-400"
+                  : "text-gray-500"
             }`}
           >
             {wordCount} / {maxWords} words

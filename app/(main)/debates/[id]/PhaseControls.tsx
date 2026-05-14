@@ -51,7 +51,7 @@ export default function PhaseControls({
   if (isClosed) return null;
 
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <span className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
@@ -91,7 +91,7 @@ export default function PhaseControls({
 
                 setLoading(null);
               }}
-              className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+              className="rounded-lg bg-emerald-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
             >
               {loading === "advance" ? "Starting..." : "Start Debate"}
             </button>
@@ -116,7 +116,7 @@ export default function PhaseControls({
 
                 setLoading(null);
               }}
-              className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
+              className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
             >
               {loading === "advance"
                 ? "Advancing..."
@@ -133,7 +133,7 @@ export default function PhaseControls({
               type="button"
               disabled={loading !== null}
               onClick={() => setConfirmingClose(true)}
-              className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+              className="rounded-lg bg-red-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
             >
               Close Debate
             </button>
@@ -155,7 +155,7 @@ export default function PhaseControls({
               type="button"
               disabled={loading !== null}
               onClick={() => setConfirmingClose(false)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-canvas disabled:opacity-50"
+              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-canvas disabled:opacity-50"
             >
               Keep open
             </button>
@@ -163,7 +163,7 @@ export default function PhaseControls({
               type="button"
               disabled={loading !== null}
               onClick={() => void handleClose()}
-              className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+              className="rounded-lg bg-red-500 px-3 py-2 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50"
             >
               {loading === "close" ? "Closing..." : "Close now"}
             </button>

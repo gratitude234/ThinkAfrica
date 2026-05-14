@@ -588,7 +588,7 @@ export default function WritePage() {
     <div className={`mx-auto max-w-6xl pb-24 lg:pb-0 ${focusMode ? "focus-mode" : ""}`}>
       {focusMode ? (
         <div className="fixed right-4 top-4 z-50 flex items-center gap-3 rounded-full border border-gray-200 bg-white/90 px-4 py-2 shadow-md backdrop-blur-sm">
-          <span className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}>
+          <span className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
             {wordCount.toLocaleString()} words · {saveStatusText}
           </span>
           <button
@@ -604,7 +604,7 @@ export default function WritePage() {
           <Link href="/" className="text-sm font-semibold tracking-wide text-gray-900">
             ThinkAfrica
           </Link>
-          <p className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}>
+          <p className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
             {saveStatusText}
           </p>
           <div className="flex items-center gap-3 sm:justify-end">
@@ -708,7 +708,7 @@ export default function WritePage() {
                       void saveDraft(getCurrentData({ postType: type.type }));
                     }
                   }}
-                  className={`rounded-xl border bg-white p-5 text-left transition-all hover:border-emerald-300 hover:ring-2 hover:ring-emerald-100 ${
+                  className={`rounded-xl border bg-white p-5 text-left transition-[border-color,box-shadow,ring-color] hover:border-emerald-300 hover:ring-2 hover:ring-emerald-100 ${
                     selected
                       ? "border-emerald-brand ring-2 ring-emerald-100"
                       : "border-gray-200"
@@ -918,7 +918,7 @@ export default function WritePage() {
                     type="button"
                     onClick={() => setFocusMode(true)}
                     title="Focus mode"
-                    className="flex h-10 items-center px-3 text-xs font-medium text-gray-400"
+                    className="flex h-10 items-center px-3 text-xs font-medium text-gray-500"
                   >
                     Focus
                   </button>
@@ -928,21 +928,21 @@ export default function WritePage() {
               <div className="px-4 py-2.5">
                 <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
                   <div
-                    className={`h-full rounded-full transition-all duration-300 ${
+                    className={`h-full rounded-full transition-[width] duration-300 ${
                       wordCount >= selectedPostType.minWords ? "bg-emerald-500" : "bg-gray-300"
                     }`}
                     style={{ width: `${wordProgress}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-500">
                     {wordCount.toLocaleString()} / {selectedPostType.minWords.toLocaleString()} words
                   </p>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => setIsDetailsOpen(true)}
-                      className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700"
+                      className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700"
                     >
                       Details
                     </button>
@@ -950,7 +950,7 @@ export default function WritePage() {
                       type="button"
                       disabled={!canOpenPublish}
                       onClick={handleReadyToPublish}
-                      className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      className="rounded-lg bg-emerald-brand px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                     >
                       Publish
                     </button>

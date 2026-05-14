@@ -487,7 +487,7 @@ export default function PublishDrawer({
             >
               {reviewTitle}
             </h2>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-500">
               Choose the essentials now. Refine the rest only if you want to.
             </p>
           </div>
@@ -742,11 +742,11 @@ export default function PublishDrawer({
                 <p className="mt-1 text-xs text-gray-500">
                   {POST_TYPE_INTENTS[postType]}
                 </p>
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-gray-500">
                   {currentFormat.requirementsSummary}
                 </p>
                 {postType === inferredType ? (
-                  <p className="mt-1 text-[11px] text-gray-400">
+                  <p className="mt-1 text-[11px] text-gray-500">
                     Suggested from your {wordCount.toLocaleString()} words.
                   </p>
                 ) : null}
@@ -802,7 +802,7 @@ export default function PublishDrawer({
 
             {suggestedTags.length > 0 ? (
               <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
                   Suggested tags
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -919,7 +919,7 @@ export default function PublishDrawer({
               </p>
             </div>
 
-            <article className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <article className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
               <div className="relative aspect-[16/9] w-full overflow-hidden">
                 {coverImageUrl ? (
                   <Image
@@ -943,7 +943,7 @@ export default function PublishDrawer({
               <div className="p-5">
                 <div className="flex items-center justify-between gap-3">
                   <Badge type={postType} wordCount={wordCount} />
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-500">
                     {readTimeFromText(excerpt || title || "draft")} min read
                   </span>
                 </div>
@@ -959,7 +959,7 @@ export default function PublishDrawer({
 
                 <div className="mt-4 border-t border-gray-100 pt-4">
                   <p className="text-sm font-medium text-gray-900">{authorName}</p>
-                  <p className="text-xs text-gray-400">{authorUniversity}</p>
+                  <p className="text-xs text-gray-500">{authorUniversity}</p>
                 </div>
               </div>
             </article>

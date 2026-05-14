@@ -64,8 +64,8 @@ export default function MotionVotePanel({
   };
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-400">
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-gray-500">
         {isClosed ? "Final community verdict" : "Vote on the motion"}
       </p>
       <p className="mb-4 text-sm font-semibold leading-6 text-gray-800">
@@ -117,7 +117,7 @@ export default function MotionVotePanel({
           label={isClosed ? "Final vote" : "Current vote"}
           compact
         />
-        <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
+        <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
           <span>{forCount} for</span>
           <span>{split.total} votes</span>
           <span>{againstCount} against</span>

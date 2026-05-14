@@ -395,6 +395,40 @@ export default async function AdminAnalyticsPage() {
       .map((event) => event.user_id)
       .filter(Boolean) as string[]
   );
+  const returnActionUsers = uniqueUsersForEvent(activationEvents, "next_action_clicked");
+  const notificationOpenedUsers = uniqueUsersForEvent(
+    activationEvents,
+    "notification_opened"
+  );
+  const responseStartedUsers = uniqueUsersForEvent(activationEvents, "response_started");
+  const firstContributionAt = new Map<string, number>();
+  for (const event of activationEvents) {
+    if (
+      !event.user_id ||
+      !["draft_started", "response_started", "post_submitted"].includes(
+        event.event_name
+      )
+    ) {
+      continue;
+    }
+    const eventTime = new Date(event.created_at).getTime();
+    const current = firstContributionAt.get(event.user_id);
+    if (!current || eventTime < current) {
+      firstContributionAt.set(event.user_id, eventTime);
+    }
+  }
+  const now = Date.now();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  const firstContributionEligible = Array.from(firstContributionAt.entries()).filter(
+    ([, timestamp]) => now >= timestamp + sevenDaysMs
+  );
+  const returnedAfterFirstContribution = firstContributionEligible.filter(
+    ([userId, timestamp]) =>
+      (eventsByUser.get(userId) ?? []).some((event) => {
+        const eventTime = new Date(event.created_at).getTime();
+        return eventTime > timestamp && eventTime <= timestamp + sevenDaysMs;
+      })
+  ).length;
   const publicOpportunityProfiles = talentProfiles.filter(
     (profile) =>
       profile.open_to_opportunities === true && profile.visibility === "public"
@@ -448,6 +482,41 @@ export default async function AdminAnalyticsPage() {
             value={postOpened.size}
             trend="neutral"
             trendLabel={`${pct(postOpened.size, totalUsers)} of registered users`}
+          />
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Return Loop
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="Return Action Clickers"
+            value={returnActionUsers.size}
+            trend="neutral"
+            trendLabel={`${pct(returnActionUsers.size, totalUsers)} of registered users`}
+          />
+          <HealthCard
+            label="Notification Openers"
+            value={notificationOpenedUsers.size}
+            trend="neutral"
+            trendLabel="opened activity from bell or page"
+          />
+          <HealthCard
+            label="Response Starters"
+            value={responseStartedUsers.size}
+            trend="neutral"
+            trendLabel="reader-to-writer loop"
+          />
+          <HealthCard
+            label="7D After First Contribution"
+            value={pct(
+              returnedAfterFirstContribution,
+              firstContributionEligible.length
+            )}
+            trend="neutral"
+            trendLabel={`${returnedAfterFirstContribution} of ${firstContributionEligible.length} eligible users`}
           />
         </div>
       </div>

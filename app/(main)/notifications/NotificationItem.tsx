@@ -124,6 +124,9 @@ export default function NotificationItem({
   const message = buildMessage(notification);
   const link = buildLink(notification);
   const icon = TYPE_ICONS[notification.type] ?? "N";
+  const writeBackHref = notification.post_id
+    ? `/write?inResponseTo=${notification.post_id}&type=essay&starter=response&responseIntent=extend`
+    : null;
   const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");
   const [localRead, setLocalRead] = useState(notification.read);
 
@@ -166,7 +169,7 @@ export default function NotificationItem({
       )}
       <div className="min-w-0 flex-1">
         <p className="text-sm leading-snug text-gray-700">{message}</p>
-        <p className="mt-1 text-xs text-gray-400">
+        <p className="mt-1 text-xs text-gray-500">
           {formatRelativeTime(notification.created_at)}
         </p>
         {notification.type === "co_author_invite" && notification.post_id ? (
@@ -209,6 +212,86 @@ export default function NotificationItem({
       ) : null}
     </div>
   );
+
+  if (notification.type === "response_post") {
+    return (
+      <div className="rounded-xl border border-emerald-100 bg-white shadow-sm">
+        {link ? (
+          <Link
+            href={link}
+            onClick={() => {
+              trackActivationEvent({
+                event: "notification_opened",
+                metadata: {
+                  notificationId: notification.id,
+                  type: notification.type,
+                  source: "notifications_page",
+                },
+              });
+            }}
+          >
+            {inner}
+          </Link>
+        ) : (
+          inner
+        )}
+        <div className="flex flex-wrap gap-2 border-t border-emerald-50 px-4 py-3">
+          {link ? (
+            <Link
+              href={link}
+              onClick={() => {
+                trackActivationEvent({
+                  event: "next_action_clicked",
+                  metadata: {
+                    actionKey: "response_received",
+                    label: "Read response",
+                    source: "notifications_response",
+                  },
+                });
+                trackActivationEvent({
+                  event: "notification_opened",
+                  metadata: {
+                    notificationId: notification.id,
+                    type: notification.type,
+                    source: "notifications_response",
+                  },
+                });
+              }}
+              className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
+            >
+              Read response
+            </Link>
+          ) : null}
+          {writeBackHref ? (
+            <Link
+              href={writeBackHref}
+              onClick={() => {
+                trackActivationEvent({
+                  event: "next_action_clicked",
+                  metadata: {
+                    actionKey: "write_back",
+                    label: "Write back",
+                    source: "notifications_response",
+                  },
+                });
+                trackActivationEvent({
+                  event: "response_started",
+                  metadata: {
+                    postId: notification.post_id ?? null,
+                    source: "notifications_response",
+                    responseIntent: "extend",
+                  },
+                });
+              }}
+              className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+            >
+              Write back
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   if (link && notification.type !== "co_author_invite") {
     return (

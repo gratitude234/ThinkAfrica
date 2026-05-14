@@ -67,7 +67,7 @@ export default async function TopicPage({ params }: PageProps) {
     <div className="max-w-4xl mx-auto">
       {/* Hero */}
       <div className="mb-8">
-        <p className="text-sm text-gray-400 mb-1">Topic</p>
+        <p className="text-sm text-gray-500 mb-1">Topic</p>
         <h1 className="text-3xl font-bold text-gray-900">#{decodedTag}</h1>
         <p className="text-gray-500 text-sm mt-1">
           {posts.length} post{posts.length !== 1 ? "s" : ""}
@@ -78,7 +78,7 @@ export default async function TopicPage({ params }: PageProps) {
         {/* Posts */}
         <div className="lg:col-span-2 space-y-4">
           {posts.length === 0 ? (
-            <div className="text-center py-16 text-gray-400 bg-white rounded-xl border border-gray-200">
+            <div className="text-center py-16 text-gray-500 bg-white rounded-xl border border-gray-200">
               <p>No posts with this tag yet.</p>
               <Link href="/write" className="text-emerald-brand text-sm mt-2 inline-block hover:underline">
                 Write about {decodedTag}
@@ -141,7 +141,7 @@ export default async function TopicPage({ params }: PageProps) {
                     href={`/${c.username}`}
                     className="flex items-center gap-3 group"
                   >
-                    <span className="text-xs text-gray-400 font-medium w-4">
+                    <span className="text-xs text-gray-500 font-medium w-4">
                       {i + 1}
                     </span>
                     <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0">
@@ -151,7 +151,7 @@ export default async function TopicPage({ params }: PageProps) {
                       <p className="text-sm font-medium text-gray-900 group-hover:text-emerald-brand transition-colors truncate">
                         {c.full_name}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-gray-500">
                         {c.count} post{c.count !== 1 ? "s" : ""}
                       </p>
                     </div>

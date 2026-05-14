@@ -30,7 +30,7 @@ export default function QualitySignals({
     <section className="mb-6 rounded-xl border border-gray-200 bg-white p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             Portfolio signals
           </p>
           <h2 className="mt-1 text-lg font-semibold text-gray-900">
@@ -81,19 +81,19 @@ export default function QualitySignals({
 
               <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                 <div className="rounded-lg bg-white px-3 py-2">
-                  <p className="text-gray-400">References</p>
+                  <p className="text-gray-500">References</p>
                   <p className="mt-0.5 font-medium text-gray-800">
                     {item.summary.referenceLabel}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white px-3 py-2">
-                  <p className="text-gray-400">Discussion</p>
+                  <p className="text-gray-500">Discussion</p>
                   <p className="mt-0.5 font-medium text-gray-800">
                     {discussion?.value ?? "0 comments"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white px-3 py-2">
-                  <p className="text-gray-400">Saves / likes</p>
+                  <p className="text-gray-500">Saves / likes</p>
                   <p className="mt-0.5 font-medium text-gray-800">
                     {engagement?.value ?? "0 saves / 0 likes"}
                   </p>

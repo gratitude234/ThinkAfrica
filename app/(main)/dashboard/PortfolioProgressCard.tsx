@@ -30,7 +30,7 @@ export default function PortfolioProgressCard({
     <section className="mb-6 rounded-xl border border-emerald-100 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
             Portfolio progress
           </p>
           <h2 className="mt-2 text-lg font-semibold text-gray-900">
@@ -69,7 +69,7 @@ export default function PortfolioProgressCard({
             >
               {item.value.toLocaleString()}
               {item.target ? (
-                <span className="text-sm font-medium text-gray-400">
+                <span className="text-sm font-medium text-gray-500">
                   /{item.target.toLocaleString()}
                 </span>
               ) : null}

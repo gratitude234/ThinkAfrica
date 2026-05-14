@@ -5,7 +5,9 @@ import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import { getActivationState, type ActivationState } from "@/lib/activation";
+import { getRetentionSummary, type RetentionSummary } from "@/lib/retention";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
+import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
 import ActivationFocusPanel from "./ActivationFocusPanel";
 import DailyBriefStrip from "./DailyBriefStrip";
 import EditorPicksRow from "./EditorPicksRow";
@@ -334,6 +336,7 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   let peopleResult: SuggestedPeopleResult = { suggestions: [], reason: "" };
   let activationState: ActivationState | null = null;
+  let retentionSummary: RetentionSummary | null = null;
 
   if (user) {
     [peopleResult, activationState] = await Promise.all([
@@ -345,6 +348,14 @@ export default async function HomePage({ searchParams }: PageProps) {
       }),
       getActivationState(supabase, user.id),
     ]);
+
+    if (activationState.activated) {
+      retentionSummary = await getRetentionSummary(
+        supabase,
+        user.id,
+        activationState
+      );
+    }
   }
 
   const showFollowingEligible = !!user;
@@ -374,6 +385,10 @@ export default async function HomePage({ searchParams }: PageProps) {
 
       {user && activationState && !activationState.activated ? (
         <ActivationFocusPanel state={activationState} />
+      ) : null}
+
+      {user && activationState?.activated && retentionSummary ? (
+        <RetentionThisWeek summary={retentionSummary} source="home" />
       ) : null}
 
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_296px]">

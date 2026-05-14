@@ -43,8 +43,8 @@ function AccessCard({
 }) {
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+      <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand">
           {eyebrow}
         </p>
         <h1 className="font-display mt-2 text-2xl font-bold text-ink">
@@ -158,7 +158,7 @@ export default function CreateDebatePage() {
           <div className="h-4 w-96 max-w-full rounded bg-gray-100" />
         </div>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-6">
             <div className="space-y-5">
               {[0, 1, 2].map((item) => (
                 <div key={item} className="space-y-2">
@@ -168,7 +168,7 @@ export default function CreateDebatePage() {
               ))}
             </div>
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="h-5 w-24 rounded bg-gray-200" />
             <div className="mt-4 h-20 rounded bg-gray-100" />
           </div>
@@ -225,7 +225,7 @@ export default function CreateDebatePage() {
     <div className="mx-auto max-w-5xl">
       <div className="mb-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand">
             Debate motion
           </p>
           <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-ink md:text-4xl">
@@ -247,7 +247,7 @@ export default function CreateDebatePage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-gray-200 bg-white p-6"
+          className="rounded-xl border border-gray-200 bg-white p-6"
         >
           <div className="border-b border-gray-100 pb-5">
             <h2 className="text-base font-semibold text-ink">Motion details</h2>
@@ -263,7 +263,7 @@ export default function CreateDebatePage() {
                 <label className="block text-sm font-semibold text-gray-800">
                   Motion <span className="text-red-500">*</span>
                 </label>
-                <span className="text-xs text-gray-400">{titleCount}/160</span>
+                <span className="text-xs text-gray-500">{titleCount}/160</span>
               </div>
               <input
                 type="text"
@@ -274,7 +274,7 @@ export default function CreateDebatePage() {
                 placeholder="e.g. African universities should prioritize entrepreneurship over employability"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-gray-500">
                 Use a claim people can clearly argue for or against.
               </p>
             </div>
@@ -284,7 +284,7 @@ export default function CreateDebatePage() {
                 <label className="block text-sm font-semibold text-gray-800">
                   Context
                 </label>
-                <span className="text-xs text-gray-400">{contextCount}/900</span>
+                <span className="text-xs text-gray-500">{contextCount}/900</span>
               </div>
               <textarea
                 value={description}
@@ -307,7 +307,7 @@ export default function CreateDebatePage() {
                 placeholder="education, policy, entrepreneurship"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-gray-500">
                 Up to 6 comma-separated tags.
               </p>
             </div>
@@ -333,7 +333,7 @@ export default function CreateDebatePage() {
                   </button>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-gray-500">
                 Moderators can manually advance phases when the room is ready.
               </p>
             </div>
@@ -360,7 +360,7 @@ export default function CreateDebatePage() {
         </form>
 
         <aside className="space-y-4 lg:sticky lg:top-[76px] lg:self-start">
-          <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          <section className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <DebateStatusPill status="open" />
               <PhasePill phase="opening" />
@@ -373,7 +373,7 @@ export default function CreateDebatePage() {
                 {description.trim()}
               </p>
             ) : (
-              <p className="mt-2 text-sm leading-6 text-gray-400">
+              <p className="mt-2 text-sm leading-6 text-gray-500">
                 Add context so students know what counts as a strong argument.
               </p>
             )}
@@ -394,8 +394,8 @@ export default function CreateDebatePage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+          <section className="rounded-xl border border-gray-200 bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
               Lifecycle
             </p>
             <div className="mt-4">

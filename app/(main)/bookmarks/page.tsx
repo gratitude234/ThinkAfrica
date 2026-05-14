@@ -130,7 +130,7 @@ export default function BookmarksPage() {
             />
           </svg>
           <p className="font-medium text-gray-500">No bookmarks yet</p>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm text-gray-500">
             Your saved posts will appear here.
           </p>
         </div>
@@ -163,7 +163,7 @@ export default function BookmarksPage() {
           </div>
 
           {filtered.length === 0 ? (
-            <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-gray-400">
+            <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-gray-500">
               <p className="text-lg font-medium">
                 No {typeLabel(filter)} bookmarks
               </p>

@@ -178,10 +178,10 @@ export default function WriteReadinessPanel({
 
   return (
     <aside className="space-y-3">
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand">
               Create mode
             </p>
             <h2 className="mt-1 text-lg font-semibold text-ink">
@@ -190,7 +190,7 @@ export default function WriteReadinessPanel({
             <p className="mt-1 text-sm leading-5 text-gray-500">
               {selectedFormat.desc}
             </p>
-            <p className="mt-2 text-xs leading-5 text-gray-400">
+            <p className="mt-2 text-xs leading-5 text-gray-500">
               {selectedFormat.requirementsSummary}
             </p>
           </div>
@@ -223,18 +223,18 @@ export default function WriteReadinessPanel({
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-gray-100">
             <div
-              className="h-full rounded-full bg-emerald-brand transition-all duration-300"
+              className="h-full rounded-full bg-emerald-brand transition-[width] duration-300"
               style={{ width: `${Math.min(100, wordProgress)}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-gray-400">
+          <p className="mt-2 text-xs text-gray-500">
             Target: {selectedFormat.minWords.toLocaleString()} words /{" "}
             {selectedFormat.review}
           </p>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+      <section className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
           Next step
         </p>
@@ -258,7 +258,7 @@ export default function WriteReadinessPanel({
 
       {children ? <div className="space-y-3">{children}</div> : null}
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-ink">Readiness</h2>
@@ -317,8 +317,8 @@ export default function WriteReadinessPanel({
                   ) : null}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-400">{item.label}</p>
-                  <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-gray-400">
+                  <p className="text-sm font-medium text-gray-500">{item.label}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-gray-500">
                     {item.helper}
                   </p>
                 </div>

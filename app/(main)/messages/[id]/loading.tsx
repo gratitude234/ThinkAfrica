@@ -6,7 +6,7 @@ export default function Loading() {
         {[...Array(6)].map((_, index) => (
           <div
             key={index}
-            className={`h-10 animate-pulse rounded-2xl bg-gray-100 ${
+            className={`h-10 animate-pulse rounded-xl bg-gray-100 ${
               index % 2 === 0 ? "w-3/4" : "ml-auto w-1/2"
             }`}
           />

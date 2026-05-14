@@ -205,7 +205,7 @@ function PortfolioSummary({
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02]">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
             Portfolio summary
           </p>
           <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
@@ -730,7 +730,7 @@ export default async function UserProfilePage({ params }: PageProps) {
               </div>
 
               {recentActivity.length === 0 ? (
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
+                <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
                   No recent activity yet.
                 </div>
               ) : (
@@ -739,7 +739,7 @@ export default async function UserProfilePage({ params }: PageProps) {
                     <Link
                       key={`${item.type}-${item.created_at}-${index}`}
                       href={item.link}
-                      className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
+                      className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
                     >
                       <span className="mt-0.5 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
                         {ACTIVITY_TYPE_ICONS[item.type]}
@@ -748,7 +748,7 @@ export default async function UserProfilePage({ params }: PageProps) {
                         <p className="text-sm text-gray-700">
                           {item.description}
                         </p>
-                        <p className="mt-0.5 text-xs text-gray-400">
+                        <p className="mt-0.5 text-xs text-gray-500">
                           {formatRelativeTime(item.created_at)}
                         </p>
                       </div>

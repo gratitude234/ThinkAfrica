@@ -112,7 +112,7 @@ function EmptyDebates({
   };
 
   return (
-    <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
+    <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
       <p className="text-base font-semibold text-gray-900">{copy[filter].title}</p>
       <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-gray-500">
         {copy[filter].body}
@@ -157,7 +157,7 @@ function DebateCard({ debate }: { debate: DebateRow }) {
   return (
     <Link
       href={`/debates/${debate.id}`}
-      className={`group block rounded-2xl border border-l-4 border-gray-200 bg-white p-5 transition-all hover:-translate-y-px hover:border-gray-300 hover:shadow-md ${statusAccent}`}
+      className={`group block rounded-xl border border-l-4 border-gray-200 bg-white p-5 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)] ${statusAccent}`}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
@@ -165,7 +165,7 @@ function DebateCard({ debate }: { debate: DebateRow }) {
             <DebateStatusPill status={status} />
             <PhasePill phase={phase} />
             {timeLabel ? (
-              <span className="text-xs font-medium text-gray-400">{timeLabel}</span>
+              <span className="text-xs font-medium text-gray-500">{timeLabel}</span>
             ) : null}
           </div>
 
@@ -202,7 +202,7 @@ function DebateCard({ debate }: { debate: DebateRow }) {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-400">
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-500">
         <span>{argCount} {argCount === 1 ? "argument" : "arguments"}</span>
         {debate.round_duration_minutes ? (
           <span>{debate.round_duration_minutes} min phases</span>
@@ -239,14 +239,14 @@ function FeaturedDebateHero({ debate }: { debate: DebateRow }) {
   return (
     <Link
       href={`/debates/${debate.id}`}
-      className="block overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] transition-all hover:-translate-y-px hover:border-gray-300 hover:shadow-md"
+      className="block overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)]"
     >
       <div className="mb-4 flex items-center justify-between gap-3">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-brand" />
           {debate.status === "active" ? "Live debate" : "Open motion"}
         </span>
-        <span className="text-xs font-medium text-gray-400">{timeLabel}</span>
+        <span className="text-xs font-medium text-gray-500">{timeLabel}</span>
       </div>
 
       <h2 className="font-display text-xl font-semibold leading-snug text-ink">
@@ -383,9 +383,9 @@ export default async function DebatesPage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-6 flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] md:mb-7 md:flex-row md:items-end md:justify-between">
+      <div className="mb-6 flex flex-col gap-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] md:mb-7 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand">
             Debate room
           </p>
           <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-ink md:text-4xl">

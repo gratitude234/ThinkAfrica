@@ -27,10 +27,10 @@ export default function DebateRecap({
         : "Community verdict split";
 
   return (
-    <section className="mt-10 rounded-2xl border border-gray-200 bg-white p-6">
+    <section className="mt-10 rounded-xl border border-gray-200 bg-white p-6">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-brand">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-brand">
             Archived recap
           </p>
           <h2 className="font-display mt-1 text-2xl font-bold text-gray-900">
@@ -69,7 +69,7 @@ export default function DebateRecap({
         </div>
       </div>
 
-      <div className="prose prose-sm max-w-none rounded-2xl border border-gray-100 bg-white leading-7 text-gray-700">
+      <div className="prose prose-sm max-w-none rounded-xl border border-gray-100 bg-white leading-7 text-gray-700">
         {recapText.split("\n\n").map((paragraph, index) => (
           <p key={index} className="mb-4 px-5 first:pt-5 last:mb-0 last:pb-5">
             {paragraph}
