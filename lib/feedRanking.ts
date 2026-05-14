@@ -22,6 +22,9 @@ interface RankablePost extends PostCardData {
   author_id?: string;
   bookmark_count?: number;
   comment_count?: number;
+  reference_count?: number;
+  response_count?: number;
+  quality_score?: number;
 }
 
 export function scorePost(post: RankablePost, ctx: RankingContext): number {
@@ -29,7 +32,17 @@ export function scorePost(post: RankablePost, ctx: RankingContext): number {
   const likes = post.like_count ?? 0;
   const comments = post.comment_count ?? 0;
   const bookmarks = post.bookmark_count ?? 0;
-  const quality = views + 5 * likes + 10 * comments + 15 * bookmarks;
+  const references = post.reference_count ?? 0;
+  const responses = post.response_count ?? 0;
+  const helperQuality = post.quality_score ?? 0;
+  const quality =
+    views +
+    5 * likes +
+    10 * comments +
+    15 * bookmarks +
+    18 * references +
+    16 * responses +
+    helperQuality;
 
   const typeWeight = TYPE_WEIGHT[post.type] ?? 1.0;
 

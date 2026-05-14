@@ -1,5 +1,9 @@
 import type { PostCardData } from "@/components/post/PostCard";
 import { rankPosts, type RankingContext } from "@/lib/feedRanking";
+import {
+  getFeedSurfaceReason,
+  getPublicQualitySignals,
+} from "@/lib/postQuality";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type FeedTabKey = "home" | "following" | "latest";
@@ -42,7 +46,7 @@ export async function getCountsByPostId(
   supabase: {
     from: (table: string) => any;
   },
-  table: "likes" | "bookmarks" | "comments",
+  table: "likes" | "bookmarks" | "comments" | "post_references",
   postIds: string[]
 ): Promise<Record<string, number>> {
   if (postIds.length === 0) return {};
@@ -64,7 +68,8 @@ async function enrichPosts(
   supabase: {
     from: (table: string) => any;
   },
-  raw: unknown[]
+  raw: unknown[],
+  rankingContext?: RankingContext
 ): Promise<PostCardData[]> {
   const ids = (raw as Array<{ id: string }>).map((post) => post.id);
   const authorIds = Array.from(
@@ -79,12 +84,18 @@ async function enrichPosts(
     likeCounts,
     bookmarkCounts,
     commentCounts,
+    referenceCounts,
+    responseCounts,
     profilesResult,
     postAuthorsResult,
   ] = await Promise.all([
     getCountsByPostId(supabase, "likes", ids),
     getCountsByPostId(supabase, "bookmarks", ids),
     getCountsByPostId(supabase, "comments", ids),
+    getCountsByPostId(supabase, "post_references", ids),
+    ids.length > 0
+      ? supabase.from("posts").select("in_response_to").in("in_response_to", ids)
+      : Promise.resolve({ data: [], error: null }),
     authorIds.length > 0
       ? supabase
           .from("profiles")
@@ -102,6 +113,18 @@ async function enrichPosts(
           .order("display_order", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
   ]);
+
+  const responseCountsByPostId = ((responseCounts.data ?? []) as Array<{
+    in_response_to?: string | null;
+  }>).reduce(
+    (acc, row) => {
+      if (row.in_response_to) {
+        acc[row.in_response_to] = (acc[row.in_response_to] ?? 0) + 1;
+      }
+      return acc;
+    },
+    {} as Record<string, number>
+  );
 
   const profiles = (profilesResult.data ?? []) as Array<{
     id: string;
@@ -173,13 +196,47 @@ async function enrichPosts(
       (coAuthor) => coAuthor.user_id !== authorId
     );
 
+    const profile = profilesById.get(authorId) ?? null;
+    const tags = (post.tags as string[] | null) ?? null;
+    const followedAuthor = Boolean(
+      authorId && rankingContext?.followedIds.has(authorId)
+    );
+    const interestMatch = Boolean(
+      tags &&
+        rankingContext?.userInterests.length &&
+        tags.some((tag) => rankingContext.userInterests.includes(tag))
+    );
+    const qualityInput = {
+      type: post.type as string | null,
+      citationId: post.citation_id as string | null,
+      publishedVersionId: post.published_version_id as string | null,
+      referenceCount: referenceCounts[id] ?? 0,
+      responseCount: responseCountsByPostId[id] ?? 0,
+      commentCount: commentCounts[id] ?? 0,
+      likeCount: likeCounts[id] ?? 0,
+      bookmarkCount: bookmarkCounts[id] ?? 0,
+      viewCount: post.view_count as number | null,
+      publishedAt: post.published_at as string | null,
+      createdAt: post.created_at as string | null,
+      tags,
+      author: profile,
+      followedAuthor,
+      interestMatch,
+    };
+    const qualitySignals = getPublicQualitySignals(qualityInput);
+
     return {
       ...(post as object),
-      profiles: profilesById.get(authorId) ?? null,
+      profiles: profile,
       co_authors: coAuthors,
       like_count: likeCounts[id] ?? 0,
       bookmark_count: bookmarkCounts[id] ?? 0,
       comment_count: commentCounts[id] ?? 0,
+      reference_count: referenceCounts[id] ?? 0,
+      response_count: responseCountsByPostId[id] ?? 0,
+      quality_badges: qualitySignals.badges,
+      surface_reason: getFeedSurfaceReason(qualityInput),
+      quality_score: qualitySignals.score,
     } as PostCardData;
   });
 }
@@ -283,7 +340,18 @@ export async function fetchFeedPage({
       .range(start, end);
 
     const raw = data ?? [];
-    const posts = await enrichPosts(reader, raw.slice(0, safePageSize));
+    const rankingContext: RankingContext = {
+      userId,
+      followedIds: new Set(followedIds),
+      userInterests,
+      userUniversity,
+      userCountry: null,
+    };
+    const posts = await enrichPosts(
+      reader,
+      raw.slice(0, safePageSize),
+      rankingContext
+    );
     return { posts, hasMore: raw.length > safePageSize };
   }
 
@@ -299,7 +367,18 @@ export async function fetchFeedPage({
       .range(start, end);
 
     const raw = data ?? [];
-    const posts = await enrichPosts(reader, raw.slice(0, safePageSize));
+    const rankingContext: RankingContext = {
+      userId,
+      followedIds: new Set(followedIds),
+      userInterests,
+      userUniversity,
+      userCountry: null,
+    };
+    const posts = await enrichPosts(
+      reader,
+      raw.slice(0, safePageSize),
+      rankingContext
+    );
     return { posts, hasMore: raw.length > safePageSize };
   }
 
@@ -316,7 +395,6 @@ export async function fetchFeedPage({
     .order("published_at", { ascending: false })
     .limit(candidateLimit);
 
-  const enriched = await enrichPosts(reader, data ?? []);
   const rankingContext: RankingContext = {
     userId,
     followedIds: new Set(followedIds),
@@ -324,6 +402,7 @@ export async function fetchFeedPage({
     userUniversity,
     userCountry: null,
   };
+  const enriched = await enrichPosts(reader, data ?? [], rankingContext);
 
   const ranked = rankPosts(enriched, rankingContext);
   const start = (safePage - 1) * safePageSize;

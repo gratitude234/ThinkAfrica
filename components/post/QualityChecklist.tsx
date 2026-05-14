@@ -16,7 +16,7 @@ export default function QualityChecklist({
           <p className="mt-1 text-xs text-gray-500">
             {summary.requiresReview
               ? "Editorial submissions must clear the required checks."
-              : "Quick Takes and essays can stay lightweight, but these signals help readers trust the work."}
+              : "Quick Takes and essays can stay lightweight, but clear claims, examples, and summaries help readers trust the work."}
           </p>
         </div>
         <span
@@ -81,7 +81,13 @@ export default function QualityChecklist({
                   <div>
                     <p className="text-sm font-medium text-gray-800">{item.label}</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
-                      {item.done ? "Looks good." : item.helper}
+                      {item.done
+                        ? "Looks good."
+                        : item.key === "excerpt"
+                          ? "Summarize the claim so readers know why to open it."
+                          : item.key === "references"
+                            ? "For essays and quick takes, a source, example, or concrete observation is enough."
+                            : item.helper}
                     </p>
                   </div>
                   <span

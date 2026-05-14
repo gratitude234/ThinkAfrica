@@ -22,10 +22,19 @@ export interface PostCardData {
   bookmark_count?: number;
   comment_count?: number;
   view_count?: number;
+  reference_count?: number;
+  response_count?: number;
   citation_id?: string | null;
   published_version_id?: string | null;
   cover_image_url?: string | null;
   score?: number;
+  quality_score?: number;
+  quality_badges?: Array<{
+    key: string;
+    label: string;
+    tone: "emerald" | "sky" | "purple" | "amber" | "gray";
+  }>;
+  surface_reason?: string | null;
   co_authors?: Array<{
     user_id: string;
     profile?: {
@@ -77,6 +86,14 @@ const SIGNAL_BADGES = {
   coauthor: "border-purple-200 bg-purple-50 text-purple-700",
 };
 
+const QUALITY_BADGE_CLASSES = {
+  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  sky: "border-sky-200 bg-sky-50 text-sky-700",
+  purple: "border-purple-200 bg-purple-50 text-purple-700",
+  amber: "border-amber-200 bg-amber-50 text-amber-700",
+  gray: "border-gray-200 bg-gray-50 text-gray-600",
+};
+
 function estimateReadTime(excerpt: string | null): number {
   return Math.max(
     1,
@@ -106,6 +123,9 @@ export default function PostCard({
   const likeCount = typeof post.like_count === "number" ? post.like_count : null;
   const commentCount = typeof post.comment_count === "number" ? post.comment_count : null;
   const viewCount = typeof post.view_count === "number" ? post.view_count : null;
+  const qualityBadges = (post.quality_badges ?? [])
+    .filter((badge) => !["reviewed", "citable"].includes(badge.key))
+    .slice(0, 3);
 
   return (
     <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-3.5 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08),0_2px_5px_-2px_rgb(0_0_0/0.05)] sm:px-5 sm:py-[18px]">
@@ -149,6 +169,16 @@ export default function PostCard({
                 Co-author
               </span>
             ) : null}
+            {qualityBadges.map((badge) => (
+              <span
+                key={badge.key}
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${
+                  QUALITY_BADGE_CLASSES[badge.tone] ?? QUALITY_BADGE_CLASSES.gray
+                }`}
+              >
+                {badge.label}
+              </span>
+            ))}
           </div>
 
           <Link href={`/post/${post.slug}`}>
@@ -160,6 +190,12 @@ export default function PostCard({
           {excerpt ? (
             <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-gray-500 max-[359px]:hidden">
               {excerpt}
+            </p>
+          ) : null}
+
+          {post.surface_reason ? (
+            <p className="mt-2 inline-flex rounded-lg bg-canvas px-2.5 py-1 text-[11px] font-medium text-gray-500">
+              Why surfaced: {post.surface_reason}
             </p>
           ) : null}
 

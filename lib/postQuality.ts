@@ -63,6 +63,39 @@ export interface PostQualitySummary {
   credibilitySignals: CredibilitySignal[];
 }
 
+export type PublicQualityTone = "emerald" | "sky" | "purple" | "amber" | "gray";
+
+export interface PublicQualityBadge {
+  key: string;
+  label: string;
+  tone: PublicQualityTone;
+}
+
+export interface PublicQualitySignals {
+  badges: PublicQualityBadge[];
+  score: number;
+}
+
+export interface PublicQualityInput {
+  type?: string | null;
+  citationId?: string | null;
+  publishedVersionId?: string | null;
+  referenceCount?: number | null;
+  responseCount?: number | null;
+  commentCount?: number | null;
+  likeCount?: number | null;
+  bookmarkCount?: number | null;
+  viewCount?: number | null;
+  publishedAt?: string | null;
+  createdAt?: string | null;
+  tags?: string[] | null;
+  author?: {
+    verified?: boolean | null;
+  } | null;
+  followedAuthor?: boolean;
+  interestMatch?: boolean;
+}
+
 function normalizePostType(type: string | null | undefined): PostType {
   if (
     type === "blog" ||
@@ -86,6 +119,92 @@ function countWords(content: string | null | undefined) {
 
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
+}
+
+function isReviewedType(type: string | null | undefined) {
+  return type === "research" || type === "policy_brief";
+}
+
+export function getQualityScore(input: PublicQualityInput): number {
+  const referenceCount = input.referenceCount ?? 0;
+  const responseCount = input.responseCount ?? 0;
+  const commentCount = input.commentCount ?? 0;
+  const bookmarkCount = input.bookmarkCount ?? 0;
+  const likeCount = input.likeCount ?? 0;
+  const viewCount = input.viewCount ?? 0;
+  const reviewed = isReviewedType(input.type) || Boolean(input.publishedVersionId);
+  const citable = Boolean(input.citationId);
+  const publishedAt = input.publishedAt ?? input.createdAt;
+  const ageHours = publishedAt
+    ? Math.max(0, (Date.now() - new Date(publishedAt).getTime()) / (1000 * 60 * 60))
+    : 72;
+  const recencyBoost = Math.max(0, 18 - Math.log2(ageHours + 2));
+
+  return Math.round(
+    referenceCount * 18 +
+      responseCount * 16 +
+      commentCount * 10 +
+      bookmarkCount * 14 +
+      likeCount * 5 +
+      Math.min(viewCount, 500) * 0.6 +
+      (citable ? 45 : 0) +
+      (reviewed ? 28 : 0) +
+      (input.author?.verified ? 12 : 0) +
+      recencyBoost
+  );
+}
+
+export function getPublicQualitySignals(
+  input: PublicQualityInput
+): PublicQualitySignals {
+  const referenceCount = input.referenceCount ?? 0;
+  const responseCount = input.responseCount ?? 0;
+  const commentCount = input.commentCount ?? 0;
+  const bookmarkCount = input.bookmarkCount ?? 0;
+  const badges: PublicQualityBadge[] = [];
+
+  if (referenceCount > 0) {
+    badges.push({ key: "source_backed", label: "Source-backed", tone: "emerald" });
+  }
+  if (isReviewedType(input.type) || input.publishedVersionId) {
+    badges.push({ key: "reviewed", label: "Reviewed", tone: "purple" });
+  }
+  if (input.citationId) {
+    badges.push({ key: "citable", label: "Citable", tone: "sky" });
+  }
+  if (responseCount > 0) {
+    badges.push({ key: "response_thread", label: "Response thread", tone: "amber" });
+  }
+  if (commentCount >= 3) {
+    badges.push({ key: "discussion", label: "Strong discussion", tone: "amber" });
+  }
+  if (bookmarkCount >= 3) {
+    badges.push({ key: "saved", label: "Saved often", tone: "emerald" });
+  }
+  if (input.author?.verified) {
+    badges.push({ key: "verified_author", label: "Verified author", tone: "gray" });
+  }
+
+  return {
+    badges,
+    score: getQualityScore(input),
+  };
+}
+
+export function getFeedSurfaceReason(input: PublicQualityInput): string | null {
+  if (input.interestMatch) return "Matches your reading interests";
+  if (input.followedAuthor) return "From a writer you follow";
+  if (input.referenceCount && input.referenceCount > 0) {
+    return "Source-backed post";
+  }
+  if (input.citationId || isReviewedType(input.type) || input.publishedVersionId) {
+    return "Reviewed or citable work";
+  }
+  if ((input.responseCount ?? 0) > 0) return "Active response thread";
+  if ((input.commentCount ?? 0) >= 3) return "Strong discussion";
+  if ((input.bookmarkCount ?? 0) >= 3) return "Saved by readers";
+  if (getQualityScore(input) >= 35) return "Quality signals are rising";
+  return null;
 }
 
 function getReviewLabel(

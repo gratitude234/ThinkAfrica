@@ -5,6 +5,7 @@ import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import { getActivationState, type ActivationState } from "@/lib/activation";
+import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
 import { getRetentionSummary, type RetentionSummary } from "@/lib/retention";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
@@ -40,9 +41,12 @@ interface FeaturedPostRaw {
   slug: string;
   type: string;
   excerpt: string | null;
+  tags: string[] | null;
   cover_image_url: string | null;
   view_count: number | null;
   published_at: string | null;
+  citation_id: string | null;
+  published_version_id: string | null;
   profiles: FeaturedProfile | FeaturedProfile[] | null;
 }
 
@@ -183,7 +187,7 @@ export default async function HomePage({ searchParams }: PageProps) {
       .from("posts")
       .select(
         `
-        id, author_id, title, slug, type, excerpt, cover_image_url, view_count, published_at,
+        id, author_id, title, slug, type, excerpt, tags, cover_image_url, view_count, published_at, citation_id, published_version_id,
         profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified)
       `
       )
@@ -266,7 +270,66 @@ export default async function HomePage({ searchParams }: PageProps) {
     profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
   }));
 
-  const [featuredPost = null, ...editorPicksRaw] = featuredPostsNorm;
+  const featuredIds = featuredPostsNorm.map((post) => post.id);
+  const [
+    { data: featuredReferences },
+    { data: featuredComments },
+    { data: featuredBookmarks },
+    { data: featuredResponses },
+  ] =
+    featuredIds.length > 0
+      ? await Promise.all([
+          supabase.from("post_references").select("post_id").in("post_id", featuredIds),
+          supabase.from("comments").select("post_id").in("post_id", featuredIds),
+          supabase.from("bookmarks").select("post_id").in("post_id", featuredIds),
+          supabase.from("posts").select("in_response_to").in("in_response_to", featuredIds),
+        ])
+      : [
+          { data: [] },
+          { data: [] },
+          { data: [] },
+          { data: [] },
+        ];
+  const countBy = (rows: Array<Record<string, string | null>>, key: string) =>
+    rows.reduce((acc: Record<string, number>, row) => {
+      const id = row[key];
+      if (id) acc[id] = (acc[id] ?? 0) + 1;
+      return acc;
+    }, {});
+  const referenceCounts = countBy((featuredReferences ?? []) as Array<Record<string, string | null>>, "post_id");
+  const commentCounts = countBy((featuredComments ?? []) as Array<Record<string, string | null>>, "post_id");
+  const bookmarkCounts = countBy((featuredBookmarks ?? []) as Array<Record<string, string | null>>, "post_id");
+  const responseCounts = countBy((featuredResponses ?? []) as Array<Record<string, string | null>>, "in_response_to");
+  const qualityRankedFeaturedPosts = featuredPostsNorm
+    .map((post) => {
+      const interestMatch = Boolean(
+        post.tags?.some((tag) => userInterests.includes(tag))
+      );
+      const qualityInput = {
+        type: post.type,
+        citationId: post.citation_id,
+        publishedVersionId: post.published_version_id,
+        referenceCount: referenceCounts[post.id] ?? 0,
+        responseCount: responseCounts[post.id] ?? 0,
+        commentCount: commentCounts[post.id] ?? 0,
+        bookmarkCount: bookmarkCounts[post.id] ?? 0,
+        viewCount: post.view_count,
+        publishedAt: post.published_at,
+        tags: post.tags,
+        author: post.profiles,
+        followedAuthor: followedIds.includes(post.author_id),
+        interestMatch,
+      };
+
+      return {
+        ...post,
+        quality_reason: getFeedSurfaceReason(qualityInput),
+        quality_score: getQualityScore(qualityInput),
+      };
+    })
+    .sort((left, right) => right.quality_score - left.quality_score);
+
+  const [featuredPost = null, ...editorPicksRaw] = qualityRankedFeaturedPosts;
   const editorPicks = editorPicksRaw.slice(0, 2);
   const newVoiceAuthorIds = Array.from(
     new Set(

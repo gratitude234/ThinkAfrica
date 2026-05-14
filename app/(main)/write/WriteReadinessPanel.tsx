@@ -86,7 +86,7 @@ export default function WriteReadinessPanel({
     if (!bodyStarted) {
       return {
         title: "Write the first paragraph",
-        body: "Get one clear point down. Structure and metadata can wait until the draft has shape.",
+        body: "Lead with one clear claim, then add the example or evidence that makes it worth reading.",
       };
     }
     if (!profileInfo?.username) {
@@ -109,7 +109,7 @@ export default function WriteReadinessPanel({
     }
     return {
       title: "Ready for final review",
-      body: "Open details to confirm tags, summary, authorship, and publication settings.",
+      body: "Open details to confirm the summary, evidence signals, reader question, and publication settings.",
     };
   })();
   const checklist = [
@@ -122,7 +122,7 @@ export default function WriteReadinessPanel({
       label: "Body started",
       helper: bodyStarted
         ? `${wordCount.toLocaleString()} words drafted`
-        : "Add the first argument, example, or section.",
+        : "Add a claim, why it matters, and one example or source.",
       done: bodyStarted,
     },
     {
@@ -143,8 +143,8 @@ export default function WriteReadinessPanel({
     {
       label: "Excerpt ready",
       helper: excerpt.trim()
-        ? "Feed summary is ready."
-        : "We can generate one when you publish.",
+        ? "Readers can judge the point from the feed."
+        : "Add a useful one-sentence summary or generate one during publish review.",
       done: excerpt.trim().length > 0,
     },
     {
@@ -153,7 +153,7 @@ export default function WriteReadinessPanel({
         ? references.length > 0
           ? `${references.length} reference${references.length === 1 ? "" : "s"} added`
           : "Formal submissions need at least one source."
-        : "Add sources in the publish review if useful.",
+        : "Optional, but sources or concrete examples help readers trust the argument.",
       done: needsReferences ? references.length > 0 : true,
     },
   ];

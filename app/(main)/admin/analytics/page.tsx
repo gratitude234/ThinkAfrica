@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AnalyticsCharts from "./AnalyticsCharts";
+import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
 
 interface ProfileRow {
   id: string;
@@ -25,6 +27,30 @@ interface TalentProfileAnalyticsRow {
   opportunity_types: string[] | null;
   cv_url: string | null;
   linkedin_url: string | null;
+}
+
+interface PromisingPostRow {
+  id: string;
+  title: string;
+  slug: string;
+  type: string;
+  tags: string[] | null;
+  view_count: number | null;
+  published_at: string | null;
+  citation_id: string | null;
+  published_version_id: string | null;
+  profiles:
+    | {
+        username: string | null;
+        full_name: string | null;
+        verified?: boolean | null;
+      }
+    | Array<{
+        username: string | null;
+        full_name: string | null;
+        verified?: boolean | null;
+      }>
+    | null;
 }
 
 function StatCard({
@@ -111,6 +137,13 @@ function buildThirtyDayMap() {
     dayMap[d.toISOString().slice(0, 10)] = 0;
   }
   return dayMap;
+}
+
+function countByPostId(rows: Array<{ post_id?: string | null }>) {
+  return rows.reduce((acc: Record<string, number>, row) => {
+    if (row.post_id) acc[row.post_id] = (acc[row.post_id] ?? 0) + 1;
+    return acc;
+  }, {});
 }
 
 function computeReturnRate(
@@ -444,6 +477,93 @@ export default async function AdminAnalyticsPage() {
         (profile.cv_url || profile.linkedin_url)
     );
   }).length;
+  const { data: promisingPostsRaw } = await supabase
+    .from("posts")
+    .select(
+      `id, title, slug, type, tags, view_count, published_at, citation_id, published_version_id,
+      profiles!posts_author_id_fkey(username, full_name, verified)`
+    )
+    .eq("status", "published")
+    .order("published_at", { ascending: false })
+    .limit(60);
+  const promisingPostIds = ((promisingPostsRaw ?? []) as PromisingPostRow[]).map(
+    (post) => post.id
+  );
+  const [
+    { data: promisingReferences },
+    { data: promisingComments },
+    { data: promisingBookmarks },
+    { data: promisingResponses },
+  ] =
+    promisingPostIds.length > 0
+      ? await Promise.all([
+          supabase
+            .from("post_references")
+            .select("post_id")
+            .in("post_id", promisingPostIds),
+          supabase
+            .from("comments")
+            .select("post_id")
+            .in("post_id", promisingPostIds),
+          supabase
+            .from("bookmarks")
+            .select("post_id")
+            .in("post_id", promisingPostIds),
+          supabase
+            .from("posts")
+            .select("in_response_to")
+            .in("in_response_to", promisingPostIds),
+        ])
+      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
+  const promisingReferenceCounts = countByPostId(
+    (promisingReferences ?? []) as Array<{ post_id?: string | null }>
+  );
+  const promisingCommentCounts = countByPostId(
+    (promisingComments ?? []) as Array<{ post_id?: string | null }>
+  );
+  const promisingBookmarkCounts = countByPostId(
+    (promisingBookmarks ?? []) as Array<{ post_id?: string | null }>
+  );
+  const promisingResponseCounts = (
+    (promisingResponses ?? []) as Array<{ in_response_to?: string | null }>
+  ).reduce((acc: Record<string, number>, row) => {
+    if (row.in_response_to) {
+      acc[row.in_response_to] = (acc[row.in_response_to] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
+  const promisingPosts = ((promisingPostsRaw ?? []) as PromisingPostRow[])
+    .map((post) => {
+      const author = Array.isArray(post.profiles)
+        ? post.profiles[0] ?? null
+        : post.profiles;
+      const qualityInput = {
+        type: post.type,
+        citationId: post.citation_id,
+        publishedVersionId: post.published_version_id,
+        referenceCount: promisingReferenceCounts[post.id] ?? 0,
+        responseCount: promisingResponseCounts[post.id] ?? 0,
+        commentCount: promisingCommentCounts[post.id] ?? 0,
+        bookmarkCount: promisingBookmarkCounts[post.id] ?? 0,
+        viewCount: post.view_count,
+        publishedAt: post.published_at,
+        tags: post.tags,
+        author,
+      };
+
+      return {
+        ...post,
+        author,
+        qualityScore: getQualityScore(qualityInput),
+        reason: getFeedSurfaceReason(qualityInput) ?? "Promising engagement",
+        referenceCount: promisingReferenceCounts[post.id] ?? 0,
+        responseCount: promisingResponseCounts[post.id] ?? 0,
+        commentCount: promisingCommentCounts[post.id] ?? 0,
+        bookmarkCount: promisingBookmarkCounts[post.id] ?? 0,
+      };
+    })
+    .sort((left, right) => right.qualityScore - left.qualityScore)
+    .slice(0, 6);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -582,6 +702,66 @@ export default async function AdminAnalyticsPage() {
             trend="neutral"
             trendLabel={`${pct(collaborationUsers.size, totalUsers)} collaboration conversion`}
           />
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Promising Posts
+        </h2>
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          {promisingPosts.length > 0 ? (
+            <div className="space-y-3">
+              {promisingPosts.map((post) => (
+                <div
+                  key={post.id}
+                  className="flex flex-col gap-3 rounded-lg border border-gray-100 bg-canvas px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        Score {post.qualityScore}
+                      </span>
+                      <span className="text-xs font-medium text-gray-500">
+                        {post.reason}
+                      </span>
+                    </div>
+                    <Link
+                      href={`/post/${post.slug}`}
+                      className="line-clamp-1 text-sm font-semibold text-gray-900 hover:text-emerald-700"
+                    >
+                      {post.title}
+                    </Link>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {post.author?.full_name ?? post.author?.username ?? "Unknown author"} /{" "}
+                      {post.referenceCount} refs / {post.responseCount} responses /{" "}
+                      {post.commentCount} comments / {post.bookmarkCount} saves
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Link
+                      href={`/post/${post.slug}`}
+                      className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
+                    >
+                      Open post
+                    </Link>
+                    {post.author?.username ? (
+                      <Link
+                        href={`/${post.author.username}`}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-emerald-200 hover:text-emerald-700"
+                      >
+                        Author
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">
+              Promising posts will appear after published work gains quality signals.
+            </p>
+          )}
         </div>
       </div>
 

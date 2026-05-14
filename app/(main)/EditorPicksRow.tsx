@@ -14,6 +14,7 @@ interface PickPost {
   excerpt: string | null;
   cover_image_url: string | null;
   published_at: string | null;
+  quality_reason?: string | null;
   profiles: {
     username: string | null;
     full_name: string | null;
@@ -67,6 +68,11 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
                   <p className="mt-1 truncate text-[11px] text-ink-muted">
                     {author.full_name ?? author.username}
                     {author.university ? ` - ${author.university}` : ""}
+                  </p>
+                ) : null}
+                {pick.quality_reason ? (
+                  <p className="mt-1 truncate text-[11px] font-medium text-emerald-700">
+                    {pick.quality_reason}
                   </p>
                 ) : null}
               </div>
