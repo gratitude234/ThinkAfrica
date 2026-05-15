@@ -9,6 +9,8 @@ import FeaturePostButton from "./FeaturePostButton";
 import AssignReviewers from "./AssignReviewers";
 import { requiresEditorialWorkflow } from "@/lib/reviewWorkflow";
 import { getPostQualitySummary } from "@/lib/postQuality";
+import { getEditorialTrustSummary } from "@/lib/editorialTrust";
+import { getProfileCredibilitySummary } from "@/lib/profileCredibility";
 
 type ReviewerAssignment = {
   post_id: string;
@@ -99,6 +101,7 @@ export default async function AdminReviewPage() {
     { data: reviewersRaw },
     { data: reviewsRaw },
     { data: decisionsRaw },
+    { data: versionsRaw },
   ] = await Promise.all([
     supabase
       .from("posts")
@@ -107,7 +110,7 @@ export default async function AdminReviewPage() {
         id, title, excerpt, content, type, status, tags, created_at, author_id, current_round,
         document_path, document_original_name, document_size_bytes,
         post_references(id),
-        profiles!posts_author_id_fkey (username, full_name, university)
+        profiles!posts_author_id_fkey (username, full_name, university, field_of_study, verified, verified_type)
       `
       )
       .eq("status", "pending")
@@ -140,6 +143,10 @@ export default async function AdminReviewPage() {
         "post_id, round, decision, notes, created_at, editor:profiles!post_editor_decisions_editor_id_fkey(username, full_name)"
       )
       .order("created_at", { ascending: false }),
+    supabase
+      .from("post_versions")
+      .select("post_id, id, version_kind, round, created_at")
+      .order("created_at", { ascending: true }),
   ]);
 
   const posts = (pendingPostsRaw ?? []).map((post) => ({
@@ -231,6 +238,12 @@ export default async function AdminReviewPage() {
                     (decision) =>
                       decision.post_id === post.id && decision.round < currentRound
                   );
+                  const decisions = (decisionsRaw ?? []).filter(
+                    (decision) => decision.post_id === post.id
+                  );
+                  const versions = (versionsRaw ?? []).filter(
+                    (version) => version.post_id === post.id
+                  );
 
                   const availableReviewers = ((reviewersRaw ?? []) as Array<{
                     id: string;
@@ -264,6 +277,24 @@ export default async function AdminReviewPage() {
                     completedReviewCount: assignments.filter(
                       (assignment) => assignment.submitted_at
                     ).length,
+                  });
+                  const editorialSummary = getEditorialTrustSummary({
+                    type: post.type,
+                    status: post.status,
+                    currentRound,
+                    createdAt: post.created_at,
+                    referenceCount,
+                    minReviewers: track?.min_reviewers ?? 0,
+                    requiresReview: Boolean(track?.requires_review),
+                    reviews: assignments,
+                    decisions,
+                    versionCount: versions.length,
+                  });
+                  const credibilitySummary = getProfileCredibilitySummary({
+                    profile: post.profiles,
+                    stats: {
+                      reviewedCount: requiresEditorialWorkflow(post.type) ? 1 : 0,
+                    },
                   });
 
                   return (
@@ -363,6 +394,37 @@ export default async function AdminReviewPage() {
                               ) : null}
                             </div>
                           ) : null}
+
+                          <div className="rounded-lg border border-sky-100 bg-sky-50/70 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                              Review context
+                            </p>
+                            <div className="mt-3 grid gap-2 text-sm text-sky-950/80 sm:grid-cols-2">
+                              <span>
+                                Author: {credibilitySummary.strongestSignal ?? "Profile basics only"}
+                              </span>
+                              <span>
+                                Sources: {referenceCount} reference{referenceCount === 1 ? "" : "s"}
+                              </span>
+                              <span>
+                                Status: {editorialSummary.currentStatusLabel}
+                              </span>
+                              <span>
+                                Round {editorialSummary.reviewRound} /{" "}
+                                {editorialSummary.revisionCount} revision
+                                {editorialSummary.revisionCount === 1 ? "" : "s"}
+                              </span>
+                              <span>
+                                {editorialSummary.decisionContext.timeInReviewLabel ??
+                                  `Submitted ${formatDate(post.created_at)}`}
+                              </span>
+                              <span>
+                                {editorialSummary.decisionContext.readyForDecision
+                                  ? "Ready for editor decision"
+                                  : editorialSummary.nextActionLabel}
+                              </span>
+                            </div>
+                          </div>
 
                           {assignments.some((assignment) => assignment.notes) ? (
                             <div className="space-y-2">

@@ -28,11 +28,13 @@ import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
 import PostCover from "@/components/post/PostCover";
 import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
+import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import ResponseStartLink, {
   type ResponseIntent,
 } from "@/components/post/ResponseStartLink";
 import { getCollaborationSummary } from "@/lib/collaboration";
 import { getMessageEligibility } from "@/lib/messaging";
+import { getEditorialTrustSummary } from "@/lib/editorialTrust";
 import { getPostQualitySummary } from "@/lib/postQuality";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 
@@ -73,6 +75,9 @@ interface PostRecord {
   view_count: number | null;
   cover_image_url: string | null;
   citation_id: string | null;
+  published_version_id: string | null;
+  current_round: number | null;
+  revision_due_at: string | null;
   in_response_to: string | null;
   audio_summary_url: string | null;
   document_path: string | null;
@@ -159,7 +164,14 @@ interface SecondaryData {
   references: ReferenceRecord[];
   coAuthors: CoAuthorRecord[];
   responsePosts: Array<Omit<ResponsePostRow, "profiles"> & { profiles: ResponsePostProfile | null }>;
-  reviews: Array<{ submitted_at: string | null }>;
+  reviews: Array<{
+    assigned_at: string | null;
+    submitted_at: string | null;
+    recommendation: string | null;
+    round: number | null;
+  }>;
+  decisions: Array<{ decision: string | null; created_at: string | null; round: number | null }>;
+  versions: Array<{ id: string; version_kind: string | null; round: number | null; created_at: string | null }>;
   likeCount: number;
   commentCount: number;
   bookmarkCount: number;
@@ -378,6 +390,8 @@ async function getSecondaryData(
     { data: coAuthorsRaw },
     { data: responsePostsRaw },
     { data: reviewsRaw },
+    { data: decisionsRaw },
+    { data: versionsRaw },
     { count: commentCount },
     { count: bookmarkCount },
     relatedResult,
@@ -408,7 +422,20 @@ async function getSecondaryData(
       .eq("status", "published")
       .order("published_at", { ascending: false })
       .limit(10),
-    supabase.from("post_reviews").select("submitted_at").eq("post_id", postId),
+    supabase
+      .from("post_reviews")
+      .select("assigned_at, submitted_at, recommendation, round")
+      .eq("post_id", postId),
+    supabase
+      .from("post_editor_decisions")
+      .select("decision, created_at, round")
+      .eq("post_id", postId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("post_versions")
+      .select("id, version_kind, round, created_at")
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true }),
     supabase
       .from("comments")
       .select("*", { count: "exact", head: true })
@@ -468,7 +495,23 @@ async function getSecondaryData(
     references: (referencesRaw ?? []) as ReferenceRecord[],
     coAuthors,
     responsePosts,
-    reviews: (reviewsRaw ?? []) as Array<{ submitted_at: string | null }>,
+    reviews: (reviewsRaw ?? []) as Array<{
+      assigned_at: string | null;
+      submitted_at: string | null;
+      recommendation: string | null;
+      round: number | null;
+    }>,
+    decisions: (decisionsRaw ?? []) as Array<{
+      decision: string | null;
+      created_at: string | null;
+      round: number | null;
+    }>,
+    versions: (versionsRaw ?? []) as Array<{
+      id: string;
+      version_kind: string | null;
+      round: number | null;
+      created_at: string | null;
+    }>,
     likeCount: likeCount ?? 0,
     commentCount: commentCount ?? 0,
     bookmarkCount: bookmarkCount ?? 0,
@@ -633,9 +676,38 @@ async function PublicationSignalBlock({
 }) {
   if (post.status !== "published") return null;
 
-  const { references } = await secondaryDataPromise;
+  const { references, reviews, decisions, versions } = await secondaryDataPromise;
   const reviewed = isReviewedWork(post);
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
+  const editorialSummary = getEditorialTrustSummary({
+    type: post.type,
+    status: post.status,
+    currentRound: post.current_round ?? 1,
+    createdAt: post.created_at,
+    publishedAt: post.published_at,
+    revisionDueAt: post.revision_due_at,
+    citationId: post.citation_id,
+    publishedVersionId: post.published_version_id,
+    referenceCount: references.length,
+    reviews,
+    decisions,
+    versionCount: versions.length,
+  });
+
+  if (editorialSummary.applies) {
+    return (
+      <div className="mt-5">
+        <EditorialTrustPanel
+          summary={editorialSummary}
+          description="Reviewed and citable work includes stronger editorial context, sources, and archived publication metadata for readers."
+          actionHref={post.citation_id ? `/publication/${post.citation_id}` : null}
+          actionSource="post_editorial_trust"
+          actionKey="citation_archive"
+          compact
+        />
+      </div>
+    );
+  }
 
   return (
     <section className="mt-5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm shadow-black/[0.02] sm:px-4">
@@ -700,6 +772,47 @@ async function PostReadingChrome({
       title={post.title}
       slug={post.slug}
     />
+  );
+}
+
+async function PostReviewStatusPanel({
+  post,
+  secondaryDataPromise,
+}: {
+  post: PostRecord;
+  secondaryDataPromise: Promise<SecondaryData>;
+}) {
+  if (post.status !== "pending" && post.status !== "pending_revision") return null;
+
+  const { references, reviews, decisions, versions } = await secondaryDataPromise;
+  const summary = getEditorialTrustSummary({
+    type: post.type,
+    status: post.status,
+    currentRound: post.current_round ?? 1,
+    createdAt: post.created_at,
+    publishedAt: post.published_at,
+    revisionDueAt: post.revision_due_at,
+    citationId: post.citation_id,
+    publishedVersionId: post.published_version_id,
+    referenceCount: references.length,
+    reviews,
+    decisions,
+    versionCount: versions.length,
+  });
+
+  if (!summary.applies) return null;
+
+  return (
+    <div className="mb-6">
+      <EditorialTrustPanel
+        summary={summary}
+        title="Editorial review status"
+        description="This timeline is visible to permitted viewers and shows where the submission sits in the review workflow."
+        actionHref={post.status === "pending_revision" ? `/edit/${post.slug}` : "/dashboard"}
+        actionSource="post_editorial_status"
+        actionKey="editorial_review_status"
+      />
+    </div>
   );
 }
 
@@ -1300,6 +1413,7 @@ export default async function PostPage({ params }: PageProps) {
       `
       id, title, slug, content, excerpt, type, tags, status, author_id,
       created_at, published_at, view_count, cover_image_url, citation_id,
+      published_version_id, current_round, revision_due_at,
       in_response_to,
       audio_summary_url,
       document_path, document_original_name, document_mime_type, document_size_bytes,
@@ -1424,15 +1538,12 @@ export default async function PostPage({ params }: PageProps) {
                 </div>
               ) : null}
 
-              {post.status === "pending" || post.status === "pending_revision" ? (
-                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                  This submission is in the editorial workflow. We&apos;ll
-                  notify you when a final decision is recorded.{" "}
-                  <Link href="/dashboard" className="font-semibold underline">
-                    View dashboard
-                  </Link>
-                </div>
-              ) : null}
+              <Suspense fallback={null}>
+                <PostReviewStatusPanel
+                  post={post}
+                  secondaryDataPromise={secondaryDataPromise}
+                />
+              </Suspense>
 
               <header className="mb-8 sm:mb-10">
                 <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted sm:mb-5">

@@ -33,6 +33,7 @@ interface ProfileCardProps {
   followerCount?: number;
   followingCount?: number;
   totalViews?: number;
+  strongestSignal?: string | null;
   children?: React.ReactNode;
 }
 
@@ -43,8 +44,17 @@ export default function ProfileCard({
   followerCount = 0,
   followingCount = 0,
   totalViews = 0,
+  strongestSignal,
   children,
 }: ProfileCardProps) {
+  const fallbackSignal =
+    strongestSignal ??
+    (profile.verified
+      ? profile.verified_type
+        ? `Verified ${profile.verified_type}`
+        : "Verified profile"
+      : profile.field_of_study || profile.university || null);
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       {/* Avatar & Name */}
@@ -76,6 +86,11 @@ export default function ProfileCard({
           {profile.field_of_study && (
             <p className="text-sm text-gray-500">{profile.field_of_study}</p>
           )}
+          {fallbackSignal ? (
+            <p className="mt-2 inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+              {fallbackSignal}
+            </p>
+          ) : null}
         </div>
       </div>
 

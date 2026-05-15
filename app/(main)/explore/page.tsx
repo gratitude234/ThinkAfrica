@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getDiscoverData,
   getDiscoverTab,
+  type DiscoverConversation,
   type DiscoverData,
   type DiscoverPerson,
   type DiscoverTab,
@@ -243,6 +244,11 @@ function PersonCard({
   person: DiscoverPerson;
   currentUserId: string | null;
 }) {
+  const strongestSignal =
+    person.field_of_study ??
+    person.university ??
+    (person.points !== null ? `${person.points.toLocaleString()} points` : null);
+
   return (
     <div className="flex min-h-[92px] items-center gap-3 rounded-xl border border-gray-200 bg-white p-4">
       <Link href={`/${person.username}`} className="shrink-0">
@@ -269,6 +275,11 @@ function PersonCard({
         ) : person.points !== null ? (
           <p className="mt-0.5 text-xs text-gray-400">
             {person.points.toLocaleString()} points
+          </p>
+        ) : null}
+        {strongestSignal ? (
+          <p className="mt-1 inline-flex rounded-full bg-canvas px-2 py-0.5 text-[11px] font-medium text-gray-500">
+            {strongestSignal}
           </p>
         ) : null}
       </div>
@@ -356,6 +367,136 @@ function SpotlightCard({
   );
 }
 
+function DiscoveryBrief({
+  data,
+  activeTab,
+}: {
+  data: DiscoverData;
+  activeTab: DiscoverTab;
+}) {
+  if (data.personalizedPrompts.length === 0) return null;
+
+  return (
+    <section className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm shadow-emerald-900/[0.03] sm:mb-6 sm:p-5">
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+            Discovery brief
+          </p>
+          <h2 className="mt-1 text-base font-semibold text-ink">
+            Start with the strongest signal
+          </h2>
+        </div>
+        <p className="text-xs text-emerald-800/75">
+          Based on interests, writers, and active work.
+        </p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {data.personalizedPrompts.map((prompt, index) => (
+          <DiscoverTrackedLink
+            key={prompt.key}
+            href={prompt.href}
+            metadata={{
+              item: "discovery_prompt",
+              prompt: prompt.key,
+              source: prompt.source,
+              tab: activeTab,
+              rank: index + 1,
+              surface: "explore",
+            }}
+            className="block rounded-xl border border-emerald-100 bg-white p-3 transition-colors hover:border-emerald-300 hover:bg-emerald-50/40"
+          >
+            <span className="block text-sm font-semibold text-ink">
+              {prompt.label}
+            </span>
+            <span className="mt-1 line-clamp-2 block text-xs leading-5 text-ink-muted">
+              {prompt.description}
+            </span>
+            <span className="mt-2 inline-flex text-xs font-semibold text-emerald-brand">
+              {prompt.cta}
+            </span>
+          </DiscoverTrackedLink>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ConversationCard({
+  conversation,
+  index,
+}: {
+  conversation: DiscoverConversation;
+  index: number;
+}) {
+  return (
+    <DiscoverTrackedLink
+      href={`/post/${conversation.slug}`}
+      metadata={{
+        item: "active_conversation",
+        postId: conversation.postId,
+        rank: index + 1,
+        surface: "explore",
+      }}
+      className="block rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
+    >
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        {conversation.tag ? (
+          <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+            #{conversation.tag}
+          </span>
+        ) : null}
+        <span className="text-[11px] font-medium text-ink-muted">
+          {conversation.reason}
+        </span>
+      </div>
+      <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
+        {conversation.title}
+      </h3>
+      <p className="mt-2 text-xs text-ink-muted">
+        {conversation.responseCount.toLocaleString()} responses /{" "}
+        {conversation.commentCount.toLocaleString()} comments /{" "}
+        {conversation.referenceCount.toLocaleString()} refs
+      </p>
+    </DiscoverTrackedLink>
+  );
+}
+
+function ActiveConversations({ data }: { data: DiscoverData }) {
+  if (data.activeConversations.length === 0) return null;
+
+  return (
+    <section className="mb-5 sm:mb-6">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            Active conversations
+          </p>
+          <p className="mt-1 text-[13px] text-ink-muted">
+            Posts with discussion, responses, or strong quality signals.
+          </p>
+        </div>
+        <DiscoverTrackedLink
+          href="/search?q=response"
+          metadata={{ item: "active_conversations_search", surface: "explore" }}
+          className="hidden shrink-0 text-xs font-semibold text-emerald-brand hover:underline sm:inline-flex"
+        >
+          Search more
+        </DiscoverTrackedLink>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {data.activeConversations.map((conversation, index) => (
+          <ConversationCard
+            key={conversation.postId}
+            conversation={conversation}
+            index={index}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function DiscoverHighlights({
   data,
   cardClassName = "",
@@ -369,19 +510,20 @@ function DiscoverHighlights({
 
   return (
     <>
-      {data.activeDebate ? (
+      {data.debateHighlights.slice(0, 1).map((debate) => (
         <SpotlightCard
-          kicker={data.activeDebate.status === "active" ? "Live debate" : "Open debate"}
-          title={data.activeDebate.title}
-          body={`${data.activeDebate.argumentCount.toLocaleString()} ${
-            data.activeDebate.argumentCount === 1 ? "argument" : "arguments"
+          key={debate.id}
+          kicker={debate.status === "active" ? "Live debate" : "Open debate"}
+          title={debate.title}
+          body={`${debate.argumentCount.toLocaleString()} ${
+            debate.argumentCount === 1 ? "argument" : "arguments"
           } so far`}
-          href={`/debates/${data.activeDebate.id}`}
+          href={`/debates/${debate.id}`}
           cta="Join the debate"
-          metadata={{ item: "active_debate", debateId: data.activeDebate.id, surface: "explore" }}
+          metadata={{ item: "active_debate", debateId: debate.id, surface: "explore" }}
           className={cardClassName}
         />
-      ) : null}
+      ))}
 
       {data.upcomingWebinar ? (
         <SpotlightCard
@@ -505,6 +647,7 @@ function ForYouSection({
   return (
     <>
       <TopicStrip data={data} />
+      <ActiveConversations data={data} />
       {sectionTitle(
         signedIn ? "Recommended reads" : "Start with what is active now",
         signedIn
@@ -681,6 +824,7 @@ export default async function ExplorePage({ searchParams }: PageProps) {
 
       <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_312px] lg:gap-8">
         <main className="min-w-0">
+          <DiscoveryBrief data={data} activeTab={activeTab} />
           <ActiveSection
             activeTab={activeTab}
             data={data}

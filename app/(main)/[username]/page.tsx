@@ -11,11 +11,16 @@ import ProfileHeader from "@/components/profile/ProfileHeader";
 import PublicationsSection from "@/components/profile/PublicationsSection";
 import TopArguments from "@/components/profile/TopArguments";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
+import TrackedActionLink from "@/components/retention/TrackedActionLink";
 import { getMessageEligibility } from "@/lib/messaging";
 import {
   getOpportunityReadinessSummary,
   type OpportunityReadinessSummary,
 } from "@/lib/opportunityReadiness";
+import {
+  getProfileCredibilitySummary,
+  type ProfileCredibilitySummary,
+} from "@/lib/profileCredibility";
 import { createClient } from "@/lib/supabase/server";
 import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
 
@@ -34,6 +39,7 @@ interface ProfileRecord {
   id: string;
   username: string;
   full_name: string | null;
+  country: string | null;
   university: string | null;
   field_of_study: string | null;
   graduation_year: number | null;
@@ -44,6 +50,7 @@ interface ProfileRecord {
   cover_image_url: string | null;
   verified: boolean;
   verified_type: string | null;
+  interests: string[] | null;
   created_at: string;
 }
 
@@ -248,6 +255,109 @@ function PortfolioSummary({
   );
 }
 
+const CREDIBILITY_BADGE_CLASSES = {
+  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  sky: "border-sky-200 bg-sky-50 text-sky-700",
+  purple: "border-purple-200 bg-purple-50 text-purple-700",
+  amber: "border-amber-200 bg-amber-50 text-amber-700",
+  gray: "border-gray-200 bg-gray-50 text-gray-600",
+};
+
+function CredibilityPanel({
+  summary,
+}: {
+  summary: ProfileCredibilitySummary;
+}) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+            Why this profile is credible
+          </p>
+          <h2 className="font-display mt-1 text-lg font-semibold text-gray-900">
+            {summary.strongestSignal ?? "Building academic signal"}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-gray-500">
+            Signals are based on public work, academic identity, verification, and portfolio readiness.
+          </p>
+        </div>
+        <span className="w-fit rounded-full bg-canvas px-3 py-1 text-xs font-semibold text-gray-600">
+          {summary.profileCompletionScore}% complete
+        </span>
+      </div>
+
+      {summary.credibilityBadges.length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {summary.credibilityBadges.map((badge) => (
+            <span
+              key={badge.key}
+              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                CREDIBILITY_BADGE_CLASSES[badge.tone]
+              }`}
+            >
+              {badge.label}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-xl border border-dashed border-gray-200 bg-canvas px-4 py-3 text-sm text-gray-500">
+          More credibility signals will appear as this profile publishes, verifies identity, and features work.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function ProfileCompletionPanel({
+  summary,
+}: {
+  summary: ProfileCredibilitySummary;
+}) {
+  if (summary.missingProfileItems.length === 0) return null;
+
+  return (
+    <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+            Complete your academic profile
+          </p>
+          <h2 className="mt-1 text-base font-semibold text-gray-900">
+            {summary.profileCompletionScore}% profile credibility
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-amber-900/75">
+            Stronger profiles help readers, collaborators, and opportunity partners understand your work.
+          </p>
+        </div>
+        <TrackedActionLink
+          href={summary.missingProfileItems[0].href}
+          actionKey="profile_completion"
+          label={summary.missingProfileItems[0].label}
+          source="profile_completion_panel"
+          className="inline-flex w-fit items-center justify-center rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+        >
+          {summary.missingProfileItems[0].label}
+        </TrackedActionLink>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {summary.missingProfileItems.slice(0, 6).map((item) => (
+          <TrackedActionLink
+            key={item.key}
+            href={item.href}
+            actionKey={`profile_completion_${item.key}`}
+            label={item.label}
+            source="profile_completion_panel"
+            className="rounded-lg border border-amber-200 bg-white/70 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-white"
+          >
+            {item.label}
+          </TrackedActionLink>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params;
   const supabase = await createClient();
@@ -313,7 +423,7 @@ export default async function UserProfilePage({ params }: PageProps) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, username, full_name, university, field_of_study, graduation_year, is_alumni, bio, avatar_url, points, cover_image_url, verified, verified_type, created_at"
+      "id, username, full_name, country, university, field_of_study, graduation_year, is_alumni, bio, avatar_url, points, cover_image_url, verified, verified_type, interests, created_at"
     )
     .eq("username", username)
     .single<ProfileRecord>();
@@ -611,6 +721,22 @@ export default async function UserProfilePage({ params }: PageProps) {
     isOpenToOpportunities: Boolean(talentProfile?.open_to_opportunities),
     opportunityVisible,
   };
+  const credibilitySummary = getProfileCredibilitySummary({
+    profile,
+    stats: {
+      publishedCount: mergedPosts.length,
+      citableCount: citableWorkCount,
+      reviewedCount: reviewedWorkCount,
+      coAuthoredCount: coAuthoredWorkCount,
+      debateContributionCount: debateContributionCount ?? 0,
+      followerCount: followerCount ?? 0,
+      badgeCount: badges.length,
+      topicCount: topicStats.length,
+      featuredWorkCount: curatedFeaturedPosts.length,
+      opportunityReadinessScore: opportunityReadiness.score,
+      isOpenToOpportunities: Boolean(talentProfile?.open_to_opportunities),
+    },
+  });
 
   return (
     <div className="mx-auto max-w-[1180px] space-y-6">
@@ -646,6 +772,10 @@ export default async function UserProfilePage({ params }: PageProps) {
           points: profile.points,
         }}
       />
+
+      <CredibilityPanel summary={credibilitySummary} />
+
+      {isOwnProfile ? <ProfileCompletionPanel summary={credibilitySummary} /> : null}
 
       <PortfolioSummary
         stats={portfolioSummary}

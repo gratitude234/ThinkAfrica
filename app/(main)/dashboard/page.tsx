@@ -13,6 +13,8 @@ import CollaborationDashboardCard from "@/components/collaboration/Collaboration
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
+import TrackedActionLink from "@/components/retention/TrackedActionLink";
+import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import Button from "@/components/ui/Button";
 import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import { getActivationState } from "@/lib/activation";
@@ -24,7 +26,71 @@ import {
 import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
 import { getRetentionSummary } from "@/lib/retention";
 import { getPostQualitySummary } from "@/lib/postQuality";
+import { getEditorialTrustSummary } from "@/lib/editorialTrust";
 import { updateOpportunityInquiryStatus } from "./opportunityInquiryActions";
+
+function WorkUnderReviewPanel({
+  items,
+}: {
+  items: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    status: string;
+    type: string;
+    citation_id?: string | null;
+    summary: ReturnType<typeof getEditorialTrustSummary>;
+  }>;
+}) {
+  if (items.length === 0) return null;
+
+  const primary = items[0];
+  const actionHref =
+    primary.status === "pending_revision"
+      ? `/edit/${primary.slug}`
+      : primary.status === "published" && primary.citation_id
+        ? `/publication/${primary.citation_id}`
+        : `/post/${primary.slug}`;
+
+  return (
+    <div className="mb-6">
+      <EditorialTrustPanel
+        summary={primary.summary}
+        title="Work under review"
+        description={`${primary.title} is being tracked through the editorial workflow. Use this panel to see what changed and what happens next.`}
+        actionHref={actionHref}
+        actionSource="dashboard_editorial_trust"
+        actionKey="editorial_review_status"
+        compact
+      />
+      {items.length > 1 ? (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {items.slice(1, 3).map((item) => (
+            <TrackedActionLink
+              key={item.id}
+              href={
+                item.status === "published" && item.citation_id
+                  ? `/publication/${item.citation_id}`
+                  : item.status === "pending_revision"
+                    ? `/edit/${item.slug}`
+                    : `/post/${item.slug}`
+              }
+              actionKey="editorial_review_status"
+              label={item.summary.nextActionLabel}
+              source="dashboard_editorial_trust"
+              className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm transition-colors hover:border-emerald-200 hover:text-emerald-700"
+            >
+              <p className="font-semibold text-gray-900">{item.title}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {item.summary.currentStatusLabel} / {item.summary.nextActionLabel}
+              </p>
+            </TrackedActionLink>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -40,7 +106,8 @@ export default async function DashboardPage() {
     .select(
       `
       id, author_id, title, slug, content, excerpt, tags, type, status, view_count,
-      created_at, published_at, revision_due_at, citation_id, in_response_to,
+      created_at, published_at, revision_due_at, citation_id, published_version_id,
+      current_round, in_response_to,
       document_path, document_original_name, document_mime_type, document_size_bytes,
       post_reviews(assigned_at, submitted_at, recommendation),
       post_editor_decisions(decision, created_at),
@@ -282,6 +349,9 @@ export default async function DashboardPage() {
     like_count: likeCounts[p.id] ?? 0,
     revision_due_at: p.revision_due_at ?? null,
     citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
+    published_version_id:
+      (p as { published_version_id?: string | null }).published_version_id ?? null,
+    current_round: (p as { current_round?: number | null }).current_round ?? 1,
     document_path: (p as { document_path?: string | null }).document_path ?? null,
     document_original_name:
       (p as { document_original_name?: string | null }).document_original_name ?? null,
@@ -407,6 +477,41 @@ export default async function DashboardPage() {
       (referenceCounts[post.id] ?? 0) > 0
   );
   const citablePost = publishedPosts.find((post) => post.citation_id);
+  const recentReviewedCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const workUnderReviewItems = posts
+    .filter((post) => post.type === "research" || post.type === "policy_brief")
+    .filter((post) => {
+      if (post.status === "pending" || post.status === "pending_revision") return true;
+      if (post.status !== "published") return false;
+      const publishedAt = post.published_at ? new Date(post.published_at).getTime() : 0;
+      return publishedAt >= recentReviewedCutoff;
+    })
+    .map((post) => ({
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      status: post.status,
+      type: post.type,
+      citation_id: post.citation_id ?? null,
+      summary: getEditorialTrustSummary({
+        type: post.type,
+        status: post.status,
+        currentRound: post.current_round ?? 1,
+        createdAt: post.created_at,
+        publishedAt: post.published_at,
+        revisionDueAt: post.revision_due_at ?? null,
+        citationId: post.citation_id ?? null,
+        publishedVersionId: post.published_version_id ?? null,
+        referenceCount: referenceCounts[post.id] ?? 0,
+        reviews: post.post_reviews ?? [],
+        decisions: post.post_editor_decisions ?? [],
+      }),
+    }))
+    .sort((left, right) => {
+      const priority = (status: string) =>
+        status === "pending_revision" ? 0 : status === "pending" ? 1 : 2;
+      return priority(left.status) - priority(right.status);
+    });
   const portfolioItems: PortfolioProgressItem[] = [
     {
       key: "published",
@@ -522,6 +627,8 @@ export default async function DashboardPage() {
       ) : (
         <ActivationChecklist state={activationState} />
       )}
+
+      <WorkUnderReviewPanel items={workUnderReviewItems} />
 
       <PortfolioProgressCard
         items={portfolioItems}

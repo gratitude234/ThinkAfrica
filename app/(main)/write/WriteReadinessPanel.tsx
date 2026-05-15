@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PostReferenceRecord } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
 import { WRITE_FORMATS } from "./writeConfig";
 import type { CoAuthorProfile } from "@/components/collaboration/CoAuthorPicker";
 import DraftSignalPreview from "./DraftSignalPreview";
+import { trackActivationEvent } from "@/lib/activationEvents";
+import { getDraftCoachingSummary } from "./draftCoaching";
 
 interface WriteReadinessPanelProps {
   postType: PostType;
   title: string;
+  subtitle: string;
   content: string;
   excerpt: string;
   tags: string[];
@@ -55,6 +58,7 @@ function CheckIcon({ done }: { done: boolean }) {
 export default function WriteReadinessPanel({
   postType,
   title,
+  subtitle,
   content,
   excerpt,
   tags,
@@ -72,8 +76,34 @@ export default function WriteReadinessPanel({
   children,
 }: WriteReadinessPanelProps) {
   const [showOptional, setShowOptional] = useState(false);
+  const completedTrackedRef = useRef<Set<string>>(new Set());
   const selectedFormat =
     WRITE_FORMATS.find((item) => item.type === postType) ?? WRITE_FORMATS[0];
+  const coachingSummary = useMemo(
+    () =>
+      getDraftCoachingSummary({
+        postType,
+        title,
+        subtitle,
+        excerpt,
+        content,
+        tags,
+        references,
+        wordCount,
+        inResponseToTitle,
+      }),
+    [
+      content,
+      excerpt,
+      inResponseToTitle,
+      postType,
+      references,
+      subtitle,
+      tags,
+      title,
+      wordCount,
+    ]
+  );
   const needsReferences = postType === "research" || postType === "policy_brief";
   const bodyStarted = stripHtml(content).length > 0;
   const nextStep = (() => {
@@ -176,6 +206,34 @@ export default function WriteReadinessPanel({
     },
   ];
 
+  useEffect(() => {
+    trackActivationEvent({
+      event: "quality_check_viewed",
+      metadata: {
+        source: "write_coaching",
+        postType,
+        format: coachingSummary.formatLabel,
+      },
+    });
+  }, [coachingSummary.formatLabel, postType]);
+
+  useEffect(() => {
+    coachingSummary.items.forEach((item) => {
+      if (!item.done || completedTrackedRef.current.has(item.key)) return;
+      completedTrackedRef.current.add(item.key);
+      trackActivationEvent({
+        event: "quality_check_completed",
+        metadata: {
+          source: "write_coaching",
+          item: item.key,
+          postType,
+          completedCount: coachingSummary.completedCount,
+          totalCount: coachingSummary.totalCount,
+        },
+      });
+    });
+  }, [coachingSummary, postType]);
+
   return (
     <aside className="space-y-3">
       <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -236,12 +294,62 @@ export default function WriteReadinessPanel({
 
       <section className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-          Next step
+          Draft coaching
         </p>
-        <h3 className="mt-1 text-sm font-semibold text-ink">{nextStep.title}</h3>
+        <h3 className="mt-1 text-sm font-semibold text-ink">
+          {coachingSummary.primaryAction.done
+            ? nextStep.title
+            : coachingSummary.primaryAction.label}
+        </h3>
         <p className="mt-1 text-xs leading-5 text-emerald-900/75">
-          {nextStep.body}
+          {coachingSummary.primaryAction.done
+            ? nextStep.body
+            : coachingSummary.primaryAction.helper}
         </p>
+        <p className="mt-2 text-xs leading-5 text-emerald-900/70">
+          {coachingSummary.formatHint}
+        </p>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/70">
+          <div
+            className="h-full rounded-full bg-emerald-brand transition-[width] duration-300"
+            style={{
+              width: `${Math.round(
+                (coachingSummary.completedCount / coachingSummary.totalCount) * 100
+              )}%`,
+            }}
+          />
+        </div>
+        <p className="mt-2 text-[11px] font-medium text-emerald-800">
+          {coachingSummary.completedCount}/{coachingSummary.totalCount} coaching checks
+        </p>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-ink">Quality coaching</h2>
+            <p className="mt-1 text-xs text-gray-500">
+              Guidance for clarity, evidence, and reader value.
+            </p>
+          </div>
+          <span className="rounded-full bg-canvas px-2.5 py-1 text-xs font-semibold text-gray-500">
+            {coachingSummary.completedCount}/{coachingSummary.totalCount}
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          {coachingSummary.items.map((item) => (
+            <div key={item.key} className="flex gap-3">
+              <CheckIcon done={item.done} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900">{item.label}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-gray-500">
+                  {item.helper}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <DraftSignalPreview

@@ -71,26 +71,26 @@ export const STARTER_TEMPLATES: Record<
   blog: {
     title: "One thing I noticed about [campus, country, or topic]",
     subtitle: "A quick take from class, campus, reading, or lived experience",
-    excerpt: "A short argument about one issue worth discussing.",
+    excerpt: "A short argument with one point, one example, and a question for readers.",
     tags: ["quick take", "student voice"],
     content:
-      "<p><strong>My point:</strong> State the one idea you want readers to remember.</p><p><strong>Why it matters:</strong> Connect it to your campus, country, community, or Africa more broadly.</p><p><strong>One example:</strong> Add a class discussion, source, statistic, news item, or lived observation.</p><p><strong>Question for others:</strong> End with the question you want classmates or readers to answer.</p>",
+      "<p><strong>My point:</strong> State the one idea you want readers to remember.</p><p><strong>Why it matters:</strong> Connect it to your campus, country, community, or Africa more broadly.</p><p><strong>Evidence or example:</strong> Add a class discussion, source, statistic, news item, or lived observation.</p><p><strong>Question for readers:</strong> End with the question you want classmates or readers to answer.</p>",
   },
   essay: {
     title: "Rethinking [issue] in Africa",
     subtitle: "An argument with context, evidence, and a clear position",
-    excerpt: "This essay argues for a more careful way to understand the issue.",
+    excerpt: "This essay makes a clear claim, explains why it matters, and supports it with evidence.",
     tags: ["essay"],
     content:
-      "<h2>Opening claim</h2><p>Introduce the issue and your position.</p><h2>Context</h2><p>Explain the background readers need before they can judge the argument.</p><h2>Evidence</h2><p>Bring in examples, data, readings, or cases.</p><h2>Counterargument</h2><p>Address the strongest objection to your view.</p><h2>Conclusion</h2><p>Close with what your argument changes.</p>",
+      "<h2>Opening claim</h2><p>Introduce the issue and your position in one clear paragraph.</p><h2>Why it matters</h2><p>Explain who is affected and why readers should care now.</p><h2>Evidence or example</h2><p>Bring in examples, data, readings, cases, or lived observations.</p><h2>Counterargument</h2><p>Address the strongest objection to your view.</p><h2>Question for readers</h2><p>Close with what your argument changes and the question others should consider next.</p>",
   },
   policy_brief: {
     title: "Policy brief: Improving [issue]",
     subtitle: "Problem, evidence, options, and recommendations",
-    excerpt: "A short policy brief with practical recommendations.",
+    excerpt: "A short policy brief with a clear problem, evidence, options, and recommendation.",
     tags: ["policy"],
     content:
-      "<h2>Problem</h2><p>Define the policy problem and who is affected.</p><h2>Evidence</h2><p>Summarize the strongest facts, cases, or research.</p><h2>Policy options</h2><p>Compare two or three realistic choices.</p><h2>Recommendation</h2><p>State what decision-makers should do and why.</p>",
+      "<h2>Problem</h2><p>Define the policy problem, who is affected, and why it matters now.</p><h2>Evidence</h2><p>Summarize the strongest facts, cases, research, or examples.</p><h2>Policy options</h2><p>Compare two or three realistic choices.</p><h2>Recommendation</h2><p>State what decision-makers should do and why.</p><h2>Question for implementation</h2><p>Name the tradeoff or question that still needs attention.</p>",
   },
   research: {
     title: "Research: [question]",
@@ -98,7 +98,7 @@ export const STARTER_TEMPLATES: Record<
     excerpt: "This research examines a focused question using evidence and method.",
     tags: ["research"],
     content:
-      "<h2>Abstract</h2><p>Summarize the question, method, finding, and contribution.</p><h2>Introduction</h2><p>Explain the research problem and why it matters.</p><h2>Literature and context</h2><p>Position your work in existing debates.</p><h2>Method</h2><p>Describe your data, sources, or analytical approach.</p><h2>Findings</h2><p>Present the main results clearly.</p><h2>Conclusion</h2><p>Explain implications and limits.</p>",
+      "<h2>Abstract</h2><p>Summarize the question, method, finding, and contribution.</p><h2>Introduction</h2><p>Explain the research problem and why it matters.</p><h2>Literature and context</h2><p>Position your work in existing debates.</p><h2>Method</h2><p>Describe your data, sources, or analytical approach.</p><h2>Findings</h2><p>Present the main results clearly.</p><h2>Implications and next question</h2><p>Explain what the finding changes, its limits, and what readers should investigate next.</p>",
   },
 };
 

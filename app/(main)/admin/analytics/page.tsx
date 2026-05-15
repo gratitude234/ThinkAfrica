@@ -9,8 +9,12 @@ interface ProfileRow {
   created_at: string;
   full_name: string | null;
   username: string | null;
+  country: string | null;
   university: string | null;
   field_of_study: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  verified: boolean | null;
   interests: string[] | null;
 }
 
@@ -18,6 +22,7 @@ interface ActivationEventRow {
   user_id: string | null;
   event_name: string;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface TalentProfileAnalyticsRow {
@@ -51,6 +56,16 @@ interface PromisingPostRow {
         verified?: boolean | null;
       }>
     | null;
+}
+
+interface EditorialAnalyticsPostRow {
+  id: string;
+  type: string;
+  status: string;
+  created_at: string;
+  published_at: string | null;
+  citation_id: string | null;
+  published_version_id: string | null;
 }
 
 function StatCard({
@@ -123,6 +138,20 @@ function uniqueUsersForEvent(rows: ActivationEventRow[], eventName: string) {
       .filter((row) => row.user_id && row.event_name === eventName)
       .map((row) => row.user_id as string)
   );
+}
+
+function eventMetadataValue(row: ActivationEventRow, key: string) {
+  const metadata = row.metadata;
+  if (!metadata || typeof metadata !== "object") return null;
+  const value = metadata[key];
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+  return null;
 }
 
 function pct(numerator: number, denominator: number) {
@@ -213,10 +242,11 @@ export default async function AdminAnalyticsPage() {
     { count: acceptedCoauthorCount },
     { count: totalMessages },
     { data: debateArgumentsRaw },
+    { count: featuredProfileCount },
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, created_at, full_name, username, university, field_of_study, interests")
+      .select("id, created_at, full_name, username, country, university, field_of_study, bio, avatar_url, verified, interests")
       .limit(10000),
     supabase.from("posts").select("type").eq("status", "published"),
     supabase.from("debates").select("*", { count: "exact", head: true }),
@@ -249,10 +279,13 @@ export default async function AdminAnalyticsPage() {
       .select("profiles!posts_author_id_fkey(university)")
       .eq("status", "published")
       .gte("published_at", thirtyDaysAgo),
-    supabase.from("posts").select("author_id").eq("status", "published"),
+    supabase
+      .from("posts")
+      .select("author_id, type, citation_id")
+      .eq("status", "published"),
     supabase
       .from("activation_events")
-      .select("user_id, event_name, created_at")
+      .select("user_id, event_name, created_at, metadata")
       .limit(10000),
     supabase.from("follows").select("follower_id").limit(10000),
     supabase
@@ -267,12 +300,67 @@ export default async function AdminAnalyticsPage() {
       .gt("display_order", 0),
     supabase.from("messages").select("*", { count: "exact", head: true }),
     supabase.from("debate_arguments").select("author_id").limit(10000),
+    supabase
+      .from("profile_featured_posts")
+      .select("user_id", { count: "exact", head: true }),
   ]);
 
   const profiles = (profilesRaw ?? []) as ProfileRow[];
   const totalUsers = profiles.length;
   const activationEvents = (activationEventsRaw ?? []) as ActivationEventRow[];
   const talentProfiles = (talentProfilesRaw ?? []) as TalentProfileAnalyticsRow[];
+  const { data: editorialPostsRaw } = await supabase
+    .from("posts")
+    .select("id, type, status, created_at, published_at, citation_id, published_version_id")
+    .in("type", ["research", "policy_brief"])
+    .limit(10000);
+  const editorialPosts = (editorialPostsRaw ?? []) as EditorialAnalyticsPostRow[];
+  const editorialPostIds = editorialPosts.map((post) => post.id);
+  const [{ data: editorialReviewsRaw }, { data: editorialDecisionsRaw }] =
+    editorialPostIds.length > 0
+      ? await Promise.all([
+          supabase
+            .from("post_reviews")
+            .select("post_id, submitted_at")
+            .in("post_id", editorialPostIds),
+          supabase
+            .from("post_editor_decisions")
+            .select("post_id, decision, created_at")
+            .in("post_id", editorialPostIds),
+        ])
+      : [{ data: [] }, { data: [] }];
+  const editorialStatusCounts = editorialPosts.reduce((acc: Record<string, number>, post) => {
+    acc[post.status] = (acc[post.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  const editorialCompletedReviews = (editorialReviewsRaw ?? []).filter(
+    (review) => review.submitted_at
+  ).length;
+  const editorialRevisionRequests = (editorialDecisionsRaw ?? []).filter(
+    (decision) => decision.decision === "request_revision"
+  ).length;
+  const editorialPublishedPosts = editorialPosts.filter(
+    (post) => post.status === "published"
+  );
+  const editorialCitablePosts = editorialPosts.filter((post) => post.citation_id);
+  const decisionDurations = editorialPublishedPosts
+    .map((post) => {
+      if (!post.published_at) return null;
+      const submitted = new Date(post.created_at).getTime();
+      const published = new Date(post.published_at).getTime();
+      if (Number.isNaN(submitted) || Number.isNaN(published) || published < submitted) {
+        return null;
+      }
+      return Math.round((published - submitted) / (24 * 60 * 60 * 1000));
+    })
+    .filter((value): value is number => value !== null);
+  const avgEditorialDecisionDays =
+    decisionDurations.length > 0
+      ? Math.round(
+          decisionDurations.reduce((sum, value) => sum + value, 0) /
+            decisionDurations.length
+        )
+      : 0;
 
   const weeklyActiveUsers = new Set((activeThisWeekRaw ?? []).map((p) => p.author_id)).size;
   const prevWeekActiveUsers = new Set((activePrevWeekRaw ?? []).map((p) => p.author_id)).size;
@@ -282,8 +370,14 @@ export default async function AdminAnalyticsPage() {
       : 0;
 
   const authorPostCount: Record<string, number> = {};
+  const citableProfileUsers = new Set<string>();
+  const reviewedProfileUsers = new Set<string>();
   for (const p of allPublishedAuthorsRaw ?? []) {
     authorPostCount[p.author_id] = (authorPostCount[p.author_id] ?? 0) + 1;
+    if (p.citation_id) citableProfileUsers.add(p.author_id);
+    if (p.type === "research" || p.type === "policy_brief" || p.citation_id) {
+      reviewedProfileUsers.add(p.author_id);
+    }
   }
   const publishedAtLeastOnce = Object.keys(authorPostCount).length;
   const publishedOncePercent =
@@ -309,6 +403,28 @@ export default async function AdminAnalyticsPage() {
     (sum, p) => sum + (p.view_count ?? 0),
     0
   );
+
+  const verifiedProfiles = profiles.filter((profile) => profile.verified).length;
+  const completeProfileCount = profiles.filter((profile) =>
+    Boolean(
+      profile.full_name &&
+        profile.username &&
+        profile.bio &&
+        profile.country &&
+        profile.university &&
+        profile.field_of_study &&
+        profile.avatar_url &&
+        Array.isArray(profile.interests) &&
+        profile.interests.length > 0
+    )
+  ).length;
+  const partialProfileCount = profiles.filter((profile) =>
+    Boolean(
+      profile.full_name &&
+        profile.username &&
+        (profile.university || profile.field_of_study || profile.bio)
+    )
+  ).length;
 
   const typeMap: Record<string, number> = {};
   for (const p of postsByTypeRaw ?? []) {
@@ -434,6 +550,60 @@ export default async function AdminAnalyticsPage() {
     "notification_opened"
   );
   const responseStartedUsers = uniqueUsersForEvent(activationEvents, "response_started");
+  const searchUsers = uniqueUsersForEvent(activationEvents, "search_performed");
+  const exploreUsers = uniqueUsersForEvent(activationEvents, "discover_viewed");
+  const discoveryClickRows = activationEvents.filter(
+    (event) => event.event_name === "discover_item_clicked"
+  );
+  const discoveryClickUsers = new Set(
+    discoveryClickRows.map((event) => event.user_id).filter(Boolean) as string[]
+  );
+  const topicOpenRows = discoveryClickRows.filter((event) => {
+    const item = eventMetadataValue(event, "item");
+    return item === "topic" || item === "topic_strip" || item === "search_topic";
+  });
+  const debateOpenRows = discoveryClickRows.filter((event) => {
+    const item = eventMetadataValue(event, "item");
+    return item === "active_debate" || item === "search_debate";
+  });
+  const opportunityClickRows = discoveryClickRows.filter((event) => {
+    const item = eventMetadataValue(event, "item");
+    return (
+      item === "opportunities" ||
+      item === "opportunities_empty" ||
+      item === "search_opportunity" ||
+      item === "fellowship" ||
+      item === "fellowships_all"
+    );
+  });
+  const writerFollowUsers = uniqueUsersForEvent(activationEvents, "writer_followed");
+  const coachingViewedRows = activationEvents.filter(
+    (event) =>
+      event.event_name === "quality_check_viewed" &&
+      eventMetadataValue(event, "source") === "write_coaching"
+  );
+  const coachingCompletedRows = activationEvents.filter(
+    (event) =>
+      event.event_name === "quality_check_completed" &&
+      eventMetadataValue(event, "source") === "write_coaching"
+  );
+  const coachingViewers = new Set(
+    coachingViewedRows.map((event) => event.user_id).filter(Boolean) as string[]
+  );
+  const coachingCompleters = new Set(
+    coachingCompletedRows.map((event) => event.user_id).filter(Boolean) as string[]
+  );
+  const publishDrawerUsers = uniqueUsersForEvent(
+    activationEvents,
+    "publish_drawer_opened"
+  );
+  const submittedUsers = uniqueUsersForEvent(activationEvents, "post_submitted");
+  const publishAfterCoachingUsers = new Set(
+    Array.from(publishDrawerUsers).filter((userId) => coachingViewers.has(userId))
+  );
+  const submitAfterCoachingUsers = new Set(
+    Array.from(submittedUsers).filter((userId) => coachingViewers.has(userId))
+  );
   const firstContributionAt = new Map<string, number>();
   for (const event of activationEvents) {
     if (
@@ -643,6 +813,150 @@ export default async function AdminAnalyticsPage() {
 
       <div className="mb-10">
         <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Draft Coaching
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="Coaching Viewers"
+            value={coachingViewers.size}
+            trend="neutral"
+            trendLabel={`${coachingViewedRows.length.toLocaleString()} coaching views`}
+          />
+          <HealthCard
+            label="Checks Completed"
+            value={coachingCompletedRows.length}
+            trend="neutral"
+            trendLabel={`${coachingCompleters.size.toLocaleString()} users completed checks`}
+          />
+          <HealthCard
+            label="Publish Review After Coaching"
+            value={publishAfterCoachingUsers.size}
+            trend="neutral"
+            trendLabel={`${pct(publishAfterCoachingUsers.size, coachingViewers.size)} of coaching viewers`}
+          />
+          <HealthCard
+            label="Submitted After Coaching"
+            value={submitAfterCoachingUsers.size}
+            trend="neutral"
+            trendLabel={`${pct(submitAfterCoachingUsers.size, coachingViewers.size)} of coaching viewers`}
+          />
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Editorial Trust
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="In Review"
+            value={editorialStatusCounts.pending ?? 0}
+            trend="neutral"
+            trendLabel="research and policy submissions"
+          />
+          <HealthCard
+            label="Pending Revisions"
+            value={editorialStatusCounts.pending_revision ?? 0}
+            trend="neutral"
+            trendLabel={`${editorialRevisionRequests.toLocaleString()} revision requests`}
+          />
+          <HealthCard
+            label="Completed Reviews"
+            value={editorialCompletedReviews}
+            trend="neutral"
+            trendLabel="submitted reviewer recommendations"
+          />
+          <HealthCard
+            label="Reviewed Published"
+            value={editorialPublishedPosts.length}
+            trend="neutral"
+            trendLabel={`${editorialStatusCounts.rejected ?? 0} declined`}
+          />
+          <HealthCard
+            label="Citable Posts"
+            value={editorialCitablePosts.length}
+            trend="neutral"
+            trendLabel={`${pct(editorialCitablePosts.length, editorialPublishedPosts.length)} of reviewed published`}
+          />
+          <HealthCard
+            label="Avg Review Time"
+            value={decisionDurations.length > 0 ? `${avgEditorialDecisionDays}d` : "-"}
+            trend="neutral"
+            trendLabel={`${decisionDurations.length.toLocaleString()} completed publication paths`}
+          />
+          <HealthCard
+            label="Research Submissions"
+            value={editorialPosts.filter((post) => post.type === "research").length}
+            trend="neutral"
+            trendLabel="all statuses"
+          />
+          <HealthCard
+            label="Policy Brief Submissions"
+            value={editorialPosts.filter((post) => post.type === "policy_brief").length}
+            trend="neutral"
+            trendLabel="all statuses"
+          />
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Discovery Loop
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="Explore Viewers"
+            value={exploreUsers.size}
+            trend="neutral"
+            trendLabel={`${pct(exploreUsers.size, totalUsers)} of registered users`}
+          />
+          <HealthCard
+            label="Search Users"
+            value={searchUsers.size}
+            trend="neutral"
+            trendLabel="searched across discovery"
+          />
+          <HealthCard
+            label="Discovery Clickers"
+            value={discoveryClickUsers.size}
+            trend="neutral"
+            trendLabel={`${discoveryClickRows.length.toLocaleString()} tracked clicks`}
+          />
+          <HealthCard
+            label="Topic Opens"
+            value={topicOpenRows.length}
+            trend="neutral"
+            trendLabel="topic discovery clicks"
+          />
+          <HealthCard
+            label="Writer Follows"
+            value={writerFollowUsers.size}
+            trend="neutral"
+            trendLabel="follow conversion signal"
+          />
+          <HealthCard
+            label="Debate Opens"
+            value={debateOpenRows.length}
+            trend="neutral"
+            trendLabel="from discovery surfaces"
+          />
+          <HealthCard
+            label="Opportunity Clicks"
+            value={opportunityClickRows.length}
+            trend="neutral"
+            trendLabel="fellowship and opportunity interest"
+          />
+          <HealthCard
+            label="Response Starts"
+            value={responseStartedUsers.size}
+            trend="neutral"
+            trendLabel="reader-to-writer discovery outcome"
+          />
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
           Opportunity Outcomes
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -669,6 +983,62 @@ export default async function AdminAnalyticsPage() {
             value={totalApplications ?? 0}
             trend="neutral"
             trendLabel="submitted applications"
+          />
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Profile Credibility
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="Complete Profiles"
+            value={completeProfileCount}
+            trend="neutral"
+            trendLabel={`${pct(completeProfileCount, totalUsers)} of registered users`}
+          />
+          <HealthCard
+            label="Partial Academic Profiles"
+            value={partialProfileCount}
+            trend="neutral"
+            trendLabel="has identity plus at least one academic signal"
+          />
+          <HealthCard
+            label="Verified Profiles"
+            value={verifiedProfiles}
+            trend="neutral"
+            trendLabel={`${pct(verifiedProfiles, totalUsers)} of registered users`}
+          />
+          <HealthCard
+            label="Featured Work Profiles"
+            value={featuredProfileCount ?? 0}
+            trend="neutral"
+            trendLabel="manual portfolio curation"
+          />
+          <HealthCard
+            label="Citable Author Profiles"
+            value={citableProfileUsers.size}
+            trend="neutral"
+            trendLabel="at least one citable post"
+          />
+          <HealthCard
+            label="Reviewed Author Profiles"
+            value={reviewedProfileUsers.size}
+            trend="neutral"
+            trendLabel="reviewed format or citation"
+          />
+          <HealthCard
+            label="Opportunity-ready Profiles"
+            value={readinessCompleteProfiles}
+            trend="neutral"
+            trendLabel="ready for selector review"
+          />
+          <HealthCard
+            label="Published Profiles"
+            value={publishedAtLeastOnce}
+            trend="neutral"
+            trendLabel={`${publishedOncePercent}% of registered users`}
           />
         </div>
       </div>

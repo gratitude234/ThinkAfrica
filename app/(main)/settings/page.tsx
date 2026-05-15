@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getProfileCredibilitySummary } from "@/lib/profileCredibility";
 import ProfileForm from "./ProfileForm";
 
 export default async function SettingsPage() {
@@ -18,15 +19,25 @@ export default async function SettingsPage() {
 
   if (!profile) redirect("/login");
 
-  const missingFields: string[] = [];
-  if (!profile.bio) missingFields.push("bio");
-  if (!profile.country) missingFields.push("country");
-  if (!profile.field_of_study) missingFields.push("field of study");
-  if (!profile.avatar_url) missingFields.push("profile photo");
-  if (!((profile.interests as string[] | null)?.length ?? 0)) {
-    missingFields.push("interests");
-  }
-
+  const credibilitySummary = getProfileCredibilitySummary({
+    profile: {
+      full_name: profile.full_name,
+      username: profile.username,
+      bio: profile.bio,
+      country: profile.country,
+      university: profile.university,
+      field_of_study: profile.field_of_study,
+      avatar_url: profile.avatar_url,
+      verified: profile.verified,
+      verified_type: profile.verified_type,
+      interests: (profile.interests as string[] | null) ?? [],
+    },
+    stats: {
+      featuredWorkCount: 1,
+      opportunityReadinessScore: 100,
+      isOpenToOpportunities: true,
+    },
+  });
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-8">
@@ -36,13 +47,32 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      {missingFields.length > 0 && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <span className="flex-shrink-0 text-lg text-amber-500">💡</span>
-          <p className="text-sm text-amber-800">
-            Complete your profile to rank higher and attract fellowship opportunities.{" "}
-            <span className="font-medium">Missing: {missingFields.join(", ")}.</span>
+      {credibilitySummary.missingProfileItems.length > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+            Profile credibility
           </p>
+          <div className="mt-1 flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-gray-900">
+              {credibilitySummary.profileCompletionScore}% complete
+            </h2>
+            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-amber-700">
+              {credibilitySummary.missingProfileItems.length} left
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-amber-800">
+            Complete these public signals so readers and opportunity partners can trust your profile faster.
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {credibilitySummary.missingProfileItems.slice(0, 6).map((item) => (
+              <div
+                key={item.key}
+                className="rounded-lg border border-amber-200 bg-white/70 px-3 py-2 text-sm font-medium text-amber-900"
+              >
+                {item.label}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

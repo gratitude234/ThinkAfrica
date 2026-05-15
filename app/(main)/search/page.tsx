@@ -47,6 +47,26 @@ interface TopicResult {
   count: number;
 }
 
+interface DebateResult {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+}
+
+interface OpportunityResult {
+  id: string;
+  title: string;
+  sponsor_name: string | null;
+  deadline: string | null;
+}
+
+export interface DiscoverSearchGroup {
+  key: "people" | "posts" | "topics" | "debates" | "opportunities";
+  label: string;
+  count: number;
+}
+
 type RawPostResult = Omit<PostResult, "profiles"> & {
   profiles: PostResult["profiles"] | PostResult["profiles"][];
 };
@@ -57,6 +77,12 @@ type TrendingRow = {
 
 function isReviewedWork(post: { type?: string | null; citation_id?: string | null }) {
   return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+}
+
+function getPersonSignal(person: PersonResult) {
+  if (person.university) return person.university;
+  if (person.points > 0) return `${person.points.toLocaleString()} points`;
+  return "ThinkAfrica writer";
 }
 
 function SearchSignalBadge({
@@ -127,6 +153,8 @@ function SearchPageContent() {
   const [posts, setPosts] = useState<PostResult[]>([]);
   const [people, setPeople] = useState<PersonResult[]>([]);
   const [topics, setTopics] = useState<TopicResult[]>([]);
+  const [debates, setDebates] = useState<DebateResult[]>([]);
+  const [opportunities, setOpportunities] = useState<OpportunityResult[]>([]);
   const [allTopics, setAllTopics] = useState<TopicResult[]>([]);
   const [trending, setTrending] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -142,6 +170,8 @@ function SearchPageContent() {
         setPosts([]);
         setPeople([]);
         setTopics([]);
+        setDebates([]);
+        setOpportunities([]);
         setLoading(false);
         return;
       }
@@ -150,7 +180,12 @@ function SearchPageContent() {
       setLoading(true);
       const supabase = createClient();
 
-      const [{ data: postResults }, { data: peopleResults }] = await Promise.all([
+      const [
+        { data: postResults },
+        { data: peopleResults },
+        { data: debateResults },
+        { data: opportunityResults },
+      ] = await Promise.all([
         supabase
           .from("posts")
           .select(
@@ -167,6 +202,19 @@ function SearchPageContent() {
             `username.ilike.%${trimmed}%,full_name.ilike.%${trimmed}%,university.ilike.%${trimmed}%`
           )
           .limit(8),
+        supabase
+          .from("debates")
+          .select("id, title, description, status")
+          .or(`title.ilike.%${trimmed}%,description.ilike.%${trimmed}%`)
+          .order("created_at", { ascending: false })
+          .limit(6),
+        supabase
+          .from("fellowships")
+          .select("id, title, sponsor_name, deadline")
+          .eq("status", "open")
+          .or(`title.ilike.%${trimmed}%,sponsor_name.ilike.%${trimmed}%`)
+          .order("deadline", { ascending: true, nullsFirst: false })
+          .limit(6),
       ]);
 
       if (requestId !== requestIdRef.current) {
@@ -184,16 +232,25 @@ function SearchPageContent() {
       setPosts(normalizedPosts);
       setPeople((peopleResults ?? []) as PersonResult[]);
       setTopics(normalizedTopics);
+      setDebates((debateResults ?? []) as DebateResult[]);
+      setOpportunities((opportunityResults ?? []) as OpportunityResult[]);
       setLoading(false);
       trackActivationEvent({
         event: "search_performed",
         metadata: {
           surface: "search",
           queryLength: trimmed.length,
+          postResults: normalizedPosts.length,
+          peopleResults: peopleResults?.length ?? 0,
+          topicResults: normalizedTopics.length,
+          debateResults: debateResults?.length ?? 0,
+          opportunityResults: opportunityResults?.length ?? 0,
           resultCount:
             normalizedPosts.length +
             (peopleResults?.length ?? 0) +
-            normalizedTopics.length,
+            normalizedTopics.length +
+            (debateResults?.length ?? 0) +
+            (opportunityResults?.length ?? 0),
         },
       });
     },
@@ -247,7 +304,15 @@ function SearchPageContent() {
   }, []);
 
   const showResults = query.trim().length >= 2 && !loading;
-  const totalResults = people.length + posts.length + topics.length;
+  const totalResults =
+    people.length + posts.length + topics.length + debates.length + opportunities.length;
+  const groups: DiscoverSearchGroup[] = [
+    { key: "posts", label: "Posts", count: posts.length },
+    { key: "people", label: "Writers", count: people.length },
+    { key: "topics", label: "Topics", count: topics.length },
+    { key: "debates", label: "Debates", count: debates.length },
+    { key: "opportunities", label: "Opportunities", count: opportunities.length },
+  ].filter((group) => group.count > 0) as DiscoverSearchGroup[];
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -259,7 +324,7 @@ function SearchPageContent() {
           Search across ThinkAfrica
         </h1>
         <p className="mt-2 text-sm leading-6 text-gray-500">
-          Find posts, people, topics, and universities from one place.
+          Find posts, writers, topics, debates, and opportunities from one place.
         </p>
       </div>
 
@@ -302,9 +367,24 @@ function SearchPageContent() {
       </div>
 
       {query.trim().length >= 2 && !loading ? (
-        <p className="mb-4 text-sm text-gray-500">
-          {totalResults} results for &ldquo;{query.trim()}&rdquo;
-        </p>
+        <div className="mb-4">
+          <p className="text-sm text-gray-500">
+            {totalResults} results for &ldquo;{query.trim()}&rdquo;
+          </p>
+          {groups.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {groups.map((group) => (
+                <a
+                  key={group.key}
+                  href={`#${group.key}`}
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:border-emerald-300 hover:text-emerald-700"
+                >
+                  {group.label} {group.count}
+                </a>
+              ))}
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       {query.trim().length < 2 && trending.length > 0 ? (
@@ -339,8 +419,11 @@ function SearchPageContent() {
 
           {people.length > 0 ? (
             <section>
-              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                People
+              <h2
+                id="people"
+                className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500"
+              >
+                Writers
               </h2>
               <div className="space-y-3">
                 {people.map((person) => {
@@ -348,6 +431,16 @@ function SearchPageContent() {
                     <Link
                       key={person.id}
                       href={`/${person.username}`}
+                      onClick={() => {
+                        trackActivationEvent({
+                          event: "discover_item_clicked",
+                          metadata: {
+                            item: "search_person",
+                            personId: person.id,
+                            surface: "search",
+                          },
+                        });
+                      }}
                       className="flex items-center gap-4 rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md"
                     >
                       <UserAvatar
@@ -359,11 +452,14 @@ function SearchPageContent() {
                         <p className="truncate text-sm font-semibold text-gray-900">
                           {person.full_name ?? person.username}
                         </p>
-                        <p className="truncate text-xs text-gray-500">
-                          @{person.username}
-                          {person.university ? ` - ${person.university}` : ""}
-                        </p>
-                      </div>
+                      <p className="truncate text-xs text-gray-500">
+                        @{person.username}
+                        {person.university ? ` - ${person.university}` : ""}
+                      </p>
+                      <p className="mt-1 inline-flex rounded-full bg-canvas px-2 py-0.5 text-[11px] font-medium text-gray-500">
+                        {getPersonSignal(person)}
+                      </p>
+                    </div>
                       <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                         {person.points} pts
                       </span>
@@ -376,7 +472,10 @@ function SearchPageContent() {
 
           {posts.length > 0 ? (
             <section>
-              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <h2
+                id="posts"
+                className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500"
+              >
                 Posts
               </h2>
               <div className="space-y-3">
@@ -399,7 +498,20 @@ function SearchPageContent() {
                       ) : null}
                     </div>
                     <div className="min-w-0">
-                      <Link href={`/post/${post.slug}`}>
+                      <Link
+                        href={`/post/${post.slug}`}
+                        onClick={() => {
+                          trackActivationEvent({
+                            event: "discover_item_clicked",
+                            metadata: {
+                              item: "search_post",
+                              postId: post.id,
+                              postType: post.type,
+                              surface: "search",
+                            },
+                          });
+                        }}
+                      >
                         <p className="font-display mt-3 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
                           {post.title}
                         </p>
@@ -427,7 +539,10 @@ function SearchPageContent() {
 
           {topics.length > 0 ? (
             <section>
-              <h2 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <h2
+                id="topics"
+                className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500"
+              >
                 Topics
               </h2>
               <div className="flex flex-wrap gap-2">
@@ -435,10 +550,112 @@ function SearchPageContent() {
                   <Link
                     key={topic.tag}
                     href={`/topics/${encodeURIComponent(topic.tag)}`}
+                    onClick={() => {
+                      trackActivationEvent({
+                        event: "discover_item_clicked",
+                        metadata: {
+                          item: "search_topic",
+                          tag: topic.tag,
+                          surface: "search",
+                        },
+                      });
+                    }}
                     className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 shadow-sm transition-colors hover:border-emerald-400 hover:text-emerald-700"
                   >
                     <span>#{topic.tag}</span>
                     <span className="text-xs text-gray-500">{topic.count}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {debates.length > 0 ? (
+            <section>
+              <h2
+                id="debates"
+                className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500"
+              >
+                Debates
+              </h2>
+              <div className="space-y-3">
+                {debates.map((debate) => (
+                  <Link
+                    key={debate.id}
+                    href={`/debates/${debate.id}`}
+                    onClick={() => {
+                      trackActivationEvent({
+                        event: "discover_item_clicked",
+                        metadata: {
+                          item: "search_debate",
+                          debateId: debate.id,
+                          surface: "search",
+                        },
+                      });
+                    }}
+                    className="block rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                        {debate.status}
+                      </span>
+                      <span className="text-xs text-gray-500">Debate</span>
+                    </div>
+                    <p className="line-clamp-2 text-sm font-semibold text-gray-900">
+                      {debate.title}
+                    </p>
+                    {debate.description ? (
+                      <p className="mt-2 line-clamp-2 text-sm text-gray-500">
+                        {debate.description}
+                      </p>
+                    ) : null}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {opportunities.length > 0 ? (
+            <section>
+              <h2
+                id="opportunities"
+                className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500"
+              >
+                Opportunities
+              </h2>
+              <div className="space-y-3">
+                {opportunities.map((opportunity) => (
+                  <Link
+                    key={opportunity.id}
+                    href={`/fellowships/${opportunity.id}`}
+                    onClick={() => {
+                      trackActivationEvent({
+                        event: "discover_item_clicked",
+                        metadata: {
+                          item: "search_opportunity",
+                          fellowshipId: opportunity.id,
+                          surface: "search",
+                        },
+                      });
+                    }}
+                    className="block rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        Open
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {opportunity.sponsor_name ?? "ThinkAfrica"}
+                      </span>
+                    </div>
+                    <p className="line-clamp-2 text-sm font-semibold text-gray-900">
+                      {opportunity.title}
+                    </p>
+                    {opportunity.deadline ? (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Deadline {new Date(opportunity.deadline).toLocaleDateString()}
+                      </p>
+                    ) : null}
                   </Link>
                 ))}
               </div>

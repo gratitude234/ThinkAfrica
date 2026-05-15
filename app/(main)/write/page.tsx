@@ -71,6 +71,10 @@ function getBodyPlaceholder(postType: PostType) {
   return "Lead with your argument — the one point you want readers to leave with.";
 }
 
+function normalizeStarterTag(value: string | null) {
+  return value?.trim().toLowerCase() || null;
+}
+
 export default function WritePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,6 +84,7 @@ export default function WritePage() {
   const draftParam = searchParams.get("draft");
   const starterParam = searchParams.get("starter");
   const responseIntentParam = searchParams.get("responseIntent");
+  const starterTag = normalizeStarterTag(searchParams.get("tag"));
   const initialPostType = isPostType(typeParam) ? typeParam : "blog";
   const {
     draftId,
@@ -136,6 +141,7 @@ export default function WritePage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [publishDraftId, setPublishDraftId] = useState<string | null>(null);
   const responseStarterAppliedRef = useRef(false);
+  const topicStarterAppliedRef = useRef(false);
 
   useEffect(() => {
     if (typeParam === "research") {
@@ -377,6 +383,59 @@ export default function WritePage() {
     title,
   ]);
 
+  useEffect(() => {
+    if (topicStarterAppliedRef.current) return;
+    if (starterParam !== "1" || !starterTag) return;
+    if (draftParam || initialData || localBackup) return;
+
+    if (typeof window !== "undefined") {
+      try {
+        const savedBackup = window.localStorage.getItem(
+          "thinkafrica_draft_backup"
+        );
+
+        if (savedBackup) {
+          const parsedBackup = JSON.parse(savedBackup) as Partial<DraftPayload>;
+          const hasBackupContent =
+            (parsedBackup.title ?? "").trim().length > 0 ||
+            (parsedBackup.subtitle ?? "").trim().length > 0 ||
+            (parsedBackup.content ?? "")
+              .replace(/<[^>]*>/g, " ")
+              .trim().length > 0;
+
+          if (hasBackupContent) return;
+        }
+      } catch {
+        return;
+      }
+    }
+
+    const hasManualContent =
+      title.trim().length > 0 ||
+      subtitle.trim().length > 0 ||
+      content.replace(/<[^>]*>/g, " ").trim().length > 0 ||
+      tags.length > 0;
+
+    if (hasManualContent) return;
+
+    topicStarterAppliedRef.current = true;
+    const nextTags = [starterTag];
+    setTags(nextTags);
+    void saveDraft(getCurrentData({ tags: nextTags }));
+  }, [
+    content,
+    draftParam,
+    getCurrentData,
+    initialData,
+    localBackup,
+    saveDraft,
+    starterParam,
+    starterTag,
+    subtitle,
+    tags.length,
+    title,
+  ]);
+
   const handleEditorUpdate = useCallback((html: string, words: number) => {
     setContent(html);
     setWordCount(words);
@@ -565,6 +624,7 @@ export default function WritePage() {
     <WriteReadinessPanel
       postType={postType}
       title={title}
+      subtitle={subtitle}
       content={content}
       excerpt={excerpt}
       tags={tags}

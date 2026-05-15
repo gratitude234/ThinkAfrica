@@ -30,6 +30,8 @@ export interface DashboardPost {
   type: string;
   status: string;
   citation_id?: string | null;
+  published_version_id?: string | null;
+  current_round?: number | null;
   document_path?: string | null;
   document_original_name?: string | null;
   document_mime_type?: string | null;
@@ -78,6 +80,9 @@ function normalizePost(
     type: record.type ?? existing?.type ?? "blog",
     status: record.status ?? existing?.status ?? "draft",
     citation_id: record.citation_id ?? existing?.citation_id ?? null,
+    published_version_id:
+      record.published_version_id ?? existing?.published_version_id ?? null,
+    current_round: record.current_round ?? existing?.current_round ?? 1,
     document_path: record.document_path ?? existing?.document_path ?? null,
     document_original_name:
       record.document_original_name ?? existing?.document_original_name ?? null,

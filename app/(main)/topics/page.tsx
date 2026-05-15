@@ -61,6 +61,9 @@ const TOPIC_CATEGORIES: Record<string, string[]> = {
 
 type TagRow = {
   tags: string[] | null;
+  type?: string | null;
+  citation_id?: string | null;
+  published_version_id?: string | null;
 };
 
 export default async function TopicsPage() {
@@ -71,7 +74,11 @@ export default async function TopicsPage() {
       data: { user },
     },
   ] = await Promise.all([
-    supabase.from("posts").select("tags").eq("status", "published").limit(500),
+    supabase
+      .from("posts")
+      .select("tags, type, citation_id, published_version_id")
+      .eq("status", "published")
+      .limit(500),
     supabase.auth.getUser(),
   ]);
 
@@ -87,10 +94,16 @@ export default async function TopicsPage() {
   }
 
   const counts: Record<string, number> = {};
+  let citablePostCount = 0;
+  let reviewedPostCount = 0;
   ((postsRaw ?? []) as TagRow[]).forEach((post) =>
-    (post.tags ?? []).forEach((tag) => {
-      counts[tag] = (counts[tag] ?? 0) + 1;
-    })
+    {
+      if (post.citation_id || post.published_version_id) citablePostCount++;
+      if (post.type === "research" || post.type === "policy_brief") reviewedPostCount++;
+      (post.tags ?? []).forEach((tag) => {
+        counts[tag] = (counts[tag] ?? 0) + 1;
+      });
+    }
   );
 
   const allTags = Object.entries(counts)
@@ -130,10 +143,35 @@ export default async function TopicsPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <h1 className="mb-2 text-2xl font-bold text-gray-900">Explore Topics</h1>
-      <p className="mb-8 text-gray-500">
-        Browse {allTags.length} topics from the community.
-      </p>
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand">
+          Topics
+        </p>
+        <h1 className="mt-2 text-2xl font-bold text-gray-900">Explore Topics</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
+          Browse {allTags.length} topics from the community and follow the ones
+          that should shape your feed.
+        </p>
+      </div>
+
+      <div className="mb-8 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium text-gray-500">Published topics</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{allTags.length}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium text-gray-500">Your interests</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">
+            {initialInterests.length}
+          </p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium text-gray-500">Citable or reviewed</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">
+            {(citablePostCount + reviewedPostCount).toLocaleString()}
+          </p>
+        </div>
+      </div>
 
       {sections.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-200 bg-canvas px-6 py-12 text-center text-sm text-gray-500">

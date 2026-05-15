@@ -32,6 +32,34 @@ export interface DiscoverDebate {
   argumentCount: number;
 }
 
+export interface DiscoverPrompt {
+  key: string;
+  label: string;
+  description: string;
+  href: string;
+  cta: string;
+  source: "interest" | "follow" | "conversation" | "debate" | "opportunity" | "trending";
+}
+
+export interface DiscoverConversation {
+  postId: string;
+  title: string;
+  slug: string;
+  tag: string | null;
+  reason: string;
+  responseCount: number;
+  commentCount: number;
+  referenceCount: number;
+}
+
+export interface DiscoverOpportunityHighlight {
+  key: string;
+  title: string;
+  body: string;
+  href: string;
+  kind: "fellowship" | "profiles" | "setup";
+}
+
 export interface DiscoverWebinar {
   id: string;
   title: string;
@@ -62,9 +90,13 @@ export interface DiscoverData {
   topics: DiscoverTopic[];
   people: DiscoverPerson[];
   peopleReason: string;
+  personalizedPrompts: DiscoverPrompt[];
+  activeConversations: DiscoverConversation[];
   activeDebate: DiscoverDebate | null;
+  debateHighlights: DiscoverDebate[];
   upcomingWebinar: DiscoverWebinar | null;
   fellowships: DiscoverFellowship[];
+  opportunityHighlights: DiscoverOpportunityHighlight[];
   opportunitySummary: DiscoverOpportunitySummary;
 }
 
@@ -296,24 +328,27 @@ async function getPeople(
 async function getActiveDebate(
   supabase: SupabaseLike
 ): Promise<DiscoverDebate | null> {
+  const debates = await getDebateHighlights(supabase);
+  return debates[0] ?? null;
+}
+
+async function getDebateHighlights(
+  supabase: SupabaseLike
+): Promise<DiscoverDebate[]> {
   const { data } = await supabase
     .from("debates")
     .select("id, title, status, description, debate_arguments(count)")
     .in("status", ["open", "active"])
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(3);
 
-  const debate = data as RawDebate | null;
-  if (!debate) return null;
-
-  return {
+  return ((data ?? []) as RawDebate[]).map((debate) => ({
     id: debate.id,
     title: debate.title,
     status: debate.status,
     description: debate.description,
     argumentCount: getDebateArgumentCount(debate.debate_arguments),
-  };
+  }));
 }
 
 async function getUpcomingWebinar(
@@ -370,6 +405,171 @@ async function getOpportunitySummary(
   };
 }
 
+function buildActiveConversations(posts: PostCardData[]): DiscoverConversation[] {
+  const seen = new Set<string>();
+
+  return posts
+    .filter((post) => {
+      if (seen.has(post.id)) return false;
+      seen.add(post.id);
+      return (
+        (post.response_count ?? 0) > 0 ||
+        (post.comment_count ?? 0) > 0 ||
+        (post.reference_count ?? 0) > 0 ||
+        (post.quality_score ?? 0) >= 35
+      );
+    })
+    .sort((left, right) => {
+      const leftScore =
+        (left.response_count ?? 0) * 4 +
+        (left.comment_count ?? 0) * 3 +
+        (left.reference_count ?? 0) * 2 +
+        (left.quality_score ?? 0);
+      const rightScore =
+        (right.response_count ?? 0) * 4 +
+        (right.comment_count ?? 0) * 3 +
+        (right.reference_count ?? 0) * 2 +
+        (right.quality_score ?? 0);
+      return rightScore - leftScore;
+    })
+    .slice(0, 3)
+    .map((post) => ({
+      postId: post.id,
+      title: post.title,
+      slug: post.slug,
+      tag: post.tags?.[0] ?? null,
+      reason:
+        post.surface_reason ??
+        ((post.response_count ?? 0) > 0
+          ? "Active response thread"
+          : (post.comment_count ?? 0) > 0
+            ? "Readers are discussing this"
+            : "Quality signals are rising"),
+      responseCount: post.response_count ?? 0,
+      commentCount: post.comment_count ?? 0,
+      referenceCount: post.reference_count ?? 0,
+    }));
+}
+
+function buildOpportunityHighlights(
+  fellowships: DiscoverFellowship[],
+  summary: DiscoverOpportunitySummary
+): DiscoverOpportunityHighlight[] {
+  const fellowshipHighlights = fellowships.slice(0, 2).map((fellowship) => ({
+    key: `fellowship-${fellowship.id}`,
+    title: fellowship.title,
+    body: fellowship.sponsor_name ?? "Curated opportunity",
+    href: `/fellowships/${fellowship.id}`,
+    kind: "fellowship" as const,
+  }));
+
+  if (fellowshipHighlights.length > 0) return fellowshipHighlights;
+
+  if (summary.openProfileCount > 0) {
+    return [
+      {
+        key: "open-profiles",
+        title: "Find open academic profiles",
+        body: `${summary.openProfileCount.toLocaleString()} people are open to collaborations or roles.`,
+        href: "/opportunities",
+        kind: "profiles",
+      },
+    ];
+  }
+
+  return [
+    {
+      key: "setup-profile",
+      title: "Make your profile discoverable",
+      body: "Signal your skills, interests, and availability for collaboration.",
+      href: "/opportunities",
+      kind: "setup",
+    },
+  ];
+}
+
+function buildPersonalizedPrompts({
+  userId,
+  interests,
+  followedIds,
+  topics,
+  people,
+  activeConversations,
+  debateHighlights,
+  opportunityHighlights,
+}: {
+  userId: string | null;
+  interests: string[];
+  followedIds: string[];
+  topics: DiscoverTopic[];
+  people: DiscoverPerson[];
+  activeConversations: DiscoverConversation[];
+  debateHighlights: DiscoverDebate[];
+  opportunityHighlights: DiscoverOpportunityHighlight[];
+}): DiscoverPrompt[] {
+  const prompts: DiscoverPrompt[] = [];
+  const firstInterest = interests[0] ?? topics[0]?.tag;
+
+  if (firstInterest) {
+    prompts.push({
+      key: "interest-topic",
+      label: `Read ${firstInterest}`,
+      description: userId
+        ? "Start with work connected to your saved interests."
+        : "Start with a topic the community is writing about.",
+      href: `/topics/${encodeURIComponent(firstInterest)}`,
+      cta: "Open topic",
+      source: interests.length > 0 ? "interest" : "trending",
+    });
+  }
+
+  if (userId && followedIds.length < 3 && people.length > 0) {
+    prompts.push({
+      key: "follow-writers",
+      label: "Follow useful writers",
+      description: "Following a few writers makes Explore and Home sharper.",
+      href: "/explore?tab=people",
+      cta: "Find writers",
+      source: "follow",
+    });
+  }
+
+  if (activeConversations.length > 0) {
+    prompts.push({
+      key: "active-conversation",
+      label: "Join an active conversation",
+      description: activeConversations[0].reason,
+      href: `/post/${activeConversations[0].slug}`,
+      cta: "Read and respond",
+      source: "conversation",
+    });
+  }
+
+  if (debateHighlights.length > 0) {
+    prompts.push({
+      key: "debate",
+      label: "Join a debate",
+      description: `${debateHighlights[0].argumentCount.toLocaleString()} arguments so far.`,
+      href: `/debates/${debateHighlights[0].id}`,
+      cta: "Open debate",
+      source: "debate",
+    });
+  }
+
+  if (opportunityHighlights.length > 0) {
+    prompts.push({
+      key: "opportunity",
+      label: "Explore opportunities",
+      description: opportunityHighlights[0].body,
+      href: opportunityHighlights[0].href,
+      cta: "View opportunity",
+      source: "opportunity",
+    });
+  }
+
+  return prompts.slice(0, 3);
+}
+
 export async function getDiscoverData(
   supabase: SupabaseLike,
   userId: string | null
@@ -382,7 +582,7 @@ export async function getDiscoverData(
     citablePosts,
     topics,
     peopleResult,
-    activeDebate,
+    debateHighlights,
     upcomingWebinar,
     fellowships,
   ] = await Promise.all([
@@ -412,12 +612,31 @@ export async function getDiscoverData(
       fieldOfStudy: userContext.fieldOfStudy,
       followedIds: userContext.followedIds,
     }),
-    getActiveDebate(supabase),
+    getDebateHighlights(supabase),
     getUpcomingWebinar(supabase),
     getFellowships(supabase),
   ]);
 
   const opportunitySummary = await getOpportunitySummary(supabase);
+  const activeConversations = buildActiveConversations([
+    ...forYouPosts,
+    ...trendingPosts,
+    ...citablePosts,
+  ]);
+  const opportunityHighlights = buildOpportunityHighlights(
+    fellowships,
+    opportunitySummary
+  );
+  const personalizedPrompts = buildPersonalizedPrompts({
+    userId,
+    interests: userContext.interests,
+    followedIds: userContext.followedIds,
+    topics,
+    people: peopleResult.people,
+    activeConversations,
+    debateHighlights,
+    opportunityHighlights,
+  });
 
   return {
     userInterests: userContext.interests,
@@ -429,9 +648,13 @@ export async function getDiscoverData(
     topics,
     people: peopleResult.people,
     peopleReason: peopleResult.reason,
-    activeDebate,
+    personalizedPrompts,
+    activeConversations,
+    activeDebate: debateHighlights[0] ?? null,
+    debateHighlights,
     upcomingWebinar,
     fellowships,
+    opportunityHighlights,
     opportunitySummary,
   };
 }
