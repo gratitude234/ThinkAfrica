@@ -5,9 +5,11 @@ import {
   getOpportunityStyle,
   normalizeOpportunityType,
 } from "@/lib/opportunities";
+import { getOpportunityMatchSummary, type OpportunityMatchSummary } from "@/lib/opportunityMatch";
 import { formatDate } from "@/lib/utils";
 import EmptyState, { EMPTY_STATES } from "@/components/ui/EmptyState";
 import SponsorBanner from "@/components/ui/SponsorBanner";
+import SaveOpportunityButton from "@/components/opportunities/SaveOpportunityButton";
 
 function DeadlineBadge({ deadline }: { deadline: string | null }) {
   if (!deadline) return null;
@@ -36,6 +38,9 @@ interface PageProps {
 export default async function FellowshipsPage({ searchParams }: PageProps) {
   const { filter } = await searchParams;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data: all } = await supabase
     .from("fellowships")
@@ -56,6 +61,34 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
     .limit(1)
     .maybeSingle();
   const sponsor = sponsorRaw ?? null;
+  const currentUserData = user
+    ? await Promise.all([
+        supabase
+          .from("profiles")
+          .select("country, university, field_of_study, bio, interests")
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("talent_profiles")
+          .select("open_to_opportunities, opportunity_types, cv_url, linkedin_url, skills")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("posts")
+          .select("type, status, citation_id, tags")
+          .eq("author_id", user.id),
+        supabase
+          .from("saved_opportunities")
+          .select("fellowship_id")
+          .eq("user_id", user.id),
+      ])
+    : null;
+  const currentProfile = currentUserData?.[0].data ?? null;
+  const currentTalentProfile = currentUserData?.[1].data ?? null;
+  const currentPosts = currentUserData?.[2].data ?? [];
+  const savedOpportunityIds = new Set(
+    (currentUserData?.[3].data ?? []).map((row) => row.fellowship_id)
+  );
 
   const closingSoon = open.filter((f) => {
     if (!f.deadline) return false;
@@ -63,7 +96,30 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
     return days <= 14;
   });
 
-  const displayOpen = filter === "soon" ? closingSoon : open;
+  const displayOpen = (filter === "soon" ? closingSoon : open)
+    .map((opportunity) => ({
+      ...opportunity,
+      saved: savedOpportunityIds.has(opportunity.id),
+      match: user
+        ? getOpportunityMatchSummary({
+            opportunity,
+            profile: currentProfile,
+            talentProfile: currentTalentProfile,
+            posts: currentPosts ?? [],
+          })
+        : null,
+    }))
+    .sort((left, right) => {
+      if (!user) return 0;
+      const scoreDiff = (right.match?.score ?? 0) - (left.match?.score ?? 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      if (Boolean(right.featured) !== Boolean(left.featured)) {
+        return right.featured ? 1 : -1;
+      }
+      const leftDeadline = left.deadline ? new Date(left.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+      const rightDeadline = right.deadline ? new Date(right.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+      return leftDeadline - rightDeadline;
+    });
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -114,7 +170,11 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
           {displayOpen.map((f) => (
-            <OpportunityCard key={f.id} opportunity={f} />
+            <OpportunityCard
+              key={f.id}
+              opportunity={f}
+              userId={user?.id ?? null}
+            />
           ))}
         </div>
       )}
@@ -151,6 +211,7 @@ export default async function FellowshipsPage({ searchParams }: PageProps) {
 
 function OpportunityCard({
   opportunity,
+  userId,
 }: {
   opportunity: {
     id: string;
@@ -163,34 +224,44 @@ function OpportunityCard({
     skills?: string[] | null;
     location?: string | null;
     featured?: boolean | null;
+    saved?: boolean;
+    match?: OpportunityMatchSummary | null;
   };
+  userId: string | null;
 }) {
   const type = normalizeOpportunityType(opportunity.opportunity_type);
 
   return (
-    <Link
-      href={`/fellowships/${opportunity.id}`}
-      className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow flex flex-col"
-    >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span
-          className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getOpportunityStyle(
-            type
-          )}`}
-        >
-          {getOpportunityShortLabel(type)}
-        </span>
-        {opportunity.featured ? (
-          <span className="rounded-full bg-ink px-2.5 py-0.5 text-xs font-semibold text-white">
-            Featured
+    <article className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow flex flex-col">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getOpportunityStyle(
+              type
+            )}`}
+          >
+            {getOpportunityShortLabel(type)}
           </span>
-        ) : null}
-        <DeadlineBadge deadline={opportunity.deadline} />
+          {opportunity.featured ? (
+            <span className="rounded-full bg-ink px-2.5 py-0.5 text-xs font-semibold text-white">
+              Featured
+            </span>
+          ) : null}
+          <DeadlineBadge deadline={opportunity.deadline} />
+        </div>
+        <SaveOpportunityButton
+          fellowshipId={opportunity.id}
+          initialSaved={Boolean(opportunity.saved)}
+          userId={userId}
+          source="fellowships_card"
+        />
       </div>
 
-      <h2 className="text-base font-semibold text-gray-900 leading-snug">
-        {opportunity.title}
-      </h2>
+      <Link href={`/fellowships/${opportunity.id}`}>
+        <h2 className="text-base font-semibold text-gray-900 leading-snug hover:text-emerald-700">
+          {opportunity.title}
+        </h2>
+      </Link>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
         {opportunity.sponsor_name ? <span>{opportunity.sponsor_name}</span> : null}
@@ -217,9 +288,25 @@ function OpportunityCard({
         </div>
       ) : null}
 
-      <span className="mt-5 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-brand text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors self-start">
+      {opportunity.match ? (
+        <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+          <p className="text-xs font-semibold text-emerald-800">
+            {opportunity.match.label} / {opportunity.match.score}%
+          </p>
+          {opportunity.match.reasons[0] ? (
+            <p className="mt-1 text-xs text-emerald-900/75">
+              {opportunity.match.reasons[0].label}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <Link
+        href={`/fellowships/${opportunity.id}`}
+        className="mt-5 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-brand text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors self-start"
+      >
         View opportunity
-      </span>
-    </Link>
+      </Link>
+    </article>
   );
 }

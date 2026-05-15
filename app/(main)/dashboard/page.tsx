@@ -24,6 +24,7 @@ import {
   getOpportunityStyle,
 } from "@/lib/opportunities";
 import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
+import { getOpportunityMatchSummary } from "@/lib/opportunityMatch";
 import { getRetentionSummary } from "@/lib/retention";
 import { getPostQualitySummary } from "@/lib/postQuality";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
@@ -89,6 +90,92 @@ function WorkUnderReviewPanel({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function OpportunityPipelinePanel({
+  readiness,
+  savedCount,
+  applicationCount,
+  strongestMatch,
+}: {
+  readiness: ReturnType<typeof getOpportunityReadinessSummary>;
+  savedCount: number;
+  applicationCount: number;
+  strongestMatch: {
+    id: string;
+    title: string;
+    sponsor_name: string | null;
+    matchLabel: string;
+    matchScore: number;
+  } | null;
+}) {
+  if (!strongestMatch && savedCount === 0 && applicationCount === 0 && readiness.score >= 85) {
+    return null;
+  }
+
+  const nextAction = readiness.nextAction
+    ? {
+        href: readiness.nextAction.actionHref,
+        label: readiness.nextAction.actionLabel,
+        body: readiness.nextAction.label,
+        key: readiness.nextAction.key,
+      }
+    : strongestMatch
+      ? {
+          href: `/fellowships/${strongestMatch.id}`,
+          label: "View best match",
+          body: strongestMatch.title,
+          key: "best_match",
+        }
+      : {
+          href: "/opportunities",
+          label: "Find opportunities",
+          body: "Review curated openings",
+          key: "browse_opportunities",
+        };
+
+  return (
+    <section className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/70 p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+            Opportunity pipeline
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-gray-950">
+            {strongestMatch ? strongestMatch.title : "Get opportunity-ready"}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-emerald-900/75">
+            {strongestMatch
+              ? `${strongestMatch.matchLabel} / ${strongestMatch.matchScore}% match${strongestMatch.sponsor_name ? ` from ${strongestMatch.sponsor_name}` : ""}.`
+              : "Complete readiness so your profile and work can support applications."}
+          </p>
+        </div>
+        <TrackedActionLink
+          href={nextAction.href}
+          actionKey={nextAction.key}
+          label={nextAction.label}
+          source="dashboard_opportunity_pipeline"
+          className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+        >
+          {nextAction.label}
+        </TrackedActionLink>
+      </div>
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+        <div className="rounded-lg bg-white px-3 py-3">
+          <p className="text-xs text-gray-500">Readiness</p>
+          <p className="mt-1 font-semibold text-gray-900">{readiness.score}%</p>
+        </div>
+        <div className="rounded-lg bg-white px-3 py-3">
+          <p className="text-xs text-gray-500">Saved</p>
+          <p className="mt-1 font-semibold text-gray-900">{savedCount}</p>
+        </div>
+        <div className="rounded-lg bg-white px-3 py-3">
+          <p className="text-xs text-gray-500">Applications</p>
+          <p className="mt-1 font-semibold text-gray-900">{applicationCount}</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -197,7 +284,7 @@ export default async function DashboardPage() {
     supabase
       .from("profiles")
       .select(
-        "username, full_name, university, field_of_study, bio, verified, verified_type"
+        "username, full_name, country, university, field_of_study, bio, interests, verified, verified_type"
       )
       .eq("id", user.id)
       .single(),
@@ -214,7 +301,7 @@ export default async function DashboardPage() {
       ? await supabase
         .from("talent_inquiries")
         .select(
-          "id, organization_name, contact_email, opportunity_type, role_title, message, status, read_at, created_at"
+          "id, organization_name, contact_email, opportunity_type, role_title, timeline, commitment, fit_reason, message, status, read_at, created_at"
         )
         .eq("talent_id", talentProfile.id)
         .neq("status", "archived")
@@ -233,14 +320,49 @@ export default async function DashboardPage() {
   const { data: applicationsRaw } = await supabase
     .from("fellowship_applications")
     .select(
-      "id, status, created_at, fellowships(id, title, deadline, opportunity_type)"
+      "id, status, applied_at, proof_post_id, review_note, reviewed_at, fellowships(id, title, deadline, opportunity_type, application_url)"
     )
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+    .order("applied_at", { ascending: false });
+
+  const applicationProofIds = (applicationsRaw ?? [])
+    .map((application) => application.proof_post_id)
+    .filter(Boolean) as string[];
+  const { data: applicationProofPostsRaw } =
+    applicationProofIds.length > 0
+      ? await supabase
+          .from("posts")
+          .select("id, title, slug, type, citation_id")
+          .in("id", applicationProofIds)
+      : { data: [] };
+  const applicationProofPosts = new Map(
+    (applicationProofPostsRaw ?? []).map((post) => [post.id, post])
+  );
+
+  const [{ data: savedOpportunitiesRaw }, { data: openOpportunitiesRaw }] =
+    await Promise.all([
+      supabase
+        .from("saved_opportunities")
+        .select("fellowship_id, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("fellowships")
+        .select(
+          "id, title, sponsor_name, eligibility, deadline, opportunity_type, skills, location, featured"
+        )
+        .eq("status", "open")
+        .order("featured", { ascending: false })
+        .order("deadline", { ascending: true, nullsFirst: false })
+        .limit(12),
+    ]);
 
   const applications = (applicationsRaw ?? []).map((a) => ({
     ...a,
     fellowship: Array.isArray(a.fellowships) ? a.fellowships[0] : a.fellowships,
+    proofPost: a.proof_post_id
+      ? applicationProofPosts.get(a.proof_post_id) ?? null
+      : null,
   }));
 
   const collaborationTags = Array.from(
@@ -464,6 +586,26 @@ export default async function DashboardPage() {
       referenceCount: referenceCounts[post.id] ?? 0,
     })),
   });
+  const opportunityMatchPosts = (postsRaw ?? []).map((post) => ({
+    type: post.type,
+    status: post.status,
+    citation_id: (post as { citation_id?: string | null }).citation_id ?? null,
+    tags: post.tags ?? [],
+    referenceCount: referenceCounts[post.id] ?? 0,
+  }));
+  const strongestOpportunityMatch = (openOpportunitiesRaw ?? [])
+    .map((opportunity) => ({
+      id: opportunity.id,
+      title: opportunity.title,
+      sponsor_name: opportunity.sponsor_name ?? null,
+      summary: getOpportunityMatchSummary({
+        opportunity,
+        profile: authorProfile,
+        talentProfile,
+        posts: opportunityMatchPosts,
+      }),
+    }))
+    .sort((left, right) => right.summary.score - left.summary.score)[0];
   const reviewedDraftMissingReferences = posts.find(
     (post) =>
       post.status === "draft" &&
@@ -651,6 +793,23 @@ export default async function DashboardPage() {
         source="dashboard"
       />
 
+      <OpportunityPipelinePanel
+        readiness={opportunityReadiness}
+        savedCount={(savedOpportunitiesRaw ?? []).length}
+        applicationCount={applications.length}
+        strongestMatch={
+          strongestOpportunityMatch
+            ? {
+                id: strongestOpportunityMatch.id,
+                title: strongestOpportunityMatch.title,
+                sponsor_name: strongestOpportunityMatch.sponsor_name,
+                matchLabel: strongestOpportunityMatch.summary.label,
+                matchScore: strongestOpportunityMatch.summary.score,
+              }
+            : null
+        }
+      />
+
       {revisionPosts.length > 0 ? (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
           <h2 className="text-sm font-semibold text-amber-900">
@@ -742,12 +901,73 @@ export default async function DashboardPage() {
                     })}
                   </span>
                 </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  {inquiry.timeline ? (
+                    <div className="rounded-lg bg-canvas px-3 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Timeline
+                      </p>
+                      <p className="mt-1 text-sm text-gray-700">{inquiry.timeline}</p>
+                    </div>
+                  ) : null}
+                  {inquiry.commitment ? (
+                    <div className="rounded-lg bg-canvas px-3 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Commitment
+                      </p>
+                      <p className="mt-1 text-sm text-gray-700">{inquiry.commitment}</p>
+                    </div>
+                  ) : null}
+                  <div className="rounded-lg bg-canvas px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      Next action
+                    </p>
+                    <p className="mt-1 text-sm text-gray-700">
+                      Reply by email if relevant, or archive it after review.
+                    </p>
+                  </div>
+                </div>
+                {inquiry.fit_reason ? (
+                  <div className="mt-3 rounded-lg border border-sky-100 bg-sky-50 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                      Why they think you fit
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-sky-900">
+                      {inquiry.fit_reason}
+                    </p>
+                  </div>
+                ) : null}
                 {inquiry.message ? (
-                  <p className="mt-3 text-sm leading-relaxed text-gray-600">
-                    {inquiry.message}
-                  </p>
+                  <div className="mt-3 rounded-lg border border-gray-100 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      Message
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                      {inquiry.message}
+                    </p>
+                  </div>
                 ) : null}
                 <div className="mt-4 flex flex-wrap gap-2">
+                  {inquiry.contact_email ? (
+                    <TrackedActionLink
+                      href={`mailto:${inquiry.contact_email}`}
+                      actionKey="reply_opportunity_inquiry"
+                      label="Reply by email"
+                      source="dashboard_opportunity_interest"
+                      className="rounded-lg bg-gray-900 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-gray-800"
+                    >
+                      Reply by email
+                    </TrackedActionLink>
+                  ) : null}
+                  <TrackedActionLink
+                    href="/opportunities#opportunity-profile"
+                    actionKey="review_opportunity_profile"
+                    label="Review profile visibility"
+                    source="dashboard_opportunity_interest"
+                    className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-medium text-gray-600 transition-colors hover:border-emerald-300 hover:text-emerald-700"
+                  >
+                    Review profile visibility
+                  </TrackedActionLink>
                   {inquiry.status === "new" ? (
                     <form action={updateOpportunityInquiryStatus}>
                       <input type="hidden" name="inquiryId" value={inquiry.id} />
@@ -805,6 +1025,38 @@ export default async function DashboardPage() {
                     accepted: "bg-emerald-50 text-emerald-700 border-emerald-200",
                     rejected: "bg-red-50 text-red-600 border-red-200",
                   };
+                  const nextAction =
+                    app.status === "pending"
+                      ? {
+                          href: opportunityReadiness.nextAction?.actionHref ?? "/opportunities",
+                          label:
+                            opportunityReadiness.nextAction?.actionLabel ??
+                            "Find another match",
+                          helper: "Keep your profile and proof current while it is reviewed.",
+                        }
+                      : app.status === "shortlisted"
+                        ? {
+                            href: app.proofPost
+                              ? `/post/${app.proofPost.slug}`
+                              : profileHref,
+                            label: app.proofPost ? "Review proof" : "Review profile",
+                            helper: "You are in the candidate set.",
+                          }
+                        : app.status === "accepted"
+                          ? {
+                              href:
+                                app.fellowship?.application_url ??
+                                `/fellowships/${app.fellowship?.id}`,
+                              label: app.fellowship?.application_url
+                                ? "Open external link"
+                                : "Open opportunity",
+                              helper: "Follow the opportunity instructions.",
+                            }
+                          : {
+                              href: "/opportunities",
+                              label: "Apply to another match",
+                              helper: "Use your proof on the next fit.",
+                            };
                   return (
                     <tr key={app.id} className="hover:bg-canvas transition-colors">
                       <td className="px-4 py-3">
@@ -818,9 +1070,20 @@ export default async function DashboardPage() {
                         ) : (
                           <span className="text-gray-500">No fellowship found</span>
                         )}
+                        {app.proofPost ? (
+                          <Link
+                            href={`/post/${app.proofPost.slug}`}
+                            className="mt-1 block text-xs font-medium text-emerald-700 hover:text-emerald-800"
+                          >
+                            Proof: {app.proofPost.title}
+                          </Link>
+                        ) : null}
+                        <p className="mt-1 text-xs text-gray-500">
+                          {nextAction.helper}
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-gray-500">
-                        {new Date(app.created_at).toLocaleDateString("en-GB", {
+                        {new Date(app.applied_at).toLocaleDateString("en-GB", {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
@@ -835,6 +1098,12 @@ export default async function DashboardPage() {
                         >
                           {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
                         </span>
+                        <Link
+                          href={nextAction.href}
+                          className="mt-2 block text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                        >
+                          {nextAction.label}
+                        </Link>
                       </td>
                     </tr>
                   );

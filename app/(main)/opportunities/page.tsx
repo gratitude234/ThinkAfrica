@@ -9,8 +9,13 @@ import {
   OPPORTUNITY_TYPES,
 } from "@/lib/opportunities";
 import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
+import {
+  getOpportunityMatchSummary,
+  type OpportunityMatchSummary,
+} from "@/lib/opportunityMatch";
 import OpportunityProfileEditor from "@/components/opportunities/OpportunityProfileEditor";
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
+import SaveOpportunityButton from "@/components/opportunities/SaveOpportunityButton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import UserAvatar from "@/components/ui/UserAvatar";
 
@@ -54,6 +59,8 @@ interface CuratedOpportunity {
   skills: string[] | null;
   location: string | null;
   featured: boolean | null;
+  match?: OpportunityMatchSummary | null;
+  saved?: boolean;
 }
 
 interface ApplicationSummary {
@@ -181,7 +188,7 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
     ? Promise.all([
         supabase
           .from("profiles")
-          .select("username, full_name, university, field_of_study, bio")
+          .select("username, full_name, country, university, field_of_study, bio, interests")
           .eq("id", user.id)
           .single(),
         supabase
@@ -193,8 +200,12 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
           .maybeSingle(),
         supabase
           .from("posts")
-          .select("id, type, status, citation_id")
+          .select("id, title, slug, type, status, citation_id, tags")
           .eq("author_id", user.id),
+        supabase
+          .from("saved_opportunities")
+          .select("fellowship_id")
+          .eq("user_id", user.id),
       ])
     : Promise.resolve(null);
 
@@ -237,6 +248,33 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
   const currentProfile = currentUserData?.[0].data ?? null;
   const currentTalentProfile = currentUserData?.[1].data ?? null;
   const currentPosts = currentUserData?.[2].data ?? [];
+  const savedOpportunityIds = new Set(
+    (currentUserData?.[3].data ?? []).map((row) => row.fellowship_id)
+  );
+  const matchedOpportunities = filteredOpportunities
+    .map((opportunity) => ({
+      ...opportunity,
+      saved: savedOpportunityIds.has(opportunity.id),
+      match: user
+        ? getOpportunityMatchSummary({
+            opportunity,
+            profile: currentProfile,
+            talentProfile: currentTalentProfile,
+            posts: currentPosts ?? [],
+          })
+        : null,
+    }))
+    .sort((left, right) => {
+      if (!user) return 0;
+      const matchDiff = (right.match?.score ?? 0) - (left.match?.score ?? 0);
+      if (matchDiff !== 0) return matchDiff;
+      if (Boolean(right.featured) !== Boolean(left.featured)) {
+        return right.featured ? 1 : -1;
+      }
+      const leftDeadline = left.deadline ? new Date(left.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+      const rightDeadline = right.deadline ? new Date(right.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+      return leftDeadline - rightDeadline;
+    });
   const readiness =
     user && currentProfile
       ? getOpportunityReadinessSummary({
@@ -398,11 +436,12 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {filteredOpportunities.map((opportunity) => (
+            {matchedOpportunities.map((opportunity) => (
               <OpportunityCard
                 key={opportunity.id}
                 opportunity={opportunity}
                 applicationStatus={applications.get(opportunity.id) ?? null}
+                userId={user?.id ?? null}
               />
             ))}
           </div>
@@ -445,41 +484,50 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
 function OpportunityCard({
   opportunity,
   applicationStatus,
+  userId,
 }: {
   opportunity: CuratedOpportunity;
   applicationStatus: string | null;
+  userId: string | null;
 }) {
   const type = normalizeOpportunityType(opportunity.opportunity_type);
   const deadline = deadlineLabel(opportunity.deadline);
 
   return (
-    <Link
-      href={`/fellowships/${opportunity.id}`}
-      className="flex min-h-[260px] flex-col rounded-xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md"
-    >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span
-          className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getOpportunityStyle(
-            type
-          )}`}
-        >
-          {getOpportunityShortLabel(type)}
-        </span>
-        {opportunity.featured ? (
-          <span className="rounded-full bg-ink px-2.5 py-0.5 text-xs font-semibold text-white">
-            Featured
+    <article className="flex min-h-[260px] flex-col rounded-xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getOpportunityStyle(
+              type
+            )}`}
+          >
+            {getOpportunityShortLabel(type)}
           </span>
-        ) : null}
-        {deadline ? (
-          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
-            {deadline}
-          </span>
-        ) : null}
+          {opportunity.featured ? (
+            <span className="rounded-full bg-ink px-2.5 py-0.5 text-xs font-semibold text-white">
+              Featured
+            </span>
+          ) : null}
+          {deadline ? (
+            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+              {deadline}
+            </span>
+          ) : null}
+        </div>
+        <SaveOpportunityButton
+          fellowshipId={opportunity.id}
+          initialSaved={Boolean(opportunity.saved)}
+          userId={userId}
+          source="opportunities_card"
+        />
       </div>
 
-      <h3 className="text-base font-semibold leading-snug text-gray-900">
-        {opportunity.title}
-      </h3>
+      <Link href={`/fellowships/${opportunity.id}`}>
+        <h3 className="text-base font-semibold leading-snug text-gray-900 hover:text-emerald-700">
+          {opportunity.title}
+        </h3>
+      </Link>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
         {opportunity.sponsor_name ? <span>{opportunity.sponsor_name}</span> : null}
@@ -508,17 +556,33 @@ function OpportunityCard({
         </div>
       ) : null}
 
+      {opportunity.match ? (
+        <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+          <p className="text-xs font-semibold text-emerald-800">
+            {opportunity.match.label} / {opportunity.match.score}%
+          </p>
+          {opportunity.match.reasons[0] ? (
+            <p className="mt-1 text-xs text-emerald-900/75">
+              {opportunity.match.reasons[0].label}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="mt-5 flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-emerald-brand">
+        <Link
+          href={`/fellowships/${opportunity.id}`}
+          className="text-sm font-semibold text-emerald-brand hover:text-emerald-700"
+        >
           {applicationStatus ? "View application" : "View details"}
-        </span>
+        </Link>
         {applicationStatus ? (
           <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium capitalize text-amber-700">
             {applicationStatus}
           </span>
         ) : null}
       </div>
-    </Link>
+    </article>
   );
 }
 

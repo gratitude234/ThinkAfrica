@@ -11,6 +11,13 @@ interface Props {
   existingApplication: { status: string } | null;
   fellowshipStatus: string;
   opportunityType?: string | null;
+  proofPosts?: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    type: string;
+    citation_id: string | null;
+  }>;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -26,10 +33,12 @@ export default function FellowshipApply({
   existingApplication,
   fellowshipStatus,
   opportunityType,
+  proofPosts = [],
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [coverLetter, setCoverLetter] = useState("");
+  const [proofPostId, setProofPostId] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +79,12 @@ export default function FellowshipApply({
     setError(null);
     const supabase = createClient();
     const { error: err } = await supabase.from("fellowship_applications").insert([
-      { fellowship_id: fellowshipId, user_id: userId, cover_letter: coverLetter },
+      {
+        fellowship_id: fellowshipId,
+        user_id: userId,
+        cover_letter: coverLetter,
+        proof_post_id: proofPostId || null,
+      },
     ]);
     if (err) {
       setError(err.message);
@@ -83,6 +97,7 @@ export default function FellowshipApply({
         fellowshipId,
         opportunityType: opportunityType ?? null,
         coverLetterWordCount: wordCount,
+        proofAttached: Boolean(proofPostId),
       },
     });
     trackActivationEvent({
@@ -91,6 +106,7 @@ export default function FellowshipApply({
         fellowshipId,
         opportunityType: opportunityType ?? null,
         coverLetterWordCount: wordCount,
+        proofAttached: Boolean(proofPostId),
       },
     });
     setLoading(false);
@@ -143,6 +159,37 @@ export default function FellowshipApply({
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
             />
           </div>
+          {proofPosts.length > 0 ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Application proof{" "}
+                <span className="text-xs font-normal text-gray-400">
+                  (optional)
+                </span>
+              </label>
+              <select
+                value={proofPostId}
+                onChange={(event) => setProofPostId(event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+              >
+                <option value="">No ThinkAfrica proof attached</option>
+                {proofPosts.map((post) => (
+                  <option key={post.id} value={post.id}>
+                    {post.title}
+                    {post.citation_id ||
+                    post.type === "research" ||
+                    post.type === "policy_brief"
+                      ? " / reviewed proof"
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Attach one published post, brief, or research piece that supports
+                your application.
+              </p>
+            </div>
+          ) : null}
           <div className="flex items-center gap-3">
             <button
               type="submit"

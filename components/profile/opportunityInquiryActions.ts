@@ -13,6 +13,9 @@ interface SubmitOpportunityInquiryInput {
   contactEmail: string;
   opportunityType: string;
   roleTitle: string;
+  timeline?: string;
+  commitment?: string;
+  fitReason?: string;
   message: string;
 }
 
@@ -37,6 +40,9 @@ export async function submitOpportunityInquiry(
   const organizationName = input.organizationName.trim();
   const contactEmail = normalizeEmail(input.contactEmail);
   const roleTitle = input.roleTitle.trim();
+  const timeline = input.timeline?.trim() ?? "";
+  const commitment = input.commitment?.trim() ?? "";
+  const fitReason = input.fitReason?.trim() ?? "";
   const message = input.message.trim();
   const opportunityType = input.opportunityType.trim();
 
@@ -54,6 +60,21 @@ export async function submitOpportunityInquiry(
 
   if (!isOpportunityType(opportunityType)) {
     return { ok: false, error: "Choose an opportunity type." };
+  }
+
+  if (!timeline) {
+    return { ok: false, error: "Add the expected timeline." };
+  }
+
+  if (!commitment) {
+    return { ok: false, error: "Add the expected commitment." };
+  }
+
+  if (fitReason.length < 30) {
+    return {
+      ok: false,
+      error: "Explain why this specific student is a fit.",
+    };
   }
 
   if (message.length < 40) {
@@ -97,6 +118,9 @@ export async function submitOpportunityInquiry(
     contact_email: contactEmail,
     opportunity_type: opportunityType,
     role_title: roleTitle,
+    timeline,
+    commitment,
+    fit_reason: fitReason,
     message,
     status: "new",
   });

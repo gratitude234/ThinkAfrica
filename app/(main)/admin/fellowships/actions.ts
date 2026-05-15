@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createCheckedAdminClient } from "@/lib/supabase/admin";
+import { createCheckedAdminClient, requireAdmin } from "@/lib/supabase/admin";
 import { isOpportunityType } from "@/lib/opportunities";
 
 const APPLICATION_STATUSES = new Set([
@@ -71,17 +71,25 @@ export async function createFellowship(input: {
 
 export async function updateFellowshipApplicationStatus(
   applicationId: string,
-  status: string
+  status: string,
+  reviewNote?: string
 ) {
   try {
     if (!APPLICATION_STATUSES.has(status)) {
       return { error: "Invalid application status." };
     }
 
+    const { user } = await requireAdmin();
     const admin = await createCheckedAdminClient();
+    const note = reviewNote?.trim() || null;
     const { error } = await admin
       .from("fellowship_applications")
-      .update({ status })
+      .update({
+        status,
+        review_note: note,
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+      })
       .eq("id", applicationId);
 
     if (error) {

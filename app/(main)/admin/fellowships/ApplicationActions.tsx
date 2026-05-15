@@ -7,17 +7,27 @@ import { updateFellowshipApplicationStatus } from "./actions";
 interface Props {
   applicationId: string;
   currentStatus: string;
+  initialReviewNote?: string | null;
 }
 
-export default function ApplicationActions({ applicationId, currentStatus }: Props) {
+export default function ApplicationActions({
+  applicationId,
+  currentStatus,
+  initialReviewNote,
+}: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reviewNote, setReviewNote] = useState(initialReviewNote ?? "");
 
   const update = async (status: string) => {
     setLoading(status);
     setError(null);
-    const result = await updateFellowshipApplicationStatus(applicationId, status);
+    const result = await updateFellowshipApplicationStatus(
+      applicationId,
+      status,
+      reviewNote
+    );
     setLoading(null);
     if (result.error) {
       setError(result.error);
@@ -33,8 +43,22 @@ export default function ApplicationActions({ applicationId, currentStatus }: Pro
   ];
 
   return (
-    <>
+    <div className="space-y-2">
+      <textarea
+        value={reviewNote}
+        onChange={(event) => setReviewNote(event.target.value)}
+        rows={3}
+        placeholder="Internal review note"
+        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+      />
       <div className="flex items-center gap-1.5 flex-wrap">
+        <button
+          onClick={() => update(currentStatus)}
+          disabled={loading !== null}
+          className="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:border-emerald-200 hover:text-emerald-700 disabled:opacity-50"
+        >
+          {loading === currentStatus ? "Saving..." : "Save note"}
+        </button>
         {statuses.map((s) => (
           currentStatus !== s.value && (
             <button
@@ -49,6 +73,6 @@ export default function ApplicationActions({ applicationId, currentStatus }: Pro
         ))}
       </div>
       {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
-    </>
+    </div>
   );
 }

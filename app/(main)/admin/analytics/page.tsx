@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AnalyticsCharts from "./AnalyticsCharts";
 import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
+import { getOpportunityShortLabel } from "@/lib/opportunities";
 
 interface ProfileRow {
   id: string;
@@ -32,6 +33,15 @@ interface TalentProfileAnalyticsRow {
   opportunity_types: string[] | null;
   cv_url: string | null;
   linkedin_url: string | null;
+}
+
+interface TalentInquiryAnalyticsRow {
+  status: string | null;
+  opportunity_type: string | null;
+  created_at: string | null;
+  timeline: string | null;
+  commitment: string | null;
+  fit_reason: string | null;
 }
 
 interface PromisingPostRow {
@@ -228,6 +238,8 @@ export default async function AdminAnalyticsPage() {
     { count: totalDebates },
     { count: totalWebinars },
     { count: totalApplications },
+    { data: opportunityApplicationsRaw },
+    { count: savedOpportunityCount },
     { data: viewsData },
     { data: signupsRaw },
     { data: activeThisWeekRaw },
@@ -238,7 +250,7 @@ export default async function AdminAnalyticsPage() {
     { data: activationEventsRaw },
     { data: followsRaw },
     { data: talentProfilesRaw },
-    { count: totalTalentInquiries },
+    { data: talentInquiriesRaw, count: totalTalentInquiries },
     { count: acceptedCoauthorCount },
     { count: totalMessages },
     { data: debateArgumentsRaw },
@@ -252,6 +264,13 @@ export default async function AdminAnalyticsPage() {
     supabase.from("debates").select("*", { count: "exact", head: true }),
     supabase.from("webinars").select("*", { count: "exact", head: true }),
     supabase.from("fellowship_applications").select("*", { count: "exact", head: true }),
+    supabase
+      .from("fellowship_applications")
+      .select(
+        "fellowship_id, status, proof_post_id, applied_at, reviewed_at, fellowships(title, opportunity_type)"
+      )
+      .limit(10000),
+    supabase.from("saved_opportunities").select("*", { count: "exact", head: true }),
     supabase.from("posts").select("view_count").eq("status", "published"),
     supabase
       .from("profiles")
@@ -292,7 +311,13 @@ export default async function AdminAnalyticsPage() {
       .from("talent_profiles")
       .select("open_to_opportunities, visibility, skills, opportunity_types, cv_url, linkedin_url")
       .limit(10000),
-    supabase.from("talent_inquiries").select("*", { count: "exact", head: true }),
+    supabase
+      .from("talent_inquiries")
+      .select(
+        "status, opportunity_type, created_at, timeline, commitment, fit_reason",
+        { count: "exact" }
+      )
+      .limit(10000),
     supabase
       .from("post_authors")
       .select("*", { count: "exact", head: true })
@@ -309,6 +334,26 @@ export default async function AdminAnalyticsPage() {
   const totalUsers = profiles.length;
   const activationEvents = (activationEventsRaw ?? []) as ActivationEventRow[];
   const talentProfiles = (talentProfilesRaw ?? []) as TalentProfileAnalyticsRow[];
+  const talentInquiries = (talentInquiriesRaw ?? []) as TalentInquiryAnalyticsRow[];
+  const opportunityApplications = (opportunityApplicationsRaw ?? []).map((application) => ({
+    ...application,
+    fellowship: Array.isArray(application.fellowships)
+      ? application.fellowships[0]
+      : application.fellowships,
+  }));
+  const opportunityProofPostIds = opportunityApplications
+    .map((application) => application.proof_post_id)
+    .filter(Boolean) as string[];
+  const { data: opportunityProofPostsRaw } =
+    opportunityProofPostIds.length > 0
+      ? await supabase
+          .from("posts")
+          .select("id, type, citation_id")
+          .in("id", opportunityProofPostIds)
+      : { data: [] };
+  const opportunityProofPosts = new Map(
+    (opportunityProofPostsRaw ?? []).map((post) => [post.id, post])
+  );
   const { data: editorialPostsRaw } = await supabase
     .from("posts")
     .select("id, type, status, created_at, published_at, citation_id, published_version_id")
@@ -577,6 +622,78 @@ export default async function AdminAnalyticsPage() {
     );
   });
   const writerFollowUsers = uniqueUsersForEvent(activationEvents, "writer_followed");
+  const opportunityListingOpens = activationEvents.filter(
+    (event) => event.event_name === "opportunity_listing_opened"
+  );
+  const opportunityApplyStartedRows = activationEvents.filter(
+    (event) => event.event_name === "opportunity_apply_started"
+  );
+  const opportunityApplySubmittedRows = activationEvents.filter(
+    (event) => event.event_name === "opportunity_apply_submitted"
+  );
+  const opportunitySavedRows = activationEvents.filter(
+    (event) => event.event_name === "opportunity_saved"
+  );
+  const proofAttachedApplications = opportunityApplications.filter(
+    (application) => application.proof_post_id
+  ).length;
+  const applicationStatusCounts = opportunityApplications.reduce(
+    (acc: Record<string, number>, application) => {
+      acc[application.status] = (acc[application.status] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+  const reviewedProofApplications = opportunityApplications.filter((application) => {
+    if (!application.proof_post_id) return false;
+    const proof = opportunityProofPosts.get(application.proof_post_id);
+    return Boolean(
+      proof?.citation_id ||
+        proof?.type === "research" ||
+        proof?.type === "policy_brief"
+    );
+  }).length;
+  const reviewedApplicationDurations = opportunityApplications
+    .map((application) => {
+      if (!application.reviewed_at) return null;
+      const applied = new Date(application.applied_at).getTime();
+      const reviewed = new Date(application.reviewed_at).getTime();
+      if (Number.isNaN(applied) || Number.isNaN(reviewed) || reviewed < applied) {
+        return null;
+      }
+      return Math.round((reviewed - applied) / (24 * 60 * 60 * 1000));
+    })
+    .filter((value): value is number => value !== null);
+  const avgApplicationReviewDays =
+    reviewedApplicationDurations.length > 0
+      ? Math.round(
+          reviewedApplicationDurations.reduce((sum, value) => sum + value, 0) /
+            reviewedApplicationDurations.length
+        )
+      : 0;
+  const opportunityConversionMap = opportunityApplications.reduce(
+    (acc: Record<string, { title: string; type: string | null; count: number; proofCount: number }>, application) => {
+      const key = application.fellowship_id;
+      const fellowship = application.fellowship as
+        | { title?: string | null; opportunity_type?: string | null }
+        | null;
+      if (!acc[key]) {
+        acc[key] = {
+          title: fellowship?.title ?? "Untitled opportunity",
+          type: fellowship?.opportunity_type ?? null,
+          count: 0,
+          proofCount: 0,
+        };
+      }
+      acc[key].count += 1;
+      if (application.proof_post_id) acc[key].proofCount += 1;
+      return acc;
+    },
+    {}
+  );
+  const topOpportunityConversions = Object.values(opportunityConversionMap)
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 4);
   const coachingViewedRows = activationEvents.filter(
     (event) =>
       event.event_name === "quality_check_viewed" &&
@@ -647,6 +764,42 @@ export default async function AdminAnalyticsPage() {
         (profile.cv_url || profile.linkedin_url)
     );
   }).length;
+  const openTalentProfiles = talentProfiles.filter(
+    (profile) =>
+      profile.open_to_opportunities === true &&
+      (profile.visibility === "public" || profile.visibility === "partners_only")
+  ).length;
+  const talentDiscoveryViews = opportunityListingOpens.filter(
+    (event) => eventMetadataValue(event, "source") === "talent"
+  );
+  const inquiryStartedRows = activationEvents.filter(
+    (event) => event.event_name === "opportunity_inquiry_started"
+  );
+  const inquirySubmittedRows = activationEvents.filter(
+    (event) => event.event_name === "opportunity_inquiry_submitted"
+  );
+  const inquiryStatusCounts = talentInquiries.reduce(
+    (acc: Record<string, number>, inquiry) => {
+      const key = inquiry.status ?? "unknown";
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+  const structuredInquiryCount = talentInquiries.filter(
+    (inquiry) => inquiry.timeline && inquiry.commitment && inquiry.fit_reason
+  ).length;
+  const inquiryTypeCounts = talentInquiries.reduce(
+    (acc: Record<string, number>, inquiry) => {
+      const key = inquiry.opportunity_type ?? "unspecified";
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+  const topInquiryTypes = Object.entries(inquiryTypeCounts)
+    .sort(([, left], [, right]) => right - left)
+    .slice(0, 4);
   const { data: promisingPostsRaw } = await supabase
     .from("posts")
     .select(
@@ -961,6 +1114,30 @@ export default async function AdminAnalyticsPage() {
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <HealthCard
+            label="Opportunity Views"
+            value={opportunityListingOpens.length}
+            trend="neutral"
+            trendLabel="detail and listing opens"
+          />
+          <HealthCard
+            label="Saved Opportunities"
+            value={savedOpportunityCount ?? opportunitySavedRows.length}
+            trend="neutral"
+            trendLabel={`${opportunitySavedRows.length.toLocaleString()} tracked saves`}
+          />
+          <HealthCard
+            label="Application Starts"
+            value={opportunityApplyStartedRows.length}
+            trend="neutral"
+            trendLabel={`${pct(opportunityApplyStartedRows.length, opportunityListingOpens.length)} of views`}
+          />
+          <HealthCard
+            label="Proof Attached"
+            value={proofAttachedApplications}
+            trend="neutral"
+            trendLabel={`${pct(proofAttachedApplications, totalApplications ?? 0)} of applications`}
+          />
+          <HealthCard
             label="Public Opportunity Profiles"
             value={publicOpportunityProfiles}
             trend="neutral"
@@ -982,7 +1159,170 @@ export default async function AdminAnalyticsPage() {
             label="Opportunity Applications"
             value={totalApplications ?? 0}
             trend="neutral"
-            trendLabel="submitted applications"
+            trendLabel={`${opportunityApplySubmittedRows.length.toLocaleString()} tracked submits`}
+          />
+        </div>
+        {topOpportunityConversions.length > 0 ? (
+          <div className="mt-4 rounded-xl border border-gray-200 bg-white p-5">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Top opportunity conversions
+            </h3>
+            <div className="space-y-2">
+              {topOpportunityConversions.map((item) => (
+                <div
+                  key={item.title}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-canvas px-3 py-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-gray-900">{item.title}</p>
+                    <p className="text-xs text-gray-500">
+                      {item.proofCount} with ThinkAfrica proof
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    {item.count} applications
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Partner Discovery
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="Talent Discovery Views"
+            value={talentDiscoveryViews.length}
+            trend="neutral"
+            trendLabel="tracked talent directory opens"
+          />
+          <HealthCard
+            label="Open Talent Profiles"
+            value={openTalentProfiles}
+            trend="neutral"
+            trendLabel="public or partner-visible"
+          />
+          <HealthCard
+            label="Opportunity-Ready Talent"
+            value={readinessCompleteProfiles}
+            trend="neutral"
+            trendLabel={`${pct(readinessCompleteProfiles, openTalentProfiles)} of open profiles`}
+          />
+          <HealthCard
+            label="Inquiry Starts"
+            value={inquiryStartedRows.length}
+            trend="neutral"
+            trendLabel="partner outreach modal opened"
+          />
+          <HealthCard
+            label="Inquiry Submissions"
+            value={inquirySubmittedRows.length || totalTalentInquiries || 0}
+            trend="neutral"
+            trendLabel={`${pct(inquirySubmittedRows.length || totalTalentInquiries || 0, inquiryStartedRows.length)} conversion from starts`}
+          />
+          <HealthCard
+            label="Structured Outreach"
+            value={structuredInquiryCount}
+            trend="neutral"
+            trendLabel={`${pct(structuredInquiryCount, totalTalentInquiries ?? 0)} include fit context`}
+          />
+          <HealthCard
+            label="New Inquiries"
+            value={inquiryStatusCounts.new ?? 0}
+            trend="neutral"
+            trendLabel="unread opportunity interest"
+          />
+          <HealthCard
+            label="Read / Archived"
+            value={`${(inquiryStatusCounts.read ?? 0).toLocaleString()} / ${(inquiryStatusCounts.archived ?? 0).toLocaleString()}`}
+            trend="neutral"
+            trendLabel="recipient triage status"
+          />
+        </div>
+        {topInquiryTypes.length > 0 ? (
+          <div className="mt-4 rounded-xl border border-gray-200 bg-white p-5">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Common outreach types
+            </h3>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {topInquiryTypes.map(([type, count]) => (
+                <div
+                  key={type}
+                  className="rounded-lg bg-canvas px-3 py-2 text-sm"
+                >
+                  <p className="font-semibold text-gray-900">
+                    {type === "unspecified" ? "Unspecified" : getOpportunityShortLabel(type)}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {count.toLocaleString()} {count === 1 ? "inquiry" : "inquiries"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Application Review
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="Pending Review"
+            value={applicationStatusCounts.pending ?? 0}
+            trend="neutral"
+            trendLabel="waiting for admin decision"
+          />
+          <HealthCard
+            label="Shortlisted"
+            value={applicationStatusCounts.shortlisted ?? 0}
+            trend="neutral"
+            trendLabel={`${pct(applicationStatusCounts.shortlisted ?? 0, totalApplications ?? 0)} shortlist rate`}
+          />
+          <HealthCard
+            label="Accepted"
+            value={applicationStatusCounts.accepted ?? 0}
+            trend="neutral"
+            trendLabel={`${pct(applicationStatusCounts.accepted ?? 0, totalApplications ?? 0)} acceptance rate`}
+          />
+          <HealthCard
+            label="Rejected"
+            value={applicationStatusCounts.rejected ?? 0}
+            trend="neutral"
+            trendLabel="closed application decisions"
+          />
+          <HealthCard
+            label="Proof Attached Rate"
+            value={pct(proofAttachedApplications, totalApplications ?? 0)}
+            trend="neutral"
+            trendLabel={`${proofAttachedApplications.toLocaleString()} applications with proof`}
+          />
+          <HealthCard
+            label="Reviewed Proof Rate"
+            value={pct(reviewedProofApplications, proofAttachedApplications)}
+            trend="neutral"
+            trendLabel="citable or reviewed-format proof"
+          />
+          <HealthCard
+            label="Avg Review Time"
+            value={reviewedApplicationDurations.length > 0 ? `${avgApplicationReviewDays}d` : "-"}
+            trend="neutral"
+            trendLabel={`${reviewedApplicationDurations.length.toLocaleString()} reviewed applications`}
+          />
+          <HealthCard
+            label="Decisioned"
+            value={
+              (applicationStatusCounts.shortlisted ?? 0) +
+              (applicationStatusCounts.accepted ?? 0) +
+              (applicationStatusCounts.rejected ?? 0)
+            }
+            trend="neutral"
+            trendLabel="non-pending applications"
           />
         </div>
       </div>

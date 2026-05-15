@@ -6,8 +6,12 @@ import {
   getOpportunityStyle,
   normalizeOpportunityType,
 } from "@/lib/opportunities";
+import { getOpportunityMatchSummary } from "@/lib/opportunityMatch";
+import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
 import { formatDate } from "@/lib/utils";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
+import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
+import SaveOpportunityButton from "@/components/opportunities/SaveOpportunityButton";
 import FellowshipApply from "./FellowshipApply";
 
 interface PageProps {
@@ -32,15 +36,86 @@ export default async function FellowshipPage({ params }: PageProps) {
   } = await supabase.auth.getUser();
 
   let existingApplication: { status: string } | null = null;
+  let currentProfile = null;
+  let currentTalentProfile = null;
+  let currentPosts: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    type: string;
+    status: string;
+    citation_id: string | null;
+    tags: string[] | null;
+  }> = [];
+  let saved = false;
   if (user) {
-    const { data } = await supabase
-      .from("fellowship_applications")
-      .select("status")
-      .eq("fellowship_id", id)
-      .eq("user_id", user.id)
-      .single();
-    existingApplication = data;
+    const [
+      { data: applicationData },
+      { data: profileData },
+      { data: talentData },
+      { data: postsData },
+      { data: savedData },
+    ] = await Promise.all([
+      supabase
+        .from("fellowship_applications")
+        .select("status")
+        .eq("fellowship_id", id)
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("username, full_name, country, university, field_of_study, bio, interests")
+        .eq("id", user.id)
+        .single(),
+      supabase
+        .from("talent_profiles")
+        .select("id, open_to_opportunities, opportunity_types, cv_url, linkedin_url, skills, visibility")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("posts")
+        .select("id, title, slug, type, status, citation_id, tags")
+        .eq("author_id", user.id)
+        .order("published_at", { ascending: false, nullsFirst: false }),
+      supabase
+        .from("saved_opportunities")
+        .select("id")
+        .eq("fellowship_id", id)
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
+    existingApplication = applicationData;
+    currentProfile = profileData;
+    currentTalentProfile = talentData;
+    currentPosts = postsData ?? [];
+    saved = Boolean(savedData);
   }
+
+  const matchSummary = user
+    ? getOpportunityMatchSummary({
+        opportunity: fellowship,
+        profile: currentProfile,
+        talentProfile: currentTalentProfile,
+        posts: currentPosts,
+      })
+    : null;
+  const readiness =
+    user && currentProfile
+      ? getOpportunityReadinessSummary({
+          profile: currentProfile,
+          talentProfile: currentTalentProfile,
+          posts: currentPosts,
+        })
+      : null;
+  const proofPosts = currentPosts
+    .filter((post) => post.status === "published")
+    .sort((left, right) => {
+      const score = (post: typeof left) =>
+        (post.citation_id ? 3 : 0) +
+        (post.type === "research" || post.type === "policy_brief" ? 2 : 0);
+      return score(right) - score(left);
+    })
+    .slice(0, 8);
 
   const daysLeft = fellowship.deadline
     ? Math.ceil(
@@ -109,9 +184,17 @@ export default async function FellowshipPage({ params }: PageProps) {
           )}
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-2 leading-tight">
-          {fellowship.title}
-        </h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2 leading-tight">
+            {fellowship.title}
+          </h1>
+          <SaveOpportunityButton
+            fellowshipId={id}
+            initialSaved={saved}
+            userId={user?.id ?? null}
+            source="fellowship_detail"
+          />
+        </div>
 
         {fellowship.sponsor_name && (
           <p className="text-sm font-medium text-emerald-600 mb-4">
@@ -172,6 +255,47 @@ export default async function FellowshipPage({ params }: PageProps) {
           </div>
         ) : null}
 
+        {matchSummary ? (
+          <div className="mb-6 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Match
+                </p>
+                <h2 className="mt-1 text-lg font-semibold text-gray-900">
+                  {matchSummary.label} / {matchSummary.score}%
+                </h2>
+              </div>
+              {matchSummary.missing[0] ? (
+                <Link
+                  href={matchSummary.missing[0].actionHref}
+                  className="inline-flex rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 hover:border-emerald-300"
+                >
+                  {matchSummary.missing[0].label}
+                </Link>
+              ) : null}
+            </div>
+            {matchSummary.reasons.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {matchSummary.reasons.map((reason) => (
+                  <span
+                    key={reason.key}
+                    className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-emerald-800"
+                  >
+                    {reason.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {readiness ? (
+          <div className="mb-6">
+            <OpportunityReadinessCard summary={readiness} source="opportunities" />
+          </div>
+        ) : null}
+
         {fellowship.eligibility && (
           <div className="mb-6">
             <h2 className="text-sm font-semibold text-gray-900 mb-2">Eligibility</h2>
@@ -200,6 +324,7 @@ export default async function FellowshipPage({ params }: PageProps) {
             existingApplication={existingApplication}
             fellowshipStatus={fellowship.status}
             opportunityType={opportunityType}
+            proofPosts={proofPosts}
           />
         </div>
       </div>

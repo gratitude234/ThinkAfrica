@@ -37,6 +37,8 @@ export type ActivationEventName =
   | "opportunity_listing_opened"
   | "opportunity_apply_started"
   | "opportunity_apply_submitted"
+  | "opportunity_saved"
+  | "opportunity_unsaved"
   | "opportunity_profile_setup_cta_clicked"
   | "fellowship_opened"
   | "fellowship_application_submitted"
