@@ -260,7 +260,8 @@ export default function PostsTable({
   return (
     <div>
       {/* Tab filter */}
-      <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-lg w-fit overflow-x-auto">
+      <div className="mb-4 overflow-x-auto">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit min-w-full sm:min-w-0">
         {TABS.map((tab) => (
           <button
             key={tab}
@@ -274,6 +275,7 @@ export default function PostsTable({
             {tab}
           </button>
         ))}
+      </div>
       </div>
 
       {filtered.length === 0 ? (

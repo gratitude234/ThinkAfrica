@@ -1049,6 +1049,7 @@ export default async function DashboardPage() {
             Opportunity applications
           </h2>
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-canvas">
@@ -1156,6 +1157,7 @@ export default async function DashboardPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

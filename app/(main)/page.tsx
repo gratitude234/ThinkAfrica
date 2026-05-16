@@ -44,11 +44,14 @@ interface FeaturedPostRaw {
   tags: string[] | null;
   cover_image_url: string | null;
   view_count: number | null;
+  featured?: boolean | null;
   published_at: string | null;
   citation_id: string | null;
   published_version_id: string | null;
   profiles: FeaturedProfile | FeaturedProfile[] | null;
 }
+
+type FeaturedSource = "manual" | "automatic";
 
 interface VoicePostRaw {
   author_id: string;
@@ -111,6 +114,28 @@ function FeedSkeleton() {
   );
 }
 
+const FEATURED_POST_SELECT = `
+  id, author_id, title, slug, type, excerpt, tags, cover_image_url, view_count, featured, published_at, citation_id, published_version_id,
+  profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified)
+`;
+
+function logHomeQueryError(
+  label: string,
+  error?: { message?: string } | null
+) {
+  if (!error) return;
+  console.error(`[home] ${label} query failed`, error);
+}
+
+function uniqueFeaturedPosts(posts: FeaturedPostRaw[]) {
+  const seen = new Set<string>();
+  return posts.filter((post) => {
+    if (seen.has(post.id)) return false;
+    seen.add(post.id);
+    return true;
+  });
+}
+
 export default async function HomePage({ searchParams }: PageProps) {
   const { guest, tab, type, timeframe } = await searchParams;
   const supabase = await createClient();
@@ -144,12 +169,17 @@ export default async function HomePage({ searchParams }: PageProps) {
   const draftCutoff = new Date(
     Date.now() - 14 * 24 * 60 * 60 * 1000
   ).toISOString();
+  const featuredFallbackCutoff = new Date(
+    Date.now() - 30 * 24 * 60 * 60 * 1000
+  ).toISOString();
 
   const [
     { data: followedUsers },
     { data: hotDebateRaw },
     { data: recentDraft },
-    featuredPostsResult,
+    manualFeaturedResult,
+    recentFeaturedCandidatesResult,
+    latestPublishedResult,
     upcomingWebinarResult,
     newVoiceResult,
   ] = await Promise.all([
@@ -185,19 +215,29 @@ export default async function HomePage({ searchParams }: PageProps) {
 
     supabase
       .from("posts")
-      .select(
-        `
-        id, author_id, title, slug, type, excerpt, tags, cover_image_url, view_count, published_at, citation_id, published_version_id,
-        profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified)
-      `
-      )
+      .select(FEATURED_POST_SELECT)
       .eq("status", "published")
-      .gte(
-        "published_at",
-        new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-      )
+      .eq("featured", true)
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+
+    supabase
+      .from("posts")
+      .select(FEATURED_POST_SELECT)
+      .eq("status", "published")
+      .gte("published_at", featuredFallbackCutoff)
       .order("view_count", { ascending: false })
-      .limit(3),
+      .order("published_at", { ascending: false })
+      .limit(12),
+
+    supabase
+      .from("posts")
+      .select(FEATURED_POST_SELECT)
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
 
     supabase
       .from("webinars")
@@ -228,6 +268,15 @@ export default async function HomePage({ searchParams }: PageProps) {
       .limit(50),
   ]);
 
+  logHomeQueryError("manual featured post", manualFeaturedResult.error);
+  logHomeQueryError(
+    "recent featured candidates",
+    recentFeaturedCandidatesResult.error
+  );
+  logHomeQueryError("latest published fallback", latestPublishedResult.error);
+  logHomeQueryError("upcoming webinar", upcomingWebinarResult.error);
+  logHomeQueryError("new voice", newVoiceResult.error);
+
   const followedIds = (followedUsers ?? []).map(
     (row: { following_id: string }) => row.following_id
   );
@@ -252,7 +301,17 @@ export default async function HomePage({ searchParams }: PageProps) {
       }
     : null;
 
-  const featuredPostsRaw = (featuredPostsResult.data ?? []) as FeaturedPostRaw[];
+  const manualFeaturedRaw =
+    (manualFeaturedResult.data as FeaturedPostRaw | null) ?? null;
+  const latestPublishedRaw =
+    (latestPublishedResult.data as FeaturedPostRaw | null) ?? null;
+  const recentFeaturedCandidatesRaw =
+    (recentFeaturedCandidatesResult.data ?? []) as FeaturedPostRaw[];
+  const featuredPostsRaw = uniqueFeaturedPosts([
+    ...(manualFeaturedRaw ? [manualFeaturedRaw] : []),
+    ...recentFeaturedCandidatesRaw,
+    ...(latestPublishedRaw ? [latestPublishedRaw] : []),
+  ]);
   const upcomingWebinarRaw =
     (upcomingWebinarResult.data as UpcomingWebinar | null) ?? null;
   const upcomingWebinar = upcomingWebinarRaw
@@ -329,8 +388,21 @@ export default async function HomePage({ searchParams }: PageProps) {
     })
     .sort((left, right) => right.quality_score - left.quality_score);
 
-  const [featuredPost = null, ...editorPicksRaw] = qualityRankedFeaturedPosts;
-  const editorPicks = editorPicksRaw.slice(0, 2);
+  const manualFeaturedPost = qualityRankedFeaturedPosts.find(
+    (post) => post.id === manualFeaturedRaw?.id
+  );
+  const automaticFeaturedPost =
+    qualityRankedFeaturedPosts.find(
+      (post) => post.id !== manualFeaturedPost?.id
+    ) ?? null;
+  const featuredPost = manualFeaturedPost ?? automaticFeaturedPost;
+  const featuredSource: FeaturedSource =
+    manualFeaturedPost && featuredPost?.id === manualFeaturedPost.id
+      ? "manual"
+      : "automatic";
+  const editorPicks = qualityRankedFeaturedPosts
+    .filter((post) => post.id !== featuredPost?.id)
+    .slice(0, 2);
   const newVoiceAuthorIds = Array.from(
     new Set(
       newVoiceRaw
@@ -456,7 +528,12 @@ export default async function HomePage({ searchParams }: PageProps) {
 
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_296px]">
         <div className="min-w-0">
-          <FeaturedPostLead post={featuredPost} />
+          <FeaturedPostLead
+            post={featuredPost}
+            label={
+              featuredSource === "manual" ? "Editor's pick" : "Featured today"
+            }
+          />
 
           {user ? <EditorPicksRow picks={editorPicks} /> : null}
 

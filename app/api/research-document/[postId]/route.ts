@@ -8,9 +8,11 @@ interface RouteProps {
 
 async function canAccessDocument({
   postId,
+  userEmail,
   userId,
 }: {
   postId: string;
+  userEmail: string | null;
   userId: string | null;
 }) {
   const admin = createAdminClient();
@@ -54,7 +56,8 @@ async function canAccessDocument({
   ]);
 
   const role = profile?.role;
-  const elevated = role === "editor" || role === "admin";
+  const elevated =
+    role === "editor" || role === "admin" || userEmail === process.env.ADMIN_EMAIL;
 
   if (elevated || coAuthor || review) {
     return { allowed: true, path: post.document_path as string, reason: null };
@@ -70,7 +73,11 @@ export async function GET(_request: NextRequest, { params }: RouteProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const access = await canAccessDocument({ postId, userId: user?.id ?? null });
+  const access = await canAccessDocument({
+    postId,
+    userEmail: user?.email ?? null,
+    userId: user?.id ?? null,
+  });
 
   if (!access.allowed || !access.path) {
     return NextResponse.json(

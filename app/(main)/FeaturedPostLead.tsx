@@ -38,10 +38,35 @@ const STAMP: Record<string, string> = {
   quick_take: "Q",
 };
 
-export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }) {
-  if (!post) return (
-    <div className="mb-5 h-[200px] animate-pulse rounded-xl border border-gray-200 bg-gray-100 sm:h-[280px]" aria-hidden="true" />
-  );
+export default function FeaturedPostLead({
+  post,
+  label = "Editor's pick",
+}: {
+  post: FeaturedPost | null;
+  label?: string;
+}) {
+  if (!post) {
+    return (
+      <section className="mb-5 rounded-xl border border-emerald-100 bg-white p-5 sm:p-7">
+        <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          Featured today
+        </p>
+        <h2 className="font-display mb-2 text-[21px] font-semibold leading-[1.14] text-gray-900 sm:text-[26px]">
+          Be the first to publish today
+        </h2>
+        <p className="mb-5 max-w-xl text-sm leading-6 text-gray-500">
+          There are no published posts ready for the featured slot yet. Start a
+          quick take, essay, research note, or policy brief for the community.
+        </p>
+        <Link
+          href="/write"
+          className="inline-flex rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+        >
+          Start writing
+        </Link>
+      </section>
+    );
+  }
 
   const author = post.profiles;
   const authorName = author?.full_name ?? author?.username ?? "ThinkAfrica";
@@ -90,7 +115,7 @@ export default function FeaturedPostLead({ post }: { post: FeaturedPost | null }
         <div className="flex flex-col justify-between p-4 sm:p-7">
           <div>
             <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-emerald-700 sm:mb-3">
-              Editor&apos;s pick
+              {label}
             </p>
 
             <Link href={`/post/${post.slug}`}>
