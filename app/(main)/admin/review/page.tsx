@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminActionClient } from "@/lib/adminAccess";
+import { AdminAccessError, createAdminClient } from "@/lib/supabase/admin";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
 import { formatDate } from "@/lib/utils";
@@ -66,35 +66,18 @@ function getReviewSummary(assignments: ReviewerAssignment[]) {
 }
 
 export default async function AdminReviewPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: currentProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const isAllowed =
-    (adminEmail && user.email === adminEmail) ||
-    currentProfile?.role === "editor" ||
-    currentProfile?.role === "admin";
-
-  if (!isAllowed) {
+  let admin: ReturnType<typeof createAdminClient> | null = null;
+  try {
+    const result = await createAdminActionClient("editorial.manage");
+    admin = result.admin;
+  } catch (error) {
+    if (error instanceof AdminAccessError && error.status === 401) redirect("/login");
     return (
       <div className="mx-auto max-w-2xl py-20 text-center">
         <p className="text-gray-500">You don&apos;t have access to this page.</p>
       </div>
     );
   }
-
-  const admin = createAdminClient();
 
   const [
     { data: pendingPostsRaw },

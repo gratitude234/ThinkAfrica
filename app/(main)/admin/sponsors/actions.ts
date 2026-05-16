@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createCheckedAdminClient } from "@/lib/supabase/admin";
+import {
+  createAdminActionClient,
+  recordAdminAuditEvent,
+} from "@/lib/adminAccess";
 
 const PLACEMENT_TYPES = new Set([
   "fellowship",
@@ -27,19 +30,35 @@ export async function createSponsorPlacement(input: {
       return { error: "Sponsor name is required." };
     }
 
-    const admin = await createCheckedAdminClient();
-    const { error } = await admin.from("sponsor_placements").insert({
+    const { admin, context } = await createAdminActionClient("sponsors.manage");
+    const placementType = PLACEMENT_TYPES.has(input.placement_type)
+      ? input.placement_type
+      : "leaderboard";
+    const { data, error } = await admin.from("sponsor_placements").insert({
       sponsor_name: sponsorName,
-      placement_type: PLACEMENT_TYPES.has(input.placement_type)
-        ? input.placement_type
-        : "leaderboard",
+      placement_type: placementType,
       content: input.content.trim() || null,
       link_url: input.link_url.trim() || null,
       active: input.active,
-    });
+    }).select("id").single();
 
     if (error) {
       return { error: error.message };
+    }
+
+    if (data?.id) {
+      await recordAdminAuditEvent({
+        admin,
+        context,
+        action: "sponsor_placement.created",
+        targetTable: "sponsor_placements",
+        targetId: data.id,
+        metadata: {
+          sponsorName,
+          placementType,
+          active: input.active,
+        },
+      });
     }
 
     revalidatePath("/admin/sponsors");
@@ -52,15 +71,25 @@ export async function createSponsorPlacement(input: {
 
 export async function toggleSponsorPlacement(sponsorId: string, active: boolean) {
   try {
-    const admin = await createCheckedAdminClient();
+    const { admin, context } = await createAdminActionClient("sponsors.manage");
+    const nextActive = !active;
     const { error } = await admin
       .from("sponsor_placements")
-      .update({ active: !active })
+      .update({ active: nextActive })
       .eq("id", sponsorId);
 
     if (error) {
       return { error: error.message };
     }
+
+    await recordAdminAuditEvent({
+      admin,
+      context,
+      action: "sponsor_placement.visibility_toggled",
+      targetTable: "sponsor_placements",
+      targetId: sponsorId,
+      metadata: { active: nextActive },
+    });
 
     revalidatePath("/admin/sponsors");
     revalidatePath("/");

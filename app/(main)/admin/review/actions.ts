@@ -1,9 +1,10 @@
 ﻿"use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { canPublish } from "@/lib/roles";
+import {
+  createAdminActionClient,
+  recordAdminAuditEvent,
+} from "@/lib/adminAccess";
 import {
   getEditorialReviewState,
   publishReviewedPost,
@@ -13,32 +14,19 @@ import {
 import type { EditorDecision } from "@/lib/types";
 
 async function requireEditorAccess() {
-  const authClient = await createClient();
-  const {
-    data: { user },
-  } = await authClient.auth.getUser();
-
-  if (!user) {
-    return { supabase: authClient, user: null, error: "You must be signed in." };
+  try {
+    const { admin, context } = await createAdminActionClient("editorial.manage");
+    return { supabase: admin, context, error: null };
+  } catch (error) {
+    return {
+      supabase: null,
+      context: null,
+      error:
+        error instanceof Error
+          ? error.message
+          : "You do not have permission to review posts.",
+    };
   }
-
-  const { data: profile } = await authClient
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const isBootstrapAdmin = user.email === process.env.ADMIN_EMAIL;
-  const hasEditorialRole =
-    profile?.role === "admin" ||
-    profile?.role === "editor" ||
-    (profile?.role ? canPublish(profile.role) : false);
-
-  if (!isBootstrapAdmin && !hasEditorialRole) {
-    return { supabase: authClient, user, error: "You do not have permission to review posts." };
-  }
-
-  return { supabase: createAdminClient(), user, error: null };
 }
 
 function revalidateEditorialPaths(slug?: string | null, citationId?: string | null) {
@@ -58,8 +46,8 @@ function revalidateEditorialPaths(slug?: string | null, citationId?: string | nu
 }
 
 export async function assignReviewer(postId: string, reviewerId: string, round: number) {
-  const { supabase, error: accessError } = await requireEditorAccess();
-  if (accessError) return { error: accessError };
+  const { supabase, context, error: accessError } = await requireEditorAccess();
+  if (accessError || !supabase || !context) return { error: accessError };
 
   const [{ data: reviewer }, { data: post }] = await Promise.all([
     supabase.from("profiles").select("role").eq("id", reviewerId).single(),
@@ -101,13 +89,28 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
     read: false,
   });
 
+  await recordAdminAuditEvent({
+    admin: supabase,
+    context,
+    action: "editorial.reviewer_assigned",
+    targetTable: "post_reviews",
+    targetId: postId,
+    metadata: {
+      postId,
+      reviewerId,
+      round,
+    },
+  });
+
   revalidateEditorialPaths(post.slug);
   return { error: null };
 }
 
 export async function toggleFeaturedPost(postId: string, nextFeatured: boolean) {
-  const { supabase, error: accessError } = await requireEditorAccess();
-  if (accessError) return { error: accessError, featured: !nextFeatured };
+  const { supabase, context, error: accessError } = await requireEditorAccess();
+  if (accessError || !supabase || !context) {
+    return { error: accessError, featured: !nextFeatured };
+  }
 
   if (nextFeatured) {
     const { error: unfeatureError } = await supabase
@@ -131,6 +134,15 @@ export async function toggleFeaturedPost(postId: string, nextFeatured: boolean) 
     return { error: error.message, featured: !nextFeatured };
   }
 
+  await recordAdminAuditEvent({
+    admin: supabase,
+    context,
+    action: "editorial.featured_post_toggled",
+    targetTable: "posts",
+    targetId: postId,
+    metadata: { featured: nextFeatured },
+  });
+
   revalidatePath("/");
   revalidatePath("/admin/review");
   if (post?.slug) {
@@ -145,8 +157,8 @@ export async function submitEditorialDecision(input: {
   decision: EditorDecision;
   notes?: string;
 }) {
-  const { supabase, user, error: accessError } = await requireEditorAccess();
-  if (accessError || !user) return { error: accessError };
+  const { supabase, context, error: accessError } = await requireEditorAccess();
+  if (accessError || !supabase || !context) return { error: accessError };
 
   const reviewState = await getEditorialReviewState(input.postId);
   if (!reviewState.post) {
@@ -165,7 +177,7 @@ export async function submitEditorialDecision(input: {
     await recordEditorDecision({
       postId: input.postId,
       round: post.current_round,
-      editorId: user.id,
+      editorId: context.userId,
       decision: input.decision,
       notes: input.notes,
     });
@@ -184,7 +196,7 @@ export async function submitEditorialDecision(input: {
         ? await publishReviewedPost({
             postId: input.postId,
             round: post.current_round,
-            editorId: user.id,
+            editorId: context.userId,
           })
         : null;
 
@@ -234,6 +246,20 @@ export async function submitEditorialDecision(input: {
         read: false,
       });
 
+      await recordAdminAuditEvent({
+        admin: supabase,
+        context,
+        action: "editorial.decision_recorded",
+        targetTable: "posts",
+        targetId: input.postId,
+        metadata: {
+          decision: input.decision,
+          postType: post.type,
+          round: post.current_round,
+          citationId: publication?.citationId ?? post.citation_id,
+        },
+      });
+
       revalidateEditorialPaths(post.slug, publication?.citationId ?? post.citation_id);
       return { error: null };
     } catch (publishError) {
@@ -268,6 +294,20 @@ export async function submitEditorialDecision(input: {
       read: false,
     });
 
+    await recordAdminAuditEvent({
+      admin: supabase,
+      context,
+      action: "editorial.decision_recorded",
+      targetTable: "posts",
+      targetId: input.postId,
+      metadata: {
+        decision: input.decision,
+        postType: post.type,
+        round: post.current_round,
+        revisionDueAt: dueDate,
+      },
+    });
+
     revalidateEditorialPaths(post.slug, post.citation_id);
     return { error: null };
   }
@@ -286,6 +326,19 @@ export async function submitEditorialDecision(input: {
     link: "/dashboard",
     post_id: input.postId,
     read: false,
+  });
+
+  await recordAdminAuditEvent({
+    admin: supabase,
+    context,
+    action: "editorial.decision_recorded",
+    targetTable: "posts",
+    targetId: input.postId,
+    metadata: {
+      decision: input.decision,
+      postType: post.type,
+      round: post.current_round,
+    },
   });
 
   revalidateEditorialPaths(post.slug, post.citation_id);

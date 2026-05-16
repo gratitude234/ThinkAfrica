@@ -1,6 +1,9 @@
 "use server";
 
-import { createAdminClient, requireAdmin } from "@/lib/supabase/admin";
+import {
+  createAdminActionClient,
+  recordAdminAuditEvent,
+} from "@/lib/adminAccess";
 import type { AppRole, VerificationType } from "@/lib/types";
 
 function normalizeRole(
@@ -20,8 +23,9 @@ export async function updateVerificationStatus(input: {
   verifiedType: VerificationType | null;
   role: AppRole;
 }) {
+  let actionClient: Awaited<ReturnType<typeof createAdminActionClient>>;
   try {
-    await requireAdmin();
+    actionClient = await createAdminActionClient("users.verify");
   } catch (error) {
     return {
       error:
@@ -36,7 +40,7 @@ export async function updateVerificationStatus(input: {
     ? normalizeRole(nextVerifiedType, input.role)
     : "student";
 
-  const admin = createAdminClient();
+  const { admin, context } = actionClient;
   const { error } = await admin
     .from("profiles")
     .update({
@@ -45,6 +49,21 @@ export async function updateVerificationStatus(input: {
       role: nextRole,
     })
     .eq("id", input.userId);
+
+  if (!error) {
+    await recordAdminAuditEvent({
+      admin,
+      context,
+      action: "profile.verification_updated",
+      targetTable: "profiles",
+      targetId: input.userId,
+      metadata: {
+        verified: input.verified,
+        verifiedType: nextVerifiedType,
+        role: nextRole,
+      },
+    });
+  }
 
   return { error: error?.message ?? null };
 }

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminActionClient } from "@/lib/adminAccess";
+import { AdminAccessError, createAdminClient } from "@/lib/supabase/admin";
 import VerificationActions from "./VerificationActions";
 import type { AppRole } from "@/lib/types";
 
@@ -11,23 +12,12 @@ const VERIFIED_TYPE_STYLES: Record<string, string> = {
 };
 
 export default async function AdminVerificationPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: currentProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const isBootstrapAdmin = user.email === process.env.ADMIN_EMAIL;
-  const isRoleAdmin = currentProfile?.role === "admin";
-
-  if (!isBootstrapAdmin && !isRoleAdmin) {
+  let supabase: ReturnType<typeof createAdminClient> | null = null;
+  try {
+    const result = await createAdminActionClient("users.verify");
+    supabase = result.admin;
+  } catch (error) {
+    if (error instanceof AdminAccessError && error.status === 401) redirect("/login");
     return (
       <div className="mx-auto max-w-2xl py-20 text-center text-gray-500">
         Access denied.

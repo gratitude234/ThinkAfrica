@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createCheckedAdminClient, requireAdmin } from "@/lib/supabase/admin";
+import {
+  createAdminActionClient,
+  recordAdminAuditEvent,
+} from "@/lib/adminAccess";
 import { isOpportunityType } from "@/lib/opportunities";
 
 const APPLICATION_STATUSES = new Set([
@@ -40,8 +43,8 @@ export async function createFellowship(input: {
       ? input.opportunity_type
       : "fellowship";
 
-    const admin = await createCheckedAdminClient();
-    const { error } = await admin.from("fellowships").insert({
+    const { admin, context } = await createAdminActionClient("opportunities.manage");
+    const { data, error } = await admin.from("fellowships").insert({
       title,
       description: input.description.trim() || null,
       sponsor_name: input.sponsor_name.trim() || null,
@@ -54,10 +57,26 @@ export async function createFellowship(input: {
       location: input.location.trim() || null,
       featured: input.featured,
       status,
-    });
+    }).select("id").single();
 
     if (error) {
       return { error: error.message };
+    }
+
+    if (data?.id) {
+      await recordAdminAuditEvent({
+        admin,
+        context,
+        action: "opportunity.created",
+        targetTable: "fellowships",
+        targetId: data.id,
+        metadata: {
+          title,
+          status,
+          opportunityType,
+          featured: input.featured,
+        },
+      });
     }
 
     revalidatePath("/admin/fellowships");
@@ -79,15 +98,14 @@ export async function updateFellowshipApplicationStatus(
       return { error: "Invalid application status." };
     }
 
-    const { user } = await requireAdmin();
-    const admin = await createCheckedAdminClient();
+    const { admin, context } = await createAdminActionClient("opportunities.manage");
     const note = reviewNote?.trim() || null;
     const { error } = await admin
       .from("fellowship_applications")
       .update({
         status,
         review_note: note,
-        reviewed_by: user.id,
+        reviewed_by: context.userId,
         reviewed_at: new Date().toISOString(),
       })
       .eq("id", applicationId);
@@ -95,6 +113,18 @@ export async function updateFellowshipApplicationStatus(
     if (error) {
       return { error: error.message };
     }
+
+    await recordAdminAuditEvent({
+      admin,
+      context,
+      action: "opportunity_application.status_updated",
+      targetTable: "fellowship_applications",
+      targetId: applicationId,
+      metadata: {
+        status,
+        hasReviewNote: Boolean(note),
+      },
+    });
 
     revalidatePath("/admin/fellowships");
     return { error: null };

@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createCheckedAdminClient } from "@/lib/supabase/admin";
+import {
+  createAdminActionClient,
+  recordAdminAuditEvent,
+} from "@/lib/adminAccess";
 
 const PARTNER_TYPES = new Set(["university", "ngo", "government", "thinktank", "media"]);
 
@@ -23,18 +26,33 @@ export async function createPartner(input: {
       return { error: "Partner name is required." };
     }
 
-    const admin = await createCheckedAdminClient();
-    const { error } = await admin.from("institutional_partners").insert({
+    const { admin, context } = await createAdminActionClient("partners.manage");
+    const { data, error } = await admin.from("institutional_partners").insert({
       name,
       type: PARTNER_TYPES.has(input.type) ? input.type : "university",
       country: input.country.trim() || null,
       description: input.description.trim() || null,
       website_url: input.website_url.trim() || null,
       active: input.active,
-    });
+    }).select("id").single();
 
     if (error) {
       return { error: error.message };
+    }
+
+    if (data?.id) {
+      await recordAdminAuditEvent({
+        admin,
+        context,
+        action: "partner.created",
+        targetTable: "institutional_partners",
+        targetId: data.id,
+        metadata: {
+          name,
+          active: input.active,
+          type: PARTNER_TYPES.has(input.type) ? input.type : "university",
+        },
+      });
     }
 
     revalidatePath("/admin/partners");
@@ -47,15 +65,25 @@ export async function createPartner(input: {
 
 export async function togglePartner(partnerId: string, active: boolean) {
   try {
-    const admin = await createCheckedAdminClient();
+    const { admin, context } = await createAdminActionClient("partners.manage");
+    const nextActive = !active;
     const { error } = await admin
       .from("institutional_partners")
-      .update({ active: !active })
+      .update({ active: nextActive })
       .eq("id", partnerId);
 
     if (error) {
       return { error: error.message };
     }
+
+    await recordAdminAuditEvent({
+      admin,
+      context,
+      action: "partner.visibility_toggled",
+      targetTable: "institutional_partners",
+      targetId: partnerId,
+      metadata: { active: nextActive },
+    });
 
     revalidatePath("/admin/partners");
     revalidatePath("/partners");

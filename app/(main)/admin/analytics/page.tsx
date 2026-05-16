@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminActionClient } from "@/lib/adminAccess";
+import { AdminAccessError, createAdminClient } from "@/lib/supabase/admin";
 import AnalyticsCharts from "./AnalyticsCharts";
 import { getActionInboxSummary } from "@/lib/actionInbox";
 import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
@@ -223,15 +224,12 @@ function computeReturnRate(
 }
 
 export default async function AdminAnalyticsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail || user.email !== adminEmail) {
+  let supabase: ReturnType<typeof createAdminClient> | null = null;
+  try {
+    const result = await createAdminActionClient("analytics.view");
+    supabase = result.admin;
+  } catch (error) {
+    if (error instanceof AdminAccessError && error.status === 401) redirect("/login");
     return (
       <div className="max-w-2xl mx-auto py-20 text-center text-gray-500">
         Access denied.

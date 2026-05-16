@@ -4,6 +4,7 @@ import GuestBanner from "@/components/ui/GuestBanner";
 import { isLiteModeServer } from "@/lib/liteMode";
 import NavigationShell from "./NavigationShell";
 import { canReview } from "@/lib/roles";
+import { canAccessAdminHubForRole } from "@/lib/adminAccess";
 
 export default async function MainLayout({
   children,
@@ -34,7 +35,10 @@ export default async function MainLayout({
 
   const isAdmin =
     !!user &&
-    (user.email === process.env.ADMIN_EMAIL || profileData?.role === "admin");
+    canAccessAdminHubForRole(
+      profileData?.role,
+      Boolean(process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL)
+    );
   const canAccessReview = !!profileData?.role && canReview(profileData.role);
   const cookieStore = await cookies();
   const isLite = isLiteModeServer(cookieStore.toString());

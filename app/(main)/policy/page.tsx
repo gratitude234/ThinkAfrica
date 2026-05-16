@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminContext, hasCapability } from "@/lib/adminAccess";
 import { formatDate } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
 import FeaturePolicyButton from "./FeaturePolicyButton";
@@ -8,10 +9,8 @@ import SponsorBanner from "@/components/ui/SponsorBanner";
 export default async function PolicyHubPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const isAdmin = !!user && user.email === process.env.ADMIN_EMAIL;
+  const adminContext = await getAdminContext();
+  const canFeaturePolicyBriefs = hasCapability(adminContext, "editorial.manage");
 
   // Fetch featured policy briefs
   const { data: featuredRaw } = await supabase
@@ -174,7 +173,7 @@ export default async function PolicyHubPage() {
                         {post.view_count > 0 && ` · ${post.view_count} views`}
                       </p>
                     </div>
-                    {isAdmin && (
+                    {canFeaturePolicyBriefs && (
                       <div className="flex-shrink-0">
                         <FeaturePolicyButton postId={post.id} />
                       </div>

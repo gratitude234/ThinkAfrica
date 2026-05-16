@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { AdminAccessError, createCheckedAdminClient } from "@/lib/supabase/admin";
+import { createAdminActionClient } from "@/lib/adminAccess";
+import { AdminAccessError, createAdminClient } from "@/lib/supabase/admin";
 import { formatDate } from "@/lib/utils";
 import AmbassadorActions from "./AmbassadorActions";
 
@@ -10,9 +11,10 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default async function AdminAmbassadorsPage() {
-  let supabase: Awaited<ReturnType<typeof createCheckedAdminClient>> | null = null;
+  let supabase: ReturnType<typeof createAdminClient> | null = null;
   try {
-    supabase = await createCheckedAdminClient();
+    const result = await createAdminActionClient("ambassadors.manage");
+    supabase = result.admin;
   } catch (error) {
     if (error instanceof AdminAccessError && error.status === 401) redirect("/login");
     return (
