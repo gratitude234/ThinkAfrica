@@ -94,7 +94,7 @@ export default async function NotificationsPage() {
   const unreadCount = notifications.filter((notification) => !notification.read).length;
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-3xl">
       <NotificationsPageClient
         userId={user.id}
         initialUnreadCount={unreadCount}

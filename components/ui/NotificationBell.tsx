@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
 import { createClient } from "@/lib/supabase/client";
 
 interface Notification {
@@ -72,6 +73,10 @@ export default function NotificationBell({ userId }: { userId: string }) {
   const supabase = useMemo(() => createClient(), []);
 
   const unreadCount = notifications.filter((notification) => !notification.read).length;
+  const actionSummary = useMemo(
+    () => getActionInboxSummary(notifications),
+    [notifications]
+  );
 
   useEffect(() => {
     async function fetchNotifications() {
@@ -150,6 +155,29 @@ export default function NotificationBell({ userId }: { userId: string }) {
     });
   }
 
+  function trackAction(item: ActionInboxItem) {
+    trackActivationEvent({
+      event: "next_action_clicked",
+      metadata: {
+        actionKey: item.actionKey,
+        label: item.cta,
+        source: "notification_bell",
+        notificationId: item.notificationId,
+        type: item.type,
+        postId: item.postId,
+      },
+    });
+    trackActivationEvent({
+      event: "notification_opened",
+      metadata: {
+        notificationId: item.notificationId,
+        type: item.type,
+        source: "notification_bell",
+        postId: item.postId,
+      },
+    });
+  }
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -206,7 +234,33 @@ export default function NotificationBell({ userId }: { userId: string }) {
                 </Link>
               </div>
             ) : (
-              notifications.map((notification) => {
+              <>
+                {actionSummary.primaryAction ? (
+                  <div className="px-3 py-3">
+                    <Link
+                      href={actionSummary.primaryAction.href}
+                      onClick={() => {
+                        trackAction(actionSummary.primaryAction as ActionInboxItem);
+                        setOpen(false);
+                      }}
+                      className="block rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 transition-colors hover:bg-emerald-100/60"
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                        Needs attention
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                        {actionSummary.primaryAction.label}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-600">
+                        {actionSummary.primaryAction.description}
+                      </p>
+                      <p className="mt-2 text-xs font-semibold text-emerald-700">
+                        {actionSummary.primaryAction.cta}
+                      </p>
+                    </Link>
+                  </div>
+                ) : null}
+                {notifications.map((notification) => {
                 const inner = (
                   <div className="flex items-start gap-3">
                     <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600">
@@ -248,7 +302,8 @@ export default function NotificationBell({ userId }: { userId: string }) {
                     )}
                   </div>
                 );
-              })
+                })}
+              </>
             )}
           </div>
 

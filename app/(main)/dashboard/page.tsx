@@ -10,6 +10,7 @@ import PortfolioProgressCard, {
   type PortfolioProgressItem,
 } from "./PortfolioProgressCard";
 import CollaborationDashboardCard from "@/components/collaboration/CollaborationDashboardCard";
+import ActionInboxPanel from "@/components/notifications/ActionInboxPanel";
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
@@ -28,6 +29,7 @@ import { getOpportunityMatchSummary } from "@/lib/opportunityMatch";
 import { getRetentionSummary } from "@/lib/retention";
 import { getPostQualitySummary } from "@/lib/postQuality";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
+import { getActionInboxSummary } from "@/lib/actionInbox";
 import { updateOpportunityInquiryStatus } from "./opportunityInquiryActions";
 
 function WorkUnderReviewPanel({
@@ -315,6 +317,44 @@ export default async function DashboardPage() {
     user.id,
     activationState
   );
+
+  const { data: actionNotificationsRaw } = await supabase
+    .from("notifications")
+    .select(
+      `
+      id, type, read, created_at, actor_id, post_id, message, link,
+      actor:profiles!notifications_actor_id_fkey(full_name, username, avatar_url),
+      post:posts!notifications_post_id_fkey(title, slug)
+    `
+    )
+    .eq("user_id", user.id)
+    .eq("read", false)
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  const actionNotifications = (actionNotificationsRaw ?? []).map((notification) => {
+    const actor = Array.isArray(notification.actor)
+      ? notification.actor[0]
+      : notification.actor;
+    const post = Array.isArray(notification.post)
+      ? notification.post[0]
+      : notification.post;
+
+    return {
+      id: notification.id,
+      type: notification.type,
+      read: notification.read,
+      created_at: notification.created_at,
+      message: notification.message ?? null,
+      link: notification.link ?? null,
+      post_id: notification.post_id ?? null,
+      actor,
+      actor_username: actor?.username ?? null,
+      post_title: post?.title ?? null,
+      post_slug: post?.slug ?? null,
+    };
+  });
+  const actionInboxSummary = getActionInboxSummary(actionNotifications);
 
   // Fellowship applications by this user
   const { data: applicationsRaw } = await supabase
@@ -771,6 +811,12 @@ export default async function DashboardPage() {
       )}
 
       <WorkUnderReviewPanel items={workUnderReviewItems} />
+
+      <ActionInboxPanel
+        summary={actionInboxSummary}
+        source="dashboard_action_inbox"
+        compact
+      />
 
       <PortfolioProgressCard
         items={portfolioItems}

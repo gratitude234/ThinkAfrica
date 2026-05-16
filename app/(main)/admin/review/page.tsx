@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
 import { formatDate } from "@/lib/utils";
@@ -93,6 +94,8 @@ export default async function AdminReviewPage() {
     );
   }
 
+  const admin = createAdminClient();
+
   const [
     { data: pendingPostsRaw },
     { data: publishedPostsRaw },
@@ -103,7 +106,7 @@ export default async function AdminReviewPage() {
     { data: decisionsRaw },
     { data: versionsRaw },
   ] = await Promise.all([
-    supabase
+    admin
       .from("posts")
       .select(
         `
@@ -116,7 +119,7 @@ export default async function AdminReviewPage() {
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(50),
-    supabase
+    admin
       .from("posts")
       .select(
         `id, title, excerpt, type, featured, created_at,
@@ -125,25 +128,25 @@ export default async function AdminReviewPage() {
       .eq("status", "published")
       .order("published_at", { ascending: false })
       .limit(20),
-    supabase.from("policy_briefs_featured").select("post_id"),
-    supabase.from("submission_tracks").select("*"),
-    supabase
+    admin.from("policy_briefs_featured").select("post_id"),
+    admin.from("submission_tracks").select("*"),
+    admin
       .from("profiles")
       .select("id, username, full_name, role")
       .in("role", ["reviewer", "editor", "admin"]),
-    supabase
+    admin
       .from("post_reviews")
       .select(
         "post_id, reviewer_id, submitted_at, recommendation, notes, round, reviewer:profiles!post_reviews_reviewer_id_fkey(id, username, full_name)"
       )
       .order("assigned_at", { ascending: true }),
-    supabase
+    admin
       .from("post_editor_decisions")
       .select(
         "post_id, round, decision, notes, created_at, editor:profiles!post_editor_decisions_editor_id_fkey(username, full_name)"
       )
       .order("created_at", { ascending: false }),
-    supabase
+    admin
       .from("post_versions")
       .select("post_id, id, version_kind, round, created_at")
       .order("created_at", { ascending: true }),
@@ -173,7 +176,7 @@ export default async function AdminReviewPage() {
 
   const alreadyFeatured = new Set((featuredIdsRaw ?? []).map((item) => item.post_id));
 
-  const { data: policyBriefsRaw } = await supabase
+  const { data: policyBriefsRaw } = await admin
     .from("posts")
     .select(
       "id, title, excerpt, tags, created_at, profiles!posts_author_id_fkey (full_name, university)"

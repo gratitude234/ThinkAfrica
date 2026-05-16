@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AnalyticsCharts from "./AnalyticsCharts";
+import { getActionInboxSummary } from "@/lib/actionInbox";
 import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
 import { getOpportunityShortLabel } from "@/lib/opportunities";
 
@@ -42,6 +43,16 @@ interface TalentInquiryAnalyticsRow {
   timeline: string | null;
   commitment: string | null;
   fit_reason: string | null;
+}
+
+interface NotificationAnalyticsRow {
+  id: string;
+  type: string;
+  read: boolean;
+  created_at: string;
+  message: string | null;
+  link: string | null;
+  post_id: string | null;
 }
 
 interface PromisingPostRow {
@@ -251,6 +262,7 @@ export default async function AdminAnalyticsPage() {
     { data: followsRaw },
     { data: talentProfilesRaw },
     { data: talentInquiriesRaw, count: totalTalentInquiries },
+    { data: notificationsRaw },
     { count: acceptedCoauthorCount },
     { count: totalMessages },
     { data: debateArgumentsRaw },
@@ -319,6 +331,10 @@ export default async function AdminAnalyticsPage() {
       )
       .limit(10000),
     supabase
+      .from("notifications")
+      .select("id, type, read, created_at, message, link, post_id")
+      .limit(10000),
+    supabase
       .from("post_authors")
       .select("*", { count: "exact", head: true })
       .not("accepted_at", "is", null)
@@ -335,6 +351,7 @@ export default async function AdminAnalyticsPage() {
   const activationEvents = (activationEventsRaw ?? []) as ActivationEventRow[];
   const talentProfiles = (talentProfilesRaw ?? []) as TalentProfileAnalyticsRow[];
   const talentInquiries = (talentInquiriesRaw ?? []) as TalentInquiryAnalyticsRow[];
+  const notifications = (notificationsRaw ?? []) as NotificationAnalyticsRow[];
   const opportunityApplications = (opportunityApplicationsRaw ?? []).map((application) => ({
     ...application,
     fellowship: Array.isArray(application.fellowships)
@@ -595,6 +612,27 @@ export default async function AdminAnalyticsPage() {
     "notification_opened"
   );
   const responseStartedUsers = uniqueUsersForEvent(activationEvents, "response_started");
+  const notificationOpenRows = activationEvents.filter(
+    (event) => event.event_name === "notification_opened"
+  );
+  const actionInboxClickRows = activationEvents.filter((event) => {
+    if (event.event_name !== "next_action_clicked") return false;
+    const source = eventMetadataValue(event, "source") ?? "";
+    return (
+      source.includes("notifications") ||
+      source.includes("notification_bell") ||
+      source.includes("dashboard_action_inbox")
+    );
+  });
+  const responseStartsFromNotifications = activationEvents.filter(
+    (event) =>
+      event.event_name === "response_started" &&
+      (eventMetadataValue(event, "source") ?? "").includes("notifications")
+  );
+  const inquiryTriageRows = activationEvents.filter(
+    (event) => event.event_name === "opportunity_inquiry_status_updated"
+  );
+  const actionInboxSummary = getActionInboxSummary(notifications);
   const searchUsers = uniqueUsersForEvent(activationEvents, "search_performed");
   const exploreUsers = uniqueUsersForEvent(activationEvents, "discover_viewed");
   const discoveryClickRows = activationEvents.filter(
@@ -960,6 +998,68 @@ export default async function AdminAnalyticsPage() {
             )}
             trend="neutral"
             trendLabel={`${returnedAfterFirstContribution} of ${firstContributionEligible.length} eligible users`}
+          />
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">
+          Action Inbox
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <HealthCard
+            label="Unread Action Items"
+            value={actionInboxSummary.unreadActionCount}
+            trend="neutral"
+            trendLabel="from current notifications"
+          />
+          <HealthCard
+            label="Stale Unread"
+            value={actionInboxSummary.staleUnreadCount}
+            trend="neutral"
+            trendLabel="older than 7 days"
+          />
+          <HealthCard
+            label="Notification Opens"
+            value={notificationOpenRows.length}
+            trend="neutral"
+            trendLabel={`${notificationOpenedUsers.size.toLocaleString()} unique users`}
+          />
+          <HealthCard
+            label="Inbox Action Clicks"
+            value={actionInboxClickRows.length}
+            trend="neutral"
+            trendLabel="notifications, bell, and dashboard"
+          />
+          <HealthCard
+            label="Response Starts"
+            value={responseStartsFromNotifications.length}
+            trend="neutral"
+            trendLabel="from notification response CTAs"
+          />
+          <HealthCard
+            label="Inquiry Triage"
+            value={inquiryTriageRows.length}
+            trend="neutral"
+            trendLabel="read/archive actions"
+          />
+          <HealthCard
+            label="Response Items"
+            value={
+              actionInboxSummary.groups.find((group) => group.key === "responses")
+                ?.items.length ?? 0
+            }
+            trend="neutral"
+            trendLabel="notification backlog"
+          />
+          <HealthCard
+            label="Opportunity Items"
+            value={
+              actionInboxSummary.groups.find((group) => group.key === "opportunities")
+                ?.items.length ?? 0
+            }
+            trend="neutral"
+            trendLabel="partner outreach backlog"
           />
         </div>
       </div>

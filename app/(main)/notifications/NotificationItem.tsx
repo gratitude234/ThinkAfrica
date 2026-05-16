@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
 import { formatRelativeTime } from "@/lib/utils";
 import { respondToCoAuthorInvite } from "./actions";
 
@@ -121,7 +122,8 @@ export default function NotificationItem({
 }: {
   notification: NotificationData;
 }) {
-  const message = buildMessage(notification);
+  const inboxItem = getActionInboxSummary([notification]).items[0];
+  const message = inboxItem?.description ?? buildMessage(notification);
   const link = buildLink(notification);
   const icon = TYPE_ICONS[notification.type] ?? "N";
   const writeBackHref = notification.post_id
@@ -129,6 +131,31 @@ export default function NotificationItem({
     : null;
   const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");
   const [localRead, setLocalRead] = useState(notification.read);
+
+  const trackNotificationAction = (source: string, item?: ActionInboxItem) => {
+    trackActivationEvent({
+      event: "notification_opened",
+      metadata: {
+        notificationId: notification.id,
+        type: notification.type,
+        source,
+        postId: notification.post_id ?? null,
+      },
+    });
+    if (item) {
+      trackActivationEvent({
+        event: "next_action_clicked",
+        metadata: {
+          actionKey: item.actionKey,
+          label: item.cta,
+          source,
+          notificationId: notification.id,
+          type: notification.type,
+          postId: notification.post_id ?? null,
+        },
+      });
+    }
+  };
 
   const handleInviteResponse = async (accept: boolean) => {
     if (!notification.post_id || inviteState === "saving") return;
@@ -168,10 +195,20 @@ export default function NotificationItem({
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-sm leading-snug text-gray-700">{message}</p>
+        {inboxItem ? (
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            {inboxItem.label}
+          </p>
+        ) : null}
+        <p className="mt-0.5 text-sm leading-snug text-gray-700">{message}</p>
         <p className="mt-1 text-xs text-gray-500">
           {formatRelativeTime(notification.created_at)}
         </p>
+        {inboxItem && notification.type !== "co_author_invite" ? (
+          <p className="mt-2 text-xs font-semibold text-emerald-700">
+            {inboxItem.cta}
+          </p>
+        ) : null}
         {notification.type === "co_author_invite" && notification.post_id ? (
           <div className="mt-3 flex gap-2">
             {inviteState === "accepted" || inviteState === "declined" ? (
@@ -220,14 +257,7 @@ export default function NotificationItem({
           <Link
             href={link}
             onClick={() => {
-              trackActivationEvent({
-                event: "notification_opened",
-                metadata: {
-                  notificationId: notification.id,
-                  type: notification.type,
-                  source: "notifications_page",
-                },
-              });
+              trackNotificationAction("notifications_page", inboxItem);
             }}
           >
             {inner}
@@ -246,6 +276,9 @@ export default function NotificationItem({
                     actionKey: "response_received",
                     label: "Read response",
                     source: "notifications_response",
+                    notificationId: notification.id,
+                    type: notification.type,
+                    postId: notification.post_id ?? null,
                   },
                 });
                 trackActivationEvent({
@@ -254,6 +287,7 @@ export default function NotificationItem({
                     notificationId: notification.id,
                     type: notification.type,
                     source: "notifications_response",
+                    postId: notification.post_id ?? null,
                   },
                 });
               }}
@@ -272,6 +306,9 @@ export default function NotificationItem({
                     actionKey: "write_back",
                     label: "Write back",
                     source: "notifications_response",
+                    notificationId: notification.id,
+                    type: notification.type,
+                    postId: notification.post_id ?? null,
                   },
                 });
                 trackActivationEvent({
@@ -296,16 +333,9 @@ export default function NotificationItem({
   if (link && notification.type !== "co_author_invite") {
     return (
       <Link
-        href={link}
-        onClick={() => {
-          trackActivationEvent({
-            event: "notification_opened",
-            metadata: {
-              notificationId: notification.id,
-              type: notification.type,
-              source: "notifications_page",
-            },
-          });
+            href={link}
+            onClick={() => {
+          trackNotificationAction("notifications_page", inboxItem);
         }}
       >
         {inner}
