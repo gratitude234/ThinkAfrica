@@ -26,6 +26,9 @@ export interface PostCardData {
   response_count?: number;
   citation_id?: string | null;
   published_version_id?: string | null;
+  document_original_name?: string | null;
+  document_mime_type?: string | null;
+  document_size_bytes?: number | null;
   cover_image_url?: string | null;
   score?: number;
   quality_score?: number;
@@ -101,6 +104,12 @@ function estimateReadTime(excerpt: string | null): number {
   );
 }
 
+function formatDocumentSize(value: number | null | undefined) {
+  if (!value) return null;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function PostCard({
   post,
 }: PostCardProps) {
@@ -109,6 +118,13 @@ export default function PostCard({
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const readTime = estimateReadTime(excerpt);
+  const documentSize = formatDocumentSize(post.document_size_bytes);
+  const readingLabel =
+    post.type === "research"
+      ? documentSize
+        ? `PDF manuscript / ${documentSize}`
+        : "PDF manuscript"
+      : `${readTime} min read`;
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
   const authorHref = author?.username ? `/${author.username}` : null;
   const coAuthorCount = post.co_authors?.length ?? 0;
@@ -124,7 +140,11 @@ export default function PostCard({
   const commentCount = typeof post.comment_count === "number" ? post.comment_count : null;
   const viewCount = typeof post.view_count === "number" ? post.view_count : null;
   const qualityBadges = (post.quality_badges ?? [])
-    .filter((badge) => !["reviewed", "citable"].includes(badge.key))
+    .filter((badge) =>
+      post.type === "research"
+        ? !["reviewed", "citable", "source_backed"].includes(badge.key)
+        : !["reviewed", "citable"].includes(badge.key)
+    )
     .slice(0, 3);
 
   return (
@@ -140,8 +160,13 @@ export default function PostCard({
               {typeLabel}
             </span>
             <span className="text-[11px] font-medium text-ink-muted">
-              {readTime} min read
+              {readingLabel}
             </span>
+            {post.type === "research" ? (
+              <span className="inline-flex rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-purple-700">
+                PDF
+              </span>
+            ) : null}
             {post.in_response_to ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
                 {"↩"} Response
@@ -149,7 +174,11 @@ export default function PostCard({
             ) : null}
             {isReviewed ? (
               <span
-                className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${SIGNAL_BADGES.reviewed}`}
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${
+                  post.type === "research"
+                    ? "border-purple-200 bg-purple-50 text-purple-700"
+                    : SIGNAL_BADGES.reviewed
+                }`}
               >
                 Reviewed
               </span>

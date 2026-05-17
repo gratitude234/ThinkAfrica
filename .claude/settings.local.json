@@ -16,7 +16,11 @@
       "Bash(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\" -Force)",
       "Bash(Select-Object Name, Mode)",
       "Bash(Format-Table -AutoSize)",
-      "Bash(xargs wc -l)"
+      "Bash(xargs wc -l)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\\\\app\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\dev\\\\Think_Africa\\\\\"\\), \"\" } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\\\\lib\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\dev\\\\Think_Africa\\\\\"\\), \"\" } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\\\\components\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\dev\\\\Think_Africa\\\\\"\\), \"\" } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\\\\supabase\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\dev\\\\Think_Africa\\\\\"\\), \"\" } | Sort-Object)"
     ]
   }
 }

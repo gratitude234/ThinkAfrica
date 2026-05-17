@@ -36,20 +36,43 @@ Optional:
 
 ```
 app/
-├── (auth)/          # Login, signup — standalone layout
-├── (main)/          # Full app shell with navigation
-│   ├── page.tsx     # Home feed
-│   ├── write/       # Post creation
-│   ├── post/[slug]/ # Post detail + comments/reviews
-│   ├── [username]/  # User profile
-│   ├── admin/       # Review queue, analytics, fellowships
-│   ├── debates/     # Debate platform
-│   ├── messages/    # Direct messaging
-│   └── ...          # ~30 more routes
+├── (auth)/          # Login, signup, forgot/reset-password — standalone AuthShell layout
+├── (main)/          # Full app shell with NavigationShell
+│   ├── page.tsx     # Home feed (tabs: home/following/latest)
+│   ├── write/       # Post creation (blog, essay, research, policy_brief)
+│   ├── submit/research/  # Research-specific submission form
+│   ├── post/[slug]/ # Post detail, comments, reviews
+│   ├── edit/[slug]/ # Edit published posts
+│   ├── publication/[citationId]/  # Published post with citation
+│   ├── [username]/  # User profile with followers/following
+│   ├── dashboard/   # User dashboard
+│   ├── settings/    # User settings
+│   ├── admin/       # Review queue, analytics, fellowships, partners, sponsors, ambassadors, digest, verification
+│   ├── debates/     # Debate platform (guarded by FEATURE_FLAGS.debates)
+│   ├── messages/[id]/  # Direct messaging
+│   ├── discover/    # Explore interface
+│   ├── search/      # Full-text search
+│   ├── topics/[tag]/   # Tag-based filtering
+│   ├── bookmarks/   # Saved posts
+│   ├── leaderboard/ # Points/contribution ranking
+│   ├── opportunities/  # Fellowships/scholarships
+│   ├── onboarding/  # New user flow
+│   └── notifications/  # Activity notifications
 └── (marketing)/     # Landing page, public info pages
 ```
 
-API routes live in `app/api/`: `feed`, `audio-summary`, `debate-recap`, `upload-image`, `og`, `activation`.
+API routes (`app/api/`):
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/feed` | Paginated feed with ranking |
+| `POST /api/upload-image` | Image upload to Supabase Storage |
+| `POST /api/research-document/upload` | PDF/document upload |
+| `GET /api/research-document/[postId]` | Retrieve research document |
+| `POST /api/audio-summary` | Claude API audio synthesis |
+| `POST /api/debate-recap` | Generate debate summary |
+| `POST /api/activation` | Track activation/onboarding events |
+| `GET /api/og` | Open Graph image generation |
 
 ### Data Layer
 
@@ -58,39 +81,66 @@ Supabase clients are split by context — always use the right one:
 - `lib/supabase/server.ts` — server components and route handlers
 - `lib/supabase/admin.ts` — server-only operations requiring elevated privileges
 
-The feed is driven by `lib/feedData.ts` (`fetchFeedPage()`) with tab/timeframe/type filtering and custom ranking logic in `lib/feedRanking.ts`.
+The feed is driven by `lib/feedData.ts` (`fetchFeedPage()`) with tab/timeframe/type filtering and custom ranking logic in `lib/feedRanking.ts`. Quality signals come from `lib/postQuality.ts`.
 
 ### Authentication & Authorization
 
-Auth is handled via Supabase SSR (`@supabase/ssr`). The auth proxy in `proxy.ts` intercepts requests, refreshes sessions via cookies, and redirects unauthenticated users away from protected routes (`/write`, `/admin/*`, `/dashboard`, `/settings`, etc.).
+`proxy.ts` (the middleware) creates a Supabase SSR client, refreshes auth cookies, and redirects unauthenticated users away from protected routes: `/write`, `/admin/*`, `/debates/create`, `/onboarding`, `/stats`, `/dashboard`, `/settings`, `/bookmarks`, `/notifications`, `/edit/*`.
 
 Role system (`lib/roles.ts`):
 - Roles: `student` | `reviewer` | `editor` | `admin`
 - `canReview()` → reviewer, editor, admin
 - `canPublish()` → editor, admin
 - Admin is granted when the user's email matches `ADMIN_EMAIL`
+- Admin route guards live in `lib/adminAccess.ts` (`requireAdminHubAccess()`)
 
 ### Post Workflow
 
-Posts move through statuses: `draft → pending → pending_revision → published | rejected`. The editorial review state machine lives in `lib/reviewWorkflow.ts`. Post type minimum word counts: blog (50), essay (500), policy_brief (400), research (1500). Quality scoring is in `lib/postQuality.ts`.
+Posts move through statuses: `draft → pending → pending_revision → published | rejected`. The editorial review state machine lives in `lib/reviewWorkflow.ts`. Tables involved: `post_reviews` (round-based reviewer feedback), `post_editor_decisions` (editor approve/reject).
+
+Post type minimum word counts: blog (50), essay (500), policy_brief (400), research (1500).
 
 ### Key Utilities
 
 | File | Purpose |
 |------|---------|
-| `lib/types.ts` | Shared TypeScript interfaces |
-| `lib/featureFlags.ts` | Feature gates |
+| `lib/types.ts` | Shared TypeScript interfaces — `PostStatus`, `PostType`, `AppRole`, `ReviewRecommendation`, `EditorDecision` |
+| `lib/featureFlags.ts` | Feature gates — `debates: true`, `fellowshipsSection/ambassadors/talentMarketplace: false` |
 | `lib/sanitizePostHtml.ts` | HTML sanitization before DB writes |
-| `lib/activation.ts` | Onboarding/activation tracking |
+| `lib/activation.ts` / `lib/activationServer.ts` | Onboarding/activation tracking |
 | `lib/roles.ts` | Permission helpers |
+| `lib/debatePhases.ts` | Debate state machine |
+| `lib/opportunityMatch.ts` | Fellowship recommendation matching |
+| `lib/citationId.ts` | Citation ID generation for publications |
+
+### Component Organization
+
+```
+components/
+├── editor/          # Editor.tsx — Tiptap wrapper (StarterKit, Image, CharacterCount, Placeholder)
+├── post/            # PostCard, PostFeed, PostCover
+├── profile/         # ProfileHeader, ProfileCard, CredentialsCard
+├── admin/           # Admin-specific UI
+├── collaboration/   # Co-author invite UI
+├── editorial/       # EditorialTrustPanel
+├── notifications/   # Notification UI
+├── opportunities/   # Fellowship cards, application UI
+├── retention/       # Activation checklist, retention banners
+└── ui/              # Button, Badge, Toast, SearchOverlay, Footer, etc.
+```
+
+The `Editor.tsx` component exposes an `EditorHandle` ref (`toggleBold`, `toggleItalic`, `toggleH2`, `toggleBulletList`, `toggleBlockquote`, `isActive`) for toolbar integration, and fires `onUpdate` / `onAutoSave` callbacks.
 
 ### UI Conventions
 
 - Server Components fetch data directly with the server Supabase client; mark interactive leaves with `"use client"`.
 - Loading states use `loading.tsx` skeleton files (Suspense boundaries).
-- Custom brand colors are defined in `tailwind.config.ts`: `brand-emerald` (#10B981), `brand-gold` (#F59E0B), `brand-purple` (#7C3AED). Use these instead of raw Tailwind color classes for on-brand UI.
+- Custom brand colors in `tailwind.config.ts`: `brand-emerald` (#10B981), `brand-gold` (#F59E0B), `brand-purple` (#7C3AED). Use these instead of raw Tailwind color classes.
 - Fonts: Inter (body) and Playfair Display (headlines) — applied in the root layout.
+- Nav visibility for feature-flagged sections (debates, fellowships, ambassadors, talent) is controlled exclusively via `lib/featureFlags.ts`.
 
-### Database Migrations
+### Database
 
-Schema lives in `supabase/schema.sql` (base) and incremental `supabase/schema_phase2-5.sql`. Timestamped migration files are in `supabase/migrations/`. Run migrations against the Supabase dashboard or CLI — there is no local migration runner configured.
+Key tables: `profiles`, `posts`, `post_versions`, `post_authors` (co-authors), `post_references`, `post_likes`, `post_comments`, `post_reviews`, `post_editor_decisions`, `debates`, `debate_rounds`, `debate_arguments`, `follows`, `messages`, `notifications`, `badges`, `user_badges`, `opportunities`, `opportunity_applications`, `ambassador_applications`, `editor_assignments`.
+
+Schema: `supabase/schema.sql` (base) + `supabase/schema_phase2-5.sql` (incremental). Timestamped migrations in `supabase/migrations/`. Apply via Supabase dashboard or CLI — no local migration runner configured.

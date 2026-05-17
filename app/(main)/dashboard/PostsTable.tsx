@@ -318,7 +318,10 @@ export default function PostsTable({
                     (post.type === "research" || post.type === "policy_brief");
                   const reviewStatus = getReviewStatus(post);
                   const actionHref =
-                    post.status === "draft"
+                    post.type === "research" &&
+                    (post.status === "draft" || post.status === "pending_revision")
+                      ? `/submit/research?draft=${post.id}`
+                      : post.status === "draft"
                       ? `/write?draft=${post.id}`
                       : reviewedPublication && post.citation_id
                         ? `/publication/${post.citation_id}`

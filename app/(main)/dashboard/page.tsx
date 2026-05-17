@@ -566,7 +566,12 @@ export default async function DashboardPage() {
         title: post.title,
         status: post.status,
         actionHref:
-          post.status === "draft" ? `/write?draft=${post.id}` : `/edit/${post.slug}`,
+          post.type === "research" &&
+          (post.status === "draft" || post.status === "pending_revision")
+            ? `/submit/research?draft=${post.id}`
+            : post.status === "draft"
+              ? `/write?draft=${post.id}`
+              : `/edit/${post.slug}`,
         actionLabel:
           post.status === "pending_revision"
             ? "Review notes"

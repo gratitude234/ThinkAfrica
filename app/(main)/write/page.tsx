@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
@@ -12,9 +12,7 @@ import CoAuthorPicker, {
 import ProfileGate from "@/components/ui/ProfileGate";
 import type { PostReferenceRecord } from "@/lib/types";
 import { formatRelativeTime, type PostType } from "@/lib/utils";
-import ContinueDraftBanner from "./ContinueDraftBanner";
 import { useDraftManager } from "./DraftManager";
-import MyDrafts from "./MyDrafts";
 import PublishDrawer from "./PublishDrawer";
 import WriteReadinessPanel from "./WriteReadinessPanel";
 import { ensureDraft, savePostReferences } from "./actions";
@@ -46,15 +44,55 @@ interface DraftPayload {
   inResponseToId: string | null;
 }
 
-const MOBILE_TOOLBAR_BUTTONS = [
-  { label: "B", title: "Bold", action: "bold", italic: false },
-  { label: "I", title: "Italic", action: "italic", italic: true },
-  { label: "H2", title: "Heading", action: "heading", italic: false },
-  { label: "—", title: "List", action: "list", italic: false },
-  { label: "❝", title: "Quote", action: "quote", italic: false },
-] as const;
+type MobileToolbarAction = "bold" | "italic" | "heading" | "list" | "quote";
 
-type MobileToolbarAction = (typeof MOBILE_TOOLBAR_BUTTONS)[number]["action"];
+const MOBILE_TOOLBAR_BUTTONS: Array<{
+  title: string;
+  action: MobileToolbarAction;
+  icon: ReactNode;
+}> = [
+  {
+    title: "Bold",
+    action: "bold",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 4h8a4 4 0 010 8H6zm0 8h9a4 4 0 010 8H6z" />
+      </svg>
+    ),
+  },
+  {
+    title: "Italic",
+    action: "italic",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 4h-9M14 20H5M15 4 9 20" />
+      </svg>
+    ),
+  },
+  {
+    title: "Heading",
+    action: "heading",
+    icon: <span className="text-sm font-bold">H2</span>,
+  },
+  {
+    title: "List",
+    action: "list",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+      </svg>
+    ),
+  },
+  {
+    title: "Quote",
+    action: "quote",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1zm12 0c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
+      </svg>
+    ),
+  },
+];
 
 function countWords(value: string) {
   return value
@@ -598,28 +636,32 @@ export default function WritePage() {
 
   if (loadingDraft) {
     return (
-      <div className="mx-auto max-w-3xl py-12 text-center text-gray-400">
-        Loading draft...
+      <div className="mx-auto max-w-6xl animate-pulse pb-24 lg:pb-0">
+        <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="h-5 w-28 rounded bg-gray-200" />
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-16 rounded-lg bg-gray-200" />
+            <div className="h-8 w-32 rounded-lg bg-gray-200" />
+          </div>
+        </div>
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-4">
+            <div className="h-14 w-full rounded-xl bg-gray-100" />
+            <div className="h-12 w-3/4 rounded bg-gray-200" />
+            <div className="h-7 w-1/2 rounded bg-gray-100" />
+            <div className="h-96 w-full rounded-lg bg-gray-100" />
+          </div>
+          <div className="hidden space-y-3 lg:block">
+            <div className="h-48 w-full rounded-xl bg-gray-100" />
+            <div className="h-32 w-full rounded-xl bg-gray-100" />
+          </div>
+        </div>
       </div>
     );
   }
 
   const showStructureStrip =
     starterParam === "1" || (!draftParam && wordCount === 0);
-  const supportTools = (
-    <>
-      <ContinueDraftBanner activeDraftId={draftId} variant="panel" />
-      <MyDrafts activeDraftId={draftId} variant="panel" />
-      {currentUserId ? (
-        <CoAuthorPicker
-          userId={currentUserId}
-          value={coAuthors}
-          onChange={setCoAuthors}
-          source="write"
-        />
-      ) : null}
-    </>
-  );
   const readinessPanel = (
     <WriteReadinessPanel
       postType={postType}
@@ -639,9 +681,7 @@ export default function WritePage() {
       canOpenPublish={canOpenPublish}
       onChangeFormat={() => setShowChooser(true)}
       onReadyToPublish={handleReadyToPublish}
-    >
-      {supportTools}
-    </WriteReadinessPanel>
+    />
   );
 
   return (
@@ -676,7 +716,15 @@ export default function WritePage() {
             >
               Focus
             </button>
-            <Button variant="ghost" type="button" onClick={() => router.push("/")}>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => {
+                const hasContent = title.trim().length > 0 || wordCount > 0;
+                if (hasContent && !window.confirm("Leave the editor? Your draft is saved automatically, but unsaved changes may be lost.")) return;
+                router.push("/");
+              }}
+            >
               Cancel
             </Button>
             <Button
@@ -685,7 +733,7 @@ export default function WritePage() {
               disabled={!canOpenPublish}
               onClick={handleReadyToPublish}
             >
-              Ready to publish
+              Publish
             </Button>
           </div>
         </div>
@@ -780,10 +828,10 @@ export default function WritePage() {
                         {type.label}
                       </p>
                       <p className="mt-1 text-sm text-gray-500">{type.desc}</p>
-                      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                      <p className="mt-3 hidden text-xs font-semibold uppercase tracking-wide text-emerald-700 sm:block">
                         {type.signalLabel}
                       </p>
-                      <p className="mt-1 text-sm leading-6 text-gray-600">
+                      <p className="mt-1 hidden text-sm leading-6 text-gray-600 sm:block">
                         {type.portfolioValue}
                       </p>
                     </div>
@@ -791,7 +839,7 @@ export default function WritePage() {
                       min. {type.minWords.toLocaleString()} words
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                  <div className="hidden flex-wrap gap-2 text-xs text-gray-500 sm:flex">
                     <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
                       {type.readTime}
                     </span>
@@ -882,6 +930,7 @@ export default function WritePage() {
           <input
             type="text"
             value={title}
+            autoFocus
             onChange={(event) => {
               setTitle(event.target.value);
               saveDraft(getCurrentData({ title: event.target.value }));
@@ -919,22 +968,6 @@ export default function WritePage() {
                   </p>
                 ) : null}
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                {WRITE_FORMATS.map((type) => (
-                  <button
-                    key={type.type}
-                    type="button"
-                    onClick={() => applyTemplate(type.type)}
-                    className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                      postType === type.type
-                        ? "border-emerald-300 bg-white text-emerald-900"
-                        : "border-emerald-100 bg-emerald-50/50 text-emerald-800 hover:bg-white"
-                    }`}
-                  >
-                    <span className="block font-medium">{type.label}</span>
-                  </button>
-                ))}
-              </div>
             </div>
           ) : null}
 
@@ -970,7 +1003,7 @@ export default function WritePage() {
                     onClick={() => runMobileToolbarAction(btn.action)}
                     className="flex h-10 min-w-[40px] items-center justify-center rounded-lg px-3 text-sm font-medium text-gray-600 transition-colors active:bg-emerald-100"
                   >
-                    {btn.italic ? <em>{btn.label}</em> : btn.label}
+                    {btn.icon}
                   </button>
                 ))}
                 <div className="ml-auto flex items-center gap-1 pr-1">
@@ -1086,10 +1119,12 @@ export default function WritePage() {
               <button
                 type="button"
                 onClick={() => setIsDetailsOpen(false)}
-                className="rounded-lg px-2 py-1 text-2xl leading-none text-gray-400 hover:bg-white hover:text-gray-600"
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-white hover:text-gray-600"
                 aria-label="Close details"
               >
-                x
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
             {readinessPanel}

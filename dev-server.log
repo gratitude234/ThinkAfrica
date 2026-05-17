@@ -1,0 +1,13 @@
+
+> think-africa@0.1.0 dev
+> next dev --port 3001
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://172.16.15.19:3001
+- Environments: .env.local
+✓ Ready in 2.2s
+Creating turbopack project { dir: 'C:\\dev\\Think_Africa', testMode: true }
+
+ GET /manifest.webmanifest 200 in 337ms (next.js: 249ms, proxy.ts: 26ms, application-code: 62ms)
+ GET /?guest=1 200 in 9.8s (next.js: 469ms, proxy.ts: 619ms, application-code: 8.7s)

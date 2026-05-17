@@ -14,6 +14,7 @@ interface FeaturedPost {
   excerpt: string | null;
   cover_image_url: string | null;
   published_at: string | null;
+  document_size_bytes?: number | null;
   profiles: {
     username: string | null;
     full_name: string | null;
@@ -28,6 +29,12 @@ function estimateReadTime(excerpt: string | null): number {
     1,
     Math.ceil((excerpt?.trim().split(/\s+/).filter(Boolean).length ?? 0) / 200)
   );
+}
+
+function formatDocumentSize(value: number | null | undefined) {
+  if (!value) return null;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const STAMP: Record<string, string> = {
@@ -72,6 +79,13 @@ export default function FeaturedPostLead({
   const authorName = author?.full_name ?? author?.username ?? "ThinkAfrica";
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
   const readTime = estimateReadTime(post.excerpt);
+  const documentSize = formatDocumentSize(post.document_size_bytes);
+  const readingLabel =
+    post.type === "research"
+      ? documentSize
+        ? `PDF / ${documentSize}`
+        : "PDF manuscript"
+      : `${readTime} min`;
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const stamp = STAMP[post.type] ?? "T";
   const initials = authorName
@@ -103,7 +117,7 @@ export default function FeaturedPostLead({
           <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-white/18 px-2.5 py-1 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md">
             {typeLabel}
             <span className="opacity-60">·</span>
-            {readTime} min
+            {readingLabel}
           </div>
           {/* Type-stamp watermark */}
           <span className="absolute bottom-3 right-3 font-display text-[56px] font-semibold leading-none text-white/[0.16] select-none">

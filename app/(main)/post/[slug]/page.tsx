@@ -24,6 +24,7 @@ import TableOfContents from "./TableOfContents";
 import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
 import CiteThis from "./CiteThis";
+import CopyCitationIdButton from "./CopyCitationIdButton";
 import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
 import PostCover from "@/components/post/PostCover";
 import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
@@ -283,14 +284,27 @@ function ResearchDocumentPanel({ post }: { post: PostRecord }) {
         document is preserved with the citation archive after publication.
       </p>
       {post.document_path ? (
-        <a
-          href={`/api/research-document/${post.id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 inline-flex items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-800"
-        >
-          Open PDF{size ? ` / ${size}` : ""}
-        </a>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a
+            href={`/api/research-document/${post.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-800"
+          >
+            Open PDF{size ? ` / ${size}` : ""}
+          </a>
+          {post.citation_id ? (
+            <>
+              <CopyCitationIdButton citationId={post.citation_id} />
+              <Link
+                href={`/publication/${post.citation_id}`}
+                className="inline-flex items-center justify-center rounded-lg border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-50"
+              >
+                Citation archive
+              </Link>
+            </>
+          ) : null}
+        </div>
       ) : (
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           No PDF is attached to this research submission yet.
@@ -808,7 +822,13 @@ async function PostReviewStatusPanel({
         summary={summary}
         title="Editorial review status"
         description="This timeline is visible to permitted viewers and shows where the submission sits in the review workflow."
-        actionHref={post.status === "pending_revision" ? `/edit/${post.slug}` : "/dashboard"}
+        actionHref={
+          post.status === "pending_revision"
+            ? post.type === "research"
+              ? `/submit/research?draft=${post.id}`
+              : `/edit/${post.slug}`
+            : "/dashboard"
+        }
         actionSource="post_editorial_status"
         actionKey="editorial_review_status"
       />

@@ -289,7 +289,10 @@ export async function submitEditorialDecision(input: {
       message: input.notes?.trim()
         ? `Revision requested for "${post.title}": ${input.notes.trim()}`
         : `Revision requested for "${post.title}". Visit your dashboard for the editor decision and reviewer notes.`,
-      link: `/edit/${post.slug}`,
+      link:
+        post.type === "research"
+          ? `/submit/research?draft=${post.id}`
+          : `/edit/${post.slug}`,
       post_id: input.postId,
       read: false,
     });

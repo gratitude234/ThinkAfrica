@@ -29,7 +29,6 @@ import {
 } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary } from "@/lib/postQuality";
-import DraftSignalPreview from "./DraftSignalPreview";
 import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
 import { publishPost } from "./actions";
 import { WRITE_FORMATS } from "./writeConfig";
@@ -70,10 +69,6 @@ interface ProfileRow {
 
 interface TagRow {
   tags: string[] | null;
-}
-
-function readTimeFromText(text: string) {
-  return Math.max(1, Math.ceil(text.trim().split(/\s+/).filter(Boolean).length / 200));
 }
 
 function stripHtml(value: string) {
@@ -494,27 +489,180 @@ export default function PublishDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="text-2xl leading-none text-gray-400 transition-colors hover:text-gray-600"
+            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-600"
             aria-label="Close publish drawer"
           >
-            x
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
         <div className="space-y-6 px-5 py-5">
-          <DraftSignalPreview
-            postType={postType}
-            title={title}
-            contentStarted={stripHtml(content).length > 0}
-            tags={tags}
-            excerpt={excerpt}
-            references={refs}
-            coAuthors={coAuthors}
-            profileComplete={Boolean(profile?.full_name && profile?.university)}
-            wordCount={wordCount}
-            compact
-          />
+          {/* 1. Preview — first thing users want to see */}
+          <section className="space-y-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Preview</p>
+              <p className="mt-1 text-xs text-gray-500">
+                This is how the card will look in the feed.
+              </p>
+            </div>
 
+            <article className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+              <div className="relative aspect-[16/9] w-full overflow-hidden">
+                {coverImageUrl ? (
+                  <Image
+                    src={coverImageUrl}
+                    alt={title}
+                    fill
+                    sizes="440px"
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 to-emerald-100">
+                    <span className="text-sm font-semibold uppercase tracking-widest text-emerald-600/80">
+                      {isQuickTake(postType, wordCount)
+                        ? "Quick Take"
+                        : POST_TYPE_LABELS[postType]}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge type={postType} wordCount={wordCount} />
+                  <span className="text-xs text-gray-500">
+                    {Math.max(1, Math.ceil(wordCount / 200))} min read
+                  </span>
+                </div>
+
+                <h3 className="mt-3 line-clamp-2 text-lg font-semibold text-gray-900">
+                  {title || "Untitled draft"}
+                </h3>
+                {excerpt.trim() ? (
+                  <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">
+                    {excerpt}
+                  </p>
+                ) : null}
+
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <p className="text-sm font-medium text-gray-900">{authorName}</p>
+                  <p className="text-xs text-gray-500">{authorUniversity}</p>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          {/* 2. Tags — highest urgency, most often forgotten */}
+          <section className="space-y-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Tags</p>
+              <p className="mt-1 text-xs text-gray-500">
+                Pick 1 to 5 topics so the right readers find this piece.
+              </p>
+            </div>
+
+            {suggestedTags.length > 0 ? (
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Suggested tags
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => addSuggestedTag(tag)}
+                      disabled={tags.includes(normalizeTagValue(tag))}
+                      className="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-brand hover:text-emerald-brand disabled:cursor-not-allowed disabled:bg-canvas disabled:text-gray-400"
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <TagInput
+              label="Topics"
+              value={tags}
+              maxTags={5}
+              helperText={`Suggested from ${CANONICAL_TAGS.length} canonical tags. Freeform tags still work for now.`}
+              placeholder="Add a topic"
+              onChange={handleTagChange}
+            />
+          </section>
+
+          {/* 3. Post type */}
+          <section className="space-y-3">
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-canvas px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Publishing as:{" "}
+                  <span className="text-emerald-brand">
+                    {isQuickTake(postType, wordCount)
+                      ? "Quick Take"
+                      : POST_TYPE_LABELS[postType]}
+                  </span>
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {POST_TYPE_INTENTS[postType]}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {currentFormat.requirementsSummary}
+                </p>
+                {postType === inferredType ? (
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Suggested from your {wordCount.toLocaleString()} words.
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTypePicker((current) => !current)}
+                className="text-sm font-medium text-emerald-brand hover:underline"
+              >
+                {showTypePicker ? "Hide" : "Change"}
+              </button>
+            </div>
+
+            {showTypePicker ? (
+              <div className="space-y-2">
+                {POST_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setPostType(type);
+                      setShowTypePicker(false);
+                      onMetadataChange?.({ postType: type });
+                    }}
+                    className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
+                      postType === type
+                        ? "border-emerald-brand bg-emerald-50"
+                        : "border-gray-200 hover:border-emerald-300"
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-gray-900">
+                      {POST_TYPE_LABELS[type]}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {POST_TYPE_INTENTS[type]}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-emerald-700">
+                      {WRITE_FORMATS.find((item) => item.type === type)?.signalLabel}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
+          {/* 4. Quality checklist */}
+          <QualityChecklist summary={qualitySummary} />
+
+          {/* 5. Authorship */}
           <section className="space-y-3">
             <div>
               <p className="text-sm font-medium text-gray-900">Authorship</p>
@@ -606,6 +754,7 @@ export default function PublishDrawer({
             ) : null}
           </section>
 
+          {/* 6. References (policy/research only) */}
           {postType === "research" || postType === "policy_brief" ? (
             <section className="rounded-xl border border-gray-200">
               <button
@@ -726,111 +875,7 @@ export default function PublishDrawer({
             </section>
           ) : null}
 
-          <QualityChecklist summary={qualitySummary} />
-
-          <section className="space-y-3">
-            <div className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-canvas px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Publishing as:{" "}
-                  <span className="text-emerald-brand">
-                    {isQuickTake(postType, wordCount)
-                      ? "Quick Take"
-                      : POST_TYPE_LABELS[postType]}
-                  </span>
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {POST_TYPE_INTENTS[postType]}
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {currentFormat.requirementsSummary}
-                </p>
-                {postType === inferredType ? (
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    Suggested from your {wordCount.toLocaleString()} words.
-                  </p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTypePicker((current) => !current)}
-                className="text-sm font-medium text-emerald-brand hover:underline"
-              >
-                {showTypePicker ? "Hide" : "Change"}
-              </button>
-            </div>
-
-            {showTypePicker ? (
-              <div className="space-y-2">
-                {POST_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => {
-                      setPostType(type);
-                      setShowTypePicker(false);
-                      onMetadataChange?.({ postType: type });
-                    }}
-                    className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
-                      postType === type
-                        ? "border-emerald-brand bg-emerald-50"
-                        : "border-gray-200 hover:border-emerald-300"
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-gray-900">
-                      {POST_TYPE_LABELS[type]}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {POST_TYPE_INTENTS[type]}
-                    </p>
-                    <p className="mt-1 text-xs font-medium text-emerald-700">
-                      {WRITE_FORMATS.find((item) => item.type === type)?.signalLabel}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </section>
-
-          <section className="space-y-3">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Tags</p>
-              <p className="mt-1 text-xs text-gray-500">
-                Pick 1 to 5 topics so the right readers find this piece.
-              </p>
-            </div>
-
-            {suggestedTags.length > 0 ? (
-              <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Suggested tags
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {suggestedTags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => addSuggestedTag(tag)}
-                      disabled={tags.includes(normalizeTagValue(tag))}
-                      className="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-brand hover:text-emerald-brand disabled:cursor-not-allowed disabled:bg-canvas disabled:text-gray-400"
-                    >
-                      + {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <TagInput
-              label="Topics"
-              value={tags}
-              maxTags={5}
-              helperText={`Suggested from ${CANONICAL_TAGS.length} canonical tags. Freeform tags still work for now.`}
-              placeholder="Add a topic"
-              onChange={handleTagChange}
-            />
-          </section>
-
+          {/* 7. Refine (optional, collapsed) */}
           <section className="rounded-xl border border-gray-200">
             <button
               type="button"
@@ -909,60 +954,6 @@ export default function PublishDrawer({
                 </section>
               </div>
             ) : null}
-          </section>
-
-          <section className="space-y-3">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Preview</p>
-              <p className="mt-1 text-xs text-gray-500">
-                This is how the card will look in the feed.
-              </p>
-            </div>
-
-            <article className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-              <div className="relative aspect-[16/9] w-full overflow-hidden">
-                {coverImageUrl ? (
-                  <Image
-                    src={coverImageUrl}
-                    alt={title}
-                    fill
-                    sizes="440px"
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-50 to-emerald-100">
-                    <span className="text-sm font-semibold uppercase tracking-widest text-emerald-600/80">
-                      {isQuickTake(postType, wordCount)
-                        ? "Quick Take"
-                        : POST_TYPE_LABELS[postType]}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <Badge type={postType} wordCount={wordCount} />
-                  <span className="text-xs text-gray-500">
-                    {readTimeFromText(excerpt || title || "draft")} min read
-                  </span>
-                </div>
-
-                <h3 className="mt-3 line-clamp-2 text-lg font-semibold text-gray-900">
-                  {title || "Untitled draft"}
-                </h3>
-                {excerpt.trim() ? (
-                  <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">
-                    {excerpt}
-                  </p>
-                ) : null}
-
-                <div className="mt-4 border-t border-gray-100 pt-4">
-                  <p className="text-sm font-medium text-gray-900">{authorName}</p>
-                  <p className="text-xs text-gray-500">{authorUniversity}</p>
-                </div>
-              </div>
-            </article>
           </section>
 
           <p className="text-sm text-gray-500">

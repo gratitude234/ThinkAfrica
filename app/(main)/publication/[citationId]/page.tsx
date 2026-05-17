@@ -95,7 +95,7 @@ export default async function PublicationArchivePage({ params }: PageProps) {
     <div className="mx-auto max-w-4xl space-y-8">
       <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-          Archived publication
+          {post.type === "research" ? "Archived research publication" : "Archived publication"}
         </p>
         <h1 className="mt-2 text-3xl font-bold text-gray-900">{version.title}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-sky-900">
@@ -114,7 +114,9 @@ export default async function PublicationArchivePage({ params }: PageProps) {
           <span>Version {version.version_number}</span>
         </div>
         <p className="mt-3 text-sm text-sky-900">
-          This archived page preserves the accepted publication snapshot for citation purposes.
+          {post.type === "research"
+            ? "This archived page preserves the accepted research manuscript snapshot for citation purposes."
+            : "This archived page preserves the accepted publication snapshot for citation purposes."}
         </p>
         <Link href={`/post/${post.slug}`} className="mt-3 inline-block text-sm font-medium text-sky-800 underline">
           Open the live post page
@@ -156,13 +158,13 @@ export default async function PublicationArchivePage({ params }: PageProps) {
       {post.type === "research" && archivedDocument.path ? (
         <section className="rounded-xl border border-purple-100 bg-purple-50 p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">
-            Archived research PDF
+            Accepted research PDF manuscript
           </p>
           <h2 className="mt-2 text-lg font-semibold text-gray-900">
             {archivedDocument.originalName ?? "Research paper PDF"}
           </h2>
           <p className="mt-1 text-sm text-purple-950/75">
-            Accepted document snapshot
+            Accepted manuscript snapshot
             {formatDocumentSize(archivedDocument.sizeBytes)
               ? ` / ${formatDocumentSize(archivedDocument.sizeBytes)}`
               : ""}

@@ -39,6 +39,13 @@ interface ResearchPayload {
   currentRound?: number;
 }
 
+interface ResearchUploadDraftInput {
+  draftId: string | null;
+  title: string;
+  abstract: string;
+  tags: string[];
+}
+
 const RESEARCH_SETUP_ERROR =
   "Research document storage is not set up yet. Apply the research document migration.";
 
@@ -144,6 +151,20 @@ function buildResearchContent(abstract: string, documentName: string | null) {
   return sanitizePostHtml(
     `<h2>Abstract</h2><p>${escapedAbstract}</p>${documentLine}`
   );
+}
+
+function normalizeResearchDraftFields(input: ResearchUploadDraftInput) {
+  const title = input.title.trim() || "Untitled research paper";
+  const abstract =
+    input.abstract.trim() ||
+    "Abstract pending. Add the research question, method, findings, and contribution before submitting for review.";
+  const tags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+
+  return {
+    title,
+    abstract,
+    tags: tags.length > 0 ? tags : ["research"],
+  };
 }
 
 async function syncReferences(
@@ -451,4 +472,96 @@ export async function saveResearchDraft(input: ResearchPayload) {
 
 export async function submitResearchPaper(input: ResearchPayload) {
   return upsertResearchPost(input, "pending");
+}
+
+export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInput) {
+  const { supabase, user } = await getCurrentUser();
+
+  if (!user) {
+    return { error: "You must be signed in.", postId: null as string | null, slug: null as string | null };
+  }
+
+  const { title, abstract, tags } = normalizeResearchDraftFields(input);
+  const content = buildResearchContent(abstract, null);
+  const now = Date.now().toString(36);
+
+  if (input.draftId) {
+    const { data: existingPost } = await supabase
+      .from("posts")
+      .select("id, author_id, slug, status")
+      .eq("id", input.draftId)
+      .eq("type", "research")
+      .single();
+
+    if (!existingPost || existingPost.author_id !== user.id) {
+      return { error: "You do not have permission to update this research submission.", postId: null, slug: null };
+    }
+
+    if (!["draft", "pending_revision"].includes(existingPost.status)) {
+      return {
+        error: "This research submission cannot accept a new PDF in its current review state.",
+        postId: null,
+        slug: null,
+      };
+    }
+
+    const { error } = await supabase
+      .from("posts")
+      .update({
+        title,
+        excerpt: abstract,
+        content,
+        tags,
+      })
+      .eq("id", existingPost.id)
+      .eq("author_id", user.id);
+
+    if (error) {
+      return {
+        error:
+          userSafeDatabaseError(error.message) ??
+          "Failed to prepare the research draft for upload.",
+        postId: null,
+        slug: null,
+      };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath(`/submit/research`);
+    return { error: null, postId: existingPost.id as string, slug: existingPost.slug as string };
+  }
+
+  const slug = `${slugify(title, { lower: true, strict: true }) || "research"}-${now}`;
+  const { data, error } = await supabase
+    .from("posts")
+    .insert({
+      author_id: user.id,
+      title,
+      slug,
+      excerpt: abstract,
+      content,
+      tags,
+      type: "research",
+      status: "draft",
+      current_round: 1,
+      published_at: null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return {
+      error:
+        userSafeDatabaseError(error?.message) ??
+        "Failed to create a research draft for upload.",
+      postId: null,
+      slug: null,
+    };
+  }
+
+  await syncAuthors(supabase, data.id, user.id, []);
+  revalidatePath("/dashboard");
+  revalidatePath(`/submit/research`);
+
+  return { error: null, postId: data.id as string, slug };
 }

@@ -11,6 +11,7 @@ import ActivationFocusPanel from "./ActivationFocusPanel";
 import DailyBriefStrip from "./DailyBriefStrip";
 import EditorPicksRow from "./EditorPicksRow";
 import FeaturedPostLead from "./FeaturedPostLead";
+import LatestResearchShelf, { type LatestResearchItem } from "./LatestResearchShelf";
 import PostsFeedSection from "./PostsFeedSection";
 
 export const revalidate = 60;
@@ -46,6 +47,9 @@ interface FeaturedPostRaw {
   published_at: string | null;
   citation_id: string | null;
   published_version_id: string | null;
+  document_original_name: string | null;
+  document_mime_type: string | null;
+  document_size_bytes: number | null;
   profiles: FeaturedProfile | FeaturedProfile[] | null;
 }
 
@@ -90,7 +94,7 @@ function FeedSkeleton() {
 }
 
 const FEATURED_POST_SELECT = `
-  id, author_id, title, slug, type, excerpt, tags, cover_image_url, view_count, featured, published_at, citation_id, published_version_id,
+  id, author_id, title, slug, type, excerpt, tags, cover_image_url, view_count, featured, published_at, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes,
   profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified)
 `;
 
@@ -156,6 +160,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     recentFeaturedCandidatesResult,
     latestPublishedResult,
     newVoiceResult,
+    latestResearchResult,
   ] = await Promise.all([
     user
       ? supabase
@@ -228,6 +233,19 @@ export default async function HomePage({ searchParams }: PageProps) {
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
       )
       .limit(50),
+
+    supabase
+      .from("posts")
+      .select(
+        `
+        id, title, slug, excerpt, tags, citation_id, document_size_bytes, published_at,
+        profiles!posts_author_id_fkey (username, full_name, university)
+      `
+      )
+      .eq("status", "published")
+      .eq("type", "research")
+      .order("published_at", { ascending: false })
+      .limit(12),
   ]);
 
   logHomeQueryError("manual featured post", manualFeaturedResult.error);
@@ -237,6 +255,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   );
   logHomeQueryError("latest published fallback", latestPublishedResult.error);
   logHomeQueryError("new voice", newVoiceResult.error);
+  logHomeQueryError("latest research", latestResearchResult.error);
 
   const followedIds = (followedUsers ?? []).map(
     (row: { following_id: string }) => row.following_id
@@ -274,6 +293,11 @@ export default async function HomePage({ searchParams }: PageProps) {
     ...(latestPublishedRaw ? [latestPublishedRaw] : []),
   ]);
   const newVoiceRaw = (newVoiceResult.data ?? []) as VoicePostRaw[];
+  const latestResearchRaw = (latestResearchResult.data ?? []) as Array<
+    Omit<LatestResearchItem, "profiles"> & {
+      profiles: LatestResearchItem["profiles"] | LatestResearchItem["profiles"][];
+    }
+  >;
 
   const featuredPostsNorm = featuredPostsRaw.map((post) => ({
     ...post,
@@ -420,6 +444,35 @@ export default async function HomePage({ searchParams }: PageProps) {
       );
     })[0] ?? null;
 
+  const latestResearch = latestResearchRaw
+    .map((paper) => ({
+      ...paper,
+      profiles: Array.isArray(paper.profiles)
+        ? paper.profiles[0] ?? null
+        : paper.profiles,
+    }))
+    .sort((left, right) => {
+      const score = (paper: LatestResearchItem) => {
+        const interestMatch = Boolean(
+          paper.tags?.some((tag) => userInterests.includes(tag))
+        );
+        const universityMatch = Boolean(
+          userUniversity &&
+            paper.profiles?.university &&
+            paper.profiles.university === userUniversity
+        );
+        return (
+          (paper.citation_id ? 100 : 0) +
+          (interestMatch ? 25 : 0) +
+          (universityMatch ? 20 : 0) +
+          new Date(paper.published_at ?? 0).getTime() / 100000000000
+        );
+      };
+
+      return score(right) - score(left);
+    })
+    .slice(0, 3);
+
   let peopleResult: SuggestedPeopleResult = { suggestions: [], reason: "" };
   let activationState: ActivationState | null = null;
 
@@ -474,6 +527,8 @@ export default async function HomePage({ searchParams }: PageProps) {
           />
 
           {user ? <EditorPicksRow picks={editorPicks} /> : null}
+
+          <LatestResearchShelf papers={latestResearch} />
 
           <Suspense fallback={<FeedSkeleton />}>
             <PostsFeedSection

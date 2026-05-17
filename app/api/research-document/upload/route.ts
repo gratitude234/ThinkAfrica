@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,9 +23,39 @@ export async function POST(request: NextRequest) {
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
+  const postId = formData.get("postId")?.toString() ?? null;
 
   if (!file) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+
+  if (!postId) {
+    return NextResponse.json(
+      { error: "Save the research draft before uploading a PDF." },
+      { status: 400 }
+    );
+  }
+
+  const admin = createAdminClient();
+  const { data: post } = await admin
+    .from("posts")
+    .select("id, author_id, slug, status, type")
+    .eq("id", postId)
+    .eq("type", "research")
+    .single();
+
+  if (!post || post.author_id !== user.id) {
+    return NextResponse.json(
+      { error: "You do not have permission to attach a PDF to this research submission." },
+      { status: 403 }
+    );
+  }
+
+  if (!["draft", "pending_revision"].includes(post.status)) {
+    return NextResponse.json(
+      { error: "This research submission cannot accept a new PDF in its current review state." },
+      { status: 409 }
+    );
   }
 
   const lowerName = file.name.toLowerCase();
@@ -58,7 +89,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const admin = createAdminClient();
   const { data: bucket } = await admin.storage.getBucket("research-documents");
   if (!bucket) {
     return NextResponse.json({ error: SETUP_ERROR }, { status: 503 });
@@ -79,6 +109,31 @@ export async function POST(request: NextRequest) {
         ? SETUP_ERROR
         : uploadError.message;
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  const { error: updateError } = await admin
+    .from("posts")
+    .update({
+      document_path: path,
+      document_original_name: file.name || "research-paper.pdf",
+      document_mime_type: "application/pdf",
+      document_size_bytes: file.size,
+    })
+    .eq("id", post.id)
+    .eq("author_id", user.id);
+
+  if (updateError) {
+    return NextResponse.json(
+      { error: updateError.message ?? "Unable to attach the uploaded PDF to this draft." },
+      { status: 500 }
+    );
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/admin/review");
+  revalidatePath(`/submit/research`);
+  if (post.slug) {
+    revalidatePath(`/post/${post.slug}`);
   }
 
   return NextResponse.json({

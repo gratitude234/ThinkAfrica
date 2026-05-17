@@ -9,6 +9,7 @@ import CoAuthorPicker, {
 } from "@/components/collaboration/CoAuthorPicker";
 import type { PostReferenceRecord } from "@/lib/types";
 import {
+  ensureResearchDraftForUpload,
   saveResearchDraft,
   submitResearchPaper,
   type ResearchDocumentInput,
@@ -115,6 +116,7 @@ export default function ResearchSubmissionForm({
   const pdfAttached = Boolean(document.documentPath && draftId);
   const referencesReady = references.some((ref) => ref.title?.trim());
   const submittedForReview = status === "pending" || status === "pending_revision";
+  const canChangePdf = status === "draft" || status === "pending_revision";
   const reviewerDecision =
     status === "pending_revision" || status === "published" || status === "rejected";
   const citationArchived = status === "published";
@@ -182,8 +184,25 @@ export default function ResearchSubmissionForm({
     setError(null);
     setNotice(null);
 
+    const draftResult = await ensureResearchDraftForUpload({
+      draftId,
+      title,
+      abstract,
+      tags,
+    });
+
+    if (draftResult.error || !draftResult.postId) {
+      setError(draftResult.error ?? "Unable to prepare the research draft for upload.");
+      setUploading(false);
+      return;
+    }
+
+    setDraftId(draftResult.postId);
+    router.replace(`/submit/research?draft=${draftResult.postId}`);
+
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("postId", draftResult.postId);
 
     const response = await fetch("/api/research-document/upload", {
       method: "POST",
@@ -205,7 +224,7 @@ export default function ResearchSubmissionForm({
       mimeType: result.mimeType,
       sizeBytes: result.sizeBytes,
     });
-    setNotice("PDF uploaded. Save the draft to attach it to this submission.");
+    setNotice("PDF uploaded and attached to this research draft.");
     setUploading(false);
   };
 
@@ -340,17 +359,20 @@ export default function ResearchSubmissionForm({
               <input
                 type="file"
                 accept="application/pdf,.pdf"
+                disabled={!canChangePdf || uploading}
                 onChange={(event) => void handleUpload(event.target.files?.[0] ?? null)}
                 className="block w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-brand file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
               />
               {uploading ? (
-                <p className="mt-3 text-sm text-gray-500">Uploading PDF...</p>
+                <p className="mt-3 text-sm text-gray-500">
+                  Preparing draft and uploading PDF...
+                </p>
               ) : null}
               {document.documentPath ? (
                 <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
                   <p className="font-semibold">{document.originalName}</p>
                   <p className="mt-0.5 text-xs text-emerald-800/75">
-                    {formatBytes(document.sizeBytes)} / PDF uploaded
+                    {formatBytes(document.sizeBytes)} / PDF attached to this draft
                   </p>
                   {draftId ? (
                     <a
@@ -361,12 +383,13 @@ export default function ResearchSubmissionForm({
                     >
                       Open uploaded PDF
                     </a>
-                  ) : (
-                    <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-800">
-                      Save the draft to attach this PDF to the submission record.
-                    </p>
-                  )}
+                  ) : null}
                 </div>
+              ) : null}
+              {!canChangePdf ? (
+                <p className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-500">
+                  PDFs can be changed while a paper is a draft or when revision is requested.
+                </p>
               ) : null}
               <p className="mt-3 text-xs leading-5 text-gray-500">
                 DOCX is fine for drafting, but the review packet requires PDF so
@@ -518,8 +541,7 @@ export default function ResearchSubmissionForm({
 
             {pdfUploaded && !pdfAttached ? (
               <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                PDF uploaded, but not attached yet. Save the draft before leaving
-                this page.
+                PDF attached. Refresh the page if the draft link has not updated yet.
               </div>
             ) : null}
 
@@ -548,7 +570,7 @@ export default function ResearchSubmissionForm({
                 type="button"
                 className="w-full"
                 loading={isPending}
-                disabled={uploading}
+                disabled={uploading || !canChangePdf}
                 onClick={submit}
               >
                 Submit for review
