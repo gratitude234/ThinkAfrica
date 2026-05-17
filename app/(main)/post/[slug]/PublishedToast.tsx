@@ -142,7 +142,7 @@ export default function PublishedToast({
           <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
             {isLive
               ? `You earned +${points} points, and this piece now strengthens your public ThinkAfrica profile. Keep the loop going by reading a related idea and adding a response if you have a useful angle.`
-              : "Reviewers and editors can now evaluate your submission. While you wait, read a related idea and add a response where you can move the conversation forward."}
+              : "Your submission is now in editorial review. You'll be notified when a reviewer submits feedback or an editor makes a decision. Keep the momentum going — a response post often surfaces your next angle."}
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -190,64 +190,135 @@ export default function PublishedToast({
                 onClick={() => trackNextAction("view_dashboard")}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
               >
-                View dashboard
+                Track review status
               </Link>
             )}
           </div>
         </div>
 
-        <div className="border-t border-emerald-50 bg-emerald-50/55 p-4 lg:border-l lg:border-t-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-            Share second
-          </p>
-          <p className="mt-1 text-xs leading-5 text-emerald-900/75">
-            Your next best move is another interaction, but sharing still helps
-            readers find your work.
-          </p>
+        {isLive ? (
+          <div className="border-t border-emerald-50 bg-emerald-50/55 p-4 lg:border-l lg:border-t-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+              Share second
+            </p>
+            <p className="mt-1 text-xs leading-5 text-emerald-900/75">
+              Your next best move is another interaction, but sharing still helps
+              readers find your work.
+            </p>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={onWhatsApp}
-              className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
-            >
-              WhatsApp
-            </button>
-            <button
-              type="button"
-              onClick={onX}
-              className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
-            >
-              X
-            </button>
-            <button
-              type="button"
-              onClick={onLinkedIn}
-              className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
-            >
-              LinkedIn
-            </button>
-          </div>
-
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-            <button
-              type="button"
-              onClick={() => void onCopy("post")}
-              className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
-            >
-              {copiedTarget === "post" ? "Post copied" : "Copy post link"}
-            </button>
-            {username ? (
+            <div className="mt-4 grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => void onCopy("profile")}
+                onClick={onWhatsApp}
                 className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
               >
-                {copiedTarget === "profile" ? "Profile copied" : "Copy profile"}
+                WhatsApp
               </button>
-            ) : null}
+              <button
+                type="button"
+                onClick={onX}
+                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+              >
+                X
+              </button>
+              <button
+                type="button"
+                onClick={onLinkedIn}
+                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+              >
+                LinkedIn
+              </button>
+            </div>
+
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <button
+                type="button"
+                onClick={() => void onCopy("post")}
+                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+              >
+                {copiedTarget === "post" ? "Post copied" : "Copy post link"}
+              </button>
+              {username ? (
+                <button
+                  type="button"
+                  onClick={() => void onCopy("profile")}
+                  className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+                >
+                  {copiedTarget === "profile" ? "Profile copied" : "Copy profile"}
+                </button>
+              ) : null}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="border-t border-emerald-50 bg-emerald-50/55 p-4 lg:border-l lg:border-t-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+              What happens next
+            </p>
+
+            <ol className="mt-3 space-y-3">
+              {(
+                [
+                  {
+                    n: 1,
+                    label: "Reviewers evaluate",
+                    detail:
+                      "2–3 subject-matter reviewers assess your argument, evidence, and structure.",
+                  },
+                  {
+                    n: 2,
+                    label: "Editor decides",
+                    detail:
+                      "Based on reviewer feedback, an editor accepts, requests revision, or declines.",
+                  },
+                  {
+                    n: 3,
+                    label: "You're notified",
+                    detail:
+                      "You'll get an in-app notification at each stage so you're never left wondering.",
+                  },
+                ] as const
+              ).map(({ n, label, detail }) => (
+                <li key={n} className="flex gap-3">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">
+                    {n}
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-950">{label}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-emerald-900/70">{detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <p className="mt-4 text-xs leading-5 text-emerald-900/60">
+              Initial feedback usually arrives within 7–10 days.
+            </p>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={onWhatsApp}
+                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+              >
+                WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={onX}
+                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+              >
+                X
+              </button>
+              <button
+                type="button"
+                onClick={onLinkedIn}
+                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+              >
+                LinkedIn
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

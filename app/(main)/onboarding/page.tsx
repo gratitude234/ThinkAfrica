@@ -87,11 +87,17 @@ export default function OnboardingPage() {
   const [suggestions, setSuggestions] = useState<SuggestedProfile[]>([]);
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const [step, setStep] = useState<Step>(initialStep);
+  const [usernameStatus, setUsernameStatus] = useState<
+    "idle" | "checking" | "available" | "taken"
+  >("idle");
 
   const currentStepIndex = STEP_ORDER.indexOf(step);
   const progress = Math.round(((currentStepIndex + 1) / STEP_ORDER.length) * 100);
   const graduationYears = useMemo(
-    () => Array.from({ length: 12 }, (_, index) => String(new Date().getFullYear() + index)),
+    () =>
+      Array.from({ length: 20 }, (_, index) =>
+        String(new Date().getFullYear() - 7 + index)
+      ),
     []
   );
 
@@ -112,6 +118,26 @@ export default function OnboardingPage() {
     },
     [country]
   );
+
+  useEffect(() => {
+    const normalized = normalizeUsername(username);
+    if (!normalized || normalized.length < 2 || !userId) {
+      setUsernameStatus("idle");
+      return;
+    }
+    setUsernameStatus("checking");
+    const timer = setTimeout(async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", normalized)
+        .neq("id", userId)
+        .maybeSingle();
+      setUsernameStatus(data ? "taken" : "available");
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [username, userId]);
 
   const loadSuggestions = useCallback(
     async (currentUserId: string, userUniversity: string | null, userField: string | null) => {
@@ -235,6 +261,10 @@ export default function OnboardingPage() {
       setError("Add your name, username, country, university, and field of study.");
       return;
     }
+    if (usernameStatus === "taken") {
+      setError("That username is already taken. Please choose another.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -329,6 +359,11 @@ export default function OnboardingPage() {
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-gray-100">
           <div
+            role="progressbar"
+            aria-valuenow={progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Onboarding progress"
             className="h-full rounded-full bg-emerald-500 transition-[width]"
             style={{ width: `${progress}%` }}
           />
@@ -377,6 +412,13 @@ export default function OnboardingPage() {
                 onChange={(event) => setUsername(normalizeUsername(event.target.value))}
                 className={INPUT_STYLES}
               />
+              {usernameStatus === "available" ? (
+                <p className="mt-1 text-xs text-emerald-600">✓ Available</p>
+              ) : usernameStatus === "taken" ? (
+                <p className="mt-1 text-xs text-red-500">✗ Already taken — try a variation.</p>
+              ) : usernameStatus === "checking" ? (
+                <p className="mt-1 text-xs text-gray-400">Checking…</p>
+              ) : null}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -425,7 +467,8 @@ export default function OnboardingPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Graduation year
+                Graduation year{" "}
+                <span className="text-xs font-normal text-gray-400">(optional)</span>
               </label>
               <select
                 value={graduationYear}
@@ -466,7 +509,11 @@ export default function OnboardingPage() {
             Choose the ideas you want in your feed
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            Pick up to 6 topics. We will use them for recommendations and first follows.
+            Pick up to 6 topics. We will use them for recommendations and first follows.{" "}
+            <span className={`font-semibold ${interests.length >= 6 ? "text-amber-600" : "text-emerald-700"}`}>
+              {interests.length}/6 selected
+            </span>
+            {interests.length >= 6 ? " — deselect one to change." : ""}
           </p>
 
           <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -518,20 +565,13 @@ export default function OnboardingPage() {
               <h1 className="mt-2 text-2xl font-bold text-gray-900">
                 Follow 3 writers to shape your home feed
               </h1>
-              <p className="mt-2 text-sm text-gray-500">
-                {Math.min(followedIds.size, 3)} of 3 followed.
+              <p className="mt-2 text-sm font-medium text-gray-700">
+                <span className={followedIds.size >= 3 ? "text-emerald-600" : "text-gray-700"}>
+                  {Math.min(followedIds.size, 3)}/3
+                </span>{" "}
+                <span className="text-gray-500">writers followed</span>
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                trackStepCompleted("follow");
-                goToStep("contribute");
-              }}
-              className="text-sm text-gray-500 transition-colors hover:text-gray-600"
-            >
-              Skip for now
-            </button>
           </div>
 
           {loadingSuggestions ? (
@@ -601,17 +641,33 @@ export default function OnboardingPage() {
             >
               Back
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                trackStepCompleted("follow");
-                goToStep("contribute");
-              }}
-              disabled={followedIds.size < 3}
-              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-            >
-              Continue
-            </button>
+            <div className="flex items-center gap-3">
+              {followedIds.size < 3 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    trackStepCompleted("follow");
+                    goToStep("contribute");
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Skip for now
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  trackStepCompleted("follow");
+                  goToStep("contribute");
+                }}
+                disabled={followedIds.size < 3}
+                className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+              >
+                {followedIds.size < 3
+                  ? `Continue (${Math.min(followedIds.size, 3)}/3)`
+                  : "Continue"}
+              </button>
+            </div>
           </div>
         </section>
       ) : null}

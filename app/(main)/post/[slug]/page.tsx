@@ -821,7 +821,11 @@ async function PostReviewStatusPanel({
       <EditorialTrustPanel
         summary={summary}
         title="Editorial review status"
-        description="This timeline is visible to permitted viewers and shows where the submission sits in the review workflow."
+        description={
+          post.status === "pending_revision"
+            ? "Reviewers have requested changes. Use the button to edit and resubmit — your revisions will be tracked as a new round."
+            : "You'll be notified when reviewers submit feedback or an editor makes a decision. This timeline updates automatically."
+        }
         actionHref={
           post.status === "pending_revision"
             ? post.type === "research"

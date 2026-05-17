@@ -8,6 +8,7 @@ import CoAuthorPicker, {
   type CoAuthorProfile,
 } from "@/components/collaboration/CoAuthorPicker";
 import type { PostReferenceRecord } from "@/lib/types";
+import ReferenceRow from "@/components/ui/ReferenceRow";
 import {
   ensureResearchDraftForUpload,
   saveResearchDraft,
@@ -59,6 +60,27 @@ function emptyReference(): PostReferenceRecord {
     doi: null,
     raw: null,
   };
+}
+
+function CheckItem({ done, label }: { done: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+          done ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-400"
+        }`}
+      >
+        {done ? (
+          <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : null}
+      </span>
+      <span className={`text-sm ${done ? "text-gray-900" : "text-gray-500"}`}>
+        {label}
+      </span>
+    </div>
+  );
 }
 
 function TimelineDot({
@@ -228,21 +250,6 @@ export default function ResearchSubmissionForm({
     setUploading(false);
   };
 
-  const updateReference = (
-    index: number,
-    changes: Partial<PostReferenceRecord>
-  ) => {
-    setReferences((current) =>
-      current.map((reference, itemIndex) =>
-        itemIndex === index ? { ...reference, ...changes } : reference
-      )
-    );
-  };
-
-  const removeReference = (index: number) => {
-    setReferences((current) => current.filter((_, itemIndex) => itemIndex !== index));
-  };
-
   const saveDraft = () => {
     setError(null);
     setNotice(null);
@@ -278,7 +285,7 @@ export default function ResearchSubmissionForm({
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-16">
+    <div className="mx-auto max-w-5xl space-y-6 pb-24 lg:pb-16">
       <div className="rounded-2xl border border-purple-100 bg-purple-50 px-5 py-5">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-purple-700">
           Research submission
@@ -400,68 +407,58 @@ export default function ResearchSubmissionForm({
           </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">References</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Add the core references reviewers need to verify the paper.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setReferences((current) => [...current, emptyReference()])}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:border-emerald-200 hover:text-emerald-700"
-              >
-                Add reference
-              </button>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">References</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Add the core references reviewers need to verify the paper.
+              </p>
             </div>
-            <div className="mt-4 space-y-3">
+
+            <div className="space-y-3">
               {references.map((reference, index) => (
-                <div key={reference.id} className="rounded-xl border border-gray-100 bg-canvas p-3">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <input
-                      value={reference.title ?? ""}
-                      onChange={(event) =>
-                        updateReference(index, { title: event.target.value })
-                      }
-                      placeholder="Reference title"
-                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                    />
-                    <input
-                      value={reference.authors ?? ""}
-                      onChange={(event) =>
-                        updateReference(index, { authors: event.target.value })
-                      }
-                      placeholder="Authors"
-                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                    />
-                    <input
-                      value={reference.source ?? ""}
-                      onChange={(event) =>
-                        updateReference(index, { source: event.target.value })
-                      }
-                      placeholder="Source / journal / publisher"
-                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                    />
-                    <input
-                      value={reference.url ?? ""}
-                      onChange={(event) =>
-                        updateReference(index, { url: event.target.value })
-                      }
-                      placeholder="URL or DOI"
-                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeReference(index)}
-                    className="mt-2 text-xs font-semibold text-gray-400 hover:text-red-500"
-                  >
-                    Remove
-                  </button>
-                </div>
+                <ReferenceRow
+                  key={reference.id}
+                  index={index}
+                  reference={reference}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < references.length - 1}
+                  onMove={(direction) => {
+                    const next = [...references];
+                    const target = direction === "up" ? index - 1 : index + 1;
+                    const [item] = next.splice(index, 1);
+                    next.splice(target, 0, item);
+                    setReferences(next.map((r, i) => ({ ...r, display_order: i })));
+                  }}
+                  onChange={(nextRef) =>
+                    setReferences(
+                      references.map((r, i) =>
+                        i === index ? { ...nextRef, display_order: index } : r
+                      )
+                    )
+                  }
+                  onRemove={() =>
+                    setReferences(
+                      references
+                        .filter((_, i) => i !== index)
+                        .map((r, i) => ({ ...r, display_order: i }))
+                    )
+                  }
+                />
               ))}
             </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setReferences((current) => [
+                  ...current,
+                  { ...emptyReference(), display_order: current.length },
+                ])
+              }
+              className="mt-3 w-full rounded-lg border border-dashed border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+            >
+              + Add reference
+            </button>
           </section>
 
           {needsAuthorNote ? (
@@ -521,22 +518,15 @@ export default function ResearchSubmissionForm({
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
               Submission readiness
             </p>
-            <div className="mt-4 space-y-3 text-sm">
-              <p className={title.trim() ? "text-emerald-700" : "text-gray-500"}>
-                Title {title.trim() ? "ready" : "needed"}
-              </p>
-              <p className={abstract.trim() ? "text-emerald-700" : "text-gray-500"}>
-                Abstract {abstract.trim() ? "ready" : "needed"}
-              </p>
-              <p className={document.documentPath ? "text-emerald-700" : "text-gray-500"}>
-                PDF {document.documentPath ? "uploaded" : "needed"}
-              </p>
-              <p className={tags.length > 0 ? "text-emerald-700" : "text-gray-500"}>
-                Topics {tags.length > 0 ? "selected" : "needed"}
-              </p>
-              <p className={references.some((ref) => ref.title?.trim()) ? "text-emerald-700" : "text-gray-500"}>
-                References {references.some((ref) => ref.title?.trim()) ? "added" : "needed"}
-              </p>
+            <div className="mt-4 space-y-2.5">
+              <CheckItem done={title.trim().length > 0} label="Title" />
+              <CheckItem done={abstract.trim().length > 0} label="Abstract" />
+              <CheckItem done={Boolean(document.documentPath)} label="PDF uploaded" />
+              <CheckItem done={tags.length > 0} label="Topics selected" />
+              <CheckItem
+                done={references.some((ref) => ref.title?.trim())}
+                label="References added"
+              />
             </div>
 
             {pdfUploaded && !pdfAttached ? (
@@ -573,7 +563,7 @@ export default function ResearchSubmissionForm({
                 disabled={uploading || !canChangePdf}
                 onClick={submit}
               >
-                Submit for review
+                {needsAuthorNote ? "Resubmit" : "Submit for review"}
               </Button>
             </div>
           </section>
@@ -590,6 +580,40 @@ export default function ResearchSubmissionForm({
             </div>
           </section>
         </aside>
+      </div>
+
+      {/* Mobile submit footer — hidden on desktop where sidebar buttons are used */}
+      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white px-4 py-3 lg:hidden">
+        {error ? (
+          <p className="mb-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-600">
+            {error}
+          </p>
+        ) : null}
+        {notice ? (
+          <p className="mb-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            {notice}
+          </p>
+        ) : null}
+        <div className="flex gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            className="flex-1"
+            disabled={isPending || uploading}
+            onClick={saveDraft}
+          >
+            Save draft
+          </Button>
+          <Button
+            type="button"
+            className="flex-1"
+            loading={isPending}
+            disabled={uploading || !canChangePdf}
+            onClick={submit}
+          >
+            {needsAuthorNote ? "Resubmit" : "Submit for review"}
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -29,6 +29,24 @@ import {
 } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary } from "@/lib/postQuality";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import ReferenceRow from "@/components/ui/ReferenceRow";
 import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
 import { publishPost } from "./actions";
 import { WRITE_FORMATS } from "./writeConfig";
@@ -172,9 +190,6 @@ export default function PublishDrawer({
   const [correspondingAuthorId, setCorrespondingAuthorId] = useState<string | null>(null);
   const [refs, setRefs] = useState<PostReferenceRecord[]>(initialReferences);
   const [showReferences, setShowReferences] = useState(false);
-  const [newReferenceTitle, setNewReferenceTitle] = useState("");
-  const [newReferenceAuthors, setNewReferenceAuthors] = useState("");
-  const [newReferenceSource, setNewReferenceSource] = useState("");
   const wasOpenRef = useRef(false);
 
   const inferredType = useMemo(
@@ -214,9 +229,6 @@ export default function PublishDrawer({
       setShowReferences(
         initialPostType === "policy_brief" || initialPostType === "research"
       );
-      setNewReferenceTitle("");
-      setNewReferenceAuthors("");
-      setNewReferenceSource("");
     }
 
     wasOpenRef.current = open;
@@ -344,6 +356,11 @@ export default function PublishDrawer({
     ]
   );
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
   if (!open) return null;
 
   const isInstantPublish = postType === "blog" || postType === "essay";
@@ -386,11 +403,14 @@ export default function PublishDrawer({
     }
   };
 
-  const moveCoAuthor = (fromIndex: number, toIndex: number) => {
-    const next = [...coAuthors];
-    const [item] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, item);
-    handleCoAuthorsChange(next);
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = coAuthors.findIndex((c) => c.id === active.id);
+    const newIndex = coAuthors.findIndex((c) => c.id === over.id);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      handleCoAuthorsChange(arrayMove(coAuthors, oldIndex, newIndex));
+    }
   };
 
   const handlePublish = async () => {
@@ -691,7 +711,7 @@ export default function PublishDrawer({
             <div>
               <p className="text-sm font-medium text-gray-900">Authorship</p>
               <p className="mt-1 text-xs text-gray-500">
-                Set author order, invite collaborators, and choose the corresponding author.
+                Add co-authors and drag to set author order.
               </p>
             </div>
 
@@ -699,15 +719,13 @@ export default function PublishDrawer({
               <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
                 <div>
                   <p className="font-medium text-gray-900">{authorName}</p>
-                  <p className="text-xs text-gray-500">
-                    {correspondingAuthorId
-                      ? "Lead author"
-                      : "Lead author / Default corresponding author"}
-                  </p>
+                  <p className="text-xs text-gray-500">Lead author</p>
                 </div>
-                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">
-                  {correspondingAuthorId ? "Primary contact fallback" : "Corresponding"}
-                </span>
+                {!correspondingAuthorId ? (
+                  <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                    Primary contact
+                  </span>
+                ) : null}
               </div>
             </div>
 
@@ -720,65 +738,56 @@ export default function PublishDrawer({
 
             {coAuthors.length > 0 ? (
               <div className="space-y-2 rounded-xl border border-gray-200 bg-canvas p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Author order and corresponding author
-                </p>
-                {coAuthors.map((coAuthor, index) => (
-                  <div
-                    key={`${coAuthor.id}-controls`}
-                    className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Author order
+                  </p>
+                  <p className="text-xs text-gray-400">Drag to reorder</p>
+                </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={coAuthors.map((c) => c.id)}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-gray-900">
-                        {index + 2}. {coAuthor.full_name ?? `@${coAuthor.username}`}
-                      </p>
-                      <p className="text-xs text-gray-500">@{coAuthor.username}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
+                    {coAuthors.map((coAuthor, index) => (
+                      <SortableCoAuthorRow
+                        key={coAuthor.id}
+                        coAuthor={coAuthor}
+                        index={index}
+                        isPrimary={correspondingAuthorId === coAuthor.id}
+                        onSetPrimary={() =>
                           setCorrespondingAuthorId((current) =>
                             current === coAuthor.id ? null : coAuthor.id
                           )
                         }
-                        className={`rounded border px-2 py-1 text-xs transition-colors ${
-                          correspondingAuthorId === coAuthor.id
-                            ? "border-amber-200 bg-amber-50 text-amber-600"
-                            : "border-gray-200 bg-white text-gray-400 hover:text-gray-600"
-                        }`}
-                        aria-label={
-                          correspondingAuthorId === coAuthor.id
-                            ? `Unset ${coAuthor.username} as corresponding author`
-                            : `Set ${coAuthor.username} as corresponding author`
+                        onRemove={() =>
+                          handleCoAuthorsChange(
+                            coAuthors.filter((c) => c.id !== coAuthor.id)
+                          )
                         }
-                      >
-                        {correspondingAuthorId === coAuthor.id ? "Unset" : "Set"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={index === 0}
-                        onClick={() => moveCoAuthor(index, index - 1)}
-                        className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
-                      >
-                        Up
-                      </button>
-                      <button
-                        type="button"
-                        disabled={index === coAuthors.length - 1}
-                        onClick={() => moveCoAuthor(index, index + 1)}
-                        className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
-                      >
-                        Down
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+
+                {correspondingAuthorId ? (
+                  <p className="px-1 text-xs text-gray-400">
+                    Primary contact receives editorial correspondence and appears first in citations.
+                  </p>
+                ) : (
+                  <p className="px-1 text-xs text-gray-400">
+                    Lead author is primary contact by default. Tap &ldquo;Make primary&rdquo; on a co-author to change.
+                  </p>
+                )}
               </div>
             ) : null}
           </section>
 
-          {/* 6. References (policy/research only) */}
+          {/* 7. References (policy/research only) */}
           {postType === "research" || postType === "policy_brief" ? (
             <section className="rounded-xl border border-gray-200">
               <button
@@ -789,7 +798,9 @@ export default function PublishDrawer({
                 <div>
                   <p className="text-sm font-medium text-gray-900">References</p>
                   <p className="mt-1 text-xs text-gray-500">
-                    Add or remove enough references to complete editorial submission.
+                    {postType === "policy_brief" || postType === "research"
+                      ? "Required for editorial submission. Add at least one source."
+                      : "Add or remove references."}
                   </p>
                 </div>
                 <span className="text-sm font-medium text-emerald-brand">
@@ -799,101 +810,69 @@ export default function PublishDrawer({
 
               {showReferences ? (
                 <div className="space-y-4 border-t border-gray-100 px-4 py-4">
-                  {refs.length > 0 ? (
-                    <div className="space-y-2">
-                      {refs.map((reference) => (
-                        <div
-                          key={reference.id}
-                          className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-canvas px-3 py-2"
-                        >
-                          <p className="truncate text-sm text-gray-700">
-                            {reference.title || "Untitled reference"}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateReferences(
-                                refs.filter((item) => item.id !== reference.id)
+                  <div className="space-y-3">
+                    {refs.length === 0 ? (
+                      <p className="text-xs text-gray-500">No references added yet.</p>
+                    ) : (
+                      refs.map((reference, index) => (
+                        <ReferenceRow
+                          key={reference.id || `ref-${index}`}
+                          index={index}
+                          reference={reference}
+                          canMoveUp={index > 0}
+                          canMoveDown={index < refs.length - 1}
+                          onMove={(direction) => {
+                            const next = [...refs];
+                            const target = direction === "up" ? index - 1 : index + 1;
+                            const [item] = next.splice(index, 1);
+                            next.splice(target, 0, item);
+                            updateReferences(next.map((r, i) => ({ ...r, display_order: i })));
+                          }}
+                          onChange={(nextRef) =>
+                            updateReferences(
+                              refs.map((r, i) =>
+                                i === index ? { ...nextRef, display_order: index } : r
                               )
-                            }
-                            className="text-sm text-gray-400 transition-colors hover:text-gray-700"
-                            aria-label={`Remove ${reference.title || "reference"}`}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500">No references added yet.</p>
-                  )}
-
-                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-                    <input
-                      type="text"
-                      value={newReferenceTitle}
-                      onChange={(event) => setNewReferenceTitle(event.target.value)}
-                      placeholder="Title"
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-                    />
-                    <input
-                      type="text"
-                      value={newReferenceAuthors}
-                      onChange={(event) => setNewReferenceAuthors(event.target.value)}
-                      placeholder="Authors"
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-                    />
-                    <input
-                      type="text"
-                      value={newReferenceSource}
-                      onChange={(event) => setNewReferenceSource(event.target.value)}
-                      placeholder="Source / URL"
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const trimmedTitle = newReferenceTitle.trim();
-                        if (!trimmedTitle) {
-                          return;
-                        }
-
-                        const sourceValue = newReferenceSource.trim();
-                        const isUrl = /^https?:\/\//i.test(sourceValue);
-                        updateReferences([
-                          ...refs,
-                          {
-                            id: `temp-${Date.now().toString(36)}`,
-                            post_id: draftId ?? "",
-                            display_order: refs.length,
-                            ref_type: "other",
-                            authors: newReferenceAuthors.trim() || null,
-                            title: trimmedTitle,
-                            year: null,
-                            source: isUrl ? null : sourceValue || null,
-                            url: isUrl ? sourceValue : null,
-                            doi: null,
-                            raw: null,
-                          },
-                        ]);
-                        trackActivationEvent({
-                          event: "reference_added",
-                          metadata: {
-                            draftId,
-                            postType,
-                            referenceCount: refs.length + 1,
-                          },
-                        });
-                        setNewReferenceTitle("");
-                        setNewReferenceAuthors("");
-                        setNewReferenceSource("");
-                      }}
-                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
-                      aria-label="Add reference"
-                    >
-                      +
-                    </button>
+                            )
+                          }
+                          onRemove={() =>
+                            updateReferences(
+                              refs
+                                .filter((_, i) => i !== index)
+                                .map((r, i) => ({ ...r, display_order: i }))
+                            )
+                          }
+                        />
+                      ))
+                    )}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newRef: PostReferenceRecord = {
+                        id: `temp-${Date.now().toString(36)}`,
+                        post_id: draftId ?? "",
+                        display_order: refs.length,
+                        ref_type: "other",
+                        authors: "",
+                        title: "",
+                        year: null,
+                        source: "",
+                        url: "",
+                        doi: "",
+                        raw: "",
+                      };
+                      updateReferences([...refs, newRef]);
+                      trackActivationEvent({
+                        event: "reference_added",
+                        metadata: { draftId, postType, referenceCount: refs.length + 1 },
+                      });
+                    }}
+                    className="w-full rounded-lg border border-dashed border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+                  >
+                    + Add reference
+                  </button>
                 </div>
               ) : null}
             </section>
@@ -956,6 +935,16 @@ export default function PublishDrawer({
                     placeholder="why-nigeria-needs-judicial-reform"
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
                   />
+                  {normalizedSlug ? (
+                    <p className="mt-1 text-xs text-gray-400">
+                      <span className="text-gray-300">thinkafrica.com/post/</span>
+                      <span className="font-medium text-gray-500">{normalizedSlug}</span>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-400">
+                      Leave blank to auto-generate a URL from your title.
+                    </p>
+                  )}
                 </section>
               </div>
             ) : null}
@@ -968,6 +957,7 @@ export default function PublishDrawer({
           </p>
         </div>
         </div>
+
 
         {/* Sticky footer — always visible regardless of scroll position */}
         <div className="shrink-0 space-y-3 border-t border-gray-100 bg-white px-5 py-4">
@@ -1006,6 +996,83 @@ export default function PublishDrawer({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SortableCoAuthorRow({
+  coAuthor,
+  index,
+  isPrimary,
+  onSetPrimary,
+  onRemove,
+}: {
+  coAuthor: CoAuthorProfile;
+  index: number;
+  isPrimary: boolean;
+  onSetPrimary: () => void;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: coAuthor.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+      }}
+      className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm"
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+        aria-label="Drag to reorder"
+      >
+        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM8 13.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM8 21a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM16 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM16 13.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM16 21a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
+        </svg>
+      </button>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium text-gray-900">
+          {index + 2}. {coAuthor.full_name ?? `@${coAuthor.username}`}
+        </p>
+        <p className="text-xs text-gray-500">@{coAuthor.username}</p>
+      </div>
+
+      <button
+        type="button"
+        onClick={onSetPrimary}
+        className={`shrink-0 rounded border px-2 py-1 text-xs transition-colors ${
+          isPrimary
+            ? "border-amber-200 bg-amber-50 text-amber-700"
+            : "border-gray-200 bg-white text-gray-400 hover:text-gray-600"
+        }`}
+      >
+        {isPrimary ? "Primary ✓" : "Make primary"}
+      </button>
+
+      <button
+        type="button"
+        onClick={onRemove}
+        className="shrink-0 text-gray-300 hover:text-red-400"
+        aria-label={`Remove ${coAuthor.username}`}
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
   );
 }

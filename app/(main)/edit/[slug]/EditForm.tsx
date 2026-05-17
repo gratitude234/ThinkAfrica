@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Button from "@/components/ui/Button";
 import TagInput from "@/components/ui/TagInput";
 import { MIN_WORD_COUNTS, POST_TYPE_LABELS, type PostType } from "@/lib/utils";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import type { EditorHandle } from "@/components/editor/Editor";
 import type {
   PostEditorDecisionRecord,
   PostReferenceRecord,
@@ -26,6 +28,60 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
 });
 
 const POST_TYPES: PostType[] = ["blog", "essay", "research", "policy_brief"];
+
+type MobileToolbarAction =
+  | "bold" | "italic" | "heading" | "list" | "quote" | "link" | "undo" | "redo";
+
+const MOBILE_TOOLBAR_BUTTONS: Array<{
+  title: string;
+  action: MobileToolbarAction;
+  markKey?: string;
+  icon: ReactNode;
+}> = [
+  { title: "Bold", action: "bold", markKey: "bold", icon: <span className="font-bold">B</span> },
+  { title: "Italic", action: "italic", markKey: "italic", icon: <span className="italic">I</span> },
+  { title: "Heading", action: "heading", markKey: "heading", icon: <span className="font-semibold">H2</span> },
+  {
+    title: "Bullet list", action: "list", markKey: "bulletList",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    ),
+  },
+  {
+    title: "Blockquote", action: "quote", markKey: "blockquote",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+      </svg>
+    ),
+  },
+  {
+    title: "Link", action: "link", markKey: "link",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+    ),
+  },
+  {
+    title: "Undo", action: "undo",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+      </svg>
+    ),
+  },
+  {
+    title: "Redo", action: "redo",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
+      </svg>
+    ),
+  },
+];
 
 interface Post {
   id: string;
@@ -88,6 +144,13 @@ export default function EditForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editorRef = useRef<EditorHandle>(null);
+  const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
+  const [showLinkPopover, setShowLinkPopover] = useState(false);
+  const [linkPopoverUrl, setLinkPopoverUrl] = useState("");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const reviewedPublicationLocked =
     post.status === "published" &&
@@ -121,7 +184,9 @@ export default function EditForm({
         return;
       }
 
-      if (!silent) {
+      if (silent) {
+        setIsSaving(true);
+      } else {
         setLoading(true);
       }
 
@@ -140,15 +205,15 @@ export default function EditForm({
         references,
       });
 
-      if (updateError) {
-        if (!silent) {
+      if (silent) {
+        setIsSaving(false);
+        if (!updateError) setLastSaved(new Date());
+      } else {
+        if (updateError) {
           setError(updateError);
+        } else {
+          router.push("/dashboard");
         }
-      } else if (!silent) {
-        router.push("/dashboard");
-      }
-
-      if (!silent) {
         setLoading(false);
       }
     },
@@ -203,6 +268,48 @@ export default function EditForm({
     setContent(html);
   }, []);
 
+  const handleSelectionUpdate = useCallback(() => {
+    if (!editorRef.current) return;
+    setActiveMarks({
+      bold: editorRef.current.isActive("bold"),
+      italic: editorRef.current.isActive("italic"),
+      heading: editorRef.current.isActive("heading", { level: 2 }),
+      bulletList: editorRef.current.isActive("bulletList"),
+      blockquote: editorRef.current.isActive("blockquote"),
+      link: editorRef.current.isActive("link"),
+    });
+  }, []);
+
+  const runMobileToolbarAction = useCallback(
+    (action: MobileToolbarAction) => {
+      const ref = editorRef.current;
+      if (!ref) return;
+      if (action === "undo") { ref.undo(); return; }
+      if (action === "redo") { ref.redo(); return; }
+      if (action === "link") {
+        if (activeMarks.link) {
+          ref.insertLink("");
+          setActiveMarks((prev) => ({ ...prev, link: false }));
+        } else {
+          setShowLinkPopover((prev) => !prev);
+        }
+        return;
+      }
+      if (action === "bold") ref.toggleBold();
+      if (action === "italic") ref.toggleItalic();
+      if (action === "heading") ref.toggleH2();
+      if (action === "list") ref.toggleBulletList();
+      if (action === "quote") ref.toggleBlockquote();
+    },
+    [activeMarks.link]
+  );
+
+  const saveStatusText = isSaving
+    ? "Saving…"
+    : lastSaved
+      ? `Saved at ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+      : "Unsaved changes";
+
   const submissionDateFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat("en-GB", {
@@ -221,6 +328,7 @@ export default function EditForm({
           <p className="mt-1 text-sm text-gray-500">
             Status: <span className="font-medium capitalize">{post.status.replace("_", " ")}</span>
           </p>
+          <p className="mt-0.5 text-xs text-gray-400">{saveStatusText}</p>
         </div>
         {post.citation_id ? (
           <Link
@@ -432,7 +540,7 @@ export default function EditForm({
             event.preventDefault();
             void doSave(false);
           }}
-          className="space-y-6"
+          className="space-y-6 pb-16 lg:pb-0"
         >
           <CoverImageUploader
             initialUrl={coverImageUrl}
@@ -497,6 +605,7 @@ export default function EditForm({
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Content</label>
             <Editor
+              ref={editorRef}
               content={content}
               minWords={MIN_WORD_COUNTS[postType]}
               postType={postType}
@@ -504,6 +613,7 @@ export default function EditForm({
               onReferencesChange={setReferences}
               onUpdate={handleEditorUpdate}
               onAutoSave={() => doSave(true)}
+              onSelectionUpdate={handleSelectionUpdate}
             />
           </div>
 
@@ -529,15 +639,112 @@ export default function EditForm({
           ) : null}
 
           <div className="flex items-center justify-end gap-3 pt-2">
-            <Button variant="secondary" type="button" onClick={() => router.push("/dashboard")}>
+            <Button variant="secondary" type="button" onClick={() => setShowCancelConfirm(true)}>
               Cancel
             </Button>
             <Button type="submit" loading={loading} size="lg">
-              Save changes
+              {post.status === "pending_revision" ? "Submit revision" : "Save changes"}
             </Button>
+          </div>
+
+          {/* Mobile toolbar — sticky at bottom, hidden on desktop */}
+          <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white lg:hidden">
+            {showLinkPopover ? (
+              <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
+                <input
+                  type="url"
+                  value={linkPopoverUrl}
+                  onChange={(event) => setLinkPopoverUrl(event.target.value)}
+                  placeholder="https://..."
+                  className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                  autoFocus
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      editorRef.current?.insertLink(linkPopoverUrl);
+                      setShowLinkPopover(false);
+                      setLinkPopoverUrl("");
+                    }
+                    if (event.key === "Escape") {
+                      setShowLinkPopover(false);
+                      setLinkPopoverUrl("");
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    editorRef.current?.insertLink(linkPopoverUrl);
+                    setShowLinkPopover(false);
+                    setLinkPopoverUrl("");
+                  }}
+                  className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowLinkPopover(false); setLinkPopoverUrl(""); }}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : null}
+            <div className="flex overflow-x-auto px-2 py-1" style={{ scrollbarWidth: "none" }}>
+              {MOBILE_TOOLBAR_BUTTONS.map((btn) => {
+                const isActive = btn.markKey ? (activeMarks[btn.markKey] ?? false) : false;
+                return (
+                  <button
+                    key={btn.action}
+                    type="button"
+                    title={btn.title}
+                    onClick={() => runMobileToolbarAction(btn.action)}
+                    className={`flex min-w-[40px] flex-shrink-0 items-center justify-center rounded-lg p-2.5 text-sm transition-colors ${
+                      isActive ? "bg-emerald-100 text-emerald-700" : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    {btn.icon}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </form>
       )}
+
+      {showCancelConfirm ? (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="cancel-confirm-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 id="cancel-confirm-title" className="text-base font-semibold text-gray-900">
+              Leave without saving?
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Any unsaved changes will be lost. Autosave runs every 5 seconds, but recent edits may not be saved yet.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Keep editing
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
