@@ -5,6 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
+import Link from "@tiptap/extension-link";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { PostReferenceRecord, ReferenceType } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
@@ -16,6 +17,10 @@ export interface EditorHandle {
   toggleBulletList: () => void;
   toggleBlockquote: () => void;
   isActive: (name: string, attrs?: Record<string, unknown>) => boolean;
+  undo: () => void;
+  redo: () => void;
+  triggerImageUpload: () => void;
+  insertLink: (url: string) => void;
 }
 
 interface EditorProps {
@@ -27,6 +32,7 @@ interface EditorProps {
   onReferencesChange?: (references: PostReferenceRecord[]) => void;
   onUpdate?: (html: string, wordCount: number) => void;
   onAutoSave?: () => void | Promise<void>;
+  onSelectionUpdate?: () => void;
 }
 
 type SaveStatus = "saved" | "saving" | "unsaved";
@@ -57,6 +63,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   onReferencesChange,
   onUpdate,
   onAutoSave,
+  onSelectionUpdate,
 }, ref) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -83,6 +90,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
       Placeholder.configure({ placeholder }),
       CharacterCount,
       Image.configure({ inline: false, allowBase64: false }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
+      }),
     ],
     content,
     editorProps: {
@@ -98,6 +109,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
       setSaveStatus("unsaved");
       setChangeTick((current) => current + 1);
       onUpdate?.(html, words);
+      onSelectionUpdate?.();
+    },
+    onSelectionUpdate() {
+      onSelectionUpdate?.();
     },
     immediatelyRender: false,
   });
@@ -109,6 +124,16 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     toggleBulletList: () => editor?.chain().focus().toggleBulletList().run(),
     toggleBlockquote: () => editor?.chain().focus().toggleBlockquote().run(),
     isActive: (name, attrs) => editor?.isActive(name, attrs) ?? false,
+    undo: () => editor?.chain().focus().undo().run(),
+    redo: () => editor?.chain().focus().redo().run(),
+    triggerImageUpload: () => imageInputRef.current?.click(),
+    insertLink: (url: string) => {
+      if (!url.trim()) {
+        editor?.chain().focus().unsetLink().run();
+        return;
+      }
+      editor?.chain().focus().setLink({ href: url.trim() }).run();
+    },
   }));
 
   useEffect(() => {

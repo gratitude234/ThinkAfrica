@@ -211,7 +211,9 @@ export default function PublishDrawer({
       setCoAuthors(initialCoAuthors);
       setCorrespondingAuthorId(null);
       setRefs(initialReferences);
-      setShowReferences(false);
+      setShowReferences(
+        initialPostType === "policy_brief" || initialPostType === "research"
+      );
       setNewReferenceTitle("");
       setNewReferenceAuthors("");
       setNewReferenceSource("");
@@ -469,7 +471,7 @@ export default function PublishDrawer({
       />
 
       <div
-        className="absolute right-0 top-0 h-full w-full overflow-y-auto bg-white shadow-2xl sm:w-[440px]"
+        className="absolute right-0 top-0 flex h-full w-full flex-col bg-white shadow-2xl sm:w-[440px]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="publish-drawer-title"
@@ -498,6 +500,7 @@ export default function PublishDrawer({
           </button>
         </div>
 
+        <div className="flex-1 overflow-y-auto">
         <div className="space-y-6 px-5 py-5">
           {/* 1. Preview — first thing users want to see */}
           <section className="space-y-3">
@@ -662,7 +665,28 @@ export default function PublishDrawer({
           {/* 4. Quality checklist */}
           <QualityChecklist summary={qualitySummary} />
 
-          {/* 5. Authorship */}
+          {/* 5. Feed summary — elevated from Refine for visibility */}
+          <section className="space-y-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Feed summary</p>
+              <p className="mt-1 text-xs text-gray-500">
+                Auto-generated — edit only if you want a sharper preview.
+              </p>
+            </div>
+            <textarea
+              value={excerpt}
+              onChange={(event) => {
+                setExcerpt(event.target.value);
+                onMetadataChange?.({ excerpt: event.target.value });
+              }}
+              rows={3}
+              maxLength={220}
+              className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+            />
+            <p className="text-right text-xs text-gray-400">{excerpt.length}/220</p>
+          </section>
+
+          {/* 6. Authorship */}
           <section className="space-y-3">
             <div>
               <p className="text-sm font-medium text-gray-900">Authorship</p>
@@ -885,7 +909,7 @@ export default function PublishDrawer({
               <div>
                 <p className="text-sm font-medium text-gray-900">Refine</p>
                 <p className="mt-1 text-xs text-gray-500">
-                  Cover image, feed summary, and a custom slug are optional.
+                  Cover image and custom URL slug are optional.
                 </p>
               </div>
               <span className="text-sm font-medium text-emerald-brand">
@@ -918,25 +942,6 @@ export default function PublishDrawer({
                   />
                 </section>
 
-                <section className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Feed summary</p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Auto-generated. Edit only if you want a sharper preview.
-                    </p>
-                  </div>
-                  <textarea
-                    value={excerpt}
-                    onChange={(event) => {
-                      setExcerpt(event.target.value);
-                      onMetadataChange?.({ excerpt: event.target.value });
-                    }}
-                    rows={4}
-                    maxLength={220}
-                    className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-                  />
-                </section>
-
                 <section className="space-y-2">
                   <div>
                     <p className="text-sm font-medium text-gray-900">Custom slug</p>
@@ -961,7 +966,11 @@ export default function PublishDrawer({
               ? "Publishes instantly."
               : "Enters formal editorial review. Reviewer recommendations inform the outcome, but publication only happens after a final editor decision."}
           </p>
+        </div>
+        </div>
 
+        {/* Sticky footer — always visible regardless of scroll position */}
+        <div className="shrink-0 space-y-3 border-t border-gray-100 bg-white px-5 py-4">
           {softWarning ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <p>{softWarning.message}</p>

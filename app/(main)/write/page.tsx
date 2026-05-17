@@ -44,16 +44,20 @@ interface DraftPayload {
   inResponseToId: string | null;
 }
 
-type MobileToolbarAction = "bold" | "italic" | "heading" | "list" | "quote";
+type MobileToolbarAction =
+  | "bold" | "italic" | "heading" | "list" | "quote"
+  | "link" | "undo" | "redo";
 
 const MOBILE_TOOLBAR_BUTTONS: Array<{
   title: string;
   action: MobileToolbarAction;
+  markKey?: string;
   icon: ReactNode;
 }> = [
   {
     title: "Bold",
     action: "bold",
+    markKey: "bold",
     icon: (
       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 4h8a4 4 0 010 8H6zm0 8h9a4 4 0 010 8H6z" />
@@ -63,6 +67,7 @@ const MOBILE_TOOLBAR_BUTTONS: Array<{
   {
     title: "Italic",
     action: "italic",
+    markKey: "italic",
     icon: (
       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M19 4h-9M14 20H5M15 4 9 20" />
@@ -72,11 +77,13 @@ const MOBILE_TOOLBAR_BUTTONS: Array<{
   {
     title: "Heading",
     action: "heading",
+    markKey: "heading",
     icon: <span className="text-sm font-bold">H2</span>,
   },
   {
     title: "List",
     action: "list",
+    markKey: "bulletList",
     icon: (
       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
@@ -86,9 +93,38 @@ const MOBILE_TOOLBAR_BUTTONS: Array<{
   {
     title: "Quote",
     action: "quote",
+    markKey: "blockquote",
     icon: (
       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1zm12 0c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
+      </svg>
+    ),
+  },
+  {
+    title: "Link",
+    action: "link",
+    markKey: "link",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+    ),
+  },
+  {
+    title: "Undo",
+    action: "undo",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4" />
+      </svg>
+    ),
+  },
+  {
+    title: "Redo",
+    action: "redo",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 10H11a8 8 0 000 16h4M21 10l-4-4M21 10l-4 4" />
       </svg>
     ),
   },
@@ -178,8 +214,13 @@ export default function WritePage() {
   const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [publishDraftId, setPublishDraftId] = useState<string | null>(null);
+  const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
+  const [showLinkPopover, setShowLinkPopover] = useState(false);
+  const [linkPopoverUrl, setLinkPopoverUrl] = useState("");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const responseStarterAppliedRef = useRef(false);
   const topicStarterAppliedRef = useRef(false);
+  const chooserShownRef = useRef(false);
 
   useEffect(() => {
     if (typeParam === "research") {
@@ -474,6 +515,18 @@ export default function WritePage() {
     title,
   ]);
 
+  const handleSelectionUpdate = useCallback(() => {
+    if (!editorRef.current) return;
+    setActiveMarks({
+      bold: editorRef.current.isActive("bold"),
+      italic: editorRef.current.isActive("italic"),
+      heading: editorRef.current.isActive("heading", { level: 2 }),
+      bulletList: editorRef.current.isActive("bulletList"),
+      blockquote: editorRef.current.isActive("blockquote"),
+      link: editorRef.current.isActive("link"),
+    });
+  }, []);
+
   const handleEditorUpdate = useCallback((html: string, words: number) => {
     setContent(html);
     setWordCount(words);
@@ -534,11 +587,38 @@ export default function WritePage() {
     });
   }, []);
 
+  const hasExistingContext = Boolean(
+    draftParam || typeParam || starterParam || responseToSlug ||
+    responseToIdParam || responseIntentParam
+  );
+
+  // Show format chooser automatically for brand-new writes (no existing draft/context).
+  // Only [loadingDraft] in deps — hasExistingContext/initialData/localBackup are intentionally
+  // read once when loading resolves, not re-checked on every change.
+  useEffect(() => {
+    if (loadingDraft) return;
+    if (chooserShownRef.current) return;
+    chooserShownRef.current = true;
+    if (!hasExistingContext && !initialData && !localBackup) {
+      setShowChooser(true);
+    }
+  }, [loadingDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const canOpenPublish =
     title.trim().length > 0 &&
     wordCount > 0 &&
     !!currentUserId &&
     !loadingProfileInfo;
+
+  const publishBlockReason = !currentUserId
+    ? "Sign in to publish"
+    : loadingProfileInfo
+      ? "Loading..."
+      : !title.trim()
+        ? "Add a title first"
+        : wordCount === 0
+          ? "Write something first"
+          : null;
   const selectedPostType =
     WRITE_FORMATS.find((item) => item.type === postType) ?? WRITE_FORMATS[0];
   const wordProgress = Math.min(
@@ -627,11 +707,21 @@ export default function WritePage() {
   };
 
   const runMobileToolbarAction = (action: MobileToolbarAction) => {
-    if (action === "bold") editorRef.current?.toggleBold();
-    if (action === "italic") editorRef.current?.toggleItalic();
+    if (action === "bold")    editorRef.current?.toggleBold();
+    if (action === "italic")  editorRef.current?.toggleItalic();
     if (action === "heading") editorRef.current?.toggleH2();
-    if (action === "list") editorRef.current?.toggleBulletList();
-    if (action === "quote") editorRef.current?.toggleBlockquote();
+    if (action === "list")    editorRef.current?.toggleBulletList();
+    if (action === "quote")   editorRef.current?.toggleBlockquote();
+    if (action === "undo")    editorRef.current?.undo();
+    if (action === "redo")    editorRef.current?.redo();
+    if (action === "link") {
+      if (activeMarks.link) {
+        editorRef.current?.insertLink("");
+        return;
+      }
+      setShowLinkPopover((prev) => !prev);
+      setLinkPopoverUrl("");
+    }
   };
 
   if (loadingDraft) {
@@ -678,9 +768,7 @@ export default function WritePage() {
       wordCount={wordCount}
       estimatedReadTime={estimatedReadTime}
       wordProgress={wordProgress}
-      canOpenPublish={canOpenPublish}
       onChangeFormat={() => setShowChooser(true)}
-      onReadyToPublish={handleReadyToPublish}
     />
   );
 
@@ -721,20 +809,27 @@ export default function WritePage() {
               type="button"
               onClick={() => {
                 const hasContent = title.trim().length > 0 || wordCount > 0;
-                if (hasContent && !window.confirm("Leave the editor? Your draft is saved automatically, but unsaved changes may be lost.")) return;
+                if (hasContent) { setShowCancelConfirm(true); return; }
                 router.push("/");
               }}
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              size="lg"
-              disabled={!canOpenPublish}
-              onClick={handleReadyToPublish}
-            >
-              Publish
-            </Button>
+            <div className="group relative hidden lg:block">
+              <Button
+                type="button"
+                size="lg"
+                disabled={!canOpenPublish}
+                onClick={handleReadyToPublish}
+              >
+                Publish
+              </Button>
+              {!canOpenPublish && publishBlockReason ? (
+                <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white shadow-lg group-hover:block">
+                  {publishBlockReason}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
@@ -973,7 +1068,7 @@ export default function WritePage() {
 
           <Editor
             ref={editorRef}
-            key={`${publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}-${postType}`}
+            key={publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}
             content={content}
             placeholder={getBodyPlaceholder(postType)}
             minWords={selectedPostType.minWords}
@@ -981,6 +1076,7 @@ export default function WritePage() {
             references={references}
             onReferencesChange={setReferences}
             onUpdate={handleEditorUpdate}
+            onSelectionUpdate={handleSelectionUpdate}
             onAutoSave={async () => {
               await saveDraft(getCurrentData());
               if (publishDraftId) {
@@ -993,20 +1089,66 @@ export default function WritePage() {
           />
           {!focusMode ? (
             <div className="sticky bottom-0 z-20 border-t border-gray-100 bg-white shadow-[0_-8px_20px_rgba(15,23,42,0.04)] lg:hidden">
-              {/* Formatting toolbar row — large touch targets, stays near keyboard */}
-              <div className="flex items-center gap-0.5 border-b border-gray-100 px-2 py-1.5">
+              {/* Link URL input — appears above toolbar when link button tapped */}
+              {showLinkPopover ? (
+                <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-3 py-2">
+                  <input
+                    type="url"
+                    autoFocus
+                    value={linkPopoverUrl}
+                    onChange={(e) => setLinkPopoverUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        editorRef.current?.insertLink(linkPopoverUrl);
+                        setShowLinkPopover(false);
+                        setLinkPopoverUrl("");
+                      }
+                      if (e.key === "Escape") setShowLinkPopover(false);
+                    }}
+                    placeholder="https://..."
+                    className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      editorRef.current?.insertLink(linkPopoverUrl);
+                      setShowLinkPopover(false);
+                      setLinkPopoverUrl("");
+                    }}
+                    className="shrink-0 rounded-lg bg-emerald-brand px-3 py-1.5 text-sm font-medium text-white"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowLinkPopover(false)}
+                    className="shrink-0 text-sm text-gray-400 hover:text-gray-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : null}
+              {/* Formatting toolbar — horizontally scrollable, active state highlight */}
+              <div
+                className="flex items-center gap-0.5 overflow-x-auto border-b border-gray-100 px-2 py-1.5"
+                style={{ scrollbarWidth: "none" }}
+              >
                 {MOBILE_TOOLBAR_BUTTONS.map((btn) => (
                   <button
                     key={btn.title}
                     type="button"
                     title={btn.title}
                     onClick={() => runMobileToolbarAction(btn.action)}
-                    className="flex h-10 min-w-[40px] items-center justify-center rounded-lg px-3 text-sm font-medium text-gray-600 transition-colors active:bg-emerald-100"
+                    className={`flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors ${
+                      btn.markKey && activeMarks[btn.markKey]
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "text-gray-600 active:bg-gray-100"
+                    }`}
                   >
                     {btn.icon}
                   </button>
                 ))}
-                <div className="ml-auto flex items-center gap-1 pr-1">
+                <div className="ml-auto flex shrink-0 items-center gap-1 pr-1">
                   <button
                     type="button"
                     onClick={() => setFocusMode(true)}
@@ -1022,7 +1164,7 @@ export default function WritePage() {
                 <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
                   <div
                     className={`h-full rounded-full transition-[width] duration-300 ${
-                      wordCount >= selectedPostType.minWords ? "bg-emerald-500" : "bg-gray-300"
+                      wordCount >= selectedPostType.minWords ? "bg-emerald-500" : "bg-amber-400"
                     }`}
                     style={{ width: `${wordProgress}%` }}
                   />
@@ -1049,6 +1191,9 @@ export default function WritePage() {
                     </button>
                   </div>
                 </div>
+                {!canOpenPublish && publishBlockReason ? (
+                  <p className="mt-1 text-center text-xs text-amber-600">{publishBlockReason}</p>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -1128,6 +1273,42 @@ export default function WritePage() {
               </button>
             </div>
             {readinessPanel}
+          </div>
+        </div>
+      ) : null}
+
+      {showCancelConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="cancel-confirm-title"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <h2 id="cancel-confirm-title" className="text-base font-semibold text-gray-900">
+              Leave the editor?
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Your draft is saved automatically. Any changes since the last save may be lost.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <Button
+                variant="ghost"
+                type="button"
+                className="flex-1"
+                onClick={() => setShowCancelConfirm(false)}
+              >
+                Keep writing
+              </Button>
+              <Button
+                variant="danger"
+                type="button"
+                className="flex-1"
+                onClick={() => router.push("/")}
+              >
+                Leave
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}

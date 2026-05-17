@@ -28,9 +28,7 @@ interface WriteReadinessPanelProps {
   wordCount: number;
   estimatedReadTime: number;
   wordProgress: number;
-  canOpenPublish: boolean;
   onChangeFormat: () => void;
-  onReadyToPublish: () => void;
 }
 
 function stripHtml(value: string) {
@@ -69,9 +67,7 @@ export default function WriteReadinessPanel({
   wordCount,
   estimatedReadTime,
   wordProgress,
-  canOpenPublish,
   onChangeFormat,
-  onReadyToPublish,
 }: WriteReadinessPanelProps) {
   const completedTrackedRef = useRef<Set<string>>(new Set());
   const selectedFormat =
@@ -257,14 +253,6 @@ export default function WriteReadinessPanel({
           </p>
         </div>
 
-        <button
-          type="button"
-          disabled={!canOpenPublish}
-          onClick={onReadyToPublish}
-          className="mt-4 w-full rounded-lg bg-emerald-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Publish
-        </button>
       </section>
 
       {/* Section 2: Writing guide (shows once user starts) */}
