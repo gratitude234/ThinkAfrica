@@ -57,29 +57,6 @@ interface VoicePostRaw {
   profiles: VoiceProfile | VoiceProfile[] | null;
 }
 
-interface UpcomingWebinar {
-  id: string;
-  title: string;
-  status: string;
-  scheduled_at: string;
-  attendee_count: number | null;
-  tags: string[] | null;
-  profiles:
-    | {
-        username: string | null;
-        full_name: string | null;
-        university: string | null;
-        avatar_url: string | null;
-      }
-    | Array<{
-        username: string | null;
-        full_name: string | null;
-        university: string | null;
-        avatar_url: string | null;
-      }>
-    | null;
-}
-
 interface VoiceProfile {
   username: string | null;
   full_name: string | null;
@@ -178,7 +155,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     manualFeaturedResult,
     recentFeaturedCandidatesResult,
     latestPublishedResult,
-    upcomingWebinarResult,
     newVoiceResult,
   ] = await Promise.all([
     user
@@ -238,18 +214,6 @@ export default async function HomePage({ searchParams }: PageProps) {
       .maybeSingle(),
 
     supabase
-      .from("webinars")
-      .select(
-        "id, title, status, scheduled_at, attendee_count, tags, profiles!webinars_host_id_fkey (username, full_name, university, avatar_url)"
-      )
-      .in("status", ["scheduled", "live"])
-      .gte("scheduled_at", new Date().toISOString())
-      .order("status", { ascending: true })
-      .order("scheduled_at", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
-
-    supabase
       .from("posts")
       .select(
         `
@@ -272,7 +236,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     recentFeaturedCandidatesResult.error
   );
   logHomeQueryError("latest published fallback", latestPublishedResult.error);
-  logHomeQueryError("upcoming webinar", upcomingWebinarResult.error);
   logHomeQueryError("new voice", newVoiceResult.error);
 
   const followedIds = (followedUsers ?? []).map(
@@ -310,16 +273,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     ...recentFeaturedCandidatesRaw,
     ...(latestPublishedRaw ? [latestPublishedRaw] : []),
   ]);
-  const upcomingWebinarRaw =
-    (upcomingWebinarResult.data as UpcomingWebinar | null) ?? null;
-  const upcomingWebinar = upcomingWebinarRaw
-    ? {
-        ...upcomingWebinarRaw,
-        profiles: Array.isArray(upcomingWebinarRaw.profiles)
-          ? upcomingWebinarRaw.profiles[0] ?? null
-          : upcomingWebinarRaw.profiles,
-      }
-    : null;
   const newVoiceRaw = (newVoiceResult.data ?? []) as VoicePostRaw[];
 
   const featuredPostsNorm = featuredPostsRaw.map((post) => ({
@@ -544,7 +497,6 @@ export default async function HomePage({ searchParams }: PageProps) {
           <HomeSidebar
             activeDebate={homeDebate}
             newVoice={newVoice}
-            upcomingWebinar={upcomingWebinar}
             recentDraft={recentDraft ?? null}
             activationState={activationState}
             peopleSuggestions={peopleResult.suggestions}

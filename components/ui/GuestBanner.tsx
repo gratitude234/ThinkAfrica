@@ -38,7 +38,6 @@ export default function GuestBanner() {
     "talent",
     "terms",
     "topics",
-    "webinars",
     "write",
   ]);
   const isProfilePage =

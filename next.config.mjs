@@ -10,6 +10,15 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/webinars/:path*",
+        destination: "/explore",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -27,25 +27,16 @@ export default function EmptyState({ icon, title, description, cta }: EmptyState
 
 export const EMPTY_STATES = {
   posts: {
-    icon: "📝",
     title: "No articles yet.",
     description: "Be the first to share your ideas with Africa.",
     cta: { label: "Write an article", href: "/write" },
   },
   debates: {
-    icon: "⚡",
     title: "No debates yet.",
     description: "Start a conversation that matters.",
     cta: { label: "Start a debate", href: "/debates/create" },
   },
-  webinars: {
-    icon: "🎙",
-    title: "No webinars scheduled yet.",
-    description: "Be the first to host a live session.",
-    cta: { label: "Host a webinar", href: "/webinars/create" },
-  },
   fellowships: {
-    icon: "🎓",
     title: "No open opportunities right now.",
     description: "Check back soon for fellowships, internships, and research roles.",
     cta: undefined,

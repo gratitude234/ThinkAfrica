@@ -95,7 +95,7 @@ export default async function AmbassadorsPage() {
           {
             icon: "🎙",
             title: "Exclusive Access",
-            desc: "Access private webinars, mentor sessions, and early platform features.",
+            desc: "Access mentor sessions, campus playbooks, and early platform features.",
           },
         ].map((item) => (
           <div key={item.title} className="bg-white rounded-xl border border-gray-200 p-5">

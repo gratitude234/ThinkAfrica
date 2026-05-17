@@ -10,7 +10,6 @@ const PLACEMENT_TYPES = new Set([
   "fellowship",
   "leaderboard",
   "policy_hub",
-  "webinar",
 ]);
 
 function actionError(error: unknown, fallback: string) {

@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminActionStatus from "@/components/admin/AdminActionStatus";
+import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
 import { OPPORTUNITY_LABELS, OPPORTUNITY_TYPES } from "@/lib/opportunities";
 import { createFellowship } from "./actions";
 
 export default function FellowshipForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const feedback = useAdminActionFeedback<"create">();
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -27,8 +28,7 @@ export default function FellowshipForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
+    feedback.startAction("create", "Saving opportunity...");
     const skills = form.skills
       .split(",")
       .map((skill) => skill.trim().toLowerCase())
@@ -51,12 +51,10 @@ export default function FellowshipForm() {
     });
 
     if (result.error) {
-      setError(result.error);
-      setLoading(false);
+      feedback.failAction(result.error);
       return;
     }
 
-    setLoading(false);
     setOpen(false);
     setForm({
       title: "",
@@ -72,17 +70,29 @@ export default function FellowshipForm() {
       featured: false,
       status: "open",
     });
+    feedback.finishAction("Opportunity created.");
     router.refresh();
   };
 
+  const loading = feedback.pendingAction !== null;
+
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="px-4 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors"
-      >
-        + Add Opportunity
-      </button>
+      <div className="flex flex-col items-end gap-2">
+        <button
+          onClick={() => setOpen(true)}
+          className="px-4 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors"
+        >
+          + Add Opportunity
+        </button>
+        <AdminActionStatus
+          status={feedback.statusMessage}
+          error={feedback.error}
+          toastMessage={feedback.toastMessage}
+          onToastDone={feedback.clearToast}
+          className="text-sm"
+        />
+      </div>
     );
   }
 
@@ -175,7 +185,13 @@ export default function FellowshipForm() {
           Cancel
         </button>
       </div>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <AdminActionStatus
+        status={feedback.statusMessage}
+        error={feedback.error}
+        toastMessage={feedback.toastMessage}
+        onToastDone={feedback.clearToast}
+        className="text-sm"
+      />
     </form>
   );
 }

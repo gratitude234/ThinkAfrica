@@ -240,6 +240,7 @@ export default function LiveArguments({
   const [visibleStance, setVisibleStance] = useState<"for" | "against">(
     userParticipant?.stance ?? "for"
   );
+  const [phaseFilter, setPhaseFilter] = useState<DebatePhase | "all">("all");
 
   useEffect(() => {
     setLocalDebateStatus(debateStatus);
@@ -350,6 +351,12 @@ export default function LiveArguments({
 
   const sortedForArguments = sortByUpvotes(forArguments);
   const sortedAgainstArguments = sortByUpvotes(againstArguments);
+  const filteredForArguments = phaseFilter === "all"
+    ? sortedForArguments
+    : sortedForArguments.filter((arg) => phaseForRound(arg.round_number) === phaseFilter);
+  const filteredAgainstArguments = phaseFilter === "all"
+    ? sortedAgainstArguments
+    : sortedAgainstArguments.filter((arg) => phaseForRound(arg.round_number) === phaseFilter);
   const forPoints = sortedForArguments.reduce(
     (sum, argument) => sum + argument.upvotes,
     0
@@ -420,6 +427,23 @@ export default function LiveArguments({
             </span>
           </div>
 
+          <div className="mb-4 flex flex-wrap gap-2">
+            {(["all", "opening", "rebuttal", "closing"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setPhaseFilter(f)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                  phaseFilter === f
+                    ? "bg-gray-900 text-white"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                {f === "all" ? "All phases" : PHASE_LABELS[f]}
+              </button>
+            ))}
+          </div>
+
           <div className="mb-4 grid grid-cols-2 rounded-xl border border-gray-200 bg-white p-1 md:hidden">
             <button
               type="button"
@@ -451,10 +475,16 @@ export default function LiveArguments({
                 FOR - {sortedForArguments.length}
               </div>
 
-              {sortedForArguments.length === 0 ? (
-                <EmptyColumn message="No FOR arguments yet." />
+              {filteredForArguments.length === 0 ? (
+                <EmptyColumn
+                  message={
+                    phaseFilter === "all"
+                      ? "No FOR arguments yet."
+                      : `No ${PHASE_LABELS[phaseFilter]} arguments for this side yet.`
+                  }
+                />
               ) : (
-                sortedForArguments.map((argument) => (
+                filteredForArguments.map((argument) => (
                   <ArgumentCard
                     key={argument.id}
                     argument={argument}
@@ -475,10 +505,16 @@ export default function LiveArguments({
                 AGAINST - {sortedAgainstArguments.length}
               </div>
 
-              {sortedAgainstArguments.length === 0 ? (
-                <EmptyColumn message="No AGAINST arguments yet." />
+              {filteredAgainstArguments.length === 0 ? (
+                <EmptyColumn
+                  message={
+                    phaseFilter === "all"
+                      ? "No AGAINST arguments yet."
+                      : `No ${PHASE_LABELS[phaseFilter]} arguments for this side yet.`
+                  }
+                />
               ) : (
-                sortedAgainstArguments.map((argument) => (
+                filteredAgainstArguments.map((argument) => (
                   <ArgumentCard
                     key={argument.id}
                     argument={argument}

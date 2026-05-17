@@ -12,6 +12,7 @@ interface ParticipantCheckRow {
 
 interface OtherParticipantRow {
   user_id: string;
+  last_read_at: string | null;
   profiles:
     | {
         username: string;
@@ -55,7 +56,7 @@ export default async function ConversationPage({ params }: PageProps) {
 
   const { data: otherParticipantRow } = await supabase
     .from("conversation_participants")
-    .select("user_id, profiles!conversation_participants_user_id_fkey(username, full_name, avatar_url)")
+    .select("user_id, last_read_at, profiles!conversation_participants_user_id_fkey(username, full_name, avatar_url)")
     .eq("conversation_id", id)
     .neq("user_id", user.id)
     .maybeSingle<OtherParticipantRow>();
@@ -65,6 +66,9 @@ export default async function ConversationPage({ params }: PageProps) {
       ? otherParticipantRow.profiles[0] ?? null
       : otherParticipantRow.profiles
     : null;
+
+  const otherLastReadAt = otherParticipantRow?.last_read_at ?? null;
+  const otherUserId = otherParticipantRow?.user_id ?? null;
 
   const { data: initialMessages } = await supabase
     .from("messages")
@@ -85,6 +89,8 @@ export default async function ConversationPage({ params }: PageProps) {
       currentUserId={user.id}
       otherProfile={otherProfile}
       initialMessages={((initialMessages ?? []) as MessageRow[]).reverse()}
+      otherLastReadAt={otherLastReadAt}
+      otherUserId={otherUserId}
     />
   );
 }

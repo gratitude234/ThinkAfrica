@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminActionStatus from "@/components/admin/AdminActionStatus";
+import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
 import { updateFellowshipApplicationStatus } from "./actions";
 
 interface Props {
@@ -16,23 +18,31 @@ export default function ApplicationActions({
   initialReviewNote,
 }: Props) {
   const router = useRouter();
-  const [loading, setLoading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState(initialReviewNote ?? "");
+  const feedback = useAdminActionFeedback<string>();
 
   const update = async (status: string) => {
-    setLoading(status);
-    setError(null);
+    const statusLabels: Record<string, string> = {
+      shortlisted: "Shortlisting application...",
+      accepted: "Accepting application...",
+      rejected: "Rejecting application...",
+    };
+    feedback.startAction(status, statusLabels[status] ?? "Saving review note...");
     const result = await updateFellowshipApplicationStatus(
       applicationId,
       status,
       reviewNote
     );
-    setLoading(null);
     if (result.error) {
-      setError(result.error);
+      feedback.failAction(result.error);
       return;
     }
+    const successLabels: Record<string, string> = {
+      shortlisted: "Application shortlisted.",
+      accepted: "Application accepted.",
+      rejected: "Application rejected.",
+    };
+    feedback.finishAction(successLabels[status] ?? "Review note saved.");
     router.refresh();
   };
 
@@ -41,6 +51,11 @@ export default function ApplicationActions({
     { label: "Accept", value: "accepted", style: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" },
     { label: "Reject", value: "rejected", style: "bg-red-50 text-red-600 border-red-200 hover:bg-red-100" },
   ];
+  const loadingLabels: Record<string, string> = {
+    shortlisted: "Shortlisting...",
+    accepted: "Accepting...",
+    rejected: "Rejecting...",
+  };
 
   return (
     <div className="space-y-2">
@@ -54,25 +69,31 @@ export default function ApplicationActions({
       <div className="flex items-center gap-1.5 flex-wrap">
         <button
           onClick={() => update(currentStatus)}
-          disabled={loading !== null}
+          disabled={feedback.pendingAction !== null}
           className="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:border-emerald-200 hover:text-emerald-700 disabled:opacity-50"
         >
-          {loading === currentStatus ? "Saving..." : "Save note"}
+          {feedback.pendingAction === currentStatus ? "Saving note..." : "Save note"}
         </button>
         {statuses.map((s) => (
           currentStatus !== s.value && (
             <button
               key={s.value}
               onClick={() => update(s.value)}
-              disabled={loading !== null}
+              disabled={feedback.pendingAction !== null}
               className={`px-2.5 py-1 text-xs font-medium rounded-lg border disabled:opacity-50 transition-colors ${s.style}`}
             >
-              {loading === s.value ? "..." : s.label}
+              {feedback.pendingAction === s.value ? loadingLabels[s.value] : s.label}
             </button>
           )
         ))}
       </div>
-      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+      <AdminActionStatus
+        status={feedback.statusMessage}
+        error={feedback.error}
+        toastMessage={feedback.toastMessage}
+        onToastDone={feedback.clearToast}
+        className="mt-1 text-xs"
+      />
     </div>
   );
 }

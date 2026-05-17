@@ -245,7 +245,6 @@ export default async function AdminAnalyticsPage() {
     { data: profilesRaw },
     { data: postsByTypeRaw },
     { count: totalDebates },
-    { count: totalWebinars },
     { count: totalApplications },
     { data: opportunityApplicationsRaw },
     { count: savedOpportunityCount },
@@ -272,7 +271,6 @@ export default async function AdminAnalyticsPage() {
       .limit(10000),
     supabase.from("posts").select("type").eq("status", "published"),
     supabase.from("debates").select("*", { count: "exact", head: true }),
-    supabase.from("webinars").select("*", { count: "exact", head: true }),
     supabase.from("fellowship_applications").select("*", { count: "exact", head: true }),
     supabase
       .from("fellowship_applications")
@@ -1640,7 +1638,6 @@ export default async function AdminAnalyticsPage() {
             .join(" / ")}
         />
         <StatCard label="Debates Created" value={totalDebates ?? 0} />
-        <StatCard label="Webinars Hosted" value={totalWebinars ?? 0} />
         <StatCard label="Opportunity Applications" value={totalApplications ?? 0} />
         <StatCard label="Total Page Views" value={totalViews} />
       </div>

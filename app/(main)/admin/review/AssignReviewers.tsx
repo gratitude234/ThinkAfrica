@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminActionStatus from "@/components/admin/AdminActionStatus";
+import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
 import { assignReviewer } from "./actions";
 
 interface ReviewerOption {
@@ -33,21 +35,19 @@ export default function AssignReviewers({
 }: Props) {
   const router = useRouter();
   const [selectedReviewer, setSelectedReviewer] = useState(reviewers[0]?.id ?? "");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const feedback = useAdminActionFeedback<"assign">();
 
   const handleAssign = async () => {
     if (!selectedReviewer) return;
-    setLoading(true);
-    setError(null);
+    feedback.startAction("assign", "Assigning reviewer...");
     const result = await assignReviewer(postId, selectedReviewer, round);
-    setLoading(false);
 
     if (result.error) {
-      setError(result.error);
+      feedback.failAction(result.error);
       return;
     }
 
+    feedback.finishAction("Reviewer assigned.");
     router.refresh();
   };
 
@@ -77,10 +77,10 @@ export default function AssignReviewers({
           <button
             type="button"
             onClick={handleAssign}
-            disabled={loading}
+            disabled={feedback.pendingAction !== null}
             className="rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
-            {loading ? "Assigning..." : "Assign"}
+            {feedback.pendingAction === "assign" ? "Assigning..." : "Assign"}
           </button>
         </div>
       ) : (
@@ -118,7 +118,12 @@ export default function AssignReviewers({
         </div>
       ) : null}
 
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      <AdminActionStatus
+        status={feedback.statusMessage}
+        error={feedback.error}
+        toastMessage={feedback.toastMessage}
+        onToastDone={feedback.clearToast}
+      />
     </div>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminActionStatus from "@/components/admin/AdminActionStatus";
+import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
 import { updateAmbassadorStatus } from "./actions";
 
 interface Props {
@@ -11,20 +13,26 @@ interface Props {
 
 export default function AmbassadorActions({ ambassadorId, currentStatus }: Props) {
   const router = useRouter();
-  const [loading, setLoading] = useState<"approve" | "reject" | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const feedback = useAdminActionFeedback<"approve" | "reject">();
 
   const update = async (status: "active" | "inactive") => {
-    setLoading(status === "active" ? "approve" : "reject");
-    setError(null);
+    const action = status === "active" ? "approve" : "reject";
+    feedback.startAction(
+      action,
+      status === "active" ? "Approving ambassador..." : "Declining ambassador..."
+    );
     const result = await updateAmbassadorStatus(ambassadorId, status);
-    setLoading(null);
     if (result.error) {
-      setError(result.error);
+      feedback.failAction(result.error);
       return;
     }
+    feedback.finishAction(
+      status === "active" ? "Ambassador approved." : "Ambassador declined."
+    );
     router.refresh();
   };
+
+  const loading = feedback.pendingAction;
 
   return (
     <div>
@@ -48,7 +56,13 @@ export default function AmbassadorActions({ ambassadorId, currentStatus }: Props
           </button>
         )}
       </div>
-      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+      <AdminActionStatus
+        status={feedback.statusMessage}
+        error={feedback.error}
+        toastMessage={feedback.toastMessage}
+        onToastDone={feedback.clearToast}
+        className="mt-1 text-xs"
+      />
     </div>
   );
 }

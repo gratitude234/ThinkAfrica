@@ -2,7 +2,6 @@
 // Toggle to true when the section has enough volume to feel alive.
 export const FEATURE_FLAGS = {
   debates: true,
-  webinars: false,
   fellowshipsSection: false,
   ambassadors: false,
   talentMarketplace: false,

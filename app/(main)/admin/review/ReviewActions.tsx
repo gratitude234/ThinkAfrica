@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminActionStatus from "@/components/admin/AdminActionStatus";
+import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
 import { submitEditorialDecision } from "./actions";
 import type { EditorDecision } from "@/lib/types";
 
@@ -20,6 +22,18 @@ const DECISION_LABELS: Record<EditorDecision, string> = {
   reject: "Reject",
 };
 
+const DECISION_LOADING_LABELS: Record<EditorDecision, string> = {
+  accept: "Publishing...",
+  request_revision: "Requesting revision...",
+  reject: "Rejecting...",
+};
+
+const DECISION_SUCCESS_MESSAGES: Record<EditorDecision, string> = {
+  accept: "Submission accepted.",
+  request_revision: "Revision requested.",
+  reject: "Submission rejected.",
+};
+
 export default function ReviewActions({
   postId,
   requiresEditorialWorkflow,
@@ -29,13 +43,11 @@ export default function ReviewActions({
   reviewSummary,
 }: ReviewActionsProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState<EditorDecision | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const feedback = useAdminActionFeedback<EditorDecision>();
 
   const handleDecision = async (decision: EditorDecision) => {
-    setLoading(decision);
-    setError(null);
+    feedback.startAction(decision, DECISION_LOADING_LABELS[decision]);
 
     try {
       const { error: actionError } = await submitEditorialDecision({
@@ -45,20 +57,20 @@ export default function ReviewActions({
       });
 
       if (actionError) {
-        setError(actionError);
+        feedback.failAction(actionError);
         return;
       }
 
       setNotes("");
+      feedback.finishAction(DECISION_SUCCESS_MESSAGES[decision]);
       router.refresh();
     } catch {
-      setError("Unable to record this editorial decision right now.");
-    } finally {
-      setLoading(null);
+      feedback.failAction("Unable to record this editorial decision right now.");
     }
   };
 
   const disableDecision = requiresEditorialWorkflow && !readyForDecision;
+  const loading = feedback.pendingAction;
 
   return (
     <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
@@ -99,18 +111,23 @@ export default function ReviewActions({
                   : "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
             }`}
           >
-            {loading === decision ? "Saving..." : DECISION_LABELS[decision]}
+            {loading === decision ? DECISION_LOADING_LABELS[decision] : DECISION_LABELS[decision]}
           </button>
         ))}
       </div>
+
+      <AdminActionStatus
+        status={feedback.statusMessage}
+        error={feedback.error}
+        toastMessage={feedback.toastMessage}
+        onToastDone={feedback.clearToast}
+      />
 
       {disableDecision ? (
         <p className="text-xs text-amber-700">
           {blockingReason ?? "Complete reviewer assignments and submitted recommendations first."}
         </p>
       ) : null}
-
-      {error ? <p className="text-xs text-red-500">{error}</p> : null}
     </div>
   );
 }

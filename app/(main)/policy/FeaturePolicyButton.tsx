@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminActionStatus from "@/components/admin/AdminActionStatus";
+import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
 import { featurePolicyBrief } from "./actions";
 
 interface Props {
@@ -12,25 +14,22 @@ export default function FeaturePolicyButton({ postId }: Props) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [institution, setInstitution] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const feedback = useAdminActionFeedback<"feature">();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
+    feedback.startAction("feature", "Featuring policy brief...");
     const result = await featurePolicyBrief({
       postId,
       institutionTarget: institution,
     });
     if (result.error) {
-      setError(result.error);
-      setLoading(false);
+      feedback.failAction(result.error);
       return;
     }
-    setLoading(false);
     setShowModal(false);
     setInstitution("");
+    feedback.finishAction("Policy brief featured for institutions.");
     router.refresh();
   };
 
@@ -70,17 +69,32 @@ export default function FeaturePolicyButton({ postId }: Props) {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={feedback.pendingAction !== null}
                   className="px-4 py-1.5 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
                 >
-                  {loading ? "Featuring..." : "Confirm"}
+                  {feedback.pendingAction === "feature" ? "Featuring..." : "Confirm"}
                 </button>
               </div>
-              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+              <AdminActionStatus
+                status={feedback.statusMessage}
+                error={feedback.error}
+                toastMessage={feedback.toastMessage}
+                onToastDone={feedback.clearToast}
+                className="text-sm"
+              />
             </form>
           </div>
         </div>
       )}
+      {!showModal ? (
+        <AdminActionStatus
+          status={feedback.statusMessage}
+          error={feedback.error}
+          toastMessage={feedback.toastMessage}
+          onToastDone={feedback.clearToast}
+          className="text-sm"
+        />
+      ) : null}
     </>
   );
 }

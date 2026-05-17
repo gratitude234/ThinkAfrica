@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminActionStatus from "@/components/admin/AdminActionStatus";
+import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
 import { updateVerificationStatus } from "./actions";
 import type { AppRole, VerificationType } from "@/lib/types";
 
@@ -26,11 +28,11 @@ export default function VerificationActions({
   currentRole,
 }: Props) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
   const [type, setType] = useState<VerificationType>(
     (verifiedType as VerificationType | null) ?? "student"
   );
   const [role, setRole] = useState<AppRole>(currentRole ?? "student");
+  const feedback = useAdminActionFeedback<"verify" | "revoke">();
 
   const elevatedRoleAllowed = type === "faculty" || type === "institution";
   const roleOptions: AppRole[] = elevatedRoleAllowed
@@ -38,18 +40,27 @@ export default function VerificationActions({
     : ["student"];
 
   const update = async (nextVerified: boolean) => {
-    setLoading(true);
+    const action = nextVerified ? "verify" : "revoke";
+    feedback.startAction(
+      action,
+      nextVerified ? "Verifying contributor..." : "Revoking verification..."
+    );
     const { error } = await updateVerificationStatus({
       userId,
       verified: nextVerified,
       verifiedType: nextVerified ? type : null,
       role: nextVerified && elevatedRoleAllowed ? role : "student",
     });
-    setLoading(false);
 
-    if (!error) {
-      router.refresh();
+    if (error) {
+      feedback.failAction(error);
+      return;
     }
+
+    feedback.finishAction(
+      nextVerified ? "Contributor verified." : "Verification revoked."
+    );
+    router.refresh();
   };
 
   return (
@@ -92,20 +103,26 @@ export default function VerificationActions({
       {verified ? (
         <button
           onClick={() => update(false)}
-          disabled={loading}
+          disabled={feedback.pendingAction !== null}
           className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
         >
-          {loading ? "..." : "Revoke"}
+          {feedback.pendingAction === "revoke" ? "Revoking..." : "Revoke"}
         </button>
       ) : (
         <button
           onClick={() => update(true)}
-          disabled={loading}
+          disabled={feedback.pendingAction !== null}
           className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-100 disabled:opacity-50"
         >
-          {loading ? "..." : "Verify"}
+          {feedback.pendingAction === "verify" ? "Verifying..." : "Verify"}
         </button>
       )}
+      <AdminActionStatus
+        status={feedback.statusMessage}
+        error={feedback.error}
+        toastMessage={feedback.toastMessage}
+        onToastDone={feedback.clearToast}
+      />
     </div>
   );
 }

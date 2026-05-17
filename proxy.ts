@@ -40,7 +40,6 @@ export async function proxy(request: NextRequest) {
     "/write",
     "/admin",
     "/debates/create",
-    "/webinars/create",
     "/onboarding",
     "/stats",
     "/dashboard",

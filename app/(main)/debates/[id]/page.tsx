@@ -15,6 +15,8 @@ import {
 import LiveArguments from "./LiveArguments";
 import DebateRecap from "./DebateRecap";
 import DebateCountdown from "./DebateCountdown";
+import ShareButton from "./ShareButton";
+import RecapPoller from "./RecapPoller";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -135,6 +137,14 @@ export default async function DebatePage({ params }: PageProps) {
     }
   }
 
+  const { data: participantCounts } = await supabase
+    .from("debate_participants")
+    .select("stance")
+    .eq("debate_id", id);
+
+  const forParticipants = (participantCounts ?? []).filter((p) => p.stance === "for").length;
+  const againstParticipants = (participantCounts ?? []).filter((p) => p.stance === "against").length;
+
   const status = debate.status as DebateStatus;
   const currentPhase = (debate.current_phase ?? "opening") as DebatePhase;
   const moderator = Array.isArray(debate.profiles)
@@ -187,6 +197,7 @@ export default async function DebatePage({ params }: PageProps) {
             ) : timeLabel ? (
               <span className="text-xs font-medium text-gray-400">{timeLabel}</span>
             ) : null}
+            <ShareButton />
           </div>
         </div>
       </div>
@@ -266,6 +277,12 @@ export default async function DebatePage({ params }: PageProps) {
                   value={`${forArguments.length}/${againstArguments.length}`}
                   tone="emerald"
                 />
+                <StatTile label="participants" value={forParticipants + againstParticipants} />
+                <StatTile
+                  label="sides"
+                  value={`${forParticipants} / ${againstParticipants}`}
+                  tone="emerald"
+                />
               </div>
             </aside>
           </div>
@@ -295,8 +312,10 @@ export default async function DebatePage({ params }: PageProps) {
             againstVotes={againstVotes}
           />
         ) : status === "closed" ? (
-          <div className="mt-10 rounded-2xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
-            Recap is being generated...
+          <div className="mt-10 rounded-2xl border border-dashed border-gray-200 p-6 text-center">
+            <p className="text-sm font-medium text-gray-500">Recap is being generated…</p>
+            <p className="mt-1 text-xs text-gray-400">This page will refresh automatically.</p>
+            <RecapPoller />
           </div>
         ) : null}
       </div>

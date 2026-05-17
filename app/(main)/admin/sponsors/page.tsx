@@ -6,9 +6,9 @@ import SponsorToggle from "./SponsorToggle";
 
 const PLACEMENT_LABELS: Record<string, string> = {
   leaderboard: "Leaderboard",
-  webinar: "Webinars",
   policy_hub: "Policy Hub",
   fellowship: "Fellowships",
+  webinar: "Retired: Webinars",
 };
 
 export default async function AdminSponsorsPage() {

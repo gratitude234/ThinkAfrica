@@ -2,6 +2,11 @@ export default function Loading() {
   return (
     <div className="max-w-2xl mx-auto animate-pulse">
       <div className="h-7 w-24 bg-gray-200 rounded mb-6" />
+      <div className="mb-6 flex gap-1">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-8 w-28 rounded-md bg-gray-200" />
+        ))}
+      </div>
       <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
         {/* Avatar */}
         <div className="flex items-center gap-4">

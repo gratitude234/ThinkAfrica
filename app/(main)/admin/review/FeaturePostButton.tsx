@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import AdminActionStatus from "@/components/admin/AdminActionStatus";
+import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
 import { toggleFeaturedPost } from "./actions";
 
 interface Props {
@@ -10,27 +12,32 @@ interface Props {
 
 export default function FeaturePostButton({ postId, initialFeatured }: Props) {
   const [featured, setFeatured] = useState(initialFeatured);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const feedback = useAdminActionFeedback<"toggle">();
 
   const handleToggle = async () => {
-    setLoading(true);
-    setError(null);
+    const nextFeatured = !featured;
+    feedback.startAction(
+      "toggle",
+      nextFeatured ? "Featuring post..." : "Removing featured status..."
+    );
 
     try {
-      const result = await toggleFeaturedPost(postId, !featured);
+      const result = await toggleFeaturedPost(postId, nextFeatured);
 
       if (result.error) {
         throw new Error(result.error);
       }
 
       setFeatured(result.featured);
+      feedback.finishAction(result.featured ? "Post featured." : "Featured status removed.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update featured post.");
-    } finally {
-      setLoading(false);
+      feedback.failAction(
+        err instanceof Error ? err.message : "Failed to update featured post."
+      );
     }
   };
+
+  const loading = feedback.pendingAction !== null;
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -44,9 +51,14 @@ export default function FeaturePostButton({ postId, initialFeatured }: Props) {
             : "border-gray-200 bg-white text-gray-600 hover:border-amber-300 hover:text-amber-700"
         }`}
       >
-        {loading ? "..." : featured ? "Featured" : "Feature post"}
+        {loading ? (featured ? "Removing..." : "Featuring...") : featured ? "Featured" : "Feature post"}
       </button>
-      {error ? <p className="text-xs text-red-500">{error}</p> : null}
+      <AdminActionStatus
+        status={feedback.statusMessage}
+        error={feedback.error}
+        toastMessage={feedback.toastMessage}
+        onToastDone={feedback.clearToast}
+      />
     </div>
   );
 }

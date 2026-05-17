@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { ActivationState } from "@/lib/activation";
-import { formatDate, formatRelativeTime, formatTimeUntil } from "@/lib/utils";
+import { formatRelativeTime, formatTimeUntil } from "@/lib/utils";
 import FollowButton from "@/components/ui/FollowButton";
 import UserAvatar from "@/components/ui/UserAvatar";
 
@@ -11,21 +11,6 @@ interface NewVoice {
   totalPosts?: number;
   firstPublishedAt?: string | null;
   profile: {
-    username: string | null;
-    full_name: string | null;
-    university: string | null;
-    avatar_url: string | null;
-  } | null;
-}
-
-interface UpcomingWebinar {
-  id: string;
-  title: string;
-  status: string;
-  scheduled_at: string;
-  attendee_count: number | null;
-  tags: string[] | null;
-  profiles: {
     username: string | null;
     full_name: string | null;
     university: string | null;
@@ -50,7 +35,6 @@ interface SuggestedPerson {
 interface Props {
   activeDebate: DebateInterludeData | null;
   newVoice: NewVoice | null;
-  upcomingWebinar: UpcomingWebinar | null;
   recentDraft: RecentDraft | null;
   activationState: ActivationState | null;
   peopleSuggestions: SuggestedPerson[];
@@ -197,7 +181,6 @@ function ActivationCard({ state }: { state: ActivationState }) {
 export default function HomeSidebar({
   activeDebate,
   newVoice,
-  upcomingWebinar,
   recentDraft,
   activationState,
   peopleSuggestions,
@@ -206,12 +189,6 @@ export default function HomeSidebar({
   const debateShare = activeDebate ? getDebateShare(activeDebate) : null;
   const debateRemaining = activeDebate
     ? formatTimeUntil(activeDebate.endsAt ?? null)
-    : null;
-  const webinarHost = upcomingWebinar?.profiles;
-  const webinarTiming = upcomingWebinar
-    ? upcomingWebinar.status === "live"
-      ? "Live now"
-      : formatTimeUntil(upcomingWebinar.scheduled_at)
     : null;
 
   return (
@@ -331,66 +308,6 @@ export default function HomeSidebar({
           </p>
         </SideCard>
       ) : null}
-
-      {upcomingWebinar ? (
-        <SideCard>
-          <div className="mb-2.5 flex items-center justify-between gap-3">
-            <SideKicker className="mb-0">
-              {upcomingWebinar.status === "live" ? (
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-              ) : null}
-              Upcoming webinar
-            </SideKicker>
-            {webinarTiming ? (
-              <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
-                {webinarTiming}
-              </span>
-            ) : null}
-          </div>
-          <p className="mb-1 text-[11px] font-medium text-emerald-brand">
-            {formatDate(upcomingWebinar.scheduled_at)}
-          </p>
-          <Link href={`/webinars/${upcomingWebinar.id}`}>
-            <p className="font-display text-sm font-semibold leading-snug text-ink transition-colors hover:text-gray-700">
-              {upcomingWebinar.title}
-            </p>
-          </Link>
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-muted">
-            {webinarHost ? (
-              <span className="truncate">
-                Hosted by {webinarHost.full_name ?? webinarHost.username}
-              </span>
-            ) : null}
-            <span>{upcomingWebinar.attendee_count ?? 0} registered</span>
-          </div>
-          {upcomingWebinar.tags && upcomingWebinar.tags.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {upcomingWebinar.tags.slice(0, 2).map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          <Link
-            href={`/webinars/${upcomingWebinar.id}`}
-            className="mt-2.5 inline-flex rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-brand hover:bg-emerald-50"
-          >
-            Register free
-          </Link>
-        </SideCard>
-      ) : (
-        <PromptCard
-          kicker="Events"
-          title="No session scheduled"
-          body="Host a focused webinar, workshop, or reading session for the network."
-          href="/webinars/create"
-          cta="Host a webinar"
-        />
-      )}
 
       {peopleSuggestions.length > 0 ? (
         <SideCard>

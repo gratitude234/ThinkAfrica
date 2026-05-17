@@ -60,14 +60,6 @@ export interface DiscoverOpportunityHighlight {
   kind: "fellowship" | "profiles" | "setup";
 }
 
-export interface DiscoverWebinar {
-  id: string;
-  title: string;
-  status: string;
-  scheduled_at: string;
-  attendee_count: number | null;
-}
-
 export interface DiscoverFellowship {
   id: string;
   title: string;
@@ -94,7 +86,6 @@ export interface DiscoverData {
   activeConversations: DiscoverConversation[];
   activeDebate: DiscoverDebate | null;
   debateHighlights: DiscoverDebate[];
-  upcomingWebinar: DiscoverWebinar | null;
   fellowships: DiscoverFellowship[];
   opportunityHighlights: DiscoverOpportunityHighlight[];
   opportunitySummary: DiscoverOpportunitySummary;
@@ -134,14 +125,6 @@ interface RawDebate {
   status: string;
   description: string | null;
   debate_arguments?: { count: number }[] | { count: number } | null;
-}
-
-interface RawWebinar {
-  id: string;
-  title: string;
-  status: string;
-  scheduled_at: string;
-  attendee_count: number | null;
 }
 
 interface RawFellowship {
@@ -349,21 +332,6 @@ async function getDebateHighlights(
     description: debate.description,
     argumentCount: getDebateArgumentCount(debate.debate_arguments),
   }));
-}
-
-async function getUpcomingWebinar(
-  supabase: SupabaseLike
-): Promise<DiscoverWebinar | null> {
-  const { data } = await supabase
-    .from("webinars")
-    .select("id, title, status, scheduled_at, attendee_count")
-    .in("status", ["scheduled", "live"])
-    .gte("scheduled_at", new Date().toISOString())
-    .order("scheduled_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  return (data as RawWebinar | null) ?? null;
 }
 
 async function getFellowships(
@@ -583,7 +551,6 @@ export async function getDiscoverData(
     topics,
     peopleResult,
     debateHighlights,
-    upcomingWebinar,
     fellowships,
   ] = await Promise.all([
     getFeed(supabase, {
@@ -613,7 +580,6 @@ export async function getDiscoverData(
       followedIds: userContext.followedIds,
     }),
     getDebateHighlights(supabase),
-    getUpcomingWebinar(supabase),
     getFellowships(supabase),
   ]);
 
@@ -652,7 +618,6 @@ export async function getDiscoverData(
     activeConversations,
     activeDebate: debateHighlights[0] ?? null,
     debateHighlights,
-    upcomingWebinar,
     fellowships,
     opportunityHighlights,
     opportunitySummary,

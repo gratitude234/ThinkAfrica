@@ -26,6 +26,8 @@ interface MessageThreadProps {
     avatar_url: string | null;
   } | null;
   initialMessages: Message[];
+  otherLastReadAt: string | null;
+  otherUserId: string | null;
 }
 
 export default function MessageThread({
@@ -33,19 +35,35 @@ export default function MessageThread({
   currentUserId,
   otherProfile,
   initialMessages,
+  otherLastReadAt,
+  otherUserId,
 }: MessageThreadProps) {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  // Read receipts
+  const [liveOtherLastReadAt, setLiveOtherLastReadAt] = useState(otherLastReadAt);
+  // Typing indicator
+  const [otherTyping, setOtherTyping] = useState(false);
+  // Message editing
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastBroadcastRef = useRef<number>(0);
+
   const displayName = otherProfile?.full_name ?? otherProfile?.username ?? "Unknown";
 
+  // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, otherTyping]);
 
+  // Track activation event on mount
   useEffect(() => {
     trackActivationEvent({
       event: "message_started",
@@ -57,10 +75,9 @@ export default function MessageThread({
     });
   }, [conversationId, initialMessages.length]);
 
+  // Real-time: new messages + read receipts + typing broadcast
   useEffect(() => {
-    if (document.cookie.includes("ta_lite=1")) {
-      return;
-    }
+    if (document.cookie.includes("ta_lite=1")) return;
 
     const channel = supabase
       .channel(`messages:${conversationId}`)
@@ -74,7 +91,6 @@ export default function MessageThread({
         },
         async (payload) => {
           const newMessage = payload.new as Message;
-
           if (newMessage.sender_id !== currentUserId) {
             setMessages((prev) => [...prev, newMessage]);
             await supabase
@@ -85,12 +101,60 @@ export default function MessageThread({
           }
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "conversation_participants",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          // Update read receipt when the OTHER user reads our messages
+          if (
+            payload.new.user_id !== currentUserId &&
+            typeof payload.new.last_read_at === "string"
+          ) {
+            setLiveOtherLastReadAt(payload.new.last_read_at);
+          }
+        }
+      )
+      .on(
+        "broadcast",
+        { event: "typing" },
+        (payload: { payload: { userId: string } }) => {
+          if (payload.payload.userId !== currentUserId) {
+            setOtherTyping(true);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => setOtherTyping(false), 3000);
+          }
+        }
+      )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       void supabase.removeChannel(channel);
     };
   }, [conversationId, currentUserId, supabase]);
+
+  // Compute which message gets the "Seen" label (last sent message the other person has read)
+  const seenMessageId = useMemo(() => {
+    if (!liveOtherLastReadAt) return null;
+    const readTime = new Date(liveOtherLastReadAt).getTime();
+    const myReadMessages = messages.filter(
+      (m) =>
+        m.sender_id === currentUserId &&
+        !m.deleted_at &&
+        !m.id.startsWith("optimistic-") &&
+        new Date(m.created_at).getTime() <= readTime
+    );
+    return myReadMessages.length > 0
+      ? myReadMessages[myReadMessages.length - 1].id
+      : null;
+  }, [messages, liveOtherLastReadAt, currentUserId]);
 
   const handleSend = async () => {
     const text = input.trim();
@@ -122,7 +186,7 @@ export default function MessageThread({
       .single<Message>();
 
     if (error) {
-      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setInput(text);
       setSending(false);
       return;
@@ -130,7 +194,7 @@ export default function MessageThread({
 
     if (inserted) {
       setMessages((prev) =>
-        prev.map((message) => (message.id === optimisticId ? inserted : message))
+        prev.map((m) => (m.id === optimisticId ? inserted : m))
       );
       await supabase
         .from("conversation_participants")
@@ -139,10 +203,7 @@ export default function MessageThread({
         .eq("user_id", currentUserId);
       trackActivationEvent({
         event: "message_sent",
-        metadata: {
-          conversationId,
-          length: text.length,
-        },
+        metadata: { conversationId, length: text.length },
       });
     }
 
@@ -158,14 +219,50 @@ export default function MessageThread({
       .eq("sender_id", currentUserId);
 
     setMessages((prev) =>
-      prev.map((message) =>
-        message.id === messageId ? { ...message, deleted_at: deletedAt } : message
+      prev.map((m) => (m.id === messageId ? { ...m, deleted_at: deletedAt } : m))
+    );
+  };
+
+  const handleEdit = async (messageId: string) => {
+    const trimmed = editContent.trim();
+    if (!trimmed) return;
+
+    const editedAt = new Date().toISOString();
+    await supabase
+      .from("messages")
+      .update({ content: trimmed, edited_at: editedAt })
+      .eq("id", messageId)
+      .eq("sender_id", currentUserId);
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, content: trimmed, edited_at: editedAt } : m
       )
     );
+    setEditingId(null);
+    setEditContent("");
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    // Broadcast typing at most once per 1.5s
+    if (
+      e.target.value.trim() &&
+      Date.now() - lastBroadcastRef.current > 1500 &&
+      channelRef.current
+    ) {
+      lastBroadcastRef.current = Date.now();
+      void channelRef.current.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { userId: currentUserId },
+      });
+    }
   };
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col" style={{ height: "calc(100vh - 8rem)" }}>
+      {/* Header */}
       <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
         <button
           type="button"
@@ -188,6 +285,7 @@ export default function MessageThread({
         </Link>
       </div>
 
+      {/* Message list */}
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
           <p className="mt-8 text-center text-sm text-gray-500">
@@ -197,55 +295,135 @@ export default function MessageThread({
 
         {messages.map((message) => {
           const isMine = message.sender_id === currentUserId;
+          const isEditing = editingId === message.id;
 
           return (
             <div
               key={message.id}
-              className={`group relative flex ${isMine ? "justify-end" : "justify-start"}`}
+              className={`group relative flex flex-col ${isMine ? "items-end" : "items-start"}`}
             >
-              {isMine && !message.deleted_at ? (
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(message.id)}
-                  className="mr-2 self-center text-[11px] text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-400"
-                  aria-label="Delete message"
-                >
-                  Delete
-                </button>
-              ) : null}
-              <div
-                className={`max-w-[75%] rounded-xl px-4 py-2.5 text-sm ${
-                  message.deleted_at
-                    ? "border border-dashed border-gray-200 bg-white italic text-gray-400"
-                    : isMine
-                      ? "bg-emerald-brand text-white"
-                      : "bg-gray-100 text-gray-900"
-                }`}
-              >
-                <p>{message.deleted_at ? "This message was deleted." : message.content}</p>
-                <p
-                  className={`mt-0.5 text-right text-[10px] ${
-                    isMine ? "text-emerald-100" : "text-gray-500"
-                  }`}
-                >
-                  {formatRelativeTime(message.created_at)}
-                  {message.edited_at && !message.deleted_at ? " / edited" : ""}
-                </p>
+              <div className={`flex w-full ${isMine ? "justify-end" : "justify-start"}`}>
+                {/* Hover actions for own messages */}
+                {isMine && !message.deleted_at && !isEditing ? (
+                  <div className="mr-2 flex items-center gap-2 self-center opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(message.id);
+                        setEditContent(message.content);
+                      }}
+                      className="text-[11px] text-gray-300 hover:text-emerald-500"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(message.id)}
+                      className="text-[11px] text-gray-300 hover:text-red-400"
+                      aria-label="Delete message"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* Message bubble or edit form */}
+                {isMine && !message.deleted_at && isEditing ? (
+                  <div className="w-[75%] space-y-2">
+                    <textarea
+                      autoFocus
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void handleEdit(message.id);
+                        }
+                        if (e.key === "Escape") {
+                          setEditingId(null);
+                          setEditContent("");
+                        }
+                      }}
+                      rows={3}
+                      maxLength={2000}
+                      className="w-full resize-none rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditContent("");
+                        }}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleEdit(message.id)}
+                        className="rounded-lg bg-emerald-brand px-3 py-1 text-xs font-medium text-white hover:bg-emerald-600"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={`max-w-[75%] rounded-xl px-4 py-2.5 text-sm ${
+                      message.deleted_at
+                        ? "border border-dashed border-gray-200 bg-white italic text-gray-400"
+                        : isMine
+                          ? "bg-emerald-brand text-white"
+                          : "bg-gray-100 text-gray-900"
+                    }`}
+                  >
+                    <p>{message.deleted_at ? "This message was deleted." : message.content}</p>
+                    <p
+                      className={`mt-0.5 text-right text-[10px] ${
+                        isMine ? "text-emerald-100" : "text-gray-500"
+                      }`}
+                    >
+                      {formatRelativeTime(message.created_at)}
+                      {message.edited_at && !message.deleted_at ? " / edited" : ""}
+                    </p>
+                  </div>
+                )}
               </div>
+
+              {/* Read receipt — only under the last seen message */}
+              {isMine && message.id === seenMessageId ? (
+                <p className="mt-0.5 text-[10px] text-emerald-400">Seen</p>
+              ) : null}
             </div>
           );
         })}
 
+        {/* Typing indicator */}
+        {otherTyping ? (
+          <div className="flex justify-start">
+            <div className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm text-gray-500">
+              <span className="inline-flex gap-0.5">
+                <span className="animate-bounce" style={{ animationDelay: "0ms" }}>·</span>
+                <span className="animate-bounce" style={{ animationDelay: "150ms" }}>·</span>
+                <span className="animate-bounce" style={{ animationDelay: "300ms" }}>·</span>
+              </span>
+              {" "}{displayName} is typing
+            </div>
+          </div>
+        ) : null}
+
         <div ref={bottomRef} />
       </div>
 
+      {/* Input area */}
       <div className="border-t border-gray-200 bg-white px-4 py-3">
         <div className="flex items-end gap-2">
           <textarea
             rows={1}
             placeholder="Write a message..."
             value={input}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={handleInputChange}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();

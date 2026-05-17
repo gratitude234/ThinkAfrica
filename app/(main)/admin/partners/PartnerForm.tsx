@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminActionStatus from "@/components/admin/AdminActionStatus";
+import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
 import { createPartner } from "./actions";
 
 export default function PartnerForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const feedback = useAdminActionFeedback<"create">();
   const [form, setForm] = useState({
     name: "",
     type: "university",
@@ -20,26 +21,35 @@ export default function PartnerForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
+    feedback.startAction("create", "Saving partner...");
     const result = await createPartner(form);
     if (result.error) {
-      setError(result.error);
-      setLoading(false);
+      feedback.failAction(result.error);
       return;
     }
-    setLoading(false);
     setOpen(false);
     setForm({ name: "", type: "university", country: "", description: "", website_url: "", active: true });
+    feedback.finishAction("Partner created.");
     router.refresh();
   };
 
+  const loading = feedback.pendingAction !== null;
+
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)}
-        className="px-4 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors">
-        + Add Partner
-      </button>
+      <div className="flex flex-col items-end gap-2">
+        <button onClick={() => setOpen(true)}
+          className="px-4 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors">
+          + Add Partner
+        </button>
+        <AdminActionStatus
+          status={feedback.statusMessage}
+          error={feedback.error}
+          toastMessage={feedback.toastMessage}
+          onToastDone={feedback.clearToast}
+          className="text-sm"
+        />
+      </div>
     );
   }
 
@@ -86,7 +96,13 @@ export default function PartnerForm() {
         <button type="button" onClick={() => setOpen(false)}
           className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
       </div>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <AdminActionStatus
+        status={feedback.statusMessage}
+        error={feedback.error}
+        toastMessage={feedback.toastMessage}
+        onToastDone={feedback.clearToast}
+        className="text-sm"
+      />
     </form>
   );
 }

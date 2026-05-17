@@ -1,9 +1,32 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileCredibilitySummary } from "@/lib/profileCredibility";
 import ProfileForm from "./ProfileForm";
+import AccountForm from "./AccountForm";
+import NotificationsForm, { type NotificationPrefs } from "./NotificationsForm";
+import PrivacyForm, { type PrivacySettings } from "./PrivacyForm";
 
-export default async function SettingsPage() {
+const VALID_TABS = ["profile", "account", "notifications", "privacy"] as const;
+type SettingsTab = (typeof VALID_TABS)[number];
+
+const TABS: { value: SettingsTab; label: string }[] = [
+  { value: "profile", label: "Profile" },
+  { value: "account", label: "Account & Security" },
+  { value: "notifications", label: "Notifications" },
+  { value: "privacy", label: "Privacy" },
+];
+
+interface PageProps {
+  searchParams: Promise<{ tab?: string }>;
+}
+
+export default async function SettingsPage({ searchParams }: PageProps) {
+  const { tab: rawTab } = await searchParams;
+  const tab: SettingsTab = VALID_TABS.includes(rawTab as SettingsTab)
+    ? (rawTab as SettingsTab)
+    : "profile";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,7 +36,9 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, username, full_name, bio, country, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, signup_email, avatar_url, interests, cover_image_url")
+    .select(
+      "id, username, full_name, bio, country, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, signup_email, avatar_url, interests, cover_image_url, notification_prefs, privacy_settings"
+    )
     .eq("id", user.id)
     .single();
 
@@ -38,16 +63,49 @@ export default async function SettingsPage() {
       isOpenToOpportunities: true,
     },
   });
+
+  const notifPrefs: NotificationPrefs = {
+    email_comments: true,
+    email_follows: true,
+    email_published: true,
+    email_digest: true,
+    ...((profile.notification_prefs as Partial<NotificationPrefs>) ?? {}),
+  };
+
+  const privacySettings: PrivacySettings = {
+    profile_visibility: "public",
+    allow_messages: "everyone",
+    show_in_directory: true,
+    ...((profile.privacy_settings as Partial<PrivacySettings>) ?? {}),
+  };
+
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Profile settings</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Update your profile information and preferences.
-        </p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
       </div>
 
-      {credibilitySummary.missingProfileItems.length > 0 && (
+      {/* Tab navigation */}
+      <div className="mb-6 overflow-x-auto">
+        <div className="flex min-w-max gap-1 rounded-lg bg-gray-100 p-1">
+          {TABS.map((t) => (
+            <Link
+              key={t.value}
+              href={`/settings?tab=${t.value}`}
+              className={`whitespace-nowrap rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                tab === t.value
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Credibility banner — profile tab only */}
+      {tab === "profile" && credibilitySummary.missingProfileItems.length > 0 && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
             Profile credibility
@@ -77,26 +135,35 @@ export default async function SettingsPage() {
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <ProfileForm
-          profile={{
-            id: profile.id,
-            username: profile.username,
-            full_name: profile.full_name ?? null,
-            bio: profile.bio ?? null,
-            country: profile.country ?? null,
-            university: profile.university ?? null,
-            field_of_study: profile.field_of_study ?? null,
-            graduation_year: profile.graduation_year ?? null,
-            is_alumni: profile.is_alumni ?? false,
-            open_to_mentoring: profile.open_to_mentoring ?? false,
-            verified: profile.verified ?? false,
-            verified_type: profile.verified_type ?? null,
-            signup_email: profile.signup_email ?? null,
-            avatar_url: profile.avatar_url ?? null,
-            interests: (profile.interests as string[] | null) ?? null,
-            cover_image_url: (profile.cover_image_url as string | null) ?? null,
-          }}
-        />
+        {tab === "profile" && (
+          <ProfileForm
+            profile={{
+              id: profile.id,
+              username: profile.username,
+              full_name: profile.full_name ?? null,
+              bio: profile.bio ?? null,
+              country: profile.country ?? null,
+              university: profile.university ?? null,
+              field_of_study: profile.field_of_study ?? null,
+              graduation_year: profile.graduation_year ?? null,
+              is_alumni: profile.is_alumni ?? false,
+              open_to_mentoring: profile.open_to_mentoring ?? false,
+              verified: profile.verified ?? false,
+              verified_type: profile.verified_type ?? null,
+              signup_email: profile.signup_email ?? null,
+              avatar_url: profile.avatar_url ?? null,
+              interests: (profile.interests as string[] | null) ?? null,
+              cover_image_url: (profile.cover_image_url as string | null) ?? null,
+            }}
+          />
+        )}
+        {tab === "account" && <AccountForm email={user.email!} />}
+        {tab === "notifications" && (
+          <NotificationsForm profileId={profile.id} notificationPrefs={notifPrefs} />
+        )}
+        {tab === "privacy" && (
+          <PrivacyForm profileId={profile.id} privacySettings={privacySettings} />
+        )}
       </div>
     </div>
   );

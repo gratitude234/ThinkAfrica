@@ -8,13 +8,13 @@ import {
   type DiscoverPerson,
   type DiscoverTab,
 } from "@/lib/discoverData";
-import { formatDate } from "@/lib/utils";
 import PostCard, { type PostCardData } from "@/components/post/PostCard";
 import UserAvatar from "@/components/ui/UserAvatar";
 import FollowButton from "@/components/ui/FollowButton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import DiscoverTrackedLink from "../discover/DiscoverTrackedLink";
 import DiscoverTopicsGrid from "../discover/DiscoverTopicsGrid";
+import { formatDate } from "@/lib/utils";
 
 export const revalidate = 60;
 
@@ -524,22 +524,6 @@ function DiscoverHighlights({
           className={cardClassName}
         />
       ))}
-
-      {data.upcomingWebinar ? (
-        <SpotlightCard
-          kicker={data.upcomingWebinar.status === "live" ? "Live session" : "Upcoming webinar"}
-          title={data.upcomingWebinar.title}
-          body={`${formatDate(data.upcomingWebinar.scheduled_at)}${
-            data.upcomingWebinar.attendee_count
-              ? ` - ${data.upcomingWebinar.attendee_count.toLocaleString()} registered`
-              : ""
-          }`}
-          href={`/webinars/${data.upcomingWebinar.id}`}
-          cta="View session"
-          metadata={{ item: "webinar", webinarId: data.upcomingWebinar.id, surface: "explore" }}
-          className={cardClassName}
-        />
-      ) : null}
 
       {hasOpportunitySignal ? (
         <SpotlightCard

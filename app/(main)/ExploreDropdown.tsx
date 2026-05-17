@@ -10,7 +10,6 @@ const EXPLORE_ITEMS = [
     label: "Leaderboard",
     description: "Top contributors",
   },
-  { href: "/webinars", label: "Webinars", description: "Live sessions" },
   {
     href: "/policy",
     label: "Policy",

@@ -21,7 +21,6 @@ export default async function AdminDigestPage() {
   const [
     { data: topPosts },
     { data: topDebateRaw },
-    { data: upcomingWebinars },
     { data: openFellowships },
     { data: weeklyPostsForContrib },
   ] = await Promise.all([
@@ -38,14 +37,6 @@ export default async function AdminDigestPage() {
       .select("id, title, status, debate_arguments(count)")
       .order("created_at", { ascending: false })
       .limit(10),
-
-    supabase
-      .from("webinars")
-      .select("id, title, scheduled_at, status")
-      .eq("status", "scheduled")
-      .gte("scheduled_at", new Date().toISOString())
-      .order("scheduled_at", { ascending: true })
-      .limit(3),
 
     supabase
       .from("fellowships")
@@ -125,23 +116,6 @@ export default async function AdminDigestPage() {
               <p className="text-xs text-gray-400 mt-0.5">{topDebate.argCount} arguments · {topDebate.status}</p>
             </Link>
           ) : <p className="text-sm text-gray-400">No debates this week.</p>}
-        </section>
-
-        {/* Upcoming webinars */}
-        <section className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">Upcoming Webinars</h2>
-          {(upcomingWebinars ?? []).length === 0 ? (
-            <p className="text-sm text-gray-400">No upcoming webinars.</p>
-          ) : (
-            <div className="space-y-2">
-              {(upcomingWebinars ?? []).map((w) => (
-                <Link key={w.id} href={`/webinars/${w.id}`} className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-gray-50 group">
-                  <p className="text-sm font-medium text-gray-900 group-hover:text-emerald-brand transition-colors">{w.title}</p>
-                  <span className="text-xs text-gray-400 flex-shrink-0">{formatDate(w.scheduled_at)}</span>
-                </Link>
-              ))}
-            </div>
-          )}
         </section>
 
         {/* Fellowships */}

@@ -8,7 +8,6 @@ const platformLinks = [
   { label: "Opportunities", href: "/opportunities" },
   { label: "Policy Hub", href: "/policy" },
   ...(FEATURE_FLAGS.debates ? [{ label: "Debates", href: "/debates" }] : []),
-  ...(FEATURE_FLAGS.webinars ? [{ label: "Webinars", href: "/webinars" }] : []),
 ];
 
 const communityLinks = [
