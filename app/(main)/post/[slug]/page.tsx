@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import UserAvatar from "@/components/ui/UserAvatar";
+import FollowButton from "@/components/ui/FollowButton";
 import {
   formatDate,
   POST_TYPE_LABELS,
@@ -644,7 +645,7 @@ async function ParentPostLink({
       <span aria-hidden="true">{"\u21A9"}</span>
       <span>
         In response to:{" "}
-        <span className="font-medium text-gray-600">
+        <span className="font-medium text-white/80">
           {(parentPost as ParentPostRef).title}
         </span>
       </span>
@@ -682,10 +683,14 @@ async function HeaderCoAuthors({
 
 async function PublicationSignalBlock({
   post,
+  author,
   secondaryDataPromise,
+  variant = "hero",
 }: {
   post: PostRecord;
+  author?: AuthorProfile | null;
   secondaryDataPromise: Promise<SecondaryData>;
+  variant?: "hero" | "standalone";
 }) {
   if (post.status !== "published") return null;
 
@@ -707,6 +712,54 @@ async function PublicationSignalBlock({
     versionCount: versions.length,
   });
 
+  const signalPills = (
+    <>
+      <PublicationSignalPill label="Format" value={typeLabel} />
+      <PublicationSignalPill
+        label="Review"
+        value={reviewed ? "Reviewed" : "Community"}
+        tone={reviewed ? "emerald" : "gray"}
+      />
+      <PublicationSignalPill
+        label="Citation"
+        value={post.citation_id ? "Archived" : "Not archived"}
+        tone={post.citation_id ? "sky" : "gray"}
+      />
+      <PublicationSignalPill
+        label="Sources"
+        value={references.length > 0 ? `${references.length} refs` : "No refs"}
+        tone={references.length > 0 ? "emerald" : "gray"}
+      />
+      {variant === "standalone" && author ? (
+        <PublicationSignalPill
+          label="Author"
+          value={author.verified ? "Verified" : "Profile"}
+          tone={author.verified ? "emerald" : "gray"}
+        />
+      ) : null}
+    </>
+  );
+
+  if (variant === "standalone") {
+    return (
+      <section className="mb-8">
+        <div className="flex flex-wrap gap-2">{signalPills}</div>
+        {editorialSummary.applies ? (
+          <div className="mt-4">
+            <EditorialTrustPanel
+              summary={editorialSummary}
+              description="Reviewed and citable work includes stronger editorial context, sources, and archived publication metadata for readers."
+              actionHref={post.citation_id ? `/publication/${post.citation_id}` : null}
+              actionSource="post_editorial_trust"
+              actionKey="citation_archive"
+              compact
+            />
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
   if (editorialSummary.applies) {
     return (
       <div className="mt-5">
@@ -725,24 +778,7 @@ async function PublicationSignalBlock({
   return (
     <section className="mt-6 rounded-lg border border-white/20 bg-white/10 p-3 backdrop-blur-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <PublicationSignalPill label="Format" value={typeLabel} />
-          <PublicationSignalPill
-            label="Review"
-            value={reviewed ? "Reviewed" : "Community"}
-            tone={reviewed ? "emerald" : "gray"}
-          />
-          <PublicationSignalPill
-            label="Citation"
-            value={post.citation_id ? "Archived" : "Not archived"}
-            tone={post.citation_id ? "sky" : "gray"}
-          />
-          <PublicationSignalPill
-            label="Sources"
-            value={references.length > 0 ? `${references.length} refs` : "No refs"}
-            tone={references.length > 0 ? "emerald" : "gray"}
-          />
-        </div>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{signalPills}</div>
         {post.citation_id ? (
           <Link
             href={`/publication/${post.citation_id}`}
@@ -1317,7 +1353,7 @@ async function PostSidebar({
             <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
               Reader actions
             </h2>
-            <div className="space-y-2">
+            <div className="space-y-2 [&_a]:w-full [&_button]:w-full">
               <LikeButton
                 postId={post.id}
                 initialLiked={viewer.userLiked}
@@ -1355,6 +1391,39 @@ async function PostSidebar({
         ) : null}
         <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} />
         <TableOfContents headings={headings} />
+        {author ? (
+          <section className="rounded-lg bg-gray-950 p-4 text-white">
+            <h2 className="font-display text-[15px] font-semibold">
+              Follow this author
+            </h2>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-white/55">
+              Get new work by {author.full_name ?? author.username} in your feed.
+            </p>
+            <div className="mt-3">
+              {userId && userId !== author.id ? (
+                <FollowButton
+                  followerId={userId}
+                  followingId={author.id}
+                  initialFollowing={viewer.userFollowsAuthor}
+                />
+              ) : userId === author.id ? (
+                <Link
+                  href="/dashboard"
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/15"
+                >
+                  View dashboard
+                </Link>
+              ) : (
+                <Link
+                  href={`/login?redirectTo=${encodeURIComponent(`/post/${post.slug}`)}`}
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
+                >
+                  Follow author
+                </Link>
+              )}
+            </div>
+          </section>
+        ) : null}
       </div>
     </aside>
   );
@@ -1520,8 +1589,10 @@ export default async function PostPage({ params }: PageProps) {
     authorId: author?.id ?? null,
     supabase,
   });
+  const isResearchPost = post.type === "research";
 
-  return (
+  if (isResearchPost) {
+    return (
     <div className="relative">
       {isPublished ? (
         <>
@@ -1795,6 +1866,271 @@ export default async function PostPage({ params }: PageProps) {
             />
           </Suspense>
         </div>
+      </div>
+    </div>
+  );
+  }
+
+  return (
+    <div className="relative">
+      {isPublished ? (
+        <>
+          <Suspense fallback={null}>
+            <PostReadingChrome
+              post={post}
+              userId={userId}
+              isPublished={isPublished}
+              secondaryDataPromise={secondaryDataPromise}
+              viewerDataPromise={viewerDataPromise}
+            />
+          </Suspense>
+          <ReadingProgressBar />
+          <ViewTracker slug={slug} />
+        </>
+      ) : null}
+
+      <header className="relative left-1/2 -mt-6 w-[calc(100vw-16px)] -translate-x-1/2 overflow-hidden bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-700 px-4 py-14 text-white sm:px-6 sm:py-16 lg:px-8">
+        <div
+          className="absolute inset-0 opacity-40"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.14) 1px, transparent 0)",
+            backgroundSize: "22px 22px",
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative z-10 mx-auto max-w-[800px]">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
+              {basicQualitySummary.contentLabel}
+            </span>
+            {post.tags?.slice(0, 5).map((tag) => (
+              <Link
+                key={tag}
+                href={`/topics/${encodeURIComponent(tag)}`}
+                className="rounded-full border border-white/15 bg-white/[0.08] px-3 py-1 text-[10.5px] font-medium text-white/75 transition-colors hover:border-white/35 hover:text-white"
+              >
+                {tag}
+              </Link>
+            ))}
+          </div>
+
+          <Suspense fallback={null}>
+            <ParentPostLink parentPostId={parentPostId} />
+          </Suspense>
+
+          <h1 className="font-display max-w-[760px] text-[36px] font-bold leading-[1.04] tracking-normal text-white sm:text-[50px] lg:text-[56px]">
+            {post.title}
+          </h1>
+
+          {sanitizedExcerpt ? (
+            <p className="font-display mt-4 max-w-[650px] text-[17px] font-normal italic leading-[1.55] text-white/80 sm:text-[21px]">
+              {sanitizedExcerpt}
+            </p>
+          ) : null}
+
+          {author ? (
+            <div className="mt-7 flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
+              <Link href={`/${author.username}`} className="shrink-0">
+                <UserAvatar
+                  name={authorName}
+                  src={author.avatar_url}
+                  size={44}
+                  className="flex-shrink-0 overflow-hidden rounded-full ring-2 ring-white/25"
+                />
+              </Link>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/${author.username}`}
+                    className="text-[13.5px] font-semibold text-white transition-colors hover:text-emerald-100"
+                  >
+                    {authorName}
+                  </Link>
+                  {author.verified ? (
+                    <span
+                      title={
+                        author.verified_type
+                          ? `Verified ${author.verified_type}`
+                          : "Verified"
+                      }
+                      className="inline-flex items-center gap-1 rounded-full bg-emerald-brand px-2 py-0.5 text-[9.5px] font-bold text-white"
+                    >
+                      {"\u2713"}{" "}
+                      {author.verified_type
+                        ? author.verified_type.charAt(0).toUpperCase() +
+                          author.verified_type.slice(1)
+                        : "Verified"}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-0.5 text-[11.5px] text-white/55">
+                  {[author.field_of_study, author.university].filter(Boolean).join(" / ")}
+                </p>
+              </div>
+              <div className="w-full shrink-0 text-left sm:ml-auto sm:w-auto sm:text-right">
+                <p className="text-[12px] font-semibold text-white/75">
+                  {formatDate(post.published_at ?? post.created_at)}
+                </p>
+                <p className="mt-0.5 text-[10.5px] text-white/45">
+                  {readTime} min read / {wordCount.toLocaleString()} words
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <Suspense fallback={null}>
+            <HeaderCoAuthors
+              authorId={author?.id ?? null}
+              secondaryDataPromise={secondaryDataPromise}
+            />
+          </Suspense>
+        </div>
+      </header>
+
+      <div
+        className="relative left-1/2 h-12 w-[calc(100vw-16px)] -translate-x-1/2 bg-gradient-to-b from-teal-700/20 to-canvas"
+        aria-hidden="true"
+      />
+
+      <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-4 pb-20 pt-4 sm:px-6 lg:grid-cols-[minmax(0,680px)_276px] lg:gap-[52px] lg:px-8">
+        <main className="min-w-0">
+          <Suspense fallback={null}>
+            <PostPublishSuccessSection
+              post={post}
+              author={author}
+              points={POST_POINTS[(post.type as PostType) ?? "blog"] ?? 10}
+              secondaryDataPromise={secondaryDataPromise}
+            />
+          </Suspense>
+
+          {post.status === "draft" ? (
+            <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+              This post is a <strong>draft</strong> and is only visible to you.{" "}
+              <Link href={`/edit/${post.slug}`} className="font-semibold underline">
+                Edit &amp; publish
+              </Link>
+            </div>
+          ) : null}
+
+          <Suspense fallback={null}>
+            <PostReviewStatusPanel
+              post={post}
+              secondaryDataPromise={secondaryDataPromise}
+            />
+          </Suspense>
+
+          <Suspense fallback={<SectionSkeleton rows={2} />}>
+            <PublicationSignalBlock
+              post={post}
+              author={author}
+              secondaryDataPromise={secondaryDataPromise}
+              variant="standalone"
+            />
+          </Suspense>
+
+          {post.audio_summary_url ? (
+            <AudioSummaryPlayer audioUrl={post.audio_summary_url} />
+          ) : null}
+
+          <div className="article-journal-body relative mb-10 sm:mb-16">
+            <HighlightShare containerId="post-article-prose" />
+            <div
+              id="post-article-prose"
+              className="article-journal-body prose prose-gray max-w-[680px] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-normal prose-headings:text-gray-900"
+              dangerouslySetInnerHTML={{ __html: contentWithIds }}
+            />
+          </div>
+
+          {isPublished ? <ResponsePromptPanel postId={post.id} /> : null}
+
+          <Suspense fallback={<SectionSkeleton rows={2} />}>
+            <MobileCredibilitySection
+              post={post}
+              author={author}
+              sanitizedContent={sanitizedContent}
+              wordCount={wordCount}
+              parentPostId={parentPostId}
+              isPublished={isPublished}
+              secondaryDataPromise={secondaryDataPromise}
+            />
+          </Suspense>
+
+          <Suspense fallback={<SectionSkeleton rows={4} />}>
+            <PostReferencesAndCitation
+              post={post}
+              author={author}
+              secondaryDataPromise={secondaryDataPromise}
+            />
+          </Suspense>
+
+          <Suspense fallback={<SectionSkeleton rows={2} />}>
+            <PostEngagementSection
+              post={post}
+              author={author}
+              userId={userId}
+              sanitizedExcerpt={sanitizedExcerpt}
+              secondaryDataPromise={secondaryDataPromise}
+              viewerDataPromise={viewerDataPromise}
+            />
+          </Suspense>
+
+          <Suspense fallback={<SectionSkeleton rows={3} />}>
+            <AuthorAndCollaborationSection
+              post={post}
+              author={author}
+              userId={userId}
+              authorName={authorName}
+              secondaryDataPromise={secondaryDataPromise}
+              viewerDataPromise={viewerDataPromise}
+            />
+          </Suspense>
+
+          <hr className="my-9 border-gray-200/80" />
+
+          <Suspense fallback={<SectionSkeleton rows={3} />}>
+            <PostRelatedSection secondaryDataPromise={secondaryDataPromise} />
+          </Suspense>
+
+          <hr className="mb-8 border-gray-200/80" />
+
+          <Suspense fallback={<CommentsSkeleton />}>
+            <CommentsLoader
+              postId={post.id}
+              userId={userId}
+              userProfileId={userId}
+            />
+          </Suspense>
+
+          <Suspense fallback={<SectionSkeleton rows={3} />}>
+            <PostResponsesSection secondaryDataPromise={secondaryDataPromise} />
+          </Suspense>
+        </main>
+
+        <Suspense
+          fallback={
+            <aside className="hidden lg:block">
+              <div className="sticky top-24 space-y-4">
+                <SectionSkeleton rows={5} />
+                <SectionSkeleton rows={4} />
+              </div>
+            </aside>
+          }
+        >
+          <PostSidebar
+            post={post}
+            author={author}
+            userId={userId}
+            headings={headings}
+            sanitizedContent={sanitizedContent}
+            sanitizedExcerpt={sanitizedExcerpt}
+            wordCount={wordCount}
+            parentPostId={parentPostId}
+            isPublished={isPublished}
+            secondaryDataPromise={secondaryDataPromise}
+            viewerDataPromise={viewerDataPromise}
+          />
+        </Suspense>
       </div>
     </div>
   );
