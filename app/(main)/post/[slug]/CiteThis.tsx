@@ -82,7 +82,7 @@ export default function CiteThis({
   ];
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
@@ -115,8 +115,8 @@ export default function CiteThis({
         ))}
       </div>
 
-      <div className="rounded-lg border border-gray-100 bg-canvas p-4">
-        <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+      <div className="min-w-0 rounded-lg border border-gray-100 bg-canvas p-4">
+        <pre className="whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">
           {formatted[activeTab]}
         </pre>
         <button
