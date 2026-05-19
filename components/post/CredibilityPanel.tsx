@@ -45,12 +45,12 @@ export default function CredibilityPanel({
   const overallGood = summary.missingItems.length === 0;
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02]">
+    <section className="rounded-lg border border-gray-200 bg-white p-4">
       {/* Mobile compact view */}
       <div className="sm:hidden">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
               Credibility
             </p>
             <h2 className="mt-0.5 text-sm font-semibold text-gray-900">
@@ -94,7 +94,7 @@ export default function CredibilityPanel({
       <div className="hidden sm:block">
         <div className="mb-4 flex items-center justify-between gap-2">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
               Credibility
             </p>
             <h2 className="mt-0.5 text-[13px] font-semibold text-gray-900">
@@ -121,7 +121,7 @@ export default function CredibilityPanel({
 
         <dl className="space-y-2.5">
           {signals.map((signal) => (
-            <div key={signal.label} className="flex items-center justify-between gap-3">
+            <div key={signal.label} className="flex items-center justify-between gap-3 border-b border-gray-100 pb-2 last:border-b-0 last:pb-0">
               <dt className="flex items-center gap-1.5 text-[11px] text-gray-400">
                 <svg
                   className={`h-2 w-2 shrink-0 ${toneIconClass(signal.tone)}`}
@@ -156,7 +156,7 @@ export default function CredibilityPanel({
           <ResponseStartLink
             postId={postId}
             source="credibility_panel"
-            className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+            className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
           >
             Write a response
           </ResponseStartLink>

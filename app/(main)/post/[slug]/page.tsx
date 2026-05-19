@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import Tag from "@/components/ui/Tag";
 import UserAvatar from "@/components/ui/UserAvatar";
 import {
   formatDate,
@@ -244,18 +243,18 @@ function PublicationSignalPill({
   tone?: "gray" | "emerald" | "sky" | "purple";
 }) {
   const toneClass = {
-    gray: "border-gray-200 bg-gray-50 text-gray-700",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    sky: "border-sky-200 bg-sky-50 text-sky-700",
-    purple: "border-purple-200 bg-purple-50 text-purple-700",
+    gray: "border-gray-200 bg-white/90 text-gray-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    sky: "border-sky-200 bg-sky-50 text-sky-800",
+    purple: "border-purple-200 bg-purple-50 text-purple-800",
   };
 
   return (
-    <div className={`rounded-lg border px-2.5 py-2 sm:min-w-[108px] ${toneClass[tone]}`}>
-      <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] opacity-70">
+    <div className={`min-w-[92px] rounded-lg border px-3 py-2 ${toneClass[tone]}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
         {label}
       </p>
-      <p className="mt-0.5 truncate text-xs font-semibold">{value}</p>
+      <p className="mt-0.5 truncate text-[12px] font-semibold">{value}</p>
     </div>
   );
 }
@@ -640,7 +639,7 @@ async function ParentPostLink({
   return (
     <Link
       href={`/post/${(parentPost as ParentPostRef).slug}`}
-      className="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-emerald-600"
+      className="mb-4 inline-flex items-center gap-1.5 text-sm text-white/60 transition-colors hover:text-white"
     >
       <span aria-hidden="true">{"\u21A9"}</span>
       <span>
@@ -671,7 +670,7 @@ async function HeaderCoAuthors({
         <Link
           key={coAuthor.user_id}
           href={`/${coAuthor.profile?.username}`}
-          className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-brand"
+          className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/75 transition-colors hover:border-white/30 hover:text-white"
         >
           {coAuthor.corresponding_author ? "Corresponding / " : ""}
           {coAuthor.profile?.full_name ?? coAuthor.profile?.username}
@@ -724,7 +723,7 @@ async function PublicationSignalBlock({
   }
 
   return (
-    <section className="mt-5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm shadow-black/[0.02] sm:px-4">
+    <section className="mt-6 rounded-lg border border-white/20 bg-white/10 p-3 backdrop-blur-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <PublicationSignalPill label="Format" value={typeLabel} />
@@ -747,7 +746,7 @@ async function PublicationSignalBlock({
         {post.citation_id ? (
           <Link
             href={`/publication/${post.citation_id}`}
-            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-700 transition-colors hover:border-sky-300 hover:text-sky-800"
+            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-white/25 bg-white/20 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/25"
           >
             Citation archive
           </Link>
@@ -903,12 +902,12 @@ async function PostReferencesAndCitation({
   return (
     <>
       {references.length > 0 ? (
-        <section className="mb-8 border-t border-gray-200 pt-6">
+        <section className="mb-8 border-t border-[#EDE9E2] pt-6">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
               References
             </h2>
-            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-medium text-gray-600">
               {references.length} listed
             </span>
           </div>
@@ -917,7 +916,7 @@ async function PostReferencesAndCitation({
               <li
                 key={reference.id}
                 id={`ref-${index + 1}`}
-                className="flex gap-3 border-t border-gray-100 py-3 text-sm leading-relaxed text-gray-600 first:border-t-0"
+                className="flex gap-3 border-t border-gray-100 py-3 text-[13px] leading-relaxed text-gray-600 first:border-t-0"
               >
                 <span className="min-w-[2rem] shrink-0 font-bold text-emerald-600">
                   [{index + 1}]
@@ -992,7 +991,7 @@ async function PostEngagementSection({
   ]);
 
   return (
-    <div className="mb-8 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm shadow-black/[0.02] sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="mb-8 flex flex-col gap-3 border-y border-[#EDE9E2] py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-2">
         <LikeButton
           postId={post.id}
@@ -1013,7 +1012,7 @@ async function PostEngagementSection({
         authorName={author?.full_name ?? null}
       />
       {typeof post.view_count === "number" ? (
-        <span className="text-xs font-medium text-gray-400">
+        <span className="text-[11px] font-medium text-gray-400">
           {post.view_count.toLocaleString()}{" "}
           {post.view_count === 1 ? "view" : "views"}
         </span>
@@ -1103,7 +1102,7 @@ async function PostRelatedSection({
           <Link
             key={item.id}
             href={`/post/${item.slug}`}
-            className="group flex overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm shadow-black/[0.015] transition-all hover:-translate-y-px hover:shadow-md sm:flex-col"
+            className="group flex overflow-hidden rounded-lg border border-gray-200 bg-white transition-all hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:flex-col"
           >
             <div className="h-[92px] w-[112px] shrink-0 overflow-hidden sm:h-[96px] sm:w-full">
               <PostCover
@@ -1167,17 +1166,17 @@ async function PostPublishSuccessSection({
 
 function ResponsePromptPanel({ postId }: { postId: string }) {
   return (
-    <section className="mb-10 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
+    <section className="mb-10 rounded-lg border border-emerald-200 bg-gradient-to-br from-emerald-50 to-[#E0FAF0] p-5 sm:p-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">
             Respond to this idea
           </p>
-          <h2 className="mt-1 text-lg font-semibold text-gray-950">
+          <h2 className="font-display mt-1 text-[22px] font-semibold text-gray-950">
             Add your argument to the thread
           </h2>
         </div>
-        <p className="max-w-sm text-sm leading-6 text-emerald-800">
+        <p className="max-w-sm text-[13px] leading-6 text-emerald-900/75">
           Choose the angle that best fits what you want to say next.
         </p>
       </div>
@@ -1190,7 +1189,7 @@ function ResponsePromptPanel({ postId }: { postId: string }) {
             source="article_response_prompt"
             starter="response"
             responseIntent={prompt.intent}
-            className="group flex min-h-[132px] flex-col justify-between rounded-lg border border-emerald-100 bg-white p-4 text-left shadow-sm shadow-black/[0.015] transition-all hover:-translate-y-px hover:border-emerald-300 hover:shadow-md"
+            className="group flex min-h-[124px] flex-col justify-between rounded-lg border border-emerald-100 bg-white p-4 text-left transition-all hover:-translate-y-px hover:border-emerald-300 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
           >
             <span>
               <span className="block text-sm font-semibold text-gray-950 transition-colors group-hover:text-emerald-700">
@@ -1231,7 +1230,7 @@ async function PostResponsesSection({
             <Link
               key={response.id}
               href={`/post/${response.slug}`}
-              className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.015] transition-shadow hover:shadow-md"
+              className="flex gap-4 rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
             >
               <div className="w-1 flex-shrink-0 self-stretch rounded-full bg-emerald-brand" />
               <div className="min-w-0 flex-1">
@@ -1314,8 +1313,8 @@ async function PostSidebar({
     <aside className="hidden lg:block">
       <div className="sticky top-24 space-y-4">
         {isPublished ? (
-          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02]">
-            <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+          <section className="rounded-lg border border-gray-200 bg-white p-4">
+            <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
               Reader actions
             </h2>
             <div className="space-y-2">
@@ -1339,7 +1338,7 @@ async function PostSidebar({
               {post.citation_id ? (
                 <Link
                   href={`/publication/${post.citation_id}`}
-                  className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                  className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-sky-200 hover:text-sky-700"
                 >
                   Cite this
                 </Link>
@@ -1347,7 +1346,7 @@ async function PostSidebar({
               <ResponseStartLink
                 postId={post.id}
                 source="post_sidebar"
-                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
               >
                 Write a response
               </ResponseStartLink>
@@ -1540,10 +1539,10 @@ export default async function PostPage({ params }: PageProps) {
         </>
       ) : null}
 
-      <div className="mx-auto max-w-[1180px]">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,780px)_280px] lg:justify-between">
+      <div className="mx-auto max-w-[1200px] px-4 pb-20 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,800px)_280px] lg:justify-between">
           <div className="min-w-0">
-            <div className="max-w-[780px]">
+            <div className="max-w-[800px]">
               <Suspense fallback={null}>
                 <PostPublishSuccessSection
                   post={post}
@@ -1569,9 +1568,9 @@ export default async function PostPage({ params }: PageProps) {
                 />
               </Suspense>
 
-              <header className="mb-8 sm:mb-10">
-                <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted sm:mb-5">
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+              <header className="mb-8 overflow-hidden rounded-lg bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-700 px-5 py-8 text-white shadow-[0_18px_50px_rgba(6,78,59,0.18)] sm:mb-10 sm:px-8 sm:py-10">
+                <div className="mb-5 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-white">
                     {basicQualitySummary.contentLabel}
                   </span>
                   {post.type === "research" ? (
@@ -1579,7 +1578,7 @@ export default async function PostPage({ params }: PageProps) {
                   ) : (
                     <>
                       <span>{wordCount.toLocaleString()} words</span>
-                      <span className="h-1 w-1 rounded-full bg-gray-300" aria-hidden="true" />
+                      <span className="h-1 w-1 rounded-full bg-white/30" aria-hidden="true" />
                       <span>{readTime} min read</span>
                     </>
                   )}
@@ -1590,27 +1589,31 @@ export default async function PostPage({ params }: PageProps) {
                 </Suspense>
 
                 {post.tags && post.tags.length > 0 ? (
-                  <div className="mb-4 flex flex-wrap gap-1.5">
+                  <div className="mb-5 flex flex-wrap gap-1.5">
                     {post.tags.map((tag: string) => (
-                      <Link key={tag} href={`/topics/${encodeURIComponent(tag)}`}>
-                        <Tag label={tag} />
+                      <Link
+                        key={tag}
+                        href={`/topics/${encodeURIComponent(tag)}`}
+                        className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-medium text-white/80 transition-colors hover:border-white/30 hover:text-white"
+                      >
+                        {tag}
                       </Link>
                     ))}
                   </div>
                 ) : null}
 
-                <h1 className="font-display mb-4 text-[34px] font-semibold leading-[1.12] tracking-normal text-ink sm:mb-5 sm:text-[46px] lg:text-[52px]">
+                <h1 className="font-display mb-4 max-w-[720px] text-[36px] font-semibold leading-[1.06] tracking-normal text-white sm:mb-5 sm:text-[50px] lg:text-[58px]">
                   {post.title}
                 </h1>
 
                 {sanitizedExcerpt ? (
-                  <p className="font-display mb-6 max-w-[680px] text-lg font-normal italic leading-[1.5] text-gray-700 sm:text-[21px]">
+                  <p className="font-display mb-7 max-w-[650px] text-lg font-normal italic leading-[1.55] text-white/80 sm:text-[21px]">
                     {sanitizedExcerpt}
                   </p>
                 ) : null}
 
                 {post.cover_image_url ? (
-                  <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm shadow-black/[0.03] sm:rounded-2xl">
+                  <div className="mb-7 overflow-hidden rounded-lg border border-white/20 bg-white/10 shadow-[0_14px_34px_rgba(0,0,0,0.18)]">
                     <PostCover
                       src={post.cover_image_url}
                       alt={post.title}
@@ -1624,7 +1627,7 @@ export default async function PostPage({ params }: PageProps) {
                 ) : null}
 
                 {author ? (
-                  <div className="flex flex-wrap items-center gap-3 border-y border-gray-100 py-4 sm:flex-nowrap sm:gap-4">
+                  <div className="flex flex-wrap items-center gap-3 border-y border-white/10 py-4 sm:flex-nowrap sm:gap-4">
                     <Link href={`/${author.username}`} className="shrink-0">
                       <UserAvatar
                         name={authorName}
@@ -1637,29 +1640,29 @@ export default async function PostPage({ params }: PageProps) {
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           href={`/${author.username}`}
-                          className="text-[14px] font-semibold text-gray-900 transition-colors hover:text-emerald-700"
+                          className="text-[14px] font-semibold text-white transition-colors hover:text-emerald-100"
                         >
                           {authorName}
                         </Link>
                         {author.verified ? (
                           <span
                             title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
-                            className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-semibold text-white"
+                            className="inline-flex items-center gap-1 rounded-full bg-emerald-400 px-2 py-0.5 text-[10px] font-semibold text-emerald-950"
                           >
                             {"\u2713"} {author.verified_type ? author.verified_type.charAt(0).toUpperCase() + author.verified_type.slice(1) : "Verified"}
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-0.5 text-[12px] text-gray-500">
+                      <p className="mt-0.5 text-[12px] text-white/60">
                         {[author.field_of_study, author.university].filter(Boolean).join(" \u00b7 ")}
                       </p>
                     </div>
                     <div className="w-full shrink-0 text-left sm:ml-auto sm:w-auto sm:text-right">
-                      <p className="text-[12.5px] font-semibold text-gray-700">
+                      <p className="text-[12.5px] font-semibold text-white/80">
                         {formatDate(post.published_at ?? post.created_at)}
                       </p>
                       {post.view_count ? (
-                        <p className="text-[11px] text-gray-400">{post.view_count.toLocaleString()} reads</p>
+                        <p className="text-[11px] text-white/50">{post.view_count.toLocaleString()} reads</p>
                       ) : null}
                     </div>
                   </div>

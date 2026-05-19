@@ -339,9 +339,9 @@ export default function CommentsSection({
   );
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02] sm:p-5">
+    <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-[15px] font-bold text-gray-900">
           {totalCount} {totalCount === 1 ? "Comment" : "Comments"}
         </h3>
         <span className="hidden h-px flex-1 bg-gray-200 sm:block" aria-hidden="true" />
@@ -349,7 +349,7 @@ export default function CommentsSection({
 
       <div className="mb-8 space-y-6">
         {totalCount === 0 ? (
-          <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-4 py-4">
+          <div className="rounded-lg border border-dashed border-emerald-200 bg-emerald-50 px-4 py-4 text-center">
             <p className="text-sm font-medium text-gray-900">
               Start the discussion with a useful move.
             </p>
@@ -360,7 +360,7 @@ export default function CommentsSection({
             <ResponseStartLink
               postId={postId}
               source="empty_comments"
-              className="mt-3 inline-flex rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+              className="mt-3 inline-flex rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
             >
               Write a response instead
             </ResponseStartLink>
@@ -441,7 +441,7 @@ export default function CommentsSection({
 
       {userId ? (
         <form
-          className="rounded-xl border border-gray-200 bg-canvas p-3 sm:p-4"
+          className="rounded-lg border border-gray-200 bg-canvas p-3 sm:p-4"
           onSubmit={(event) => {
             event.preventDefault();
             void handleSubmit();
@@ -452,7 +452,7 @@ export default function CommentsSection({
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Ask a question, add evidence, offer a counterpoint, or request clarification..."
             rows={3}
-            className="mb-3 w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+            className="mb-3 w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-brand focus:outline-none focus:ring-0"
           />
           <div className="mb-3 flex flex-wrap gap-2">
             {COMMENT_PROMPTS.map((prompt) => (

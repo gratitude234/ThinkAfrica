@@ -53,10 +53,10 @@ export default function BookmarkButton({
       disabled={loading}
       aria-label={bookmarked ? "Remove bookmark" : "Bookmark this post"}
       title={bookmarked ? "Remove bookmark" : "Save for later"}
-      className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors text-sm font-medium disabled:opacity-70 ${
+      className={`flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-70 ${
         bookmarked
-          ? "bg-blue-50 border-blue-200 text-blue-600"
-          : "bg-white border-gray-200 text-gray-600 hover:border-blue-200 hover:text-blue-500"
+          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+          : "bg-white border-gray-200 text-gray-600 hover:border-emerald-200 hover:text-emerald-700"
       }`}
     >
       <svg

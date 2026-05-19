@@ -69,7 +69,7 @@ export default function AuthorBioCard({
   const authorName = author.full_name ?? author.username ?? "Anonymous";
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] sm:flex-row sm:items-start sm:gap-5 sm:p-6">
+    <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-5 sm:flex-row sm:items-start sm:gap-5 sm:p-6">
       <UserAvatar
         name={authorName}
         src={author.avatar_url}
@@ -81,7 +81,7 @@ export default function AuthorBioCard({
           <div>
             <Link
               href={`/${author.username}`}
-              className="font-display text-lg font-medium text-gray-900 transition-colors hover:text-emerald-brand"
+              className="font-display text-lg font-semibold text-gray-900 transition-colors hover:text-emerald-brand"
             >
               {authorName}
             </Link>

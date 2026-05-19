@@ -86,7 +86,7 @@ export default function ShareButtons({
       <button
         type="button"
         onClick={sharePost}
-        className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 sm:w-auto"
+        className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 sm:w-auto"
         aria-haspopup="menu"
         aria-expanded={menuOpen}
       >
@@ -109,7 +109,7 @@ export default function ShareButtons({
       {menuOpen ? (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+8px)] z-30 w-full min-w-[220px] overflow-hidden rounded-xl border border-gray-200 bg-white p-2 shadow-xl sm:w-[240px]"
+          className="absolute right-0 top-[calc(100%+8px)] z-30 w-full min-w-[220px] overflow-hidden rounded-lg border border-gray-200 bg-white p-2 shadow-xl sm:w-[240px]"
         >
           <a
             href={whatsappUrl}

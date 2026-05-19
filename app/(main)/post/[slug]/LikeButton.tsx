@@ -67,12 +67,12 @@ export default function LikeButton({
   };
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-stretch gap-1 sm:items-end">
       <button
         onClick={handleToggle}
         disabled={loading}
         aria-label={liked ? "Unlike this post" : "Like this post"}
-        className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors text-sm font-medium disabled:opacity-70 ${
+        className={`flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-70 ${
           liked
             ? "bg-red-50 border-red-200 text-red-600"
             : "bg-white border-gray-200 text-gray-600 hover:border-red-200 hover:text-red-500"

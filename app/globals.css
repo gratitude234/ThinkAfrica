@@ -67,12 +67,12 @@
   /* Drop cap on the first paragraph of the article body */
   .article-journal-body .prose > p:first-of-type::first-letter {
     font-family: var(--font-display), Georgia, serif;
-    font-size: 4rem;
-    font-weight: 500;
+    font-size: 5rem;
+    font-weight: 600;
     float: left;
-    line-height: 0.95;
-    margin: 0.1em 0.1em 0 0;
-    color: #1A1A1A;
+    line-height: 0.82;
+    margin: 0.08em 0.11em 0 0;
+    color: #064E3B;
   }
 }
 
@@ -80,31 +80,37 @@
 .article-journal-body .prose p,
 .article-journal-body .prose li {
   font-family: var(--font-display), Georgia, serif;
-  font-size: 1.075rem;
-  line-height: 1.78;
+  font-size: 1.125rem;
+  line-height: 1.84;
   color: #242424;
 }
 
 .article-journal-body .prose p {
-  margin-top: 1.2rem;
-  margin-bottom: 1.2rem;
+  margin-top: 1.32rem;
+  margin-bottom: 1.32rem;
 }
 
 /* Pull quote — add the class "ta-pullquote" to a <blockquote> in Tiptap */
 .article-journal-body .prose blockquote {
-  border-left: 2px solid #10B981;
+  border-left: 3px solid #10B981;
   border-right: none;
   border-top: none;
   border-bottom: none;
-  padding: 6px 0 6px 1.5rem;
-  margin: 2.5rem 0;
+  padding: 0.25rem 0 0.25rem 1.75rem;
+  margin: 2.4rem 0;
   font-family: var(--font-display), Georgia, serif;
-  font-size: 1.2rem;
-  line-height: 1.55;
+  font-size: 1.25rem;
+  line-height: 1.48;
   font-style: italic;
-  color: #1A1A1A;
+  color: #374151;
   background: transparent;
   border-radius: 0;
+}
+
+.article-journal-body .prose blockquote p {
+  color: #374151;
+  font-size: 1.25rem;
+  line-height: 1.48;
 }
 
 /* References list — rendered via the existing <ol> in page.tsx */
@@ -120,18 +126,32 @@
 .article-journal-body .prose h3 {
   font-family: var(--font-display), Georgia, serif;
   letter-spacing: 0;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.16;
-  margin-top: 2.4rem;
+  margin-top: 2.8rem;
   margin-bottom: 0.9rem;
+}
+
+.article-journal-body .prose h2 {
+  font-size: 1.75rem;
 }
 
 .article-journal-body .prose img {
   width: 100%;
   height: auto;
-  border-radius: 12px;
-  margin-top: 2rem;
+  border-radius: 8px;
+  margin-top: 2.2rem;
   margin-bottom: 1.25rem;
+}
+
+.article-journal-body .prose sup a {
+  border-radius: 999px;
+  background: #ECFDF5;
+  padding: 0.05rem 0.32rem;
+  color: #047857;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 @media (max-width: 639px) {
