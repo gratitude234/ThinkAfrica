@@ -69,7 +69,7 @@ export default function AuthorBioCard({
   const authorName = author.full_name ?? author.username ?? "Anonymous";
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-5 sm:flex-row sm:items-start sm:gap-5 sm:p-6">
+    <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-start sm:gap-5 sm:rounded-lg sm:p-6">
       <UserAvatar
         name={authorName}
         src={author.avatar_url}
@@ -81,7 +81,7 @@ export default function AuthorBioCard({
           <div>
             <Link
               href={`/${author.username}`}
-              className="font-display text-lg font-semibold text-gray-900 transition-colors hover:text-emerald-brand"
+              className="font-display text-lg font-semibold leading-tight text-gray-900 transition-colors hover:text-emerald-brand"
             >
               {authorName}
             </Link>
@@ -97,7 +97,7 @@ export default function AuthorBioCard({
             <button
               onClick={toggleFollow}
               disabled={loading}
-              className={`min-h-9 flex-shrink-0 rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+              className={`min-h-10 flex-shrink-0 rounded-lg px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50 sm:min-h-9 sm:py-1.5 ${
                 following
                   ? "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                   : "bg-emerald-brand text-white hover:bg-emerald-600"
@@ -116,7 +116,7 @@ export default function AuthorBioCard({
               <Link
                 key={coAuthor.user_id}
                 href={`/${coAuthor.profile.username}`}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-brand"
+                className="inline-flex min-h-8 items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-brand"
               >
                 {coAuthor.corresponding_author ? "Corresponding · " : ""}
                 {coAuthor.profile.full_name ?? coAuthor.profile.username}

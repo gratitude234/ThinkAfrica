@@ -161,26 +161,62 @@ font-family: var(--font-inter), system-ui, sans-serif;
 @media (max-width: 639px) {
   .article-journal-body .prose p,
   .article-journal-body .prose li {
-    font-size: 1rem;
-    line-height: 1.72;
+    font-size: 1.0625rem;
+    line-height: 1.8;
+  }
+
+  .article-journal-body .prose p {
+    margin-bottom: 1.75em;
+  }
+
+  .article-journal-body .prose ul,
+  .article-journal-body .prose ol {
+    margin-top: 0.4rem;
+    margin-bottom: 1.75rem;
+    padding-left: 1.35rem;
+  }
+
+  .article-journal-body .prose li {
+    margin-bottom: 0.45rem;
   }
 
   .article-journal-body .prose blockquote {
-    margin: 2rem 0;
-    padding-left: 1rem;
-    font-size: 1.08rem;
+    margin: 2.15rem 0;
+    padding: 0.35rem 0 0.35rem 1rem;
+    font-size: 1.12rem;
+    line-height: 1.58;
+  }
+
+  .article-journal-body .prose blockquote p {
+    font-size: 1.12rem;
+    line-height: 1.58;
   }
 
   .article-journal-body .prose h2,
   .article-journal-body .prose h3 {
-    margin-top: 2rem;
+    margin-top: 2.25rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .article-journal-body .prose h2 {
+    font-size: 1.48rem;
+    line-height: 1.2;
+  }
+
+  .article-journal-body .prose h3 {
+    font-size: 1.28rem;
+    line-height: 1.24;
   }
 
   .article-journal-body .prose img {
-    width: calc(100% + 32px);
-    max-width: calc(100% + 32px);
+    width: calc(100% + 24px);
+    max-width: calc(100% + 24px);
     border-radius: 0;
-    margin-left: -16px;
+    margin: 2rem 0 1.35rem -12px;
+  }
+
+  .article-journal-body .prose sup a {
+    font-size: 0.72rem;
   }
 }
 

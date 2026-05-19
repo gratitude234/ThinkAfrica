@@ -94,13 +94,13 @@ export default function ReadingBar({
 
   return (
     <div
-      className="fixed inset-x-0 bottom-4 z-40 px-4 md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-0 bottom-3 z-40 px-4 md:hidden"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 4px)" }}
     >
-      <div className="mx-auto flex min-h-[56px] max-w-[360px] items-center justify-around rounded-full border border-gray-200 bg-white/95 px-4 py-2 shadow-[0_14px_34px_-14px_rgb(0_0_0/0.42)] backdrop-blur">
+      <div className="mx-auto flex min-h-[64px] max-w-[380px] items-center justify-around rounded-2xl border border-gray-200 bg-white/95 px-3 py-2.5 shadow-[0_14px_34px_-14px_rgb(0_0_0/0.42)] backdrop-blur">
         <button
           onClick={handleLike}
-          className={`flex min-w-[64px] flex-col items-center gap-0.5 rounded-full px-3 py-1.5 transition-colors ${
+          className={`flex min-h-12 min-w-[72px] flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-2 transition-colors ${
             liked ? "text-red-500" : "text-gray-500"
           } hover:bg-gray-50`}
           aria-label={liked ? "Unlike this post" : "Like this post"}
@@ -118,12 +118,12 @@ export default function ReadingBar({
               d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
             />
           </svg>
-          <span className="text-[11px] font-medium">{likeCount}</span>
+          <span className="text-[11px] font-semibold">{likeCount}</span>
         </button>
 
         <button
           onClick={handleBookmark}
-          className={`flex min-w-[64px] flex-col items-center gap-0.5 rounded-full px-3 py-1.5 transition-colors ${
+          className={`flex min-h-12 min-w-[72px] flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-2 transition-colors ${
             bookmarked ? "text-emerald-600" : "text-gray-500"
           } hover:bg-gray-50`}
           aria-label={bookmarked ? "Remove saved post" : "Save this post"}
@@ -141,14 +141,14 @@ export default function ReadingBar({
               d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
             />
           </svg>
-          <span className="text-[11px] font-medium">
+          <span className="text-[11px] font-semibold">
             {bookmarked ? "Saved" : "Save"}
           </span>
         </button>
 
         <button
           onClick={handleShare}
-          className="flex min-w-[64px] flex-col items-center gap-0.5 rounded-full px-3 py-1.5 text-gray-500 transition-colors hover:bg-gray-50"
+          className="flex min-h-12 min-w-[72px] flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-2 text-gray-500 transition-colors hover:bg-gray-50"
           aria-label="Share this post"
         >
           <svg
@@ -164,7 +164,7 @@ export default function ReadingBar({
               d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"
             />
           </svg>
-          <span className="text-[11px] font-medium">Share</span>
+          <span className="text-[11px] font-semibold">Share</span>
         </button>
       </div>
     </div>

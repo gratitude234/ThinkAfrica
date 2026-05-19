@@ -123,7 +123,7 @@ export default function CollaborationPanel({
   const responseHref = summary.viewerId ? summary.responseHref : summary.signInHref;
 
   return (
-    <section className="mb-8 rounded-lg bg-gray-950 px-5 py-5 text-white sm:px-6">
+    <section className="mb-8 rounded-xl bg-gray-950 px-4 py-5 text-white sm:rounded-lg sm:px-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">
@@ -164,7 +164,7 @@ export default function CollaborationPanel({
               });
             }
           }}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 sm:min-h-10"
         >
           Write a response
         </Link>
@@ -172,7 +172,7 @@ export default function CollaborationPanel({
           type="button"
           onClick={handleFollow}
           disabled={followLoading || summary.isOwnPost}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/20 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white/90 transition-colors hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/20 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white/90 transition-colors hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-10"
         >
           {followLoading ? "Saving..." : following ? "Following" : "Follow author"}
         </button>
@@ -180,7 +180,7 @@ export default function CollaborationPanel({
           type="button"
           onClick={handleMessage}
           disabled={messageLoading || summary.isOwnPost}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/20 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white/90 transition-colors hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/20 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white/90 transition-colors hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-10"
         >
           {messageLoading ? "Opening..." : "Message author"}
         </button>
@@ -197,7 +197,7 @@ export default function CollaborationPanel({
                 },
               });
             }}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/20 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white/90 transition-colors hover:bg-white/[0.14]"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/20 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white/90 transition-colors hover:bg-white/[0.14] sm:min-h-10"
           >
             View related responses
           </Link>

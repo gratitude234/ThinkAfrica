@@ -251,7 +251,7 @@ function PublicationSignalPill({
   };
 
   return (
-    <div className={`min-w-[92px] rounded-lg border px-3 py-2 ${toneClass[tone]}`}>
+    <div className={`min-w-[96px] rounded-xl border px-3 py-2.5 ${toneClass[tone]}`}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
         {label}
       </p>
@@ -828,8 +828,10 @@ async function PublicationSignalBlock({
 
   if (variant === "standalone") {
     return (
-      <section className="mb-8">
-        <div className="flex flex-wrap gap-2">{signalPills}</div>
+      <section className="mb-9">
+        <div className="grid grid-cols-2 gap-2 min-[430px]:grid-cols-4 sm:flex sm:flex-wrap">
+          {signalPills}
+        </div>
         {editorialSummary.applies ? (
           <div className="mt-4">
             <EditorialTrustPanel
@@ -862,7 +864,7 @@ async function PublicationSignalBlock({
   }
 
   return (
-    <section className="mt-6 rounded-lg border border-white/20 bg-white/10 p-3 backdrop-blur-sm">
+    <section className="mt-6 rounded-xl border border-white/20 bg-white/10 p-3.5 backdrop-blur-sm sm:rounded-lg sm:p-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{signalPills}</div>
         {post.citation_id ? (
@@ -1291,13 +1293,13 @@ async function PostPublishSuccessSection({
 
 function ResponsePromptPanel({ postId }: { postId: string }) {
   return (
-    <section className="mb-10 rounded-lg border border-emerald-200 bg-gradient-to-br from-emerald-50 to-[#E0FAF0] p-5 sm:p-6">
+    <section className="mb-10 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-[#E0FAF0] p-4 sm:rounded-lg sm:p-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">
             Respond to this idea
           </p>
-          <h2 className="font-display mt-1 text-[22px] font-semibold text-gray-950">
+          <h2 className="font-display mt-1 text-[21px] font-semibold leading-tight text-gray-950 sm:text-[22px]">
             Add your argument to the thread
           </h2>
         </div>
@@ -1314,7 +1316,7 @@ function ResponsePromptPanel({ postId }: { postId: string }) {
             source="article_response_prompt"
             starter="response"
             responseIntent={prompt.intent}
-            className="group flex min-h-[124px] flex-col justify-between rounded-lg border border-emerald-100 bg-white p-4 text-left transition-all hover:-translate-y-px hover:border-emerald-300 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
+            className="group flex min-h-[112px] flex-col justify-between rounded-xl border border-emerald-100 bg-white p-4 text-left transition-all hover:-translate-y-px hover:border-emerald-300 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:min-h-[124px] sm:rounded-lg"
           >
             <span>
               <span className="block text-sm font-semibold text-gray-950 transition-colors group-hover:text-emerald-700">
@@ -1355,7 +1357,7 @@ async function PostResponsesSection({
             <Link
               key={response.id}
               href={`/post/${response.slug}`}
-              className="flex gap-4 rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
+              className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:rounded-lg"
             >
               <div className="w-1 flex-shrink-0 self-stretch rounded-full bg-emerald-brand" />
               <div className="min-w-0 flex-1">
@@ -1566,7 +1568,7 @@ async function ResearchHero({
   const statusLabel = formatResearchStatus(post.status);
 
   return (
-    <header className="relative left-1/2 -mt-6 w-[calc(100vw-16px)] -translate-x-1/2 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.22),transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_48%,#12322d_100%)] px-4 py-14 text-white sm:px-6 sm:py-16 lg:px-8">
+    <header className="relative left-1/2 -mt-6 w-[calc(100vw-16px)] -translate-x-1/2 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.22),transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_48%,#12322d_100%)] px-4 py-12 text-white sm:px-6 sm:py-16 lg:px-8">
       <div
         className="absolute inset-0 opacity-25"
         style={{
@@ -1585,18 +1587,20 @@ async function ResearchHero({
             <span className="rounded-full border border-white/15 bg-white/[0.08] px-3 py-1 text-[10.5px] font-semibold text-white/75">
               {statusLabel}
             </span>
-            {post.tags?.slice(0, 4).map((tag) => (
+            {post.tags?.slice(0, 4).map((tag, index) => (
               <Link
                 key={tag}
                 href={`/topics/${encodeURIComponent(tag)}`}
-                className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-[10.5px] font-medium text-white/65 transition-colors hover:border-white/35 hover:text-white"
+                className={`rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-[10.5px] font-medium text-white/65 transition-colors hover:border-white/35 hover:text-white ${
+                  index >= 3 ? "hidden sm:inline-flex" : ""
+                }`}
               >
                 {tag}
               </Link>
             ))}
           </div>
 
-          <h1 className="font-display max-w-[860px] text-[34px] font-semibold leading-[1.06] tracking-normal text-white sm:text-[48px] lg:text-[58px]">
+          <h1 className="font-display max-w-[860px] text-[32px] font-semibold leading-[1.12] tracking-normal text-white sm:text-[48px] sm:leading-[1.06] lg:text-[58px]">
             {post.title}
           </h1>
 
@@ -1604,12 +1608,12 @@ async function ResearchHero({
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-100/75">
               Abstract
             </p>
-            <p className="font-display mt-2 line-clamp-5 text-[18px] italic leading-[1.65] text-white/80 sm:text-[21px]">
+            <p className="font-display mt-2 line-clamp-4 text-[17px] italic leading-[1.68] text-white/80 sm:line-clamp-5 sm:text-[21px]">
               {sanitizedExcerpt ?? "Abstract not provided for this research record."}
             </p>
           </div>
 
-          <div className="mt-8 grid gap-5 border-t border-white/10 pt-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div className="mt-9 grid gap-5 border-t border-white/10 pt-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             {author ? (
               <div className="flex items-center gap-3">
                 <Link href={`/${author.username}`} className="shrink-0">
@@ -1730,12 +1734,12 @@ function ResearchAbstractSection({
   return (
     <section
       id="abstract"
-      className="mb-8 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-5 sm:p-6"
+      className="mb-8 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 sm:p-6"
     >
       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
         Abstract
       </p>
-      <p className="font-display mt-3 text-[20px] leading-[1.75] text-slate-800 sm:text-[23px]">
+      <p className="font-display mt-3 text-[19px] leading-[1.78] text-slate-800 sm:text-[23px]">
         {sanitizedExcerpt ?? "No abstract was provided for this research record."}
       </p>
     </section>
@@ -2383,11 +2387,13 @@ export default async function PostPage({ params }: PageProps) {
             <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
               {basicQualitySummary.contentLabel}
             </span>
-            {post.tags?.slice(0, 5).map((tag) => (
+            {post.tags?.slice(0, 5).map((tag, index) => (
               <Link
                 key={tag}
                 href={`/topics/${encodeURIComponent(tag)}`}
-                className="rounded-full border border-white/15 bg-white/[0.08] px-3 py-1 text-[10.5px] font-medium text-white/75 transition-colors hover:border-white/35 hover:text-white"
+                className={`rounded-full border border-white/15 bg-white/[0.08] px-3 py-1 text-[10.5px] font-medium text-white/75 transition-colors hover:border-white/35 hover:text-white ${
+                  index >= 3 ? "hidden sm:inline-flex" : ""
+                }`}
               >
                 {tag}
               </Link>
@@ -2398,18 +2404,18 @@ export default async function PostPage({ params }: PageProps) {
             <ParentPostLink parentPostId={parentPostId} />
           </Suspense>
 
-          <h1 className="font-display max-w-[760px] text-[36px] font-bold leading-[1.04] tracking-normal text-white sm:text-[50px] lg:text-[56px]">
+          <h1 className="font-display max-w-[760px] text-[32px] font-bold leading-[1.12] tracking-normal text-white sm:text-[50px] sm:leading-[1.04] lg:text-[56px]">
             {post.title}
           </h1>
 
           {sanitizedExcerpt ? (
-            <p className="font-display mt-4 max-w-[650px] text-[17px] font-normal italic leading-[1.55] text-white/80 sm:text-[21px]">
+            <p className="font-display mt-4 line-clamp-4 max-w-[650px] text-[16px] font-normal italic leading-[1.62] text-white/80 sm:line-clamp-none sm:text-[21px] sm:leading-[1.55]">
               {sanitizedExcerpt}
             </p>
           ) : null}
 
           {author ? (
-            <div className="mt-7 flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
+            <div className="mt-8 flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
               <Link href={`/${author.username}`} className="shrink-0">
                 <UserAvatar
                   name={authorName}
@@ -2447,7 +2453,7 @@ export default async function PostPage({ params }: PageProps) {
                   {[author.field_of_study, author.university].filter(Boolean).join(" / ")}
                 </p>
               </div>
-              <div className="w-full shrink-0 text-left sm:ml-auto sm:w-auto sm:text-right">
+              <div className="w-full shrink-0 border-t border-white/10 pt-3 text-left sm:ml-auto sm:w-auto sm:border-t-0 sm:pt-0 sm:text-right">
                 <p className="text-[12px] font-semibold text-white/75">
                   {formatDate(post.published_at ?? post.created_at)}
                 </p>

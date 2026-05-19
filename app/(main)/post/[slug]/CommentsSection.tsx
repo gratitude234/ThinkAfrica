@@ -307,15 +307,15 @@ export default function CommentsSection({
           </span>
         </div>
         <p className="mb-2 text-sm leading-relaxed text-gray-700">{comment.content}</p>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => handleVote(comment.id)}
             disabled={!userId}
             aria-label={comment.userVoted ? "Remove upvote" : "Upvote this comment"}
-            className={`flex items-center gap-1 text-[11.5px] transition-colors ${
+            className={`inline-flex min-h-9 items-center gap-1 rounded-lg px-2.5 text-[12px] font-medium transition-colors ${
               comment.userVoted
-                ? "text-emerald-600"
-                : "text-gray-400 hover:text-emerald-600"
+                ? "bg-emerald-50 text-emerald-700"
+                : "text-gray-500 hover:bg-gray-50 hover:text-emerald-600"
             } disabled:cursor-default disabled:opacity-50`}
           >
             <span>Upvote</span>
@@ -328,7 +328,7 @@ export default function CommentsSection({
                 setReplyingToId(comment.id);
                 setReplyContent("");
               }}
-              className="text-xs text-gray-400 transition-colors hover:text-emerald-600"
+              className="inline-flex min-h-9 items-center rounded-lg px-2.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-emerald-600"
             >
               Reply
             </button>
@@ -339,7 +339,7 @@ export default function CommentsSection({
   );
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
+    <section className="rounded-xl border border-gray-200 bg-white p-4 sm:rounded-lg sm:p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
         <h3 className="text-[15px] font-bold text-gray-900">
           {totalCount} {totalCount === 1 ? "Comment" : "Comments"}
@@ -349,7 +349,7 @@ export default function CommentsSection({
 
       <div className="mb-8 space-y-6">
         {totalCount === 0 ? (
-          <div className="rounded-lg border border-dashed border-emerald-200 bg-emerald-50 px-4 py-4 text-center">
+          <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-4 py-5 text-center sm:rounded-lg">
             <p className="text-sm font-medium text-gray-900">
               Start the discussion with a useful move.
             </p>
@@ -360,7 +360,7 @@ export default function CommentsSection({
             <ResponseStartLink
               postId={postId}
               source="empty_comments"
-              className="mt-3 inline-flex rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+              className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
             >
               Write a response instead
             </ResponseStartLink>
@@ -378,20 +378,20 @@ export default function CommentsSection({
                 <button
                   type="button"
                   onClick={() => toggleReplies(comment.id)}
-                  className="mt-1 cursor-pointer text-xs text-gray-400"
+                  className="mt-1 inline-flex min-h-8 cursor-pointer items-center rounded-lg px-1 text-xs font-medium text-gray-500 hover:text-emerald-700"
                 >
                   {comment.replyCount} {comment.replyCount === 1 ? "reply" : "replies"}
                 </button>
               ) : null}
 
               {replyingToId === comment.id ? (
-                <div className="ml-10 mt-3 rounded-lg border border-gray-200 bg-canvas p-3 max-[420px]:ml-0">
+                <div className="ml-10 mt-3 rounded-xl border border-gray-200 bg-canvas p-3 max-[420px]:ml-0 sm:rounded-lg">
                   <textarea
                     value={replyContent}
                     onChange={(e) => setReplyContent(e.target.value)}
                     rows={2}
                     placeholder="Reply with a question, evidence, counterpoint, or clarification..."
-                    className="mb-2 w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                    className="mb-2 min-h-[92px] w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-6 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
                   />
                   {replyContent.trim().length >= 220 ? (
                     <div className="mb-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
@@ -413,7 +413,7 @@ export default function CommentsSection({
                         setReplyingToId(null);
                         setReplyContent("");
                       }}
-                      className="rounded-lg px-3 py-1.5 text-xs text-gray-500"
+                      className="min-h-10 rounded-lg px-3 py-2 text-xs font-medium text-gray-500"
                     >
                       Cancel
                     </button>
@@ -421,7 +421,7 @@ export default function CommentsSection({
                       type="button"
                       onClick={() => void handleSubmit(comment.id)}
                       disabled={replyLoading || !replyContent.trim()}
-                      className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                      className="min-h-10 rounded-lg bg-emerald-brand px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
                     >
                       {replyLoading ? "Posting..." : "Post reply"}
                     </button>
@@ -441,7 +441,7 @@ export default function CommentsSection({
 
       {userId ? (
         <form
-          className="rounded-lg border border-gray-200 bg-canvas p-3 sm:p-4"
+          className="rounded-xl border border-gray-200 bg-canvas p-3 sm:rounded-lg sm:p-4"
           onSubmit={(event) => {
             event.preventDefault();
             void handleSubmit();
@@ -452,7 +452,7 @@ export default function CommentsSection({
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Ask a question, add evidence, offer a counterpoint, or request clarification..."
             rows={3}
-            className="mb-3 w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-brand focus:outline-none focus:ring-0"
+            className="mb-3 min-h-[116px] w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-3 text-sm leading-6 focus:border-emerald-brand focus:outline-none focus:ring-0"
           />
           <div className="mb-3 flex flex-wrap gap-2">
             {COMMENT_PROMPTS.map((prompt) => (
@@ -464,7 +464,7 @@ export default function CommentsSection({
                     current.trim() ? current : prompt.text
                   )
                 }
-                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+                className="min-h-9 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:border-emerald-200 hover:text-emerald-700"
               >
                 {prompt.label}
               </button>
@@ -495,7 +495,7 @@ export default function CommentsSection({
           </div>
         </form>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-canvas px-4 py-3 text-sm text-gray-500">
+        <div className="rounded-xl border border-gray-200 bg-canvas px-4 py-4 text-sm leading-6 text-gray-500 sm:rounded-lg">
           <Link
             href="/login"
             className="font-medium text-emerald-brand hover:underline"
