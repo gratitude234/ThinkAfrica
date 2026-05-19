@@ -1,4 +1,7 @@
 import type { PostType } from "@/lib/utils";
+import type { ProfileType } from "@/lib/profileTypes";
+
+export type { ProfileType } from "@/lib/profileTypes";
 
 export type VerificationType =
   | "student"
@@ -32,6 +35,11 @@ export interface ProfileSummary {
   verified?: boolean;
   verified_type?: VerificationType | null;
   role?: AppRole;
+  profile_type?: ProfileType | null;
+  secondary_profile_types?: ProfileType[] | null;
+  organization_name?: string | null;
+  professional_title?: string | null;
+  organization_website?: string | null;
 }
 
 export interface SubmissionTrack {

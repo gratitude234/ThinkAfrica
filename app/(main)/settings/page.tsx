@@ -37,7 +37,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, username, full_name, bio, country, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, signup_email, avatar_url, interests, cover_image_url, notification_prefs, privacy_settings"
+      "id, username, full_name, bio, country, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, signup_email, avatar_url, interests, cover_image_url, profile_type, secondary_profile_types, organization_name, professional_title, organization_website, notification_prefs, privacy_settings"
     )
     .eq("id", user.id)
     .single();
@@ -154,6 +154,12 @@ export default async function SettingsPage({ searchParams }: PageProps) {
               avatar_url: profile.avatar_url ?? null,
               interests: (profile.interests as string[] | null) ?? null,
               cover_image_url: (profile.cover_image_url as string | null) ?? null,
+              profile_type: profile.profile_type ?? null,
+              secondary_profile_types:
+                (profile.secondary_profile_types as string[] | null) ?? [],
+              organization_name: profile.organization_name ?? null,
+              professional_title: profile.professional_title ?? null,
+              organization_website: profile.organization_website ?? null,
             }}
           />
         )}

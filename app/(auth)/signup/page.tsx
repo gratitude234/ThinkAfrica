@@ -74,7 +74,7 @@ export default function SignupPage() {
     <AuthShell
       eyebrow="Create your profile"
       title="Join Africa's student intellectual network."
-      subtitle="Start with your name and email. Next, we will shape your country, university, interests, and first follows."
+      subtitle="Start with your name and email. Next, we will shape your role, profile, interests, and first follows."
       proofItems={PROOF_ITEMS}
       quote="Turn your strongest campus ideas into work other students can read, cite, and respond to."
       quoteSource="ThinkAfrica onboarding promise"
@@ -187,7 +187,7 @@ export default function SignupPage() {
       </form>
 
       <div className="mt-7 grid grid-cols-3 gap-3 rounded-xl border border-gray-200 bg-canvas p-2 text-center">
-        {["Profile", "Topics", "Follows"].map((step, index) => (
+        {["Role", "Profile", "Topics"].map((step, index) => (
           <div key={step} className="rounded-lg bg-white px-2 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-brand">
               Step {index + 1}

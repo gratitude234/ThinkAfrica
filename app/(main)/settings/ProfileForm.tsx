@@ -9,6 +9,13 @@ import AvatarUploader from "./AvatarUploader";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import UniversitySelect from "@/components/ui/UniversitySelect";
 import { AFRICAN_COUNTRIES, inferCountryFromUniversity } from "@/lib/academicIdentity";
+import {
+  PROFILE_TYPE_OPTIONS,
+  type ProfileType,
+  isAcademicProfileType,
+  isProfileType,
+  normalizeSecondaryProfileTypes,
+} from "@/lib/profileTypes";
 
 const COMMON_INTERESTS = [
   "economics",
@@ -50,6 +57,11 @@ interface Profile {
   avatar_url: string | null;
   interests: string[] | null;
   cover_image_url: string | null;
+  profile_type: string | null;
+  secondary_profile_types: string[] | null;
+  organization_name: string | null;
+  professional_title: string | null;
+  organization_website: string | null;
 }
 
 const INPUT_STYLES =
@@ -59,6 +71,15 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const [fullName, setFullName] = useState(profile.full_name ?? "");
   const [username, setUsername] = useState(profile.username);
   const [bio, setBio] = useState(profile.bio ?? "");
+  const initialProfileType = isProfileType(profile.profile_type)
+    ? profile.profile_type
+    : null;
+  const [profileType, setProfileType] = useState<ProfileType | null>(
+    initialProfileType
+  );
+  const [secondaryProfileTypes, setSecondaryProfileTypes] = useState<ProfileType[]>(
+    normalizeSecondaryProfileTypes(profile.secondary_profile_types, initialProfileType)
+  );
   const [country, setCountry] = useState(
     profile.country ?? inferCountryFromUniversity(profile.university)
   );
@@ -71,12 +92,23 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
     (profile as typeof profile & { open_to_mentoring?: boolean })
       .open_to_mentoring ?? false
   );
+  const [organizationName, setOrganizationName] = useState(
+    profile.organization_name ?? ""
+  );
+  const [professionalTitle, setProfessionalTitle] = useState(
+    profile.professional_title ?? ""
+  );
+  const [organizationWebsite, setOrganizationWebsite] = useState(
+    profile.organization_website ?? ""
+  );
   const [interests, setInterests] = useState<string[]>(profile.interests ?? []);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
   const [coverImageUrl, setCoverImageUrl] = useState(profile.cover_image_url);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const isAcademicProfile = isAcademicProfileType(profileType);
+  const hasNonAcademicProfile = Boolean(profileType && !isAcademicProfile);
 
   const checkUsername = useCallback(async () => {
     if (username === profile.username) {
@@ -108,6 +140,24 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
       setUniversity("");
     }
     setCountry(nextCountry);
+  };
+
+  const selectPrimaryProfileType = (nextType: ProfileType) => {
+    setProfileType(nextType);
+    setSecondaryProfileTypes((current) =>
+      normalizeSecondaryProfileTypes(current, nextType)
+    );
+  };
+
+  const toggleSecondaryProfileType = (nextType: ProfileType) => {
+    if (nextType === profileType) return;
+    setSecondaryProfileTypes((current) => {
+      if (current.includes(nextType)) {
+        return current.filter((item) => item !== nextType);
+      }
+      if (current.length >= 3) return current;
+      return [...current, nextType];
+    });
   };
 
   // FIX: Auto-save avatar URL to DB immediately on upload
@@ -162,8 +212,29 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
       setSaving(false);
       return;
     }
+    if (secondaryProfileTypes.length > 3) {
+      setToast("Choose no more than 3 secondary profile types.");
+      setSaving(false);
+      return;
+    }
+    if (profileType && !isAcademicProfileType(profileType)) {
+      if (!professionalTitle.trim()) {
+        setToast("Add a title or short description for your profile.");
+        setSaving(false);
+        return;
+      }
+      if (profileType !== "other" && !organizationName.trim()) {
+        setToast("Add your organization name.");
+        setSaving(false);
+        return;
+      }
+    }
 
     const supabase = createClient();
+    const nextSecondaryProfileTypes = normalizeSecondaryProfileTypes(
+      secondaryProfileTypes,
+      profileType
+    );
 
     const { error } = await supabase
       .from("profiles")
@@ -171,10 +242,15 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         full_name: fullName,
         username,
         bio,
+        profile_type: profileType,
+        secondary_profile_types: nextSecondaryProfileTypes,
         country,
         university,
         field_of_study: fieldOfStudy,
         graduation_year: parsedYear,
+        organization_name: organizationName.trim() || null,
+        professional_title: professionalTitle.trim() || null,
+        organization_website: organizationWebsite.trim() || null,
         open_to_mentoring: openToMentoring,
         interests,
         avatar_url: avatarUrl,
@@ -189,6 +265,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
       return;
     }
 
+    setSecondaryProfileTypes(nextSecondaryProfileTypes);
     setToast("Profile saved successfully!");
   };
 
@@ -236,6 +313,66 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             </p>
           </div>
         ) : null}
+
+        <div className="space-y-4 border-b border-gray-100 pb-6">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Profile type
+            </label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PROFILE_TYPE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => selectPrimaryProfileType(option.value)}
+                  className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                    profileType === option.value
+                      ? "border-emerald-brand bg-emerald-50 text-emerald-950"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-emerald-300"
+                  }`}
+                >
+                  <span className="text-sm font-semibold">{option.label}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-gray-500">
+                    {option.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {profileType ? (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Secondary profile types{" "}
+                <span className="text-xs font-normal text-gray-500">
+                  ({secondaryProfileTypes.length}/3)
+                </span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {PROFILE_TYPE_OPTIONS.filter((option) => option.value !== profileType).map(
+                  (option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => toggleSecondaryProfileType(option.value)}
+                      disabled={
+                        !secondaryProfileTypes.includes(option.value) &&
+                        secondaryProfileTypes.length >= 3
+                      }
+                      className={`rounded-full border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        secondaryProfileTypes.includes(option.value)
+                          ? "border-emerald-brand bg-emerald-brand text-white"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -287,7 +424,10 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
-            University
+            University{" "}
+            {hasNonAcademicProfile ? (
+              <span className="text-xs font-normal text-gray-400">(optional)</span>
+            ) : null}
           </label>
           <UniversitySelect
             value={university}
@@ -299,7 +439,10 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
-            Field of study
+            Field of study{" "}
+            {hasNonAcademicProfile ? (
+              <span className="text-xs font-normal text-gray-400">(optional)</span>
+            ) : null}
           </label>
           <input
             type="text"
@@ -309,6 +452,53 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             className={INPUT_STYLES}
           />
         </div>
+
+        {hasNonAcademicProfile ? (
+          <>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Title or description
+              </label>
+              <input
+                type="text"
+                value={professionalTitle}
+                onChange={(e) => setProfessionalTitle(e.target.value)}
+                placeholder="e.g. Program manager, founder, policy analyst"
+                className={INPUT_STYLES}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Organization{" "}
+                {profileType === "other" || !profileType ? (
+                  <span className="text-xs font-normal text-gray-400">(optional)</span>
+                ) : null}
+              </label>
+              <input
+                type="text"
+                value={organizationName}
+                onChange={(e) => setOrganizationName(e.target.value)}
+                placeholder="e.g. ThinkAfrica, ministry, newsroom, company"
+                className={INPUT_STYLES}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Organization website{" "}
+                <span className="text-xs font-normal text-gray-400">(optional)</span>
+              </label>
+              <input
+                type="url"
+                value={organizationWebsite}
+                onChange={(e) => setOrganizationWebsite(e.target.value)}
+                placeholder="https://example.org"
+                className={INPUT_STYLES}
+              />
+            </div>
+          </>
+        ) : null}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

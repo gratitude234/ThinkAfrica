@@ -18,6 +18,11 @@ create table if not exists public.profiles (
   country text,
   university text,
   field_of_study text,
+  profile_type text,
+  secondary_profile_types text[] not null default '{}',
+  organization_name text,
+  professional_title text,
+  organization_website text,
   bio text,
   avatar_url text,
   role text not null default 'student' check (role in ('student', 'reviewer', 'editor', 'admin')),
@@ -27,7 +32,12 @@ create table if not exists public.profiles (
 
 alter table public.profiles
   add column if not exists role text not null default 'student',
-  add column if not exists country text;
+  add column if not exists country text,
+  add column if not exists profile_type text,
+  add column if not exists secondary_profile_types text[] not null default '{}',
+  add column if not exists organization_name text,
+  add column if not exists professional_title text,
+  add column if not exists organization_website text;
 
 alter table public.profiles
   drop constraint if exists profiles_role_check;
@@ -35,6 +45,49 @@ alter table public.profiles
 alter table public.profiles
   add constraint profiles_role_check
   check (role in ('student', 'reviewer', 'editor', 'admin'));
+
+alter table public.profiles
+  drop constraint if exists profiles_profile_type_check;
+
+alter table public.profiles
+  add constraint profiles_profile_type_check
+  check (
+    profile_type is null or profile_type in (
+      'student',
+      'researcher',
+      'educator',
+      'ngo_nonprofit',
+      'founder',
+      'policy_government',
+      'journalist_media',
+      'professional',
+      'other'
+    )
+  );
+
+alter table public.profiles
+  drop constraint if exists profiles_secondary_profile_types_check;
+
+alter table public.profiles
+  add constraint profiles_secondary_profile_types_check
+  check (
+    secondary_profile_types <@ array[
+      'student',
+      'researcher',
+      'educator',
+      'ngo_nonprofit',
+      'founder',
+      'policy_government',
+      'journalist_media',
+      'professional',
+      'other'
+    ]::text[]
+    and cardinality(secondary_profile_types) <= 3
+    and (
+      profile_type is null
+      or profile_type <> all(secondary_profile_types)
+    )
+  );
 
 -- posts
 create table if not exists public.posts (
@@ -137,6 +190,7 @@ create index if not exists posts_slug_idx on public.posts(slug);
 create index if not exists comments_post_id_idx on public.comments(post_id);
 create index if not exists likes_post_id_idx on public.likes(post_id);
 create index if not exists profiles_country_idx on public.profiles(country);
+create index if not exists profiles_profile_type_idx on public.profiles(profile_type);
 create index if not exists universities_country_name_idx on public.universities(country, name);
 
 insert into public.universities (country, name)

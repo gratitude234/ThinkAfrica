@@ -9,6 +9,13 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import AvatarUploader from "../settings/AvatarUploader";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { AFRICAN_COUNTRIES, inferCountryFromUniversity } from "@/lib/academicIdentity";
+import {
+  PROFILE_TYPE_OPTIONS,
+  type ProfileType,
+  isAcademicProfileType,
+  isProfileType,
+  normalizeSecondaryProfileTypes,
+} from "@/lib/profileTypes";
 
 const INTEREST_OPTIONS = [
   "Law & Justice",
@@ -45,9 +52,9 @@ interface SuggestedProfile {
   points: number | null;
 }
 
-type Step = "identity" | "interests" | "follow" | "contribute";
+type Step = "persona" | "identity" | "interests" | "follow" | "contribute";
 
-const STEP_ORDER: Step[] = ["identity", "interests", "follow", "contribute"];
+const STEP_ORDER: Step[] = ["persona", "identity", "interests", "follow", "contribute"];
 
 const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
@@ -78,10 +85,15 @@ export default function OnboardingPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
+  const [profileType, setProfileType] = useState<ProfileType | null>(null);
+  const [secondaryProfileTypes, setSecondaryProfileTypes] = useState<ProfileType[]>([]);
   const [country, setCountry] = useState("");
   const [university, setUniversity] = useState("");
   const [fieldOfStudy, setFieldOfStudy] = useState("");
   const [graduationYear, setGraduationYear] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [professionalTitle, setProfessionalTitle] = useState("");
+  const [organizationWebsite, setOrganizationWebsite] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestedProfile[]>([]);
@@ -93,6 +105,8 @@ export default function OnboardingPage() {
 
   const currentStepIndex = STEP_ORDER.indexOf(step);
   const progress = Math.round(((currentStepIndex + 1) / STEP_ORDER.length) * 100);
+  const isAcademicProfile = isAcademicProfileType(profileType);
+  const hasNonAcademicProfile = Boolean(profileType && !isAcademicProfile);
   const graduationYears = useMemo(
     () =>
       Array.from({ length: 20 }, (_, index) =>
@@ -118,6 +132,24 @@ export default function OnboardingPage() {
     },
     [country]
   );
+
+  const selectPrimaryProfileType = (nextType: ProfileType) => {
+    setProfileType(nextType);
+    setSecondaryProfileTypes((current) =>
+      normalizeSecondaryProfileTypes(current, nextType)
+    );
+  };
+
+  const toggleSecondaryProfileType = (nextType: ProfileType) => {
+    if (nextType === profileType) return;
+    setSecondaryProfileTypes((current) => {
+      if (current.includes(nextType)) {
+        return current.filter((item) => item !== nextType);
+      }
+      if (current.length >= 3) return current;
+      return [...current, nextType];
+    });
+  };
 
   useEffect(() => {
     const normalized = normalizeUsername(username);
@@ -199,32 +231,51 @@ export default function OnboardingPage() {
 
       const metadata = user.user_metadata as {
         full_name?: string;
+        profile_type?: string;
+        secondary_profile_types?: string[];
         country?: string;
         university?: string;
         field_of_study?: string;
         graduation_year?: string | number;
+        organization_name?: string;
+        professional_title?: string;
+        organization_website?: string;
       };
 
       const { data: profile } = await supabase
         .from("profiles")
         .select(
-          "full_name, username, avatar_url, interests, onboarding_completed, graduation_year, country, university, field_of_study"
+          "full_name, username, avatar_url, interests, onboarding_completed, graduation_year, country, university, field_of_study, profile_type, secondary_profile_types, organization_name, professional_title, organization_website"
         )
         .eq("id", user.id)
         .single();
 
-      if (profile?.onboarding_completed && initialStep === "identity") {
+      if (profile?.onboarding_completed && initialStep === "persona") {
         router.push("/");
         return;
       }
 
       const nextFullName = profile?.full_name || metadata.full_name || "";
       const emailUsername = user.email?.split("@")[0] ?? "";
+      const nextProfileType = isProfileType(profile?.profile_type)
+        ? profile.profile_type
+        : isProfileType(metadata.profile_type)
+          ? metadata.profile_type
+          : null;
 
       setFullName(nextFullName);
       setUsername(profile?.username || normalizeUsername(emailUsername));
       setAvatarUrl(profile?.avatar_url ?? null);
       setInterests((profile?.interests as string[] | null) ?? []);
+      setProfileType(nextProfileType);
+      setSecondaryProfileTypes(
+        normalizeSecondaryProfileTypes(
+          ((profile?.secondary_profile_types as string[] | null) ??
+            metadata.secondary_profile_types) ??
+            [],
+          nextProfileType
+        )
+      );
       const nextUniversity = profile?.university || metadata.university || "";
       setCountry(
         profile?.country ||
@@ -233,6 +284,9 @@ export default function OnboardingPage() {
       );
       setUniversity(nextUniversity);
       setFieldOfStudy(profile?.field_of_study || metadata.field_of_study || "");
+      setOrganizationName(profile?.organization_name || metadata.organization_name || "");
+      setProfessionalTitle(profile?.professional_title || metadata.professional_title || "");
+      setOrganizationWebsite(profile?.organization_website || metadata.organization_website || "");
       setGraduationYear(
         profile?.graduation_year || metadata.graduation_year
           ? String(profile?.graduation_year ?? metadata.graduation_year)
@@ -249,16 +303,70 @@ export default function OnboardingPage() {
     });
   }, [initialStep, loadSuggestions, router]);
 
+  const savePersona = async () => {
+    if (!userId) return;
+    if (!profileType) {
+      setError("Choose the profile type that best describes you.");
+      return;
+    }
+
+    const nextSecondaryProfileTypes = normalizeSecondaryProfileTypes(
+      secondaryProfileTypes,
+      profileType
+    );
+
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        profile_type: profileType,
+        secondary_profile_types: nextSecondaryProfileTypes,
+        onboarding_completed: false,
+      })
+      .eq("id", userId);
+
+    setLoading(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setSecondaryProfileTypes(nextSecondaryProfileTypes);
+    trackActivationEvent({
+      event: "onboarding_step_completed",
+      metadata: { step: "persona", profile_type: profileType },
+    });
+    goToStep("identity");
+  };
+
   const saveIdentity = async () => {
     if (!userId) return;
-    if (
-      !fullName.trim() ||
-      !username.trim() ||
-      !country.trim() ||
-      !university.trim() ||
-      !fieldOfStudy
-    ) {
-      setError("Add your name, username, country, university, and field of study.");
+    if (!profileType) {
+      setError("Choose your profile type before finishing your identity.");
+      goToStep("persona");
+      return;
+    }
+
+    const needsAcademicDetails = isAcademicProfileType(profileType);
+    const needsOrganization = !needsAcademicDetails && profileType !== "other";
+    const needsProfessionalTitle = !needsAcademicDetails;
+
+    if (!fullName.trim() || !username.trim() || !country.trim()) {
+      setError("Add your name, username, and country.");
+      return;
+    }
+    if (needsAcademicDetails && (!university.trim() || !fieldOfStudy)) {
+      setError("Add your university and field of study.");
+      return;
+    }
+    if (needsProfessionalTitle && !professionalTitle.trim()) {
+      setError("Add a title or short description for your profile.");
+      return;
+    }
+    if (needsOrganization && !organizationName.trim()) {
+      setError("Add your organization name.");
       return;
     }
     if (usernameStatus === "taken") {
@@ -275,9 +383,12 @@ export default function OnboardingPage() {
         full_name: fullName.trim(),
         username: normalizeUsername(username),
         country: country.trim(),
-        university: university.trim(),
-        field_of_study: fieldOfStudy,
+        university: university.trim() || null,
+        field_of_study: fieldOfStudy || null,
         graduation_year: graduationYear ? parseInt(graduationYear, 10) : null,
+        organization_name: organizationName.trim() || null,
+        professional_title: professionalTitle.trim() || null,
+        organization_website: organizationWebsite.trim() || null,
         avatar_url: avatarUrl,
         onboarding_completed: false,
       })
@@ -370,16 +481,115 @@ export default function OnboardingPage() {
         </div>
       </div>
 
+      {step === "persona" ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+            Profile type
+          </p>
+          <h1 className="mt-2 text-2xl font-bold text-gray-900">
+            What best describes you?
+          </h1>
+          <p className="mt-2 text-sm text-gray-500">
+            Choose one primary identity. You can add up to 3 secondary identities
+            if your work crosses roles.
+          </p>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {PROFILE_TYPE_OPTIONS.map((option) => {
+              const selected = profileType === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => selectPrimaryProfileType(option.value)}
+                  className={`min-h-[132px] rounded-xl border p-4 text-left transition-colors ${
+                    selected
+                      ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100"
+                      : "border-gray-200 bg-white hover:border-emerald-200"
+                  }`}
+                >
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      selected
+                        ? "bg-emerald-600 text-white"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {selected ? "Primary" : "Choose"}
+                  </span>
+                  <p className="mt-3 text-sm font-semibold text-gray-900">
+                    {option.label}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    {option.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {profileType ? (
+            <div className="mt-6 rounded-xl border border-gray-200 bg-canvas p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    Secondary identities
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Optional. {secondaryProfileTypes.length}/3 selected.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {PROFILE_TYPE_OPTIONS.filter((option) => option.value !== profileType).map(
+                  (option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => toggleSecondaryProfileType(option.value)}
+                      disabled={
+                        !secondaryProfileTypes.includes(option.value) &&
+                        secondaryProfileTypes.length >= 3
+                      }
+                      className={`rounded-full border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        secondaryProfileTypes.includes(option.value)
+                          ? "border-emerald-600 bg-emerald-600 text-white"
+                          : "border-gray-200 bg-white text-gray-700 hover:border-emerald-300"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+
+          <div className="mt-8 flex justify-end">
+            <button
+              type="button"
+              onClick={savePersona}
+              disabled={loading || !profileType}
+              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            >
+              {loading ? "Saving..." : "Continue"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       {step === "identity" ? (
         <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-            Academic identity
+            {hasNonAcademicProfile ? "Professional identity" : "Academic identity"}
           </p>
           <h1 className="mt-2 text-2xl font-bold text-gray-900">
             Set up the profile people will trust
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            These details help classmates, editors, and readers understand your work.
+            These details help readers, editors, and collaborators understand your work.
           </p>
 
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
@@ -439,7 +649,10 @@ export default function OnboardingPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                University
+                University{" "}
+                {hasNonAcademicProfile ? (
+                  <span className="text-xs font-normal text-gray-400">(optional)</span>
+                ) : null}
               </label>
               <UniversitySelect
                 value={university}
@@ -450,7 +663,10 @@ export default function OnboardingPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Field of study
+                Field of study{" "}
+                {hasNonAcademicProfile ? (
+                  <span className="text-xs font-normal text-gray-400">(optional)</span>
+                ) : null}
               </label>
               <select
                 value={fieldOfStudy}
@@ -465,6 +681,48 @@ export default function OnboardingPage() {
                 ))}
               </select>
             </div>
+            {hasNonAcademicProfile ? (
+              <>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Title or description
+                  </label>
+                  <input
+                    value={professionalTitle}
+                    onChange={(event) => setProfessionalTitle(event.target.value)}
+                    placeholder="e.g. Program manager, founder, policy analyst"
+                    className={INPUT_STYLES}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Organization{" "}
+                    {profileType === "other" ? (
+                      <span className="text-xs font-normal text-gray-400">(optional)</span>
+                    ) : null}
+                  </label>
+                  <input
+                    value={organizationName}
+                    onChange={(event) => setOrganizationName(event.target.value)}
+                    placeholder="e.g. ThinkAfrica, ministry, newsroom, company"
+                    className={INPUT_STYLES}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Organization website{" "}
+                    <span className="text-xs font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={organizationWebsite}
+                    onChange={(event) => setOrganizationWebsite(event.target.value)}
+                    placeholder="https://example.org"
+                    className={INPUT_STYLES}
+                  />
+                </div>
+              </>
+            ) : null}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Graduation year{" "}
@@ -488,6 +746,13 @@ export default function OnboardingPage() {
           {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
 
           <div className="mt-8 flex justify-end">
+            <button
+              type="button"
+              onClick={() => goToStep("persona")}
+              className="mr-auto text-sm text-gray-500 hover:text-gray-700"
+            >
+              Back
+            </button>
             <button
               type="button"
               onClick={saveIdentity}
