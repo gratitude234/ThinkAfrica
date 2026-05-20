@@ -147,26 +147,6 @@ export default function NavUserMenu({
             </Link>
           )}
           <Link
-            href="/messages"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
-          >
-            <svg
-              className="w-4 h-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.275 2.903 2.875 2.903h.375a2.625 2.625 0 011.855.769l.396.396.396-.396A2.625 2.625 0 019.252 15.663h.375c1.6 0 2.875-1.302 2.875-2.903V8.25c0-1.6-1.275-2.903-2.875-2.903H5.625C4.025 5.347 2.75 6.65 2.75 8.25v4.51z"
-              />
-            </svg>
-            Messages
-          </Link>
-          <Link
             href="/dashboard"
             onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
@@ -185,26 +165,6 @@ export default function NavUserMenu({
               />
             </svg>
             Dashboard
-          </Link>
-          <Link
-            href="/write"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
-          >
-            <svg
-              className="w-4 h-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-              />
-            </svg>
-            Write
           </Link>
           {canAccessReview ? (
             <Link
@@ -273,26 +233,6 @@ export default function NavUserMenu({
               />
             </svg>
             Settings
-          </Link>
-          <Link
-            href="/stats"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
-          >
-            <svg
-              className="w-4 h-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              />
-            </svg>
-            My Stats
           </Link>
           {isAdmin && (
             <Link

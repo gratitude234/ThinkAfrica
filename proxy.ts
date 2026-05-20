@@ -2,6 +2,25 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const protectedPaths = [
+    "/write",
+    "/admin",
+    "/debates/create",
+    "/onboarding",
+    "/stats",
+    "/dashboard",
+    "/settings",
+    "/bookmarks",
+    "/notifications",
+    "/edit",
+  ];
+  const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
+
+  if (!isProtected) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -35,23 +54,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-  const protectedPaths = [
-    "/write",
-    "/admin",
-    "/debates/create",
-    "/onboarding",
-    "/stats",
-    "/dashboard",
-    "/settings",
-    "/bookmarks",
-    "/notifications",
-    "/edit",
-  ];
-
-  const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
-
-  if (isProtected && !user) {
+  if (!user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("redirectTo", pathname);

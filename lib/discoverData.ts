@@ -1,4 +1,5 @@
 import type { PostCardData } from "@/components/post/PostCard";
+import { unstable_cache } from "next/cache";
 import {
   fetchCitableFeed,
   fetchFeedPage,
@@ -9,6 +10,7 @@ import {
   getSuggestedPeople,
   type SuggestedPerson,
 } from "@/lib/suggestedPeople";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type DiscoverTab = "for-you" | "trending" | "citable" | "topics" | "people";
 
@@ -134,6 +136,11 @@ interface RawFellowship {
   deadline: string | null;
 }
 
+interface TopicCount {
+  tag: string;
+  count: number;
+}
+
 function normalizeInterests(value: string[] | null | undefined) {
   return (value ?? []).filter(Boolean);
 }
@@ -214,13 +221,38 @@ async function getTopics(
   supabase: SupabaseLike,
   userInterests: string[]
 ): Promise<DiscoverTopic[]> {
+  const topicCounts = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? await getCachedTopicCounts()
+    : await getTopicCountsUncached(supabase);
+  const followed = new Set(userInterests.map(normalizeTag));
+  const counts = new Map<string, { tag: string; count: number }>(
+    topicCounts.map((topic) => [normalizeTag(topic.tag), topic])
+  );
+
+  return Array.from(counts.values())
+    .sort((left, right) => {
+      const leftFollowed = followed.has(normalizeTag(left.tag)) ? 1 : 0;
+      const rightFollowed = followed.has(normalizeTag(right.tag)) ? 1 : 0;
+      if (leftFollowed !== rightFollowed) return rightFollowed - leftFollowed;
+      return right.count - left.count;
+    })
+    .slice(0, 32)
+    .map((topic) => ({
+      ...topic,
+      followed: followed.has(normalizeTag(topic.tag)),
+    }));
+}
+
+async function getTopicCountsUncached(
+  supabase: SupabaseLike
+): Promise<TopicCount[]> {
   const { data } = await supabase
     .from("posts")
     .select("tags")
     .eq("status", "published")
-    .limit(700);
+    .order("published_at", { ascending: false })
+    .limit(250);
 
-  const followed = new Set(userInterests.map(normalizeTag));
   const counts = new Map<string, { tag: string; count: number }>();
 
   for (const row of ((data ?? []) as TopicRow[])) {
@@ -236,19 +268,14 @@ async function getTopics(
     }
   }
 
-  return Array.from(counts.values())
-    .sort((left, right) => {
-      const leftFollowed = followed.has(normalizeTag(left.tag)) ? 1 : 0;
-      const rightFollowed = followed.has(normalizeTag(right.tag)) ? 1 : 0;
-      if (leftFollowed !== rightFollowed) return rightFollowed - leftFollowed;
-      return right.count - left.count;
-    })
-    .slice(0, 32)
-    .map((topic) => ({
-      ...topic,
-      followed: followed.has(normalizeTag(topic.tag)),
-    }));
+  return Array.from(counts.values());
 }
+
+const getCachedTopicCounts = unstable_cache(
+  async () => getTopicCountsUncached(createAdminClient()),
+  ["discover-topic-counts"],
+  { revalidate: 300, tags: ["discover", "topics"] }
+);
 
 async function getPeople(
   supabase: SupabaseLike,
@@ -285,6 +312,26 @@ async function getPeople(
     };
   }
 
+  const topPeople = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? await getCachedTopPeople()
+    : null;
+
+  if (topPeople) {
+    return {
+      reason: "Top contributors",
+      people: topPeople.map((person) => ({
+        id: person.id,
+        username: person.username ?? "",
+        full_name: person.full_name,
+        university: person.university,
+        avatar_url: person.avatar_url,
+        points: person.points,
+        field_of_study: person.field_of_study,
+        followed: followed.has(person.id),
+      })),
+    };
+  }
+
   const { data } = await supabase
     .from("profiles")
     .select("id, username, full_name, university, field_of_study, avatar_url, points")
@@ -308,6 +355,22 @@ async function getPeople(
   };
 }
 
+const getCachedTopPeople = unstable_cache(
+  async (): Promise<RawPerson[]> => {
+    const { data } = await createAdminClient()
+      .from("profiles")
+      .select("id, username, full_name, university, field_of_study, avatar_url, points")
+      .order("points", { ascending: false })
+      .limit(8);
+
+    return ((data ?? []) as RawPerson[]).filter((person) =>
+      Boolean(person.username)
+    );
+  },
+  ["discover-top-people"],
+  { revalidate: 300, tags: ["discover", "people"] }
+);
+
 async function getActiveDebate(
   supabase: SupabaseLike
 ): Promise<DiscoverDebate | null> {
@@ -316,6 +379,16 @@ async function getActiveDebate(
 }
 
 async function getDebateHighlights(
+  supabase: SupabaseLike
+): Promise<DiscoverDebate[]> {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return getCachedDebateHighlights();
+  }
+
+  return getDebateHighlightsUncached(supabase);
+}
+
+async function getDebateHighlightsUncached(
   supabase: SupabaseLike
 ): Promise<DiscoverDebate[]> {
   const { data } = await supabase
@@ -334,7 +407,23 @@ async function getDebateHighlights(
   }));
 }
 
+const getCachedDebateHighlights = unstable_cache(
+  async () => getDebateHighlightsUncached(createAdminClient()),
+  ["discover-debate-highlights"],
+  { revalidate: 120, tags: ["discover", "debates"] }
+);
+
 async function getFellowships(
+  supabase: SupabaseLike
+): Promise<DiscoverFellowship[]> {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return getCachedFellowships();
+  }
+
+  return getFellowshipsUncached(supabase);
+}
+
+async function getFellowshipsUncached(
   supabase: SupabaseLike
 ): Promise<DiscoverFellowship[]> {
   const { data } = await supabase
@@ -352,7 +441,23 @@ async function getFellowships(
   }));
 }
 
+const getCachedFellowships = unstable_cache(
+  async () => getFellowshipsUncached(createAdminClient()),
+  ["discover-fellowships"],
+  { revalidate: 300, tags: ["discover", "fellowships"] }
+);
+
 async function getOpportunitySummary(
+  supabase: SupabaseLike
+): Promise<DiscoverOpportunitySummary> {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return getCachedOpportunitySummary();
+  }
+
+  return getOpportunitySummaryUncached(supabase);
+}
+
+async function getOpportunitySummaryUncached(
   supabase: SupabaseLike
 ): Promise<DiscoverOpportunitySummary> {
   const [talentResult, fellowshipResult] = await Promise.all([
@@ -372,6 +477,12 @@ async function getOpportunitySummary(
     openFellowshipCount: fellowshipResult.count ?? 0,
   };
 }
+
+const getCachedOpportunitySummary = unstable_cache(
+  async () => getOpportunitySummaryUncached(createAdminClient()),
+  ["discover-opportunity-summary"],
+  { revalidate: 300, tags: ["discover", "opportunities"] }
+);
 
 function buildActiveConversations(posts: PostCardData[]): DiscoverConversation[] {
   const seen = new Set<string>();

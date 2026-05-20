@@ -5,6 +5,7 @@ import {
   createAdminActionClient,
   recordAdminAuditEvent,
 } from "@/lib/adminAccess";
+import { logEmailResult, sendUserEmail } from "@/lib/email";
 import {
   getEditorialReviewState,
   publishReviewedPost,
@@ -80,7 +81,7 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
 
   if (error) return { error: error.message };
 
-  await supabase.from("notifications").insert({
+  const { error: notificationError } = await supabase.from("notifications").insert({
     user_id: reviewerId,
     type: "review_assigned",
     message: `You've been assigned to review: ${post.title}`,
@@ -88,6 +89,19 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
     post_id: postId,
     read: false,
   });
+  if (!notificationError) {
+    const emailResult = await sendUserEmail({
+      recipientId: reviewerId,
+      subject: "You have a ThinkAfrica review assignment",
+      preview: `You've been assigned to review: ${post.title}`,
+      title: "Review assignment",
+      intro: `You've been assigned to review "${post.title}". Open the review workspace to read the submission and submit your recommendation.`,
+      ctaLabel: "Open review",
+      ctaPath: `/review/${postId}`,
+      idempotencyKey: `review-assigned:${postId}:${reviewerId}:${round}`,
+    });
+    logEmailResult(`review_assigned:${postId}:${reviewerId}`, emailResult);
+  }
 
   await recordAdminAuditEvent({
     admin: supabase,
@@ -233,7 +247,7 @@ export async function submitEditorialDecision(input: {
         }),
       }).catch(() => {});
 
-      await supabase.from("notifications").insert({
+      const { error: notificationError } = await supabase.from("notifications").insert({
         user_id: post.author_id,
         type: "post_published",
         message: `Your ${post.type === "policy_brief" ? "policy brief" : post.type} "${
@@ -245,6 +259,24 @@ export async function submitEditorialDecision(input: {
         post_id: input.postId,
         read: false,
       });
+      if (!notificationError) {
+        const emailResult = await sendUserEmail({
+          recipientId: post.author_id,
+          subject: "Your ThinkAfrica submission has been published",
+          preview: `"${post.title}" has been accepted and published.`,
+          title: "Your submission is published",
+          intro: `Your ${post.type === "policy_brief" ? "policy brief" : post.type} "${post.title}" has been accepted and published${
+            publication?.citationId ? `. Citation ID: ${publication.citationId}` : "."
+          }`,
+          ctaLabel: "View publication",
+          ctaPath: publication?.citationId
+            ? `/publication/${publication.citationId}`
+            : `/post/${post.slug}`,
+          preferenceKey: "email_published",
+          idempotencyKey: `post-published:${input.postId}:${post.author_id}`,
+        });
+        logEmailResult(`post_published:${input.postId}:${post.author_id}`, emailResult);
+      }
 
       await recordAdminAuditEvent({
         admin: supabase,
@@ -283,7 +315,7 @@ export async function submitEditorialDecision(input: {
       return { error: error.message };
     }
 
-    await supabase.from("notifications").insert({
+    const { error: notificationError } = await supabase.from("notifications").insert({
       user_id: post.author_id,
       type: "revision_requested",
       message: input.notes?.trim()
@@ -296,6 +328,25 @@ export async function submitEditorialDecision(input: {
       post_id: input.postId,
       read: false,
     });
+    if (!notificationError) {
+      const emailResult = await sendUserEmail({
+        recipientId: post.author_id,
+        subject: "Revision requested on your ThinkAfrica submission",
+        preview: `Revision requested for "${post.title}".`,
+        title: "Revision requested",
+        intro: input.notes?.trim()
+          ? `Revision requested for "${post.title}": ${input.notes.trim()}`
+          : `Revision requested for "${post.title}". Visit your dashboard for the editor decision and reviewer notes.`,
+        ctaLabel: "Open submission",
+        ctaPath:
+          post.type === "research"
+            ? `/submit/research?draft=${post.id}`
+            : `/edit/${post.slug}`,
+        preferenceKey: "email_published",
+        idempotencyKey: `revision-requested:${input.postId}:${post.author_id}:${post.current_round}`,
+      });
+      logEmailResult(`revision_requested:${input.postId}:${post.author_id}`, emailResult);
+    }
 
     await recordAdminAuditEvent({
       admin: supabase,
@@ -320,7 +371,7 @@ export async function submitEditorialDecision(input: {
     return { error: error.message };
   }
 
-  await supabase.from("notifications").insert({
+  const { error: notificationError } = await supabase.from("notifications").insert({
     user_id: post.author_id,
     type: "post_rejected",
     message: input.notes?.trim()
@@ -330,6 +381,22 @@ export async function submitEditorialDecision(input: {
     post_id: input.postId,
     read: false,
   });
+  if (!notificationError) {
+    const emailResult = await sendUserEmail({
+      recipientId: post.author_id,
+      subject: "Editorial decision on your ThinkAfrica submission",
+      preview: `Your submission "${post.title}" was rejected.`,
+      title: "Editorial decision recorded",
+      intro: input.notes?.trim()
+        ? `Your submission "${post.title}" was rejected: ${input.notes.trim()}`
+        : `Your submission "${post.title}" was rejected. Visit your dashboard for the editorial decision.`,
+      ctaLabel: "Open dashboard",
+      ctaPath: "/dashboard",
+      preferenceKey: "email_published",
+      idempotencyKey: `post-rejected:${input.postId}:${post.author_id}:${post.current_round}`,
+    });
+    logEmailResult(`post_rejected:${input.postId}:${post.author_id}`, emailResult);
+  }
 
   await recordAdminAuditEvent({
     admin: supabase,

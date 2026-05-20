@@ -41,20 +41,13 @@ function isProfileComplete(profile: Record<string, unknown> | null) {
   );
 }
 
-async function countRows(
-  query: Promise<{ count?: number | null }>
-): Promise<number> {
-  const result = await query;
-  return result.count ?? 0;
-}
-
 async function countRowsSafe(
-  query: Promise<{ count?: number | null; error?: unknown }>
+  query: Promise<{ data?: unknown[] | null; error?: unknown }>
 ): Promise<number> {
   try {
     const result = await query;
     if (result.error) return 0;
-    return result.count ?? 0;
+    return result.data?.length ?? 0;
   } catch {
     return 0;
   }
@@ -80,71 +73,65 @@ export async function getActivationState(
       .select("full_name, username, university, field_of_study, interests")
       .eq("id", userId)
       .single(),
-    countRows(
+    countRowsSafe(
       supabase
         .from("follows")
-        .select("*", { count: "exact", head: true })
-        .eq("follower_id", userId) as unknown as Promise<{ count?: number | null }>
+        .select("following_id")
+        .eq("follower_id", userId)
+        .limit(3) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
     countRowsSafe(
       supabase
         .from("activation_events")
-        .select("*", { count: "exact", head: true })
+        .select("id")
         .eq("user_id", userId)
-        .eq("event_name", "post_opened") as unknown as Promise<{
-        count?: number | null;
-        error?: unknown;
-      }>
+        .eq("event_name", "post_opened")
+        .limit(2) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
     countRowsSafe(
       supabase
         .from("bookmarks")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId) as unknown as Promise<{
-        count?: number | null;
-        error?: unknown;
-      }>
+        .select("post_id")
+        .eq("user_id", userId)
+        .limit(2) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
     countRowsSafe(
       supabase
         .from("comments")
-        .select("*", { count: "exact", head: true })
-        .eq("author_id", userId) as unknown as Promise<{
-        count?: number | null;
-        error?: unknown;
-      }>
+        .select("id")
+        .eq("author_id", userId)
+        .limit(2) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
     countRowsSafe(
       supabase
         .from("activation_events")
-        .select("*", { count: "exact", head: true })
+        .select("id")
         .eq("user_id", userId)
-        .eq("event_name", "response_started") as unknown as Promise<{
-        count?: number | null;
-        error?: unknown;
-      }>
+        .eq("event_name", "response_started")
+        .limit(1) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
-    countRows(
+    countRowsSafe(
       supabase
         .from("posts")
-        .select("*", { count: "exact", head: true })
+        .select("id")
         .eq("author_id", userId)
-        .in("status", ["published", "pending", "pending_revision"]) as unknown as Promise<{
-        count?: number | null;
-      }>
+        .in("status", ["published", "pending", "pending_revision"])
+        .limit(1) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
-    countRows(
+    countRowsSafe(
       supabase
         .from("posts")
-        .select("*", { count: "exact", head: true })
+        .select("id")
         .eq("author_id", userId)
-        .eq("status", "draft") as unknown as Promise<{ count?: number | null }>
+        .eq("status", "draft")
+        .limit(1) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
-    countRows(
+    countRowsSafe(
       supabase
         .from("debate_arguments")
-        .select("*", { count: "exact", head: true })
-        .eq("author_id", userId) as unknown as Promise<{ count?: number | null }>
+        .select("id")
+        .eq("author_id", userId)
+        .limit(1) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
   ]);
 

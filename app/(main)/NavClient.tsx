@@ -144,7 +144,7 @@ export default function NavClient({
           <div className="ml-auto flex items-center gap-2.5">
             <Link
               href={messagesHref}
-              className="relative rounded-lg p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink lg:hidden"
+              className="relative rounded-lg p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
               aria-label="Open messages"
             >
               <MessageIcon />

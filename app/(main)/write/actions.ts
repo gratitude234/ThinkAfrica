@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { recordActivationEvent } from "@/lib/activationServer";
 import {
@@ -246,7 +247,7 @@ async function syncAuthors(
     }
 
     if (!existingByUserId.has(coAuthor.user_id)) {
-      await supabase.from("notifications").insert({
+      const { error: notificationError } = await supabase.from("notifications").insert({
         user_id: coAuthor.user_id,
         type: "co_author_invite",
         message: `${ownerName} has invited you to co-author this post.`,
@@ -255,6 +256,19 @@ async function syncAuthors(
         post_id: postId,
         read: false,
       });
+      if (!notificationError) {
+        const emailResult = await sendUserEmail({
+          recipientId: coAuthor.user_id,
+          subject: `${ownerName} invited you to co-author on ThinkAfrica`,
+          preview: `${ownerName} has invited you to co-author a ThinkAfrica post.`,
+          title: "Co-author invitation",
+          intro: `${ownerName} has invited you to co-author a ThinkAfrica post. Review the invitation and accept or decline from your notifications.`,
+          ctaLabel: "Review invitation",
+          ctaPath: `/post/${slug}`,
+          idempotencyKey: `co-author-invite:${postId}:${coAuthor.user_id}`,
+        });
+        logEmailResult(`co_author_invite:${postId}:${coAuthor.user_id}`, emailResult);
+      }
       await recordActivationEvent({
         supabase,
         event: "coauthor_invite_sent",
@@ -478,7 +492,7 @@ export async function publishPost(input: {
   if (input.inResponseTo) {
     const { data: parentPost } = await supabase
       .from("posts")
-      .select("author_id, slug")
+      .select("author_id, slug, title")
       .eq("id", input.inResponseTo)
       .maybeSingle();
 
@@ -486,7 +500,7 @@ export async function publishPost(input: {
       responseParentPath = `/post/${parentPost.slug}`;
 
       if (parentPost.author_id !== user.id) {
-        await supabase.from("notifications").insert({
+        const { error: notificationError } = await supabase.from("notifications").insert({
           user_id: parentPost.author_id,
           type: "response_post",
           message: `${ownerProfile?.full_name ?? "A ThinkAfrica author"} wrote a response to your post.`,
@@ -495,6 +509,20 @@ export async function publishPost(input: {
           post_id: postId,
           read: false,
         });
+        if (!notificationError) {
+          const authorName = ownerProfile?.full_name ?? "A ThinkAfrica author";
+          const emailResult = await sendUserEmail({
+            recipientId: parentPost.author_id,
+            subject: `${authorName} responded to your ThinkAfrica post`,
+            preview: `${authorName} wrote a response to your post.`,
+            title: "New response to your post",
+            intro: `${authorName} wrote a response to "${parentPost.title}".`,
+            ctaLabel: "Read the response",
+            ctaPath: `/post/${slug}`,
+            idempotencyKey: `response-post:${postId}:${parentPost.author_id}`,
+          });
+          logEmailResult(`response_post:${postId}:${parentPost.author_id}`, emailResult);
+        }
       }
     }
   }

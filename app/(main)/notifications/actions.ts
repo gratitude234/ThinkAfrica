@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { recordActivationEvent } from "@/lib/activationServer";
+import { logEmailResult, sendUserEmail } from "@/lib/email";
 
 export async function respondToCoAuthorInvite(input: {
   notificationId: string;
@@ -62,7 +63,7 @@ export async function respondToCoAuthorInvite(input: {
     if (error) return { error: error.message };
     if (!invite) return { error: "Invitation no longer exists." };
 
-    await supabase.from("notifications").insert({
+    const { error: notificationError } = await supabase.from("notifications").insert({
       user_id: post.author_id,
       type: "co_author_accepted",
       message: `${actorName} accepted your co-author invitation on: ${post.title}`,
@@ -71,6 +72,19 @@ export async function respondToCoAuthorInvite(input: {
       post_id: input.postId,
       read: false,
     });
+    if (!notificationError) {
+      const emailResult = await sendUserEmail({
+        recipientId: post.author_id,
+        subject: `${actorName} accepted your ThinkAfrica co-author invitation`,
+        preview: `${actorName} accepted your co-author invitation.`,
+        title: "Co-author invitation accepted",
+        intro: `${actorName} accepted your co-author invitation on "${post.title}".`,
+        ctaLabel: "Open post",
+        ctaPath: `/post/${post.slug}`,
+        idempotencyKey: `co-author-accepted:${input.postId}:${user.id}`,
+      });
+      logEmailResult(`co_author_accepted:${input.postId}:${post.author_id}`, emailResult);
+    }
     await recordActivationEvent({
       supabase,
       event: "coauthor_invite_accepted",
@@ -102,7 +116,7 @@ export async function respondToCoAuthorInvite(input: {
         .eq("user_id", post.author_id);
     }
 
-    await supabase.from("notifications").insert({
+    const { error: notificationError } = await supabase.from("notifications").insert({
       user_id: post.author_id,
       type: "co_author_declined",
       message: `${actorName} declined your co-author invitation on: ${post.title}`,
@@ -111,6 +125,19 @@ export async function respondToCoAuthorInvite(input: {
       post_id: input.postId,
       read: false,
     });
+    if (!notificationError) {
+      const emailResult = await sendUserEmail({
+        recipientId: post.author_id,
+        subject: `${actorName} declined your ThinkAfrica co-author invitation`,
+        preview: `${actorName} declined your co-author invitation.`,
+        title: "Co-author invitation declined",
+        intro: `${actorName} declined your co-author invitation on "${post.title}".`,
+        ctaLabel: "Open post",
+        ctaPath: `/post/${post.slug}`,
+        idempotencyKey: `co-author-declined:${input.postId}:${user.id}`,
+      });
+      logEmailResult(`co_author_declined:${input.postId}:${post.author_id}`, emailResult);
+    }
     await recordActivationEvent({
       supabase,
       event: "coauthor_invite_declined",

@@ -42,6 +42,8 @@ const ALLOWED_EVENTS = new Set<ActivationEventName>([
   "opportunity_listing_opened",
   "opportunity_apply_started",
   "opportunity_apply_submitted",
+  "opportunity_saved",
+  "opportunity_unsaved",
   "opportunity_profile_setup_cta_clicked",
   "fellowship_opened",
   "fellowship_application_submitted",
@@ -54,6 +56,22 @@ const ALLOWED_EVENTS = new Set<ActivationEventName>([
   "message_started",
   "message_sent",
   "response_thread_opened",
+]);
+
+const ANONYMOUS_VIEW_EVENTS = new Set<ActivationEventName>([
+  "post_opened",
+  "discover_viewed",
+  "home_viewed",
+  "dashboard_viewed",
+  "landing_viewed",
+  "opportunity_profile_viewed",
+  "opportunity_readiness_viewed",
+  "opportunity_listing_opened",
+  "fellowship_opened",
+  "collaboration_panel_viewed",
+  "response_thread_opened",
+  "weekly_digest_previewed",
+  "quality_check_viewed",
 ]);
 
 export async function POST(request: Request) {
@@ -72,6 +90,10 @@ export async function POST(request: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user && ANONYMOUS_VIEW_EVENTS.has(body.event)) {
+    return NextResponse.json({ ok: true, persisted: false });
+  }
 
   await recordActivationEvent({
     supabase,

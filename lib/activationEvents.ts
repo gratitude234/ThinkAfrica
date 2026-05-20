@@ -59,6 +59,61 @@ interface ActivationEventPayload {
   route?: string;
 }
 
+const VIEW_EVENT_DEDUPE_MS = 10 * 60 * 1000;
+const VIEW_EVENTS = new Set<ActivationEventName>([
+  "post_opened",
+  "discover_viewed",
+  "home_viewed",
+  "dashboard_viewed",
+  "landing_viewed",
+  "opportunity_profile_viewed",
+  "opportunity_readiness_viewed",
+  "opportunity_listing_opened",
+  "fellowship_opened",
+  "collaboration_panel_viewed",
+  "response_thread_opened",
+  "weekly_digest_previewed",
+  "quality_check_viewed",
+]);
+
+function hashActivationKey(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = Math.imul(31, hash) + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function shouldSkipDuplicateViewEvent(
+  payload: ActivationEventPayload,
+  route: string
+) {
+  if (!VIEW_EVENTS.has(payload.event)) return false;
+
+  try {
+    const storageKey = `thinkafrica:activation:${hashActivationKey(
+      JSON.stringify({
+        event: payload.event,
+        route,
+        metadata: payload.metadata ?? {},
+      })
+    )}`;
+    const now = Date.now();
+    const previous = Number(window.sessionStorage.getItem(storageKey) ?? 0);
+
+    if (previous && now - previous < VIEW_EVENT_DEDUPE_MS) {
+      return true;
+    }
+
+    window.sessionStorage.setItem(storageKey, String(now));
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
 export function logActivationEvent(
   event: ActivationEventName,
   metadata: Record<string, string | number | boolean | null> = {}
@@ -73,9 +128,14 @@ export function logActivationEvent(
 export function trackActivationEvent(payload: ActivationEventPayload) {
   if (typeof window === "undefined") return;
 
+  const route =
+    payload.route ?? `${window.location.pathname}${window.location.search}`;
+
+  if (shouldSkipDuplicateViewEvent(payload, route)) return;
+
   const body = JSON.stringify({
     source: "client",
-    route: `${window.location.pathname}${window.location.search}`,
+    route,
     ...payload,
   });
 

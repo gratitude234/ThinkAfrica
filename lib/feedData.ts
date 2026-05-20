@@ -1,4 +1,5 @@
 import type { PostCardData } from "@/components/post/PostCard";
+import { unstable_cache } from "next/cache";
 import { rankPosts, type RankingContext } from "@/lib/feedRanking";
 import {
   getFeedSurfaceReason,
@@ -28,6 +29,11 @@ interface FeedOptions {
   userUniversity: string | null;
   followedIds: string[];
 }
+
+type PublicFeedCacheInput = Pick<
+  FeedOptions,
+  "tab" | "page" | "pageSize" | "type" | "timeframe"
+>;
 
 const POST_SELECT =
   "id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
@@ -247,6 +253,19 @@ export async function fetchCitableFeed(
   },
   pageSize = 8
 ): Promise<PostCardData[]> {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return fetchCachedCitableFeed(pageSize);
+  }
+
+  return fetchCitableFeedUncached(supabase, pageSize);
+}
+
+async function fetchCitableFeedUncached(
+  supabase: {
+    from: (table: string) => any;
+  },
+  pageSize = 8
+): Promise<PostCardData[]> {
   const reader = process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createAdminClient()
     : supabase;
@@ -284,6 +303,15 @@ export async function fetchCitableFeed(
   return enrichPosts(reader, rows.slice(0, safePageSize));
 }
 
+const fetchCachedCitableFeed = unstable_cache(
+  async (pageSize: number) => {
+    const admin = createAdminClient();
+    return fetchCitableFeedUncached(admin, pageSize);
+  },
+  ["citable-feed"],
+  { revalidate: 300, tags: ["feed", "citable-feed"] }
+);
+
 function applyPostFilters(
   query: any,
   {
@@ -305,6 +333,44 @@ function applyPostFilters(
 }
 
 export async function fetchFeedPage({
+  supabase,
+  tab,
+  page,
+  pageSize,
+  type,
+  timeframe,
+  userId,
+  userInterests,
+  userUniversity,
+  followedIds,
+}: FeedOptions): Promise<FeedPageResult> {
+  const shouldUsePublicCache =
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    !userId &&
+    userInterests.length === 0 &&
+    !userUniversity &&
+    followedIds.length === 0 &&
+    tab !== "following";
+
+  if (shouldUsePublicCache) {
+    return fetchCachedPublicFeedPage({ tab, page, pageSize, type, timeframe });
+  }
+
+  return fetchFeedPageUncached({
+    supabase,
+    tab,
+    page,
+    pageSize,
+    type,
+    timeframe,
+    userId,
+    userInterests,
+    userUniversity,
+    followedIds,
+  });
+}
+
+async function fetchFeedPageUncached({
   supabase,
   tab,
   page,
@@ -382,7 +448,10 @@ export async function fetchFeedPage({
     return { posts, hasMore: raw.length > safePageSize };
   }
 
-  const candidateLimit = Math.max(80, safePage * safePageSize + 20);
+  const candidateLimit = Math.max(
+    safePageSize * 2,
+    safePage * safePageSize + 12
+  );
   const query = applyPostFilters(
     reader.from("posts").select(POST_SELECT),
     {
@@ -413,3 +482,29 @@ export async function fetchFeedPage({
     hasMore: ranked.length > end,
   };
 }
+
+const fetchCachedPublicFeedPage = unstable_cache(
+  async ({
+    tab,
+    page,
+    pageSize,
+    type,
+    timeframe,
+  }: PublicFeedCacheInput): Promise<FeedPageResult> => {
+    const admin = createAdminClient();
+    return fetchFeedPageUncached({
+      supabase: admin,
+      tab,
+      page,
+      pageSize,
+      type,
+      timeframe,
+      userId: null,
+      userInterests: [],
+      userUniversity: null,
+      followedIds: [],
+    });
+  },
+  ["public-feed-page"],
+  { revalidate: 120, tags: ["feed", "public-feed"] }
+);

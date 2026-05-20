@@ -80,7 +80,7 @@ export default async function AdminDigestPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Weekly Digest Preview</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Admin-only preview. Email delivery is not connected in this V1.
+            Review the weekly digest, then send it to members with digest email enabled.
           </p>
         </div>
         <DigestSendButton />

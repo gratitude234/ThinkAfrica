@@ -5,6 +5,7 @@ import {
   getOpportunityShortLabel,
   isOpportunityType,
 } from "@/lib/opportunities";
+import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 
 interface SubmitOpportunityInquiryInput {
@@ -111,32 +112,49 @@ export async function submitOpportunityInquiry(
     return { ok: false, error: "You cannot send an opportunity inquiry to yourself." };
   }
 
-  const { error: insertError } = await supabase.from("talent_inquiries").insert({
-    talent_id: input.talentProfileId,
-    sender_id: user.id,
-    organization_name: organizationName,
-    contact_email: contactEmail,
-    opportunity_type: opportunityType,
-    role_title: roleTitle,
-    timeline,
-    commitment,
-    fit_reason: fitReason,
-    message,
-    status: "new",
-  });
+  const { data: inquiry, error: insertError } = await supabase
+    .from("talent_inquiries")
+    .insert({
+      talent_id: input.talentProfileId,
+      sender_id: user.id,
+      organization_name: organizationName,
+      contact_email: contactEmail,
+      opportunity_type: opportunityType,
+      role_title: roleTitle,
+      timeline,
+      commitment,
+      fit_reason: fitReason,
+      message,
+      status: "new",
+    })
+    .select("id")
+    .single();
 
   if (insertError) {
     return { ok: false, error: insertError.message };
   }
 
   const typeLabel = getOpportunityShortLabel(opportunityType);
-  await supabase.from("notifications").insert({
+  const { error: notificationError } = await supabase.from("notifications").insert({
     user_id: target.user_id,
     actor_id: user.id,
     type: "opportunity_inquiry",
     message: `${organizationName} sent you a ${typeLabel.toLowerCase()} inquiry for ${roleTitle}.`,
     link: "/dashboard#opportunity-interest",
   });
+  if (!notificationError) {
+    const emailResult = await sendUserEmail({
+      recipientId: target.user_id,
+      subject: `${organizationName} sent you an opportunity inquiry`,
+      preview: `${organizationName} sent you a ${typeLabel.toLowerCase()} inquiry for ${roleTitle}.`,
+      title: "New opportunity inquiry",
+      intro: `${organizationName} sent you a ${typeLabel.toLowerCase()} inquiry for ${roleTitle}. Review the inquiry from your dashboard and reply using ${contactEmail}.`,
+      ctaLabel: "Open dashboard",
+      ctaPath: "/dashboard#opportunity-interest",
+      idempotencyKey: `opportunity-inquiry:${inquiry?.id ?? input.talentProfileId}:${target.user_id}`,
+    });
+    logEmailResult(`opportunity_inquiry:${input.talentProfileId}:${target.user_id}`, emailResult);
+  }
 
   revalidatePath("/dashboard");
   return { ok: true };
