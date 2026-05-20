@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { usePathname, useRouter } from "next/navigation";
+import { toggleFollow } from "@/components/ui/followActions";
 
 interface FollowButtonProps {
   targetUserId: string;
@@ -18,6 +18,7 @@ export default function FollowButton({
   className = "",
 }: FollowButtonProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [following, setFollowing] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
 
@@ -29,21 +30,16 @@ export default function FollowButton({
     if (currentUserId === targetUserId) return;
 
     setLoading(true);
-    const supabase = createClient();
+    const result = await toggleFollow({
+      followingId: targetUserId,
+      follow: !following,
+      pathname,
+    });
 
-    if (following) {
-      await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", currentUserId)
-        .eq("following_id", targetUserId);
-      setFollowing(false);
+    if (result.error) {
+      console.error(result.error);
     } else {
-      await supabase.from("follows").insert({
-        follower_id: currentUserId,
-        following_id: targetUserId,
-      });
-      setFollowing(true);
+      setFollowing(result.following);
     }
 
     setLoading(false);

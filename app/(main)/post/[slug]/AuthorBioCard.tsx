@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { usePathname, useRouter } from "next/navigation";
 import UserAvatar from "@/components/ui/UserAvatar";
+import { toggleFollow } from "@/components/ui/followActions";
 
 interface Author {
   id: string;
@@ -39,28 +39,26 @@ export default function AuthorBioCard({
   coAuthors = [],
 }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const [following, setFollowing] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
 
-  const toggleFollow = async () => {
+  const handleFollow = async () => {
     if (!userId) {
       router.push("/login");
       return;
     }
     setLoading(true);
-    const supabase = createClient();
-    if (following) {
-      await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", userId)
-        .eq("following_id", author.id);
-      setFollowing(false);
+    const result = await toggleFollow({
+      followingId: author.id,
+      follow: !following,
+      pathname,
+    });
+
+    if (result.error) {
+      console.error(result.error);
     } else {
-      await supabase
-        .from("follows")
-        .insert([{ follower_id: userId, following_id: author.id }]);
-      setFollowing(true);
+      setFollowing(result.following);
     }
     setLoading(false);
   };
@@ -95,7 +93,7 @@ export default function AuthorBioCard({
           </div>
           {!isOwnProfile ? (
             <button
-              onClick={toggleFollow}
+              onClick={handleFollow}
               disabled={loading}
               className={`min-h-10 flex-shrink-0 rounded-lg px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50 sm:min-h-9 sm:py-1.5 ${
                 following

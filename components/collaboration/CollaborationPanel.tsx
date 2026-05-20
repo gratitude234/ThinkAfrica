@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { findOrCreateConversation } from "@/lib/messaging";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { toggleFollow } from "@/components/ui/followActions";
 import type { CollaborationSummary } from "@/lib/collaboration";
 
 export default function CollaborationPanel({
@@ -16,6 +17,7 @@ export default function CollaborationPanel({
   authorName: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [following, setFollowing] = useState(summary.isFollowingAuthor);
   const [followLoading, setFollowLoading] = useState(false);
   const [messageLoading, setMessageLoading] = useState(false);
@@ -52,25 +54,26 @@ export default function CollaborationPanel({
     if (!summary.canFollow || followLoading) return;
 
     setFollowLoading(true);
-    const supabase = createClient();
-    if (following) {
-      await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", summary.viewerId)
-        .eq("following_id", summary.authorId);
-    } else {
-      await supabase.from("follows").insert({
-        follower_id: summary.viewerId,
-        following_id: summary.authorId,
-      });
+    const result = await toggleFollow({
+      followingId: summary.authorId,
+      follow: !following,
+      pathname,
+    });
+
+    if (result.error) {
+      console.error(result.error);
+      setFollowLoading(false);
+      return;
+    }
+
+    if (result.following) {
       trackActivationEvent({
         event: "writer_followed",
-        metadata: { followingId: summary.authorId },
+        metadata: { followerId: summary.viewerId, followingId: summary.authorId },
       });
     }
 
-    setFollowing((current) => !current);
+    setFollowing(result.following);
     setFollowLoading(false);
   };
 

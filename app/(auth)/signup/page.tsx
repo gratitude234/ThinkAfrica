@@ -12,6 +12,7 @@ import {
 import { formatAuthError } from "../authMessages";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { createClient } from "@/lib/supabase/client";
+import { sendWelcomeEmail } from "../accountEmailActions";
 
 const PROOF_ITEMS = [
   "Claim a trusted student byline",
@@ -24,6 +25,16 @@ function getPasswordHint(password: string) {
   if (password.length < 6) return "Add a few more characters.";
   if (password.length < 10) return "Good start. Longer passwords are stronger.";
   return "Strong enough to create your account.";
+}
+
+function getAuthRedirectUrl(path: string) {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl =
+    configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
+      ? configuredUrl
+      : "https://www.thinkafrica.africa";
+
+  return `${appUrl.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export default function SignupPage() {
@@ -49,12 +60,15 @@ export default function SignupPage() {
     setError(null);
 
     const supabase = createClient();
+    const normalizedEmail = form.email.trim();
+    const fullName = form.fullName.trim();
     const { error: signUpError } = await supabase.auth.signUp({
-      email: form.email.trim(),
+      email: normalizedEmail,
       password: form.password,
       options: {
+        emailRedirectTo: getAuthRedirectUrl("/onboarding"),
         data: {
-          full_name: form.fullName.trim(),
+          full_name: fullName,
         },
       },
     });
@@ -66,6 +80,7 @@ export default function SignupPage() {
     }
 
     trackActivationEvent({ event: "signup_completed" });
+    void sendWelcomeEmail({ email: normalizedEmail, fullName });
     router.push("/onboarding");
     router.refresh();
   };

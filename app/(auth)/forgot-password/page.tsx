@@ -17,6 +17,16 @@ const PROOF_ITEMS = [
   "Keep drafts and activity intact",
 ];
 
+function getResetRedirectUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl =
+    configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
+      ? configuredUrl
+      : "https://www.thinkafrica.africa";
+
+  return `${appUrl.replace(/\/+$/, "")}/reset-password`;
+}
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,7 +39,7 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/reset-password`;
+    const redirectTo = getResetRedirectUrl();
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       email.trim(),
       { redirectTo }

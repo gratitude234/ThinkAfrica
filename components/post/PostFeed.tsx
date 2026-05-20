@@ -1,5 +1,6 @@
 import Link from "next/link";
-import PostCard, { PostCardData } from "./PostCard";
+import { PostCardData } from "./PostCard";
+import PostCardImpression from "./PostCardImpression";
 import DebateInterlude, { type DebateInterludeData } from "./DebateInterlude";
 import PeopleInterlude from "./PeopleInterlude";
 import TopicInterlude from "./TopicInterlude";
@@ -90,7 +91,7 @@ export default function PostFeed({
 
           {posts.map((post, index) => (
             <div key={post.id}>
-              <PostCard post={post} variant="standard" />
+              <PostCardImpression post={post} variant="standard" currentUserId={currentUserId} />
 
               {canShowDebateInterlude &&
               (index + 1) % 8 === 0 &&

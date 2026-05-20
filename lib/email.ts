@@ -7,7 +7,9 @@ export type NotificationPreferenceKey =
   | "email_comments"
   | "email_follows"
   | "email_published"
-  | "email_digest";
+  | "email_digest"
+  | "email_account_security"
+  | "email_profile_reminders";
 
 export type EmailSendResult =
   | { ok: true; id: string | null }
@@ -41,6 +43,10 @@ type UserEmailInput = {
   ctaPath: string;
   idempotencyKey: string;
   preferenceKey?: NotificationPreferenceKey;
+};
+
+type DirectEmailInput = Omit<UserEmailInput, "recipientId" | "preferenceKey"> & {
+  to: string;
 };
 
 let resendClient: Resend | null = null;
@@ -270,6 +276,41 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
           : "Unable to prepare recipient email.",
     };
   }
+}
+
+export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSendResult> {
+  const normalizedEmail = input.to.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { skipped: true, reason: "invalid_email_address" };
+  }
+
+  const ctaHref = absoluteUrl(input.ctaPath);
+  const html = renderEmailShell({
+    preview: input.preview,
+    title: input.title,
+    intro: input.intro,
+    bodyHtml: input.bodyHtml,
+    ctaLabel: input.ctaLabel,
+    ctaHref,
+  });
+  const text = [
+    input.title,
+    "",
+    input.intro,
+    ...(input.bodyTextLines ?? []),
+    "",
+    `${input.ctaLabel}: ${ctaHref}`,
+    "",
+    "Manage email preferences in ThinkAfrica notification settings.",
+  ].join("\n");
+
+  return sendEmail({
+    to: normalizedEmail,
+    subject: input.subject,
+    html,
+    text,
+    idempotencyKey: input.idempotencyKey,
+  });
 }
 
 export function logEmailResult(context: string, result: EmailSendResult) {

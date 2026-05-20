@@ -25,9 +25,6 @@ export default function ContactInquiryModal({
     contact_email: "",
     opportunity_type: "",
     role_title: "",
-    timeline: "",
-    commitment: "",
-    fit_reason: "",
     message: "",
   });
   const [sending, setSending] = useState(false);
@@ -52,23 +49,8 @@ export default function ContactInquiryModal({
     setError(null);
 
     const message = inquiry.message.trim();
-    const fitReason = inquiry.fit_reason.trim();
-    const timeline = inquiry.timeline.trim();
-    const commitment = inquiry.commitment.trim();
-    if (!timeline) {
-      setError("Add the expected timeline so the student can judge timing.");
-      return;
-    }
-    if (!commitment) {
-      setError("Add the expected commitment so the student can judge fit.");
-      return;
-    }
-    if (fitReason.length < 30) {
-      setError("Explain why this specific student is a fit.");
-      return;
-    }
-    if (message.length < 40) {
-      setError("Add a substantive message so the student can evaluate the opportunity.");
+    if (message.length < 20) {
+      setError("Add a brief message describing the opportunity and why you're reaching out.");
       return;
     }
 
@@ -80,9 +62,9 @@ export default function ContactInquiryModal({
       contactEmail: inquiry.contact_email,
       opportunityType: inquiry.opportunity_type,
       roleTitle: inquiry.role_title,
-      timeline,
-      commitment,
-      fitReason,
+      timeline: "",
+      commitment: "",
+      fitReason: message,
       message,
     });
 
@@ -99,7 +81,7 @@ export default function ContactInquiryModal({
         talentProfileId,
         source,
         opportunityType: inquiry.opportunity_type || null,
-        fitReasonLength: fitReason.length,
+        fitReasonLength: message.length,
         messageLength: message.length,
       },
     });
@@ -110,9 +92,6 @@ export default function ContactInquiryModal({
       contact_email: "",
       opportunity_type: "",
       role_title: "",
-      timeline: "",
-      commitment: "",
-      fit_reason: "",
       message: "",
     });
     onSent?.();
@@ -167,157 +146,95 @@ export default function ContactInquiryModal({
         )}
 
         {!sent ? (
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Organization *
-            </label>
-            <input
-              required
-              type="text"
-              value={inquiry.organization_name}
-              onChange={(event) =>
-                setInquiry((current) => ({
-                  ...current,
-                  organization_name: event.target.value,
-                }))
-              }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Reply email *
-            </label>
-            <input
-              required
-              type="email"
-              value={inquiry.contact_email}
-              onChange={(event) =>
-                setInquiry((current) => ({
-                  ...current,
-                  contact_email: event.target.value,
-                }))
-              }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-            />
-          </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Role or opportunity *
-            </label>
-            <input
-              required
-              type="text"
-              value={inquiry.role_title}
-              onChange={(event) =>
-                setInquiry((current) => ({
-                  ...current,
-                  role_title: event.target.value,
-                }))
-              }
-              placeholder="Research assistant, policy internship, fellowship..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Opportunity type *
-            </label>
-            <select
-              required
-              value={inquiry.opportunity_type}
-              onChange={(event) =>
-                setInquiry((current) => ({
-                  ...current,
-                  opportunity_type: event.target.value,
-                }))
-              }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-            >
-              <option value="">Select a type</option>
-              {OPPORTUNITY_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {OPPORTUNITY_LABELS[type]}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Organization *
+              </label>
+              <input
+                required
+                type="text"
+                value={inquiry.organization_name}
+                onChange={(event) =>
+                  setInquiry((current) => ({
+                    ...current,
+                    organization_name: event.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Reply email *
+              </label>
+              <input
+                required
+                type="email"
+                value={inquiry.contact_email}
+                onChange={(event) =>
+                  setInquiry((current) => ({
+                    ...current,
+                    contact_email: event.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+              />
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Timeline *
-            </label>
-            <input
-              required
-              type="text"
-              value={inquiry.timeline}
-              onChange={(event) =>
-                setInquiry((current) => ({
-                  ...current,
-                  timeline: event.target.value,
-                }))
-              }
-              placeholder="June-August 2026, rolling start..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-            />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Role or opportunity *
+              </label>
+              <input
+                required
+                type="text"
+                value={inquiry.role_title}
+                onChange={(event) =>
+                  setInquiry((current) => ({
+                    ...current,
+                    role_title: event.target.value,
+                  }))
+                }
+                placeholder="Research assistant, fellowship..."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Type *
+              </label>
+              <select
+                required
+                value={inquiry.opportunity_type}
+                onChange={(event) =>
+                  setInquiry((current) => ({
+                    ...current,
+                    opportunity_type: event.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+              >
+                <option value="">Select a type</option>
+                {OPPORTUNITY_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {OPPORTUNITY_LABELS[type]}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Expected commitment *
-            </label>
-            <input
-              required
-              type="text"
-              value={inquiry.commitment}
-              onChange={(event) =>
-                setInquiry((current) => ({
-                  ...current,
-                  commitment: event.target.value,
-                }))
-              }
-              placeholder="5 hrs/week, full-time, remote..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-            />
-          </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Why this student fits *
+              Message *
             </label>
             <textarea
               required
-              rows={3}
-              value={inquiry.fit_reason}
-              onChange={(event) =>
-                setInquiry((current) => ({
-                  ...current,
-                  fit_reason: event.target.value,
-                }))
-              }
-              placeholder="Reference their field, skills, public work, or profile signals that match the opportunity."
-              className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              {inquiry.fit_reason.trim().length} / 30 characters minimum
-            </p>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Message or details *
-            </label>
-            <textarea
-              required
-              rows={4}
+              rows={5}
               value={inquiry.message}
               onChange={(event) =>
                 setInquiry((current) => ({
@@ -325,12 +242,9 @@ export default function ContactInquiryModal({
                   message: event.target.value,
                 }))
               }
-              placeholder="Explain the opportunity, timeline, expected commitment, and why their work stood out."
+              placeholder="Describe the opportunity, timeline, commitment expected, and why this student's work caught your attention."
               className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
             />
-            <p className="mt-1 text-xs text-gray-400">
-              {inquiry.message.trim().length} / 40 characters minimum
-            </p>
           </div>
 
           {error ? (

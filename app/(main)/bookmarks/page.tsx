@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import PostCard from "@/components/post/PostCard";
 import type { PostCardData } from "@/components/post/PostCard";
+import PostCardImpression from "@/components/post/PostCardImpression";
 import { createClient } from "@/lib/supabase/client";
 
 const POST_TYPE_FILTERS = [
@@ -47,11 +47,13 @@ export default function BookmarksPage() {
   const [allPosts, setAllPosts] = useState<PostCardData[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
 
     supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) setCurrentUserId(user.id);
       if (!user) {
         window.location.href = "/login?redirectTo=/bookmarks";
         return;
@@ -174,7 +176,7 @@ export default function BookmarksPage() {
           ) : (
             <div className="space-y-4">
               {filtered.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCardImpression key={post.id} post={post} currentUserId={currentUserId} />
               ))}
             </div>
           )}

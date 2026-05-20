@@ -69,6 +69,8 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     email_follows: true,
     email_published: true,
     email_digest: true,
+    email_account_security: true,
+    email_profile_reminders: true,
     ...((profile.notification_prefs as Partial<NotificationPrefs>) ?? {}),
   };
 

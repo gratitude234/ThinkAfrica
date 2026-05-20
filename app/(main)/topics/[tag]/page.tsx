@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import PostCard from "@/components/post/PostCard";
+import PostCardImpression from "@/components/post/PostCardImpression";
 import Link from "next/link";
 import { getCountsByPostId } from "@/lib/feedData";
 import {
@@ -167,8 +167,9 @@ export default async function TopicPage({ params }: PageProps) {
             </div>
           ) : (
             posts.map((post) => (
-              <PostCard
+              <PostCardImpression
                 key={post.id}
+                currentUserId={null}
                 post={{
                   id: post.id,
                   title: post.title,

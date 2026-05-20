@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createAdminActionClient } from "@/lib/adminAccess";
 import { AdminAccessError, createAdminClient } from "@/lib/supabase/admin";
 import AnalyticsCharts from "./AnalyticsCharts";
+import ProfileReminderButton from "./ProfileReminderButton";
 import { getActionInboxSummary } from "@/lib/actionInbox";
 import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
 import { getOpportunityShortLabel } from "@/lib/opportunities";
@@ -924,11 +925,14 @@ export default async function AdminAnalyticsPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Activation, retention, and platform health.
-        </p>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Activation, retention, and platform health.
+          </p>
+        </div>
+        <ProfileReminderButton />
       </div>
 
       <div className="mb-10">

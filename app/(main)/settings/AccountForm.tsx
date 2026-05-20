@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
+import { sendPasswordChangedEmail } from "@/app/(auth)/accountEmailActions";
 
 const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
@@ -52,6 +53,7 @@ export default function AccountForm({ email }: { email: string }) {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
+    void sendPasswordChangedEmail();
     setToast("Password updated successfully.");
   };
 

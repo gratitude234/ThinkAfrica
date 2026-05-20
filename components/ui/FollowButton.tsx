@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { usePathname } from "next/navigation";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { toggleFollow } from "@/components/ui/followActions";
 
 interface Props {
   followerId: string;
@@ -19,28 +20,27 @@ export default function FollowButton({
 }: Props) {
   const [following, setFollowing] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
+  const pathname = usePathname();
 
   const handleToggle = async () => {
     setLoading(true);
-    const supabase = createClient();
+    const result = await toggleFollow({
+      followingId,
+      follow: !following,
+      pathname,
+    });
 
-    if (following) {
-      await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", followerId)
-        .eq("following_id", followingId);
-    } else {
-      await supabase
-        .from("follows")
-        .insert({ follower_id: followerId, following_id: followingId });
+    if (result.error) {
+      console.error(result.error);
+      setLoading(false);
+      return;
     }
 
-    const nextFollowing = !following;
+    const nextFollowing = result.following;
     if (nextFollowing) {
       trackActivationEvent({
         event: "writer_followed",
-        metadata: { followingId },
+        metadata: { followerId, followingId },
       });
     }
 

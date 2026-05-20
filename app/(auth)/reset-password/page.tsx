@@ -11,6 +11,7 @@ import {
 } from "../AuthShell";
 import { formatAuthError } from "../authMessages";
 import { createClient } from "@/lib/supabase/client";
+import { sendPasswordChangedEmail } from "../accountEmailActions";
 
 const PROOF_ITEMS = [
   "Choose a fresh password",
@@ -60,6 +61,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    void sendPasswordChangedEmail();
     router.push("/login?reset=1");
     router.refresh();
   };

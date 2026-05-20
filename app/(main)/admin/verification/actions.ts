@@ -4,6 +4,7 @@ import {
   createAdminActionClient,
   recordAdminAuditEvent,
 } from "@/lib/adminAccess";
+import { logEmailResult, sendUserEmail } from "@/lib/email";
 import type { AppRole, VerificationType } from "@/lib/types";
 
 function normalizeRole(
@@ -41,6 +42,12 @@ export async function updateVerificationStatus(input: {
     : "student";
 
   const { admin, context } = actionClient;
+  const { data: previousProfile } = await admin
+    .from("profiles")
+    .select("verified, verified_type, role")
+    .eq("id", input.userId)
+    .maybeSingle();
+
   const { error } = await admin
     .from("profiles")
     .update({
@@ -51,6 +58,66 @@ export async function updateVerificationStatus(input: {
     .eq("id", input.userId);
 
   if (!error) {
+    if (previousProfile && previousProfile.verified !== input.verified) {
+      const result = await sendUserEmail({
+        recipientId: input.userId,
+        subject: input.verified
+          ? "Your ThinkAfrica profile has been verified"
+          : "Your ThinkAfrica verification status changed",
+        preview: input.verified
+          ? "Your ThinkAfrica profile is now verified."
+          : "Your ThinkAfrica verification status was updated.",
+        title: input.verified ? "Profile verified" : "Verification status updated",
+        intro: input.verified
+          ? `Your ThinkAfrica profile has been verified${
+              nextVerifiedType ? ` as ${nextVerifiedType}` : ""
+            }. This trust signal now appears on your public profile and byline.`
+          : "Your ThinkAfrica profile verification was revoked or changed. Review your profile details if you need to update your academic identity.",
+        ctaLabel: "Open profile settings",
+        ctaPath: "/settings?tab=profile",
+        preferenceKey: "email_account_security",
+        idempotencyKey: `verification-status:${input.userId}:${input.verified}:${nextVerifiedType ?? "none"}`,
+      });
+      logEmailResult(`verification_status:${input.userId}`, result);
+    } else if (previousProfile?.verified_type !== nextVerifiedType && input.verified) {
+      const result = await sendUserEmail({
+        recipientId: input.userId,
+        subject: "Your ThinkAfrica verification type changed",
+        preview: "Your ThinkAfrica verification type was updated.",
+        title: "Verification type updated",
+        intro: `Your ThinkAfrica verification type is now ${nextVerifiedType ?? "updated"}.`,
+        ctaLabel: "Open profile settings",
+        ctaPath: "/settings?tab=profile",
+        preferenceKey: "email_account_security",
+        idempotencyKey: `verification-type:${input.userId}:${nextVerifiedType ?? "none"}`,
+      });
+      logEmailResult(`verification_type:${input.userId}`, result);
+    }
+
+    if (previousProfile && previousProfile.role !== nextRole) {
+      const roleCtaPath =
+        nextRole === "admin" ? "/admin" : nextRole === "editor" || nextRole === "reviewer" ? "/review" : "/settings?tab=profile";
+      const result = await sendUserEmail({
+        recipientId: input.userId,
+        subject: "Your ThinkAfrica account role changed",
+        preview: `Your ThinkAfrica role is now ${nextRole}.`,
+        title: "Account role updated",
+        intro: `Your ThinkAfrica account role changed from ${
+          previousProfile?.role ?? "student"
+        } to ${nextRole}.`,
+        ctaLabel:
+          nextRole === "admin"
+            ? "Open admin"
+            : nextRole === "editor" || nextRole === "reviewer"
+              ? "Open reviews"
+              : "Open profile settings",
+        ctaPath: roleCtaPath,
+        preferenceKey: "email_account_security",
+        idempotencyKey: `role-change:${input.userId}:${previousProfile?.role ?? "none"}:${nextRole}`,
+      });
+      logEmailResult(`role_change:${input.userId}`, result);
+    }
+
     await recordAdminAuditEvent({
       admin,
       context,

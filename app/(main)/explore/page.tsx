@@ -8,7 +8,8 @@ import {
   type DiscoverPerson,
   type DiscoverTab,
 } from "@/lib/discoverData";
-import PostCard, { type PostCardData } from "@/components/post/PostCard";
+import { type PostCardData } from "@/components/post/PostCard";
+import PostCardImpression from "@/components/post/PostCardImpression";
 import UserAvatar from "@/components/ui/UserAvatar";
 import FollowButton from "@/components/ui/FollowButton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
@@ -192,7 +193,7 @@ function PostList({
   return (
     <div>
       {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
+        <PostCardImpression key={post.id} post={post} currentUserId={null} />
       ))}
     </div>
   );

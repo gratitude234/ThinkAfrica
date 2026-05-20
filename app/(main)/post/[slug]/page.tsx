@@ -2175,7 +2175,7 @@ export default async function PostPage({ params }: PageProps) {
               />
             </Suspense>
             <ReadingProgressBar />
-            <ViewTracker slug={slug} />
+            <ViewTracker slug={slug} authorId={post.author_id} userId={user?.id ?? null} />
           </>
         ) : null}
 
@@ -2368,7 +2368,7 @@ export default async function PostPage({ params }: PageProps) {
             />
           </Suspense>
           <ReadingProgressBar />
-          <ViewTracker slug={slug} />
+          <ViewTracker slug={slug} authorId={post.author_id} userId={user?.id ?? null} />
         </>
       ) : null}
 

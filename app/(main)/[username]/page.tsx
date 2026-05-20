@@ -265,26 +265,30 @@ const CREDIBILITY_BADGE_CLASSES = {
 
 function CredibilityPanel({
   summary,
+  isOwnProfile,
 }: {
   summary: ProfileCredibilitySummary;
+  isOwnProfile: boolean;
 }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-            Why this profile is credible
+            Academic signal
           </p>
           <h2 className="font-display mt-1 text-lg font-semibold text-gray-900">
             {summary.strongestSignal ?? "Building academic signal"}
           </h2>
           <p className="mt-1 text-sm leading-6 text-gray-500">
-            Signals are based on public work, academic identity, verification, and portfolio readiness.
+            Based on public work, academic identity, verification, and portfolio readiness.
           </p>
         </div>
-        <span className="w-fit rounded-full bg-canvas px-3 py-1 text-xs font-semibold text-gray-600">
-          {summary.profileCompletionScore}% complete
-        </span>
+        {isOwnProfile ? (
+          <span className="w-fit rounded-full bg-canvas px-3 py-1 text-xs font-semibold text-gray-600">
+            {summary.profileCompletionScore}% complete
+          </span>
+        ) : null}
       </div>
 
       {summary.credibilityBadges.length > 0 ? (
@@ -773,7 +777,7 @@ export default async function UserProfilePage({ params }: PageProps) {
         }}
       />
 
-      <CredibilityPanel summary={credibilitySummary} />
+      <CredibilityPanel summary={credibilitySummary} isOwnProfile={isOwnProfile} />
 
       {isOwnProfile ? <ProfileCompletionPanel summary={credibilitySummary} /> : null}
 

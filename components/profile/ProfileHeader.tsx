@@ -86,6 +86,7 @@ export default function ProfileHeader({
 }: ProfileHeaderProps) {
   const router = useRouter();
   const [showInquiry, setShowInquiry] = useState(false);
+  const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const displayName = profile.full_name ?? profile.username;
   const affiliationBits = [
     profile.university,
@@ -129,12 +130,19 @@ export default function ProfileHeader({
           }`}
         >
           {profile.avatar_url ? (
-            <UserAvatar
-              name={displayName}
-              src={profile.avatar_url}
-              size={88}
-              className="-mt-11 border-4 border-white shadow-md md:-mt-12"
-            />
+            <button
+              type="button"
+              onClick={() => setShowAvatarLightbox(true)}
+              className="-mt-11 shrink-0 cursor-zoom-in rounded-full md:-mt-12"
+              aria-label="View full profile picture"
+            >
+              <UserAvatar
+                name={displayName}
+                src={profile.avatar_url}
+                size={88}
+                className="border-4 border-white shadow-md"
+              />
+            </button>
           ) : null}
 
           <div className="min-w-0 flex-1">
@@ -150,9 +158,25 @@ export default function ProfileHeader({
                 </span>
               ) : null}
               {isOpenToOpportunities ? (
-                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                  Open to opportunities
-                </span>
+                canContact && !isOwnProfile ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!currentUserId) { router.push("/login"); return; }
+                      setShowInquiry(true);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                  >
+                    Open to opportunities
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    Open to opportunities
+                  </span>
+                )
               ) : null}
               {profile.is_alumni && profile.graduation_year ? (
                 <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
@@ -195,7 +219,7 @@ export default function ProfileHeader({
             ) : null}
           </div>
 
-          <div className="flex w-full flex-col gap-3 md:w-auto md:min-w-[200px]">
+          <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[200px]">
             {isOwnProfile ? (
               <>
                 <Link
@@ -208,57 +232,42 @@ export default function ProfileHeader({
               </>
             ) : (
               <>
-                {isOpenToOpportunities && canContact ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!currentUserId) {
-                        router.push("/login");
-                        return;
-                      }
-                      setShowInquiry(true);
-                    }}
-                    className="inline-flex items-center justify-center rounded-xl bg-emerald-brand px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-                  >
-                    Contact about opportunities
-                  </button>
-                ) : null}
                 <FollowButton
                   targetUserId={profile.id}
                   currentUserId={currentUserId}
                   initialFollowing={initialFollowing}
                   className="mt-0"
                 />
-                {!isOwnProfile && currentUserId ? (
-                  messagingEligibility?.eligible ? (
-                    <MessageButton
-                      currentUserId={currentUserId}
-                      targetUserId={profile.id}
-                      reason={messagingEligibility.reason}
-                    />
-                  ) : (
-                    <div className="w-full rounded-lg border border-dashed border-gray-200 px-4 py-2 text-center text-xs text-gray-400">
-                      {messagingEligibility?.reason ??
-                        "Sign in to send a message"}
-                    </div>
-                  )
-                ) : null}
-                <ShareButton className="w-full" />
+                <div className="flex gap-2">
+                  {currentUserId ? (
+                    messagingEligibility?.eligible ? (
+                      <MessageButton
+                        currentUserId={currentUserId}
+                        targetUserId={profile.id}
+                        reason={messagingEligibility.reason}
+                        className="flex-1"
+                      />
+                    ) : (
+                      <div className="flex-1 rounded-lg border border-dashed border-gray-200 px-3 py-2 text-center text-xs text-gray-400">
+                        {messagingEligibility?.reason ?? "Messaging unavailable"}
+                      </div>
+                    )
+                  ) : null}
+                  <ShareButton className={currentUserId ? "flex-1" : "w-full"} />
+                </div>
               </>
             )}
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3 border-t border-gray-100 bg-white px-5 pb-5 pt-4 sm:px-6 md:px-7">
+        <div className="flex divide-x divide-gray-100 overflow-x-auto border-t border-gray-100 bg-white px-2 pb-4 pt-3 sm:px-4">
           {statsItems.map((item) => (
             <div
               key={item.label}
-              className="min-w-[80px] flex-1 rounded-lg bg-canvas px-3 py-3 text-left"
+              className="flex min-w-[72px] flex-1 flex-col items-center px-3 py-1.5"
             >
-              <div className="text-lg font-semibold text-ink">
-                {formatStat(item.value)}
-              </div>
-              <div className="mt-0.5 text-xs text-ink-muted">{item.label}</div>
+              <span className="text-base font-semibold text-ink">{formatStat(item.value)}</span>
+              <span className="mt-0.5 text-[11px] text-ink-muted">{item.label}</span>
             </div>
           ))}
         </div>
@@ -272,6 +281,32 @@ export default function ProfileHeader({
           source="profile_header"
         />
       ) : null}
+
+      {showAvatarLightbox && profile.avatar_url ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setShowAvatarLightbox(false)}
+        >
+          <div className="relative max-h-[90vw] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={profile.avatar_url}
+              alt={displayName}
+              className="max-h-[85vh] max-w-[85vw] rounded-xl object-contain shadow-2xl"
+            />
+            <button
+              type="button"
+              onClick={() => setShowAvatarLightbox(false)}
+              className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100"
+              aria-label="Close"
+            >
+              <svg className="h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -280,10 +315,12 @@ function MessageButton({
   currentUserId,
   targetUserId,
   reason,
+  className = "",
 }: {
   currentUserId: string;
   targetUserId: string;
   reason: string | null;
+  className?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -318,7 +355,7 @@ function MessageButton({
   };
 
   return (
-    <div className="w-full">
+    <div className={className}>
       {reason ? (
         <p className="mb-1 text-center text-[10px] text-gray-400">{reason}</p>
       ) : null}

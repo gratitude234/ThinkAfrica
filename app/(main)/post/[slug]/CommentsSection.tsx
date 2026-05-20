@@ -10,9 +10,10 @@ import ProfileGate from "@/components/ui/ProfileGate";
 import { formatRelativeTime } from "@/lib/utils";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
+import { submitComment } from "../commentActions";
 
 interface CommentAuthor {
-  username: string;
+  username: string | null;
   full_name: string | null;
   avatar_url: string | null;
 }
@@ -194,31 +195,21 @@ export default function CommentsSection({
     }
     setError(null);
 
-    const supabase = createClient();
-    const { data, error: insertError } = await supabase
-      .from("comments")
-      .insert({
-        post_id: postId,
-        author_id: userProfileId,
-        content: content.trim(),
-        parent_id: parentId,
-      })
-      .select(
-        "id, content, created_at, upvotes, parent_id, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
-      )
-      .single();
+    const result = await submitComment({
+      postId,
+      content,
+      parentId,
+    });
 
-    if (insertError) {
+    if (result.error) {
       if (parentId) {
-        setToastMessage(insertError.message);
+        setToastMessage(result.error);
       } else {
-        setError(insertError.message);
+        setError(result.error);
       }
-    } else if (data) {
+    } else if (result.comment) {
       const commentData = {
-        ...data,
-        upvotes: data.upvotes ?? 0,
-        profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles,
+        ...result.comment,
         userVoted: false,
       };
 
@@ -287,7 +278,7 @@ export default function CommentsSection({
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={comment.profiles.avatar_url}
-          alt={comment.profiles.full_name ?? comment.profiles.username}
+          alt={comment.profiles.full_name ?? comment.profiles.username ?? "Comment author"}
           className="mt-0.5 h-8 w-8 flex-shrink-0 rounded-full object-cover"
         />
       ) : (
