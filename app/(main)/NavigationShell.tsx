@@ -11,6 +11,7 @@ interface NavigationShellProps {
   profile: {
     username: string;
     full_name: string | null;
+    avatar_url?: string | null;
     points?: number;
     role?: "student" | "reviewer" | "editor" | "admin";
   } | null;

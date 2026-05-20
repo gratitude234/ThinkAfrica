@@ -20,9 +20,27 @@ export function getVoteSplit(forCount = 0, againstCount = 0) {
 
   return {
     total,
+    forCount,
+    againstCount,
     forPct,
     againstPct: 100 - forPct,
   };
+}
+
+export function LiveDot({ size = 8 }: { size?: number }) {
+  return (
+    <span
+      className="animate-pulse"
+      style={{
+        display: "inline-block",
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: "#F59E0B",
+        flexShrink: 0,
+      }}
+    />
+  );
 }
 
 export function DebateStatusPill({
@@ -34,8 +52,9 @@ export function DebateStatusPill({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[status]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[status]} ${className}`}
     >
+      {status === "active" && <LiveDot size={7} />}
       {getStatusLabel(status)}
     </span>
   );
@@ -62,11 +81,13 @@ export function StanceMeter({
   againstCount,
   label = "Community vote",
   compact = false,
+  againstColor = "#7C3AED",
 }: {
   forCount?: number | null;
   againstCount?: number | null;
   label?: string;
   compact?: boolean;
+  againstColor?: string;
 }) {
   const split = getVoteSplit(forCount ?? 0, againstCount ?? 0);
 
@@ -82,13 +103,13 @@ export function StanceMeter({
           style={{ width: `${split.forPct}%` }}
         />
         <span
-          className="h-full bg-amber-500 transition-[width] duration-500"
-          style={{ width: `${split.againstPct}%` }}
+          className="h-full transition-[width] duration-500"
+          style={{ width: `${split.againstPct}%`, background: againstColor }}
         />
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-xs font-semibold">
         <span className="text-emerald-700">For {split.forPct}%</span>
-        <span className="text-amber-700">Against {split.againstPct}%</span>
+        <span style={{ color: againstColor }}>Against {split.againstPct}%</span>
       </div>
     </div>
   );
@@ -123,7 +144,7 @@ export function PhaseStepper({
                 } ${current ? "ring-4 ring-emerald-100" : ""}`}
                 title={PHASE_LABELS[phase]}
               >
-                {index + 1}
+                {index < currentIndex && !isOpen ? "✓" : index + 1}
               </span>
               {index < phases.length - 1 ? (
                 <span
@@ -153,10 +174,12 @@ export function StatTile({
   label,
   value,
   tone = "neutral",
+  pulse = false,
 }: {
   label: string;
   value: string | number;
   tone?: "neutral" | "emerald" | "amber";
+  pulse?: boolean;
 }) {
   const toneClass =
     tone === "emerald"
@@ -167,7 +190,10 @@ export function StatTile({
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white px-3 py-3">
-      <p className={`text-lg font-bold leading-none ${toneClass}`}>{value}</p>
+      <div className="flex items-center gap-2">
+        {pulse && <LiveDot size={8} />}
+        <p className={`text-lg font-bold leading-none ${toneClass}`}>{value}</p>
+      </div>
       <p className="mt-1 text-[11px] font-medium text-gray-500">{label}</p>
     </div>
   );

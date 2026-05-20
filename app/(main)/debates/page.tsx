@@ -5,9 +5,10 @@ import {
   formatRelativeTime,
   formatTimeUntil,
 } from "@/lib/utils";
-import { type DebatePhase } from "@/lib/debatePhases";
+import { type DebatePhase, PHASE_LABELS } from "@/lib/debatePhases";
 import {
   DebateStatusPill,
+  LiveDot,
   PhasePill,
   StanceMeter,
   StatTile,
@@ -135,6 +136,136 @@ function EmptyDebates({
   );
 }
 
+function LiveHeroCard({ debate }: { debate: DebateRow }) {
+  const split = getVoteSplit(debate);
+  const argCount = getArgumentCount(debate.debate_arguments);
+  const phase = debate.current_phase ?? "opening";
+  const moderator = getProfile(debate.profiles);
+
+  return (
+    <Link
+      href={`/debates/${debate.id}`}
+      className="group block overflow-hidden rounded-2xl transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl"
+      style={{ background: "#111827" }}
+    >
+      <div className="p-6 sm:p-7">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <LiveDot size={8} />
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-400">
+              Live Debate
+            </span>
+          </div>
+          {debate.ends_at ? (
+            <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.4)" }}>
+              {formatTimeUntil(debate.ends_at)}
+            </span>
+          ) : null}
+        </div>
+
+        <h2 className="font-display mb-3 text-xl font-bold leading-snug text-white sm:text-[22px]">
+          {debate.title}
+        </h2>
+        {debate.description ? (
+          <p className="mb-5 line-clamp-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.55)" }}>
+            {debate.description}
+          </p>
+        ) : null}
+
+        <div className="mb-5 grid grid-cols-2 gap-2.5">
+          <div
+            className="rounded-xl px-4 py-3 text-center"
+            style={{
+              background: "rgba(16,185,129,0.1)",
+              border: "1px solid rgba(16,185,129,0.22)",
+            }}
+          >
+            <p
+              className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+              style={{ color: "#10B981" }}
+            >
+              For
+            </p>
+            <p className="text-3xl font-bold leading-none text-white">{split.forPct}%</p>
+            <p className="mt-1 text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+              {split.forCount.toLocaleString()} votes
+            </p>
+          </div>
+          <div
+            className="rounded-xl px-4 py-3 text-center"
+            style={{
+              background: "rgba(124,58,237,0.1)",
+              border: "1px solid rgba(124,58,237,0.25)",
+            }}
+          >
+            <p
+              className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+              style={{ color: "#A78BFA" }}
+            >
+              Against
+            </p>
+            <p className="text-3xl font-bold leading-none text-white">{split.againstPct}%</p>
+            <p className="mt-1 text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+              {split.againstCount.toLocaleString()} votes
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="mb-5 h-1 overflow-hidden rounded-full"
+          style={{ background: "rgba(255,255,255,0.08)" }}
+        >
+          <div
+            className="h-full bg-emerald-brand transition-[width] duration-500"
+            style={{ width: `${split.forPct}%` }}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {debate.tags && debate.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {debate.tags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full px-2.5 py-1 text-[11px]"
+                  style={{
+                    color: "rgba(255,255,255,0.4)",
+                    background: "rgba(255,255,255,0.06)",
+                  }}
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <span className="text-sm font-bold text-emerald-400 transition-colors group-hover:text-emerald-300">
+            Enter room →
+          </span>
+        </div>
+      </div>
+
+      <div
+        className="flex flex-wrap gap-x-4 gap-y-1 px-6 py-3 text-xs font-medium sm:px-7"
+        style={{
+          background: "rgba(255,255,255,0.04)",
+          borderTop: "1px solid rgba(255,255,255,0.07)",
+          color: "rgba(255,255,255,0.35)",
+        }}
+      >
+        <span>{argCount} {argCount === 1 ? "argument" : "arguments"}</span>
+        <span>·</span>
+        <span>{PHASE_LABELS[phase]}</span>
+        {moderator ? (
+          <>
+            <span>·</span>
+            <span>Moderated by {moderator.full_name ?? moderator.username}</span>
+          </>
+        ) : null}
+      </div>
+    </Link>
+  );
+}
+
 function DebateCard({ debate }: { debate: DebateRow }) {
   const status = debate.status;
   const argCount = getArgumentCount(debate.debate_arguments);
@@ -193,7 +324,7 @@ function DebateCard({ debate }: { debate: DebateRow }) {
           ) : null}
         </div>
 
-        <div className="w-full shrink-0 rounded-xl border border-gray-100 bg-canvas p-3 sm:w-[230px]">
+        <div className="hidden w-full shrink-0 rounded-xl border border-gray-100 bg-canvas p-3 sm:block sm:w-[220px]">
           <StanceMeter
             forCount={split.forCount}
             againstCount={split.againstCount}
@@ -263,7 +394,10 @@ function FeaturedDebateHero({ debate }: { debate: DebateRow }) {
           <p className="text-xs font-bold">For</p>
           <p className="mt-1 text-2xl font-bold">{split.forPct}%</p>
         </div>
-        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-center text-amber-800">
+        <div
+          className="rounded-xl px-4 py-3 text-center"
+          style={{ background: "#EDE9FE", border: "1px solid #C4B5FD", color: "#5B21B6" }}
+        >
           <p className="text-xs font-bold">Against</p>
           <p className="mt-1 text-2xl font-bold">{split.againstPct}%</p>
         </div>
@@ -389,7 +523,8 @@ export default async function DebatesPage({ searchParams }: PageProps) {
             Debate room
           </p>
           <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-ink md:text-4xl">
-            Argue ideas in public, with structure
+            Argue the motion.
+            <br className="hidden sm:block" /> Move the debate.
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
             Pick a side, vote on the motion, and make the strongest case while
@@ -415,13 +550,11 @@ export default async function DebatesPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-3 gap-3 sm:grid-cols-4">
-        <StatTile label="Live rooms" value={counts.live} tone="amber" />
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatTile label="Live rooms" value={counts.live} tone="amber" pulse />
         <StatTile label="Open motions" value={counts.open} tone="emerald" />
         <StatTile label="Closed" value={counts.closed} />
-        <div className="hidden sm:block">
-          <StatTile label="Recaps" value={counts.recaps} />
-        </div>
+        <StatTile label="Recaps" value={counts.recaps} />
       </div>
 
       <div className="mb-6 overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -459,10 +592,14 @@ export default async function DebatesPage({ searchParams }: PageProps) {
       ) : debates.length === 0 ? (
         <EmptyDebates filter={filter} signedIn={Boolean(user)} />
       ) : (
-        <div className="space-y-4">
-          {debates.map((debate) => (
-            <DebateCard key={debate.id} debate={debate} />
-          ))}
+        <div className="space-y-3">
+          {debates.map((debate) =>
+            filter === "live" ? (
+              <LiveHeroCard key={debate.id} debate={debate} />
+            ) : (
+              <DebateCard key={debate.id} debate={debate} />
+            )
+          )}
         </div>
       )}
     </div>

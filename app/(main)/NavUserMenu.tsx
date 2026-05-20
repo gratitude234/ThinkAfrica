@@ -12,6 +12,7 @@ interface NavUserMenuProps {
   profile: {
     username: string;
     full_name: string | null;
+    avatar_url?: string | null;
     points?: number;
     role?: "student" | "reviewer" | "editor" | "admin";
   } | null;
@@ -107,11 +108,18 @@ export default function NavUserMenu({
         className="flex items-center gap-2 text-sm font-medium text-gray-700 transition-colors hover:text-emerald-brand"
         aria-label="Open account menu"
       >
-        <div
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[13px] font-semibold text-emerald-800"
-        >
-          {displayName.charAt(0).toUpperCase()}
-        </div>
+        {profile?.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={profile.avatar_url}
+            alt={displayName}
+            className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[13px] font-semibold text-emerald-800">
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+        )}
       </button>
 
       {open && (

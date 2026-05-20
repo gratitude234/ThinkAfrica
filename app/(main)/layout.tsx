@@ -23,7 +23,7 @@ export default async function MainLayout({
   const { data: profileData } = user
     ? await supabase
         .from("profiles")
-        .select("points, username, full_name, role")
+        .select("points, username, full_name, role, avatar_url")
         .eq("id", user.id)
         .single()
     : { data: null };

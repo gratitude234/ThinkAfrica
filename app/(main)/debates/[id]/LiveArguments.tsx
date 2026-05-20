@@ -133,13 +133,13 @@ function ArgumentCard({
     actualStance === "for"
       ? "border-l-4 border-l-emerald-500"
       : actualStance === "against"
-        ? "border-l-4 border-l-amber-500"
+        ? "border-l-4 border-l-violet-600"
         : "border-l-4 border-l-gray-200";
   const badgeClass =
     actualStance === "for"
       ? "bg-emerald-100 text-emerald-700"
       : actualStance === "against"
-        ? "bg-amber-100 text-amber-700"
+        ? "bg-violet-100 text-violet-700"
         : "bg-gray-100 text-gray-500";
   const badgeLabel =
     actualStance === "for"
@@ -162,7 +162,13 @@ function ArgumentCard({
               className="h-9 w-9 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${
+                actualStance === "against"
+                  ? "bg-violet-100 text-violet-700"
+                  : "bg-emerald-100 text-emerald-700"
+              }`}
+            >
               {getInitials(authorName)}
             </div>
           )}
@@ -365,6 +371,9 @@ export default function LiveArguments({
     (sum, argument) => sum + argument.upvotes,
     0
   );
+  const motionTotal = motionForCount + motionAgainstCount;
+  const motionForPct = motionTotal > 0 ? Math.round((motionForCount / motionTotal) * 100) : 50;
+  const motionAgainstPct = 100 - motionForPct;
   const isClosed = localDebateStatus === "closed";
   const isOpen = localDebateStatus === "open";
   const canSubmitArguments = localDebateStatus === "active";
@@ -461,7 +470,7 @@ export default function LiveArguments({
               onClick={() => setVisibleStance("against")}
               className={`rounded-lg px-3 py-2 text-sm font-semibold ${
                 visibleStance === "against"
-                  ? "bg-amber-50 text-amber-700"
+                  ? "bg-violet-50 text-violet-700"
                   : "text-gray-500"
               }`}
             >
@@ -471,8 +480,19 @@ export default function LiveArguments({
 
           <div className="grid gap-6 md:grid-cols-2">
             <div className={visibleStance === "for" ? "block" : "hidden md:block"}>
-              <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-emerald-700">
-                FOR - {sortedForArguments.length}
+              <div className="mb-3 flex items-center justify-between rounded-t-xl bg-emerald-500 px-4 py-2.5">
+                <span className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-white">
+                  For the motion
+                </span>
+                <span className="text-xs font-medium text-white/75">
+                  {filteredForArguments.length}
+                </span>
+              </div>
+              <div className="mb-3 border border-t-0 border-emerald-100 bg-emerald-50 px-4 py-2.5">
+                <div className="flex justify-between text-xs font-semibold text-emerald-700">
+                  <span>{motionForCount} votes</span>
+                  <span>{motionForPct}% support</span>
+                </div>
               </div>
 
               {filteredForArguments.length === 0 ? (
@@ -501,8 +521,28 @@ export default function LiveArguments({
                 visibleStance === "against" ? "block" : "hidden md:block"
               }
             >
-              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-amber-700">
-                AGAINST - {sortedAgainstArguments.length}
+              <div
+                className="mb-3 flex items-center justify-between rounded-t-xl px-4 py-2.5"
+                style={{ background: "#7C3AED" }}
+              >
+                <span className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-white">
+                  Against the motion
+                </span>
+                <span className="text-xs font-medium text-white/75">
+                  {filteredAgainstArguments.length}
+                </span>
+              </div>
+              <div
+                className="mb-3 border border-t-0 px-4 py-2.5"
+                style={{ background: "#EDE9FE", borderColor: "#C4B5FD" }}
+              >
+                <div
+                  className="flex justify-between text-xs font-semibold"
+                  style={{ color: "#7C3AED" }}
+                >
+                  <span>{motionAgainstCount} votes</span>
+                  <span>{motionAgainstPct}% support</span>
+                </div>
               </div>
 
               {filteredAgainstArguments.length === 0 ? (
