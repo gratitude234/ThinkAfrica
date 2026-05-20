@@ -52,10 +52,13 @@ function getResendClient() {
 }
 
 export function getAppUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://www.thinkafrica.africa").replace(
-    /\/+$/,
-    ""
-  );
+  const configuredUrl = process.env.EMAIL_APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  const emailUrl =
+    configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
+      ? configuredUrl
+      : "https://www.thinkafrica.africa";
+
+  return emailUrl.replace(/\/+$/, "");
 }
 
 export function absoluteUrl(path: string) {
