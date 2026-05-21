@@ -115,15 +115,16 @@ export default function ReadingBar({
       </div>
 
       {/* ── Desktop: slim vertical rail, sitting in the left margin beside the article ── */}
-      {/* Article is max-w-[760px] centered. Its left edge = 50vw - 380px.              */}
-      {/* Rail right edge target = article left - 20px = 50vw - 400px.                  */}
-      {/* Rail width ≈ 52px, so rail left = 50vw - 452px. Use 50vw - 460px for buffer.  */}
+      {/* Layout is max-w-[1200px] two-column (article + 272px sidebar).                */}
+      {/* Article left edge ≈ 50vw - 572px. Rail right = article left - 24px.           */}
+      {/* Rail width ≈ 52px → left = 50vw - 648px. Only show at xl (1280px+) where     */}
+      {/* there is room to the left of the layout without overlapping the sidebar.       */}
       <div
-        className="hidden lg:block"
+        className="hidden xl:block"
         style={{
           position: "fixed",
           top: "40%",
-          left: "calc(50vw - 460px)",
+          left: "calc(50vw - 640px)",
           transform: "translateY(-50%)",
           zIndex: 40,
         }}
