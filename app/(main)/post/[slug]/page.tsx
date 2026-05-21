@@ -2075,7 +2075,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 function getPostHeroMode(): "editorial" | "magazine" {
-  return "editorial";
+  return "magazine";
 }
 
 export default async function PostPage({ params }: PageProps) {

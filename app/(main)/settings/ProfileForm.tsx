@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
@@ -68,6 +69,7 @@ const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 export default function ProfileForm({ profile }: { profile: Profile }) {
+  const router = useRouter();
   const [fullName, setFullName] = useState(profile.full_name ?? "");
   const [username, setUsername] = useState(profile.username);
   const [bio, setBio] = useState(profile.bio ?? "");
@@ -267,6 +269,11 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
 
     setSecondaryProfileTypes(nextSecondaryProfileTypes);
     setToast("Profile saved successfully!");
+    if (username !== profile.username) {
+      router.push(`/${username}`);
+    } else {
+      router.refresh();
+    }
   };
 
   return (
