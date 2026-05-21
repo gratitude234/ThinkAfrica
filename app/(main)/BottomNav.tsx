@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CreateLauncher from "./CreateLauncher";
+import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 
 interface BottomNavProps {
   username: string | null;
@@ -28,7 +29,8 @@ export default function BottomNav({
   hasActiveDebate,
 }: BottomNavProps) {
   const pathname = usePathname();
-  if (pathname.startsWith("/post/") || pathname.startsWith("/write")) return null;
+  const isMessagesThread = /^\/messages\/.+/.test(pathname);
+  if (pathname.startsWith("/post/") || pathname.startsWith("/write") || isMessagesThread) return null;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -125,15 +127,15 @@ export default function BottomNav({
           </Link>
 
           <Link
-            href="/debates"
-            className={navLinkClass(isActive("/debates"))}
-            aria-current={isActive("/debates") ? "page" : undefined}
+            href="/messages"
+            className={navLinkClass(isActive("/messages"))}
+            aria-current={isActive("/messages") ? "page" : undefined}
           >
-            <span className={navPillClass(isActive("/debates"))}>
+            <span className={navPillClass(isActive("/messages"))}>
               <div className="relative">
                 <svg
                   className="h-[22px] w-[22px]"
-                  fill="none"
+                  fill={isActive("/messages") ? "currentColor" : "none"}
                   stroke="currentColor"
                   strokeWidth={2}
                   viewBox="0 0 24 24"
@@ -141,14 +143,14 @@ export default function BottomNav({
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M7 8h10M7 12h6m-8 7 3.5-3.5H18A2.5 2.5 0 0020.5 13V7A2.5 2.5 0 0018 4.5H6A2.5 2.5 0 003.5 7v6A2.5 2.5 0 006 15.5h1V19z"
+                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z"
                   />
                 </svg>
-                {hasActiveDebate ? (
-                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full border border-white bg-emerald-brand" />
+                {userId ? (
+                  <MessagesUnreadBadge userId={userId} className="-right-1.5 -top-1.5" />
                 ) : null}
               </div>
-              <span className="text-[11px] font-medium">Debates</span>
+              <span className="text-[11px] font-medium">Messages</span>
             </span>
           </Link>
 

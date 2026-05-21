@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import {
   getOpportunityShortLabel,
@@ -18,6 +19,30 @@ import OpportunityReadinessCard from "@/components/opportunities/OpportunityRead
 import SaveOpportunityButton from "@/components/opportunities/SaveOpportunityButton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import UserAvatar from "@/components/ui/UserAvatar";
+import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Student Opportunities, Profiles and Fellowships",
+  description:
+    "Find student opportunities, fellowships, open talent profiles, and African university writers ready for serious work.",
+  alternates: { canonical: canonicalPath("/opportunities") },
+  openGraph: {
+    title: "Student Opportunities, Profiles and Fellowships",
+    description:
+      "Find student opportunities, fellowships, open talent profiles, and African university writers ready for serious work.",
+    url: absoluteUrl("/opportunities"),
+    siteName: SITE_NAME,
+    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Student Opportunities, Profiles and Fellowships",
+    description:
+      "Find student opportunities, fellowships, open talent profiles, and African university writers ready for serious work.",
+    images: [absoluteUrl(DEFAULT_OG_IMAGE)],
+  },
+};
 
 interface PageProps {
   searchParams: Promise<{

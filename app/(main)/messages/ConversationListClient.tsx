@@ -8,6 +8,7 @@ import { formatRelativeTime } from "@/lib/utils";
 export interface ConversationRow {
   id: string;
   last_message_at: string;
+  userLastReadAt: string | null;
   last_message: {
     content: string;
     deleted_at: string | null;
@@ -25,9 +26,10 @@ export interface ConversationRow {
 
 interface Props {
   conversations: ConversationRow[];
+  currentUserId: string;
 }
 
-export default function ConversationListClient({ conversations }: Props) {
+export default function ConversationListClient({ conversations, currentUserId }: Props) {
   const [query, setQuery] = useState("");
 
   const filtered = conversations.filter((c) => {
@@ -96,6 +98,13 @@ export default function ConversationListClient({ conversations }: Props) {
                   (lastMessage.content.length > 80 ? "..." : "")
               : "No messages yet";
 
+            const isUnread =
+              !!lastMessage &&
+              !lastMessage.deleted_at &&
+              lastMessage.sender_id !== currentUserId &&
+              new Date(conversation.last_message_at).getTime() >
+                new Date(conversation.userLastReadAt ?? 0).getTime();
+
             return (
               <Link
                 key={conversation.id}
@@ -108,14 +117,21 @@ export default function ConversationListClient({ conversations }: Props) {
                   size={44}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900">
+                  <p className={`truncate text-sm ${isUnread ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>
                     {displayName}
                   </p>
-                  <p className="truncate text-xs text-gray-500">{preview}</p>
+                  <p className={`truncate text-xs ${isUnread ? "font-medium text-gray-700" : "text-gray-500"}`}>
+                    {preview}
+                  </p>
                 </div>
-                <p className="flex-shrink-0 text-xs text-gray-500">
-                  {formatRelativeTime(conversation.last_message_at)}
-                </p>
+                <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+                  <p className="text-xs text-gray-500">
+                    {formatRelativeTime(conversation.last_message_at)}
+                  </p>
+                  {isUnread ? (
+                    <span className="h-2 w-2 rounded-full bg-emerald-brand" />
+                  ) : null}
+                </div>
               </Link>
             );
           })}

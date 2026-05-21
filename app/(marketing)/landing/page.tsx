@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import type { Metadata } from "next";
 import Footer from "@/components/ui/Footer";
 import PostCover from "@/components/post/PostCover";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
@@ -7,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
+import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -38,6 +40,29 @@ type LandingData = {
 };
 
 export const revalidate = 300;
+
+export const metadata: Metadata = {
+  title: "African Student Essays, Research and Policy Ideas",
+  description:
+    "Read serious essays, research, policy briefs, and debates from African university students and emerging thinkers.",
+  alternates: { canonical: canonicalPath("/landing") },
+  openGraph: {
+    title: "ThinkAfrica - African Student Essays, Research and Policy Ideas",
+    description:
+      "Read serious essays, research, policy briefs, and debates from African university students and emerging thinkers.",
+    url: absoluteUrl("/landing"),
+    siteName: SITE_NAME,
+    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ThinkAfrica - African Student Essays, Research and Policy Ideas",
+    description:
+      "Read serious essays, research, policy briefs, and debates from African university students and emerging thinkers.",
+    images: [absoluteUrl(DEFAULT_OG_IMAGE)],
+  },
+};
 
 // ── Static data ──────────────────────────────────────────────────────
 

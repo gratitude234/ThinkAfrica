@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import {
   getDiscoverData,
@@ -16,8 +17,32 @@ import RetentionEventTracker from "@/components/retention/RetentionEventTracker"
 import DiscoverTrackedLink from "../discover/DiscoverTrackedLink";
 import DiscoverTopicsGrid from "../discover/DiscoverTopicsGrid";
 import { formatDate } from "@/lib/utils";
+import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
 
 export const revalidate = 60;
+
+export const metadata: Metadata = {
+  title: "Explore African Student Essays, Research and Ideas",
+  description:
+    "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on ThinkAfrica.",
+  alternates: { canonical: canonicalPath("/explore") },
+  openGraph: {
+    title: "Explore African Student Essays, Research and Ideas",
+    description:
+      "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on ThinkAfrica.",
+    url: absoluteUrl("/explore"),
+    siteName: SITE_NAME,
+    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Explore African Student Essays, Research and Ideas",
+    description:
+      "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on ThinkAfrica.",
+    images: [absoluteUrl(DEFAULT_OG_IMAGE)],
+  },
+};
 
 interface PageProps {
   searchParams: Promise<{

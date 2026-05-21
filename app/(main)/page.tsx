@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
@@ -13,8 +14,32 @@ import EditorPicksRow from "./EditorPicksRow";
 import FeaturedPostLead from "./FeaturedPostLead";
 import LatestResearchShelf, { type LatestResearchItem } from "./LatestResearchShelf";
 import PostsFeedSection from "./PostsFeedSection";
+import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl, canonicalPath } from "@/lib/site";
 
 export const revalidate = 60;
+
+export const metadata: Metadata = {
+  title: "African Student Essays, Research and Policy Ideas",
+  description:
+    "ThinkAfrica is an intellectual social network for African student essays, research, debates, and policy ideas.",
+  alternates: { canonical: canonicalPath("/") },
+  openGraph: {
+    title: "ThinkAfrica - Africa's Intellectual Social Network",
+    description:
+      "ThinkAfrica is an intellectual social network for African student essays, research, debates, and policy ideas.",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ThinkAfrica - Africa's Intellectual Social Network",
+    description:
+      "ThinkAfrica is an intellectual social network for African student essays, research, debates, and policy ideas.",
+    images: [absoluteUrl(DEFAULT_OG_IMAGE)],
+  },
+};
 
 interface PageProps {
   searchParams: Promise<{

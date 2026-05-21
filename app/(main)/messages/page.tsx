@@ -4,6 +4,7 @@ import ConversationListClient, { type ConversationRow } from "./ConversationList
 
 interface ParticipantRow {
   conversation_id: string;
+  last_read_at: string | null;
 }
 
 interface ConversationBaseRow {
@@ -43,11 +44,15 @@ export default async function MessagesPage() {
 
   const { data: participantRows } = await supabase
     .from("conversation_participants")
-    .select("conversation_id")
+    .select("conversation_id, last_read_at")
     .eq("user_id", user.id);
 
-  const conversationIds = ((participantRows ?? []) as ParticipantRow[]).map(
-    (row) => row.conversation_id
+  const rows = (participantRows ?? []) as ParticipantRow[];
+  const conversationIds = rows.map((row) => row.conversation_id);
+
+  // Map of conversationId -> user's last_read_at
+  const lastReadMap = new Map(
+    rows.map((row) => [row.conversation_id, row.last_read_at])
   );
 
   let conversations: ConversationRow[] = [];
@@ -91,6 +96,7 @@ export default async function MessagesPage() {
             ...conversation,
             last_message: lastMessage ?? null,
             other_participant: normalizedOther,
+            userLastReadAt: lastReadMap.get(conversation.id) ?? null,
           };
         })
       );
@@ -98,12 +104,24 @@ export default async function MessagesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-        <p className="mt-1 text-sm text-gray-500">Your direct conversations</p>
+    <>
+      {/* Mobile: full inbox */}
+      <div className="mx-auto max-w-2xl lg:hidden">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+          <p className="mt-1 text-sm text-gray-500">Your direct conversations</p>
+        </div>
+        <ConversationListClient conversations={conversations} currentUserId={user.id} />
       </div>
-      <ConversationListClient conversations={conversations} />
-    </div>
+
+      {/* Desktop: placeholder in the right panel */}
+      <div className="hidden flex-1 flex-col items-center justify-center lg:flex">
+        <svg className="mb-3 h-10 w-10 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z" />
+        </svg>
+        <p className="text-sm font-medium text-gray-400">Select a conversation</p>
+        <p className="mt-1 text-xs text-gray-300">Choose someone from the list to start chatting</p>
+      </div>
+    </>
   );
 }

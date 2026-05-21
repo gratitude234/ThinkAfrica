@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -14,18 +15,31 @@ const inter = Inter({
   display: "swap",
 });
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(appUrl),
-  applicationName: "ThinkAfrica",
-  title: "ThinkAfrica - Africa's Intellectual Social Network",
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
+  title: {
+    default: "ThinkAfrica - Africa's Intellectual Social Network",
+    template: "%s - ThinkAfrica",
+  },
   description:
     "Research, essays, and policy briefs from African university students.",
   manifest: "/manifest.webmanifest",
   openGraph: {
-    siteName: "ThinkAfrica",
-    images: ["/og-default.png"],
+    type: "website",
+    siteName: SITE_NAME,
+    title: "ThinkAfrica - Africa's Intellectual Social Network",
+    description:
+      "Research, essays, and policy briefs from African university students.",
+    url: SITE_URL,
+    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ThinkAfrica - Africa's Intellectual Social Network",
+    description:
+      "Research, essays, and policy briefs from African university students.",
+    images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
   icons: {
     icon: "/logo.png",

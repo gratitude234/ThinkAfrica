@@ -31,6 +31,65 @@ interface MessageThreadProps {
   otherUserId: string | null;
 }
 
+function MessageActions({
+  onEdit,
+  onDelete,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | TouchEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("touchstart", close);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative mr-1 self-center">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-500"
+        aria-label="Message actions"
+      >
+        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="5" cy="12" r="1.5" />
+          <circle cx="12" cy="12" r="1.5" />
+          <circle cx="19" cy="12" r="1.5" />
+        </svg>
+      </button>
+      {open ? (
+        <div className="absolute bottom-full right-0 mb-1 z-10 min-w-[100px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onEdit(); }}
+            className="block w-full px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onDelete(); }}
+            className="block w-full px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50"
+          >
+            Delete
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function MessageThread({
   conversationId,
   currentUserId,
@@ -43,15 +102,13 @@ export default function MessageThread({
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  // Read receipts
   const [liveOtherLastReadAt, setLiveOtherLastReadAt] = useState(otherLastReadAt);
-  // Typing indicator
   const [otherTyping, setOtherTyping] = useState(false);
-  // Message editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const supabase = useMemo(() => createClient(), []);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,12 +116,10 @@ export default function MessageThread({
 
   const displayName = otherProfile?.full_name ?? otherProfile?.username ?? "Unknown";
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, otherTyping]);
 
-  // Track activation event on mount
   useEffect(() => {
     trackActivationEvent({
       event: "message_started",
@@ -76,7 +131,7 @@ export default function MessageThread({
     });
   }, [conversationId, initialMessages.length]);
 
-  // Real-time: new messages + read receipts + typing broadcast
+  // Real-time: new messages + read receipts + typing
   useEffect(() => {
     if (!shouldUseRealtime()) return;
 
@@ -111,7 +166,6 @@ export default function MessageThread({
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          // Update read receipt when the OTHER user reads our messages
           if (
             payload.new.user_id !== currentUserId &&
             typeof payload.new.last_read_at === "string"
@@ -141,7 +195,25 @@ export default function MessageThread({
     };
   }, [conversationId, currentUserId, supabase]);
 
-  // Compute which message gets the "Seen" label (last sent message the other person has read)
+  // Polling fallback when Realtime is disabled
+  useEffect(() => {
+    if (shouldUseRealtime()) return;
+
+    const poll = setInterval(async () => {
+      const lastTs = messages.at(-1)?.created_at ?? new Date(0).toISOString();
+      const { data } = await supabase
+        .from("messages")
+        .select("id, sender_id, content, created_at, deleted_at, edited_at")
+        .eq("conversation_id", conversationId)
+        .gt("created_at", lastTs)
+        .order("created_at", { ascending: true });
+      if (data?.length) setMessages((prev) => [...prev, ...(data as Message[])]);
+    }, 12_000);
+
+    return () => clearInterval(poll);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, supabase, messages.length]);
+
   const seenMessageId = useMemo(() => {
     if (!liveOtherLastReadAt) return null;
     const readTime = new Date(liveOtherLastReadAt).getTime();
@@ -163,6 +235,9 @@ export default function MessageThread({
 
     setSending(true);
     setInput("");
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+    }
 
     const optimisticId = `optimistic-${Date.now()}`;
     const optimisticMessage: Message = {
@@ -246,7 +321,6 @@ export default function MessageThread({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    // Broadcast typing at most once per 1.5s
     if (
       e.target.value.trim() &&
       Date.now() - lastBroadcastRef.current > 1500 &&
@@ -262,16 +336,18 @@ export default function MessageThread({
   };
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col" style={{ height: "calc(100vh - 8rem)" }}>
+    <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-2xl flex-col lg:h-full">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
         <button
           type="button"
           onClick={() => router.push("/messages")}
-          className="mr-1 text-gray-400 hover:text-gray-600"
+          className="mr-1 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
           aria-label="Back to inbox"
         >
-          Back
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
         </button>
         <UserAvatar
           name={displayName}
@@ -287,7 +363,10 @@ export default function MessageThread({
       </div>
 
       {/* Message list */}
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div
+        className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
+        style={{ overscrollBehavior: "contain" }}
+      >
         {messages.length === 0 ? (
           <p className="mt-8 text-center text-sm text-gray-500">
             Send the first message.
@@ -301,34 +380,21 @@ export default function MessageThread({
           return (
             <div
               key={message.id}
-              className={`group relative flex flex-col ${isMine ? "items-end" : "items-start"}`}
+              className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}
             >
               <div className={`flex w-full ${isMine ? "justify-end" : "justify-start"}`}>
-                {/* Hover actions for own messages */}
+                {/* Actions for own messages */}
                 {isMine && !message.deleted_at && !isEditing ? (
-                  <div className="mr-2 flex items-center gap-2 self-center opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(message.id);
-                        setEditContent(message.content);
-                      }}
-                      className="text-[11px] text-gray-300 hover:text-emerald-500"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDelete(message.id)}
-                      className="text-[11px] text-gray-300 hover:text-red-400"
-                      aria-label="Delete message"
-                    >
-                      Delete
-                    </button>
-                  </div>
+                  <MessageActions
+                    onEdit={() => {
+                      setEditingId(message.id);
+                      setEditContent(message.content);
+                    }}
+                    onDelete={() => void handleDelete(message.id)}
+                  />
                 ) : null}
 
-                {/* Message bubble or edit form */}
+                {/* Edit form */}
                 {isMine && !message.deleted_at && isEditing ? (
                   <div className="w-[75%] space-y-2">
                     <textarea
@@ -370,6 +436,7 @@ export default function MessageThread({
                     </div>
                   </div>
                 ) : (
+                  /* Message bubble */
                   <div
                     className={`max-w-[75%] rounded-xl px-4 py-2.5 text-sm ${
                       message.deleted_at
@@ -386,13 +453,13 @@ export default function MessageThread({
                       }`}
                     >
                       {formatRelativeTime(message.created_at)}
-                      {message.edited_at && !message.deleted_at ? " / edited" : ""}
+                      {message.edited_at && !message.deleted_at ? " · edited" : ""}
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Read receipt — only under the last seen message */}
+              {/* Read receipt */}
               {isMine && message.id === seenMessageId ? (
                 <p className="mt-0.5 text-[10px] text-emerald-400">Seen</p>
               ) : null}
@@ -418,13 +485,22 @@ export default function MessageThread({
       </div>
 
       {/* Input area */}
-      <div className="border-t border-gray-200 bg-white px-4 py-3">
+      <div
+        className="border-t border-gray-200 bg-white px-4 py-3"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
+      >
         <div className="flex items-end gap-2">
           <textarea
+            ref={inputRef}
             rows={1}
             placeholder="Write a message..."
             value={input}
             onChange={handleInputChange}
+            onInput={(e) => {
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
@@ -433,13 +509,12 @@ export default function MessageThread({
             }}
             maxLength={2000}
             className="flex-1 resize-none rounded-xl border border-gray-200 bg-canvas px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            style={{ maxHeight: "120px", overflowY: "auto" }}
           />
           <button
             type="button"
             onClick={() => void handleSend()}
             disabled={!input.trim() || sending}
-            className="flex-shrink-0 rounded-xl bg-emerald-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-40"
+            className="flex-shrink-0 rounded-xl bg-emerald-brand px-4 py-2.5 text-sm font-medium text-white transition-all active:scale-95 hover:bg-emerald-600 disabled:opacity-40"
           >
             Send
           </button>

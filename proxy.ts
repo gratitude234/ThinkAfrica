@@ -3,6 +3,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get("host")?.toLowerCase();
+
+  if (host === "thinkafrica.africa") {
+    const canonicalUrl = request.nextUrl.clone();
+    canonicalUrl.hostname = "www.thinkafrica.africa";
+    return NextResponse.redirect(canonicalUrl, 308);
+  }
+
   const protectedPaths = [
     "/write",
     "/admin",
@@ -16,8 +24,9 @@ export async function proxy(request: NextRequest) {
     "/edit",
   ];
   const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
+  const isGuestHome = pathname === "/";
 
-  if (!isProtected) {
+  if (!isProtected && !isGuestHome) {
     return NextResponse.next({ request });
   }
 
@@ -53,6 +62,12 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user && isGuestHome) {
+    const landingUrl = request.nextUrl.clone();
+    landingUrl.pathname = "/landing";
+    return NextResponse.redirect(landingUrl);
+  }
 
   if (!user) {
     const loginUrl = request.nextUrl.clone();

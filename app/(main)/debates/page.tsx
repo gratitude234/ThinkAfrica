@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import {
   formatDate,
@@ -14,8 +15,32 @@ import {
   StatTile,
   type DebateStatus,
 } from "./DebatePrimitives";
+import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
 
 export const revalidate = 30;
+
+export const metadata: Metadata = {
+  title: "Student Debates on Africa, Education and Society",
+  description:
+    "Join structured ThinkAfrica debates where students argue motions, vote on positions, and build stronger public ideas.",
+  alternates: { canonical: canonicalPath("/debates") },
+  openGraph: {
+    title: "Student Debates on Africa, Education and Society",
+    description:
+      "Join structured ThinkAfrica debates where students argue motions, vote on positions, and build stronger public ideas.",
+    url: absoluteUrl("/debates"),
+    siteName: SITE_NAME,
+    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Student Debates on Africa, Education and Society",
+    description:
+      "Join structured ThinkAfrica debates where students argue motions, vote on positions, and build stronger public ideas.",
+    images: [absoluteUrl(DEFAULT_OG_IMAGE)],
+  },
+};
 
 type DebateFilter = "live" | "open" | "closed" | "recaps";
 
