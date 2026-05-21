@@ -270,7 +270,9 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
     setSecondaryProfileTypes(nextSecondaryProfileTypes);
     setToast("Profile saved successfully!");
     if (username !== profile.username) {
-      router.push(`/${username}`);
+      // Hard redirect forces the server layout to re-fetch the profile,
+      // so the nav "Me" link immediately reflects the new username.
+      window.location.href = `/${username}`;
     } else {
       router.refresh();
     }
