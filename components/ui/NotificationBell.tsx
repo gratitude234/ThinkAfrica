@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
+import { shouldUseRealtime } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 
 interface Notification {
@@ -93,6 +94,10 @@ export default function NotificationBell({ userId }: { userId: string }) {
     }
 
     void fetchNotifications();
+
+    if (!shouldUseRealtime()) {
+      return;
+    }
 
     const channel = supabase
       .channel(`notifications:${userId}`)

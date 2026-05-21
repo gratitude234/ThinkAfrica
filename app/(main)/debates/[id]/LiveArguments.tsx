@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { shouldUseRealtime } from "@/lib/realtime";
 import {
   type DebatePhase,
   PHASE_DESCRIPTIONS,
@@ -257,6 +258,10 @@ export default function LiveArguments({
   }, [currentPhase]);
 
   useEffect(() => {
+    if (!shouldUseRealtime()) {
+      return;
+    }
+
     const supabase = createClient();
 
     const channel = supabase

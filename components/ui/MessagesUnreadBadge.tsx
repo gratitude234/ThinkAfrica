@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { shouldUseRealtime } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 
 interface ParticipantRow {
@@ -50,7 +51,7 @@ export default function MessagesUnreadBadge({
   useEffect(() => {
     void fetchCount();
 
-    if (document.cookie.includes("ta_lite=1")) {
+    if (!shouldUseRealtime()) {
       return;
     }
 

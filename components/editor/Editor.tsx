@@ -70,6 +70,11 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [bubbleLinkMode, setBubbleLinkMode] = useState(false);
   const [bubbleLinkUrl, setBubbleLinkUrl] = useState("");
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  useEffect(() => {
+    setIsTouchDevice(navigator.maxTouchPoints > 0);
+  }, []);
   const [rawWordCount, setRawWordCount] = useState(() =>
     countWordsFromHtml(content)
   );
@@ -416,7 +421,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         <BubbleMenu
           editor={editor}
           tippyOptions={{ duration: 100, placement: "top" }}
-          shouldShow={({ from, to }) => bubbleLinkMode || from !== to}
+          shouldShow={({ from, to }) => !isTouchDevice && (bubbleLinkMode || from !== to)}
           className="flex items-center gap-0.5 rounded-xl border border-gray-100 bg-white p-1 shadow-lg shadow-gray-900/10"
         >
           {bubbleLinkMode ? (

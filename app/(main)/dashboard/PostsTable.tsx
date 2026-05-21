@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { shouldUseRealtime } from "@/lib/realtime";
 import Toast from "@/components/ui/Toast";
 import {
   formatDate,
@@ -163,6 +164,10 @@ export default function PostsTable({
   };
 
   useEffect(() => {
+    if (!shouldUseRealtime()) {
+      return;
+    }
+
     const supabase = createClient();
 
     const channel = supabase

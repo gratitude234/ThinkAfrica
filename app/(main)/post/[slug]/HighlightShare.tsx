@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface HighlightShareProps {
   containerId: string;
@@ -15,6 +15,7 @@ interface TooltipState {
 export default function HighlightShare({ containerId }: HighlightShareProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [copied, setCopied] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const container = document.getElementById(containerId);
@@ -56,9 +57,10 @@ export default function HighlightShare({ containerId }: HighlightShareProps) {
     };
 
     const handleDocumentMouseDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node) || !container.contains(event.target)) {
-        hideTooltip();
-      }
+      if (!(event.target instanceof Node)) { hideTooltip(); return; }
+      if (container.contains(event.target)) return;
+      if (tooltipRef.current?.contains(event.target)) return;
+      hideTooltip();
     };
 
     container.addEventListener("mouseup", handleMouseUp);
@@ -78,6 +80,7 @@ export default function HighlightShare({ containerId }: HighlightShareProps) {
 
   return (
     <div
+      ref={tooltipRef}
       className="fixed z-20 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-xl"
       style={{
         top: tooltip.top,

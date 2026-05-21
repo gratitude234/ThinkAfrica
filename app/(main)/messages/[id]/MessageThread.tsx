@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { formatRelativeTime } from "@/lib/utils";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { shouldUseRealtime } from "@/lib/realtime";
 
 interface Message {
   id: string;
@@ -77,7 +78,7 @@ export default function MessageThread({
 
   // Real-time: new messages + read receipts + typing broadcast
   useEffect(() => {
-    if (document.cookie.includes("ta_lite=1")) return;
+    if (!shouldUseRealtime()) return;
 
     const channel = supabase
       .channel(`messages:${conversationId}`)
