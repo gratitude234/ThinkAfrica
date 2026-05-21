@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   AuthShell,
   INPUT_STYLES,
@@ -19,7 +19,6 @@ const PROOF_ITEMS = [
 ];
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -56,8 +55,7 @@ function LoginForm() {
       return;
     }
 
-    router.push(redirectTo);
-    router.refresh();
+    window.location.href = redirectTo;
   };
 
   return (
