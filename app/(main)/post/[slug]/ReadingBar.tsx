@@ -71,9 +71,6 @@ export default function ReadingBar({
 
   if (!visible) return null;
 
-  const railBtn =
-    "flex h-10 w-10 flex-col items-center justify-center rounded-xl transition-colors hover:bg-gray-100 active:scale-95";
-
   return (
     <>
       {/* ── Mobile / tablet: horizontal pill at bottom ── */}
@@ -117,32 +114,39 @@ export default function ReadingBar({
         </div>
       </div>
 
-      {/* ── Desktop: slim vertical rail on the left edge ── */}
+      {/* ── Desktop: slim vertical rail, sitting in the left margin beside the article ── */}
+      {/* Article is max-w-[760px] centered. Its left edge = 50vw - 380px.              */}
+      {/* Rail right edge target = article left - 20px = 50vw - 400px.                  */}
+      {/* Rail width ≈ 52px, so rail left = 50vw - 452px. Use 50vw - 460px for buffer.  */}
       <div
-        className="fixed top-1/3 z-40 hidden -translate-y-1/2 lg:flex lg:left-6 xl:left-[calc(50%-440px)]"
-        style={{ transform: "translateY(-50%)" }}
+        className="hidden lg:block"
+        style={{
+          position: "fixed",
+          top: "40%",
+          left: "calc(50vw - 460px)",
+          transform: "translateY(-50%)",
+          zIndex: 40,
+        }}
       >
-        <div className="flex flex-col items-center gap-0.5 rounded-2xl border border-gray-200 bg-white/90 p-1.5 shadow-[0_8px_32px_-4px_rgb(0_0_0/0.12)] backdrop-blur-sm">
+        <div className="flex flex-col items-center gap-1 rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_4px_24px_-2px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.03)]">
           {/* Like */}
           <button
             onClick={handleLike}
-            className={`${railBtn} ${liked ? "text-red-500" : "text-gray-400 hover:text-gray-700"}`}
+            className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 ${liked ? "text-red-500" : "text-gray-400"}`}
             aria-label={liked ? "Unlike" : "Like"}
           >
             <svg className="h-5 w-5" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
           </button>
-          {likeCount > 0 && (
-            <span className={`text-[10px] font-semibold tabular-nums leading-none ${liked ? "text-red-500" : "text-gray-400"}`}>
-              {likeCount}
-            </span>
-          )}
+          <span className={`text-[11px] font-semibold tabular-nums leading-none ${liked ? "text-red-500" : "text-gray-400"}`}>
+            {likeCount}
+          </span>
 
           {/* Bookmark */}
           <button
             onClick={handleBookmark}
-            className={`${railBtn} mt-1 ${bookmarked ? "text-emerald-600" : "text-gray-400 hover:text-gray-700"}`}
+            className={`mt-1 flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 ${bookmarked ? "text-emerald-600" : "text-gray-400"}`}
             aria-label={bookmarked ? "Unsave" : "Save"}
           >
             <svg className="h-5 w-5" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -153,7 +157,7 @@ export default function ReadingBar({
           {/* Share */}
           <button
             onClick={handleShare}
-            className={`${railBtn} text-gray-400 hover:text-gray-700`}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
             aria-label="Share"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -162,12 +166,12 @@ export default function ReadingBar({
           </button>
 
           {/* Divider */}
-          <div className="my-1 h-px w-6 rounded-full bg-gray-200" />
+          <div className="my-0.5 h-px w-6 rounded-full bg-gray-200" />
 
           {/* Write a response */}
           <Link
             href={`/write?response_to=${slug}&inResponseTo=${postId}`}
-            className={`${railBtn} text-emerald-600 hover:bg-emerald-50`}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-emerald-600 transition-colors hover:bg-emerald-50"
             aria-label="Write a response"
             title="Write a response"
           >
