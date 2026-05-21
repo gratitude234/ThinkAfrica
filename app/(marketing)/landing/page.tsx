@@ -1,7 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 import Footer from "@/components/ui/Footer";
 import PostCover from "@/components/post/PostCover";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
@@ -28,6 +30,14 @@ type LandingPost = {
 type LandingPostRaw = Omit<LandingPost, "profiles"> & {
   profiles: LandingPost["profiles"] | LandingPost["profiles"][];
 };
+
+type LandingData = {
+  postsRaw: LandingPostRaw[];
+  postCount: number;
+  userCount: number;
+};
+
+export const revalidate = 300;
 
 // ── Static data ──────────────────────────────────────────────────────
 
@@ -97,11 +107,9 @@ function authorLine(post: LandingPost) {
   };
 }
 
-// ── Page ─────────────────────────────────────────────────────────────
-
-export default async function LandingPage() {
-  const supabase = await createClient();
-
+async function fetchLandingData(
+  supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>
+): Promise<LandingData> {
   const [{ data: postsRaw }, { count: postCount }, { count: userCount }] =
     await Promise.all([
       supabase
@@ -115,11 +123,32 @@ export default async function LandingPage() {
         .order("view_count", { ascending: false })
         .order("published_at", { ascending: false })
         .limit(7),
-      supabase.from("posts").select("*", { count: "exact", head: true }).eq("status", "published"),
-      supabase.from("profiles").select("*", { count: "exact", head: true }),
+      supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", "published"),
+      supabase.from("profiles").select("id", { count: "exact", head: true }),
     ]);
 
-  const posts: LandingPost[] = ((postsRaw ?? []) as LandingPostRaw[]).map((p) => ({
+  return {
+    postsRaw: (postsRaw ?? []) as LandingPostRaw[],
+    postCount: postCount ?? 0,
+    userCount: userCount ?? 0,
+  };
+}
+
+const getCachedLandingData = unstable_cache(
+  async () => fetchLandingData(createAdminClient()),
+  ["marketing-landing-data"],
+  { revalidate: 300, tags: ["landing", "public"] }
+);
+
+// ── Page ─────────────────────────────────────────────────────────────
+
+export default async function LandingPage() {
+  const { postsRaw, postCount, userCount } =
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? await getCachedLandingData()
+      : await fetchLandingData(await createClient());
+
+  const posts: LandingPost[] = postsRaw.map((p) => ({
     ...p,
     profiles: Array.isArray(p.profiles) ? (p.profiles[0] ?? null) : p.profiles,
   }));
@@ -129,8 +158,8 @@ export default async function LandingPage() {
   const gridPosts  = posts.slice(0, 4);
   const primaryHref = leadPost ? `/post/${leadPost.slug}` : "/?guest=1";
 
-  const displayPostCount = postCount ?? 0;
-  const displayUserCount = userCount ?? 0;
+  const displayPostCount = postCount;
+  const displayUserCount = userCount;
 
   const stats = [
     ...(displayUserCount > 0

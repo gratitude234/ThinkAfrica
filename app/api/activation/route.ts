@@ -74,6 +74,11 @@ const ANONYMOUS_VIEW_EVENTS = new Set<ActivationEventName>([
   "quality_check_viewed",
 ]);
 
+function hasSupabaseAuthCookie(request: Request) {
+  const cookie = request.headers.get("cookie") ?? "";
+  return /\bsb-[^=;]+-auth-token(?:\.\d+)?=/.test(cookie);
+}
+
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     event?: ActivationEventName;
@@ -84,6 +89,10 @@ export async function POST(request: Request) {
 
   if (!body?.event || !ALLOWED_EVENTS.has(body.event)) {
     return NextResponse.json({ error: "Unknown activation event." }, { status: 400 });
+  }
+
+  if (ANONYMOUS_VIEW_EVENTS.has(body.event) && !hasSupabaseAuthCookie(request)) {
+    return NextResponse.json({ ok: true, persisted: false });
   }
 
   const supabase = await createClient();
