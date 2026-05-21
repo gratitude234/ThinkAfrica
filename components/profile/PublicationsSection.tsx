@@ -14,6 +14,7 @@ interface PublicationPost {
   created_at: string;
   published_at: string | null;
   view_count?: number | null;
+  read_count?: number | null;
   isCoAuthor?: boolean;
   co_authors?: Array<{
     user_id: string;
@@ -183,7 +184,7 @@ export default function PublicationsSection({
                     <div className="shrink-0 text-sm text-gray-400 md:text-right">
                       <p>{formatDate(publishedDate)}</p>
                       <p className="mt-1 text-xs">
-                        {(post.view_count ?? 0).toLocaleString()} reads
+                        {(post.read_count ?? 0).toLocaleString()} reads
                       </p>
                     </div>
                   </article>

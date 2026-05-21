@@ -20,6 +20,8 @@ export const AFFINITY_CAP = 4.0;
 
 interface RankablePost extends PostCardData {
   author_id?: string;
+  impression_count?: number;
+  read_count?: number;
   bookmark_count?: number;
   comment_count?: number;
   reference_count?: number;
@@ -28,7 +30,9 @@ interface RankablePost extends PostCardData {
 }
 
 export function scorePost(post: RankablePost, ctx: RankingContext): number {
+  const impressions = post.impression_count ?? 0;
   const views = post.view_count ?? 0;
+  const reads = post.read_count ?? 0;
   const likes = post.like_count ?? 0;
   const comments = post.comment_count ?? 0;
   const bookmarks = post.bookmark_count ?? 0;
@@ -36,7 +40,9 @@ export function scorePost(post: RankablePost, ctx: RankingContext): number {
   const responses = post.response_count ?? 0;
   const helperQuality = post.quality_score ?? 0;
   const quality =
+    0.2 * impressions +
     views +
+    3 * reads +
     5 * likes +
     10 * comments +
     15 * bookmarks +

@@ -36,7 +36,7 @@ type PublicFeedCacheInput = Pick<
 >;
 
 const POST_SELECT =
-  "id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
+  "id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
 
 function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   if (timeframe === "week") {

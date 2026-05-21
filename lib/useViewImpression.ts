@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
-import { createClient } from "@/lib/supabase/client";
 
-const SESSION_KEY = (slug: string) => `ta_viewed_${slug}`;
+const SESSION_KEY = (slug: string, surface: string) =>
+  `ta_impression_${surface}_${slug}`;
 
 export function useViewImpression(
   ref: RefObject<HTMLElement | null>,
   slug: string,
-  authorId: string | undefined,
-  currentUserId: string | null | undefined
+  surface: string
 ) {
   const fired = useRef(false);
 
@@ -17,11 +16,8 @@ export function useViewImpression(
     if (fired.current) return;
     if (!slug) return;
 
-    // Skip author self-views
-    if (authorId && currentUserId && currentUserId === authorId) return;
-
-    // Skip if already counted this session
-    if (sessionStorage.getItem(SESSION_KEY(slug))) return;
+    const sessionKey = SESSION_KEY(slug, surface);
+    if (sessionStorage.getItem(sessionKey)) return;
 
     const el = ref.current;
     if (!el) return;
@@ -33,11 +29,18 @@ export function useViewImpression(
         if (entry.isIntersecting) {
           timer = setTimeout(() => {
             if (fired.current) return;
-            if (sessionStorage.getItem(SESSION_KEY(slug))) return;
+            if (sessionStorage.getItem(sessionKey)) return;
             fired.current = true;
-            sessionStorage.setItem(SESSION_KEY(slug), "1");
-            const supabase = createClient();
-            supabase.rpc("increment_view_count", { post_slug: slug });
+            sessionStorage.setItem(sessionKey, "1");
+            void fetch(`/api/posts/${encodeURIComponent(slug)}/impression`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                surface,
+                route: `${window.location.pathname}${window.location.search}`,
+              }),
+              keepalive: true,
+            });
           }, 1000);
         } else {
           if (timer) clearTimeout(timer);
@@ -52,5 +55,5 @@ export function useViewImpression(
       observer.disconnect();
       if (timer) clearTimeout(timer);
     };
-  }, [slug, authorId, currentUserId, ref]);
+  }, [slug, surface, ref]);
 }

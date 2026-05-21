@@ -8,15 +8,16 @@ interface PostCardImpressionProps {
   post: PostCardData;
   variant?: "standard" | "featured";
   currentUserId?: string | null;
+  surface?: string;
 }
 
 export default function PostCardImpression({
   post,
   variant,
-  currentUserId,
+  surface = "feed",
 }: PostCardImpressionProps) {
   const ref = useRef<HTMLDivElement>(null);
-  useViewImpression(ref, post.slug, post.author_id, currentUserId);
+  useViewImpression(ref, post.slug, surface);
 
   return (
     <div ref={ref}>

@@ -74,6 +74,8 @@ interface PostRecord {
   created_at: string;
   published_at: string | null;
   view_count: number | null;
+  impression_count: number | null;
+  read_count: number | null;
   cover_image_url: string | null;
   citation_id: string | null;
   published_version_id: string | null;
@@ -1138,10 +1140,10 @@ async function PostEngagementSection({
         excerpt={sanitizedExcerpt}
         authorName={author?.full_name ?? null}
       />
-      {typeof post.view_count === "number" ? (
+      {typeof post.read_count === "number" && post.read_count > 0 ? (
         <span className="text-[11px] font-medium text-gray-400">
-          {post.view_count.toLocaleString()}{" "}
-          {post.view_count === 1 ? "view" : "views"}
+          {post.read_count.toLocaleString()}{" "}
+          {post.read_count === 1 ? "read" : "reads"}
         </span>
       ) : null}
     </div>
@@ -2073,7 +2075,7 @@ export default async function PostPage({ params }: PageProps) {
     .select(
       `
       id, title, slug, content, excerpt, type, tags, status, author_id,
-      created_at, published_at, view_count, cover_image_url, citation_id,
+      created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id,
       published_version_id, current_round, revision_due_at,
       in_response_to,
       audio_summary_url,
@@ -2175,7 +2177,7 @@ export default async function PostPage({ params }: PageProps) {
               />
             </Suspense>
             <ReadingProgressBar />
-            <ViewTracker slug={slug} authorId={post.author_id} userId={user?.id ?? null} />
+            <ViewTracker slug={slug} wordCount={wordCount} />
           </>
         ) : null}
 
@@ -2368,7 +2370,7 @@ export default async function PostPage({ params }: PageProps) {
             />
           </Suspense>
           <ReadingProgressBar />
-          <ViewTracker slug={slug} authorId={post.author_id} userId={user?.id ?? null} />
+          <ViewTracker slug={slug} wordCount={wordCount} />
         </>
       ) : null}
 

@@ -43,6 +43,8 @@ interface FeaturedPostRaw {
   tags: string[] | null;
   cover_image_url: string | null;
   view_count: number | null;
+  impression_count: number | null;
+  read_count: number | null;
   featured?: boolean | null;
   published_at: string | null;
   citation_id: string | null;
@@ -94,7 +96,7 @@ function FeedSkeleton() {
 }
 
 const FEATURED_POST_SELECT = `
-  id, author_id, title, slug, type, excerpt, tags, cover_image_url, view_count, featured, published_at, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes,
+  id, author_id, title, slug, type, excerpt, tags, cover_image_url, view_count, impression_count, read_count, featured, published_at, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes,
   profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified)
 `;
 

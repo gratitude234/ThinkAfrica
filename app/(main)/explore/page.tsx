@@ -184,16 +184,18 @@ function EmptyPosts({ signedIn }: { signedIn: boolean }) {
 function PostList({
   posts,
   signedIn,
+  surface,
 }: {
   posts: PostCardData[];
   signedIn: boolean;
+  surface: string;
 }) {
   if (posts.length === 0) return <EmptyPosts signedIn={signedIn} />;
 
   return (
     <div>
       {posts.map((post) => (
-        <PostCardImpression key={post.id} post={post} currentUserId={null} />
+        <PostCardImpression key={post.id} post={post} surface={surface} />
       ))}
     </div>
   );
@@ -639,7 +641,7 @@ function ForYouSection({
           ? "Ranked with your interests, follows, and engagement signals."
           : "Popular community work you can read before signing in."
       )}
-      <PostList posts={data.forYouPosts} signedIn={signedIn} />
+      <PostList posts={data.forYouPosts} signedIn={signedIn} surface="explore-for-you" />
     </>
   );
 }
@@ -657,7 +659,7 @@ function TrendingSection({
         "Trending this week",
         "Recent posts with the strongest engagement and freshness signals."
       )}
-      <PostList posts={data.trendingPosts} signedIn={signedIn} />
+      <PostList posts={data.trendingPosts} signedIn={signedIn} surface="explore-trending" />
     </>
   );
 }
@@ -675,7 +677,7 @@ function CitableSection({
         "Citable works",
         "Archived publications, research, and policy briefs with the strongest academic signal."
       )}
-      <PostList posts={data.citablePosts} signedIn={signedIn} />
+      <PostList posts={data.citablePosts} signedIn={signedIn} surface="explore-citable" />
     </>
   );
 }

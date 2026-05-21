@@ -21,7 +21,7 @@ export default async function TopicPage({ params }: PageProps) {
   const { data: postsRaw } = await supabase
     .from("posts")
     .select(`
-      id, author_id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, cover_image_url, citation_id, published_version_id,
+      id, author_id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id,
       profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
       post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
     `)
@@ -170,6 +170,7 @@ export default async function TopicPage({ params }: PageProps) {
               <PostCardImpression
                 key={post.id}
                 currentUserId={null}
+                surface="topic"
                 post={{
                   id: post.id,
                   title: post.title,
@@ -182,6 +183,11 @@ export default async function TopicPage({ params }: PageProps) {
                   created_at: post.created_at,
                   published_at: post.published_at,
                   view_count: post.view_count,
+                  impression_count:
+                    (post as { impression_count?: number | null })
+                      .impression_count ?? null,
+                  read_count:
+                    (post as { read_count?: number | null }).read_count ?? null,
                   citation_id:
                     (post as { citation_id?: string | null }).citation_id ?? null,
                   published_version_id:

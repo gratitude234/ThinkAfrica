@@ -11,6 +11,7 @@ interface FeaturedPost {
   excerpt: string | null;
   type: string;
   view_count?: number | null;
+  read_count?: number | null;
   citation_id?: string | null;
   created_at?: string;
   published_at?: string | null;
@@ -145,7 +146,7 @@ export default function FeaturedWork({
                 ) : null}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
                   <span>{readTime} min read</span>
-                  <span>{(post.view_count ?? 0).toLocaleString()} reads</span>
+                  <span>{(post.read_count ?? 0).toLocaleString()} reads</span>
                   {publishedDate ? <span>{formatDate(publishedDate)}</span> : null}
                 </div>
               </div>

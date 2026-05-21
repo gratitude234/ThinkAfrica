@@ -21,7 +21,9 @@ export interface PostCardData {
   like_count?: number;
   bookmark_count?: number;
   comment_count?: number;
-  view_count?: number;
+  view_count?: number | null;
+  impression_count?: number | null;
+  read_count?: number | null;
   reference_count?: number;
   response_count?: number;
   citation_id?: string | null;
@@ -138,7 +140,7 @@ export default function PostCard({
   const badgeClass = TYPE_BADGES[post.type] ?? "bg-emerald-100 text-emerald-800";
   const likeCount = typeof post.like_count === "number" ? post.like_count : null;
   const commentCount = typeof post.comment_count === "number" ? post.comment_count : null;
-  const viewCount = typeof post.view_count === "number" ? post.view_count : null;
+  const readCount = typeof post.read_count === "number" ? post.read_count : null;
   const qualityBadges = (post.quality_badges ?? [])
     .filter((badge) =>
       post.type === "research"
@@ -284,13 +286,13 @@ export default function PostCard({
                     {commentCount > 0 ? commentCount : null}
                   </span>
                 ) : null}
-                {viewCount !== null ? (
+                {readCount !== null && readCount > 0 ? (
                   <span className="flex items-center gap-1 text-[11.5px]">
                     <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                       <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
-                    {viewCount > 0 ? viewCount.toLocaleString() : null}
+                    {readCount.toLocaleString()}
                   </span>
                 ) : null}
               </div>
