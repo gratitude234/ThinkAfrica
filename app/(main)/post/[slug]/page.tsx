@@ -991,7 +991,7 @@ async function MobileCredibilitySection({
   });
 
   return (
-    <div className="mb-8 lg:hidden">
+    <div className="mb-8">
       <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} />
     </div>
   );
@@ -2478,7 +2478,7 @@ export default async function PostPage({ params }: PageProps) {
         aria-hidden="true"
       />
 
-      <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-4 pb-20 pt-4 sm:px-6 lg:grid-cols-[minmax(0,680px)_276px] lg:gap-[52px] lg:px-8">
+      <div className="mx-auto max-w-[760px] px-4 pb-20 pt-4 sm:px-6 lg:px-8">
         <main className="min-w-0">
           <Suspense fallback={null}>
             <PostPublishSuccessSection
@@ -2591,31 +2591,6 @@ export default async function PostPage({ params }: PageProps) {
             <PostResponsesSection secondaryDataPromise={secondaryDataPromise} />
           </Suspense>
         </main>
-
-        <Suspense
-          fallback={
-            <aside className="hidden lg:block">
-              <div className="sticky top-24 space-y-4">
-                <SectionSkeleton rows={5} />
-                <SectionSkeleton rows={4} />
-              </div>
-            </aside>
-          }
-        >
-          <PostSidebar
-            post={post}
-            author={author}
-            userId={userId}
-            headings={headings}
-            sanitizedContent={sanitizedContent}
-            sanitizedExcerpt={sanitizedExcerpt}
-            wordCount={wordCount}
-            parentPostId={parentPostId}
-            isPublished={isPublished}
-            secondaryDataPromise={secondaryDataPromise}
-            viewerDataPromise={viewerDataPromise}
-          />
-        </Suspense>
       </div>
     </div>
   );
