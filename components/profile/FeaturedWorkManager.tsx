@@ -13,6 +13,7 @@ interface FeaturedWorkOption {
   published_at: string | null;
   created_at: string;
   view_count?: number | null;
+  read_count?: number | null;
   isCoAuthor?: boolean;
 }
 
@@ -143,7 +144,7 @@ export default function FeaturedWorkManager({
                           {index + 1}. {post.title}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {(post.view_count ?? 0).toLocaleString()} reads
+                          {(post.read_count ?? 0).toLocaleString()} reads
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
@@ -193,7 +194,7 @@ export default function FeaturedWorkManager({
                         {post.title}
                       </p>
                       <p className="mt-1 text-xs text-gray-500">
-                        {formatDate(displayDate)} / {(post.view_count ?? 0).toLocaleString()} reads
+                        {formatDate(displayDate)} / {(post.read_count ?? 0).toLocaleString()} reads
                         {post.isCoAuthor ? " / Co-author" : ""}
                       </p>
                     </div>

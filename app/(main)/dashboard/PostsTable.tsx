@@ -37,7 +37,9 @@ export interface DashboardPost {
   document_original_name?: string | null;
   document_mime_type?: string | null;
   document_size_bytes?: number | null;
+  impression_count: number;
   view_count: number;
+  read_count: number;
   like_count: number;
   created_at: string;
   published_at: string | null;
@@ -91,7 +93,10 @@ function normalizePost(
       record.document_mime_type ?? existing?.document_mime_type ?? null,
     document_size_bytes:
       record.document_size_bytes ?? existing?.document_size_bytes ?? null,
+    impression_count:
+      record.impression_count ?? existing?.impression_count ?? 0,
     view_count: record.view_count ?? existing?.view_count ?? 0,
+    read_count: record.read_count ?? existing?.read_count ?? 0,
     like_count: existing?.like_count ?? 0,
     created_at: record.created_at ?? existing?.created_at ?? new Date().toISOString(),
     published_at: record.published_at ?? existing?.published_at ?? null,
@@ -303,7 +308,13 @@ export default function PostsTable({
                     Status
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">
+                    Impr.
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">
                     Views
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">
+                    Reads
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">
                     Likes
@@ -383,7 +394,13 @@ export default function PostsTable({
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-gray-500 hidden md:table-cell">
+                        {post.impression_count.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-500 hidden md:table-cell">
                         {post.view_count.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-500 hidden md:table-cell">
+                        {post.read_count.toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-500 hidden md:table-cell">
                         {post.like_count.toLocaleString()}

@@ -141,6 +141,8 @@ export interface ExtendedPostRecord {
   created_at: string;
   published_at: string | null;
   cover_image_url?: string | null;
+  impression_count?: number | null;
+  read_count?: number | null;
   current_round: number;
   citation_id: string | null;
   revision_due_at: string | null;

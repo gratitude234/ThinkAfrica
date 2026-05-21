@@ -194,7 +194,7 @@ export default async function DashboardPage() {
     .from("posts")
     .select(
       `
-      id, author_id, title, slug, content, excerpt, tags, type, status, view_count,
+      id, author_id, title, slug, content, excerpt, tags, type, status, impression_count, view_count, read_count,
       created_at, published_at, revision_due_at, citation_id, published_version_id,
       current_round, in_response_to,
       document_path, document_original_name, document_mime_type, document_size_bytes,
@@ -507,7 +507,9 @@ export default async function DashboardPage() {
 
   const posts: DashboardPost[] = (postsRaw ?? []).map((p) => ({
     ...p,
+    impression_count: (p as { impression_count?: number | null }).impression_count ?? 0,
     view_count: p.view_count ?? 0,
+    read_count: (p as { read_count?: number | null }).read_count ?? 0,
     like_count: likeCounts[p.id] ?? 0,
     revision_due_at: p.revision_due_at ?? null,
     citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
@@ -621,6 +623,11 @@ export default async function DashboardPage() {
     (post) => (referenceCounts[post.id] ?? 0) > 0
   ).length;
   const totalViews = publishedPosts.reduce((sum, p) => sum + p.view_count, 0);
+  const totalImpressions = publishedPosts.reduce(
+    (sum, p) => sum + p.impression_count,
+    0
+  );
+  const totalReads = publishedPosts.reduce((sum, p) => sum + p.read_count, 0);
   const opportunityReadiness = getOpportunityReadinessSummary({
     profile: authorProfile,
     talentProfile,
@@ -895,7 +902,9 @@ export default async function DashboardPage() {
       <QualitySignals items={qualityItems} />
 
       <StatsBar
+        totalImpressions={totalImpressions}
         totalViews={totalViews}
+        totalReads={totalReads}
         publishedCount={publishedPosts.length}
         reviewedCount={reviewedOrCitableCount}
         sourceBackedCount={sourceBackedCount}

@@ -63,7 +63,9 @@ interface PromisingPostRow {
   slug: string;
   type: string;
   tags: string[] | null;
+  impression_count: number | null;
   view_count: number | null;
+  read_count: number | null;
   published_at: string | null;
   citation_id: string | null;
   published_version_id: string | null;
@@ -280,7 +282,10 @@ export default async function AdminAnalyticsPage() {
       )
       .limit(10000),
     supabase.from("saved_opportunities").select("*", { count: "exact", head: true }),
-    supabase.from("posts").select("view_count").eq("status", "published"),
+    supabase
+      .from("posts")
+      .select("impression_count, view_count, read_count")
+      .eq("status", "published"),
     supabase
       .from("profiles")
       .select("created_at")
@@ -460,6 +465,14 @@ export default async function AdminAnalyticsPage() {
 
   const totalViews = (viewsData ?? []).reduce(
     (sum, p) => sum + (p.view_count ?? 0),
+    0
+  );
+  const totalImpressions = (viewsData ?? []).reduce(
+    (sum, p) => sum + ((p as { impression_count?: number | null }).impression_count ?? 0),
+    0
+  );
+  const totalReads = (viewsData ?? []).reduce(
+    (sum, p) => sum + ((p as { read_count?: number | null }).read_count ?? 0),
     0
   );
 
@@ -838,7 +851,7 @@ export default async function AdminAnalyticsPage() {
   const { data: promisingPostsRaw } = await supabase
     .from("posts")
     .select(
-      `id, title, slug, type, tags, view_count, published_at, citation_id, published_version_id,
+      `id, title, slug, type, tags, impression_count, view_count, read_count, published_at, citation_id, published_version_id,
       profiles!posts_author_id_fkey(username, full_name, verified)`
     )
     .eq("status", "published")
@@ -1643,7 +1656,9 @@ export default async function AdminAnalyticsPage() {
         />
         <StatCard label="Debates Created" value={totalDebates ?? 0} />
         <StatCard label="Opportunity Applications" value={totalApplications ?? 0} />
-        <StatCard label="Total Page Views" value={totalViews} />
+        <StatCard label="Post Impressions" value={totalImpressions} />
+        <StatCard label="Post Views" value={totalViews} />
+        <StatCard label="Post Reads" value={totalReads} />
       </div>
 
       <AnalyticsCharts

@@ -102,8 +102,26 @@ create table if not exists public.posts (
   tags text[] default '{}',
   pdf_url text,
   view_count integer not null default 0,
+  impression_count integer not null default 0,
+  read_count integer not null default 0,
   created_at timestamptz not null default now(),
   published_at timestamptz
+);
+
+create table if not exists public.post_engagement_events (
+  id uuid primary key default uuid_generate_v4(),
+  post_id uuid not null references public.posts(id) on delete cascade,
+  event_type text not null check (event_type in ('impression', 'view', 'read')),
+  user_id uuid references public.profiles(id) on delete cascade,
+  anonymous_id text,
+  surface text,
+  route text,
+  read_seconds integer check (read_seconds is null or read_seconds >= 0),
+  scroll_depth integer check (scroll_depth is null or scroll_depth between 0 and 100),
+  metadata jsonb not null default '{}'::jsonb,
+  event_date date not null default current_date,
+  created_at timestamptz not null default now(),
+  check (user_id is not null or nullif(anonymous_id, '') is not null)
 );
 
 -- post_authors
@@ -187,6 +205,35 @@ create table if not exists public.profile_featured_posts (
 create index if not exists posts_author_id_idx on public.posts(author_id);
 create index if not exists posts_status_idx on public.posts(status);
 create index if not exists posts_slug_idx on public.posts(slug);
+create index if not exists posts_published_reads_recency_idx
+  on public.posts(read_count desc, published_at desc)
+  where status = 'published';
+create index if not exists post_engagement_events_post_created_idx
+  on public.post_engagement_events(post_id, created_at desc);
+create index if not exists post_engagement_events_type_created_idx
+  on public.post_engagement_events(event_type, created_at desc);
+create unique index if not exists post_engagement_impression_daily_actor_surface_idx
+  on public.post_engagement_events(
+    post_id,
+    coalesce('user:' || user_id::text, 'anon:' || anonymous_id),
+    coalesce(surface, 'unknown'),
+    event_date
+  )
+  where event_type = 'impression';
+create unique index if not exists post_engagement_view_daily_actor_idx
+  on public.post_engagement_events(
+    post_id,
+    coalesce('user:' || user_id::text, 'anon:' || anonymous_id),
+    event_date
+  )
+  where event_type = 'view';
+create unique index if not exists post_engagement_read_daily_actor_idx
+  on public.post_engagement_events(
+    post_id,
+    coalesce('user:' || user_id::text, 'anon:' || anonymous_id),
+    event_date
+  )
+  where event_type = 'read';
 create index if not exists comments_post_id_idx on public.comments(post_id);
 create index if not exists likes_post_id_idx on public.likes(post_id);
 create index if not exists profiles_country_idx on public.profiles(country);
@@ -317,6 +364,133 @@ as $$
   where slug = post_slug;
 $$;
 
+create or replace function public.record_post_engagement(
+  post_slug text,
+  engagement_type text,
+  actor_user_id uuid default null,
+  actor_anonymous_id text default null,
+  engagement_surface text default null,
+  engagement_route text default null,
+  engagement_read_seconds integer default null,
+  engagement_scroll_depth integer default null,
+  engagement_metadata jsonb default '{}'::jsonb
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_post_id uuid;
+  target_author_id uuid;
+  inserted_event_id uuid;
+  normalized_anonymous_id text;
+begin
+  if engagement_type not in ('impression', 'view', 'read') then
+    return false;
+  end if;
+
+  normalized_anonymous_id :=
+    case
+      when actor_user_id is null then nullif(actor_anonymous_id, '')
+      else null
+    end;
+
+  if actor_user_id is null and normalized_anonymous_id is null then
+    return false;
+  end if;
+
+  select id, author_id
+  into target_post_id, target_author_id
+  from public.posts
+  where slug = post_slug
+    and status = 'published'
+  limit 1;
+
+  if target_post_id is null then
+    return false;
+  end if;
+
+  if actor_user_id is not null and actor_user_id = target_author_id then
+    return false;
+  end if;
+
+  insert into public.post_engagement_events (
+    post_id,
+    event_type,
+    user_id,
+    anonymous_id,
+    surface,
+    route,
+    read_seconds,
+    scroll_depth,
+    metadata
+  )
+  values (
+    target_post_id,
+    engagement_type,
+    actor_user_id,
+    normalized_anonymous_id,
+    nullif(engagement_surface, ''),
+    nullif(engagement_route, ''),
+    case
+      when engagement_read_seconds is null then null
+      else greatest(0, engagement_read_seconds)
+    end,
+    case
+      when engagement_scroll_depth is null then null
+      else least(100, greatest(0, engagement_scroll_depth))
+    end,
+    coalesce(engagement_metadata, '{}'::jsonb)
+  )
+  on conflict do nothing
+  returning id into inserted_event_id;
+
+  if inserted_event_id is null then
+    return false;
+  end if;
+
+  if engagement_type = 'impression' then
+    update public.posts
+    set impression_count = impression_count + 1
+    where id = target_post_id;
+  elsif engagement_type = 'view' then
+    update public.posts
+    set view_count = view_count + 1
+    where id = target_post_id;
+  elsif engagement_type = 'read' then
+    update public.posts
+    set read_count = read_count + 1
+    where id = target_post_id;
+  end if;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.record_post_engagement(
+  text,
+  text,
+  uuid,
+  text,
+  text,
+  text,
+  integer,
+  integer,
+  jsonb
+) from public;
+grant execute on function public.record_post_engagement(
+  text,
+  text,
+  uuid,
+  text,
+  text,
+  text,
+  integer,
+  integer,
+  jsonb
+) to service_role;
+
 -- ============================================================
 -- RPC: admin role check
 -- ============================================================
@@ -350,6 +524,7 @@ alter table public.badges enable row level security;
 alter table public.user_badges enable row level security;
 alter table public.universities enable row level security;
 alter table public.profile_featured_posts enable row level security;
+alter table public.post_engagement_events enable row level security;
 
 -- ---- profiles ----
 create or replace function pg_temp.create_policy_if_missing(

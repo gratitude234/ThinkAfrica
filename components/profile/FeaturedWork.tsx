@@ -146,7 +146,9 @@ export default function FeaturedWork({
                 ) : null}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
                   <span>{readTime} min read</span>
-                  <span>{(post.read_count ?? 0).toLocaleString()} reads</span>
+                  {(post.read_count ?? 0) > 0 ? (
+                    <span>{(post.read_count ?? 0).toLocaleString()} reads</span>
+                  ) : null}
                   {publishedDate ? <span>{formatDate(publishedDate)}</span> : null}
                 </div>
               </div>

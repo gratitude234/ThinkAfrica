@@ -183,9 +183,11 @@ export default function PublicationsSection({
                     </div>
                     <div className="shrink-0 text-sm text-gray-400 md:text-right">
                       <p>{formatDate(publishedDate)}</p>
-                      <p className="mt-1 text-xs">
-                        {(post.read_count ?? 0).toLocaleString()} reads
-                      </p>
+                      {(post.read_count ?? 0) > 0 ? (
+                        <p className="mt-1 text-xs">
+                          {(post.read_count ?? 0).toLocaleString()} reads
+                        </p>
+                      ) : null}
                     </div>
                   </article>
                 );

@@ -20,8 +20,8 @@ export const AFFINITY_CAP = 4.0;
 
 interface RankablePost extends PostCardData {
   author_id?: string;
-  impression_count?: number;
-  read_count?: number;
+  impression_count?: number | null;
+  read_count?: number | null;
   bookmark_count?: number;
   comment_count?: number;
   reference_count?: number;

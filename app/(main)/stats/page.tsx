@@ -44,14 +44,14 @@ export default async function StatsPage() {
 
   const { data: publishedPosts } = await supabase
     .from("posts")
-    .select("id, title, slug, type, view_count, created_at, published_at")
+    .select("id, title, slug, type, view_count, read_count, created_at, published_at")
     .eq("author_id", profile.id)
     .eq("status", "published")
-    .order("view_count", { ascending: false });
+    .order("read_count", { ascending: false });
 
   const theirPostIds = (publishedPosts ?? []).map((p) => p.id);
-  const totalViews = (publishedPosts ?? []).reduce(
-    (sum, p) => sum + (p.view_count ?? 0),
+  const totalReads = (publishedPosts ?? []).reduce(
+    (sum, p) => sum + ((p as { read_count?: number | null }).read_count ?? 0),
     0
   );
 
@@ -94,7 +94,7 @@ export default async function StatsPage() {
 
       {/* 4 stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total Views" value={totalViews} />
+        <StatCard label="Total Reads" value={totalReads} />
         <StatCard label="Total Likes" value={totalLikes} />
         <StatCard label="Followers" value={followerCount ?? 0} />
         <StatCard
@@ -113,7 +113,7 @@ export default async function StatsPage() {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8">
           <div className="px-6 py-4 border-b border-gray-100">
             <h2 className="text-sm font-semibold text-gray-900">
-              Top Posts by Views
+              Top Posts by Reads
             </h2>
           </div>
           <div className="divide-y divide-gray-100">
@@ -133,9 +133,9 @@ export default async function StatsPage() {
                 <Badge type={post.type} />
                 <div className="text-right flex-shrink-0">
                   <p className="text-sm font-semibold text-gray-900">
-                    {(post.view_count ?? 0).toLocaleString()}
+                    {((post as { read_count?: number | null }).read_count ?? 0).toLocaleString()}
                   </p>
-                  <p className="text-xs text-gray-400">views</p>
+                  <p className="text-xs text-gray-400">reads</p>
                 </div>
               </div>
             ))}

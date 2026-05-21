@@ -18,7 +18,7 @@ export default async function PolicyHubPage() {
     .select(`
       id, institution_target, featured_at,
       posts!policy_briefs_featured_post_id_fkey (
-        id, title, slug, excerpt, tags, view_count, published_at,
+        id, title, slug, excerpt, tags, view_count, read_count, published_at,
         profiles!posts_author_id_fkey (username, full_name, university)
       )
     `)
@@ -35,12 +35,12 @@ export default async function PolicyHubPage() {
   const { data: allBriefsRaw } = await supabase
     .from("posts")
     .select(`
-      id, title, slug, excerpt, tags, view_count, published_at,
+      id, title, slug, excerpt, tags, view_count, read_count, published_at,
       profiles!posts_author_id_fkey (username, full_name, university)
     `)
     .eq("status", "published")
     .eq("type", "policy_brief")
-    .order("view_count", { ascending: false });
+    .order("read_count", { ascending: false });
 
   const allBriefs = (allBriefsRaw ?? []).map((p) => ({
     ...p,
@@ -79,7 +79,7 @@ export default async function PolicyHubPage() {
             {featured.map((f) => {
               type PostShape = {
                 id: string; title: string; slug: string; excerpt: string | null;
-                tags: string[] | null; view_count: number; published_at: string | null;
+                tags: string[] | null; view_count: number; read_count?: number | null; published_at: string | null;
                 profiles: { username: string; full_name: string; university: string } | null;
               };
               const post = f.posts as unknown as PostShape;
@@ -119,9 +119,11 @@ export default async function PolicyHubPage() {
                         {post.published_at && ` · ${formatDate(post.published_at)}`}
                       </p>
                     </div>
-                    <div className="text-xs text-gray-400 flex-shrink-0">
-                      {post.view_count} views
-                    </div>
+                    {(post.read_count ?? 0) > 0 ? (
+                      <div className="text-xs text-gray-400 flex-shrink-0">
+                        {(post.read_count ?? 0).toLocaleString()} reads
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -170,7 +172,8 @@ export default async function PolicyHubPage() {
                       <p className="text-xs text-gray-400">
                         By <span className="font-medium text-gray-600">{author?.full_name}</span>
                         {author?.university && ` · ${author.university}`}
-                        {post.view_count > 0 && ` · ${post.view_count} views`}
+                        {(post.read_count ?? 0) > 0 &&
+                          ` / ${(post.read_count ?? 0).toLocaleString()} reads`}
                       </p>
                     </div>
                     {canFeaturePolicyBriefs && (
