@@ -2519,7 +2519,7 @@ export default async function PostPage({ params }: PageProps) {
           ) : null}
 
           <div className="article-journal-body relative mb-10 sm:mb-16">
-            <HighlightShare containerId="post-article-prose" />
+            <HighlightShare containerId="post-article-prose" postSlug={post.slug} postId={post.id} />
             <div
               id="post-article-prose"
               className="article-journal-body prose prose-gray max-w-[680px] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-normal prose-headings:text-gray-900"

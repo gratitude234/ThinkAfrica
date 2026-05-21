@@ -207,6 +207,7 @@ export default function WritePage() {
   );
   const [inResponseToTitle, setInResponseToTitle] = useState<string | null>(null);
   const [inResponseToAuthor, setInResponseToAuthor] = useState<string | null>(null);
+  const [responseQuote, setResponseQuote] = useState<string | null>(null);
   const [references, setReferences] = useState<PostReferenceRecord[]>([]);
   const [coAuthors, setCoAuthors] = useState<CoAuthorProfile[]>([]);
   const [wordCount, setWordCount] = useState(0);
@@ -601,6 +602,16 @@ export default function WritePage() {
     chooserShownRef.current = true;
     if (!hasExistingContext && !initialData && !localBackup) {
       setShowChooser(true);
+    }
+  }, [loadingDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pick up a highlighted quote stored by HighlightShare when navigating from a post.
+  useEffect(() => {
+    if (loadingDraft) return;
+    const quote = sessionStorage.getItem("write_response_quote");
+    if (quote) {
+      sessionStorage.removeItem("write_response_quote");
+      setResponseQuote(quote);
     }
   }, [loadingDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1017,7 +1028,11 @@ export default function WritePage() {
                     </span>
                   ) : null}
                 </p>
-                {responseStarterTemplate && responseIntentLabel ? (
+                {responseQuote ? (
+                  <blockquote className="mt-2 border-l-2 border-emerald-400 pl-3 text-sm italic leading-relaxed text-emerald-900">
+                    &ldquo;{responseQuote}&rdquo;
+                  </blockquote>
+                ) : responseStarterTemplate && responseIntentLabel ? (
                   <div className="mt-2 rounded-lg border border-emerald-100 bg-white/70 px-3 py-2">
                     <p className="text-xs font-semibold text-emerald-800">
                       {responseIntentLabel}

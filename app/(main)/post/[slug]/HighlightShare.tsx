@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface HighlightShareProps {
   containerId: string;
+  postSlug: string;
+  postId: string;
 }
 
 interface TooltipState {
@@ -12,10 +15,11 @@ interface TooltipState {
   left: number;
 }
 
-export default function HighlightShare({ containerId }: HighlightShareProps) {
+export default function HighlightShare({ containerId, postSlug, postId }: HighlightShareProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [copied, setCopied] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const container = document.getElementById(containerId);
@@ -35,7 +39,7 @@ export default function HighlightShare({ containerId }: HighlightShareProps) {
         selection.rangeCount === 0 ||
         !selectedText ||
         selectedText.length <= 10 ||
-        selectedText.length >= 280
+        selectedText.length >= 500
       ) {
         hideTooltip();
         return;
@@ -74,14 +78,17 @@ export default function HighlightShare({ containerId }: HighlightShareProps) {
     };
   }, [containerId]);
 
-  if (!tooltip) {
-    return null;
-  }
+  if (!tooltip) return null;
+
+  const handleReply = () => {
+    sessionStorage.setItem("write_response_quote", tooltip.text);
+    router.push(`/write?response_to=${postSlug}&inResponseTo=${postId}`);
+  };
 
   return (
     <div
       ref={tooltipRef}
-      className="fixed z-20 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-xl"
+      className="fixed z-20 rounded-xl bg-gray-900 px-3 py-2 text-xs text-white shadow-xl"
       style={{
         top: tooltip.top,
         left: tooltip.left,
@@ -91,18 +98,15 @@ export default function HighlightShare({ containerId }: HighlightShareProps) {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => {
-            const intentUrl = new URL("https://twitter.com/intent/tweet");
-            intentUrl.searchParams.set(
-              "text",
-              `"${tooltip.text}" ${window.location.href}`
-            );
-            window.open(intentUrl.toString(), "_blank", "noopener,noreferrer");
-          }}
-          className="transition-colors hover:text-emerald-300"
+          onClick={handleReply}
+          className="flex items-center gap-1.5 font-medium transition-colors hover:text-emerald-300"
         >
-          🐦 Share on Twitter
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4" />
+          </svg>
+          Reply to this
         </button>
+        <span className="text-gray-600">·</span>
         <button
           type="button"
           onClick={async () => {
@@ -110,9 +114,9 @@ export default function HighlightShare({ containerId }: HighlightShareProps) {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          className="transition-colors hover:text-emerald-300"
+          className="transition-colors hover:text-gray-300"
         >
-          {copied ? "Copied!" : "📋 Copy quote"}
+          {copied ? "Copied!" : "Copy quote"}
         </button>
       </div>
     </div>
