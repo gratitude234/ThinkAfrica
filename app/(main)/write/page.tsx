@@ -773,7 +773,7 @@ export default function WritePage() {
   );
 
   return (
-    <div className={`mx-auto max-w-6xl pb-24 lg:pb-0 ${focusMode ? "focus-mode" : ""}`}>
+    <div className={`mx-auto max-w-6xl pb-16 lg:pb-0 ${focusMode ? "focus-mode" : ""}`}>
       {focusMode ? (
         <div className="fixed right-4 top-4 z-50 flex items-center gap-3 rounded-full border border-gray-200 bg-white/90 px-4 py-2 shadow-md backdrop-blur-sm">
           <span className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
@@ -788,50 +788,78 @@ export default function WritePage() {
           </button>
         </div>
       ) : (
-        <div className="mb-6 flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <Link href="/" className="text-sm font-semibold tracking-wide text-gray-900">
-            ThinkAfrica
-          </Link>
-          <p className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
-            {saveStatusText}
-          </p>
-          <div className="flex items-center gap-3 sm:justify-end">
+        <>
+          {/* Mobile header — single compact row */}
+          <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 lg:hidden">
             <button
-              type="button"
-              onClick={() => setFocusMode(true)}
-              title="Focus mode — hide distractions"
-              className="hidden rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:border-emerald-200 hover:text-emerald-700 sm:block"
-            >
-              Focus
-            </button>
-            <Button
-              variant="ghost"
               type="button"
               onClick={() => {
                 const hasContent = title.trim().length > 0 || wordCount > 0;
                 if (hasContent) { setShowCancelConfirm(true); return; }
                 router.push("/");
               }}
+              className="text-sm font-medium text-gray-500"
             >
               Cancel
-            </Button>
-            <div className="group relative hidden lg:block">
-              <Button
+            </button>
+            <Link href="/" className="text-sm font-semibold text-gray-900">
+              ThinkAfrica
+            </Link>
+            <button
+              type="button"
+              disabled={!canOpenPublish}
+              onClick={handleReadyToPublish}
+              className="text-sm font-semibold text-emerald-600 disabled:text-gray-300"
+            >
+              Publish
+            </button>
+          </div>
+          {/* Desktop header */}
+          <div className="mb-6 hidden items-center justify-between border-b border-gray-100 pb-4 lg:flex">
+            <Link href="/" className="text-sm font-semibold tracking-wide text-gray-900">
+              ThinkAfrica
+            </Link>
+            <p className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
+              {saveStatusText}
+            </p>
+            <div className="flex items-center gap-3">
+              <button
                 type="button"
-                size="lg"
-                disabled={!canOpenPublish}
-                onClick={handleReadyToPublish}
+                onClick={() => setFocusMode(true)}
+                title="Focus mode — hide distractions"
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:border-emerald-200 hover:text-emerald-700"
               >
-                Publish
+                Focus
+              </button>
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => {
+                  const hasContent = title.trim().length > 0 || wordCount > 0;
+                  if (hasContent) { setShowCancelConfirm(true); return; }
+                  router.push("/");
+                }}
+              >
+                Cancel
               </Button>
-              {!canOpenPublish && publishBlockReason ? (
-                <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white shadow-lg group-hover:block">
-                  {publishBlockReason}
-                </div>
-              ) : null}
+              <div className="group relative">
+                <Button
+                  type="button"
+                  size="lg"
+                  disabled={!canOpenPublish}
+                  onClick={handleReadyToPublish}
+                >
+                  Publish
+                </Button>
+                {!canOpenPublish && publishBlockReason ? (
+                  <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white shadow-lg group-hover:block">
+                    {publishBlockReason}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {!focusMode && !loadingProfileInfo && currentUserId && !profileInfo?.username ? (
@@ -1088,8 +1116,11 @@ export default function WritePage() {
             }}
           />
           {!focusMode ? (
-            <div className="sticky bottom-0 z-20 border-t border-gray-100 bg-white shadow-[0_-8px_20px_rgba(15,23,42,0.04)] lg:hidden">
-              {/* Link URL input — appears above toolbar when link button tapped */}
+            <div
+              className="sticky bottom-0 z-20 border-t border-gray-100 bg-white shadow-[0_-4px_12px_rgba(15,23,42,0.06)] lg:hidden"
+              style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+            >
+              {/* Link URL input — slides in above toolbar when link button tapped */}
               {showLinkPopover ? (
                 <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-3 py-2">
                   <input
@@ -1122,78 +1153,57 @@ export default function WritePage() {
                   <button
                     type="button"
                     onClick={() => setShowLinkPopover(false)}
-                    className="shrink-0 text-sm text-gray-400 hover:text-gray-600"
+                    className="shrink-0 text-sm text-gray-400"
                   >
                     Cancel
                   </button>
                 </div>
               ) : null}
-              {/* Formatting toolbar — horizontally scrollable, active state highlight */}
-              <div
-                className="flex items-center gap-0.5 overflow-x-auto border-b border-gray-100 px-2 py-1.5"
-                style={{ scrollbarWidth: "none" }}
-              >
-                {MOBILE_TOOLBAR_BUTTONS.map((btn) => (
-                  <button
-                    key={btn.title}
-                    type="button"
-                    title={btn.title}
-                    onClick={() => runMobileToolbarAction(btn.action)}
-                    className={`flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors ${
-                      btn.markKey && activeMarks[btn.markKey]
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "text-gray-600 active:bg-gray-100"
-                    }`}
-                  >
-                    {btn.icon}
-                  </button>
-                ))}
-                <div className="ml-auto flex shrink-0 items-center gap-1 pr-1">
-                  <button
-                    type="button"
-                    onClick={() => setFocusMode(true)}
-                    title="Focus mode"
-                    className="flex h-10 items-center px-3 text-xs font-medium text-gray-500"
-                  >
-                    Focus
-                  </button>
-                </div>
-              </div>
-              {/* Progress + actions row */}
-              <div className="px-4 py-2.5">
-                <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                  <div
-                    className={`h-full rounded-full transition-[width] duration-300 ${
-                      wordCount >= selectedPostType.minWords ? "bg-emerald-500" : "bg-amber-400"
-                    }`}
-                    style={{ width: `${wordProgress}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-gray-500">
-                    {wordCount.toLocaleString()} / {selectedPostType.minWords.toLocaleString()} words
-                  </p>
-                  <div className="flex gap-2">
+              {/* Single-row toolbar: formatting icons (scrollable) + word count + details + publish */}
+              <div className="flex items-center gap-0.5 px-2 py-1.5">
+                <div
+                  className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
+                  style={{ scrollbarWidth: "none" }}
+                >
+                  {MOBILE_TOOLBAR_BUTTONS.map((btn) => (
                     <button
+                      key={btn.title}
                       type="button"
-                      onClick={() => setIsDetailsOpen(true)}
-                      className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700"
+                      title={btn.title}
+                      onClick={() => runMobileToolbarAction(btn.action)}
+                      className={`flex h-9 min-w-[36px] shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition-colors ${
+                        btn.markKey && activeMarks[btn.markKey]
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "text-gray-600 active:bg-gray-100"
+                      }`}
                     >
-                      Details
+                      {btn.icon}
                     </button>
-                    <button
-                      type="button"
-                      disabled={!canOpenPublish}
-                      onClick={handleReadyToPublish}
-                      className="rounded-lg bg-emerald-brand px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                    >
-                      Publish
-                    </button>
-                  </div>
+                  ))}
                 </div>
-                {!canOpenPublish && publishBlockReason ? (
-                  <p className="mt-1 text-center text-xs text-amber-600">{publishBlockReason}</p>
-                ) : null}
+                <div className="flex shrink-0 items-center gap-1.5 border-l border-gray-100 pl-2">
+                  <span className="tabular-nums text-xs text-gray-400">
+                    {wordCount.toLocaleString()}w
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsDetailsOpen(true)}
+                    title="Details"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 active:bg-gray-100"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canOpenPublish}
+                    onClick={handleReadyToPublish}
+                    className="rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  >
+                    Publish
+                  </button>
+                </div>
               </div>
             </div>
           ) : null}

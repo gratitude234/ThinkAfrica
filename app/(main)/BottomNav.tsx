@@ -28,7 +28,7 @@ export default function BottomNav({
   hasActiveDebate,
 }: BottomNavProps) {
   const pathname = usePathname();
-  if (pathname.startsWith("/post/")) return null;
+  if (pathname.startsWith("/post/") || pathname.startsWith("/write")) return null;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
@@ -68,6 +68,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
 }, ref) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [bubbleLinkMode, setBubbleLinkMode] = useState(false);
+  const [bubbleLinkUrl, setBubbleLinkUrl] = useState("");
   const [rawWordCount, setRawWordCount] = useState(() =>
     countWordsFromHtml(content)
   );
@@ -235,7 +237,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+    <div className="bg-white">
       <div className="hidden border-b border-gray-200 bg-canvas p-2 lg:block">
         <div className="flex flex-wrap items-center gap-1">
           <ToolbarButton
@@ -340,7 +342,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         </div>
       </div>
 
-      <div className="sticky top-0 z-10 border-b border-gray-100 bg-white px-4 py-1.5">
+      <div className="sticky top-0 z-10 hidden border-b border-gray-100 bg-white px-4 py-1.5 lg:block">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <span className={countClasses}>
@@ -408,6 +410,105 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
             Try again
           </button>
         </div>
+      ) : null}
+
+      {editor ? (
+        <BubbleMenu
+          editor={editor}
+          tippyOptions={{ duration: 100, placement: "top" }}
+          shouldShow={({ from, to }) => bubbleLinkMode || from !== to}
+          className="flex items-center gap-0.5 rounded-xl border border-gray-100 bg-white p-1 shadow-lg shadow-gray-900/10"
+        >
+          {bubbleLinkMode ? (
+            <div className="flex items-center gap-1.5 px-1">
+              <input
+                type="url"
+                autoFocus
+                value={bubbleLinkUrl}
+                onChange={(e) => setBubbleLinkUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (bubbleLinkUrl.trim()) editor.chain().focus().setLink({ href: bubbleLinkUrl.trim() }).run();
+                    setBubbleLinkMode(false);
+                    setBubbleLinkUrl("");
+                  }
+                  if (e.key === "Escape") {
+                    setBubbleLinkMode(false);
+                    setBubbleLinkUrl("");
+                  }
+                }}
+                placeholder="https://..."
+                className="w-44 rounded-lg border border-gray-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+              />
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  if (bubbleLinkUrl.trim()) editor.chain().focus().setLink({ href: bubbleLinkUrl.trim() }).run();
+                  setBubbleLinkMode(false);
+                  setBubbleLinkUrl("");
+                }}
+                className="text-xs font-semibold text-emerald-600"
+              >
+                Apply
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setBubbleLinkMode(false);
+                  setBubbleLinkUrl("");
+                }}
+                className="text-xs text-gray-400"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold transition-colors ${editor.isActive("bold") ? "bg-emerald-100 text-emerald-700" : "text-gray-700 hover:bg-gray-100"}`}
+              >
+                B
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm italic font-medium transition-colors ${editor.isActive("italic") ? "bg-emerald-100 text-emerald-700" : "text-gray-700 hover:bg-gray-100"}`}
+              >
+                I
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleHeading({ level: 2 }).run(); }}
+                className={`flex h-8 items-center justify-center rounded-lg px-2 text-xs font-bold transition-colors ${editor.isActive("heading", { level: 2 }) ? "bg-emerald-100 text-emerald-700" : "text-gray-700 hover:bg-gray-100"}`}
+              >
+                H2
+              </button>
+              <div className="mx-0.5 h-5 w-px bg-gray-200" />
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  if (editor.isActive("link")) {
+                    editor.chain().focus().unsetLink().run();
+                  } else {
+                    setBubbleLinkUrl(editor.getAttributes("link").href ?? "");
+                    setBubbleLinkMode(true);
+                  }
+                }}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${editor.isActive("link") ? "bg-emerald-100 text-emerald-700" : "text-gray-700 hover:bg-gray-100"}`}
+                title="Link"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+              </button>
+            </>
+          )}
+        </BubbleMenu>
       ) : null}
 
       <EditorContent editor={editor} className="min-h-[400px]" />
