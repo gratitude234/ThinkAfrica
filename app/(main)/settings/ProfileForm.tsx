@@ -17,6 +17,10 @@ import {
   isProfileType,
   normalizeSecondaryProfileTypes,
 } from "@/lib/profileTypes";
+import {
+  getProfileUsernameError,
+  normalizeProfileUsername,
+} from "@/lib/profileUsername";
 
 const COMMON_INTERESTS = [
   "economics",
@@ -113,6 +117,12 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const hasNonAcademicProfile = Boolean(profileType && !isAcademicProfile);
 
   const checkUsername = useCallback(async () => {
+    const validationError = getProfileUsernameError(username);
+    if (validationError) {
+      setUsernameError(validationError);
+      return;
+    }
+
     if (username === profile.username) {
       setUsernameError(null);
       return;
@@ -208,6 +218,13 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
     if (usernameError) return;
 
     setSaving(true);
+    const validationError = getProfileUsernameError(username);
+    if (validationError) {
+      setUsernameError(validationError);
+      setSaving(false);
+      return;
+    }
+
     const parsedYear = graduationYear ? parseInt(graduationYear, 10) : null;
     if (parsedYear !== null && (parsedYear < 2015 || parsedYear > 2040)) {
       setToast("Please enter a valid graduation year between 2015 and 2040.");
@@ -403,7 +420,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             type="text"
             value={username}
             onChange={(e) =>
-              setUsername(e.target.value.toLowerCase().replace(/\s+/g, ""))
+              setUsername(normalizeProfileUsername(e.target.value))
             }
             onBlur={checkUsername}
             className={`${INPUT_STYLES} ${usernameError ? "border-red-400" : ""}`}
