@@ -25,6 +25,26 @@ function getAuthCallbackUrl(nextPath: string) {
   return url.toString();
 }
 
+function getSafeAuthActionLink(actionLink: string, nextPath: string) {
+  const callbackUrl = getAuthCallbackUrl(nextPath);
+
+  try {
+    const url = new URL(actionLink);
+    const redirectTo = url.searchParams.get("redirect_to");
+
+    if (
+      !redirectTo ||
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(?:\/|$)/i.test(redirectTo)
+    ) {
+      url.searchParams.set("redirect_to", callbackUrl);
+    }
+
+    return url.toString();
+  } catch {
+    return actionLink;
+  }
+}
+
 function getEmailErrorMessage(error: unknown) {
   if (!error) return "Unable to send email.";
   return error instanceof Error ? error.message : String(error);
@@ -94,6 +114,7 @@ export async function sendSignupConfirmationEmail(input: {
     if (!actionLink) {
       return { ok: false, error: "Unable to create confirmation link." } as const;
     }
+    const safeActionLink = getSafeAuthActionLink(actionLink, "/onboarding");
 
     const displayName = fullName || "there";
     const result = await sendDirectEmail({
@@ -107,7 +128,7 @@ export async function sendSignupConfirmationEmail(input: {
         "This link protects your account and keeps your byline, drafts, follows, and notifications tied to your email.",
       ],
       ctaLabel: "Confirm account",
-      ctaPath: actionLink,
+      ctaPath: safeActionLink,
       idempotencyKey: `signup-confirm:${email}:${data.properties.hashed_token}`,
     });
 
@@ -193,6 +214,7 @@ export async function sendPasswordResetEmail(input: { email: string }) {
     if (!actionLink) {
       return { ok: false, error: "Unable to create reset link." } as const;
     }
+    const safeActionLink = getSafeAuthActionLink(actionLink, "/reset-password");
 
     const result = await sendDirectEmail({
       to: email,
@@ -205,7 +227,7 @@ export async function sendPasswordResetEmail(input: { email: string }) {
         "If you did not request this, you can ignore this email and your password will stay unchanged.",
       ],
       ctaLabel: "Reset password",
-      ctaPath: actionLink,
+      ctaPath: safeActionLink,
       idempotencyKey: `password-reset:${email}:${data.properties.hashed_token}`,
     });
 
