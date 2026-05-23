@@ -9,23 +9,13 @@ import {
   SECONDARY_LINK_STYLES,
 } from "../AuthShell";
 import { formatAuthError } from "../authMessages";
-import { createClient } from "@/lib/supabase/client";
+import { sendPasswordResetEmail } from "../accountEmailActions";
 
 const PROOF_ITEMS = [
   "Secure reset link by email",
   "Return to your saved profile",
   "Keep drafts and activity intact",
 ];
-
-function getResetRedirectUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const appUrl =
-    configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
-      ? configuredUrl
-      : "https://www.thinkafrica.africa";
-
-  return `${appUrl.replace(/\/+$/, "")}/reset-password`;
-}
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -38,15 +28,10 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-    const redirectTo = getResetRedirectUrl();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim(),
-      { redirectTo }
-    );
+    const result = await sendPasswordResetEmail({ email: email.trim() });
 
-    if (resetError) {
-      setError(formatAuthError(resetError.message));
+    if (!result.ok) {
+      setError(formatAuthError(result.error));
       setLoading(false);
       return;
     }

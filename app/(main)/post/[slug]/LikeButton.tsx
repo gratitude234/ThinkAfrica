@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { togglePostLike } from "./likeActions";
 
 interface LikeButtonProps {
   postId: string;
@@ -39,31 +39,24 @@ export default function LikeButton({
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-    let mutationError = null;
+    try {
+      const result = await togglePostLike({ postId, nextLiked: !wasLiked });
 
-    if (wasLiked) {
-      const { error: err } = await supabase
-        .from("likes")
-        .delete()
-        .eq("user_id", userId)
-        .eq("post_id", postId);
-      mutationError = err;
-    } else {
-      const { error: err } = await supabase
-        .from("likes")
-        .insert({ user_id: userId, post_id: postId });
-      mutationError = err;
-    }
-
-    if (mutationError) {
-      // Revert on failure
+      if (result.error) {
+        // Revert on failure
+        setLiked(wasLiked);
+        setCount(prevCount);
+        setError(result.error);
+      } else {
+        setLiked(result.liked);
+      }
+    } catch (error) {
       setLiked(wasLiked);
       setCount(prevCount);
-      setError("Failed. Try again.");
+      setError(error instanceof Error ? error.message : "Failed. Try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

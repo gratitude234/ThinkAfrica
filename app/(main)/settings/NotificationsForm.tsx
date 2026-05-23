@@ -8,6 +8,7 @@ import Toast from "@/components/ui/Toast";
 export interface NotificationPrefs {
   email_comments: boolean;
   email_follows: boolean;
+  email_likes: boolean;
   email_published: boolean;
   email_digest: boolean;
   email_account_security: boolean;
@@ -17,6 +18,7 @@ export interface NotificationPrefs {
 const TOGGLE_ROWS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
   { key: "email_comments", label: "New comments", description: "When someone comments on your post" },
   { key: "email_follows", label: "New followers", description: "When someone follows you" },
+  { key: "email_likes", label: "New likes", description: "When someone likes your post" },
   { key: "email_published", label: "Post published", description: "When your submitted post is published" },
   { key: "email_digest", label: "Weekly digest", description: "A weekly summary of top content" },
   { key: "email_account_security", label: "Account and trust updates", description: "Verification, role, and account status emails" },

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export type NotificationPreferenceKey =
   | "email_comments"
   | "email_follows"
+  | "email_likes"
   | "email_published"
   | "email_digest"
   | "email_account_security"

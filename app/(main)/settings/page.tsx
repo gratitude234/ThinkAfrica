@@ -67,6 +67,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
   const notifPrefs: NotificationPrefs = {
     email_comments: true,
     email_follows: true,
+    email_likes: true,
     email_published: true,
     email_digest: true,
     email_account_security: true,

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   AuthShell,
   INPUT_STYLES,
@@ -11,8 +10,7 @@ import {
 } from "../AuthShell";
 import { formatAuthError } from "../authMessages";
 import { trackActivationEvent } from "@/lib/activationEvents";
-import { createClient } from "@/lib/supabase/client";
-import { sendWelcomeEmail } from "../accountEmailActions";
+import { sendSignupConfirmationEmail } from "../accountEmailActions";
 
 const PROOF_ITEMS = [
   "Claim a trusted student byline",
@@ -25,16 +23,6 @@ function getPasswordHint(password: string) {
   if (password.length < 6) return "Add a few more characters.";
   if (password.length < 10) return "Good start. Longer passwords are stronger.";
   return "Strong enough to create your account.";
-}
-
-function getAuthRedirectUrl(path: string) {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const appUrl =
-    configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
-      ? configuredUrl
-      : "https://www.thinkafrica.africa";
-
-  return `${appUrl.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 async function withSignupTimeout<T>(promise: Promise<T>) {
@@ -58,9 +46,9 @@ async function withSignupTimeout<T>(promise: Promise<T>) {
 }
 
 export default function SignupPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
@@ -80,32 +68,25 @@ export default function SignupPage() {
     setError(null);
 
     try {
-      const supabase = createClient();
       const normalizedEmail = form.email.trim().toLowerCase();
       const fullName = form.fullName.trim();
-      const { error: signUpError } = await withSignupTimeout(
-        supabase.auth.signUp({
+      const result = await withSignupTimeout(
+        sendSignupConfirmationEmail({
           email: normalizedEmail,
           password: form.password,
-          options: {
-            emailRedirectTo: getAuthRedirectUrl("/onboarding"),
-            data: {
-              full_name: fullName,
-            },
-          },
+          fullName,
         })
       );
 
-      if (signUpError) {
-        setError(formatAuthError(signUpError.message));
+      if (!result.ok) {
+        setError(formatAuthError(result.error));
         setLoading(false);
         return;
       }
 
       trackActivationEvent({ event: "signup_completed" });
-      void sendWelcomeEmail({ email: normalizedEmail, fullName });
-      router.push("/onboarding");
-      router.refresh();
+      setSubmitted(true);
+      setLoading(false);
     } catch (error) {
       console.error("Signup failed", error);
       setError(
@@ -134,6 +115,16 @@ export default function SignupPage() {
         </>
       }
     >
+      {submitted ? (
+        <div
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-5 text-sm leading-6 text-emerald-900"
+          role="status"
+          aria-live="polite"
+        >
+          Check your email to confirm your ThinkAfrica account. After you open
+          the link, we will bring you back to onboarding.
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label
@@ -232,6 +223,7 @@ export default function SignupPage() {
           {loading ? "Creating account..." : "Create account"}
         </button>
       </form>
+      )}
 
       <div className="mt-7 grid grid-cols-3 gap-3 rounded-xl border border-gray-200 bg-canvas p-2 text-center">
         {["Role", "Profile", "Topics"].map((step, index) => (

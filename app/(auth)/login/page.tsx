@@ -27,6 +27,7 @@ function LoginForm() {
 
   const redirectTo = getSafeRedirect(searchParams.get("redirectTo"));
   const resetComplete = searchParams.get("reset") === "1";
+  const callbackFailed = searchParams.get("error") === "auth_callback_failed";
   const isWritingRedirect = redirectTo.startsWith("/write");
   const introCopy = isWritingRedirect
     ? "Sign in to start your draft and keep autosave tied to your profile."
@@ -83,6 +84,17 @@ function LoginForm() {
             aria-live="polite"
           >
             Your password has been updated. Sign in with the new password.
+          </div>
+        ) : null}
+
+        {callbackFailed ? (
+          <div
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700"
+            role="alert"
+            aria-live="assertive"
+          >
+            That email link is invalid or expired. Request a new link and try
+            again.
           </div>
         ) : null}
 
