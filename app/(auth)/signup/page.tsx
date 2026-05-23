@@ -37,6 +37,26 @@ function getAuthRedirectUrl(path: string) {
   return `${appUrl.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+async function withSignupTimeout<T>(promise: Promise<T>) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(
+        new Error(
+          "Account creation is taking too long. Check your connection and try again."
+        )
+      );
+    }, 20000);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -59,30 +79,42 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-    const normalizedEmail = form.email.trim();
-    const fullName = form.fullName.trim();
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: normalizedEmail,
-      password: form.password,
-      options: {
-        emailRedirectTo: getAuthRedirectUrl("/onboarding"),
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
+    try {
+      const supabase = createClient();
+      const normalizedEmail = form.email.trim().toLowerCase();
+      const fullName = form.fullName.trim();
+      const { error: signUpError } = await withSignupTimeout(
+        supabase.auth.signUp({
+          email: normalizedEmail,
+          password: form.password,
+          options: {
+            emailRedirectTo: getAuthRedirectUrl("/onboarding"),
+            data: {
+              full_name: fullName,
+            },
+          },
+        })
+      );
 
-    if (signUpError) {
-      setError(formatAuthError(signUpError.message));
+      if (signUpError) {
+        setError(formatAuthError(signUpError.message));
+        setLoading(false);
+        return;
+      }
+
+      trackActivationEvent({ event: "signup_completed" });
+      void sendWelcomeEmail({ email: normalizedEmail, fullName });
+      router.push("/onboarding");
+      router.refresh();
+    } catch (error) {
+      console.error("Signup failed", error);
+      setError(
+        error instanceof Error
+          ? formatAuthError(error.message)
+          : "We could not create your account. Please try again."
+      );
       setLoading(false);
-      return;
     }
-
-    trackActivationEvent({ event: "signup_completed" });
-    void sendWelcomeEmail({ email: normalizedEmail, fullName });
-    router.push("/onboarding");
-    router.refresh();
   };
 
   return (
