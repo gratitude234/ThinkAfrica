@@ -7,6 +7,8 @@ export type NotificationPreferenceKey =
   | "email_comments"
   | "email_follows"
   | "email_likes"
+  | "email_responses"
+  | "email_messages"
   | "email_published"
   | "email_digest"
   | "email_account_security"

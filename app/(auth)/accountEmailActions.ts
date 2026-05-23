@@ -39,6 +39,27 @@ function isUnknownRecoveryRecipient(error: unknown) {
   );
 }
 
+function isPrivacySafeResendRecipientError(error: unknown) {
+  const message = getEmailErrorMessage(error).toLowerCase();
+  return (
+    message.includes("user not found") ||
+    message.includes("not found") ||
+    message.includes("does not exist") ||
+    message.includes("already confirmed") ||
+    message.includes("already been confirmed") ||
+    message.includes("email confirmed")
+  );
+}
+
+function isRateLimitError(error: unknown) {
+  const message = getEmailErrorMessage(error).toLowerCase();
+  return (
+    message.includes("rate limit") ||
+    message.includes("too many") ||
+    message.includes("over_email_send_rate_limit")
+  );
+}
+
 export async function sendSignupConfirmationEmail(input: {
   email: string;
   password: string;
@@ -97,6 +118,45 @@ export async function sendSignupConfirmationEmail(input: {
     }
     return { ok: false, error: result.error } as const;
   } catch (error) {
+    return { ok: false, error: getEmailErrorMessage(error) } as const;
+  }
+}
+
+export async function resendSignupConfirmationEmail(input: { email: string }) {
+  const email = normalizeEmail(input.email);
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "Add a valid email address." } as const;
+  }
+
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: {
+        emailRedirectTo: getAuthCallbackUrl("/onboarding"),
+      },
+    });
+
+    if (error) {
+      if (isRateLimitError(error)) {
+        return { ok: false, error: error.message } as const;
+      }
+
+      if (isPrivacySafeResendRecipientError(error)) {
+        return { ok: true } as const;
+      }
+
+      return { ok: false, error: error.message } as const;
+    }
+
+    return { ok: true } as const;
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      return { ok: false, error: getEmailErrorMessage(error) } as const;
+    }
+
     return { ok: false, error: getEmailErrorMessage(error) } as const;
   }
 }

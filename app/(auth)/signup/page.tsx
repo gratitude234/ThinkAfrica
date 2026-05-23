@@ -8,9 +8,12 @@ import {
   PRIMARY_BUTTON_STYLES,
   SECONDARY_LINK_STYLES,
 } from "../AuthShell";
-import { formatAuthError } from "../authMessages";
+import { formatAuthError, isAlreadyRegisteredAuthError } from "../authMessages";
 import { trackActivationEvent } from "@/lib/activationEvents";
-import { sendSignupConfirmationEmail } from "../accountEmailActions";
+import {
+  resendSignupConfirmationEmail,
+  sendSignupConfirmationEmail,
+} from "../accountEmailActions";
 
 const PROOF_ITEMS = [
   "Claim a trusted student byline",
@@ -49,6 +52,10 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [canResendConfirmation, setCanResendConfirmation] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
@@ -60,12 +67,20 @@ export default function SignupPage() {
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
+    if (event.target.name === "email") {
+      setCanResendConfirmation(false);
+      setResendNotice(null);
+      setResendError(null);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setCanResendConfirmation(false);
+    setResendNotice(null);
+    setResendError(null);
 
     try {
       const normalizedEmail = form.email.trim().toLowerCase();
@@ -80,6 +95,7 @@ export default function SignupPage() {
 
       if (!result.ok) {
         setError(formatAuthError(result.error));
+        setCanResendConfirmation(isAlreadyRegisteredAuthError(result.error));
         setLoading(false);
         return;
       }
@@ -94,7 +110,36 @@ export default function SignupPage() {
           ? formatAuthError(error.message)
           : "We could not create your account. Please try again."
       );
+      setCanResendConfirmation(false);
       setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setResendLoading(true);
+    setResendNotice(null);
+    setResendError(null);
+
+    try {
+      const result = await resendSignupConfirmationEmail({
+        email: form.email.trim(),
+      });
+
+      if (result.ok) {
+        setResendNotice(
+          "If an unconfirmed account exists, a confirmation email is on its way."
+        );
+      } else {
+        setResendError(formatAuthError(result.error));
+      }
+    } catch (error) {
+      setResendError(
+        error instanceof Error
+          ? formatAuthError(error.message)
+          : "We could not resend the confirmation email. Please try again."
+      );
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -121,11 +166,25 @@ export default function SignupPage() {
           role="status"
           aria-live="polite"
         >
-          Check your email to confirm your ThinkAfrica account. After you open
-          the link, we will bring you back to onboarding.
+          <p>
+            Check your email to confirm your ThinkAfrica account. After you
+            open the link, we will bring you back to onboarding.
+          </p>
+          <button
+            type="button"
+            onClick={handleResendConfirmation}
+            disabled={resendLoading || !form.email.trim()}
+            className="mt-4 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {resendLoading ? "Sending..." : "Resend confirmation email"}
+          </button>
+          {resendNotice ? (
+            <p className="mt-3 text-emerald-800">{resendNotice}</p>
+          ) : null}
+          {resendError ? <p className="mt-3 text-red-700">{resendError}</p> : null}
         </div>
       ) : (
-      <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label
             htmlFor="fullName"
@@ -219,10 +278,28 @@ export default function SignupPage() {
           </div>
         ) : null}
 
+        {canResendConfirmation ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
+            <p>Need a fresh confirmation link?</p>
+            <button
+              type="button"
+              onClick={handleResendConfirmation}
+              disabled={resendLoading || !form.email.trim()}
+              className="mt-3 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {resendLoading ? "Sending..." : "Resend confirmation email"}
+            </button>
+            {resendNotice ? (
+              <p className="mt-3 text-emerald-800">{resendNotice}</p>
+            ) : null}
+            {resendError ? <p className="mt-3 text-red-700">{resendError}</p> : null}
+          </div>
+        ) : null}
+
         <button type="submit" disabled={loading} className={PRIMARY_BUTTON_STYLES}>
           {loading ? "Creating account..." : "Create account"}
         </button>
-      </form>
+        </form>
       )}
 
       <div className="mt-7 grid grid-cols-3 gap-3 rounded-xl border border-gray-200 bg-canvas p-2 text-center">

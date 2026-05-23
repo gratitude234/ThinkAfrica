@@ -8,6 +8,7 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import { formatRelativeTime } from "@/lib/utils";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { shouldUseRealtime } from "@/lib/realtime";
+import { sendConversationMessage } from "./actions";
 
 interface Message {
   id: string;
@@ -251,39 +252,31 @@ export default function MessageThread({
 
     setMessages((prev) => [...prev, optimisticMessage]);
 
-    const { data: inserted, error } = await supabase
-      .from("messages")
-      .insert({
-        conversation_id: conversationId,
-        sender_id: currentUserId,
+    try {
+      const result = await sendConversationMessage({
+        conversationId,
         content: text,
-      })
-      .select("id, sender_id, content, created_at, deleted_at, edited_at")
-      .single<Message>();
+      });
 
-    if (error) {
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      setInput(text);
-      setSending(false);
-      return;
-    }
+      if (result.error || !result.message) {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        setInput(text);
+        return;
+      }
 
-    if (inserted) {
       setMessages((prev) =>
-        prev.map((m) => (m.id === optimisticId ? inserted : m))
+        prev.map((m) => (m.id === optimisticId ? result.message as Message : m))
       );
-      await supabase
-        .from("conversation_participants")
-        .update({ last_read_at: new Date().toISOString() })
-        .eq("conversation_id", conversationId)
-        .eq("user_id", currentUserId);
       trackActivationEvent({
         event: "message_sent",
         metadata: { conversationId, length: text.length },
       });
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      setInput(text);
+    } finally {
+      setSending(false);
     }
-
-    setSending(false);
   };
 
   const handleDelete = async (messageId: string) => {

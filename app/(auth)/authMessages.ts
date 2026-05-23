@@ -13,7 +13,7 @@ export function formatAuthError(message: string) {
     normalized.includes("already exists") ||
     normalized.includes("user already")
   ) {
-    return "An account already exists with this email. Sign in instead.";
+    return "An account already exists with this email. If you have not confirmed it yet, check your inbox or resend the confirmation email.";
   }
 
   if (
@@ -40,6 +40,23 @@ export function formatAuthError(message: string) {
   }
 
   return message || "Something went wrong. Please try again.";
+}
+
+export function isAlreadyRegisteredAuthError(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("already registered") ||
+    normalized.includes("already exists") ||
+    normalized.includes("user already")
+  );
+}
+
+export function isEmailNotConfirmedAuthError(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("email not confirmed") ||
+    normalized.includes("confirm your email")
+  );
 }
 
 export function getSafeRedirect(value: string | null, fallback = "/") {

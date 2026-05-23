@@ -68,6 +68,8 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     email_comments: true,
     email_follows: true,
     email_likes: true,
+    email_responses: true,
+    email_messages: true,
     email_published: true,
     email_digest: true,
     email_account_security: true,

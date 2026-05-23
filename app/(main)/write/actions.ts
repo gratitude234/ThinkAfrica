@@ -520,6 +520,7 @@ export async function publishPost(input: {
             ctaLabel: "Read the response",
             ctaPath: `/post/${slug}`,
             idempotencyKey: `response-post:${postId}:${parentPost.author_id}`,
+            preferenceKey: "email_responses",
           });
           logEmailResult(`response_post:${postId}:${parentPost.author_id}`, emailResult);
         }

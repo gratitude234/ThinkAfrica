@@ -9,8 +9,13 @@ import {
   PRIMARY_BUTTON_STYLES,
   SECONDARY_LINK_STYLES,
 } from "../AuthShell";
-import { formatAuthError, getSafeRedirect } from "../authMessages";
+import {
+  formatAuthError,
+  getSafeRedirect,
+  isEmailNotConfirmedAuthError,
+} from "../authMessages";
 import { createClient } from "@/lib/supabase/client";
+import { resendSignupConfirmationEmail } from "../accountEmailActions";
 
 const PROOF_ITEMS = [
   "Return to drafts and saved reading",
@@ -21,8 +26,12 @@ const PROOF_ITEMS = [
 function LoginForm() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canResendConfirmation, setCanResendConfirmation] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", password: "" });
 
   const redirectTo = getSafeRedirect(searchParams.get("redirectTo"));
@@ -37,12 +46,20 @@ function LoginForm() {
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
+    if (event.target.name === "email") {
+      setCanResendConfirmation(false);
+      setResendNotice(null);
+      setResendError(null);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setCanResendConfirmation(false);
+    setResendNotice(null);
+    setResendError(null);
 
     const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -52,11 +69,40 @@ function LoginForm() {
 
     if (signInError) {
       setError(formatAuthError(signInError.message));
+      setCanResendConfirmation(isEmailNotConfirmedAuthError(signInError.message));
       setLoading(false);
       return;
     }
 
     window.location.href = redirectTo;
+  };
+
+  const handleResendConfirmation = async () => {
+    setResendLoading(true);
+    setResendNotice(null);
+    setResendError(null);
+
+    try {
+      const result = await resendSignupConfirmationEmail({
+        email: form.email.trim(),
+      });
+
+      if (result.ok) {
+        setResendNotice(
+          "If an unconfirmed account exists, a confirmation email is on its way."
+        );
+      } else {
+        setResendError(formatAuthError(result.error));
+      }
+    } catch (error) {
+      setResendError(
+        error instanceof Error
+          ? formatAuthError(error.message)
+          : "We could not resend the confirmation email. Please try again."
+      );
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   return (
@@ -164,6 +210,24 @@ function LoginForm() {
             aria-live="assertive"
           >
             {error}
+          </div>
+        ) : null}
+
+        {canResendConfirmation ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
+            <p>Need a fresh confirmation link?</p>
+            <button
+              type="button"
+              onClick={handleResendConfirmation}
+              disabled={resendLoading || !form.email.trim()}
+              className="mt-3 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {resendLoading ? "Sending..." : "Resend confirmation email"}
+            </button>
+            {resendNotice ? (
+              <p className="mt-3 text-emerald-800">{resendNotice}</p>
+            ) : null}
+            {resendError ? <p className="mt-3 text-red-700">{resendError}</p> : null}
           </div>
         ) : null}
 
