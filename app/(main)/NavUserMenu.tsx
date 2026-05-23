@@ -134,7 +134,7 @@ export default function NavUserMenu({
           </div>
           {profile && (
             <Link
-              href={`/${profile.username}`}
+              href="/me"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
             >

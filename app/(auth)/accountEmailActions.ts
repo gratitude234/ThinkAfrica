@@ -1,5 +1,6 @@
 "use server";
 
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -22,6 +23,24 @@ function getAuthCallbackUrl(nextPath: string) {
 
   const url = new URL("/auth/callback", appUrl.replace(/\/+$/, ""));
   url.searchParams.set("next", nextPath);
+  return url.toString();
+}
+
+function getAuthConfirmUrl(input: {
+  tokenHash: string;
+  type: EmailOtpType;
+  nextPath: string;
+}) {
+  const configuredUrl = process.env.EMAIL_APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl =
+    configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
+      ? configuredUrl
+      : "https://www.thinkafrica.africa";
+
+  const url = new URL("/auth/confirm", appUrl.replace(/\/+$/, ""));
+  url.searchParams.set("token_hash", input.tokenHash);
+  url.searchParams.set("type", input.type);
+  url.searchParams.set("next", input.nextPath);
   return url.toString();
 }
 
@@ -114,7 +133,13 @@ export async function sendSignupConfirmationEmail(input: {
     if (!actionLink) {
       return { ok: false, error: "Unable to create confirmation link." } as const;
     }
-    const safeActionLink = getSafeAuthActionLink(actionLink, "/onboarding");
+    const safeActionLink = data.properties.hashed_token
+      ? getAuthConfirmUrl({
+          tokenHash: data.properties.hashed_token,
+          type: "signup",
+          nextPath: "/onboarding",
+        })
+      : getSafeAuthActionLink(actionLink, "/onboarding");
 
     const displayName = fullName || "there";
     const result = await sendDirectEmail({
@@ -214,7 +239,13 @@ export async function sendPasswordResetEmail(input: { email: string }) {
     if (!actionLink) {
       return { ok: false, error: "Unable to create reset link." } as const;
     }
-    const safeActionLink = getSafeAuthActionLink(actionLink, "/reset-password");
+    const safeActionLink = data.properties.hashed_token
+      ? getAuthConfirmUrl({
+          tokenHash: data.properties.hashed_token,
+          type: "recovery",
+          nextPath: "/reset-password",
+        })
+      : getSafeAuthActionLink(actionLink, "/reset-password");
 
     const result = await sendDirectEmail({
       to: email,

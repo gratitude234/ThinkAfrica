@@ -39,10 +39,14 @@ export default function BottomNav({
     pathname.startsWith("/explore/") ||
     pathname === "/discover" ||
     pathname.startsWith("/discover/");
-  const profileHref = userId ? (username ? `/${username}` : "/settings") : "/signup";
+  const profileHref = userId ? "/me" : "/signup";
+  const resolvedProfileHref = username ? `/${username}` : "/settings";
   const profileActive = userId
     ? username
-      ? pathname === profileHref || pathname.startsWith(`${profileHref}/`)
+      ? pathname === profileHref ||
+        pathname.startsWith(`${profileHref}/`) ||
+        pathname === resolvedProfileHref ||
+        pathname.startsWith(`${resolvedProfileHref}/`)
       : pathname === "/settings" || pathname.startsWith("/settings/")
     : pathname === "/signup";
   const profileLabel = userId ? "Me" : "Join";
