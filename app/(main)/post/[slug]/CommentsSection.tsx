@@ -1,7 +1,5 @@
 "use client";
 
-// -- ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id uuid REFERENCES comments(id);
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -140,37 +138,49 @@ export default function CommentsSection({
       })
     );
 
+  const setVoteState = (
+    items: CommentItem[],
+    commentId: string,
+    upvotes: number,
+    userVoted: boolean
+  ) =>
+    sortCommentsByUpvotes(
+      items.map((comment) => {
+        if (comment.id === commentId) {
+          return { ...comment, upvotes, userVoted };
+        }
+
+        return {
+          ...comment,
+          replies: comment.replies.map((reply) =>
+            reply.id === commentId ? { ...reply, upvotes, userVoted } : reply
+          ),
+        };
+      })
+    );
+
   const handleVote = async (commentId: string) => {
     if (!userId) return;
 
-    const target =
-      comments.find((comment) => comment.id === commentId) ??
-      comments.flatMap((comment) => comment.replies).find((reply) => reply.id === commentId);
-
-    if (!target) return;
-
-    const wasVoted = target.userVoted ?? false;
+    const previousComments = comments;
     setComments((prev) => updateVote(prev, commentId));
 
     const supabase = createClient();
-    if (wasVoted) {
-      await supabase
-        .from("comment_votes")
-        .delete()
-        .eq("user_id", userId)
-        .eq("comment_id", commentId);
-      await supabase
-        .from("comments")
-        .update({ upvotes: target.upvotes - 1 })
-        .eq("id", commentId);
-    } else {
-      await supabase
-        .from("comment_votes")
-        .insert({ user_id: userId, comment_id: commentId });
-      await supabase
-        .from("comments")
-        .update({ upvotes: target.upvotes + 1 })
-        .eq("id", commentId);
+    const { data, error: voteError } = await supabase.rpc("toggle_comment_vote", {
+      p_comment_id: commentId,
+    });
+
+    if (voteError) {
+      setComments(previousComments);
+      setToastMessage(voteError.message);
+      return;
+    }
+
+    const result = data as { voted: boolean; upvotes: number } | null;
+    if (result) {
+      setComments((prev) =>
+        setVoteState(prev, commentId, result.upvotes, result.voted)
+      );
     }
   };
 

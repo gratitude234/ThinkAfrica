@@ -142,7 +142,15 @@ create table if not exists public.comments (
   author_id uuid not null references public.profiles(id) on delete cascade,
   parent_id uuid references public.comments(id) on delete cascade,
   content text not null,
+  upvotes integer not null default 0,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.comment_votes (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  comment_id uuid not null references public.comments(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, comment_id)
 );
 
 -- likes
@@ -235,6 +243,8 @@ create unique index if not exists post_engagement_read_daily_actor_idx
   )
   where event_type = 'read';
 create index if not exists comments_post_id_idx on public.comments(post_id);
+create index if not exists comments_upvotes_idx on public.comments(upvotes desc);
+create index if not exists comment_votes_comment_id_idx on public.comment_votes(comment_id);
 create index if not exists likes_post_id_idx on public.likes(post_id);
 create index if not exists profiles_country_idx on public.profiles(country);
 create index if not exists profiles_profile_type_idx on public.profiles(profile_type);
@@ -510,6 +520,70 @@ as $$
   );
 $$;
 
+create or replace function public.toggle_comment_vote(p_comment_id uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+  v_voted boolean;
+  v_inserted boolean;
+  v_upvotes integer;
+begin
+  v_user_id := auth.uid();
+
+  if v_user_id is null then
+    raise exception 'You must be signed in to vote.';
+  end if;
+
+  if not exists (select 1 from public.comments where id = p_comment_id) then
+    raise exception 'Comment not found.';
+  end if;
+
+  select exists (
+    select 1
+    from public.comment_votes
+    where user_id = v_user_id
+      and comment_id = p_comment_id
+  ) into v_voted;
+
+  if v_voted then
+    delete from public.comment_votes
+    where user_id = v_user_id
+      and comment_id = p_comment_id;
+
+    update public.comments
+      set upvotes = greatest(upvotes - 1, 0)
+      where id = p_comment_id
+      returning upvotes into v_upvotes;
+
+    return json_build_object('voted', false, 'upvotes', v_upvotes);
+  end if;
+
+  insert into public.comment_votes (user_id, comment_id)
+  values (v_user_id, p_comment_id)
+  on conflict do nothing
+  returning true into v_inserted;
+
+  if not coalesce(v_inserted, false) then
+    select upvotes into v_upvotes
+    from public.comments
+    where id = p_comment_id;
+
+    return json_build_object('voted', true, 'upvotes', v_upvotes);
+  end if;
+
+  update public.comments
+    set upvotes = upvotes + 1
+    where id = p_comment_id
+    returning upvotes into v_upvotes;
+
+  return json_build_object('voted', true, 'upvotes', v_upvotes);
+end;
+$$;
+
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================================
@@ -518,6 +592,7 @@ $$;
 alter table public.profiles enable row level security;
 alter table public.posts enable row level security;
 alter table public.comments enable row level security;
+alter table public.comment_votes enable row level security;
 alter table public.likes enable row level security;
 alter table public.follows enable row level security;
 alter table public.badges enable row level security;
@@ -587,6 +662,15 @@ select pg_temp.create_policy_if_missing('public', 'comments', 'Authors can updat
 
 select pg_temp.create_policy_if_missing('public', 'comments', 'Authors can delete their own comments',
   $$create policy "Authors can delete their own comments" on public.comments for delete using (auth.uid() = author_id)$$);
+
+select pg_temp.create_policy_if_missing('public', 'comment_votes', 'Comment votes are viewable by everyone',
+  $$create policy "Comment votes are viewable by everyone" on public.comment_votes for select using (true)$$);
+
+select pg_temp.create_policy_if_missing('public', 'comment_votes', 'Authenticated users can vote on comments',
+  $$create policy "Authenticated users can vote on comments" on public.comment_votes for insert with check (auth.role() = 'authenticated' and auth.uid() = user_id)$$);
+
+select pg_temp.create_policy_if_missing('public', 'comment_votes', 'Users can remove their own comment votes',
+  $$create policy "Users can remove their own comment votes" on public.comment_votes for delete using (auth.uid() = user_id)$$);
 
 -- ---- likes ----
 select pg_temp.create_policy_if_missing('public', 'likes', 'Likes are viewable by everyone',

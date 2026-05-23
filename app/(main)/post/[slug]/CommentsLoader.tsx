@@ -54,10 +54,11 @@ export default async function CommentsLoader({ postId, userId, userProfileId }: 
 
   let userVotedCommentIds: string[] = [];
   if (userId && allCommentIds.length > 0) {
+    const profileId = userProfileId ?? userId;
     const { data: votes } = await supabase
       .from("comment_votes")
       .select("comment_id")
-      .eq("user_id", userProfileId)
+      .eq("user_id", profileId)
       .in("comment_id", allCommentIds);
     userVotedCommentIds = votes?.map((vote) => vote.comment_id) ?? [];
   }
