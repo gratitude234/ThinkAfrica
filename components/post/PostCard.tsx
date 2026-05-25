@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import PostCover from "@/components/post/PostCover";
 import {
   formatRelativeTime,
@@ -59,7 +60,7 @@ export interface PostCardData {
 
 interface PostCardProps {
   post: PostCardData;
-  variant?: "standard" | "featured";
+  variant?: "standard" | "editorial" | "featured";
 }
 
 const VERIFIED_COLORS: Record<string, string> = {
@@ -69,26 +70,35 @@ const VERIFIED_COLORS: Record<string, string> = {
   institution: "bg-blue-600",
 };
 
-const TYPE_ACCENTS: Record<string, string> = {
-  research: "bg-purple-accent",
-  essay: "bg-gold",
-  policy_brief: "bg-blue-600",
-  blog: "bg-emerald-brand",
-  quick_take: "bg-emerald-brand",
+const TYPE_STAMPS: Record<string, string> = {
+  research: "R",
+  essay: "E",
+  policy_brief: "P",
+  blog: "B",
+  quick_take: "Q",
+};
+
+const TYPE_GRADIENTS: Record<string, string> = {
+  research: "from-purple-900 to-purple-600",
+  essay: "from-amber-900 to-amber-600",
+  policy_brief: "from-blue-900 to-blue-600",
+  blog: "from-emerald-900 to-emerald-600",
+  quick_take: "from-emerald-900 to-emerald-600",
 };
 
 const TYPE_BADGES: Record<string, string> = {
-  research: "bg-purple-100 text-purple-800",
-  essay: "bg-amber-100 text-amber-800",
-  policy_brief: "bg-blue-100 text-blue-800",
-  blog: "bg-emerald-100 text-emerald-800",
-  quick_take: "bg-emerald-100 text-emerald-800",
+  research: "border-purple-200 bg-purple-50 text-purple-700",
+  essay: "border-amber-200 bg-amber-50 text-amber-800",
+  policy_brief: "border-blue-200 bg-blue-50 text-blue-700",
+  blog: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  quick_take: "border-emerald-200 bg-emerald-50 text-emerald-800",
 };
 
 const SIGNAL_BADGES = {
   reviewed: "border-emerald-200 bg-emerald-50 text-emerald-700",
   citable: "border-sky-200 bg-sky-50 text-sky-700",
   coauthor: "border-purple-200 bg-purple-50 text-purple-700",
+  pdf: "border-purple-200 bg-white text-purple-700",
 };
 
 const QUALITY_BADGE_CLASSES = {
@@ -112,9 +122,96 @@ function formatDocumentSize(value: number | null | undefined) {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function PostCard({
-  post,
-}: PostCardProps) {
+function formatCount(value: number) {
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return value.toString();
+}
+
+function getInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function GradientThumbnail({
+  type,
+  className,
+}: {
+  type: string;
+  className: string;
+}) {
+  const gradient = TYPE_GRADIENTS[type] ?? TYPE_GRADIENTS.blog;
+  const stamp = TYPE_STAMPS[type] ?? "T";
+
+  return (
+    <div
+      className={`relative flex shrink-0 items-end justify-end overflow-hidden bg-gradient-to-br p-2 ${gradient} ${className}`}
+      aria-hidden="true"
+    >
+      <span className="font-display absolute -bottom-1 right-1 select-none text-[56px] font-bold leading-none text-white/[0.16] sm:text-[64px]">
+        {stamp}
+      </span>
+    </div>
+  );
+}
+
+function EngagementMetric({
+  icon,
+  value,
+  label,
+}: {
+  icon: ReactNode;
+  value: number | null;
+  label: string;
+}) {
+  if (value === null || value <= 0) return null;
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[11.5px]" aria-label={`${formatCount(value)} ${label}`}>
+      {icon}
+      {formatCount(value)}
+    </span>
+  );
+}
+
+function HeartIcon() {
+  return (
+    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  );
+}
+
+function CommentIcon() {
+  return (
+    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function BookmarkIcon() {
+  return (
+    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+export default function PostCard({ post, variant = "standard" }: PostCardProps) {
   const author = post.profiles;
   const displayDate = post.published_at ?? post.created_at;
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
@@ -136,60 +233,73 @@ export default function PostCard({
     coAuthorCount > 0 ? `${authorName} + ${coAuthorCount} others` : authorName;
   const verifiedBg =
     VERIFIED_COLORS[author?.verified_type ?? "student"] ?? "bg-emerald-brand";
-  const accentClass = TYPE_ACCENTS[post.type] ?? "bg-emerald-brand";
-  const badgeClass = TYPE_BADGES[post.type] ?? "bg-emerald-100 text-emerald-800";
+  const badgeClass = TYPE_BADGES[post.type] ?? TYPE_BADGES.blog;
   const likeCount = typeof post.like_count === "number" ? post.like_count : null;
   const commentCount = typeof post.comment_count === "number" ? post.comment_count : null;
   const readCount = typeof post.read_count === "number" ? post.read_count : null;
   const hasCoverImage = Boolean(post.cover_image_url?.trim());
+  const isEditorial = variant === "editorial" || variant === "featured";
   const qualityBadges = (post.quality_badges ?? [])
     .filter((badge) =>
       post.type === "research"
         ? !["reviewed", "citable", "source_backed"].includes(badge.key)
         : !["reviewed", "citable"].includes(badge.key)
     )
-    .slice(0, 3);
+    .slice(0, isEditorial ? 2 : 3);
+
+  const thumbnail = hasCoverImage ? (
+    <PostCover
+      src={post.cover_image_url}
+      alt={post.title}
+      type={post.type}
+      sizes={isEditorial ? "112px" : "96px"}
+      className={
+        isEditorial
+          ? "h-[104px] w-[88px] rounded-[10px] sm:h-[118px] sm:w-[96px]"
+          : "h-[78px] w-[78px] rounded-[9px] min-[420px]:h-[88px] min-[420px]:w-[88px] sm:h-[96px] sm:w-[96px]"
+      }
+      imageClassName="object-cover"
+    />
+  ) : (
+    <GradientThumbnail
+      type={post.type}
+      className={
+        isEditorial
+          ? "h-[104px] w-[88px] rounded-[10px] sm:h-[118px] sm:w-[96px]"
+          : "h-[78px] w-[78px] rounded-[9px] min-[420px]:h-[88px] min-[420px]:w-[88px] sm:h-[96px] sm:w-[96px]"
+      }
+    />
+  );
 
   return (
-    <article className="group relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-3.5 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08),0_2px_5px_-2px_rgb(0_0_0/0.05)] sm:px-5 sm:py-[18px]">
-      <span
-        className={`absolute bottom-4 left-0 top-4 w-0.5 rounded-r-full opacity-80 sm:w-1 ${accentClass}`}
-        aria-hidden="true"
-      />
+    <article
+      className={`group mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_8px_20px_-4px_rgb(0_0_0/0.08),0_2px_6px_-2px_rgb(0_0_0/0.04)] ${
+        isEditorial ? "px-4 py-4 sm:px-6 sm:py-5" : "px-3.5 py-3.5 sm:px-5 sm:py-[18px]"
+      }`}
+    >
       <div
-        className={
-          hasCoverImage
-            ? "grid grid-cols-[minmax(0,1fr)_84px] gap-3 pl-1 min-[420px]:grid-cols-[minmax(0,1fr)_92px] sm:grid-cols-[minmax(0,1fr)_112px] sm:gap-4"
-            : "grid grid-cols-1 pl-1"
-        }
+        className={`grid min-w-0 grid-cols-[minmax(0,1fr)_78px] gap-3 min-[420px]:grid-cols-[minmax(0,1fr)_88px] sm:gap-4 ${
+          isEditorial
+            ? "sm:grid-cols-[minmax(0,1fr)_96px]"
+            : "sm:grid-cols-[minmax(0,1fr)_96px]"
+        }`}
       >
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold ${badgeClass}`}>
+        <div className="min-w-0">
+          <div className="mb-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10.5px] font-semibold ${badgeClass}`}>
               {typeLabel}
             </span>
             <span className="text-[11px] font-medium text-ink-muted">
               {readingLabel}
             </span>
             {post.type === "research" ? (
-              <span className="inline-flex rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-purple-700">
+              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${SIGNAL_BADGES.pdf}`}>
                 PDF
               </span>
             ) : null}
             {post.in_response_to ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-400">
-                {"↩"} Response
-              </span>
-            ) : null}
-            {isReviewed ? (
-              <span
-                className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${
-                  post.type === "research"
-                    ? "border-purple-200 bg-purple-50 text-purple-700"
-                    : SIGNAL_BADGES.reviewed
-                }`}
-              >
-                Reviewed
+              <span className="inline-flex rounded-full border border-gray-200 px-2 py-0.5 text-[10.5px] font-semibold text-gray-500">
+                Response
               </span>
             ) : null}
             {post.citation_id ? (
@@ -199,6 +309,16 @@ export default function PostCard({
               >
                 Citable
               </Link>
+            ) : isReviewed ? (
+              <span
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${
+                  post.type === "research"
+                    ? "border-purple-200 bg-purple-50 text-purple-700"
+                    : SIGNAL_BADGES.reviewed
+                }`}
+              >
+                Reviewed
+              </span>
             ) : null}
             {coAuthorCount > 0 ? (
               <span
@@ -220,13 +340,25 @@ export default function PostCard({
           </div>
 
           <Link href={`/post/${post.slug}`}>
-            <h2 className="font-display line-clamp-2 text-[16.5px] font-semibold leading-[1.24] text-ink transition-colors group-hover:text-gray-700 sm:text-[18px] sm:leading-[1.22]">
+            <h2
+              className={`font-display line-clamp-2 font-semibold text-ink transition-colors group-hover:text-gray-700 ${
+                isEditorial
+                  ? "text-[19px] leading-[1.19] sm:text-[21px]"
+                  : "text-[16.5px] leading-[1.24] sm:text-[18px] sm:leading-[1.22]"
+              }`}
+            >
               {post.title}
             </h2>
           </Link>
 
           {excerpt ? (
-            <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-gray-500 max-[359px]:hidden">
+            <p
+              className={`mt-2 text-gray-500 max-[359px]:hidden ${
+                isEditorial
+                  ? "line-clamp-3 text-[13.5px] leading-[1.62]"
+                  : "line-clamp-2 text-[13px] leading-relaxed"
+              }`}
+            >
               {excerpt}
             </p>
           ) : null}
@@ -244,11 +376,13 @@ export default function PostCard({
                 <img
                   src={author.avatar_url}
                   alt={authorName}
-                  className="h-7 w-7 shrink-0 rounded-full object-cover"
+                  className={`${isEditorial ? "h-7 w-7" : "h-6 w-6 sm:h-7 sm:w-7"} shrink-0 rounded-full object-cover`}
                 />
               ) : (
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-semibold text-emerald-800">
-                  {authorName.charAt(0).toUpperCase()}
+                <span
+                  className={`${isEditorial ? "h-7 w-7" : "h-6 w-6 sm:h-7 sm:w-7"} flex shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10.5px] font-semibold text-emerald-800`}
+                >
+                  {getInitials(authorName)}
                 </span>
               )}
               <div className="min-w-0 flex-1 text-[11px] leading-4 text-ink-muted">
@@ -263,7 +397,7 @@ export default function PostCard({
                         title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
                         className={`inline-flex h-3 w-3 shrink-0 items-center justify-center rounded-full ${verifiedBg} text-[6px] font-bold text-white`}
                       >
-                        {"✓"}
+                        {"\u2713"}
                       </span>
                     ) : null}
                   </Link>
@@ -271,54 +405,23 @@ export default function PostCard({
                   <span className="font-semibold text-gray-700">{authorLine}</span>
                 )}
                 {author?.university ? (
-                  <span className="ml-1 hidden truncate text-gray-400 sm:inline">{"·"} {author.university}</span>
+                  <span className="ml-1 hidden truncate text-gray-400 sm:inline">{"\u00B7"} {author.university}</span>
                 ) : null}
-                <span className="ml-1 whitespace-nowrap text-gray-400">{"·"} {formatRelativeTime(displayDate)}</span>
+                <span className="ml-1 whitespace-nowrap text-gray-400">{"\u00B7"} {formatRelativeTime(displayDate)}</span>
               </div>
-              {/* Engagement icon row */}
               <div className="ml-auto flex shrink-0 items-center gap-2.5 text-gray-500 sm:gap-3">
-                {likeCount !== null ? (
-                  <span className="flex items-center gap-1 text-[11.5px]">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                    </svg>
-                    {likeCount > 0 ? likeCount : null}
-                  </span>
-                ) : null}
-                {commentCount !== null ? (
-                  <span className="flex items-center gap-1 text-[11.5px]">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
-                    {commentCount > 0 ? commentCount : null}
-                  </span>
-                ) : null}
-                {readCount !== null && readCount > 0 ? (
-                  <span className="flex items-center gap-1 text-[11.5px]">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    {readCount.toLocaleString()}
-                  </span>
-                ) : null}
+                <EngagementMetric icon={<HeartIcon />} value={likeCount} label="likes" />
+                <EngagementMetric icon={<CommentIcon />} value={commentCount} label="comments" />
+                <EngagementMetric icon={<EyeIcon />} value={readCount} label="reads" />
+                {isEditorial ? <span className="hidden text-gray-400 sm:inline-flex"><BookmarkIcon /></span> : null}
               </div>
             </div>
           </div>
         </div>
 
-        {hasCoverImage ? (
-          <Link href={`/post/${post.slug}`} className="shrink-0 self-start">
-            <PostCover
-              src={post.cover_image_url}
-              alt={post.title}
-              type={post.type}
-              sizes="112px"
-              className="h-[84px] w-[84px] rounded-xl sm:h-[100px] sm:w-[100px] md:h-[112px] md:w-[112px]"
-              imageClassName="object-cover"
-            />
-          </Link>
-        ) : null}
+        <Link href={`/post/${post.slug}`} className="shrink-0 self-start">
+          {thumbnail}
+        </Link>
       </div>
     </article>
   );

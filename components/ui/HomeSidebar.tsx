@@ -39,6 +39,7 @@ interface Props {
   activationState: ActivationState | null;
   peopleSuggestions: SuggestedPerson[];
   currentUserId: string | null;
+  topics: string[];
 }
 
 function SideKicker({
@@ -59,7 +60,7 @@ function SideKicker({
 
 function SideCard({ children }: { children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm shadow-black/[0.02]">
+    <section className="rounded-xl border border-gray-200 bg-white p-4">
       {children}
     </section>
   );
@@ -178,6 +179,27 @@ function ActivationCard({ state }: { state: ActivationState }) {
   );
 }
 
+function TopicsCard({ topics }: { topics: string[] }) {
+  if (topics.length === 0) return null;
+
+  return (
+    <SideCard>
+      <SideKicker>Browse by topic</SideKicker>
+      <div className="flex flex-wrap gap-1.5">
+        {topics.slice(0, 10).map((topic) => (
+          <Link
+            key={topic}
+            href={`/topics/${encodeURIComponent(topic)}`}
+            className="rounded-full border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-ink-muted transition-colors hover:border-emerald-brand hover:bg-emerald-50 hover:text-emerald-800"
+          >
+            {topic}
+          </Link>
+        ))}
+      </div>
+    </SideCard>
+  );
+}
+
 export default function HomeSidebar({
   activeDebate,
   newVoice,
@@ -185,6 +207,7 @@ export default function HomeSidebar({
   activationState,
   peopleSuggestions,
   currentUserId,
+  topics,
 }: Props) {
   const debateShare = activeDebate ? getDebateShare(activeDebate) : null;
   const debateRemaining = activeDebate
@@ -271,6 +294,8 @@ export default function HomeSidebar({
           cta="Start a debate"
         />
       )}
+
+      <TopicsCard topics={topics} />
 
       {newVoice?.profile?.username ? (
         <SideCard>

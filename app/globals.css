@@ -3,8 +3,52 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --ta-emerald-50: #ECFDF5;
+    --ta-emerald-100: #D1FAE5;
+    --ta-emerald-500: #10B981;
+    --ta-emerald-600: #059669;
+    --ta-emerald-700: #047857;
+    --ta-purple-50: #F5F3FF;
+    --ta-purple-100: #EDE9FE;
+    --ta-purple-600: #7C3AED;
+    --ta-gold-50: #FFFBEB;
+    --ta-gold-100: #FEF3C7;
+    --ta-gold-500: #F59E0B;
+    --ta-blue-50: #EFF6FF;
+    --ta-blue-100: #DBEAFE;
+    --ta-blue-600: #2563EB;
+    --ta-canvas: #FAF8F5;
+    --ta-canvas-2: #F5F3EE;
+    --ta-surface: #FFFFFF;
+    --ta-night: #111827;
+    --ta-ink: #1A1A1A;
+    --ta-ink-muted: #6B6B6B;
+    --ta-ink-faint: #9CA3AF;
+    --ta-border: #E5E7EB;
+    --ta-border-soft: #F3F4F6;
+  }
+
+  html {
+    scrollbar-color: #D1D5DB transparent;
+  }
+
   body {
     @apply overflow-x-hidden bg-canvas text-ink antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: #D1D5DB;
   }
 }
 

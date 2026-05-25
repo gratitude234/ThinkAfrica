@@ -6,7 +6,7 @@ import { useViewImpression } from "@/lib/useViewImpression";
 
 interface PostCardImpressionProps {
   post: PostCardData;
-  variant?: "standard" | "featured";
+  variant?: "standard" | "editorial" | "featured";
   currentUserId?: string | null;
   surface?: string;
 }

@@ -22,6 +22,22 @@ interface PickPost {
   } | null;
 }
 
+const TYPE_STAMPS: Record<string, string> = {
+  research: "R",
+  essay: "E",
+  policy_brief: "P",
+  blog: "B",
+  quick_take: "Q",
+};
+
+const TYPE_GRADIENTS: Record<string, string> = {
+  research: "from-purple-900 to-purple-600",
+  essay: "from-amber-900 to-amber-600",
+  policy_brief: "from-blue-900 to-blue-600",
+  blog: "from-emerald-900 to-emerald-600",
+  quick_take: "from-emerald-900 to-emerald-600",
+};
+
 function estimateReadTime(excerpt: string | null): number {
   return Math.max(
     1,
@@ -43,6 +59,8 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
           const typeLabel = POST_TYPE_LABELS[pick.type as PostType] ?? pick.type;
           const readTime = estimateReadTime(sanitizePostExcerpt(pick.excerpt));
           const hasCoverImage = Boolean(pick.cover_image_url?.trim());
+          const gradient = TYPE_GRADIENTS[pick.type] ?? TYPE_GRADIENTS.blog;
+          const stamp = TYPE_STAMPS[pick.type] ?? "T";
 
           return (
             <Link
@@ -59,7 +77,13 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
                   className="h-[88px] w-full"
                   imageClassName="object-cover"
                 />
-              ) : null}
+              ) : (
+                <div className={`relative h-[88px] w-full overflow-hidden bg-gradient-to-br ${gradient}`}>
+                  <span className="font-display absolute -bottom-2 right-3 select-none text-[68px] font-bold leading-none text-white/[0.16]">
+                    {stamp}
+                  </span>
+                </div>
+              )}
               <div className="px-3 py-2.5">
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500">
                   {typeLabel} {"\u00B7"} {readTime} min

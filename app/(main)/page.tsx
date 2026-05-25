@@ -88,6 +88,19 @@ interface VoicePostRaw {
   profiles: VoiceProfile | VoiceProfile[] | null;
 }
 
+const DEFAULT_SIDEBAR_TOPICS = [
+  "Climate Policy",
+  "Labour Law",
+  "Gender Studies",
+  "Public Health",
+  "Economic Development",
+  "Legal Theory",
+  "African Philosophy",
+  "Tech & Society",
+  "Education Reform",
+  "Urban Planning",
+];
+
 interface VoiceProfile {
   username: string | null;
   full_name: string | null;
@@ -140,6 +153,41 @@ function uniqueFeaturedPosts(posts: FeaturedPostRaw[]) {
     seen.add(post.id);
     return true;
   });
+}
+
+function deriveSidebarTopics({
+  userInterests,
+  featuredPosts,
+  latestResearch,
+}: {
+  userInterests: string[];
+  featuredPosts: Array<{ tags: string[] | null }>;
+  latestResearch: Array<{ tags: string[] | null }>;
+}) {
+  const scores = new Map<string, number>();
+
+  for (const tag of userInterests) {
+    scores.set(tag, (scores.get(tag) ?? 0) + 4);
+  }
+
+  for (const post of featuredPosts) {
+    for (const tag of post.tags ?? []) {
+      scores.set(tag, (scores.get(tag) ?? 0) + 2);
+    }
+  }
+
+  for (const paper of latestResearch) {
+    for (const tag of paper.tags ?? []) {
+      scores.set(tag, (scores.get(tag) ?? 0) + 1);
+    }
+  }
+
+  const ranked = Array.from(scores.entries())
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([tag]) => tag)
+    .filter(Boolean);
+
+  return Array.from(new Set([...ranked, ...DEFAULT_SIDEBAR_TOPICS])).slice(0, 10);
 }
 
 export default async function HomePage({ searchParams }: PageProps) {
@@ -500,6 +548,12 @@ export default async function HomePage({ searchParams }: PageProps) {
     })
     .slice(0, 3);
 
+  const sidebarTopics = deriveSidebarTopics({
+    userInterests,
+    featuredPosts: qualityRankedFeaturedPosts,
+    latestResearch,
+  });
+
   let peopleResult: SuggestedPeopleResult = { suggestions: [], reason: "" };
   let activationState: ActivationState | null = null;
 
@@ -583,6 +637,7 @@ export default async function HomePage({ searchParams }: PageProps) {
             activationState={activationState}
             peopleSuggestions={peopleResult.suggestions}
             currentUserId={user?.id ?? null}
+            topics={sidebarTopics}
           />
         </aside>
       </div>

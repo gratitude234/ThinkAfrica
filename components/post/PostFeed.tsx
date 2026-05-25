@@ -91,14 +91,21 @@ export default function PostFeed({
 
           {posts.map((post, index) => (
             <div key={post.id}>
+              {canShowDebateInterlude &&
+              index === 5 &&
+              activeDebate ? (
+                <DebateInterlude debate={activeDebate} />
+              ) : null}
+
               <PostCardImpression
                 post={post}
-                variant="standard"
+                variant={index % 3 === 1 ? "editorial" : "standard"}
                 currentUserId={currentUserId}
                 surface={activeTab}
               />
 
               {canShowDebateInterlude &&
+              index > 5 &&
               (index + 1) % 8 === 0 &&
               activeDebate ? (
                 <DebateInterlude debate={activeDebate} />
