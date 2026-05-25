@@ -52,9 +52,9 @@ interface SuggestedProfile {
   points: number | null;
 }
 
-type Step = "persona" | "identity" | "interests" | "follow" | "contribute";
+type Step = "persona" | "identity" | "interests" | "follow";
 
-const STEP_ORDER: Step[] = ["persona", "identity", "interests", "follow", "contribute"];
+const STEP_ORDER: Step[] = ["persona", "interests", "follow"];
 
 const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
@@ -64,7 +64,7 @@ function normalizeUsername(value: string) {
 }
 
 function getStepFromParam(value: string | null): Step {
-  return STEP_ORDER.includes(value as Step) ? (value as Step) : "identity";
+  return STEP_ORDER.includes(value as Step) ? (value as Step) : "persona";
 }
 
 function trackStepCompleted(step: Step) {
@@ -338,7 +338,7 @@ export default function OnboardingPage() {
       event: "onboarding_step_completed",
       metadata: { step: "persona", profile_type: profileType },
     });
-    goToStep("identity");
+    goToStep("interests");
   };
 
   const saveIdentity = async () => {
@@ -447,7 +447,6 @@ export default function OnboardingPage() {
       .from("profiles")
       .update({ onboarding_completed: true })
       .eq("id", userId);
-    trackStepCompleted("contribute");
     trackActivationEvent({ event: "onboarding_completed" });
     setLoading(false);
     router.push(destination);
@@ -803,7 +802,7 @@ export default function OnboardingPage() {
           <div className="mt-8 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => goToStep("identity")}
+              onClick={() => goToStep("persona")}
               className="text-sm text-gray-500 hover:text-gray-700"
             >
               Back
@@ -828,13 +827,15 @@ export default function OnboardingPage() {
                 First network
               </p>
               <h1 className="mt-2 text-2xl font-bold text-gray-900">
-                Follow 3 writers to shape your home feed
+                Follow writers to shape your home feed
               </h1>
               <p className="mt-2 text-sm font-medium text-gray-700">
                 <span className={followedIds.size >= 3 ? "text-emerald-600" : "text-gray-700"}>
                   {Math.min(followedIds.size, 3)}/3
                 </span>{" "}
-                <span className="text-gray-500">writers followed</span>
+                <span className="text-gray-500">
+                  writers followed. You can continue whenever you are ready.
+                </span>
               </p>
             </div>
           </div>
@@ -906,108 +907,16 @@ export default function OnboardingPage() {
             >
               Back
             </button>
-            <div className="flex items-center gap-3">
-              {followedIds.size < 3 ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    trackStepCompleted("follow");
-                    goToStep("contribute");
-                  }}
-                  className="text-sm text-gray-500 hover:text-gray-700"
-                >
-                  Skip for now
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  trackStepCompleted("follow");
-                  goToStep("contribute");
-                }}
-                disabled={followedIds.size < 3}
-                className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-              >
-                {followedIds.size < 3
-                  ? `Continue (${Math.min(followedIds.size, 3)}/3)`
-                  : "Continue"}
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {step === "contribute" ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-            First contribution
-          </p>
-          <h1 className="mt-2 text-2xl font-bold text-gray-900">
-            Start with one clear idea
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">
-            A quick take is the fastest way to make your profile real. You can
-            publish today or keep it as a draft while you read more.
-          </p>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-[1.4fr_1fr_1fr]">
             <button
               type="button"
-              onClick={() => completeOnboarding("/write?type=blog&starter=1&welcome=1")}
-              className="rounded-xl border border-emerald-300 bg-emerald-50 p-5 text-left shadow-sm transition-colors hover:bg-emerald-100"
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                Recommended
-              </p>
-              <p className="mt-2 text-base font-semibold text-emerald-950">
-                Write a quick take
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-emerald-900">
-                Use a short structure: your point, why it matters, one example,
-                and the question others should answer.
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => completeOnboarding("/?tab=latest&welcome=1")}
-              className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-emerald-200"
-            >
-              <p className="text-sm font-semibold text-gray-900">
-                Read latest posts
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-gray-500">
-                Browse first if you want more context before writing.
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => completeOnboarding("/?tab=latest&type=essay&welcome=1")}
-              className="rounded-xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-emerald-200"
-            >
-              <p className="text-sm font-semibold text-gray-900">
-                Respond to a post
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-gray-500">
-                Open an essay and add a response when you have a useful angle.
-              </p>
-            </button>
-          </div>
-
-          <div className="mt-8 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => goToStep("follow")}
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={() => completeOnboarding()}
+              onClick={() => {
+                trackStepCompleted("follow");
+                completeOnboarding();
+              }}
               disabled={loading}
-              className="rounded-lg border border-gray-200 px-6 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-canvas disabled:opacity-50"
+              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
             >
-              {loading ? "Finishing..." : "Finish for now"}
+              {loading ? "Finishing..." : "Finish onboarding"}
             </button>
           </div>
         </section>

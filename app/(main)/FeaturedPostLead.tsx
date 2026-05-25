@@ -88,6 +88,7 @@ export default function FeaturedPostLead({
       : `${readTime} min`;
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const stamp = STAMP[post.type] ?? "T";
+  const hasCoverImage = Boolean(post.cover_image_url?.trim());
   const initials = authorName
     .split(" ")
     .map((n) => n[0])
@@ -98,10 +99,17 @@ export default function FeaturedPostLead({
   return (
     <article className="group mb-5 overflow-hidden rounded-xl border border-gray-200 bg-white transition-[transform,box-shadow] duration-250 ease-[cubic-bezier(0.25,0,0,1)] hover:-translate-y-0.5 hover:shadow-[0_8px_16px_-4px_rgb(0_0_0/0.09),0_3px_6px_-3px_rgb(0_0_0/0.06)]">
       {/* Stacked on mobile, side-by-side on desktop */}
-      <div className="flex flex-col sm:grid sm:grid-cols-[340px_1fr]">
+      <div
+        className={
+          hasCoverImage
+            ? "flex flex-col sm:grid sm:grid-cols-[340px_1fr]"
+            : "flex flex-col"
+        }
+      >
 
         {/* Cover — full width on mobile, fixed left column on desktop */}
-        <Link href={`/post/${post.slug}`} className="relative block overflow-hidden sm:rounded-none">
+        {hasCoverImage ? (
+          <Link href={`/post/${post.slug}`} className="relative block overflow-hidden sm:rounded-none">
           <div className="h-[180px] sm:h-full sm:min-h-[280px]">
             <PostCover
               src={post.cover_image_url}
@@ -123,14 +131,22 @@ export default function FeaturedPostLead({
           <span className="absolute bottom-3 right-3 font-display text-[56px] font-semibold leading-none text-white/[0.16] select-none">
             {stamp}
           </span>
-        </Link>
+          </Link>
+        ) : null}
 
         {/* Body */}
         <div className="flex flex-col justify-between p-4 sm:p-7">
           <div>
-            <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-emerald-700 sm:mb-3">
-              {label}
-            </p>
+            <div className="mb-2 flex flex-wrap items-center gap-2 sm:mb-3">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                {label}
+              </p>
+              {!hasCoverImage ? (
+                <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+                  {typeLabel} {"\u00B7"} {readingLabel}
+                </span>
+              ) : null}
+            </div>
 
             <Link href={`/post/${post.slug}`}>
               <h2 className="font-display mb-2 text-[21px] font-semibold leading-[1.14] tracking-[-0.005em] text-gray-900 transition-colors group-hover:text-gray-700 sm:mb-3 sm:text-[26px]">

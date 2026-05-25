@@ -5,6 +5,8 @@
   | "start"
   | "submit";
 
+import { isAcademicProfileType, isProfileType } from "@/lib/profileTypes";
+
 export interface ActivationTask {
   key: ActivationTaskKey;
   label: string;
@@ -28,17 +30,31 @@ export interface ActivationState {
   nextTask: ActivationTask | null;
 }
 
+function hasText(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 function isProfileComplete(profile: Record<string, unknown> | null) {
   const interests = profile?.interests;
+  const rawProfileType =
+    typeof profile?.profile_type === "string" ? profile.profile_type : null;
+  const profileType = isProfileType(rawProfileType) ? rawProfileType : null;
 
-  return Boolean(
-    profile?.full_name &&
-      profile?.username &&
-      profile?.university &&
-      profile?.field_of_study &&
-      Array.isArray(interests) &&
-      interests.length > 0
-  );
+  if (
+    !hasText(profile?.full_name) ||
+    !hasText(profile?.username) ||
+    !hasText(profile?.country) ||
+    !Array.isArray(interests) ||
+    interests.length === 0
+  ) {
+    return false;
+  }
+
+  if (!profileType || isAcademicProfileType(profileType)) {
+    return hasText(profile?.university) && hasText(profile?.field_of_study);
+  }
+
+  return hasText(profile?.professional_title);
 }
 
 async function countRowsSafe(
@@ -70,7 +86,9 @@ export async function getActivationState(
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, username, university, field_of_study, interests")
+      .select(
+        "full_name, username, country, university, field_of_study, interests, profile_type, professional_title"
+      )
       .eq("id", userId)
       .single(),
     countRowsSafe(
@@ -154,9 +172,9 @@ export async function getActivationState(
   const tasks: ActivationTask[] = [
     {
       key: "profile",
-      label: "Complete academic profile",
-      description: "Add your university, field, and topics so the network can place your work.",
-      href: "/onboarding",
+      label: "Complete profile",
+      description: "Add the essentials that help readers understand who you are and what you follow.",
+      href: "/settings",
       done: profileComplete,
     },
     {

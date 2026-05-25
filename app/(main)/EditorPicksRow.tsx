@@ -42,6 +42,7 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
           const author = pick.profiles;
           const typeLabel = POST_TYPE_LABELS[pick.type as PostType] ?? pick.type;
           const readTime = estimateReadTime(sanitizePostExcerpt(pick.excerpt));
+          const hasCoverImage = Boolean(pick.cover_image_url?.trim());
 
           return (
             <Link
@@ -49,14 +50,16 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
               href={`/post/${pick.slug}`}
               className="group overflow-hidden rounded-xl border border-gray-200 bg-white transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)]"
             >
-              <PostCover
-                src={pick.cover_image_url}
-                alt={pick.title}
-                type={pick.type}
-                sizes="(max-width: 1024px) 50vw, 33vw"
-                className="h-[88px] w-full"
-                imageClassName="object-cover"
-              />
+              {hasCoverImage ? (
+                <PostCover
+                  src={pick.cover_image_url}
+                  alt={pick.title}
+                  type={pick.type}
+                  sizes="(max-width: 1024px) 50vw, 33vw"
+                  className="h-[88px] w-full"
+                  imageClassName="object-cover"
+                />
+              ) : null}
               <div className="px-3 py-2.5">
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500">
                   {typeLabel} {"\u00B7"} {readTime} min

@@ -141,6 +141,7 @@ export default function PostCard({
   const likeCount = typeof post.like_count === "number" ? post.like_count : null;
   const commentCount = typeof post.comment_count === "number" ? post.comment_count : null;
   const readCount = typeof post.read_count === "number" ? post.read_count : null;
+  const hasCoverImage = Boolean(post.cover_image_url?.trim());
   const qualityBadges = (post.quality_badges ?? [])
     .filter((badge) =>
       post.type === "research"
@@ -155,7 +156,13 @@ export default function PostCard({
         className={`absolute bottom-4 left-0 top-4 w-0.5 rounded-r-full opacity-80 sm:w-1 ${accentClass}`}
         aria-hidden="true"
       />
-      <div className="grid grid-cols-[minmax(0,1fr)_84px] gap-3 pl-1 min-[420px]:grid-cols-[minmax(0,1fr)_92px] sm:grid-cols-[minmax(0,1fr)_112px] sm:gap-4">
+      <div
+        className={
+          hasCoverImage
+            ? "grid grid-cols-[minmax(0,1fr)_84px] gap-3 pl-1 min-[420px]:grid-cols-[minmax(0,1fr)_92px] sm:grid-cols-[minmax(0,1fr)_112px] sm:gap-4"
+            : "grid grid-cols-1 pl-1"
+        }
+      >
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold ${badgeClass}`}>
@@ -300,16 +307,18 @@ export default function PostCard({
           </div>
         </div>
 
-        <Link href={`/post/${post.slug}`} className="shrink-0 self-start">
-          <PostCover
-            src={post.cover_image_url}
-            alt={post.title}
-            type={post.type}
-            sizes="112px"
-            className="h-[84px] w-[84px] rounded-xl sm:h-[100px] sm:w-[100px] md:h-[112px] md:w-[112px]"
-            imageClassName="object-cover"
-          />
-        </Link>
+        {hasCoverImage ? (
+          <Link href={`/post/${post.slug}`} className="shrink-0 self-start">
+            <PostCover
+              src={post.cover_image_url}
+              alt={post.title}
+              type={post.type}
+              sizes="112px"
+              className="h-[84px] w-[84px] rounded-xl sm:h-[100px] sm:w-[100px] md:h-[112px] md:w-[112px]"
+              imageClassName="object-cover"
+            />
+          </Link>
+        ) : null}
       </div>
     </article>
   );
