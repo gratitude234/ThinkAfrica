@@ -32,7 +32,7 @@ export function AuthShell({
 }: AuthShellProps) {
   return (
     <main className="min-h-dvh bg-[#F7F5F0]">
-      <div className="mx-auto grid min-h-dvh w-full max-w-7xl grid-cols-1 lg:grid-cols-[0.95fr_1.05fr]">
+      <div className="grid min-h-dvh w-full grid-cols-1 lg:grid-cols-[0.95fr_1.05fr]">
         <aside className="hidden min-h-dvh flex-col justify-between overflow-hidden bg-[#111816] px-10 py-10 text-white lg:flex">
           <div>
             <Link
