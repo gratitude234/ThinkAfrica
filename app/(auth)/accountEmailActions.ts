@@ -104,6 +104,17 @@ function renderConfirmationCodeHtml(code: string, email: string) {
   `;
 }
 
+function renderPasswordResetCodeHtml(code: string) {
+  const escapedCode = escapeHtml(code);
+  return `
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">Enter this code on the device where you requested the password reset:</p>
+    <div style="margin:0 0 18px;border:1px solid #d1fae5;background:#ecfdf5;border-radius:12px;padding:18px;text-align:center;">
+      <div style="font-size:30px;line-height:1.2;letter-spacing:8px;font-weight:800;color:#065f46;font-family:Arial,Helvetica,sans-serif;">${escapedCode}</div>
+    </div>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">You can also use the button below to reset your password directly.</p>
+  `;
+}
+
 async function sendGeneratedConfirmationEmail(input: {
   email: string;
   fullName?: string | null;
@@ -253,14 +264,15 @@ export async function sendPasswordResetEmail(input: { email: string }) {
           skipped: true,
           reason: "recipient_not_found",
         });
-        return { ok: true } as const;
+        return { ok: true, type: "recovery" } as const;
       }
       return { ok: false, error: error.message } as const;
     }
 
     const actionLink = data.properties?.action_link;
-    if (!actionLink) {
-      return { ok: false, error: "Unable to create reset link." } as const;
+    const emailOtp = data.properties?.email_otp;
+    if (!actionLink || !emailOtp) {
+      return { ok: false, error: "Unable to create reset code." } as const;
     }
     const safeActionLink = data.properties.hashed_token
       ? getAuthConfirmUrl({
@@ -273,11 +285,14 @@ export async function sendPasswordResetEmail(input: { email: string }) {
     const result = await sendDirectEmail({
       to: email,
       subject: "Reset your ThinkAfrica password",
-      preview: "Use this secure link to reset your ThinkAfrica password.",
+      preview: "Use your ThinkAfrica password reset code or secure link.",
       title: "Reset your password",
       intro:
-        "We received a request to reset your ThinkAfrica password. Use this secure link to choose a new password.",
+        "We received a request to reset your ThinkAfrica password. Use this code to choose a new password.",
+      bodyHtml: renderPasswordResetCodeHtml(emailOtp),
       bodyTextLines: [
+        `Password reset code: ${emailOtp}`,
+        "Enter this code on the device where you requested the reset, or use the reset link below.",
         "If you did not request this, you can ignore this email and your password will stay unchanged.",
       ],
       ctaLabel: "Reset password",
@@ -286,7 +301,7 @@ export async function sendPasswordResetEmail(input: { email: string }) {
     });
 
     logEmailResult(`password_reset:${email}`, result);
-    if ("ok" in result && result.ok) return { ok: true } as const;
+    if ("ok" in result && result.ok) return { ok: true, type: "recovery" } as const;
     if ("skipped" in result) {
       return { ok: false, error: "Email delivery is not configured." } as const;
     }

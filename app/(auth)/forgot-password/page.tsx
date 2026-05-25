@@ -9,17 +9,21 @@ import {
   SECONDARY_LINK_STYLES,
 } from "../AuthShell";
 import { formatAuthError } from "../authMessages";
+import { createClient } from "@/lib/supabase/client";
 import { sendPasswordResetEmail } from "../accountEmailActions";
 
 const PROOF_ITEMS = [
-  "Secure reset link by email",
+  "Secure reset code by email",
   "Return to your saved profile",
   "Keep drafts and activity intact",
 ];
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
+  const [resetCode, setResetCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +31,7 @@ export default function ForgotPasswordPage() {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setResendNotice(null);
 
     const result = await sendPasswordResetEmail({ email: email.trim() });
 
@@ -40,11 +45,55 @@ export default function ForgotPasswordPage() {
     setLoading(false);
   };
 
+  const handleVerifyCode = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const token = resetCode.replace(/\D/g, "");
+    if (token.length !== 6) {
+      setError("Enter the 6-digit reset code from your email.");
+      return;
+    }
+
+    setVerifyLoading(true);
+    setError(null);
+    setResendNotice(null);
+
+    const supabase = createClient();
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token,
+      type: "recovery",
+    });
+
+    setVerifyLoading(false);
+    if (verifyError) {
+      setError(formatAuthError(verifyError.message));
+      return;
+    }
+
+    window.location.href = "/reset-password";
+  };
+
+  const handleResendCode = async () => {
+    setLoading(true);
+    setError(null);
+    setResendNotice(null);
+
+    const result = await sendPasswordResetEmail({ email: email.trim() });
+
+    setLoading(false);
+    if (!result.ok) {
+      setError(formatAuthError(result.error));
+      return;
+    }
+
+    setResendNotice("A fresh reset code is on its way.");
+  };
+
   return (
     <AuthShell
       eyebrow="Account recovery"
       title="Reset your password securely."
-      subtitle="Enter the email tied to your ThinkAfrica profile. If an account exists, we will send a secure reset link."
+      subtitle="Enter the email tied to your ThinkAfrica profile. If an account exists, we will send a secure reset code and link."
       proofItems={PROOF_ITEMS}
       quote="Your profile should be easy to return to and hard for anyone else to access."
       quoteSource="ThinkAfrica account standard"
@@ -63,8 +112,49 @@ export default function ForgotPasswordPage() {
           role="status"
           aria-live="polite"
         >
-          If an account exists for that email, a reset link is on its way.
-          Check your inbox and open the link on this device.
+          <p>
+            If an account exists for {email.trim()}, a reset code is on its way.
+            Enter it here to reset your password on this device, or use the
+            email link on any device.
+          </p>
+          <form onSubmit={handleVerifyCode} className="mt-4 space-y-3">
+            <div>
+              <label
+                htmlFor="resetCode"
+                className="mb-2 block text-sm font-semibold text-emerald-950"
+              >
+                Reset code
+              </label>
+              <input
+                id="resetCode"
+                value={resetCode}
+                onChange={(event) =>
+                  setResetCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                className={`${INPUT_STYLES} bg-white text-center text-lg font-semibold tracking-[0.3em]`}
+              />
+            </div>
+            {error ? <p className="text-red-700">{error}</p> : null}
+            {resendNotice ? <p className="text-emerald-800">{resendNotice}</p> : null}
+            <button
+              type="submit"
+              disabled={verifyLoading || resetCode.length !== 6}
+              className={PRIMARY_BUTTON_STYLES}
+            >
+              {verifyLoading ? "Verifying..." : "Verify reset code"}
+            </button>
+          </form>
+          <button
+            type="button"
+            onClick={handleResendCode}
+            disabled={loading || !email.trim()}
+            className="mt-3 w-full rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {loading ? "Sending..." : "Resend code"}
+          </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -104,7 +194,7 @@ export default function ForgotPasswordPage() {
             disabled={loading}
             className={PRIMARY_BUTTON_STYLES}
           >
-            {loading ? "Sending reset link..." : "Send reset link"}
+            {loading ? "Sending reset code..." : "Send reset code"}
           </button>
         </form>
       )}
