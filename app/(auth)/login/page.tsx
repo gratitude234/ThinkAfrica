@@ -23,6 +23,8 @@ const PROOF_ITEMS = [
   "Build one credible academic profile",
 ];
 
+type VerificationType = "signup" | "magiclink";
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,9 @@ function LoginForm() {
   const [canResendConfirmation, setCanResendConfirmation] = useState(false);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationType, setVerificationType] = useState<VerificationType>("signup");
+  const [verifyLoading, setVerifyLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
 
   const redirectTo = getSafeRedirect(searchParams.get("redirectTo"));
@@ -85,12 +90,12 @@ function LoginForm() {
     try {
       const result = await resendSignupConfirmationEmail({
         email: form.email.trim(),
+        password: form.password,
       });
 
       if (result.ok) {
-        setResendNotice(
-          "If an unconfirmed account exists, a confirmation email is on its way."
-        );
+        setVerificationType(result.type);
+        setResendNotice("If an unconfirmed account exists, a verification code is on its way.");
       } else {
         setResendError(formatAuthError(result.error));
       }
@@ -98,11 +103,38 @@ function LoginForm() {
       setResendError(
         error instanceof Error
           ? formatAuthError(error.message)
-          : "We could not resend the confirmation email. Please try again."
+          : "We could not resend the verification code. Please try again."
       );
     } finally {
       setResendLoading(false);
     }
+  };
+
+  const handleVerifyCode = async () => {
+    const token = verificationCode.replace(/\D/g, "");
+    if (token.length !== 6) {
+      setResendError("Enter the 6-digit verification code from your email.");
+      return;
+    }
+
+    setVerifyLoading(true);
+    setResendNotice(null);
+    setResendError(null);
+
+    const supabase = createClient();
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email: form.email.trim().toLowerCase(),
+      token,
+      type: verificationType,
+    });
+
+    setVerifyLoading(false);
+    if (verifyError) {
+      setResendError(formatAuthError(verifyError.message));
+      return;
+    }
+
+    window.location.href = redirectTo;
   };
 
   return (
@@ -215,14 +247,41 @@ function LoginForm() {
 
         {canResendConfirmation ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
-            <p>Need a fresh confirmation link?</p>
+            <p>Need a fresh verification code?</p>
+            <div className="mt-3">
+              <label
+                htmlFor="loginVerificationCode"
+                className="mb-2 block text-sm font-semibold text-emerald-950"
+              >
+                Verification code
+              </label>
+              <input
+                id="loginVerificationCode"
+                value={verificationCode}
+                onChange={(event) =>
+                  setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                className={`${INPUT_STYLES} bg-white text-center text-lg font-semibold tracking-[0.3em]`}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleVerifyCode}
+              disabled={verifyLoading || verificationCode.length !== 6}
+              className="mt-3 rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {verifyLoading ? "Verifying..." : "Verify code"}
+            </button>
             <button
               type="button"
               onClick={handleResendConfirmation}
               disabled={resendLoading || !form.email.trim()}
-              className="mt-3 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+              className="ml-2 mt-3 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {resendLoading ? "Sending..." : "Resend confirmation email"}
+              {resendLoading ? "Sending..." : "Resend code"}
             </button>
             {resendNotice ? (
               <p className="mt-3 text-emerald-800">{resendNotice}</p>

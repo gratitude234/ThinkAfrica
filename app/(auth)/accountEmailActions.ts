@@ -78,18 +78,6 @@ function isUnknownRecoveryRecipient(error: unknown) {
   );
 }
 
-function isPrivacySafeResendRecipientError(error: unknown) {
-  const message = getEmailErrorMessage(error).toLowerCase();
-  return (
-    message.includes("user not found") ||
-    message.includes("not found") ||
-    message.includes("does not exist") ||
-    message.includes("already confirmed") ||
-    message.includes("already been confirmed") ||
-    message.includes("email confirmed")
-  );
-}
-
 function isRateLimitError(error: unknown) {
   const message = getEmailErrorMessage(error).toLowerCase();
   return (
@@ -97,6 +85,98 @@ function isRateLimitError(error: unknown) {
     message.includes("too many") ||
     message.includes("over_email_send_rate_limit")
   );
+}
+
+type ConfirmationType = Extract<EmailOtpType, "signup" | "magiclink">;
+
+function getConfirmationTypeFromLink(type: "signup" | "magiclink"): ConfirmationType {
+  return type;
+}
+
+function renderConfirmationCodeHtml(code: string, email: string) {
+  const escapedCode = escapeHtml(code);
+  return `
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">Enter this code on the device where you started signup:</p>
+    <div style="margin:0 0 18px;border:1px solid #d1fae5;background:#ecfdf5;border-radius:12px;padding:18px;text-align:center;">
+      <div style="font-size:30px;line-height:1.2;letter-spacing:8px;font-weight:800;color:#065f46;font-family:Arial,Helvetica,sans-serif;">${escapedCode}</div>
+    </div>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">You can also use the button below to confirm directly. This keeps your byline, drafts, follows, and notifications tied to ${escapeHtml(email)}.</p>
+  `;
+}
+
+async function sendGeneratedConfirmationEmail(input: {
+  email: string;
+  fullName?: string | null;
+  password?: string;
+  linkType: "signup" | "magiclink";
+}) {
+  const admin = createAdminClient();
+  const linkOptions = {
+    options: {
+      data: {
+        full_name: input.fullName?.trim() ?? "",
+      },
+      redirectTo: getAuthCallbackUrl("/onboarding"),
+    },
+  };
+  const { data, error } =
+    input.linkType === "signup"
+      ? await admin.auth.admin.generateLink({
+          type: "signup",
+          email: input.email,
+          password: input.password ?? "",
+          ...linkOptions,
+        })
+      : await admin.auth.admin.generateLink({
+          type: "magiclink",
+          email: input.email,
+          ...linkOptions,
+        });
+
+  if (error) {
+    return { ok: false, error: error.message } as const;
+  }
+
+  const actionLink = data.properties?.action_link;
+  const emailOtp = data.properties?.email_otp;
+  if (!actionLink || !emailOtp) {
+    return { ok: false, error: "Unable to create confirmation code." } as const;
+  }
+
+  const verificationType = getConfirmationTypeFromLink(input.linkType);
+  const safeActionLink = data.properties.hashed_token
+    ? getAuthConfirmUrl({
+        tokenHash: data.properties.hashed_token,
+        type: verificationType,
+        nextPath: "/onboarding",
+      })
+    : getSafeAuthActionLink(actionLink, "/onboarding");
+
+  const displayName = input.fullName?.trim() || "there";
+  const result = await sendDirectEmail({
+    to: input.email,
+    subject: "Confirm your ThinkAfrica account",
+    preview: "Use your ThinkAfrica verification code or confirmation link.",
+    title: "Confirm your ThinkAfrica account",
+    intro: `Hi ${displayName}. Use this code to activate your ThinkAfrica profile and continue onboarding.`,
+    bodyHtml: renderConfirmationCodeHtml(emailOtp, input.email),
+    bodyTextLines: [
+      `Verification code: ${emailOtp}`,
+      "Enter this code on the device where you started signup, or use the confirmation link below.",
+    ],
+    ctaLabel: "Confirm account",
+    ctaPath: safeActionLink,
+    idempotencyKey: `signup-confirm:${input.email}:${data.properties.hashed_token ?? emailOtp}`,
+  });
+
+  logEmailResult(`signup_confirm:${input.email}`, result);
+  if ("ok" in result && result.ok) {
+    return { ok: true, type: verificationType } as const;
+  }
+  if ("skipped" in result) {
+    return { ok: false, error: "Email delivery is not configured." } as const;
+  }
+  return { ok: false, error: result.error } as const;
 }
 
 export async function sendSignupConfirmationEmail(input: {
@@ -112,63 +192,22 @@ export async function sendSignupConfirmationEmail(input: {
   }
 
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin.auth.admin.generateLink({
-      type: "signup",
+    return await sendGeneratedConfirmationEmail({
       email,
       password: input.password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-        redirectTo: getAuthCallbackUrl("/onboarding"),
-      },
+      fullName,
+      linkType: "signup",
     });
-
-    if (error) {
-      return { ok: false, error: error.message } as const;
-    }
-
-    const actionLink = data.properties?.action_link;
-    if (!actionLink) {
-      return { ok: false, error: "Unable to create confirmation link." } as const;
-    }
-    const safeActionLink = data.properties.hashed_token
-      ? getAuthConfirmUrl({
-          tokenHash: data.properties.hashed_token,
-          type: "signup",
-          nextPath: "/onboarding",
-        })
-      : getSafeAuthActionLink(actionLink, "/onboarding");
-
-    const displayName = fullName || "there";
-    const result = await sendDirectEmail({
-      to: email,
-      subject: "Confirm your ThinkAfrica account",
-      preview: "Confirm your email to finish creating your ThinkAfrica profile.",
-      title: "Confirm your ThinkAfrica account",
-      intro: `Hi ${displayName}. Confirm your email to activate your ThinkAfrica profile and continue onboarding.`,
-      bodyHtml: `<p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">This link protects your account and keeps your byline, drafts, follows, and notifications tied to ${escapeHtml(email)}.</p>`,
-      bodyTextLines: [
-        "This link protects your account and keeps your byline, drafts, follows, and notifications tied to your email.",
-      ],
-      ctaLabel: "Confirm account",
-      ctaPath: safeActionLink,
-      idempotencyKey: `signup-confirm:${email}:${data.properties.hashed_token}`,
-    });
-
-    logEmailResult(`signup_confirm:${email}`, result);
-    if ("ok" in result && result.ok) return { ok: true } as const;
-    if ("skipped" in result) {
-      return { ok: false, error: "Email delivery is not configured." } as const;
-    }
-    return { ok: false, error: result.error } as const;
   } catch (error) {
     return { ok: false, error: getEmailErrorMessage(error) } as const;
   }
 }
 
-export async function resendSignupConfirmationEmail(input: { email: string }) {
+export async function resendSignupConfirmationEmail(input: {
+  email: string;
+  password?: string;
+  fullName?: string | null;
+}) {
   const email = normalizeEmail(input.email);
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -176,28 +215,12 @@ export async function resendSignupConfirmationEmail(input: { email: string }) {
   }
 
   try {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.resend({
-      type: "signup",
+    return await sendGeneratedConfirmationEmail({
       email,
-      options: {
-        emailRedirectTo: getAuthCallbackUrl("/onboarding"),
-      },
+      password: input.password,
+      fullName: input.fullName,
+      linkType: input.password ? "signup" : "magiclink",
     });
-
-    if (error) {
-      if (isRateLimitError(error)) {
-        return { ok: false, error: error.message } as const;
-      }
-
-      if (isPrivacySafeResendRecipientError(error)) {
-        return { ok: true } as const;
-      }
-
-      return { ok: false, error: error.message } as const;
-    }
-
-    return { ok: true } as const;
   } catch (error) {
     if (isRateLimitError(error)) {
       return { ok: false, error: getEmailErrorMessage(error) } as const;

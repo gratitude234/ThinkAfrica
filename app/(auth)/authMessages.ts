@@ -13,7 +13,7 @@ export function formatAuthError(message: string) {
     normalized.includes("already exists") ||
     normalized.includes("user already")
   ) {
-    return "An account already exists with this email. If you have not confirmed it yet, check your inbox or resend the confirmation email.";
+    return "An account already exists with this email. If you have not confirmed it yet, check your inbox or resend the verification code.";
   }
 
   if (
