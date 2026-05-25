@@ -18,6 +18,9 @@ const PROOF_ITEMS = [
   "Keep drafts and activity intact",
 ];
 
+const AUTH_CODE_MIN_LENGTH = 6;
+const AUTH_CODE_MAX_LENGTH = 10;
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [resetCode, setResetCode] = useState("");
@@ -48,8 +51,8 @@ export default function ForgotPasswordPage() {
   const handleVerifyCode = async (event: React.FormEvent) => {
     event.preventDefault();
     const token = resetCode.replace(/\D/g, "");
-    if (token.length !== 6) {
-      setError("Enter the 6-digit reset code from your email.");
+    if (token.length < AUTH_CODE_MIN_LENGTH) {
+      setError("Enter the full reset code from your email.");
       return;
     }
 
@@ -129,11 +132,13 @@ export default function ForgotPasswordPage() {
                 id="resetCode"
                 value={resetCode}
                 onChange={(event) =>
-                  setResetCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                  setResetCode(
+                    event.target.value.replace(/\D/g, "").slice(0, AUTH_CODE_MAX_LENGTH)
+                  )
                 }
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                placeholder="123456"
+                placeholder="12345678"
                 className={`${INPUT_STYLES} bg-white text-center text-lg font-semibold tracking-[0.3em]`}
               />
             </div>
@@ -141,7 +146,7 @@ export default function ForgotPasswordPage() {
             {resendNotice ? <p className="text-emerald-800">{resendNotice}</p> : null}
             <button
               type="submit"
-              disabled={verifyLoading || resetCode.length !== 6}
+              disabled={verifyLoading || resetCode.length < AUTH_CODE_MIN_LENGTH}
               className={PRIMARY_BUTTON_STYLES}
             >
               {verifyLoading ? "Verifying..." : "Verify reset code"}

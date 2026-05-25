@@ -25,6 +25,9 @@ const PROOF_ITEMS = [
 
 type VerificationType = "signup" | "magiclink";
 
+const AUTH_CODE_MIN_LENGTH = 6;
+const AUTH_CODE_MAX_LENGTH = 10;
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -112,8 +115,8 @@ function LoginForm() {
 
   const handleVerifyCode = async () => {
     const token = verificationCode.replace(/\D/g, "");
-    if (token.length !== 6) {
-      setResendError("Enter the 6-digit verification code from your email.");
+    if (token.length < AUTH_CODE_MIN_LENGTH) {
+      setResendError("Enter the full verification code from your email.");
       return;
     }
 
@@ -259,18 +262,20 @@ function LoginForm() {
                 id="loginVerificationCode"
                 value={verificationCode}
                 onChange={(event) =>
-                  setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                  setVerificationCode(
+                    event.target.value.replace(/\D/g, "").slice(0, AUTH_CODE_MAX_LENGTH)
+                  )
                 }
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                placeholder="123456"
+                placeholder="12345678"
                 className={`${INPUT_STYLES} bg-white text-center text-lg font-semibold tracking-[0.3em]`}
               />
             </div>
             <button
               type="button"
               onClick={handleVerifyCode}
-              disabled={verifyLoading || verificationCode.length !== 6}
+              disabled={verifyLoading || verificationCode.length < AUTH_CODE_MIN_LENGTH}
               className="mt-3 rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {verifyLoading ? "Verifying..." : "Verify code"}

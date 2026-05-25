@@ -28,6 +28,9 @@ const PROOF_ITEMS = [
 
 type VerificationType = "signup" | "magiclink";
 
+const AUTH_CODE_MIN_LENGTH = 6;
+const AUTH_CODE_MAX_LENGTH = 10;
+
 function getPasswordHint(password: string) {
   if (!password) return "Use at least 6 characters.";
   if (password.length < 6) return "Add a few more characters.";
@@ -160,8 +163,8 @@ export default function SignupPage() {
   const handleVerifyCode = async (event: React.FormEvent) => {
     event.preventDefault();
     const token = verificationCode.replace(/\D/g, "");
-    if (token.length !== 6) {
-      setResendError("Enter the 6-digit verification code from your email.");
+    if (token.length < AUTH_CODE_MIN_LENGTH) {
+      setResendError("Enter the full verification code from your email.");
       return;
     }
 
@@ -235,7 +238,7 @@ export default function SignupPage() {
           aria-live="polite"
         >
           <p>
-            We sent a 6-digit code to {form.email.trim()}. Enter it here to
+            We sent a verification code to {form.email.trim()}. Enter it here to
             continue on this device, or use the email link on any device.
           </p>
           <form onSubmit={handleVerifyCode} className="mt-4 space-y-3">
@@ -250,11 +253,13 @@ export default function SignupPage() {
                 id="verificationCode"
                 value={verificationCode}
                 onChange={(event) =>
-                  setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                  setVerificationCode(
+                    event.target.value.replace(/\D/g, "").slice(0, AUTH_CODE_MAX_LENGTH)
+                  )
                 }
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                placeholder="123456"
+                placeholder="12345678"
                 className={`${INPUT_STYLES} bg-white text-center text-lg font-semibold tracking-[0.3em]`}
               />
             </div>
@@ -262,7 +267,7 @@ export default function SignupPage() {
             {resendNotice ? <p className="text-emerald-800">{resendNotice}</p> : null}
             <button
               type="submit"
-              disabled={verifyLoading || verificationCode.length !== 6}
+              disabled={verifyLoading || verificationCode.length < AUTH_CODE_MIN_LENGTH}
               className={PRIMARY_BUTTON_STYLES}
             >
               {verifyLoading ? "Verifying..." : "Verify code"}
