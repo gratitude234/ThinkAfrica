@@ -5,22 +5,39 @@ interface ActivationFocusPanelProps {
   state: ActivationState;
 }
 
-function TaskStatusIcon({ task, active }: { task: ActivationTask; active: boolean }) {
-  if (task.done) {
-    return (
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-[10px] font-bold text-white">
-        {"\u2713"}
-      </span>
-    );
-  }
-
+function StepDot({
+  task,
+  active,
+  index,
+}: {
+  task: ActivationTask;
+  active: boolean;
+  index: number;
+}) {
   return (
-    <span
-      className={`mt-0.5 h-5 w-5 shrink-0 rounded-full border ${
-        active ? "border-emerald-brand bg-emerald-50" : "border-emerald-200 bg-white"
+    <Link
+      href={task.href}
+      className={`group flex min-w-0 items-center gap-2 rounded-full border px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors ${
+        task.done
+          ? "border-emerald-100 bg-emerald-50 text-emerald-800"
+          : active
+            ? "border-emerald-300 bg-white text-ink shadow-sm shadow-emerald-900/[0.04]"
+            : "border-gray-200 bg-white text-gray-500 hover:border-emerald-200 hover:text-emerald-700"
       }`}
-      aria-hidden="true"
-    />
+    >
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] ${
+          task.done
+            ? "bg-emerald-brand text-white"
+            : active
+              ? "border border-emerald-brand bg-emerald-50 text-emerald-800"
+              : "border border-gray-200 bg-white text-gray-400"
+        }`}
+      >
+        {task.done ? "\u2713" : index + 1}
+      </span>
+      <span className="truncate">{task.label}</span>
+    </Link>
   );
 }
 
@@ -32,76 +49,61 @@ export default function ActivationFocusPanel({ state }: ActivationFocusPanelProp
   const nextTask = state.nextTask;
 
   return (
-    <section className="mb-6 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm shadow-black/[0.02]">
-      <div className="grid gap-0 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <div className="border-b border-emerald-50 bg-white p-5 sm:p-6 lg:border-b-0 lg:border-r">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
-            First contribution
-          </p>
-          <h2 className="font-display mt-2 text-[26px] font-semibold leading-tight text-ink">
+    <section className="mb-5 rounded-xl border border-emerald-100 bg-white p-4 shadow-sm shadow-black/[0.02] sm:p-5">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+              First contribution
+            </p>
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+              {doneCount} of {state.tasks.length} complete
+            </span>
+          </div>
+
+          <h2 className="font-display text-[23px] font-semibold leading-tight text-ink sm:text-[25px]">
             {nextTask?.key === "start"
               ? "Turn one idea into your first quick take"
               : nextTask?.label ?? "Keep building your ThinkAfrica profile"}
           </h2>
-          <p className="mt-2 text-sm leading-6 text-ink-muted">
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-ink-muted">
             {nextTask?.description ??
               "Complete the first steps that make your academic profile useful to readers, writers, and opportunity partners."}
           </p>
-
-          <div className="mt-5">
-            <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
-              <span>
-                {doneCount} of {state.tasks.length} complete
-              </span>
-              <span>{pct}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-              <div
-                className="h-full rounded-full bg-emerald-brand transition-all"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-
-          {nextTask ? (
-            <Link
-              href={nextTask.href}
-              className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 sm:w-auto"
-            >
-              {nextTask.key === "start" ? "Start quick take" : "Continue"}
-            </Link>
-          ) : null}
         </div>
 
-        <div className="bg-emerald-50/45 p-4 sm:p-5">
-          <div className="grid gap-3 md:grid-cols-2">
-            {state.tasks.map((task) => {
-              const active = task.key === nextTask?.key;
+        {nextTask ? (
+          <Link
+            href={nextTask.href}
+            className="inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 sm:w-auto"
+          >
+            {nextTask.key === "start" ? "Start quick take" : "Continue"}
+          </Link>
+        ) : null}
+      </div>
 
-              return (
-                <Link
-                  key={task.key}
-                  href={task.href}
-                  className={`flex min-h-[118px] items-start gap-3 rounded-xl border p-4 text-sm transition-colors ${
-                    task.done
-                      ? "border-emerald-100 bg-white/85 text-emerald-950"
-                      : active
-                        ? "border-emerald-300 bg-white text-ink shadow-sm shadow-emerald-900/[0.04]"
-                        : "border-transparent bg-white/60 text-ink-muted hover:bg-white"
-                  }`}
-                >
-                  <TaskStatusIcon task={task} active={active} />
-                  <span className="min-w-0">
-                    <span className="block font-semibold">{task.label}</span>
-                    <span className="mt-1 line-clamp-3 block text-xs leading-5 text-gray-500">
-                      {task.description}
-                    </span>
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
+      <div className="mt-4">
+        <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
+          <span>Setup progress</span>
+          <span>{pct}%</span>
         </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+          <div
+            className="h-full rounded-full bg-emerald-brand transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {state.tasks.map((task, index) => (
+          <StepDot
+            key={task.key}
+            task={task}
+            index={index}
+            active={task.key === nextTask?.key}
+          />
+        ))}
       </div>
     </section>
   );
