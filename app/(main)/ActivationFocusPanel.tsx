@@ -1,8 +1,27 @@
 import Link from "next/link";
-import type { ActivationState } from "@/lib/activation";
+import type { ActivationState, ActivationTask } from "@/lib/activation";
 
 interface ActivationFocusPanelProps {
   state: ActivationState;
+}
+
+function TaskStatusIcon({ task, active }: { task: ActivationTask; active: boolean }) {
+  if (task.done) {
+    return (
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-[10px] font-bold text-white">
+        {"\u2713"}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`mt-0.5 h-5 w-5 shrink-0 rounded-full border ${
+        active ? "border-emerald-brand bg-emerald-50" : "border-emerald-200 bg-white"
+      }`}
+      aria-hidden="true"
+    />
+  );
 }
 
 export default function ActivationFocusPanel({ state }: ActivationFocusPanelProps) {
@@ -14,36 +33,26 @@ export default function ActivationFocusPanel({ state }: ActivationFocusPanelProp
 
   return (
     <section className="mb-6 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm shadow-black/[0.02]">
-      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="p-5 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+      <div className="grid gap-0 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <div className="border-b border-emerald-50 bg-white p-5 sm:p-6 lg:border-b-0 lg:border-r">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
             First contribution
           </p>
-          <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="font-display text-2xl font-semibold leading-tight text-ink">
-                {nextTask?.key === "start"
-                  ? "Turn one idea into your first quick take"
-                  : nextTask?.label ?? "Keep building your ThinkAfrica profile"}
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">
-                {nextTask?.description ??
-                  "Complete the first steps that make your academic profile useful to readers, writers, and opportunity partners."}
-              </p>
-            </div>
-            {nextTask ? (
-              <Link
-                href={nextTask.href}
-                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-              >
-                {nextTask.key === "start" ? "Start quick take" : "Continue"}
-              </Link>
-            ) : null}
-          </div>
+          <h2 className="font-display mt-2 text-[26px] font-semibold leading-tight text-ink">
+            {nextTask?.key === "start"
+              ? "Turn one idea into your first quick take"
+              : nextTask?.label ?? "Keep building your ThinkAfrica profile"}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">
+            {nextTask?.description ??
+              "Complete the first steps that make your academic profile useful to readers, writers, and opportunity partners."}
+          </p>
 
           <div className="mt-5">
             <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
-              <span>{doneCount} of {state.tasks.length} complete</span>
+              <span>
+                {doneCount} of {state.tasks.length} complete
+              </span>
               <span>{pct}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-gray-100">
@@ -53,39 +62,44 @@ export default function ActivationFocusPanel({ state }: ActivationFocusPanelProp
               />
             </div>
           </div>
+
+          {nextTask ? (
+            <Link
+              href={nextTask.href}
+              className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 sm:w-auto"
+            >
+              {nextTask.key === "start" ? "Start quick take" : "Continue"}
+            </Link>
+          ) : null}
         </div>
 
-        <div className="border-t border-emerald-50 bg-emerald-50/55 p-4 lg:border-l lg:border-t-0">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-            {state.tasks.map((task) => (
-              <Link
-                key={task.key}
-                href={task.href}
-                className={`flex items-start gap-3 rounded-xl border px-3 py-3 text-sm transition-colors ${
-                  task.done
-                    ? "border-emerald-100 bg-white/80 text-emerald-900"
-                    : task.key === nextTask?.key
-                      ? "border-emerald-200 bg-white text-ink shadow-sm"
-                      : "border-transparent bg-white/55 text-ink-muted hover:bg-white"
-                }`}
-              >
-                <span
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+        <div className="bg-emerald-50/45 p-4 sm:p-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            {state.tasks.map((task) => {
+              const active = task.key === nextTask?.key;
+
+              return (
+                <Link
+                  key={task.key}
+                  href={task.href}
+                  className={`flex min-h-[118px] items-start gap-3 rounded-xl border p-4 text-sm transition-colors ${
                     task.done
-                      ? "bg-emerald-brand text-white"
-                      : "border border-emerald-200 bg-white text-transparent"
+                      ? "border-emerald-100 bg-white/85 text-emerald-950"
+                      : active
+                        ? "border-emerald-300 bg-white text-ink shadow-sm shadow-emerald-900/[0.04]"
+                        : "border-transparent bg-white/60 text-ink-muted hover:bg-white"
                   }`}
                 >
-                  {"\u2713"}
-                </span>
-                <span className="min-w-0">
-                  <span className="block font-semibold">{task.label}</span>
-                  <span className="mt-0.5 line-clamp-2 block text-xs leading-5 text-gray-500">
-                    {task.description}
+                  <TaskStatusIcon task={task} active={active} />
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{task.label}</span>
+                    <span className="mt-1 line-clamp-3 block text-xs leading-5 text-gray-500">
+                      {task.description}
+                    </span>
                   </span>
-                </span>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
