@@ -60,7 +60,7 @@ export interface PostCardData {
 
 interface PostCardProps {
   post: PostCardData;
-  variant?: "standard" | "editorial" | "featured";
+  variant?: "standard" | "editorial" | "featured" | "explore";
 }
 
 const VERIFIED_COLORS: Record<string, string> = {
@@ -239,24 +239,27 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
   const readCount = typeof post.read_count === "number" ? post.read_count : null;
   const hasCoverImage = Boolean(post.cover_image_url?.trim());
   const isEditorial = variant === "editorial" || variant === "featured";
+  const isExplore = variant === "explore";
   const qualityBadges = (post.quality_badges ?? [])
     .filter((badge) =>
       post.type === "research"
         ? !["reviewed", "citable", "source_backed"].includes(badge.key)
         : !["reviewed", "citable"].includes(badge.key)
     )
-    .slice(0, isEditorial ? 2 : 3);
+    .slice(0, isExplore ? 1 : isEditorial ? 2 : 3);
 
   const thumbnail = hasCoverImage ? (
     <PostCover
       src={post.cover_image_url}
       alt={post.title}
       type={post.type}
-      sizes={isEditorial ? "112px" : "96px"}
+      sizes={isExplore ? "72px" : isEditorial ? "112px" : "96px"}
       className={
-        isEditorial
-          ? "h-[104px] w-[88px] rounded-[10px] sm:h-[118px] sm:w-[96px]"
-          : "h-[78px] w-[78px] rounded-[9px] min-[420px]:h-[88px] min-[420px]:w-[88px] sm:h-[96px] sm:w-[96px]"
+        isExplore
+          ? "h-16 w-16 rounded-[9px] min-[420px]:h-[72px] min-[420px]:w-[72px]"
+          : isEditorial
+            ? "h-[104px] w-[88px] rounded-[10px] sm:h-[118px] sm:w-[96px]"
+            : "h-[78px] w-[78px] rounded-[9px] min-[420px]:h-[88px] min-[420px]:w-[88px] sm:h-[96px] sm:w-[96px]"
       }
       imageClassName="object-cover"
     />
@@ -264,9 +267,11 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
     <GradientThumbnail
       type={post.type}
       className={
-        isEditorial
-          ? "h-[104px] w-[88px] rounded-[10px] sm:h-[118px] sm:w-[96px]"
-          : "h-[78px] w-[78px] rounded-[9px] min-[420px]:h-[88px] min-[420px]:w-[88px] sm:h-[96px] sm:w-[96px]"
+        isExplore
+          ? "h-16 w-16 rounded-[9px] min-[420px]:h-[72px] min-[420px]:w-[72px]"
+          : isEditorial
+            ? "h-[104px] w-[88px] rounded-[10px] sm:h-[118px] sm:w-[96px]"
+            : "h-[78px] w-[78px] rounded-[9px] min-[420px]:h-[88px] min-[420px]:w-[88px] sm:h-[96px] sm:w-[96px]"
       }
     />
   );
@@ -274,17 +279,28 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
   return (
     <article
       className={`group mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_8px_20px_-4px_rgb(0_0_0/0.08),0_2px_6px_-2px_rgb(0_0_0/0.04)] ${
-        isEditorial ? "px-4 py-4 sm:px-6 sm:py-5" : "px-3.5 py-3.5 sm:px-5 sm:py-[18px]"
+        isEditorial
+          ? "px-4 py-4 sm:px-6 sm:py-5"
+          : isExplore
+            ? "px-3.5 py-3.5 sm:px-5 sm:py-4"
+            : "px-3.5 py-3.5 sm:px-5 sm:py-[18px]"
       }`}
     >
       <div
-        className={`grid min-w-0 grid-cols-[minmax(0,1fr)_78px] gap-3 min-[420px]:grid-cols-[minmax(0,1fr)_88px] sm:gap-4 ${
-          isEditorial
-            ? "sm:grid-cols-[minmax(0,1fr)_96px]"
-            : "sm:grid-cols-[minmax(0,1fr)_96px]"
+        className={`grid min-w-0 gap-3 sm:gap-4 ${
+          isExplore
+            ? "grid-cols-[minmax(0,1fr)_64px] min-[420px]:grid-cols-[minmax(0,1fr)_72px]"
+            : "grid-cols-[minmax(0,1fr)_78px] min-[420px]:grid-cols-[minmax(0,1fr)_88px] sm:grid-cols-[minmax(0,1fr)_96px]"
         }`}
       >
         <div className="min-w-0">
+          {isExplore && post.surface_reason ? (
+            <p className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-medium text-gray-400">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-brand" />
+              <span className="line-clamp-1">{post.surface_reason}</span>
+            </p>
+          ) : null}
+
           <div className="mb-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
             <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10.5px] font-semibold ${badgeClass}`}>
               {typeLabel}
@@ -292,7 +308,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
             <span className="text-[11px] font-medium text-ink-muted">
               {readingLabel}
             </span>
-            {post.type === "research" ? (
+            {post.type === "research" && !isExplore ? (
               <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${SIGNAL_BADGES.pdf}`}>
                 PDF
               </span>
@@ -320,7 +336,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
                 Reviewed
               </span>
             ) : null}
-            {coAuthorCount > 0 ? (
+            {coAuthorCount > 0 && !isExplore ? (
               <span
                 className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${SIGNAL_BADGES.coauthor}`}
               >
@@ -344,6 +360,8 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
               className={`font-display line-clamp-2 font-semibold text-ink transition-colors group-hover:text-gray-700 ${
                 isEditorial
                   ? "text-[19px] leading-[1.19] sm:text-[21px]"
+                  : isExplore
+                    ? "text-[15px] leading-[1.28] sm:text-[16.5px] sm:leading-[1.28]"
                   : "text-[16.5px] leading-[1.24] sm:text-[18px] sm:leading-[1.22]"
               }`}
             >
@@ -363,7 +381,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
             </p>
           ) : null}
 
-          {post.surface_reason ? (
+          {post.surface_reason && !isExplore ? (
             <p className="mt-2 inline-flex rounded-lg bg-canvas px-2.5 py-1 text-[11px] font-medium text-gray-500">
               Why surfaced: {post.surface_reason}
             </p>
