@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { escapeHtml, logEmailResult, sendUserEmail } from "@/lib/email";
+import { requireNotSuspended } from "@/lib/suspension";
 
 type CommentAuthor = {
   username: string | null;
@@ -63,6 +64,11 @@ export async function submitComment(input: SubmitCommentInput): Promise<{
 
   if (!user) {
     return { error: "You must be signed in to comment." };
+  }
+
+  const suspensionError = await requireNotSuspended(user.id);
+  if (suspensionError) {
+    return { error: suspensionError };
   }
 
   const parentId = input.parentId ?? null;

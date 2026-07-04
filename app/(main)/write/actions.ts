@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { recordActivationEvent } from "@/lib/activationServer";
+import { requireNotSuspended } from "@/lib/suspension";
 import {
   createVersionSnapshot,
   getSubmissionTrack,
@@ -301,6 +302,11 @@ export async function ensureDraft(input: {
     return { error: "You must be signed in.", draftId: null as string | null };
   }
 
+  const suspensionError = await requireNotSuspended(user.id);
+  if (suspensionError) {
+    return { error: suspensionError, draftId: null as string | null };
+  }
+
   const slugBase = slugify(input.title || "untitled", {
     lower: true,
     strict: true,
@@ -398,6 +404,11 @@ export async function publishPost(input: {
     return { error: "You must be signed in.", slug: null as string | null };
   }
 
+  const suspensionError = await requireNotSuspended(user.id);
+  if (suspensionError) {
+    return { error: suspensionError, slug: null as string | null };
+  }
+
   if (input.postType === "research") {
     return {
       error: "Research papers must be uploaded through the research submission flow.",
@@ -435,6 +446,20 @@ export async function publishPost(input: {
   let responseParentPath: string | null = null;
 
   if (postId) {
+    const { data: existingPost } = await supabase
+      .from("posts")
+      .select("status")
+      .eq("id", postId)
+      .eq("author_id", user.id)
+      .maybeSingle();
+
+    if (existingPost?.status === "removed") {
+      return {
+        error: "This post was removed by moderators and cannot be republished.",
+        slug: null as string | null,
+      };
+    }
+
     const { error } = await supabase
       .from("posts")
       .update({

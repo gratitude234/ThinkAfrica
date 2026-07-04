@@ -453,6 +453,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     { count: debateContributionCount },
     activityData,
     followStatus,
+    blockStatus,
   ] = await Promise.all([
     supabase
       .from("posts")
@@ -533,6 +534,14 @@ export default async function UserProfilePage({ params }: PageProps) {
           .select("follower_id")
           .eq("follower_id", user.id)
           .eq("following_id", profile.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    user && user.id !== profile.id
+      ? supabase
+          .from("user_blocks")
+          .select("blocker_id")
+          .eq("blocker_id", user.id)
+          .eq("blocked_id", profile.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
@@ -757,6 +766,7 @@ export default async function UserProfilePage({ params }: PageProps) {
         isOwnProfile={isOwnProfile}
         currentUserId={user?.id ?? null}
         initialFollowing={!!followStatus.data}
+        initialBlocked={!!blockStatus.data}
         isOpenToOpportunities={!!talentProfile?.open_to_opportunities}
         canContact={opportunityVisible && !isOwnProfile}
         talentProfileId={talentProfile?.id ?? null}

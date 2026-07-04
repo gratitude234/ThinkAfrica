@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import FollowButton from "@/app/(main)/[username]/FollowButton";
+import BlockUserButton from "@/components/moderation/BlockUserButton";
+import ReportButton from "@/components/moderation/ReportButton";
 import ContactInquiryModal from "@/components/profile/ContactInquiryModal";
 import ShareButton from "@/components/profile/ShareButton";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -44,6 +46,7 @@ interface ProfileHeaderProps {
   isOwnProfile: boolean;
   currentUserId: string | null;
   initialFollowing: boolean;
+  initialBlocked?: boolean;
   isOpenToOpportunities: boolean;
   canContact: boolean;
   talentProfileId: string | null;
@@ -77,6 +80,7 @@ export default function ProfileHeader({
   isOwnProfile,
   currentUserId,
   initialFollowing,
+  initialBlocked = false,
   isOpenToOpportunities,
   canContact,
   talentProfileId,
@@ -230,6 +234,16 @@ export default function ProfileHeader({
                 </Link>
                 <ShareButton label="Share profile" className="w-full" />
               </>
+            ) : initialBlocked ? (
+              <>
+                <BlockUserButton
+                  targetUserId={profile.id}
+                  targetName={displayName}
+                  currentUserId={currentUserId}
+                  initialBlocked
+                />
+                <ShareButton className="w-full" />
+              </>
             ) : (
               <>
                 <FollowButton
@@ -255,6 +269,24 @@ export default function ProfileHeader({
                   ) : null}
                   <ShareButton className={currentUserId ? "flex-1" : "w-full"} />
                 </div>
+                {currentUserId ? (
+                  <div className="flex items-center justify-center gap-3 pt-1">
+                    <ReportButton
+                      targetType="user"
+                      targetId={profile.id}
+                      targetLabel={displayName}
+                      variant="text"
+                    />
+                    <span className="text-gray-200">|</span>
+                    <BlockUserButton
+                      targetUserId={profile.id}
+                      targetName={displayName}
+                      currentUserId={currentUserId}
+                      initialBlocked={false}
+                      variant="text"
+                    />
+                  </div>
+                ) : null}
               </>
             )}
           </div>

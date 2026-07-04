@@ -1,3 +1,4 @@
+import { getBlockedUserIds } from "@/lib/blocking";
 import { createClient } from "@/lib/supabase/server";
 import CommentsSection, { type CommentItem } from "./CommentsSection";
 
@@ -10,20 +11,26 @@ interface Props {
 export default async function CommentsLoader({ postId, userId, userProfileId }: Props) {
   const supabase = await createClient();
 
-  const { data: commentsRaw } = await supabase
-    .from("comments")
-    .select(
-      "id, content, created_at, upvotes, parent_id, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
-    )
-    .eq("post_id", postId)
-    .order("created_at", { ascending: true });
+  const [{ data: commentsRaw }, blockedIds] = await Promise.all([
+    supabase
+      .from("comments")
+      .select(
+        "id, content, created_at, upvotes, parent_id, author_id, profiles!comments_author_id_fkey (username, full_name, avatar_url)"
+      )
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true }),
+    getBlockedUserIds(userId),
+  ]);
 
-  const normalizedComments = (commentsRaw ?? []).map((comment) => ({
-    ...comment,
-    upvotes: (comment as { upvotes?: number }).upvotes ?? 0,
-    parent_id: comment.parent_id as string | null,
-    profiles: Array.isArray(comment.profiles) ? comment.profiles[0] : comment.profiles,
-  }));
+  const blockedSet = new Set(blockedIds);
+  const normalizedComments = (commentsRaw ?? [])
+    .filter((comment) => !blockedSet.has(comment.author_id as string))
+    .map((comment) => ({
+      ...comment,
+      upvotes: (comment as { upvotes?: number }).upvotes ?? 0,
+      parent_id: comment.parent_id as string | null,
+      profiles: Array.isArray(comment.profiles) ? comment.profiles[0] : comment.profiles,
+    }));
 
   const repliesByParent = normalizedComments.reduce(
     (acc, comment) => {

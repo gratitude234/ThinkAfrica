@@ -8,6 +8,8 @@ import {
   sendUserEmail,
   type EmailSendResult,
 } from "@/lib/email";
+import { isBlockedPair } from "@/lib/blocking";
+import { requireNotSuspended } from "@/lib/suspension";
 
 const MESSAGE_EMAIL_COOLDOWN_MS = 30 * 60 * 1000;
 
@@ -107,6 +109,11 @@ export async function sendConversationMessage(
   if (participantError) return { error: participantError.message };
   if (!senderParticipant) return { error: "You cannot send messages in this conversation." };
 
+  const suspensionError = await requireNotSuspended(user.id);
+  if (suspensionError) {
+    return { error: suspensionError };
+  }
+
   const [{ data: recipient }, { data: senderProfile }] = await Promise.all([
     supabase
       .from("conversation_participants")
@@ -120,6 +127,10 @@ export async function sendConversationMessage(
       .eq("id", user.id)
       .maybeSingle<ProfileSummary>(),
   ]);
+
+  if (recipient && (await isBlockedPair(user.id, recipient.user_id))) {
+    return { error: "You cannot send messages in this conversation." };
+  }
 
   const { data: message, error: messageError } = await supabase
     .from("messages")

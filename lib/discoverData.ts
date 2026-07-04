@@ -162,30 +162,39 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
       university: null as string | null,
       fieldOfStudy: null as string | null,
       followedIds: [] as string[],
+      blockedIds: [] as string[],
     };
   }
 
-  const [{ data: profile }, { data: follows }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("interests, university, field_of_study")
-      .eq("id", userId)
-      .single(),
-    supabase
-      .from("follows")
-      .select("following_id")
-      .eq("follower_id", userId)
-      .limit(1000),
-  ]);
+  const [{ data: profile }, { data: follows }, { data: blocks }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("interests, university, field_of_study")
+        .eq("id", userId)
+        .single(),
+      supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", userId)
+        .limit(1000),
+      supabase
+        .from("user_blocks")
+        .select("blocked_id")
+        .eq("blocker_id", userId)
+        .limit(1000),
+    ]);
 
   const profileRow = profile as ProfileRow | null;
   const followRows = (follows ?? []) as FollowRow[];
+  const blockRows = (blocks ?? []) as Array<{ blocked_id: string }>;
 
   return {
     interests: normalizeInterests(profileRow?.interests),
     university: profileRow?.university ?? null,
     fieldOfStudy: profileRow?.field_of_study ?? null,
     followedIds: followRows.map((row) => row.following_id),
+    blockedIds: blockRows.map((row) => row.blocked_id),
   };
 }
 
@@ -198,6 +207,7 @@ async function getFeed(
     userInterests: string[];
     userUniversity: string | null;
     followedIds: string[];
+    excludedAuthorIds?: string[];
     pageSize: number;
   }
 ) {
@@ -212,6 +222,7 @@ async function getFeed(
     userInterests: options.userInterests,
     userUniversity: options.userUniversity,
     followedIds: options.followedIds,
+    excludedAuthorIds: options.excludedAuthorIds,
   });
 
   return result.posts;
@@ -671,6 +682,7 @@ export async function getDiscoverData(
       userInterests: userContext.interests,
       userUniversity: userContext.university,
       followedIds: userContext.followedIds,
+      excludedAuthorIds: userContext.blockedIds,
       pageSize: 6,
     }),
     getFeed(supabase, {

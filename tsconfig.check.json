@@ -1,0 +1,37 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
+    "incremental": false
+  },
+  "include": [],
+  "files": [
+    "lib/blocking.ts",
+    "lib/suspension.ts",
+    "lib/messaging.ts",
+    "lib/feedData.ts",
+    "lib/suggestedPeople.ts",
+    "lib/discoverData.ts",
+    "lib/adminAccess.ts",
+    "components/moderation/reportReasons.ts",
+    "components/moderation/reportActions.ts",
+    "components/moderation/blockActions.ts",
+    "components/moderation/ReportModal.tsx",
+    "components/moderation/ReportButton.tsx",
+    "components/moderation/BlockUserButton.tsx",
+    "components/profile/ProfileHeader.tsx",
+    "app/(main)/admin/moderation/page.tsx",
+    "app/(main)/admin/moderation/actions.ts",
+    "app/(main)/admin/moderation/ModerationActions.tsx",
+    "app/(main)/admin/moderation/loading.tsx",
+    "app/(main)/admin/page.tsx",
+    "app/(main)/post/[slug]/CommentsLoader.tsx",
+    "app/(main)/post/[slug]/CommentsSection.tsx",
+    "app/(main)/post/commentActions.ts",
+    "app/(main)/write/actions.ts",
+    "app/(main)/messages/[id]/actions.ts",
+    "app/(main)/PostsFeedSection.tsx",
+    "app/api/feed/route.ts"
+  ]
+}

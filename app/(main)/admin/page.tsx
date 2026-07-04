@@ -40,6 +40,7 @@ export default async function AdminIndexPage() {
     { count: pendingEditorialCount },
     { count: pendingApplicationsCount },
     { count: pendingAmbassadorsCount },
+    { count: pendingReportsCount },
     { data: publishedAuthorRows },
     { data: recentAuditRows },
   ] = await Promise.all([
@@ -54,6 +55,10 @@ export default async function AdminIndexPage() {
       .eq("status", "pending"),
     admin
       .from("campus_ambassadors")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    admin
+      .from("reports")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending"),
     admin
@@ -116,6 +121,12 @@ export default async function AdminIndexPage() {
           label="Ambassador requests"
           value={pendingAmbassadorsCount ?? 0}
           helper="Campus ambassador requests pending"
+        />
+        <StatCard
+          href="/admin/moderation"
+          label="Open reports"
+          value={pendingReportsCount ?? 0}
+          helper="User reports awaiting moderation"
         />
       </div>
 

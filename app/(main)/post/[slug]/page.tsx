@@ -28,6 +28,7 @@ import CopyCitationIdButton from "./CopyCitationIdButton";
 import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
 import PostCover from "@/components/post/PostCover";
 import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
+import ReportButton from "@/components/moderation/ReportButton";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import ResponseStartLink, {
@@ -1158,6 +1159,15 @@ async function PostEngagementSection({
           {post.read_count === 1 ? "read" : "reads"}
         </span>
       ) : null}
+      {userId && author && userId !== author.id ? (
+        <ReportButton
+          targetType="post"
+          targetId={post.id}
+          targetLabel={`"${post.title}"`}
+          variant="text"
+          className="lg:hidden"
+        />
+      ) : null}
     </div>
   );
 }
@@ -1491,6 +1501,13 @@ async function PostSidebar({
               >
                 Write a response
               </ResponseStartLink>
+              {userId && author && userId !== author.id ? (
+                <ReportButton
+                  targetType="post"
+                  targetId={post.id}
+                  targetLabel={`"${post.title}"`}
+                />
+              ) : null}
             </div>
           </section>
         ) : null}

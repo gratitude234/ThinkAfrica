@@ -20,7 +20,13 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\\\\app\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\dev\\\\Think_Africa\\\\\"\\), \"\" } | Sort-Object)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\\\\lib\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\dev\\\\Think_Africa\\\\\"\\), \"\" } | Sort-Object)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\\\\components\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\dev\\\\Think_Africa\\\\\"\\), \"\" } | Sort-Object)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\\\\supabase\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\dev\\\\Think_Africa\\\\\"\\), \"\" } | Sort-Object)"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\Think_Africa\\\\supabase\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\dev\\\\Think_Africa\\\\\"\\), \"\" } | Sort-Object)",
+      "Bash(npm run *)",
+      "Bash(npx eslint *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(node -e \"console.log\\(require\\('os'\\).totalmem\\(\\)/1e9\\)\")",
+      "Bash(ps aux *)",
+      "Bash(dmesg)"
     ]
   }
 }

@@ -28,6 +28,7 @@ interface FeedOptions {
   userInterests: string[];
   userUniversity: string | null;
   followedIds: string[];
+  excludedAuthorIds?: string[];
 }
 
 type PublicFeedCacheInput = Pick<
@@ -317,9 +318,11 @@ function applyPostFilters(
   {
     type,
     cutoff,
+    excludedAuthorIds,
   }: {
     type: string | null;
     cutoff: string | null;
+    excludedAuthorIds?: string[];
   }
 ) {
   let nextQuery = query.eq("status", "published");
@@ -328,6 +331,13 @@ function applyPostFilters(
   }
   if (cutoff) {
     nextQuery = nextQuery.gte("published_at", cutoff);
+  }
+  if (excludedAuthorIds && excludedAuthorIds.length > 0) {
+    nextQuery = nextQuery.not(
+      "author_id",
+      "in",
+      `(${excludedAuthorIds.join(",")})`
+    );
   }
   return nextQuery;
 }
@@ -343,6 +353,7 @@ export async function fetchFeedPage({
   userInterests,
   userUniversity,
   followedIds,
+  excludedAuthorIds,
 }: FeedOptions): Promise<FeedPageResult> {
   const shouldUsePublicCache =
     process.env.SUPABASE_SERVICE_ROLE_KEY &&
@@ -350,6 +361,7 @@ export async function fetchFeedPage({
     userInterests.length === 0 &&
     !userUniversity &&
     followedIds.length === 0 &&
+    (excludedAuthorIds?.length ?? 0) === 0 &&
     tab !== "following";
 
   if (shouldUsePublicCache) {
@@ -367,6 +379,7 @@ export async function fetchFeedPage({
     userInterests,
     userUniversity,
     followedIds,
+    excludedAuthorIds,
   });
 }
 
@@ -381,6 +394,7 @@ async function fetchFeedPageUncached({
   userInterests,
   userUniversity,
   followedIds,
+  excludedAuthorIds,
 }: FeedOptions): Promise<FeedPageResult> {
   const reader = process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createAdminClient()
@@ -388,9 +402,15 @@ async function fetchFeedPageUncached({
   const safePage = Math.max(1, page);
   const safePageSize = Math.min(Math.max(pageSize, 1), 30);
   const cutoff = getTimeframeCutoff(timeframe);
+  const excluded = excludedAuthorIds ?? [];
 
   if (tab === "following") {
-    if (followedIds.length === 0) {
+    const visibleFollowedIds =
+      excluded.length > 0
+        ? followedIds.filter((id) => !excluded.includes(id))
+        : followedIds;
+
+    if (visibleFollowedIds.length === 0) {
       return { posts: [], hasMore: false };
     }
 
@@ -398,10 +418,10 @@ async function fetchFeedPageUncached({
     const end = start + safePageSize;
     const query = applyPostFilters(
       reader.from("posts").select(POST_SELECT),
-      { type, cutoff }
+      { type, cutoff, excludedAuthorIds: excluded }
     );
     const { data } = await query
-      .in("author_id", followedIds)
+      .in("author_id", visibleFollowedIds)
       .order("published_at", { ascending: false })
       .range(start, end);
 
@@ -426,7 +446,7 @@ async function fetchFeedPageUncached({
     const end = start + safePageSize;
     const query = applyPostFilters(
       reader.from("posts").select(POST_SELECT),
-      { type, cutoff }
+      { type, cutoff, excludedAuthorIds: excluded }
     );
     const { data } = await query
       .order("published_at", { ascending: false })
@@ -457,6 +477,7 @@ async function fetchFeedPageUncached({
     {
       type,
       cutoff,
+      excludedAuthorIds: excluded,
     }
   );
 

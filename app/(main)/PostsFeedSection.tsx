@@ -5,6 +5,7 @@ import {
   type FeedTabKey,
 } from "@/lib/feedData";
 import { createClient } from "@/lib/supabase/server";
+import { getBlockedUserIds } from "@/lib/blocking";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 
 interface Props {
@@ -69,6 +70,7 @@ export default async function PostsFeedSection({
   const initialTab = getInitialTab(tab, showFollowingEligible);
   const initialType = getInitialType(type);
   const initialTimeframe = getInitialTimeframe(timeframe);
+  const excludedAuthorIds = await getBlockedUserIds(userId);
 
   const initialFeed = await fetchFeedPage({
     supabase,
@@ -81,6 +83,7 @@ export default async function PostsFeedSection({
     userInterests,
     userUniversity,
     followedIds,
+    excludedAuthorIds,
   });
 
   return (

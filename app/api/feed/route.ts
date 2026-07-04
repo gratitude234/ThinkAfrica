@@ -5,6 +5,7 @@ import {
   type FeedTabKey,
   type FeedTimeframe,
 } from "@/lib/feedData";
+import { getBlockedUserIds } from "@/lib/blocking";
 
 function getTab(param: string | null): FeedTabKey {
   if (param === "following" || param === "latest") return param;
@@ -51,25 +52,29 @@ export async function GET(request: NextRequest) {
   let userInterests: string[] = [];
   let userUniversity: string | null = null;
   let followedIds: string[] = [];
+  let excludedAuthorIds: string[] = [];
 
   if (user) {
-    const [{ data: profile }, { data: followedUsers }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("interests, university")
-        .eq("id", user.id)
-        .single(),
-      supabase
-        .from("follows")
-        .select("following_id")
-        .eq("follower_id", user.id),
-    ]);
+    const [{ data: profile }, { data: followedUsers }, blockedIds] =
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .select("interests, university")
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("follows")
+          .select("following_id")
+          .eq("follower_id", user.id),
+        getBlockedUserIds(user.id),
+      ]);
 
     userInterests = (profile?.interests as string[] | null) ?? [];
     userUniversity = profile?.university ?? null;
     followedIds = (followedUsers ?? []).map(
       (row: { following_id: string }) => row.following_id
     );
+    excludedAuthorIds = blockedIds;
   }
 
   const result = await fetchFeedPage({
@@ -83,6 +88,7 @@ export async function GET(request: NextRequest) {
     userInterests,
     userUniversity,
     followedIds,
+    excludedAuthorIds,
   });
 
   return NextResponse.json(result);

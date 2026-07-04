@@ -9,6 +9,7 @@ export type AdminCapability =
   | "editorial.manage"
   | "review.assigned"
   | "users.verify"
+  | "moderation.manage"
   | "opportunities.manage"
   | "partners.manage"
   | "sponsors.manage"
@@ -45,6 +46,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     title: "Contributor Verification",
     description: "Verify contributors and manage reviewer/editor roles.",
     capability: "users.verify",
+  },
+  {
+    href: "/admin/moderation",
+    title: "Moderation",
+    description: "Review reports, remove content, and manage suspensions.",
+    capability: "moderation.manage",
   },
   {
     href: "/admin/fellowships",
@@ -89,6 +96,7 @@ const FULL_ADMIN_CAPABILITIES: AdminCapability[] = [
   "editorial.manage",
   "review.assigned",
   "users.verify",
+  "moderation.manage",
   "opportunities.manage",
   "partners.manage",
   "sponsors.manage",

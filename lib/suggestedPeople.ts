@@ -34,16 +34,26 @@ export async function getSuggestedPeople(
     limit?: number;
   }
 ): Promise<SuggestedPeopleResult> {
-  const { data: alreadyFollowing } = await supabase
-    .from("follows")
-    .select("following_id")
-    .eq("follower_id", currentUserId)
-    .limit(1000);
+  const [{ data: alreadyFollowing }, { data: blockedRows }] = await Promise.all([
+    supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", currentUserId)
+      .limit(1000),
+    supabase
+      .from("user_blocks")
+      .select("blocked_id")
+      .eq("blocker_id", currentUserId)
+      .limit(1000),
+  ]);
 
   const excludeIds = [
     currentUserId,
     ...((alreadyFollowing as Array<{ following_id: string }> | null) ?? []).map(
       (row) => row.following_id
+    ),
+    ...((blockedRows as Array<{ blocked_id: string }> | null) ?? []).map(
+      (row) => row.blocked_id
     ),
   ];
 

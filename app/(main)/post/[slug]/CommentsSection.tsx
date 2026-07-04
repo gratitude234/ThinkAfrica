@@ -8,6 +8,7 @@ import ProfileGate from "@/components/ui/ProfileGate";
 import { formatRelativeTime } from "@/lib/utils";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
+import ReportButton from "@/components/moderation/ReportButton";
 import { submitComment } from "../commentActions";
 
 interface CommentAuthor {
@@ -22,6 +23,7 @@ export interface ReplyItem {
   created_at: string;
   upvotes: number;
   parent_id: string | null;
+  author_id?: string;
   userVoted?: boolean;
   profiles: CommentAuthor | null;
 }
@@ -334,6 +336,18 @@ export default function CommentsSection({
               Reply
             </button>
           )}
+          {userId &&
+          comment.author_id &&
+          comment.author_id !== (userProfileId ?? userId) ? (
+            <ReportButton
+              targetType="comment"
+              targetId={comment.id}
+              targetLabel={`a comment by ${
+                comment.profiles?.full_name ?? comment.profiles?.username ?? "this member"
+              }`}
+              variant="text"
+            />
+          ) : null}
         </div>
       </div>
     </div>
