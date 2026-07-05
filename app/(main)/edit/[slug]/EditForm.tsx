@@ -406,7 +406,7 @@ export default function EditForm({
                       <p className="mt-1 text-sm font-medium text-gray-900">
                         {review.reviewer?.full_name ?? review.reviewer?.username ?? "Reviewer"}
                       </p>
-                      <p className="mt-1 text-sm text-gray-600">
+                      <p className="mt-1 whitespace-pre-line text-sm text-gray-600">
                         {review.notes || "No written note provided."}
                       </p>
                     </div>
@@ -512,7 +512,7 @@ export default function EditForm({
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
                     {note.recommendation}
                   </p>
-                  <p className="mt-1 text-sm text-gray-700">
+                  <p className="mt-1 whitespace-pre-line text-sm text-gray-700">
                     {note.notes || "No written note provided."}
                   </p>
                   <p className="mt-1 text-xs text-gray-400">

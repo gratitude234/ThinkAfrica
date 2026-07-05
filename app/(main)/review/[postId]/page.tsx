@@ -252,7 +252,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
                           {reviewer?.full_name ?? reviewer?.username ?? "Reviewer"}
                         </p>
                         {review.notes ? (
-                          <p className="mt-1 text-sm text-gray-600">{review.notes as string}</p>
+                          <p className="mt-1 whitespace-pre-line text-sm text-gray-600">{review.notes as string}</p>
                         ) : null}
                       </div>
                     );

@@ -135,7 +135,7 @@ export default function AssignReviewers({
                 </div>
               </div>
               {assignment.notes ? (
-                <p className="text-xs leading-relaxed text-gray-500">
+                <p className="whitespace-pre-line text-xs leading-relaxed text-gray-500">
                   {assignment.notes}
                 </p>
               ) : null}
