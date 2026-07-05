@@ -33,6 +33,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     .select("id, round, recommendation")
     .eq("post_id", postId)
     .eq("reviewer_id", user.id)
+    .is("removed_at", null)
     .single();
 
   if (!assignment || assignment.recommendation) notFound();

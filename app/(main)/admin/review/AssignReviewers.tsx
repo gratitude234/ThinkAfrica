@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminActionStatus from "@/components/admin/AdminActionStatus";
 import { useAdminActionFeedback } from "@/components/admin/useAdminActionFeedback";
-import { assignReviewer } from "./actions";
+import { assignReviewer, removeReviewer } from "./actions";
 
 interface ReviewerOption {
   id: string;
@@ -35,7 +35,7 @@ export default function AssignReviewers({
 }: Props) {
   const router = useRouter();
   const [selectedReviewer, setSelectedReviewer] = useState(reviewers[0]?.id ?? "");
-  const feedback = useAdminActionFeedback<"assign">();
+  const feedback = useAdminActionFeedback<"assign" | `remove:${string}`>();
 
   const handleAssign = async () => {
     if (!selectedReviewer) return;
@@ -48,6 +48,20 @@ export default function AssignReviewers({
     }
 
     feedback.finishAction("Reviewer assigned.");
+    router.refresh();
+  };
+
+  const handleRemove = async (reviewerId: string) => {
+    const actionKey = `remove:${reviewerId}` as const;
+    feedback.startAction(actionKey, "Removing reviewer...");
+    const result = await removeReviewer(postId, reviewerId, round);
+
+    if (result.error) {
+      feedback.failAction(result.error);
+      return;
+    }
+
+    feedback.finishAction("Reviewer removed.");
     router.refresh();
   };
 
@@ -98,15 +112,27 @@ export default function AssignReviewers({
                 <span className="font-medium text-gray-800">
                   {assignment.reviewer?.full_name ?? assignment.reviewer?.username}
                 </span>
-                <span
-                  className={`text-xs font-medium ${
-                    assignment.submitted_at ? "text-emerald-700" : "text-amber-700"
-                  }`}
-                >
-                  {assignment.submitted_at
-                    ? assignment.recommendation ?? "Submitted"
-                    : "Awaiting review"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-xs font-medium ${
+                      assignment.submitted_at ? "text-emerald-700" : "text-amber-700"
+                    }`}
+                  >
+                    {assignment.submitted_at
+                      ? assignment.recommendation ?? "Submitted"
+                      : "Awaiting review"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(assignment.reviewer_id)}
+                    disabled={feedback.pendingAction !== null}
+                    className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                  >
+                    {feedback.pendingAction === `remove:${assignment.reviewer_id}`
+                      ? "Removing..."
+                      : "Remove"}
+                  </button>
+                </div>
               </div>
               {assignment.notes ? (
                 <p className="text-xs leading-relaxed text-gray-500">

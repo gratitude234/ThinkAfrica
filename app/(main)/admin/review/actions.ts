@@ -67,15 +67,23 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
     return { error: "Selected user cannot review posts." };
   }
 
+  const { count: priorAssignmentCount } = await supabase
+    .from("post_reviews")
+    .select("*", { count: "exact", head: true })
+    .eq("post_id", postId)
+    .eq("round", round);
+  const isFirstAssignmentForRound = (priorAssignmentCount ?? 0) === 0;
+
   const { error } = await supabase.from("post_reviews").upsert(
     {
       post_id: postId,
       reviewer_id: reviewerId,
       round,
+      removed_at: null,
+      assigned_at: new Date().toISOString(),
     },
     {
       onConflict: "post_id,reviewer_id,round",
-      ignoreDuplicates: true,
     }
   );
 
@@ -103,6 +111,30 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
     logEmailResult(`review_assigned:${postId}:${reviewerId}`, emailResult);
   }
 
+  if (isFirstAssignmentForRound) {
+    const { error: authorNotificationError } = await supabase.from("notifications").insert({
+      user_id: post.author_id,
+      type: "review_started",
+      message: `Your submission "${post.title}" is now under review.`,
+      link: `/post/${post.slug}`,
+      post_id: postId,
+      read: false,
+    });
+    if (!authorNotificationError) {
+      const authorEmailResult = await sendUserEmail({
+        recipientId: post.author_id,
+        subject: "Your ThinkAfrica submission is under review",
+        preview: `"${post.title}" is now under review.`,
+        title: "Your submission is under review",
+        intro: `Your submission "${post.title}" is now under review. You'll typically hear back within about a week.`,
+        ctaLabel: "View submission",
+        ctaPath: `/post/${post.slug}`,
+        idempotencyKey: `review-started:${postId}:${round}`,
+      });
+      logEmailResult(`review_started:${postId}:${post.author_id}`, authorEmailResult);
+    }
+  }
+
   await recordAdminAuditEvent({
     admin: supabase,
     context,
@@ -117,6 +149,42 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
   });
 
   revalidateEditorialPaths(post.slug);
+  return { error: null };
+}
+
+export async function removeReviewer(postId: string, reviewerId: string, round: number) {
+  const { supabase, context, error: accessError } = await requireEditorAccess();
+  if (accessError || !supabase || !context) return { error: accessError };
+
+  const { data: post } = await supabase.from("posts").select("slug").eq("id", postId).single();
+
+  const { data: removed, error } = await supabase
+    .from("post_reviews")
+    .update({ removed_at: new Date().toISOString() })
+    .eq("post_id", postId)
+    .eq("reviewer_id", reviewerId)
+    .eq("round", round)
+    .is("removed_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!removed) return { error: "Reviewer assignment not found or already removed." };
+
+  await recordAdminAuditEvent({
+    admin: supabase,
+    context,
+    action: "editorial.reviewer_removed",
+    targetTable: "post_reviews",
+    targetId: postId,
+    metadata: {
+      postId,
+      reviewerId,
+      round,
+    },
+  });
+
+  revalidateEditorialPaths(post?.slug);
   return { error: null };
 }
 

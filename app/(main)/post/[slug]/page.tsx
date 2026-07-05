@@ -528,7 +528,8 @@ async function getSecondaryData(
     supabase
       .from("post_reviews")
       .select("assigned_at, submitted_at, recommendation, round")
-      .eq("post_id", postId),
+      .eq("post_id", postId)
+      .is("removed_at", null),
     supabase
       .from("post_editor_decisions")
       .select("decision, created_at, round")
@@ -2143,6 +2144,7 @@ export default async function PostPage({ params }: PageProps) {
             .select("id")
             .eq("post_id", post.id)
             .eq("reviewer_id", user.id)
+            .is("removed_at", null)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       user

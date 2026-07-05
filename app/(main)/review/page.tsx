@@ -33,6 +33,7 @@ export default async function ReviewerQueuePage() {
     )
     .eq("reviewer_id", user.id)
     .is("recommendation", null)
+    .is("removed_at", null)
     .order("assigned_at", { ascending: false });
 
   const rows = (assignments ?? []).map((assignment) => ({

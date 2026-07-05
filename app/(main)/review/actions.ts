@@ -46,6 +46,7 @@ export async function submitReview(input: {
     .eq("post_id", input.postId)
     .eq("reviewer_id", user.id)
     .is("recommendation", null)
+    .is("removed_at", null)
     .select("id")
     .maybeSingle();
 

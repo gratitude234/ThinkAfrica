@@ -122,10 +122,11 @@ export async function getRoundReviews(
   const { data } = await admin
     .from("post_reviews")
     .select(
-      "id, post_id, reviewer_id, round, recommendation, notes, submitted_at, assigned_at, reviewer:profiles!post_reviews_reviewer_id_fkey(username, full_name)"
+      "id, post_id, reviewer_id, round, recommendation, notes, submitted_at, assigned_at, removed_at, reviewer:profiles!post_reviews_reviewer_id_fkey(username, full_name)"
     )
     .eq("post_id", postId)
     .eq("round", round)
+    .is("removed_at", null)
     .order("assigned_at", { ascending: true });
 
   return ((data ?? []) as Array<
