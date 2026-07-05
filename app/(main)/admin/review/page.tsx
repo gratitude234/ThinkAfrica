@@ -115,7 +115,7 @@ export default async function AdminReviewPage() {
     admin.from("submission_tracks").select("*"),
     admin
       .from("profiles")
-      .select("id, username, full_name, role")
+      .select("id, username, full_name, university, field_of_study, role")
       .in("role", ["reviewer", "editor", "admin"]),
     admin
       .from("post_reviews")
@@ -236,6 +236,8 @@ export default async function AdminReviewPage() {
                     id: string;
                     username: string;
                     full_name: string | null;
+                    university: string | null;
+                    field_of_study: string | null;
                   }>).filter((reviewer) => reviewer.id !== post.author_id);
 
                   const reviewSummary = getReviewSummary(assignments);
@@ -452,6 +454,8 @@ export default async function AdminReviewPage() {
                               minReviewers={track.min_reviewers}
                               reviewers={availableReviewers}
                               assignments={assignments}
+                              authorFieldOfStudy={post.profiles?.field_of_study ?? null}
+                              authorUniversity={post.profiles?.university ?? null}
                             />
                           ) : null}
 
