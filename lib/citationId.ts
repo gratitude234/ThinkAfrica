@@ -1,14 +1,14 @@
 export async function generateCitationId(
   supabase: {
-    from: (table: string) => any;
+    rpc: (fn: string, args: Record<string, unknown>) => any;
   },
   year: number
 ): Promise<string> {
-  const { count } = await supabase
-    .from("posts")
-    .select("*", { count: "exact", head: true })
-    .in("type", ["research", "policy_brief"])
-    .not("citation_id", "is", null);
-  const seq = String((count ?? 0) + 1).padStart(4, "0");
-  return `TAK-${year}-${seq}`;
+  const { data, error } = await supabase.rpc("generate_citation_id", { p_year: year });
+
+  if (error || typeof data !== "string") {
+    throw new Error(error?.message ?? "Unable to generate citation ID.");
+  }
+
+  return data;
 }
