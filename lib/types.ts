@@ -59,6 +59,7 @@ export interface PostReviewRecord {
   notes: string | null;
   submitted_at: string | null;
   assigned_at: string;
+  removed_at: string | null;
 }
 
 export interface PostVersionRecord {

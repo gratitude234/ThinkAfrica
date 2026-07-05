@@ -122,6 +122,7 @@ export default async function AdminReviewPage() {
       .select(
         "post_id, reviewer_id, submitted_at, recommendation, notes, round, reviewer:profiles!post_reviews_reviewer_id_fkey(id, username, full_name)"
       )
+      .is("removed_at", null)
       .order("assigned_at", { ascending: true }),
     admin
       .from("post_editor_decisions")

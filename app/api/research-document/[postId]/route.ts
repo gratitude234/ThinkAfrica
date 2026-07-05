@@ -52,6 +52,7 @@ async function canAccessDocument({
       .select("reviewer_id")
       .eq("post_id", postId)
       .eq("reviewer_id", userId)
+      .is("removed_at", null)
       .maybeSingle(),
   ]);
 
