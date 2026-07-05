@@ -27,6 +27,7 @@ Optional:
 - `RESEND_API_KEY` — Email service
 - `ANTHROPIC_API_KEY` — Claude API for audio summaries (`/api/audio-summary`)
 - `GOOGLE_TTS_API_KEY` — Text-to-speech
+- `CRON_SECRET` — Authenticates Vercel Cron requests to `/api/cron/*` routes (Vercel sends it automatically as `Authorization: Bearer <value>` when set)
 
 ## Architecture Overview
 
