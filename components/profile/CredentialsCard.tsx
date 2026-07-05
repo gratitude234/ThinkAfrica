@@ -25,6 +25,7 @@ interface CredentialsCardProps {
   reviewedWorkCount: number;
   coAuthoredWorkCount: number;
   debateContributionCount: number;
+  reviewsCompletedCount: number;
   topicStats: Array<{ tag: string; count: number }>;
   followerCount: number;
   followingCount: number;
@@ -50,6 +51,7 @@ export default function CredentialsCard({
   reviewedWorkCount,
   coAuthoredWorkCount,
   debateContributionCount,
+  reviewsCompletedCount,
   topicStats,
   followerCount,
   followingCount,
@@ -173,6 +175,14 @@ export default function CredentialsCard({
               </p>
               <p className="text-xs text-gray-500">Reads</p>
             </div>
+            {reviewsCompletedCount > 0 ? (
+              <div className="rounded-xl bg-canvas p-3">
+                <p className="text-lg font-semibold text-gray-900">
+                  {reviewsCompletedCount.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500">Reviews completed</p>
+              </div>
+            ) : null}
           </div>
         </div>
 

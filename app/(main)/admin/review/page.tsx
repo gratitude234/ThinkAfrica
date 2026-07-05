@@ -435,7 +435,7 @@ export default async function AdminReviewPage() {
                                         {assignment.recommendation ?? "Awaiting"}
                                       </span>
                                     </div>
-                                    <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                                    <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-600">
                                       {assignment.notes}
                                     </p>
                                   </div>

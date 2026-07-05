@@ -451,6 +451,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     { data: topArguments },
     { data: featuredRows },
     { count: debateContributionCount },
+    { count: reviewsCompletedCount },
     activityData,
     followStatus,
     blockStatus,
@@ -506,6 +507,12 @@ export default async function UserProfilePage({ params }: PageProps) {
       .from("debate_arguments")
       .select("id", { count: "exact", head: true })
       .eq("author_id", profile.id),
+    supabase
+      .from("post_reviews")
+      .select("id", { count: "exact", head: true })
+      .eq("reviewer_id", profile.id)
+      .is("removed_at", null)
+      .not("submitted_at", "is", null),
     isOwnProfile
       ? Promise.all([
           supabase
@@ -852,6 +859,7 @@ export default async function UserProfilePage({ params }: PageProps) {
               reviewedWorkCount={reviewedWorkCount}
               coAuthoredWorkCount={coAuthoredWorkCount}
               debateContributionCount={debateContributionCount ?? 0}
+              reviewsCompletedCount={reviewsCompletedCount ?? 0}
               topicStats={topicStats}
               followerCount={followerCount ?? 0}
               followingCount={followingCount ?? 0}
@@ -916,6 +924,7 @@ export default async function UserProfilePage({ params }: PageProps) {
             reviewedWorkCount={reviewedWorkCount}
             coAuthoredWorkCount={coAuthoredWorkCount}
             debateContributionCount={debateContributionCount ?? 0}
+            reviewsCompletedCount={reviewsCompletedCount ?? 0}
             topicStats={topicStats}
             followerCount={followerCount ?? 0}
             followingCount={followingCount ?? 0}
