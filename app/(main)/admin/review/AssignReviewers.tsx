@@ -10,6 +10,8 @@ interface ReviewerOption {
   id: string;
   username: string;
   full_name: string | null;
+  university?: string | null;
+  field_of_study?: string | null;
 }
 
 interface Props {
@@ -24,6 +26,27 @@ interface Props {
     notes?: string | null;
     reviewer: ReviewerOption | null;
   }>;
+  authorFieldOfStudy?: string | null;
+  authorUniversity?: string | null;
+}
+
+// Purely a "surface relevant people first" grouping - not a scoring system.
+// Returns null (no tag, falls back to the default flat list) when there's
+// nothing to meaningfully match on.
+function getReviewerMatchLabel(
+  reviewer: ReviewerOption,
+  authorFieldOfStudy?: string | null,
+  authorUniversity?: string | null
+): string | null {
+  const sameField =
+    Boolean(authorFieldOfStudy) && reviewer.field_of_study === authorFieldOfStudy;
+  const sameUniversity =
+    Boolean(authorUniversity) && reviewer.university === authorUniversity;
+
+  if (sameField && sameUniversity) return "Same field & university";
+  if (sameField) return "Same field";
+  if (sameUniversity) return "Same university";
+  return null;
 }
 
 export default function AssignReviewers({
@@ -32,9 +55,24 @@ export default function AssignReviewers({
   minReviewers,
   reviewers,
   assignments,
+  authorFieldOfStudy,
+  authorUniversity,
 }: Props) {
   const router = useRouter();
-  const [selectedReviewer, setSelectedReviewer] = useState(reviewers[0]?.id ?? "");
+  const suggestedReviewers = reviewers.filter(
+    (reviewer) => getReviewerMatchLabel(reviewer, authorFieldOfStudy, authorUniversity) !== null
+  );
+  const otherReviewers = reviewers.filter(
+    (reviewer) => getReviewerMatchLabel(reviewer, authorFieldOfStudy, authorUniversity) === null
+  );
+  // Only group when there's a real, partial split to show - if everyone
+  // matches, or no one does (e.g. missing field_of_study/university data),
+  // grouping wouldn't add information, so fall back to the plain list.
+  const hasSuggestions = suggestedReviewers.length > 0 && otherReviewers.length > 0;
+
+  const [selectedReviewer, setSelectedReviewer] = useState(
+    (suggestedReviewers[0] ?? reviewers[0])?.id ?? ""
+  );
   const feedback = useAdminActionFeedback<"assign" | `remove:${string}`>();
 
   const handleAssign = async () => {
@@ -82,11 +120,31 @@ export default function AssignReviewers({
             onChange={(event) => setSelectedReviewer(event.target.value)}
             className="flex-1 rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-purple-300"
           >
-            {reviewers.map((reviewer) => (
-              <option key={reviewer.id} value={reviewer.id}>
-                {reviewer.full_name ?? reviewer.username}
-              </option>
-            ))}
+            {hasSuggestions ? (
+              <>
+                <optgroup label="Suggested — shared background with author">
+                  {suggestedReviewers.map((reviewer) => (
+                    <option key={reviewer.id} value={reviewer.id}>
+                      {reviewer.full_name ?? reviewer.username} —{" "}
+                      {getReviewerMatchLabel(reviewer, authorFieldOfStudy, authorUniversity)}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Other reviewers">
+                  {otherReviewers.map((reviewer) => (
+                    <option key={reviewer.id} value={reviewer.id}>
+                      {reviewer.full_name ?? reviewer.username}
+                    </option>
+                  ))}
+                </optgroup>
+              </>
+            ) : (
+              reviewers.map((reviewer) => (
+                <option key={reviewer.id} value={reviewer.id}>
+                  {reviewer.full_name ?? reviewer.username}
+                </option>
+              ))
+            )}
           </select>
           <button
             type="button"
