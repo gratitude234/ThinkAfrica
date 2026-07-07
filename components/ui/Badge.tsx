@@ -11,10 +11,10 @@ interface BadgeProps {
 }
 
 const TYPE_STYLES: Record<string, string> = {
-  blog: "bg-emerald-100 text-emerald-800",
-  essay: "bg-amber-100 text-amber-700",
-  research: "bg-purple-100 text-purple-700",
-  policy_brief: "bg-blue-100 text-blue-700",
+  blog: "bg-green-tint text-emerald-brand",
+  essay: "bg-gold-tint text-gold-ink",
+  research: "bg-purple-tint text-purple-accent",
+  policy_brief: "bg-purple-tint text-purple-accent",
 };
 
 export default function Badge({

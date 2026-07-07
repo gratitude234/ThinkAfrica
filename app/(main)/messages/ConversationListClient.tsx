@@ -80,7 +80,7 @@ export default function ConversationListClient({ conversations, currentUserId }:
           </p>
           <Link
             href="/opportunities"
-            className="mt-4 inline-flex rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+            className="mt-4 inline-flex rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37]"
           >
             Browse open profiles
           </Link>

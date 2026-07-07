@@ -1564,7 +1564,7 @@ export default async function AdminAnalyticsPage() {
                   <div className="flex shrink-0 gap-2">
                     <Link
                       href={`/post/${post.slug}`}
-                      className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
+                      className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0E4B37]"
                     >
                       Open post
                     </Link>

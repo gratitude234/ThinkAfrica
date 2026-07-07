@@ -167,7 +167,7 @@ export default function CollaborationPanel({
               });
             }
           }}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 sm:min-h-10"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] sm:min-h-10"
         >
           Write a response
         </Link>

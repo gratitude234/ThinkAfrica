@@ -152,7 +152,7 @@ function EmptyDebates({
         </Link>
         <Link
           href={signedIn ? "/debates/create" : "/login?redirectTo=/debates/create"}
-          className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+          className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
         >
           Start a debate
         </Link>
@@ -561,7 +561,7 @@ export default async function DebatesPage({ searchParams }: PageProps) {
             href={user ? "/debates/create" : "/login?redirectTo=/debates/create"}
             className={`inline-flex w-fit items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               canCreate || !user
-                ? "bg-emerald-brand text-white hover:bg-emerald-600"
+                ? "bg-emerald-brand text-white hover:bg-[#0E4B37]"
                 : "border border-gray-200 bg-canvas text-gray-600 hover:border-gray-300 hover:bg-white"
             }`}
           >

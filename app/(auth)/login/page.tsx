@@ -276,7 +276,7 @@ function LoginForm() {
               type="button"
               onClick={handleVerifyCode}
               disabled={verifyLoading || verificationCode.length < AUTH_CODE_MIN_LENGTH}
-              className="mt-3 rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-70"
+              className="mt-3 rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] disabled:cursor-not-allowed disabled:opacity-70"
             >
               {verifyLoading ? "Verifying..." : "Verify code"}
             </button>

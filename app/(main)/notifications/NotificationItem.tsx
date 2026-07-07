@@ -291,7 +291,7 @@ export default function NotificationItem({
                   },
                 });
               }}
-              className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
+              className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#0E4B37]"
             >
               Read response
             </Link>

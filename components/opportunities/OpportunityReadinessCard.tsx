@@ -65,7 +65,7 @@ export default function OpportunityReadinessCard({
             actionKey={summary.nextAction.key}
             label={summary.nextAction.actionLabel}
             source={`opportunity_readiness_${source}`}
-            className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+            className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
           >
             {summary.nextAction.actionLabel}
           </TrackedActionLink>

@@ -9,9 +9,15 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        "emerald-brand": "#10B981",
-        gold: "#F59E0B",
-        "purple-accent": "#7C3AED",
+        "emerald-brand": "#073929",
+        gold: "#CE932B",
+        "gold-ink": "#8A5D1E",
+        "purple-accent": "#391A60",
+        "green-tint": "#DFF0E7",
+        "gold-tint": "#F7EEDD",
+        "purple-tint": "#EDE8F3",
+        "green-wash": "#F4F7F5",
+        "green-wash-border": "#DCE7E0",
         canvas: "#FAF8F5",
         surface: "#FFFFFF",
         ink: "#1A1A1A",
@@ -19,7 +25,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        display: ["var(--font-playfair)", "Georgia", "serif"],
+        display: ["var(--font-bodoni)", "Georgia", "serif"],
       },
       keyframes: {
         "slide-up": {

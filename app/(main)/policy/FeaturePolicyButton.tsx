@@ -70,7 +70,7 @@ export default function FeaturePolicyButton({ postId }: Props) {
                 <button
                   type="submit"
                   disabled={feedback.pendingAction !== null}
-                  className="px-4 py-1.5 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+                  className="px-4 py-1.5 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-[#0E4B37] disabled:opacity-50 transition-colors"
                 >
                   {feedback.pendingAction === "feature" ? "Featuring..." : "Confirm"}
                 </button>

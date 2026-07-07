@@ -148,7 +148,7 @@ export default async function TopicPage({ params }: PageProps) {
           </div>
           <Link
             href={`/write?type=blog&starter=1&tag=${encodeURIComponent(decodedTag)}`}
-            className="w-fit rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+            className="w-fit rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-[#0E4B37]"
           >
             Write about #{decodedTag}
           </Link>

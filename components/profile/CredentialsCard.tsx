@@ -124,7 +124,7 @@ export default function CredentialsCard({
                 <div
                   key={badge.id}
                   title={badge.description ?? badge.name}
-                  className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs text-amber-700"
+                  className="inline-flex items-center gap-1 rounded-full bg-gold-tint px-2.5 py-1 text-xs text-gold-ink"
                 >
                   {badge.icon ? <span>{badge.icon}</span> : null}
                   <span>{badge.name}</span>
@@ -206,7 +206,7 @@ export default function CredentialsCard({
               {topicStats.slice(0, 8).map((topic) => (
                 <span
                   key={topic.tag}
-                  className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+                  className="rounded-full bg-green-tint px-2.5 py-1 text-xs font-medium text-emerald-brand"
                 >
                   {topic.tag} {topic.count > 1 ? topic.count : ""}
                 </span>

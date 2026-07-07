@@ -45,7 +45,7 @@ export default function PostFeed({
             </p>
             <Link
               href="/onboarding?step=follow"
-              className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+              className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
             >
               Find writers to follow
             </Link>
@@ -67,7 +67,7 @@ export default function PostFeed({
               </Link>
               <Link
                 href="/write?type=blog&starter=1"
-                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
               >
                 Write a quick take
               </Link>

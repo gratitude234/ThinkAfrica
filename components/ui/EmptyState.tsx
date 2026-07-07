@@ -16,7 +16,7 @@ export default function EmptyState({ icon, title, description, cta }: EmptyState
       {cta && (
         <Link
           href={cta.href}
-          className="inline-flex items-center px-4 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors"
+          className="inline-flex items-center px-4 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-[#0E4B37] transition-colors"
         >
           {cta.label}
         </Link>

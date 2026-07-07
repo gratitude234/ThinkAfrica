@@ -303,7 +303,7 @@ export default function OpportunityProfileEditor({
               void saveProfile();
             }}
             disabled={saving}
-            className="rounded-lg bg-emerald-brand px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            className="rounded-lg bg-emerald-brand px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save opportunity profile"}
           </button>

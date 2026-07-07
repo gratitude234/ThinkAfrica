@@ -105,7 +105,7 @@ export default function ReviewActions({
             disabled={Boolean(loading) || disableDecision}
             className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               decision === "accept"
-                ? "bg-emerald-brand text-white hover:bg-emerald-600"
+                ? "bg-emerald-brand text-white hover:bg-[#0E4B37]"
                 : decision === "request_revision"
                   ? "border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
                   : "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"

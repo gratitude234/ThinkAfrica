@@ -106,11 +106,11 @@ const VALUE_PROPS = [
 
 function typeBadge(type: string): { classes: string; label: string } {
   switch (type) {
-    case "essay":        return { classes: "bg-amber-100 text-amber-800",     label: "Essay" };
-    case "research":     return { classes: "bg-purple-100 text-purple-800",   label: "Research" };
-    case "policy_brief": return { classes: "bg-blue-100 text-blue-800",       label: "Policy Brief" };
-    case "quick_take":   return { classes: "bg-emerald-100 text-emerald-800", label: "Quick Take" };
-    default:             return { classes: "bg-emerald-100 text-emerald-800", label: "Blog" };
+    case "essay":        return { classes: "bg-gold-tint text-gold-ink",         label: "Essay" };
+    case "research":     return { classes: "bg-purple-tint text-purple-accent",  label: "Research" };
+    case "policy_brief": return { classes: "bg-purple-tint text-purple-accent",  label: "Policy Brief" };
+    case "quick_take":   return { classes: "bg-green-tint text-emerald-brand",   label: "Quick Take" };
+    default:             return { classes: "bg-green-tint text-emerald-brand",   label: "Blog" };
   }
 }
 
@@ -214,7 +214,7 @@ export default async function LandingPage() {
             {/* Copy */}
             <div>
               <div className="hero-animate hero-eyebrow mb-4 flex items-center gap-2.5 sm:mb-6">
-                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-brand" />
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
                   Africa&apos;s intellectual social network
                 </span>
@@ -268,7 +268,7 @@ export default async function LandingPage() {
                   href={primaryHref}
                   event="landing_read_clicked"
                   metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, postType: leadPost?.type ?? null, position: "primary" }}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-5 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-emerald-600 sm:px-7 sm:text-base"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-5 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[#0E4B37] sm:px-7 sm:text-base"
                 >
                   Start reading
                   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
@@ -399,7 +399,7 @@ export default async function LandingPage() {
                     href="/?guest=1"
                     event="landing_read_clicked"
                     metadata={{ source: "rail_empty" }}
-                    className="mt-4 inline-flex rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+                    className="mt-4 inline-flex rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-[#0E4B37]"
                   >
                     Browse latest
                   </LandingTrackedLink>
@@ -570,7 +570,7 @@ export default async function LandingPage() {
                 href="/debates"
                 event="landing_read_clicked"
                 metadata={{ source: "debates_section" }}
-                className="inline-flex items-center rounded-[10px] bg-emerald-500 px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-emerald-600"
+                className="inline-flex items-center rounded-[10px] bg-emerald-brand px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-[#0E4B37]"
               >
                 View active debates
               </LandingTrackedLink>
@@ -581,7 +581,7 @@ export default async function LandingPage() {
               {/* Active */}
               <div className="debate-card flex flex-col gap-3 rounded-xl border border-gray-200 bg-canvas p-5">
                 <div className="flex items-center gap-1.5">
-                  <span className="debate-dot-live h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                  <span className="debate-dot-live h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-brand" />
                   <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-emerald-600">
                     Active · 142 arguments
                   </span>
@@ -592,7 +592,7 @@ export default async function LandingPage() {
                 <div>
                   <div id="stance-bar" className="flex h-[5px] overflow-hidden rounded-full bg-gray-100">
                     <div
-                      className="stance-for h-full rounded-full bg-emerald-500"
+                      className="stance-for h-full rounded-full bg-emerald-brand"
                       style={{ "--for-w": "58%" } as React.CSSProperties}
                     />
                     <div
@@ -610,7 +610,7 @@ export default async function LandingPage() {
                     href="/debates"
                     event="landing_read_clicked"
                     metadata={{ source: "debate_active" }}
-                    className="inline-flex items-center rounded-lg bg-emerald-500 px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-emerald-600"
+                    className="inline-flex items-center rounded-lg bg-emerald-brand px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-[#0E4B37]"
                   >
                     Join debate
                   </LandingTrackedLink>
@@ -689,14 +689,14 @@ export default async function LandingPage() {
               href="/?guest=1"
               event="landing_read_clicked"
               metadata={{ source: "dual_cta_readers" }}
-              className="inline-flex items-center gap-1.5 rounded-[10px] bg-emerald-500 px-7 py-3 text-[15px] font-medium text-white transition-colors hover:bg-emerald-600"
+              className="inline-flex items-center gap-1.5 rounded-[10px] bg-emerald-brand px-7 py-3 text-[15px] font-medium text-white transition-colors hover:bg-[#0E4B37]"
             >
               Browse as guest
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
             </LandingTrackedLink>
           </div>
 
-          <div className="cta-card rounded-2xl bg-emerald-500 px-6 py-8 text-white sm:px-10 sm:py-11">
+          <div className="cta-card rounded-2xl bg-emerald-brand px-6 py-8 text-white sm:px-10 sm:py-11">
             <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For writers</p>
             <h2 className="mb-3 font-display text-[30px] font-medium leading-[1.1]">
               Publish your research and build your profile

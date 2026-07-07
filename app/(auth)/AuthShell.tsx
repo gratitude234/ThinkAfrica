@@ -16,7 +16,7 @@ export const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-ink shadow-sm shadow-black/[0.01] transition-colors placeholder:text-gray-400 focus:border-emerald-brand focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-gray-50";
 
 export const PRIMARY_BUTTON_STYLES =
-  "inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-brand px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-brand px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-900/10 transition-colors hover:bg-[#0E4B37] focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60";
 
 export const SECONDARY_LINK_STYLES =
   "font-semibold text-emerald-700 transition-colors hover:text-emerald-800 hover:underline";

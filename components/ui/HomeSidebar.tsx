@@ -170,7 +170,7 @@ function ActivationCard({ state }: { state: ActivationState }) {
       {state.nextTask ? (
         <Link
           href={state.nextTask.href}
-          className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-emerald-600"
+          className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#0E4B37]"
         >
           {state.nextTask.key === "start" ? "Start quick take" : "Continue setup"}
         </Link>
@@ -280,7 +280,7 @@ export default function HomeSidebar({
           ) : null}
           <Link
             href={`/debates/${activeDebate.id}`}
-            className="inline-flex w-full justify-center rounded-lg bg-emerald-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
+            className="inline-flex w-full justify-center rounded-lg bg-emerald-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#0E4B37]"
           >
             Join the debate -&gt;
           </Link>

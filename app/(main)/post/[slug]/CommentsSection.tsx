@@ -503,7 +503,7 @@ export default function CommentsSection({
             <button
               type="submit"
               disabled={loading || !newComment.trim()}
-              className="min-h-10 w-full rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              className="min-h-10 w-full rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               {loading ? "Posting..." : "Post comment"}
             </button>

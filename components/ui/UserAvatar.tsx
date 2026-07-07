@@ -9,7 +9,7 @@ interface UserAvatarProps {
   className?: string;
 }
 
-const PALETTE = ["#10B981", "#F59E0B", "#7C3AED", "#0EA5E9", "#EF4444"];
+const PALETTE = ["#073929", "#CE932B", "#391A60", "#0EA5E9", "#EF4444"];
 
 export default function UserAvatar({
   name,

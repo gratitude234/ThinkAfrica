@@ -67,7 +67,7 @@ export default async function AmbassadorsPage() {
         ) : (
           <Link
             href={user ? "/ambassadors/apply" : "/login?redirectTo=/ambassadors/apply"}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-brand text-white font-medium rounded-lg hover:bg-emerald-600 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-brand text-white font-medium rounded-lg hover:bg-[#0E4B37] transition-colors"
           >
             Apply to Become an Ambassador
           </Link>

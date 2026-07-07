@@ -232,7 +232,7 @@ export default function FeaturedWorkManager({
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={saving}
-                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save featured work"}
               </button>

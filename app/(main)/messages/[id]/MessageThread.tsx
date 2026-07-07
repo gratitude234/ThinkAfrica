@@ -422,7 +422,7 @@ export default function MessageThread({
                       <button
                         type="button"
                         onClick={() => void handleEdit(message.id)}
-                        className="rounded-lg bg-emerald-brand px-3 py-1 text-xs font-medium text-white hover:bg-emerald-600"
+                        className="rounded-lg bg-emerald-brand px-3 py-1 text-xs font-medium text-white hover:bg-[#0E4B37]"
                       >
                         Save
                       </button>
@@ -507,7 +507,7 @@ export default function MessageThread({
             type="button"
             onClick={() => void handleSend()}
             disabled={!input.trim() || sending}
-            className="flex-shrink-0 rounded-xl bg-emerald-brand px-4 py-2.5 text-sm font-medium text-white transition-all active:scale-95 hover:bg-emerald-600 disabled:opacity-40"
+            className="flex-shrink-0 rounded-xl bg-emerald-brand px-4 py-2.5 text-sm font-medium text-white transition-all active:scale-95 hover:bg-[#0E4B37] disabled:opacity-40"
           >
             Send
           </button>

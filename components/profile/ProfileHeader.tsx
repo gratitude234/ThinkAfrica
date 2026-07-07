@@ -228,7 +228,7 @@ export default function ProfileHeader({
               <>
                 <Link
                   href="/settings"
-                  className="inline-flex items-center justify-center rounded-xl bg-emerald-brand px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+                  className="inline-flex items-center justify-center rounded-xl bg-emerald-brand px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37]"
                 >
                   Edit profile
                 </Link>

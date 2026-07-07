@@ -101,7 +101,7 @@ export default function PartnerContactForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-2.5 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+        className="w-full py-2.5 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-[#0E4B37] disabled:opacity-50 transition-colors"
       >
         {loading ? "Sending..." : "Send Message"}
       </button>

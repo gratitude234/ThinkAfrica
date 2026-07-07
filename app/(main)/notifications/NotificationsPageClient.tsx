@@ -209,7 +209,7 @@ export default function NotificationsPageClient({
               onClick={() =>
                 trackAction(summary.primaryAction as ActionInboxItem, "notifications_inbox")
               }
-              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
             >
               {summary.primaryAction.cta}
             </Link>
@@ -240,7 +240,7 @@ export default function NotificationsPageClient({
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Link
               href="/?tab=latest"
-              className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+              className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
             >
               Read latest
             </Link>

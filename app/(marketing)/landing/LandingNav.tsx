@@ -20,11 +20,17 @@ export default function LandingNav() {
   }, []);
 
   return (
-    <nav
-      className={`sticky top-0 z-50 border-b border-gray-200 bg-white/92 backdrop-blur-md transition-shadow duration-300 ${
-        scrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
-      }`}
-    >
+    <div className="sticky top-0 z-50">
+      <div className="bg-emerald-brand py-1.5 text-center">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold sm:text-[10.5px]">
+          Africa&apos;s intellectual social network
+        </span>
+      </div>
+      <nav
+        className={`border-b border-gray-200 bg-white/92 backdrop-blur-md transition-shadow duration-300 ${
+          scrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
+        }`}
+      >
       <div className="mx-auto flex h-[60px] max-w-6xl items-center gap-8 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex-shrink-0" aria-label="Indegenius home">
@@ -61,7 +67,7 @@ export default function LandingNav() {
           </Link>
           <Link
             href="/signup"
-            className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+            className="rounded-lg bg-emerald-brand px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37]"
           >
             Join free
           </Link>
@@ -80,6 +86,7 @@ export default function LandingNav() {
           ))}
         </div>
       </div>
-    </nav>
+      </nav>
+    </div>
   );
 }

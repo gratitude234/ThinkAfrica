@@ -22,10 +22,10 @@ interface Props {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  blog: "#10B981",
-  essay: "#F59E0B",
-  research: "#7C3AED",
-  policy_brief: "#3B82F6",
+  blog: "#073929",
+  essay: "#CE932B",
+  research: "#391A60",
+  policy_brief: "#391A60",
 };
 
 function EmptyChart({ label }: { label: string }) {
@@ -68,7 +68,7 @@ export default function AnalyticsCharts({
             <Line
               type="monotone"
               dataKey="count"
-              stroke="#10B981"
+              stroke="#073929"
               strokeWidth={2}
               dot={false}
               name="Signups"
@@ -94,7 +94,7 @@ export default function AnalyticsCharts({
                 />
                 <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} allowDecimals={false} />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Bar dataKey="count" name="Users" fill="#10B981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" name="Users" fill="#073929" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -183,7 +183,7 @@ export default function AnalyticsCharts({
                   tickFormatter={(v: string) => (v.length > 15 ? `${v.slice(0, 15)}...` : v)}
                 />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Bar dataKey="count" fill="#10B981" name="Contributors" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="count" fill="#073929" name="Contributors" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (

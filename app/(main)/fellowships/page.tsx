@@ -303,7 +303,7 @@ function OpportunityCard({
 
       <Link
         href={`/fellowships/${opportunity.id}`}
-        className="mt-5 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-brand text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors self-start"
+        className="mt-5 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-brand text-white rounded-lg text-sm font-medium hover:bg-[#0E4B37] transition-colors self-start"
       >
         View opportunity
       </Link>

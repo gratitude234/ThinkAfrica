@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Inter, Bodoni_Moda } from "next/font/google";
 import "./globals.css";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
 
-const playfair = Playfair_Display({
+const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
-  variable: "--font-playfair",
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-bodoni",
   display: "swap",
 });
 
@@ -65,7 +67,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#10B981",
+  themeColor: "#073929",
 };
 
 export default function RootLayout({
@@ -74,7 +76,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${playfair.variable} ${inter.variable}`}>
+    <html lang="en" className={`${bodoniModa.variable} ${inter.variable}`}>
       <body className="font-sans">{children}</body>
     </html>
   );

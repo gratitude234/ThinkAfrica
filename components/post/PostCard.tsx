@@ -79,26 +79,26 @@ const TYPE_STAMPS: Record<string, string> = {
 };
 
 const TYPE_GRADIENTS: Record<string, string> = {
-  research: "from-purple-900 to-purple-600",
-  essay: "from-amber-900 to-amber-600",
-  policy_brief: "from-blue-900 to-blue-600",
-  blog: "from-emerald-900 to-emerald-600",
-  quick_take: "from-emerald-900 to-emerald-600",
+  research: "from-purple-accent to-[#6B4A94]",
+  essay: "from-gold-ink to-gold",
+  policy_brief: "from-purple-accent to-[#6B4A94]",
+  blog: "from-emerald-brand to-[#0E4B37]",
+  quick_take: "from-emerald-brand to-[#0E4B37]",
 };
 
 const TYPE_BADGES: Record<string, string> = {
-  research: "border-purple-200 bg-purple-50 text-purple-700",
-  essay: "border-amber-200 bg-amber-50 text-amber-800",
-  policy_brief: "border-blue-200 bg-blue-50 text-blue-700",
-  blog: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  quick_take: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  research: "bg-purple-tint text-purple-accent",
+  essay: "bg-gold-tint text-gold-ink",
+  policy_brief: "bg-purple-tint text-purple-accent",
+  blog: "bg-green-tint text-emerald-brand",
+  quick_take: "bg-green-tint text-emerald-brand",
 };
 
 const SIGNAL_BADGES = {
   reviewed: "border-emerald-200 bg-emerald-50 text-emerald-700",
   citable: "border-sky-200 bg-sky-50 text-sky-700",
   coauthor: "border-purple-200 bg-purple-50 text-purple-700",
-  pdf: "border-purple-200 bg-white text-purple-700",
+  pdf: "border-gray-200 bg-white text-gray-400",
 };
 
 const QUALITY_BADGE_CLASSES = {
@@ -302,7 +302,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
           ) : null}
 
           <div className="mb-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10.5px] font-semibold ${badgeClass}`}>
+            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold ${badgeClass}`}>
               {typeLabel}
             </span>
             <span className="text-[11px] font-medium text-ink-muted">
@@ -329,7 +329,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
               <span
                 className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${
                   post.type === "research"
-                    ? "border-purple-200 bg-purple-50 text-purple-700"
+                    ? "border-purple-accent/20 bg-purple-tint text-purple-accent"
                     : SIGNAL_BADGES.reviewed
                 }`}
               >

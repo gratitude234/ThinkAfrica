@@ -37,7 +37,7 @@ export default class ErrorBoundary extends React.Component<
               this.setState({ hasError: false, message: "" });
               window.location.reload();
             }}
-            className="px-5 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors"
+            className="px-5 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-[#0E4B37] transition-colors"
           >
             Try Again
           </button>

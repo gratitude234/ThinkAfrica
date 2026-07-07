@@ -83,7 +83,7 @@ export default function CredibilityPanel({
           <ResponseStartLink
             postId={postId}
             source="credibility_panel"
-            className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
           >
             Write a response
           </ResponseStartLink>
@@ -156,7 +156,7 @@ export default function CredibilityPanel({
           <ResponseStartLink
             postId={postId}
             source="credibility_panel"
-            className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+            className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
           >
             Write a response
           </ResponseStartLink>

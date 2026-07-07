@@ -41,7 +41,7 @@ interface Props {
 }
 
 const PRIMARY_BUTTON =
-  "px-3 py-1.5 bg-emerald-brand text-white text-xs font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors";
+  "px-3 py-1.5 bg-emerald-brand text-white text-xs font-medium rounded-lg hover:bg-[#0E4B37] disabled:opacity-50 transition-colors";
 const NEUTRAL_BUTTON =
   "px-3 py-1.5 bg-white text-gray-600 border border-gray-200 text-xs font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors";
 const DANGER_BUTTON =

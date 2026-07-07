@@ -127,7 +127,7 @@ export default function ContactInquiryModal({
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37]"
               >
                 Done
               </button>
@@ -264,7 +264,7 @@ export default function ContactInquiryModal({
             <button
               type="submit"
               disabled={sending}
-              className="rounded-lg bg-emerald-brand px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+              className="rounded-lg bg-emerald-brand px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-50"
             >
               {sending ? "Sending..." : "Send"}
             </button>

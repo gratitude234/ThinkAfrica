@@ -48,8 +48,8 @@ export default async function DailyBrief({ userId: _userId, points }: Props) {
   const hasContent = topPost || hotDebate;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+    <div className="bg-green-wash rounded-xl border border-green-wash-border p-4 mb-6">
+      <p className="text-xs font-semibold text-emerald-brand uppercase tracking-wide mb-3">
         Daily Brief
       </p>
       <div className="flex flex-col lg:flex-row gap-4 lg:divide-x lg:divide-gray-100">
@@ -83,7 +83,7 @@ export default async function DailyBrief({ userId: _userId, points }: Props) {
             </p>
             <Link
               href={`/debates/${hotDebate.id}`}
-              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium mt-1 inline-block"
+              className="text-xs text-emerald-brand hover:text-emerald-700 font-medium mt-1 inline-block"
             >
               Join → ({hotDebateArgCount}{" "}
               {hotDebateArgCount === 1 ? "arg" : "args"})
@@ -102,7 +102,7 @@ export default async function DailyBrief({ userId: _userId, points }: Props) {
               {nextTier.min - points} pts to {nextTier.name}
             </p>
           ) : (
-            <p className="text-xs text-emerald-600 mt-0.5">
+            <p className="text-xs text-emerald-brand mt-0.5">
               Top tier reached!
             </p>
           )}

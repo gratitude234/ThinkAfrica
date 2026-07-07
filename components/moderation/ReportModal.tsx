@@ -92,7 +92,7 @@ export default function ReportModal({
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37]"
               >
                 Done
               </button>

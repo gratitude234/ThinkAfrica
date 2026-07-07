@@ -79,7 +79,7 @@ export default function AmbassadorApplyPage() {
         </p>
         <Link
           href="/ambassadors"
-          className="inline-flex items-center px-5 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors"
+          className="inline-flex items-center px-5 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-[#0E4B37] transition-colors"
         >
           Back to Ambassadors
         </Link>
@@ -149,7 +149,7 @@ export default function AmbassadorApplyPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+            className="px-6 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-[#0E4B37] disabled:opacity-50 transition-colors"
           >
             {loading ? "Submitting..." : "Submit Application"}
           </button>

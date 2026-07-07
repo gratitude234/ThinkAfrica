@@ -380,7 +380,7 @@ export default function AboutPage() {
             <div className="mt-9 flex flex-wrap justify-center gap-3">
               <Link
                 href="/write"
-                className="inline-flex rounded-[10px] bg-emerald-brand px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                className="inline-flex rounded-[10px] bg-emerald-brand px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-[#0E4B37]"
               >
                 Start Writing
               </Link>

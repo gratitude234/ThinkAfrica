@@ -72,7 +72,7 @@ export default function AudioSummaryPlayer({
         <button
           type="button"
           onClick={toggle}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-white transition-colors hover:bg-emerald-600"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-white transition-colors hover:bg-[#0E4B37]"
           aria-label={playing ? "Pause audio summary" : "Play audio summary"}
         >
           {playing ? (

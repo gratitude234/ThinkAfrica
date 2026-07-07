@@ -132,7 +132,7 @@ export default function FellowshipApply({
               setOpen(true);
             }
           }}
-          className="px-5 py-2.5 bg-emerald-brand text-white font-medium rounded-lg hover:bg-emerald-600 transition-colors text-sm"
+          className="px-5 py-2.5 bg-emerald-brand text-white font-medium rounded-lg hover:bg-[#0E4B37] transition-colors text-sm"
         >
           Apply for this opportunity
         </button>
@@ -194,7 +194,7 @@ export default function FellowshipApply({
             <button
               type="submit"
               disabled={loading || wordCount < 200}
-              className="px-5 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+              className="px-5 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-[#0E4B37] disabled:opacity-50 transition-colors"
             >
               {loading ? "Submitting..." : "Submit Application"}
             </button>

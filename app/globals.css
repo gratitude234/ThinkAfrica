@@ -110,7 +110,7 @@
 @media (min-width: 640px) {
   /* Drop cap on the first paragraph of the article body */
   .article-journal-body .prose > p:first-of-type::first-letter {
-font-family: var(--font-playfair), Georgia, serif;
+font-family: var(--font-bodoni), Georgia, serif;
     font-size: 5rem;
     font-weight: 600;
     float: left;
@@ -127,7 +127,7 @@ font-family: var(--font-playfair), Georgia, serif;
 
 .article-journal-body .prose p,
 .article-journal-body .prose li {
-font-family: var(--font-playfair), Georgia, serif;
+font-family: var(--font-bodoni), Georgia, serif;
   font-size: 1.125rem;
   line-height: 1.84;
   color: #242424;
@@ -146,7 +146,7 @@ font-family: var(--font-playfair), Georgia, serif;
   border-bottom: none;
   padding: 0.25rem 0 0.25rem 1.75rem;
   margin: 2.4rem 0;
-font-family: var(--font-playfair), Georgia, serif;
+font-family: var(--font-bodoni), Georgia, serif;
   font-size: 1.25rem;
   line-height: 1.48;
   font-style: italic;
@@ -172,7 +172,7 @@ font-family: var(--font-inter), system-ui, sans-serif;
 /* Section headings inside article */
 .article-journal-body .prose h2,
 .article-journal-body .prose h3 {
-font-family: var(--font-playfair), Georgia, serif;
+font-family: var(--font-bodoni), Georgia, serif;
   letter-spacing: 0;
   font-weight: 600;
   line-height: 1.16;

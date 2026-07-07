@@ -64,7 +64,7 @@ export default function EditorialTrustPanel({
             actionKey={actionKey}
             label={summary.nextActionLabel}
             source={actionSource}
-            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
           >
             {summary.nextActionLabel}
           </TrackedActionLink>

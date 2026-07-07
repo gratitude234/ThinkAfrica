@@ -186,7 +186,7 @@ export default function CreateDebatePage() {
         actions={
           <Link
             href="/login?redirectTo=/debates/create"
-            className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+            className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-[#0E4B37]"
           >
             Sign in
           </Link>
@@ -205,7 +205,7 @@ export default function CreateDebatePage() {
           <>
             <Link
               href="/settings"
-              className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+              className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-[#0E4B37]"
             >
               Complete profile
             </Link>

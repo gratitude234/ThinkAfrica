@@ -69,7 +69,7 @@ export default function RetentionThisWeek({
           actionKey={primaryAction.key}
           label={primaryAction.label}
           source={copy.source}
-          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37]"
         >
           {primaryAction.cta}
         </TrackedActionLink>

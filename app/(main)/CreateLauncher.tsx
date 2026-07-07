@@ -71,7 +71,7 @@ export default function CreateLauncher({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="group fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_12px_24px_-8px_rgb(16_185_129/0.65)] transition-[background-color,transform] duration-200 hover:bg-emerald-600 active:scale-95 motion-reduce:transition-none"
+          className="group fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_12px_24px_-8px_rgb(16_185_129/0.65)] transition-[background-color,transform] duration-200 hover:bg-[#0E4B37] active:scale-95 motion-reduce:transition-none"
           aria-label="Create"
           aria-haspopup="dialog"
           aria-expanded={open}
@@ -160,7 +160,7 @@ export default function CreateLauncher({
         type="button"
         onClick={() => setOpen((current) => !current)}
         className={`inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors ${
-          isActive ? "bg-ink" : "bg-emerald-brand hover:bg-emerald-600"
+          isActive ? "bg-ink" : "bg-emerald-brand hover:bg-[#0E4B37]"
         }`}
         aria-haspopup="menu"
         aria-expanded={open}

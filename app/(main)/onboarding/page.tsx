@@ -571,7 +571,7 @@ export default function OnboardingPage() {
               type="button"
               onClick={savePersona}
               disabled={loading || !profileType}
-              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-50"
             >
               {loading ? "Saving..." : "Continue"}
             </button>
@@ -756,7 +756,7 @@ export default function OnboardingPage() {
               type="button"
               onClick={saveIdentity}
               disabled={loading}
-              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-50"
             >
               {loading ? "Saving..." : "Continue"}
             </button>
@@ -811,7 +811,7 @@ export default function OnboardingPage() {
               type="button"
               onClick={saveInterestsAndContinue}
               disabled={loading || interests.length === 0}
-              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-50"
             >
               {loading ? "Saving..." : "Continue"}
             </button>
@@ -914,7 +914,7 @@ export default function OnboardingPage() {
                 completeOnboarding();
               }}
               disabled={loading}
-              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+              className="rounded-lg bg-emerald-brand px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-50"
             >
               {loading ? "Finishing..." : "Finish onboarding"}
             </button>

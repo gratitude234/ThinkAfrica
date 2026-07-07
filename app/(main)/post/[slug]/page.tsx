@@ -1499,7 +1499,7 @@ async function PostSidebar({
               <ResponseStartLink
                 postId={post.id}
                 source="post_sidebar"
-                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
               >
                 Write a response
               </ResponseStartLink>
@@ -1540,7 +1540,7 @@ async function PostSidebar({
               ) : (
                 <Link
                   href={`/login?redirectTo=${encodeURIComponent(`/post/${post.slug}`)}`}
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0E4B37]"
                 >
                   Follow author
                 </Link>
@@ -1980,7 +1980,7 @@ async function ResearchDossierSidebar({
                 <ResponseStartLink
                   postId={post.id}
                   source="research_dossier_sidebar"
-                  className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+                  className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
                 >
                   Write a response
                 </ResponseStartLink>
@@ -2018,7 +2018,7 @@ async function ResearchDossierSidebar({
               ) : (
                 <Link
                   href={`/login?redirectTo=${encodeURIComponent(`/post/${post.slug}`)}`}
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-600"
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0E4B37]"
                 >
                   Follow researcher
                 </Link>

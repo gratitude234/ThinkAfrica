@@ -402,7 +402,7 @@ function EmptyPosts({ signedIn }: { signedIn: boolean }) {
         {!signedIn ? (
           <Link
             href="/login?redirectTo=/explore"
-            className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+            className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
           >
             Sign in
           </Link>

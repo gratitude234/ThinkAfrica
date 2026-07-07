@@ -75,10 +75,16 @@ export default function NavClient({
     : `/login?redirectTo=${encodeURIComponent("/messages")}`;
 
   return (
-    <nav
-      className="sticky top-0 z-50 h-[60px] border-b border-gray-200 bg-white/95 backdrop-blur-xl"
-      aria-label="Primary navigation"
-    >
+    <div className="sticky top-0 z-50">
+      <div className="bg-emerald-brand py-1.5 text-center">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold sm:text-[10.5px]">
+          Africa&apos;s intellectual social network
+        </span>
+      </div>
+      <nav
+        className="h-[60px] border-b border-gray-200 bg-white/95 backdrop-blur-xl"
+        aria-label="Primary navigation"
+      >
       <div className="mx-auto flex h-full max-w-[1240px] items-center gap-7 px-4 sm:px-6 lg:px-8">
           <Link href="/" className="shrink-0" aria-label="Indegenius home">
             <Image
@@ -180,6 +186,7 @@ export default function NavClient({
             />
           </div>
       </div>
-    </nav>
+      </nav>
+    </div>
   );
 }

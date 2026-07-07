@@ -55,7 +55,7 @@ export default function FollowButton({
       className={`w-full rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
         following
           ? "bg-white border-gray-300 text-gray-700 hover:border-red-300 hover:text-red-600"
-          : "bg-emerald-brand border-emerald-brand text-white hover:bg-emerald-600"
+          : "bg-emerald-brand border-emerald-brand text-white hover:bg-[#0E4B37]"
       } disabled:opacity-50 ${className}`}
     >
       {loading ? "..." : following ? "Following" : "Follow"}

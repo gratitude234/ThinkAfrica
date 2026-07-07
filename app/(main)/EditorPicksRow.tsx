@@ -31,11 +31,11 @@ const TYPE_STAMPS: Record<string, string> = {
 };
 
 const TYPE_GRADIENTS: Record<string, string> = {
-  research: "from-purple-900 to-purple-600",
-  essay: "from-amber-900 to-amber-600",
-  policy_brief: "from-blue-900 to-blue-600",
-  blog: "from-emerald-900 to-emerald-600",
-  quick_take: "from-emerald-900 to-emerald-600",
+  research: "from-purple-accent to-[#6B4A94]",
+  essay: "from-gold-ink to-gold",
+  policy_brief: "from-purple-accent to-[#6B4A94]",
+  blog: "from-emerald-brand to-[#0E4B37]",
+  quick_take: "from-emerald-brand to-[#0E4B37]",
 };
 
 function estimateReadTime(excerpt: string | null): number {

@@ -41,7 +41,7 @@ export default function AmbassadorActions({ ambassadorId, currentStatus }: Props
           <button
             onClick={() => update("active")}
             disabled={loading !== null}
-            className="px-3 py-1.5 bg-emerald-brand text-white text-xs font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+            className="px-3 py-1.5 bg-emerald-brand text-white text-xs font-medium rounded-lg hover:bg-[#0E4B37] disabled:opacity-50 transition-colors"
           >
             {loading === "approve" ? "Approving..." : "Approve"}
           </button>

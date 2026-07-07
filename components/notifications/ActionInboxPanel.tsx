@@ -78,7 +78,7 @@ export default function ActionInboxPanel({
         <Link
           href={summary.primaryAction.href}
           onClick={() => trackAction(summary.primaryAction as ActionInboxItem, source)}
-          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
+          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
         >
           {summary.primaryAction.cta}
         </Link>
