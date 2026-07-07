@@ -56,7 +56,7 @@ export default function BottomNav({
       {userId ? <CreateLauncher userId={userId} variant="mobileFab" /> : null}
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white/96 shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] backdrop-blur-lg md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="Primary navigation"
       >
