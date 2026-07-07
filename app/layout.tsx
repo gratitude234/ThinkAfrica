@@ -42,8 +42,14 @@ export const metadata: Metadata = {
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
   icons: {
-    icon: "/logo.png",
-    apple: "/icon.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/indegenius-app-icon-transparent-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/indegenius-app-icon-transparent-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/indegenius-app-icon-white-bg-180.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   appleWebApp: {
     capable: true,

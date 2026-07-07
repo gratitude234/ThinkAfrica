@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 type AuthShellProps = {
   children: React.ReactNode;
@@ -35,13 +36,15 @@ export function AuthShell({
       <div className="grid min-h-dvh w-full grid-cols-1 lg:grid-cols-[0.95fr_1.05fr]">
         <aside className="hidden min-h-dvh flex-col justify-between overflow-hidden bg-[#111816] px-10 py-10 text-white lg:flex">
           <div>
-            <Link
-              href="/landing"
-              className="inline-flex font-display text-[30px] font-bold leading-none"
-              aria-label="Indegenius home"
-            >
-              <span className="text-emerald-brand">Inde</span>
-              <span className="text-purple-accent">genius</span>
+            <Link href="/landing" className="inline-flex" aria-label="Indegenius home">
+              <Image
+                src="/brand/indegenius-icon-wordmark-white.svg"
+                alt="Indegenius"
+                width={139}
+                height={107}
+                priority
+                className="h-9 w-auto"
+              />
             </Link>
 
             <div className="mt-16 max-w-xl">
@@ -90,13 +93,15 @@ export function AuthShell({
         <section className="flex min-h-dvh items-start justify-center px-5 pb-10 pt-7 sm:px-8 lg:items-center lg:bg-white lg:px-12 lg:py-12">
           <div className="w-full max-w-[470px]">
             <div className="mb-8 lg:hidden">
-              <Link
-                href="/landing"
-                className="inline-flex font-display text-[27px] font-bold leading-none"
-                aria-label="Indegenius home"
-              >
-                <span className="text-emerald-brand">Inde</span>
-                <span className="text-purple-accent">genius</span>
+              <Link href="/landing" className="inline-flex" aria-label="Indegenius home">
+                <Image
+                  src="/brand/indegenius-icon-wordmark-color.svg"
+                  alt="Indegenius"
+                  width={139}
+                  height={107}
+                  priority
+                  className="h-8 w-auto"
+                />
               </Link>
               <p className="mt-3 text-[13px] font-medium text-ink-muted">
                 Africa&apos;s Intellectual Network

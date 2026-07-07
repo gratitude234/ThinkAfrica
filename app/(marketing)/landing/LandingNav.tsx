@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
@@ -26,9 +27,15 @@ export default function LandingNav() {
     >
       <div className="mx-auto flex h-[60px] max-w-6xl items-center gap-8 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex-shrink-0 font-display text-[22px] font-bold">
-          <span className="text-emerald-500">Inde</span>
-          <span className="text-purple-600">genius</span>
+        <Link href="/" className="flex-shrink-0" aria-label="Indegenius home">
+          <Image
+            src="/brand/indegenius-icon-wordmark-color.svg"
+            alt="Indegenius"
+            width={139}
+            height={107}
+            priority
+            className="h-7 w-auto"
+          />
         </Link>
 
         {/* Nav links */}

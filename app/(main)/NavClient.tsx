@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import NavUserMenu from "./NavUserMenu";
@@ -79,12 +80,15 @@ export default function NavClient({
       aria-label="Primary navigation"
     >
       <div className="mx-auto flex h-full max-w-[1240px] items-center gap-7 px-4 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="shrink-0 font-display text-[21px] font-bold leading-none"
-          >
-            <span className="text-emerald-brand">Inde</span>
-            <span className="text-purple-accent">genius</span>
+          <Link href="/" className="shrink-0" aria-label="Indegenius home">
+            <Image
+              src="/brand/indegenius-icon-wordmark-color.svg"
+              alt="Indegenius"
+              width={139}
+              height={107}
+              priority
+              className="h-7 w-auto"
+            />
           </Link>
 
           <div className="hidden min-w-0 flex-1 items-center gap-7 md:flex">
