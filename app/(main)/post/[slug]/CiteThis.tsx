@@ -50,28 +50,31 @@ export default function CiteThis({
   const formatted = useMemo(() => {
     const date = new Date(publishedAt);
     const year = date.getFullYear();
-    const url = `https://thinkafrica.com${citationPath}`;
+    // thinkafrica.africa must permanently 301-redirect to indegenius.com at
+    // the Cloudflare level, so any existing external link to the old
+    // citation URL (thinkafrica.com/...) still resolves.
+    const url = `https://indegenius.com${citationPath}`;
     const fullNames = authors.map((author) => author.full_name ?? author.username);
     const apaAuthors = authors
       .map((author) => formatApaAuthor(author.full_name ?? author.username))
       .join(", ");
-    const mlaLead = formatMlaAuthor(fullNames[0] ?? "ThinkAfrica");
+    const mlaLead = formatMlaAuthor(fullNames[0] ?? "Indegenius");
 
     return {
-      apa: `${apaAuthors} (${year}). ${title}. ThinkAfrica. ${url} (${citationId})`,
+      apa: `${apaAuthors} (${year}). ${title}. Indegenius. ${url} (${citationId})`,
       bibtex: `@article{${citationId},
   author    = {${formatAuthors(authors)}},
   title     = {${title}},
-  journal   = {ThinkAfrica},
+  journal   = {Indegenius},
   year      = {${year}},
   url       = {${url}},
   note      = {${citationId}}
 }`,
-      mla: `${mlaLead}. "${title}." ThinkAfrica, ${date.toLocaleDateString("en-US", {
+      mla: `${mlaLead}. "${title}." Indegenius, ${date.toLocaleDateString("en-US", {
         day: "numeric",
         month: "short",
         year: "numeric",
-      })}, thinkafrica.com${citationPath}.`,
+      })}, indegenius.com${citationPath}.`,
     };
   }, [authors, citationId, citationPath, publishedAt, title]);
 
