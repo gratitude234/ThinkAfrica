@@ -40,8 +40,8 @@ export function AuthShell({
               className="inline-flex font-display text-[30px] font-bold leading-none"
               aria-label="Indegenius home"
             >
-              <span className="text-emerald-brand">Think</span>
-              <span className="text-purple-accent">Africa</span>
+              <span className="text-emerald-brand">Inde</span>
+              <span className="text-purple-accent">genius</span>
             </Link>
 
             <div className="mt-16 max-w-xl">
@@ -95,8 +95,8 @@ export function AuthShell({
                 className="inline-flex font-display text-[27px] font-bold leading-none"
                 aria-label="Indegenius home"
               >
-                <span className="text-emerald-brand">Think</span>
-                <span className="text-purple-accent">Africa</span>
+                <span className="text-emerald-brand">Inde</span>
+                <span className="text-purple-accent">genius</span>
               </Link>
               <p className="mt-3 text-[13px] font-medium text-ink-muted">
                 Africa&apos;s Intellectual Network

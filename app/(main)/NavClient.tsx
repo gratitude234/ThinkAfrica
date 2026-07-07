@@ -83,8 +83,8 @@ export default function NavClient({
             href="/"
             className="shrink-0 font-display text-[21px] font-bold leading-none"
           >
-            <span className="text-emerald-brand">Think</span>
-            <span className="text-purple-accent">Africa</span>
+            <span className="text-emerald-brand">Inde</span>
+            <span className="text-purple-accent">genius</span>
           </Link>
 
           <div className="hidden min-w-0 flex-1 items-center gap-7 md:flex">
