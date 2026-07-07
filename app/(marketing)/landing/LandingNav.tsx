@@ -27,7 +27,7 @@ export default function LandingNav() {
         </span>
       </div>
       <nav
-        className={`border-b border-gray-200 bg-white/92 backdrop-blur-md transition-shadow duration-300 ${
+        className={`border-b border-gray-200 bg-white transition-shadow duration-300 ${
           scrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
         }`}
       >
