@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { APP_DOMAIN } from "@/lib/site";
 
 interface RelatedTarget {
   id: string;
@@ -53,9 +54,10 @@ export default function PublishedToast({
 
   if (!open) return null;
 
-  const url = `https://thinkafrica.com/post/${slug}`;
-  const profileUrl = username ? `https://thinkafrica.com/${username}` : "";
-  const shareText = `I just published "${title}" on ThinkAfrica`;
+  // TODO(gratitude): confirm production domain — APP_DOMAIN is a placeholder until then.
+  const url = `https://${APP_DOMAIN}/post/${slug}`;
+  const profileUrl = username ? `https://${APP_DOMAIN}/${username}` : "";
+  const shareText = `I just published "${title}" on Indegenius`;
   const primaryAction = relatedTarget
     ? {
         href: `/post/${relatedTarget.slug}`,
@@ -141,7 +143,7 @@ export default function PublishedToast({
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
             {isLive
-              ? `You earned +${points} points, and this piece now strengthens your public ThinkAfrica profile. Keep the loop going by reading a related idea and adding a response if you have a useful angle.`
+              ? `You earned +${points} points, and this piece now strengthens your public Indegenius profile. Keep the loop going by reading a related idea and adding a response if you have a useful angle.`
               : "Your submission is now in editorial review. You'll be notified when a reviewer submits feedback or an editor makes a decision. Keep the momentum going — a response post often surfaces your next angle."}
           </p>
 

@@ -147,7 +147,7 @@ export function getEditorialTrustSummary(input: EditorialTrustInput): EditorialT
     {
       key: "submitted",
       label: "Submitted",
-      description: "The work entered ThinkAfrica's editorial workflow.",
+      description: "The work entered Indegenius's editorial workflow.",
       status: input.createdAt ? "complete" : "upcoming",
     },
     {
@@ -179,7 +179,7 @@ export function getEditorialTrustSummary(input: EditorialTrustInput): EditorialT
       key: "published",
       label: "Published version",
       description: isPublished
-        ? "The accepted version is public on ThinkAfrica."
+        ? "The accepted version is public on Indegenius."
         : "Accepted work becomes a public reviewed publication.",
       status: isPublished ? "complete" : "upcoming",
     },

@@ -1289,7 +1289,7 @@ export default async function AdminAnalyticsPage() {
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-gray-900">{item.title}</p>
                     <p className="text-xs text-gray-500">
-                      {item.proofCount} with ThinkAfrica proof
+                      {item.proofCount} with Indegenius proof
                     </p>
                   </div>
                   <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">

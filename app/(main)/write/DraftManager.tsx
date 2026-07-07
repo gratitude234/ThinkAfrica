@@ -35,9 +35,40 @@ interface UseDraftManagerReturn {
   dismissBackup: () => void;
 }
 
-const LS_KEY = "thinkafrica_draft_backup";
+const LS_KEY = "indegenius_draft_backup";
+const LEGACY_LS_KEY = "thinkafrica_draft_backup";
 const AUTOSAVE_DELAY = 3000;
 const LS_INTERVAL = 5000;
+
+// Dual-read: new key first, then fall back to the pre-rebrand key and migrate
+// its value forward. The legacy key is never deleted outright, only replaced
+// once its value has been copied under the new name.
+export function readDraftBackupRaw(): string | null {
+  try {
+    const current = localStorage.getItem(LS_KEY);
+    if (current) return current;
+
+    const legacy = localStorage.getItem(LEGACY_LS_KEY);
+    if (legacy) {
+      localStorage.setItem(LS_KEY, legacy);
+      return legacy;
+    }
+  } catch {
+    // ignore storage errors
+  }
+
+  return null;
+}
+
+// Only clears the new key. The legacy key is intentionally left in place —
+// per the migration requirement, it is never deleted outright by this code.
+function clearDraftBackupRaw() {
+  try {
+    localStorage.removeItem(LS_KEY);
+  } catch {
+    // ignore storage errors
+  }
+}
 
 export function useDraftManager(): UseDraftManagerReturn {
   const router = useRouter();
@@ -59,7 +90,7 @@ export function useDraftManager(): UseDraftManagerReturn {
   useEffect(() => {
     if (!draftIdParam) {
       try {
-        const savedBackup = localStorage.getItem(LS_KEY);
+        const savedBackup = readDraftBackupRaw();
 
         if (savedBackup) {
           const parsedBackup = JSON.parse(savedBackup) as Partial<DraftData>;
@@ -122,7 +153,7 @@ export function useDraftManager(): UseDraftManagerReturn {
 
   const dismissBackup = useCallback(() => {
     setLocalBackup(null);
-    localStorage.removeItem(LS_KEY);
+    clearDraftBackupRaw();
   }, []);
 
   const restoreFromBackup = useCallback(() => {
@@ -131,7 +162,7 @@ export function useDraftManager(): UseDraftManagerReturn {
     latestDataRef.current = localBackup;
     setInitialData(localBackup);
     setLocalBackup(null);
-    localStorage.removeItem(LS_KEY);
+    clearDraftBackupRaw();
   }, [localBackup]);
 
   useEffect(() => {

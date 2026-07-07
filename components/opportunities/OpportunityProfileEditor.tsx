@@ -309,7 +309,7 @@ export default function OpportunityProfileEditor({
           </button>
           <p className="text-xs text-gray-400">
             Public profiles appear in opportunity discovery. Signed-in members
-            keeps discovery inside ThinkAfrica.
+            keeps discovery inside Indegenius.
           </p>
         </div>
       </div>

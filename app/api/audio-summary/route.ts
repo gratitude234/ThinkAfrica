@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "user",
-            content: `You are writing a 90-second spoken audio summary for a ThinkAfrica post.
+            content: `You are writing a 90-second spoken audio summary for an Indegenius post.
 The post is a ${postType} by ${authorName}, titled: "${title}".
 
 Write a tight, engaging spoken summary of exactly 200-240 words.

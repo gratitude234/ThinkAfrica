@@ -2,6 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SITE_URL } from "@/lib/site";
 
 export type NotificationPreferenceKey =
   | "email_comments"
@@ -65,7 +66,8 @@ export function getAppUrl() {
   const emailUrl =
     configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
       ? configuredUrl
-      : "https://www.thinkafrica.africa";
+      // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
+      : SITE_URL;
 
   return emailUrl.replace(/\/+$/, "");
 }
@@ -125,7 +127,7 @@ export function renderEmailShell(input: {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
             <tr>
               <td style="padding:22px 26px;border-bottom:1px solid #eef2f0;">
-                <div style="font-size:18px;font-weight:700;color:#047857;">ThinkAfrica</div>
+                <div style="font-size:18px;font-weight:700;color:#047857;">Indegenius</div>
                 <div style="margin-top:4px;font-size:12px;color:#6b7280;">Africa's intellectual network</div>
               </td>
             </tr>
@@ -142,7 +144,7 @@ export function renderEmailShell(input: {
             </tr>
             <tr>
               <td style="padding:18px 26px;background:#f9fafb;border-top:1px solid #eef2f0;font-size:12px;line-height:1.6;color:#6b7280;">
-                You are receiving this because you have a ThinkAfrica account. Manage email preferences in your notification settings.
+                You are receiving this because you have an Indegenius account. Manage email preferences in your notification settings.
               </td>
             </tr>
           </table>
@@ -260,7 +262,7 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       "",
       `${input.ctaLabel}: ${ctaHref}`,
       "",
-      "Manage email preferences in ThinkAfrica notification settings.",
+      "Manage email preferences in Indegenius notification settings.",
     ].join("\n");
 
     return sendEmail({
@@ -304,7 +306,7 @@ export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSen
     "",
     `${input.ctaLabel}: ${ctaHref}`,
     "",
-    "Manage email preferences in ThinkAfrica notification settings.",
+    "Manage email preferences in Indegenius notification settings.",
   ].join("\n");
 
   return sendEmail({

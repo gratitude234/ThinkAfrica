@@ -23,7 +23,7 @@ export default function WelcomeBanner({ firstName }: { firstName: string }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-display text-xl text-ink">
-            Welcome to ThinkAfrica, {firstName}.
+            Welcome to Indegenius, {firstName}.
           </h2>
           <p className="mt-1 text-sm text-ink-muted">
             Here&apos;s what writers across the continent are publishing right now.

@@ -221,7 +221,7 @@ export default function SignupPage() {
       subtitle="Start with your name and email. Next, pick your role, interests, and a few optional follows."
       proofItems={PROOF_ITEMS}
       quote="Turn your strongest campus ideas into work other students can read, cite, and respond to."
-      quoteSource="ThinkAfrica onboarding promise"
+      quoteSource="Indegenius onboarding promise"
       footer={
         <>
           Already have an account?{" "}

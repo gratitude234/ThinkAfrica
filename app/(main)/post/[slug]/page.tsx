@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { SITE_URL } from "@/lib/site";
 import UserAvatar from "@/components/ui/UserAvatar";
 import FollowButton from "@/components/ui/FollowButton";
 import {
@@ -315,7 +316,7 @@ function ResearchDocumentPanel({ post }: { post: PostRecord }) {
           </h2>
           <p className="mt-2 max-w-[58ch] text-sm leading-6 text-slate-600">
             The research record is presented as an abstract plus the submitted
-            PDF manuscript. PDF access uses the protected ThinkAfrica document
+            PDF manuscript. PDF access uses the protected Indegenius document
             route and opens in a new tab.
           </p>
         </div>
@@ -2050,20 +2051,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     throwPostQueryError(slug, "metadata", postError);
   }
 
-  if (!post) return { title: "Post not found - ThinkAfrica" };
+  if (!post) return { title: "Post not found - Indegenius" };
   if (
     (post.status === "draft" ||
       post.status === "pending" ||
       post.status === "pending_revision") &&
     user?.id !== post.author_id
   ) {
-    return { title: "Post not found - ThinkAfrica" };
+    return { title: "Post not found - Indegenius" };
   }
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
   const description = sanitizePostExcerpt(post.excerpt);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://thinkafrica.com";
+  // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? SITE_URL;
   const ogImageUrl = `${appUrl}/api/og?${new URLSearchParams({
     title: post.title,
     author: author?.full_name ?? "",
@@ -2073,13 +2075,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const ogImage = coverUrl ?? ogImageUrl;
 
   return {
-    title: `${post.title} - ThinkAfrica`,
-    description: description ?? `Read this post by ${author?.full_name} on ThinkAfrica`,
+    title: `${post.title} - Indegenius`,
+    description: description ?? `Read this post by ${author?.full_name} on Indegenius`,
     openGraph: {
       title: post.title,
       description: description ?? "",
       url: `${appUrl}/post/${post.slug}`,
-      siteName: "ThinkAfrica",
+      siteName: "Indegenius",
       images: [{ url: ogImage, width: 1200, height: 630 }],
       type: "article",
     },

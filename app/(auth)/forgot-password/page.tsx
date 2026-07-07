@@ -96,10 +96,10 @@ export default function ForgotPasswordPage() {
     <AuthShell
       eyebrow="Account recovery"
       title="Reset your password securely."
-      subtitle="Enter the email tied to your ThinkAfrica profile. If an account exists, we will send a secure reset code and link."
+      subtitle="Enter the email tied to your Indegenius profile. If an account exists, we will send a secure reset code and link."
       proofItems={PROOF_ITEMS}
       quote="Your profile should be easy to return to and hard for anyone else to access."
-      quoteSource="ThinkAfrica account standard"
+      quoteSource="Indegenius account standard"
       footer={
         <>
           Remembered it?{" "}

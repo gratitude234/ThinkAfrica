@@ -22,12 +22,12 @@ export const revalidate = 30;
 export const metadata: Metadata = {
   title: "Student Debates on Africa, Education and Society",
   description:
-    "Join structured ThinkAfrica debates where students argue motions, vote on positions, and build stronger public ideas.",
+    "Join structured Indegenius debates where students argue motions, vote on positions, and build stronger public ideas.",
   alternates: { canonical: canonicalPath("/debates") },
   openGraph: {
     title: "Student Debates on Africa, Education and Society",
     description:
-      "Join structured ThinkAfrica debates where students argue motions, vote on positions, and build stronger public ideas.",
+      "Join structured Indegenius debates where students argue motions, vote on positions, and build stronger public ideas.",
     url: absoluteUrl("/debates"),
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Student Debates on Africa, Education and Society",
     description:
-      "Join structured ThinkAfrica debates where students argue motions, vote on positions, and build stronger public ideas.",
+      "Join structured Indegenius debates where students argue motions, vote on positions, and build stronger public ideas.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };
@@ -133,7 +133,7 @@ function EmptyDebates({
     },
     recaps: {
       title: "No recaps available yet.",
-      body: "Once a debate closes, ThinkAfrica generates a citable recap.",
+      body: "Once a debate closes, Indegenius generates a citable recap.",
     },
   };
 

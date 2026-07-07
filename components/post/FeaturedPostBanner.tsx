@@ -39,7 +39,7 @@ export default function FeaturedPostBanner({ post }: Props) {
       />
 
       <p className="mb-2 text-xs font-semibold text-amber-600">
-        Featured by ThinkAfrica
+        Featured by Indegenius
       </p>
 
       <Link href={`/post/${post.slug}`}>

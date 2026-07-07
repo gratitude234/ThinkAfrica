@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     }`;
   };
 
-  const prompt = `You are writing a 400-word debate recap for the ThinkAfrica intellectual platform.
+  const prompt = `You are writing a 400-word debate recap for the Indegenius intellectual platform.
 
 Motion: "${debate.title}"
 ${debate.description ? `Context: ${debate.description}` : ""}

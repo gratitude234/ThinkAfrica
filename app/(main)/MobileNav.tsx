@@ -46,7 +46,7 @@ export default function MobileNav({
   const router = useRouter();
   const profileHref = profile?.username ? `/${profile.username}` : "/settings";
   const displayName =
-    profile?.full_name ?? user?.email?.split("@")[0] ?? "ThinkAfrica";
+    profile?.full_name ?? user?.email?.split("@")[0] ?? "Indegenius";
   const points = profile?.points ?? 0;
   const profileActive = profile?.username
     ? pathname === profileHref || pathname.startsWith(`${profileHref}/`)

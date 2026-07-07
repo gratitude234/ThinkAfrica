@@ -59,9 +59,9 @@ export async function sendProfileCompletionReminders() {
     for (const profile of targets) {
       const result = await sendUserEmail({
         recipientId: profile.id,
-        subject: "Finish setting up your ThinkAfrica profile",
+        subject: "Finish setting up your Indegenius profile",
         preview: "Complete your profile so readers can trust your work.",
-        title: "Finish your ThinkAfrica profile",
+        title: "Finish your Indegenius profile",
         intro:
           "Your profile is almost ready. Add the missing details so your posts, comments, and opportunity signals carry a credible academic identity.",
         ctaLabel: "Complete profile",

@@ -38,7 +38,7 @@ type ProfileSummary = {
 };
 
 function displayName(profile: ProfileSummary | null) {
-  return profile?.full_name?.trim() || profile?.username?.trim() || "A ThinkAfrica member";
+  return profile?.full_name?.trim() || profile?.username?.trim() || "An Indegenius member";
 }
 
 function excerpt(value: string, maxLength = 180) {
@@ -155,9 +155,9 @@ export async function sendConversationMessage(
     const messagePreview = excerpt(content);
     const emailResult = await sendUserEmail({
       recipientId: recipient.user_id,
-      subject: `${senderName} sent you a message on ThinkAfrica`,
+      subject: `${senderName} sent you a message on Indegenius`,
       preview: `${senderName} sent you a new message.`,
-      title: "New message on ThinkAfrica",
+      title: "New message on Indegenius",
       intro: `${senderName} sent you a message. Open the conversation to reply.`,
       bodyHtml: `<p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;border-left:3px solid #10b981;padding-left:14px;">${escapeHtml(messagePreview)}</p>`,
       bodyTextLines: [`Message: ${messagePreview}`],

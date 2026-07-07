@@ -147,7 +147,7 @@ function LoginForm() {
       subtitle={introCopy}
       proofItems={PROOF_ITEMS}
       quote="Serious ideas deserve a place where readers can find, test, and build on them."
-      quoteSource="ThinkAfrica editorial principle"
+      quoteSource="Indegenius editorial principle"
       footer={
         <>
           Don&apos;t have an account?{" "}

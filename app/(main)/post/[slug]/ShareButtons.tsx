@@ -49,7 +49,7 @@ export default function ShareButtons({
     .join("\n");
 
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(
-    `${shareText}\nRead on ThinkAfrica: ${url}`
+    `${shareText}\nRead on Indegenius: ${url}`
   )}`;
   const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`;
   const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;

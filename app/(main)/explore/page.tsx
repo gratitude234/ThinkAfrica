@@ -24,12 +24,12 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: "Explore African Student Essays, Research and Ideas",
   description:
-    "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on ThinkAfrica.",
+    "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on Indegenius.",
   alternates: { canonical: canonicalPath("/explore") },
   openGraph: {
     title: "Explore African Student Essays, Research and Ideas",
     description:
-      "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on ThinkAfrica.",
+      "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on Indegenius.",
     url: absoluteUrl("/explore"),
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Explore African Student Essays, Research and Ideas",
     description:
-      "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on ThinkAfrica.",
+      "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on Indegenius.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };
@@ -264,7 +264,7 @@ function SearchEntry({
         <input
           type="search"
           name="q"
-          aria-label="Search ThinkAfrica"
+          aria-label="Search Indegenius"
           placeholder="Search posts, people, topics, universities..."
           className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-3 text-[13px] text-ink shadow-sm outline-none transition-[border-color,box-shadow,background-color] placeholder:text-gray-400 focus:border-emerald-brand focus:bg-white focus:ring-4 focus:ring-emerald-100 sm:h-[52px] sm:pl-12 sm:pr-4 sm:text-sm"
         />
@@ -956,7 +956,7 @@ function OpportunitiesRailCard({ data }: { data: DiscoverData }) {
                 {fellowship.title}
               </span>
               <span className="mt-1 block text-[11px] text-ink-muted">
-                {fellowship.sponsor_name ?? "ThinkAfrica"}
+                {fellowship.sponsor_name ?? "Indegenius"}
                 {fellowship.deadline ? ` - Due ${formatDate(fellowship.deadline)}` : ""}
               </span>
             </DiscoverTrackedLink>
@@ -1196,10 +1196,10 @@ export default async function ExplorePage({ searchParams }: PageProps) {
         </h1>
         <p className="mt-1.5 max-w-2xl text-[13px] leading-5 text-ink-muted sm:mt-2 sm:text-sm sm:leading-6">
           <span className="sm:hidden">
-            Posts, writers, topics, debates, and opportunities across ThinkAfrica.
+            Posts, writers, topics, debates, and opportunities across Indegenius.
           </span>
           <span className="hidden sm:inline">
-            Essays, research, debates, and opportunities across ThinkAfrica,
+            Essays, research, debates, and opportunities across Indegenius,
             ranked to match your interests.
           </span>
         </p>

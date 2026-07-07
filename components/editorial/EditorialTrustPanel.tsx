@@ -32,7 +32,7 @@ interface EditorialTrustPanelProps {
 export default function EditorialTrustPanel({
   summary,
   title = "Review & citation",
-  description = "This status explains how formal ThinkAfrica work moves from submission to reviewed publication.",
+  description = "This status explains how formal Indegenius work moves from submission to reviewed publication.",
   actionHref,
   actionSource = "editorial_trust",
   actionKey = "editorial_status",

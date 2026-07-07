@@ -459,7 +459,7 @@ export default async function DashboardPage() {
       title: post?.title ?? "Untitled collaboration",
       slug: post?.slug ?? "",
       authorName:
-        authorProfile?.full_name ?? authorProfile?.username ?? "A ThinkAfrica author",
+        authorProfile?.full_name ?? authorProfile?.username ?? "An Indegenius author",
     };
   });
 
@@ -472,7 +472,7 @@ export default async function DashboardPage() {
       id: response.id,
       title: response.title,
       slug: response.slug,
-      authorName: profile?.full_name ?? profile?.username ?? "ThinkAfrica writer",
+      authorName: profile?.full_name ?? profile?.username ?? "Indegenius writer",
       avatarUrl: profile?.avatar_url ?? null,
     };
   });

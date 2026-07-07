@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "ThinkAfrica",
-    short_name: "ThinkAfrica",
+    name: "Indegenius",
+    short_name: "Indegenius",
     description:
       "Research, essays, and policy briefs from African university students.",
     start_url: "/",

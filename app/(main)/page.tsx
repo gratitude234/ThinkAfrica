@@ -21,12 +21,12 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: "African Student Essays, Research and Policy Ideas",
   description:
-    "ThinkAfrica is an intellectual social network for African student essays, research, debates, and policy ideas.",
+    "Indegenius is an intellectual social network for African student essays, research, debates, and policy ideas.",
   alternates: { canonical: canonicalPath("/") },
   openGraph: {
-    title: "ThinkAfrica - Africa's Intellectual Social Network",
+    title: "Indegenius - Africa's Intellectual Social Network",
     description:
-      "ThinkAfrica is an intellectual social network for African student essays, research, debates, and policy ideas.",
+      "Indegenius is an intellectual social network for African student essays, research, debates, and policy ideas.",
     url: SITE_URL,
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
@@ -34,9 +34,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ThinkAfrica - Africa's Intellectual Social Network",
+    title: "Indegenius - Africa's Intellectual Social Network",
     description:
-      "ThinkAfrica is an intellectual social network for African student essays, research, debates, and policy ideas.",
+      "Indegenius is an intellectual social network for African student essays, research, debates, and policy ideas.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };

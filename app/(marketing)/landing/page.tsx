@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     "Read serious essays, research, policy briefs, and debates from African university students and emerging thinkers.",
   alternates: { canonical: canonicalPath("/landing") },
   openGraph: {
-    title: "ThinkAfrica - African Student Essays, Research and Policy Ideas",
+    title: "Indegenius - African Student Essays, Research and Policy Ideas",
     description:
       "Read serious essays, research, policy briefs, and debates from African university students and emerging thinkers.",
     url: absoluteUrl("/landing"),
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ThinkAfrica - African Student Essays, Research and Policy Ideas",
+    title: "Indegenius - African Student Essays, Research and Policy Ideas",
     description:
       "Read serious essays, research, policy briefs, and debates from African university students and emerging thinkers.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
@@ -127,7 +127,7 @@ function relativeDate(dateStr: string | null): string {
 function authorLine(post: LandingPost) {
   const p = post.profiles;
   return {
-    name: p?.full_name ?? p?.username ?? "ThinkAfrica",
+    name: p?.full_name ?? p?.username ?? "Indegenius",
     university: p?.university ?? null,
   };
 }
@@ -310,7 +310,7 @@ export default async function LandingPage() {
                       students already publishing
                     </>
                   ) : (
-                    "Read student essays, research, and policy briefs already live on ThinkAfrica"
+                    "Read student essays, research, and policy briefs already live on Indegenius"
                   )}
                 </p>
               </div>

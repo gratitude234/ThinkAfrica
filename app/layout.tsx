@@ -19,8 +19,8 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: SITE_NAME,
   title: {
-    default: "ThinkAfrica - Africa's Intellectual Social Network",
-    template: "%s - ThinkAfrica",
+    default: "Indegenius - Africa's Intellectual Social Network",
+    template: "%s - Indegenius",
   },
   description:
     "Research, essays, and policy briefs from African university students.",
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
-    title: "ThinkAfrica - Africa's Intellectual Social Network",
+    title: "Indegenius - Africa's Intellectual Social Network",
     description:
       "Research, essays, and policy briefs from African university students.",
     url: SITE_URL,
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ThinkAfrica - Africa's Intellectual Social Network",
+    title: "Indegenius - Africa's Intellectual Social Network",
     description:
       "Research, essays, and policy briefs from African university students.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "ThinkAfrica",
+    title: "Indegenius",
     statusBarStyle: "default",
   },
   formatDetection: {

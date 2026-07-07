@@ -260,10 +260,10 @@ async function syncAuthors(
       if (!notificationError) {
         const emailResult = await sendUserEmail({
           recipientId: coAuthor.user_id,
-          subject: `${ownerName} invited you to co-author on ThinkAfrica`,
-          preview: `${ownerName} has invited you to co-author a ThinkAfrica post.`,
+          subject: `${ownerName} invited you to co-author on Indegenius`,
+          preview: `${ownerName} has invited you to co-author an Indegenius post.`,
           title: "Co-author invitation",
-          intro: `${ownerName} has invited you to co-author a ThinkAfrica post. Review the invitation and accept or decline from your notifications.`,
+          intro: `${ownerName} has invited you to co-author an Indegenius post. Review the invitation and accept or decline from your notifications.`,
           ctaLabel: "Review invitation",
           ctaPath: `/post/${slug}`,
           idempotencyKey: `co-author-invite:${postId}:${coAuthor.user_id}`,
@@ -528,17 +528,17 @@ export async function publishPost(input: {
         const { error: notificationError } = await supabase.from("notifications").insert({
           user_id: parentPost.author_id,
           type: "response_post",
-          message: `${ownerProfile?.full_name ?? "A ThinkAfrica author"} wrote a response to your post.`,
+          message: `${ownerProfile?.full_name ?? "An Indegenius author"} wrote a response to your post.`,
           link: `/post/${slug}`,
           actor_id: user.id,
           post_id: postId,
           read: false,
         });
         if (!notificationError) {
-          const authorName = ownerProfile?.full_name ?? "A ThinkAfrica author";
+          const authorName = ownerProfile?.full_name ?? "An Indegenius author";
           const emailResult = await sendUserEmail({
             recipientId: parentPost.author_id,
-            subject: `${authorName} responded to your ThinkAfrica post`,
+            subject: `${authorName} responded to your Indegenius post`,
             preview: `${authorName} wrote a response to your post.`,
             title: "New response to your post",
             intro: `${authorName} wrote a response to "${parentPost.title}".`,
@@ -561,7 +561,7 @@ export async function publishPost(input: {
       slug,
       user.id,
       input.coAuthors ?? [],
-      ownerProfile?.full_name ?? "A ThinkAfrica author"
+      ownerProfile?.full_name ?? "An Indegenius author"
     );
 
     if (input.correspondingAuthorId) {
@@ -640,7 +640,7 @@ export async function publishPost(input: {
         postId,
         title: input.title.trim(),
         content: sanitizedContent,
-        authorName: ownerProfile?.full_name ?? "A ThinkAfrica author",
+        authorName: ownerProfile?.full_name ?? "An Indegenius author",
         postType: input.postType,
       }),
     }).catch(() => {

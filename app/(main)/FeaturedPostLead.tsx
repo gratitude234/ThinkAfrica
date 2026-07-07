@@ -115,7 +115,7 @@ export default function FeaturedPostLead({
   if (!post) return <FeaturedEmptyState />;
 
   const author = post.profiles;
-  const authorName = author?.full_name ?? author?.username ?? "ThinkAfrica";
+  const authorName = author?.full_name ?? author?.username ?? "Indegenius";
   const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
   const documentSize = formatDocumentSize(post.document_size_bytes);
   const readingLabel =

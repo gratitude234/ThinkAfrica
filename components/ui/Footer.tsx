@@ -37,7 +37,7 @@ export default function Footer({ landing = false }: { landing?: boolean }) {
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="text-xl font-bold text-emerald-400">
-              ThinkAfrica
+              Indegenius
             </Link>
             <p className="mt-2 text-sm text-gray-400 leading-relaxed">
               Where Africa&apos;s Ideas Connect
@@ -103,7 +103,7 @@ export default function Footer({ landing = false }: { landing?: boolean }) {
         </div>
 
         <div className="mt-10 pt-6 border-t border-gray-800 text-center text-xs text-gray-500">
-          &copy; 2025 ThinkAfrica. Built for Africa.
+          &copy; 2025 Indegenius. Built for Africa.
         </div>
       </div>
     </footer>

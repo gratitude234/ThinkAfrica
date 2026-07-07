@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { SITE_URL } from "@/lib/site";
 
 function getSafeNextPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
@@ -25,7 +26,8 @@ function getAuthRedirectOrigin(request: NextRequest) {
   const requestOrigin = request.nextUrl.origin;
   if (!isLocalhostOrigin(requestOrigin)) return requestOrigin;
 
-  return "https://www.thinkafrica.africa";
+  // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
+  return SITE_URL;
 }
 
 export async function GET(request: NextRequest) {

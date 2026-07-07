@@ -82,7 +82,7 @@ function isReviewedWork(post: { type?: string | null; citation_id?: string | nul
 function getPersonSignal(person: PersonResult) {
   if (person.university) return person.university;
   if (person.points > 0) return `${person.points.toLocaleString()} points`;
-  return "ThinkAfrica writer";
+  return "Indegenius writer";
 }
 
 function SearchSignalBadge({
@@ -321,7 +321,7 @@ function SearchPageContent() {
           Search
         </p>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">
-          Search across ThinkAfrica
+          Search across Indegenius
         </h1>
         <p className="mt-2 text-sm leading-6 text-gray-500">
           Find posts, writers, topics, debates, and opportunities from one place.
@@ -523,7 +523,7 @@ function SearchPageContent() {
                                 ? ` / ${post.profiles.university}`
                                 : ""
                             }`
-                          : "ThinkAfrica"}
+                          : "Indegenius"}
                       </p>
                       {post.excerpt ? (
                         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">
@@ -645,7 +645,7 @@ function SearchPageContent() {
                         Open
                       </span>
                       <span className="text-xs text-gray-500">
-                        {opportunity.sponsor_name ?? "ThinkAfrica"}
+                        {opportunity.sponsor_name ?? "Indegenius"}
                       </span>
                     </div>
                     <p className="line-clamp-2 text-sm font-semibold text-gray-900">

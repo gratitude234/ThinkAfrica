@@ -75,7 +75,7 @@ export async function respondToCoAuthorInvite(input: {
     if (!notificationError) {
       const emailResult = await sendUserEmail({
         recipientId: post.author_id,
-        subject: `${actorName} accepted your ThinkAfrica co-author invitation`,
+        subject: `${actorName} accepted your Indegenius co-author invitation`,
         preview: `${actorName} accepted your co-author invitation.`,
         title: "Co-author invitation accepted",
         intro: `${actorName} accepted your co-author invitation on "${post.title}".`,
@@ -128,7 +128,7 @@ export async function respondToCoAuthorInvite(input: {
     if (!notificationError) {
       const emailResult = await sendUserEmail({
         recipientId: post.author_id,
-        subject: `${actorName} declined your ThinkAfrica co-author invitation`,
+        subject: `${actorName} declined your Indegenius co-author invitation`,
         preview: `${actorName} declined your co-author invitation.`,
         title: "Co-author invitation declined",
         intro: `${actorName} declined your co-author invitation on "${post.title}".`,

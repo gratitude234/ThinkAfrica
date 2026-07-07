@@ -1,13 +1,15 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { APP_DOMAIN } from "@/lib/site";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host")?.toLowerCase();
 
-  if (host === "thinkafrica.africa") {
+  // TODO(gratitude): confirm production domain — APP_DOMAIN is a placeholder until then.
+  if (host === APP_DOMAIN) {
     const canonicalUrl = request.nextUrl.clone();
-    canonicalUrl.hostname = "www.thinkafrica.africa";
+    canonicalUrl.hostname = `www.${APP_DOMAIN}`;
     return NextResponse.redirect(canonicalUrl, 308);
   }
 

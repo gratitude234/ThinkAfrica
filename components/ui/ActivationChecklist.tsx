@@ -29,7 +29,7 @@ export default function ActivationChecklist({
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             {state.nextTask?.description ??
-              "Complete the first-week steps that make ThinkAfrica useful."}
+              "Complete the first-week steps that make Indegenius useful."}
           </p>
         </div>
 

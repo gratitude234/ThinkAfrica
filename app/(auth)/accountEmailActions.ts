@@ -9,6 +9,7 @@ import {
   sendDirectEmail,
   sendUserEmail,
 } from "@/lib/email";
+import { SITE_URL } from "@/lib/site";
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -19,7 +20,8 @@ function getAuthCallbackUrl(nextPath: string) {
   const appUrl =
     configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
       ? configuredUrl
-      : "https://www.thinkafrica.africa";
+      // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
+      : SITE_URL;
 
   const url = new URL("/auth/callback", appUrl.replace(/\/+$/, ""));
   url.searchParams.set("next", nextPath);
@@ -35,7 +37,8 @@ function getAuthConfirmUrl(input: {
   const appUrl =
     configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
       ? configuredUrl
-      : "https://www.thinkafrica.africa";
+      // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
+      : SITE_URL;
 
   const url = new URL("/auth/confirm", appUrl.replace(/\/+$/, ""));
   url.searchParams.set("token_hash", input.tokenHash);
@@ -166,10 +169,10 @@ async function sendGeneratedConfirmationEmail(input: {
   const displayName = input.fullName?.trim() || "there";
   const result = await sendDirectEmail({
     to: input.email,
-    subject: "Confirm your ThinkAfrica account",
-    preview: "Use your ThinkAfrica verification code or confirmation link.",
-    title: "Confirm your ThinkAfrica account",
-    intro: `Hi ${displayName}. Use this code to activate your ThinkAfrica profile and continue onboarding.`,
+    subject: "Confirm your Indegenius account",
+    preview: "Use your Indegenius verification code or confirmation link.",
+    title: "Confirm your Indegenius account",
+    intro: `Hi ${displayName}. Use this code to activate your Indegenius profile and continue onboarding.`,
     bodyHtml: renderConfirmationCodeHtml(emailOtp, input.email),
     bodyTextLines: [
       `Verification code: ${emailOtp}`,
@@ -284,11 +287,11 @@ export async function sendPasswordResetEmail(input: { email: string }) {
 
     const result = await sendDirectEmail({
       to: email,
-      subject: "Reset your ThinkAfrica password",
-      preview: "Use your ThinkAfrica password reset code or secure link.",
+      subject: "Reset your Indegenius password",
+      preview: "Use your Indegenius password reset code or secure link.",
       title: "Reset your password",
       intro:
-        "We received a request to reset your ThinkAfrica password. Use this code to choose a new password.",
+        "We received a request to reset your Indegenius password. Use this code to choose a new password.",
       bodyHtml: renderPasswordResetCodeHtml(emailOtp),
       bodyTextLines: [
         `Password reset code: ${emailOtp}`,
@@ -318,14 +321,14 @@ export async function sendWelcomeEmail(input: {
   const email = normalizeEmail(input.email);
   const name = input.fullName?.trim();
   const intro = name
-    ? `Welcome to ThinkAfrica, ${name}. Finish your profile so your writing, comments, and follows carry a credible academic identity.`
-    : "Welcome to ThinkAfrica. Finish your profile so your writing, comments, and follows carry a credible academic identity.";
+    ? `Welcome to Indegenius, ${name}. Finish your profile so your writing, comments, and follows carry a credible academic identity.`
+    : "Welcome to Indegenius. Finish your profile so your writing, comments, and follows carry a credible academic identity.";
 
   const result = await sendDirectEmail({
     to: email,
-    subject: "Welcome to ThinkAfrica",
-    preview: "Finish setting up your ThinkAfrica profile.",
-    title: "Welcome to ThinkAfrica",
+    subject: "Welcome to Indegenius",
+    preview: "Finish setting up your Indegenius profile.",
+    title: "Welcome to Indegenius",
     intro,
     ctaLabel: "Complete your profile",
     ctaPath: "/onboarding",
@@ -350,11 +353,11 @@ export async function sendPasswordChangedEmail() {
 
   const result = await sendUserEmail({
     recipientId: user.id,
-    subject: "Your ThinkAfrica password was changed",
-    preview: "Your ThinkAfrica password was changed.",
+    subject: "Your Indegenius password was changed",
+    preview: "Your Indegenius password was changed.",
     title: "Password changed",
     intro:
-      "Your ThinkAfrica password was changed. If you made this change, no further action is needed. If this was not you, reset your password immediately.",
+      "Your Indegenius password was changed. If you made this change, no further action is needed. If this was not you, reset your password immediately.",
     ctaLabel: "Review account settings",
     ctaPath: "/settings?tab=account",
     idempotencyKey: `password-changed:${user.id}:${new Date().toISOString()}`,

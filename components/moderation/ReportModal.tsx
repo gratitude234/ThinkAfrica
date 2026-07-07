@@ -85,7 +85,7 @@ export default function ReportModal({
               Report submitted
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-500">
-              Thanks for helping keep ThinkAfrica safe. Our team will review this
+              Thanks for helping keep Indegenius safe. Our team will review this
               report and take action if it breaks our guidelines.
             </p>
             <div className="mt-5 flex justify-end">

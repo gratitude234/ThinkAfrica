@@ -505,7 +505,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                 type="text"
                 value={organizationName}
                 onChange={(e) => setOrganizationName(e.target.value)}
-                placeholder="e.g. ThinkAfrica, ministry, newsroom, company"
+                placeholder="e.g. Indegenius, ministry, newsroom, company"
                 className={INPUT_STYLES}
               />
             </div>

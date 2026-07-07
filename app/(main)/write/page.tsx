@@ -12,7 +12,7 @@ import CoAuthorPicker, {
 import ProfileGate from "@/components/ui/ProfileGate";
 import type { PostReferenceRecord } from "@/lib/types";
 import { formatRelativeTime, type PostType } from "@/lib/utils";
-import { useDraftManager } from "./DraftManager";
+import { useDraftManager, readDraftBackupRaw } from "./DraftManager";
 import PublishDrawer from "./PublishDrawer";
 import WriteReadinessPanel from "./WriteReadinessPanel";
 import { ensureDraft, savePostReferences } from "./actions";
@@ -396,9 +396,7 @@ export default function WritePage() {
 
     if (typeof window !== "undefined") {
       try {
-        const savedBackup = window.localStorage.getItem(
-          "thinkafrica_draft_backup"
-        );
+        const savedBackup = readDraftBackupRaw();
 
         if (savedBackup) {
           const parsedBackup = JSON.parse(savedBackup) as Partial<DraftPayload>;
@@ -470,9 +468,7 @@ export default function WritePage() {
 
     if (typeof window !== "undefined") {
       try {
-        const savedBackup = window.localStorage.getItem(
-          "thinkafrica_draft_backup"
-        );
+        const savedBackup = readDraftBackupRaw();
 
         if (savedBackup) {
           const parsedBackup = JSON.parse(savedBackup) as Partial<DraftPayload>;
@@ -814,7 +810,7 @@ export default function WritePage() {
               Cancel
             </button>
             <Link href="/" className="text-sm font-semibold text-gray-900">
-              ThinkAfrica
+              Indegenius
             </Link>
             <button
               type="button"
@@ -828,7 +824,7 @@ export default function WritePage() {
           {/* Desktop header */}
           <div className="mb-6 hidden items-center justify-between border-b border-gray-100 pb-4 lg:flex">
             <Link href="/" className="text-sm font-semibold tracking-wide text-gray-900">
-              ThinkAfrica
+              Indegenius
             </Link>
             <p className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
               {saveStatusText}

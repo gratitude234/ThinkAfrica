@@ -177,7 +177,7 @@ export default function CreateLauncher({
           className="absolute right-0 top-[calc(100%+10px)] z-[80] w-[380px] animate-create-menu-in overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl motion-reduce:animate-none"
         >
           <div className="border-b border-gray-100 px-4 py-3">
-            <p className="text-sm font-semibold text-ink">Create on ThinkAfrica</p>
+            <p className="text-sm font-semibold text-ink">Create on Indegenius</p>
             <p className="mt-0.5 text-xs text-gray-500">
               Choose the format before the workspace opens.
             </p>

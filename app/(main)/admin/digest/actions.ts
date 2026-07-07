@@ -133,7 +133,7 @@ async function buildWeeklyDigest(admin: AdminClient) {
               )}" style="color:#047857;font-weight:700;text-decoration:none;">${escapeHtml(
                 post.title
               )}</a><br><span style="color:#6b7280;font-size:13px;">${escapeHtml(
-                post.profiles?.full_name ?? post.profiles?.username ?? "ThinkAfrica"
+                post.profiles?.full_name ?? post.profiles?.username ?? "Indegenius"
               )} - ${post.view_count ?? 0} views - ${escapeHtml(
                 formatDigestDate(post.published_at ?? null)
               )}</span></li>`
@@ -252,14 +252,14 @@ export async function sendWeeklyDigestEmails() {
     for (const recipientId of recipientIds) {
       const result = await sendUserEmail({
         recipientId,
-        subject: "This week on ThinkAfrica",
-        preview: "Top posts, debates, fellowships, and contributors from ThinkAfrica.",
-        title: "This week on ThinkAfrica",
+        subject: "This week on Indegenius",
+        preview: "Top posts, debates, fellowships, and contributors from Indegenius.",
+        title: "This week on Indegenius",
         intro:
-          "Here is a short editorial digest of activity worth following across ThinkAfrica this week.",
+          "Here is a short editorial digest of activity worth following across Indegenius this week.",
         bodyHtml: digest.bodyHtml,
         bodyTextLines: digest.bodyTextLines,
-        ctaLabel: "Open ThinkAfrica",
+        ctaLabel: "Open Indegenius",
         ctaPath: "/",
         preferenceKey: "email_digest",
         idempotencyKey: `weekly-digest:${digestKey}:${recipientId}`,

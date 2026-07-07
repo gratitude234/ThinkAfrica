@@ -703,7 +703,7 @@ export default function OnboardingPage() {
                   <input
                     value={organizationName}
                     onChange={(event) => setOrganizationName(event.target.value)}
-                    placeholder="e.g. ThinkAfrica, ministry, newsroom, company"
+                    placeholder="e.g. Indegenius, ministry, newsroom, company"
                     className={INPUT_STYLES}
                   />
                 </div>

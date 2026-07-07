@@ -64,11 +64,11 @@ const TEAM_MEMBERS: TeamMember[] = [
     image: "/team/oluwaferanmi-adebayo.jpeg",
     badgeClass: "bg-emerald-50 text-emerald-700",
     shortBio:
-      "Founded ThinkAfrica from a conviction that Africa's intellectual community needs stronger institutional structures. A certified theologian, student leader, and author of The Art of Reform: The Activism Our Nation Forgot.",
+      "Founded Indegenius from a conviction that Africa's intellectual community needs stronger institutional structures. A certified theologian, student leader, and author of The Art of Reform: The Activism Our Nation Forgot.",
     fullBio: [
-      "Oluwaferanmi Adebayo founded ThinkAfrica from a conviction that Africa's intellectual community needs stronger institutional structures to nurture ideas from conception to full development. ThinkAfrica is his response to that gap: a platform designed to cultivate, refine, and advance African thought into tangible impact.",
+      "Oluwaferanmi Adebayo founded Indegenius from a conviction that Africa's intellectual community needs stronger institutional structures to nurture ideas from conception to full development. Indegenius is his response to that gap: a platform designed to cultivate, refine, and advance African thought into tangible impact.",
       "He is an active student leader with a strong record of representation and advocacy across campus. His work reflects a commitment to purposeful activism grounded in strategy, discipline, and long-term societal transformation.",
-      "As a certified theologian, his worldview is anchored in faith, shaping both his leadership and his vision. He sees ThinkAfrica not merely as a startup, but as a purpose-driven institution that must be nurtured with intentionality, discipline, and vision.",
+      "As a certified theologian, his worldview is anchored in faith, shaping both his leadership and his vision. He sees Indegenius not merely as a startup, but as a purpose-driven institution that must be nurtured with intentionality, discipline, and vision.",
     ],
     priority: true,
   },
@@ -79,9 +79,9 @@ const TEAM_MEMBERS: TeamMember[] = [
     imagePosition: "50% 48%",
     badgeClass: "bg-purple-50 text-purple-700",
     shortBio:
-      "Law student and Co-Founder, driven by the belief that Africa's students have ideas worth hearing, publishing, debating, and acting on. Responsible for building ThinkAfrica's credibility infrastructure across institutions.",
+      "Law student and Co-Founder, driven by the belief that Africa's students have ideas worth hearing, publishing, debating, and acting on. Responsible for building Indegenius's credibility infrastructure across institutions.",
     fullBio: [
-      "Malik sees ThinkAfrica as more than an app: a movement for student voices, intellectual growth, and Pan-African impact.",
+      "Malik sees Indegenius as more than an app: a movement for student voices, intellectual growth, and Pan-African impact.",
       "He is helping build a place where young African thinkers can connect across universities, challenge ideas through debates, and produce research that can influence institutions, communities, and public policy.",
       "His commitment is rooted in the belief that Africa's future will be shaped by the quality of ideas its young people are allowed to express, test, and refine.",
     ],
@@ -92,11 +92,11 @@ const TEAM_MEMBERS: TeamMember[] = [
     image: "/team/olanibi-gratitude.jpeg",
     badgeClass: "bg-amber-50 text-amber-700",
     shortBio:
-      "Self-taught full-stack developer building ThinkAfrica from the ground up while studying at JABU, Nigeria. Ships peer-review workflows, debate mechanics, AI audio summaries, and low-bandwidth modes.",
+      "Self-taught full-stack developer building Indegenius from the ground up while studying at JABU, Nigeria. Ships peer-review workflows, debate mechanics, AI audio summaries, and low-bandwidth modes.",
     fullBio: [
-      "His vision for ThinkAfrica has always been technical as much as intellectual: African university students deserve a platform with the credibility, depth, and design quality of established academic journals, built natively for the realities of the continent.",
+      "His vision for Indegenius has always been technical as much as intellectual: African university students deserve a platform with the credibility, depth, and design quality of established academic journals, built natively for the realities of the continent.",
       "He has independently architected and shipped the platform's core systems, from peer-review workflows and debate mechanics to AI-powered audio summaries, low-bandwidth modes, and WhatsApp-native sharing.",
-      "For Gratitude, ThinkAfrica is proof that the best technology is built by people who live closest to the problem.",
+      "For Gratitude, Indegenius is proof that the best technology is built by people who live closest to the problem.",
     ],
   },
 ];
@@ -146,7 +146,7 @@ export default function AboutPage() {
         />
         <div className="relative">
           <Eyebrow centered reveal="up">
-            About ThinkAfrica
+            About Indegenius
           </Eyebrow>
           <h1
             data-about-reveal="up"
@@ -209,7 +209,7 @@ export default function AboutPage() {
                 almost none of it reaches the people who need it.
               </p>
               <p>
-                ThinkAfrica was founded to fix that. Not as a blog, not as a
+                Indegenius was founded to fix that. Not as a blog, not as a
                 social feed, but as a serious publishing and intellectual
                 community built natively for African students, in African
                 contexts, with African ambition.
@@ -308,7 +308,7 @@ export default function AboutPage() {
             Built by students, for students
           </h2>
           <p className="mt-3 text-[15px] leading-[1.75] text-ink-muted">
-            ThinkAfrica is led by students and operators who believe African
+            Indegenius is led by students and operators who believe African
             student ideas deserve serious infrastructure, patient leadership,
             and world-class execution.
           </p>
@@ -335,7 +335,7 @@ export default function AboutPage() {
               Become a campus ambassador
             </h2>
             <p className="mt-2 max-w-[520px] text-sm leading-[1.7] text-ink-muted">
-              Help ThinkAfrica grow at your university. Represent your
+              Help Indegenius grow at your university. Represent your
               institution&apos;s intellectual community, recruit contributors,
               and bring your campus into the network.
             </p>

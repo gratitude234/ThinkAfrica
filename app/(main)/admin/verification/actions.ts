@@ -62,17 +62,17 @@ export async function updateVerificationStatus(input: {
       const result = await sendUserEmail({
         recipientId: input.userId,
         subject: input.verified
-          ? "Your ThinkAfrica profile has been verified"
-          : "Your ThinkAfrica verification status changed",
+          ? "Your Indegenius profile has been verified"
+          : "Your Indegenius verification status changed",
         preview: input.verified
-          ? "Your ThinkAfrica profile is now verified."
-          : "Your ThinkAfrica verification status was updated.",
+          ? "Your Indegenius profile is now verified."
+          : "Your Indegenius verification status was updated.",
         title: input.verified ? "Profile verified" : "Verification status updated",
         intro: input.verified
-          ? `Your ThinkAfrica profile has been verified${
+          ? `Your Indegenius profile has been verified${
               nextVerifiedType ? ` as ${nextVerifiedType}` : ""
             }. This trust signal now appears on your public profile and byline.`
-          : "Your ThinkAfrica profile verification was revoked or changed. Review your profile details if you need to update your academic identity.",
+          : "Your Indegenius profile verification was revoked or changed. Review your profile details if you need to update your academic identity.",
         ctaLabel: "Open profile settings",
         ctaPath: "/settings?tab=profile",
         preferenceKey: "email_account_security",
@@ -82,10 +82,10 @@ export async function updateVerificationStatus(input: {
     } else if (previousProfile?.verified_type !== nextVerifiedType && input.verified) {
       const result = await sendUserEmail({
         recipientId: input.userId,
-        subject: "Your ThinkAfrica verification type changed",
-        preview: "Your ThinkAfrica verification type was updated.",
+        subject: "Your Indegenius verification type changed",
+        preview: "Your Indegenius verification type was updated.",
         title: "Verification type updated",
-        intro: `Your ThinkAfrica verification type is now ${nextVerifiedType ?? "updated"}.`,
+        intro: `Your Indegenius verification type is now ${nextVerifiedType ?? "updated"}.`,
         ctaLabel: "Open profile settings",
         ctaPath: "/settings?tab=profile",
         preferenceKey: "email_account_security",
@@ -99,10 +99,10 @@ export async function updateVerificationStatus(input: {
         nextRole === "admin" ? "/admin" : nextRole === "editor" || nextRole === "reviewer" ? "/review" : "/settings?tab=profile";
       const result = await sendUserEmail({
         recipientId: input.userId,
-        subject: "Your ThinkAfrica account role changed",
-        preview: `Your ThinkAfrica role is now ${nextRole}.`,
+        subject: "Your Indegenius account role changed",
+        preview: `Your Indegenius role is now ${nextRole}.`,
         title: "Account role updated",
-        intro: `Your ThinkAfrica account role changed from ${
+        intro: `Your Indegenius account role changed from ${
           previousProfile?.role ?? "student"
         } to ${nextRole}.`,
         ctaLabel:

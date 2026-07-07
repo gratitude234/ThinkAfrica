@@ -53,7 +53,7 @@ export default function LatestResearchShelf({
         {papers.map((paper) => {
           const author = paper.profiles;
           const authorName =
-            author?.full_name ?? author?.username ?? "ThinkAfrica author";
+            author?.full_name ?? author?.username ?? "Indegenius author";
           const excerpt = sanitizePostExcerpt(paper.excerpt);
           const size = formatDocumentSize(paper.document_size_bytes);
 

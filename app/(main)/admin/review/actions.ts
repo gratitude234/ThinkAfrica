@@ -100,7 +100,7 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
   if (!notificationError) {
     const emailResult = await sendUserEmail({
       recipientId: reviewerId,
-      subject: "You have a ThinkAfrica review assignment",
+      subject: "You have an Indegenius review assignment",
       preview: `You've been assigned to review: ${post.title}`,
       title: "Review assignment",
       intro: `You've been assigned to review "${post.title}". Open the review workspace to read the submission and submit your recommendation.`,
@@ -123,7 +123,7 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
     if (!authorNotificationError) {
       const authorEmailResult = await sendUserEmail({
         recipientId: post.author_id,
-        subject: "Your ThinkAfrica submission is under review",
+        subject: "Your Indegenius submission is under review",
         preview: `"${post.title}" is now under review.`,
         title: "Your submission is under review",
         intro: `Your submission "${post.title}" is now under review. You'll typically hear back within about a week.`,
@@ -310,7 +310,7 @@ export async function submitEditorialDecision(input: {
           postId: input.postId,
           title: post.title,
           content: post.content ?? "",
-          authorName: authorProfile?.full_name ?? "A ThinkAfrica author",
+          authorName: authorProfile?.full_name ?? "An Indegenius author",
           postType: post.type,
         }),
       }).catch(() => {});
@@ -330,7 +330,7 @@ export async function submitEditorialDecision(input: {
       if (!notificationError) {
         const emailResult = await sendUserEmail({
           recipientId: post.author_id,
-          subject: "Your ThinkAfrica submission has been published",
+          subject: "Your Indegenius submission has been published",
           preview: `"${post.title}" has been accepted and published.`,
           title: "Your submission is published",
           intro: `Your ${post.type === "policy_brief" ? "policy brief" : post.type} "${post.title}" has been accepted and published${
@@ -399,7 +399,7 @@ export async function submitEditorialDecision(input: {
     if (!notificationError) {
       const emailResult = await sendUserEmail({
         recipientId: post.author_id,
-        subject: "Revision requested on your ThinkAfrica submission",
+        subject: "Revision requested on your Indegenius submission",
         preview: `Revision requested for "${post.title}".`,
         title: "Revision requested",
         intro: input.notes?.trim()
@@ -452,7 +452,7 @@ export async function submitEditorialDecision(input: {
   if (!notificationError) {
     const emailResult = await sendUserEmail({
       recipientId: post.author_id,
-      subject: "Editorial decision on your ThinkAfrica submission",
+      subject: "Editorial decision on your Indegenius submission",
       preview: `Your submission "${post.title}" was rejected.`,
       title: "Editorial decision recorded",
       intro: input.notes?.trim()

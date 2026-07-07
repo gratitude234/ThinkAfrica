@@ -29,6 +29,7 @@ import {
 } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary } from "@/lib/postQuality";
+import { APP_DOMAIN } from "@/lib/site";
 import {
   DndContext,
   closestCenter,
@@ -365,7 +366,7 @@ export default function PublishDrawer({
 
   const isInstantPublish = postType === "blog" || postType === "essay";
   const authorName = profile?.full_name ?? "You";
-  const authorUniversity = profile?.university ?? "ThinkAfrica";
+  const authorUniversity = profile?.university ?? "Indegenius";
   const currentFormat =
     WRITE_FORMATS.find((item) => item.type === postType) ?? WRITE_FORMATS[0];
   const normalizedSlug = customSlug.trim()
@@ -936,8 +937,9 @@ export default function PublishDrawer({
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
                   />
                   {normalizedSlug ? (
+                    // TODO(gratitude): confirm production domain — APP_DOMAIN is a placeholder until then.
                     <p className="mt-1 text-xs text-gray-400">
-                      <span className="text-gray-300">thinkafrica.com/post/</span>
+                      <span className="text-gray-300">{APP_DOMAIN}/post/</span>
                       <span className="font-medium text-gray-500">{normalizedSlug}</span>
                     </p>
                   ) : (

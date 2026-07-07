@@ -64,7 +64,7 @@ export default function ActivationFocusPanel({ state }: ActivationFocusPanelProp
           <h2 className="font-display text-[23px] font-semibold leading-tight text-ink sm:text-[25px]">
             {nextTask?.key === "start"
               ? "Turn one idea into your first quick take"
-              : nextTask?.label ?? "Keep building your ThinkAfrica profile"}
+              : nextTask?.label ?? "Keep building your Indegenius profile"}
           </h2>
           <p className="mt-1.5 max-w-2xl text-sm leading-6 text-ink-muted">
             {nextTask?.description ??

@@ -31,7 +31,7 @@ type SubmitCommentInput = {
 };
 
 function displayName(profile: CommentAuthor | null) {
-  return profile?.full_name?.trim() || profile?.username?.trim() || "A ThinkAfrica reader";
+  return profile?.full_name?.trim() || profile?.username?.trim() || "An Indegenius reader";
 }
 
 function excerpt(value: string, maxLength = 180) {
@@ -144,8 +144,8 @@ export async function submitComment(input: SubmitCommentInput): Promise<{
       const emailResult = await sendUserEmail({
         recipientId,
         subject: parentId
-          ? `${actorName} replied to your ThinkAfrica comment`
-          : `${actorName} commented on your ThinkAfrica post`,
+          ? `${actorName} replied to your Indegenius comment`
+          : `${actorName} commented on your Indegenius post`,
         preview: `${actorName} ${commentKind}.`,
         title: parentId ? "New reply to your comment" : "New comment on your post",
         intro: `${actorName} ${commentKind} on "${post.title}".`,

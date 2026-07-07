@@ -376,7 +376,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     .single();
 
   if (!profile) {
-    return { title: "Profile not found - ThinkAfrica" };
+    return { title: "Profile not found - Indegenius" };
   }
 
   const { count: postCount } = await supabase
@@ -390,7 +390,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = clampText(
     bioFirstLine
       ? `${displayName} - ${bioFirstLine}`
-      : `${displayName} - ThinkAfrica`,
+      : `${displayName} - Indegenius`,
     60
   );
   const description = profile.bio
@@ -398,7 +398,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     : clampText(
         `${displayName}, ${profile.field_of_study ?? "student"} at ${
           profile.university ?? "their university"
-        }. ${(postCount ?? 0).toLocaleString()} publications on ThinkAfrica.`,
+        }. ${(postCount ?? 0).toLocaleString()} publications on Indegenius.`,
         155
       );
   const image = profile.avatar_url ?? "/logo.png";

@@ -1,10 +1,12 @@
-﻿export default function EditorialStandardsPage() {
+﻿import { CONTACT_EMAILS } from "@/lib/site";
+
+export default function EditorialStandardsPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-10">
         <h1 className="mb-3 text-3xl font-bold text-gray-900">Editorial Standards</h1>
         <p className="leading-relaxed text-gray-500">
-          ThinkAfrica is committed to publishing high-quality, original intellectual work from
+          Indegenius is committed to publishing high-quality, original intellectual work from
           African students. Blogs and essays move through a lighter editorial check. Research and
           policy briefs follow a formal editorial workflow with reviewer recommendations and a
           final editor decision before publication.
@@ -153,11 +155,12 @@
         <p className="mb-2 text-sm text-gray-500">
           Questions about your submission or our standards?
         </p>
+        {/* TODO(gratitude): confirm production domain — this mailbox is a placeholder until then. */}
         <a
-          href="mailto:editorial@thinkafrica.io"
+          href={`mailto:${CONTACT_EMAILS.editorial}`}
           className="text-sm font-medium text-emerald-brand hover:underline"
         >
-          editorial@thinkafrica.io
+          {CONTACT_EMAILS.editorial}
         </a>
       </div>
     </div>

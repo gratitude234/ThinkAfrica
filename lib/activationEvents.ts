@@ -92,15 +92,23 @@ function shouldSkipDuplicateViewEvent(
   if (!VIEW_EVENTS.has(payload.event)) return false;
 
   try {
-    const storageKey = `thinkafrica:activation:${hashActivationKey(
+    const keySuffix = hashActivationKey(
       JSON.stringify({
         event: payload.event,
         route,
         metadata: payload.metadata ?? {},
       })
-    )}`;
+    );
+    const storageKey = `indegenius:activation:${keySuffix}`;
+    const legacyStorageKey = `thinkafrica:activation:${keySuffix}`;
     const now = Date.now();
-    const previous = Number(window.sessionStorage.getItem(storageKey) ?? 0);
+    // Dual-read: check the new key first, then fall back to the pre-rebrand
+    // key so an in-flight session's dedupe window isn't silently reset.
+    const previous = Number(
+      window.sessionStorage.getItem(storageKey) ??
+        window.sessionStorage.getItem(legacyStorageKey) ??
+        0
+    );
 
     if (previous && now - previous < VIEW_EVENT_DEDUPE_MS) {
       return true;

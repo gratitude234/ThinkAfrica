@@ -15,7 +15,7 @@ type ProfileSummary = {
 };
 
 function displayName(profile: ProfileSummary | null) {
-  return profile?.full_name?.trim() || profile?.username?.trim() || "A ThinkAfrica reader";
+  return profile?.full_name?.trim() || profile?.username?.trim() || "An Indegenius reader";
 }
 
 function isDuplicateLikeError(error: { code?: string; message?: string }) {
@@ -112,7 +112,7 @@ export async function togglePostLike(input: TogglePostLikeInput): Promise<{
     } else {
       const emailResult = await sendUserEmail({
         recipientId: post.author_id,
-        subject: `${actorName} liked your ThinkAfrica post`,
+        subject: `${actorName} liked your Indegenius post`,
         preview: `${actorName} liked your post.`,
         title: "New like on your post",
         intro: `${actorName} liked "${post.title}".`,

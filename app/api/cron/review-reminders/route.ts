@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     if (!notificationError) {
       const emailResult = await sendUserEmail({
         recipientId: review.reviewer_id,
-        subject: "Reminder: a ThinkAfrica review is waiting on you",
+        subject: "Reminder: an Indegenius review is waiting on you",
         preview: `Just a friendly reminder about "${post.title}".`,
         title: "Your review is still pending",
         intro: `Just a friendly reminder that you have a review pending for "${post.title}". No rush, but the author is waiting to hear back.`,

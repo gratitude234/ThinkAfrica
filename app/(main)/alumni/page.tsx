@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import UserAvatar from "@/components/ui/UserAvatar";
 
-export const metadata = { title: "Alumni - ThinkAfrica" };
+export const metadata = { title: "Alumni - Indegenius" };
 
 interface AlumnusRow {
   id: string;

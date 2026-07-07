@@ -137,7 +137,7 @@ export async function removeReportedPost(reportId: string) {
 
     const emailResult = await sendUserEmail({
       recipientId: post.author_id,
-      subject: "Your post was removed from ThinkAfrica",
+      subject: "Your post was removed from Indegenius",
       preview: "A post of yours was removed by our moderation team.",
       title: "Post removed",
       intro: `Your post "${post.title}" was removed because it breaks our community guidelines. If you believe this was a mistake, reply to this email.`,
@@ -364,10 +364,10 @@ export async function suspendUser(input: {
 
     const emailResult = await sendUserEmail({
       recipientId: input.userId,
-      subject: "Your ThinkAfrica account has been suspended",
+      subject: "Your Indegenius account has been suspended",
       preview: "Your account has been suspended by our moderation team.",
       title: "Account suspended",
-      intro: `Your account has been suspended for breaking our community guidelines (${reason}). You can still browse ThinkAfrica, but posting, commenting, and messaging are disabled. If you believe this was a mistake, reply to this email.`,
+      intro: `Your account has been suspended for breaking our community guidelines (${reason}). You can still browse Indegenius, but posting, commenting, and messaging are disabled. If you believe this was a mistake, reply to this email.`,
       ctaLabel: "Read our guidelines",
       ctaPath: "/editorial-standards",
       idempotencyKey: `moderation:suspend:${input.userId}:${new Date().toISOString().slice(0, 10)}`,

@@ -617,7 +617,7 @@ function TalentCard({
   talent: TalentProfileRow & { profile: OpportunityProfileSummary | null };
 }) {
   const profile = talent.profile;
-  const displayName = profile?.full_name ?? profile?.username ?? "ThinkAfrica member";
+  const displayName = profile?.full_name ?? profile?.username ?? "Indegenius member";
   const href = profile?.username ? `/${profile.username}` : "/settings";
 
   return (

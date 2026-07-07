@@ -328,7 +328,7 @@ export default function HomeSidebar({
           </Link>
           <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-[11px] leading-5 text-ink-muted">
             {newVoice.totalPosts && newVoice.totalPosts <= 1
-              ? "First publication on ThinkAfrica. Worth catching early."
+              ? "First publication on Indegenius. Worth catching early."
               : `${newVoice.totalPosts ?? newVoice.count} total publications, newly active this month.`}
           </p>
         </SideCard>

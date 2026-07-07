@@ -16,7 +16,7 @@ type ProfileSummary = {
 };
 
 function displayName(profile: ProfileSummary | null) {
-  return profile?.full_name?.trim() || profile?.username?.trim() || "A ThinkAfrica reader";
+  return profile?.full_name?.trim() || profile?.username?.trim() || "An Indegenius reader";
 }
 
 export async function toggleFollow(input: ToggleFollowInput): Promise<{
@@ -82,7 +82,7 @@ export async function toggleFollow(input: ToggleFollowInput): Promise<{
   const { error: notificationError } = await supabase.from("notifications").insert({
     user_id: input.followingId,
     type: "follow",
-    message: `${actorName} started following you on ThinkAfrica.`,
+    message: `${actorName} started following you on Indegenius.`,
     link: ctaPath,
     actor_id: user.id,
     read: false,
@@ -93,10 +93,10 @@ export async function toggleFollow(input: ToggleFollowInput): Promise<{
   } else {
     const emailResult = await sendUserEmail({
       recipientId: input.followingId,
-      subject: `${actorName} followed you on ThinkAfrica`,
+      subject: `${actorName} followed you on Indegenius`,
       preview: `${actorName} started following you.`,
       title: "You have a new follower",
-      intro: `${actorName} started following you on ThinkAfrica.`,
+      intro: `${actorName} started following you on Indegenius.`,
       ctaLabel: "View profile",
       ctaPath,
       idempotencyKey: `follow:${user.id}:${input.followingId}`,

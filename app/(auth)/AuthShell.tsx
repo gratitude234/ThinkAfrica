@@ -38,7 +38,7 @@ export function AuthShell({
             <Link
               href="/landing"
               className="inline-flex font-display text-[30px] font-bold leading-none"
-              aria-label="ThinkAfrica home"
+              aria-label="Indegenius home"
             >
               <span className="text-emerald-brand">Think</span>
               <span className="text-purple-accent">Africa</span>
@@ -93,7 +93,7 @@ export function AuthShell({
               <Link
                 href="/landing"
                 className="inline-flex font-display text-[27px] font-bold leading-none"
-                aria-label="ThinkAfrica home"
+                aria-label="Indegenius home"
               >
                 <span className="text-emerald-brand">Think</span>
                 <span className="text-purple-accent">Africa</span>

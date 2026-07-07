@@ -73,7 +73,7 @@ export default function ResetPasswordPage() {
       subtitle="Choose a password you have not used before. You will return to sign in when the update is complete."
       proofItems={PROOF_ITEMS}
       quote="A credible academic profile needs a login flow that feels calm, clear, and secure."
-      quoteSource="ThinkAfrica account standard"
+      quoteSource="Indegenius account standard"
       footer={
         <>
           Need a new link?{" "}

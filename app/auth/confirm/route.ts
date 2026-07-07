@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { SITE_URL } from "@/lib/site";
 
-const APP_ORIGIN = "https://www.thinkafrica.africa";
+// TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
+const APP_ORIGIN = SITE_URL;
 const ALLOWED_OTP_TYPES = new Set<EmailOtpType>([
   "signup",
   "invite",
