@@ -50,10 +50,10 @@ export default function CiteThis({
   const formatted = useMemo(() => {
     const date = new Date(publishedAt);
     const year = date.getFullYear();
-    // thinkafrica.africa must permanently 301-redirect to indegenius.com at
+    // thinkafrica.africa must permanently 301-redirect to indegenius.africa at
     // the Cloudflare level, so any existing external link to the old
     // citation URL (thinkafrica.com/...) still resolves.
-    const url = `https://indegenius.com${citationPath}`;
+    const url = `https://indegenius.africa${citationPath}`;
     const fullNames = authors.map((author) => author.full_name ?? author.username);
     const apaAuthors = authors
       .map((author) => formatApaAuthor(author.full_name ?? author.username))
@@ -74,7 +74,7 @@ export default function CiteThis({
         day: "numeric",
         month: "short",
         year: "numeric",
-      })}, indegenius.com${citationPath}.`,
+      })}, indegenius.africa${citationPath}.`,
     };
   }, [authors, citationId, citationPath, publishedAt, title]);
 

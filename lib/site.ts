@@ -1,9 +1,11 @@
-// TODO(gratitude): confirm production domain — this is a placeholder until the Indegenius domain is finalized.
-export const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || "indegenius.example";
+// Falls back to the confirmed production domain if NEXT_PUBLIC_APP_DOMAIN
+// isn't set in the environment (e.g. Vercel). Prefer setting the env var so
+// preview/staging deployments can differ from production.
+export const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || "indegenius.africa";
 export const SITE_URL = `https://www.${APP_DOMAIN}`;
 export const SITE_NAME = "Indegenius";
 
-// TODO(gratitude): confirm production domain — these mailboxes need to exist at the real domain before go-live.
+// Confirm these mailboxes exist at the real domain before relying on them.
 export const CONTACT_EMAILS = {
   privacy: `privacy@${APP_DOMAIN}`,
   legal: `legal@${APP_DOMAIN}`,
