@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, canonicalPath } from "@/lib/site";
 import UserAvatar from "@/components/ui/UserAvatar";
 import FollowButton from "@/components/ui/FollowButton";
 import {
@@ -2077,6 +2077,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${post.title} - Indegenius`,
     description: description ?? `Read this post by ${author?.full_name} on Indegenius`,
+    alternates: { canonical: canonicalPath(`/post/${post.slug}`) },
     openGraph: {
       title: post.title,
       description: description ?? "",
