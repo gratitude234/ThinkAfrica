@@ -29,6 +29,7 @@ import {
 } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary } from "@/lib/postQuality";
+import { looksLikeUrl } from "@/lib/postSlug";
 import { APP_DOMAIN } from "@/lib/site";
 import {
   DndContext,
@@ -420,6 +421,11 @@ export default function PublishDrawer({
       return;
     }
 
+    if (customSlug.trim() && looksLikeUrl(customSlug)) {
+      setError("That custom slug looks like a pasted URL. Enter a short, descriptive slug instead.");
+      return;
+    }
+
     if (tags.length === 0) {
       setError("Add at least one tag before publishing.");
       return;
@@ -449,7 +455,7 @@ export default function PublishDrawer({
       postType,
       coverImageUrl,
       inResponseTo,
-      customSlug: normalizedSlug,
+      customSlug: customSlug.trim() || undefined,
       coAuthors: coAuthors.map((coAuthor, index) => ({
         user_id: coAuthor.id,
         display_order: index + 1,
@@ -937,7 +943,6 @@ export default function PublishDrawer({
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
                   />
                   {normalizedSlug ? (
-                    // TODO(gratitude): confirm production domain — APP_DOMAIN is a placeholder until then.
                     <p className="mt-1 text-xs text-gray-400">
                       <span className="text-gray-300">{APP_DOMAIN}/post/</span>
                       <span className="font-medium text-gray-500">{normalizedSlug}</span>

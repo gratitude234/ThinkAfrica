@@ -96,6 +96,15 @@ export interface PublicQualityInput {
   interestMatch?: boolean;
 }
 
+const LOW_QUALITY_TITLE_PATTERN = /^(untitled|hmmm+|test|draft|new post|asdf+|\.+)\b/i;
+
+export function isLowQualityTitle(title: string | null | undefined): boolean {
+  const trimmed = (title ?? "").trim();
+  if (!trimmed) return true;
+  if (trimmed.length < 4) return true;
+  return LOW_QUALITY_TITLE_PATTERN.test(trimmed);
+}
+
 function normalizePostType(type: string | null | undefined): PostType {
   if (
     type === "blog" ||

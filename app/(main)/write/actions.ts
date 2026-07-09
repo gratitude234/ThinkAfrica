@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
+import { buildSlugFromTitle, looksLikeUrl } from "@/lib/postSlug";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { requireNotSuspended } from "@/lib/suspension";
 import {
@@ -307,11 +308,7 @@ export async function ensureDraft(input: {
     return { error: suspensionError, draftId: null as string | null };
   }
 
-  const slugBase = slugify(input.title || "untitled", {
-    lower: true,
-    strict: true,
-  });
-  const slug = `${slugBase || "untitled"}-${Date.now().toString(36)}`;
+  const slug = buildSlugFromTitle(input.title, "untitled", Date.now().toString(36));
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
 
@@ -432,10 +429,19 @@ export async function publishPost(input: {
     .eq("id", user.id)
     .single();
 
+  const trimmedCustomSlug = input.customSlug?.trim();
+  if (trimmedCustomSlug && looksLikeUrl(trimmedCustomSlug)) {
+    return {
+      error: "That custom slug looks like a pasted URL. Enter a short, descriptive slug instead.",
+      slug: null as string | null,
+    };
+  }
+
   const now = new Date().toISOString();
-  const slug =
-    input.customSlug?.trim() ||
-    `${slugify(input.title, { lower: true, strict: true })}-${Date.now().toString(36)}`;
+  const slug = trimmedCustomSlug
+    ? slugify(trimmedCustomSlug, { lower: true, strict: true }) ||
+      buildSlugFromTitle(input.title, "post", Date.now().toString(36))
+    : buildSlugFromTitle(input.title, "post", Date.now().toString(36));
   const submitStatus =
     input.postType === "blog" || input.postType === "essay" ? "published" : "pending";
   const publishedAt = submitStatus === "published" ? now : null;

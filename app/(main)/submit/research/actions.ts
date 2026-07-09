@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import slugify from "slugify";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { createVersionSnapshot } from "@/lib/reviewWorkflow";
+import { buildSlugFromTitle } from "@/lib/postSlug";
 import type { PostReferenceRecord } from "@/lib/types";
 
 type ReferenceInput = Omit<PostReferenceRecord, "post_id"> & {
@@ -357,7 +357,7 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
       };
     }
   } else {
-    slug = `${slugify(input.title, { lower: true, strict: true }) || "research"}-${Date.now().toString(36)}`;
+    slug = buildSlugFromTitle(input.title, "research", Date.now().toString(36));
     const { data, error } = await supabase
       .from("posts")
       .insert({
@@ -531,7 +531,7 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
     return { error: null, postId: existingPost.id as string, slug: existingPost.slug as string };
   }
 
-  const slug = `${slugify(title, { lower: true, strict: true }) || "research"}-${now}`;
+  const slug = buildSlugFromTitle(title, "research", now);
   const { data, error } = await supabase
     .from("posts")
     .insert({
