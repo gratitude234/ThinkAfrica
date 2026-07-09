@@ -39,6 +39,28 @@ export function sanitizePostExcerpt(excerpt: string | null): string | null {
   return cleaned || null;
 }
 
+// Falls back to a content-derived excerpt (rather than a generic string)
+// when a post has no excerpt, so search engines/link previews get a
+// real, content-specific description instead of an identical fallback
+// shared across every excerpt-less post.
+export function getPostMetaDescription({
+  excerpt,
+  content,
+  fallback,
+}: {
+  excerpt: string | null | undefined;
+  content: string | null | undefined;
+  fallback: string;
+}): string {
+  const sanitizedExcerpt = sanitizePostExcerpt(excerpt ?? null);
+  if (sanitizedExcerpt) return sanitizedExcerpt;
+
+  const contentExcerpt = content ? generateExcerpt(content, 155) : "";
+  if (contentExcerpt) return contentExcerpt;
+
+  return fallback;
+}
+
 export function formatTimeUntil(dateString: string | null): string | null {
   if (!dateString) return null;
 

@@ -11,6 +11,7 @@ import {
   POST_TYPE_LABELS,
   POST_POINTS,
   sanitizePostExcerpt,
+  getPostMetaDescription,
   type PostType,
 } from "@/lib/utils";
 import LikeButton from "./LikeButton";
@@ -2078,7 +2079,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { data: post, error: postError } = await supabase
     .from("posts")
     .select(
-      "title, excerpt, cover_image_url, slug, status, author_id, type, profiles!posts_author_id_fkey(full_name, university)"
+      "title, excerpt, content, cover_image_url, slug, status, author_id, type, profiles!posts_author_id_fkey(full_name, username, university)"
     )
     .eq("slug", slug)
     .in("status", ["published", "pending", "pending_revision", "draft"])
@@ -2101,7 +2102,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const authorLabel = author?.full_name ?? author?.username ?? "a student";
   const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
-  const description = sanitizePostExcerpt(post.excerpt);
+  const description = getPostMetaDescription({
+    excerpt: post.excerpt,
+    content: (post as { content?: string | null }).content,
+    fallback: `Read this post by ${authorLabel} on Indegenius`,
+  });
   // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? SITE_URL;
   const ogImageUrl = `${appUrl}/api/og?${new URLSearchParams({
@@ -2114,11 +2119,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return {
     title: `${post.title} - Indegenius`,
-    description: description ?? `Read this post by ${authorLabel} on Indegenius`,
+    description,
     alternates: { canonical: canonicalPath(`/post/${post.slug}`) },
     openGraph: {
       title: post.title,
-      description: description ?? "",
+      description,
       url: `${appUrl}/post/${post.slug}`,
       siteName: "Indegenius",
       images: [{ url: ogImage, width: 1200, height: 630 }],
@@ -2127,7 +2132,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     twitter: {
       card: "summary_large_image",
       title: post.title,
-      description: description ?? "",
+      description,
       images: [ogImage],
     },
   };
@@ -2241,7 +2246,11 @@ export default async function PostPage({ params }: PageProps) {
   const articleJsonLd = isPublished
     ? buildArticleJsonLd({
         post,
-        description: sanitizedExcerpt ?? `Read this post by ${authorName} on Indegenius`,
+        description: getPostMetaDescription({
+          excerpt: post.excerpt,
+          content: post.content,
+          fallback: `Read this post by ${authorName} on Indegenius`,
+        }),
         authorName,
       })
     : null;
