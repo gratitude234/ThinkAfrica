@@ -5,6 +5,7 @@ import PostCover from "@/components/post/PostCover";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { getPublicTopicCounts, type TopicCount } from "@/lib/discoverData";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
@@ -37,6 +38,7 @@ type LandingData = {
   postsRaw: LandingPostRaw[];
   postCount: number;
   userCount: number;
+  topics: TopicCount[];
 };
 
 export const revalidate = 300;
@@ -66,20 +68,7 @@ export const metadata: Metadata = {
 
 // ── Static data ──────────────────────────────────────────────────────
 
-const TOPICS = [
-  { label: "Economics", count: "824" },
-  { label: "Climate & Environment", count: "412" },
-  { label: "African Politics", count: "637" },
-  { label: "Public Health", count: "398" },
-  { label: "Technology & AI", count: "291" },
-  { label: "Education Policy", count: "183" },
-  { label: "Pan-Africanism", count: "254" },
-  { label: "Trade & AfCFTA", count: "168" },
-  { label: "Gender & Society", count: "319" },
-  { label: "Diaspora Studies", count: "142" },
-  { label: "Development Finance", count: "226" },
-  { label: "Urban Planning", count: "97" },
-];
+const TOPICS_DISPLAY_LIMIT = 12;
 
 const VALUE_PROPS = [
   {
@@ -135,7 +124,7 @@ function authorLine(post: LandingPost) {
 async function fetchLandingData(
   supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>
 ): Promise<LandingData> {
-  const [{ data: postsRaw }, { count: postCount }, { count: userCount }] =
+  const [{ data: postsRaw }, { count: postCount }, { count: userCount }, topicCounts] =
     await Promise.all([
       supabase
         .from("posts")
@@ -150,12 +139,16 @@ async function fetchLandingData(
         .limit(7),
       supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", "published"),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
+      getPublicTopicCounts(supabase),
     ]);
 
   return {
     postsRaw: (postsRaw ?? []) as LandingPostRaw[],
     postCount: postCount ?? 0,
     userCount: userCount ?? 0,
+    topics: topicCounts
+      .sort((a, b) => b.count - a.count)
+      .slice(0, TOPICS_DISPLAY_LIMIT),
   };
 }
 
@@ -168,7 +161,7 @@ const getCachedLandingData = unstable_cache(
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default async function LandingPage() {
-  const { postsRaw, postCount, userCount } =
+  const { postsRaw, postCount, userCount, topics } =
     process.env.SUPABASE_SERVICE_ROLE_KEY
       ? await getCachedLandingData()
       : await fetchLandingData(await createClient());
@@ -521,32 +514,34 @@ export default async function LandingPage() {
       )}
 
       {/* ── Topics ────────────────────────────────────────────────── */}
-      <section className="border-y border-gray-200 bg-white py-12 sm:py-14">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="section-head mb-6 flex items-end justify-between">
-            <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">Browse by topic</p>
-              <h2 className="font-display text-[24px] font-medium text-ink sm:text-[26px]">Find ideas that interest you</h2>
+      {topics.length > 0 && (
+        <section className="border-y border-gray-200 bg-white py-12 sm:py-14">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="section-head mb-6 flex items-end justify-between">
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">Browse by topic</p>
+                <h2 className="font-display text-[24px] font-medium text-ink sm:text-[26px]">Find ideas that interest you</h2>
+              </div>
+            </div>
+            <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div id="topics-grid" className="flex w-max gap-2.5 sm:w-auto sm:flex-wrap">
+              {topics.map(({ tag, count }) => (
+                <LandingTrackedLink
+                  key={tag}
+                  href={`/topics/${encodeURIComponent(tag)}`}
+                  event="landing_read_clicked"
+                  metadata={{ source: "topics_grid", topic: tag }}
+                  className="topic-pill inline-flex min-h-9 shrink-0 cursor-pointer items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[13px] font-medium text-gray-700 transition-[border-color,background-color,color,box-shadow] duration-150 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-1"
+                >
+                  {tag}
+                  <span className="ml-1.5 text-[11px] text-ink-muted">{count}</span>
+                </LandingTrackedLink>
+              ))}
+            </div>
             </div>
           </div>
-          <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div id="topics-grid" className="flex w-max gap-2.5 sm:w-auto sm:flex-wrap">
-            {TOPICS.map(({ label, count }) => (
-              <LandingTrackedLink
-                key={label}
-                href={`/?guest=1&topic=${encodeURIComponent(label)}`}
-                event="landing_read_clicked"
-                metadata={{ source: "topics_grid", topic: label }}
-                className="topic-pill inline-flex min-h-9 shrink-0 cursor-pointer items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[13px] font-medium text-gray-700 transition-[border-color,background-color,color,box-shadow] duration-150 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-1"
-              >
-                {label}
-                <span className="ml-1.5 text-[11px] text-ink-muted">{count}</span>
-              </LandingTrackedLink>
-            ))}
-          </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── Debates ───────────────────────────────────────────────── */}
       <section className="border-b border-gray-200 bg-white py-14 sm:py-20">
