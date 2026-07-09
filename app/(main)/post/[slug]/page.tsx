@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { SITE_URL, canonicalPath } from "@/lib/site";
+import { SITE_URL, canonicalPath, absoluteUrl } from "@/lib/site";
 import UserAvatar from "@/components/ui/UserAvatar";
 import FollowButton from "@/components/ui/FollowButton";
 import {
@@ -236,6 +236,43 @@ function getAuthor(post: PostRecord): AuthorProfile | null {
 
 function isReviewedWork(post: { type?: string | null; citation_id?: string | null }) {
   return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+}
+
+function buildArticleJsonLd({
+  post,
+  description,
+  authorName,
+}: {
+  post: PostRecord;
+  description: string;
+  authorName: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description,
+    datePublished: post.published_at ?? post.created_at,
+    author: { "@type": "Person", name: authorName },
+    ...(post.cover_image_url ? { image: [post.cover_image_url] } : {}),
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": absoluteUrl(`/post/${post.slug}`),
+    },
+  };
+}
+
+function ArticleJsonLd({ data }: { data: ReturnType<typeof buildArticleJsonLd> }) {
+  return (
+    <script
+      type="application/ld+json"
+      // Escaping "<" prevents a title/description containing "</script>"
+      // from breaking out of this script tag when embedded in the HTML.
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(data).replace(/</g, "\\u003c"),
+      }}
+    />
+  );
 }
 
 function PublicationSignalPill({
@@ -2201,10 +2238,18 @@ export default async function PostPage({ params }: PageProps) {
   });
   const isResearchPost = post.type === "research";
   const postHeroMode = getPostHeroMode();
+  const articleJsonLd = isPublished
+    ? buildArticleJsonLd({
+        post,
+        description: sanitizedExcerpt ?? `Read this post by ${authorName} on Indegenius`,
+        authorName,
+      })
+    : null;
 
   if (isResearchPost) {
     return (
       <div className="relative">
+        {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
         {isPublished ? (
           <>
             <Suspense fallback={null}>
@@ -2398,6 +2443,7 @@ export default async function PostPage({ params }: PageProps) {
 
   return (
     <div className="relative">
+      {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
       {isPublished ? (
         <>
           <Suspense fallback={null}>
