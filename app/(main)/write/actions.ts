@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
+import { buildSlugFromTitle, looksLikeUrl } from "@/lib/postSlug";
+import { isLowQualityTitle } from "@/lib/postQuality";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { requireNotSuspended } from "@/lib/suspension";
 import {
@@ -307,11 +309,7 @@ export async function ensureDraft(input: {
     return { error: suspensionError, draftId: null as string | null };
   }
 
-  const slugBase = slugify(input.title || "untitled", {
-    lower: true,
-    strict: true,
-  });
-  const slug = `${slugBase || "untitled"}-${Date.now().toString(36)}`;
+  const slug = buildSlugFromTitle(input.title, "untitled", Date.now().toString(36));
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
 
@@ -319,7 +317,7 @@ export async function ensureDraft(input: {
     const { error } = await supabase
       .from("posts")
       .update({
-        title: input.title || "Untitled draft",
+        title: input.title.trim(),
         excerpt: input.excerpt,
         content: sanitizedContent,
         tags: normalizedTags,
@@ -337,7 +335,7 @@ export async function ensureDraft(input: {
     .from("posts")
     .insert({
       author_id: user.id,
-      title: input.title || "Untitled draft",
+      title: input.title.trim(),
       slug,
       excerpt: input.excerpt,
       content: sanitizedContent,
@@ -416,6 +414,13 @@ export async function publishPost(input: {
     };
   }
 
+  if (isLowQualityTitle(input.title)) {
+    return {
+      error: "Add a real title before publishing — \"Untitled draft\" and similar placeholders aren't allowed.",
+      slug: null as string | null,
+    };
+  }
+
   const track = await getSubmissionTrack(input.postType);
   if (!track) {
     return { error: "Submission track is not configured for this format.", slug: null as string | null };
@@ -432,10 +437,19 @@ export async function publishPost(input: {
     .eq("id", user.id)
     .single();
 
+  const trimmedCustomSlug = input.customSlug?.trim();
+  if (trimmedCustomSlug && looksLikeUrl(trimmedCustomSlug)) {
+    return {
+      error: "That custom slug looks like a pasted URL. Enter a short, descriptive slug instead.",
+      slug: null as string | null,
+    };
+  }
+
   const now = new Date().toISOString();
-  const slug =
-    input.customSlug?.trim() ||
-    `${slugify(input.title, { lower: true, strict: true })}-${Date.now().toString(36)}`;
+  const slug = trimmedCustomSlug
+    ? slugify(trimmedCustomSlug, { lower: true, strict: true }) ||
+      buildSlugFromTitle(input.title, "post", Date.now().toString(36))
+    : buildSlugFromTitle(input.title, "post", Date.now().toString(36));
   const submitStatus =
     input.postType === "blog" || input.postType === "essay" ? "published" : "pending";
   const publishedAt = submitStatus === "published" ? now : null;

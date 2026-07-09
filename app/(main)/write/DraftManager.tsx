@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import slugify from "slugify";
 import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { buildSlugFromTitle } from "@/lib/postSlug";
 import {
   composeContentWithSubtitle,
   extractSubtitleFromContent,
@@ -213,7 +213,7 @@ export function useDraftManager(): UseDraftManagerReturn {
           const { error } = await supabase
             .from("posts")
             .update({
-              title: data.title || "Untitled draft",
+              title: data.title.trim(),
               excerpt: data.excerpt,
               content: contentWithSubtitle,
               tags,
@@ -231,17 +231,13 @@ export function useDraftManager(): UseDraftManagerReturn {
             setLastSaved(new Date());
           }
         } else {
-          const baseSlug = slugify(data.title || "untitled", {
-            lower: true,
-            strict: true,
-          });
-          const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
+          const uniqueSlug = buildSlugFromTitle(data.title, "untitled", Date.now().toString(36));
 
           const { data: inserted, error } = await supabase
             .from("posts")
             .insert({
               author_id: user.id,
-              title: data.title || "Untitled draft",
+              title: data.title.trim(),
               slug: uniqueSlug,
               excerpt: data.excerpt,
               content: contentWithSubtitle,
