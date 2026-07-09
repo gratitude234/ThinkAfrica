@@ -136,7 +136,7 @@ interface RawFellowship {
   deadline: string | null;
 }
 
-interface TopicCount {
+export interface TopicCount {
   tag: string;
   count: number;
 }
@@ -228,13 +228,19 @@ async function getFeed(
   return result.posts;
 }
 
+export async function getPublicTopicCounts(
+  supabase: SupabaseLike
+): Promise<TopicCount[]> {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? getCachedTopicCounts()
+    : getTopicCountsUncached(supabase);
+}
+
 async function getTopics(
   supabase: SupabaseLike,
   userInterests: string[]
 ): Promise<DiscoverTopic[]> {
-  const topicCounts = process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? await getCachedTopicCounts()
-    : await getTopicCountsUncached(supabase);
+  const topicCounts = await getPublicTopicCounts(supabase);
   const followed = new Set(userInterests.map(normalizeTag));
   const counts = new Map<string, { tag: string; count: number }>(
     topicCounts.map((topic) => [normalizeTag(topic.tag), topic])
