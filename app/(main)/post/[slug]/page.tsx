@@ -2062,6 +2062,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+  const authorLabel = author?.full_name ?? author?.username ?? "a student";
   const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
   const description = sanitizePostExcerpt(post.excerpt);
   // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
@@ -2076,7 +2077,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return {
     title: `${post.title} - Indegenius`,
-    description: description ?? `Read this post by ${author?.full_name} on Indegenius`,
+    description: description ?? `Read this post by ${authorLabel} on Indegenius`,
     alternates: { canonical: canonicalPath(`/post/${post.slug}`) },
     openGraph: {
       title: post.title,
