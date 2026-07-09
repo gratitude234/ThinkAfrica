@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { buildSlugFromTitle, looksLikeUrl } from "@/lib/postSlug";
+import { isLowQualityTitle } from "@/lib/postQuality";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { requireNotSuspended } from "@/lib/suspension";
 import {
@@ -316,7 +317,7 @@ export async function ensureDraft(input: {
     const { error } = await supabase
       .from("posts")
       .update({
-        title: input.title || "Untitled draft",
+        title: input.title.trim(),
         excerpt: input.excerpt,
         content: sanitizedContent,
         tags: normalizedTags,
@@ -334,7 +335,7 @@ export async function ensureDraft(input: {
     .from("posts")
     .insert({
       author_id: user.id,
-      title: input.title || "Untitled draft",
+      title: input.title.trim(),
       slug,
       excerpt: input.excerpt,
       content: sanitizedContent,
@@ -409,6 +410,13 @@ export async function publishPost(input: {
   if (input.postType === "research") {
     return {
       error: "Research papers must be uploaded through the research submission flow.",
+      slug: null as string | null,
+    };
+  }
+
+  if (isLowQualityTitle(input.title)) {
+    return {
+      error: "Add a real title before publishing — \"Untitled draft\" and similar placeholders aren't allowed.",
       slug: null as string | null,
     };
   }

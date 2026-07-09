@@ -28,7 +28,7 @@ import {
   normalizeTagValue,
 } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
-import { getPostQualitySummary } from "@/lib/postQuality";
+import { getPostQualitySummary, isLowQualityTitle } from "@/lib/postQuality";
 import { looksLikeUrl } from "@/lib/postSlug";
 import { APP_DOMAIN } from "@/lib/site";
 import {
@@ -418,6 +418,11 @@ export default function PublishDrawer({
   const handlePublish = async () => {
     if (!title.trim()) {
       setError("Please enter a title.");
+      return;
+    }
+
+    if (isLowQualityTitle(title)) {
+      setError("Add a real title before publishing — \"Untitled draft\" and similar placeholders aren't allowed.");
       return;
     }
 

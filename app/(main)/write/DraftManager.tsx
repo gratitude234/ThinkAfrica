@@ -213,7 +213,7 @@ export function useDraftManager(): UseDraftManagerReturn {
           const { error } = await supabase
             .from("posts")
             .update({
-              title: data.title || "Untitled draft",
+              title: data.title.trim(),
               excerpt: data.excerpt,
               content: contentWithSubtitle,
               tags,
@@ -237,7 +237,7 @@ export function useDraftManager(): UseDraftManagerReturn {
             .from("posts")
             .insert({
               author_id: user.id,
-              title: data.title || "Untitled draft",
+              title: data.title.trim(),
               slug: uniqueSlug,
               excerpt: data.excerpt,
               content: contentWithSubtitle,
