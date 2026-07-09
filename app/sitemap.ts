@@ -20,8 +20,8 @@ const staticRoutes: SitemapRow[] = [
   { url: absoluteUrl("/about"), changeFrequency: "monthly", priority: 0.6 },
   { url: absoluteUrl("/topics"), changeFrequency: "weekly", priority: 0.7 },
   { url: absoluteUrl("/editorial-standards"), changeFrequency: "monthly", priority: 0.5 },
-  { url: absoluteUrl("/privacy"), changeFrequency: "yearly", priority: 0.2 },
-  { url: absoluteUrl("/terms"), changeFrequency: "yearly", priority: 0.2 },
+  { url: absoluteUrl("/privacy"), changeFrequency: "yearly", priority: 0.3 },
+  { url: absoluteUrl("/terms"), changeFrequency: "yearly", priority: 0.3 },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -31,7 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const [postsResult, debatesResult, profilesResult] = await Promise.all([
       supabase
         .from("posts")
-        .select("slug, published_at, created_at")
+        .select("slug, published_at, created_at, updated_at")
         .eq("status", "published")
         .not("slug", "is", null)
         .order("published_at", { ascending: false, nullsFirst: false })
@@ -44,7 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .limit(500),
       supabase
         .from("profiles")
-        .select("username, created_at")
+        .select("username, created_at, privacy_settings")
         .not("username", "is", null)
         .order("created_at", { ascending: false })
         .limit(1000),
@@ -53,9 +53,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const postRoutes =
       postsResult.data?.map((post) => ({
         url: absoluteUrl(`/post/${post.slug}`),
-        lastModified: post.published_at ?? post.created_at ?? undefined,
+        lastModified: post.updated_at ?? post.published_at ?? post.created_at ?? undefined,
         changeFrequency: "weekly" as const,
-        priority: 0.75,
+        priority: 0.8,
       })) ?? [];
 
     const debateRoutes =
@@ -68,7 +68,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const profileRoutes =
       profilesResult.data
-        ?.filter((profile) => Boolean(profile.username))
+        ?.filter((profile) => {
+          if (!profile.username) return false;
+          const visibility = (profile.privacy_settings as { profile_visibility?: string } | null)
+            ?.profile_visibility;
+          return visibility !== "members_only";
+        })
         .map((profile) => ({
           url: absoluteUrl(`/${profile.username}`),
           lastModified: profile.created_at ?? undefined,
