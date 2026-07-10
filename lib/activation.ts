@@ -40,7 +40,7 @@ function isProfileComplete(profile: Record<string, unknown> | null) {
     typeof profile?.profile_type === "string" ? profile.profile_type : null;
   const profileType = isProfileType(rawProfileType) ? rawProfileType : null;
 
-  // Mirrors exactly what app/(main)/onboarding/page.tsx collects: persona,
+  // Mirrors exactly what app/(onboarding)/onboarding/page.tsx collects: persona,
   // country (plus university/field of study for academic personas), and
   // interests. Fields onboarding doesn't ask for (organization, title,
   // website) are intentionally excluded so this can't stay permanently

@@ -438,8 +438,8 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-canvas">
-      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
+    <div className="h-dvh overflow-hidden bg-canvas">
+      <div className="mx-auto flex h-full w-full max-w-lg flex-col">
         <div className="flex-shrink-0 px-5 pt-8">
           <div className="flex h-7 items-center justify-between">
             {currentIndex > 0 ? (
@@ -709,7 +709,10 @@ export default function OnboardingPage() {
           ) : null}
         </div>
 
-        <div className="flex-shrink-0 border-t border-gray-200 bg-white px-5 pt-3.5">
+        <div
+          className="flex-shrink-0 border-t border-gray-200 bg-white px-5 pt-3.5"
+          style={{ paddingBottom: "max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem))" }}
+        >
           {error ? (
             <p className="mb-3 text-sm text-red-600" role="alert">
               {error}
@@ -719,7 +722,7 @@ export default function OnboardingPage() {
             type="button"
             onClick={ctaHandlers[step]}
             disabled={loading || !canContinue}
-            className="mb-4 flex h-12 w-full items-center justify-center rounded-xl bg-emerald-brand text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-12 w-full items-center justify-center rounded-xl bg-emerald-brand text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
             {loading ? "Saving..." : step === "follow" ? "Finish setup" : "Continue"}
           </button>
