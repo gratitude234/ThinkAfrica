@@ -17,7 +17,7 @@ function StepDot({
   return (
     <Link
       href={task.href}
-      className={`group flex min-w-0 items-center gap-2 rounded-full border px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors ${
+      className={`group flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors ${
         task.done
           ? "border-emerald-100 bg-emerald-50 text-emerald-800"
           : active
@@ -36,7 +36,7 @@ function StepDot({
       >
         {task.done ? "\u2713" : index + 1}
       </span>
-      <span className="truncate">{task.label}</span>
+      <span className="whitespace-nowrap">{task.label}</span>
     </Link>
   );
 }

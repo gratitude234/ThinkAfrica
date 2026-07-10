@@ -17,7 +17,6 @@ import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
 import TrackedActionLink from "@/components/retention/TrackedActionLink";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import Button from "@/components/ui/Button";
-import ActivationChecklist from "@/components/ui/ActivationChecklist";
 import { getActivationState } from "@/lib/activation";
 import { getCollaborationSuggestions } from "@/lib/collaboration";
 import {
@@ -826,9 +825,7 @@ export default async function DashboardPage() {
 
       {activationState.activated ? (
         <RetentionThisWeek summary={retentionSummary} source="dashboard" />
-      ) : (
-        <ActivationChecklist state={activationState} />
-      )}
+      ) : null}
 
       <WorkUnderReviewPanel items={workUnderReviewItems} />
 
