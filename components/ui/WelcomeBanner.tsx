@@ -1,8 +1,13 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 
-export default function WelcomeBanner({ firstName }: { firstName: string }) {
+interface WelcomeBannerProps {
+  firstName: string;
+  primaryLabel: string | null;
+}
+
+export default function WelcomeBanner({ firstName, primaryLabel }: WelcomeBannerProps) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -19,21 +24,22 @@ export default function WelcomeBanner({ firstName }: { firstName: string }) {
   if (!visible) return null;
 
   return (
-    <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
+    <div className="mb-6 rounded-2xl bg-emerald-brand p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-display text-xl text-ink">
+          <h2 className="font-display text-xl font-semibold text-white">
             Welcome to Indegenius, {firstName}.
           </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Here&apos;s what writers across the continent are publishing right now.
-            Follow a few people to shape your feed.
+          <p className="mt-1.5 text-sm leading-relaxed text-white/80">
+            {primaryLabel
+              ? `Your ${primaryLabel} profile is ready. We're building your feed now.`
+              : "Your profile is ready. We're building your feed now."}
           </p>
         </div>
         <button
           type="button"
           onClick={() => setVisible(false)}
-          className="text-lg leading-none text-emerald-700 transition-colors hover:text-emerald-900"
+          className="text-lg leading-none text-white/70 transition-colors hover:text-white"
           aria-label="Dismiss welcome banner"
         >
           ×

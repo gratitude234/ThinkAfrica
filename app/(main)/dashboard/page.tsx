@@ -30,6 +30,7 @@ import { getRetentionSummary } from "@/lib/retention";
 import { getPostQualitySummary } from "@/lib/postQuality";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
 import { getActionInboxSummary } from "@/lib/actionInbox";
+import { isAcademicProfileType, isProfileType } from "@/lib/profileTypes";
 import { updateOpportunityInquiryStatus } from "./opportunityInquiryActions";
 
 function WorkUnderReviewPanel({
@@ -286,7 +287,7 @@ export default async function DashboardPage() {
     supabase
       .from("profiles")
       .select(
-        "username, full_name, country, university, field_of_study, bio, interests, verified, verified_type"
+        "username, full_name, country, university, field_of_study, bio, interests, verified, verified_type, profile_type"
       )
       .eq("id", user.id)
       .single(),
@@ -607,8 +608,13 @@ export default async function DashboardPage() {
   const profileHref = authorProfile?.username
     ? `/${authorProfile.username}`
     : "/settings";
+  const authorIsAcademic = isProfileType(authorProfile?.profile_type)
+    ? isAcademicProfileType(authorProfile.profile_type)
+    : false;
   const profileBasicsComplete = Boolean(
-    authorProfile?.username && authorProfile?.full_name && authorProfile?.university
+    authorProfile?.username &&
+      authorProfile?.full_name &&
+      (authorIsAcademic ? authorProfile?.university : true)
   );
   const reviewedOrCitableCount = publishedPosts.filter(
     (post) =>
@@ -747,7 +753,9 @@ export default async function DashboardPage() {
   const portfolioNextAction: PortfolioNextAction = !profileBasicsComplete
     ? {
         label: "Complete your profile basics",
-        body: "Add name, username, and university so every publication has a credible author line.",
+        body: authorIsAcademic
+          ? "Add your name, username, and university so every publication has a credible author line."
+          : "Add your name and username so every publication has a credible author line.",
         href: "/settings",
         cta: "Complete profile",
       }
