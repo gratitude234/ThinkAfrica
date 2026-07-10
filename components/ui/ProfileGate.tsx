@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import UniversitySelect from "@/components/ui/UniversitySelect";
 import Button from "@/components/ui/Button";
+import { isUsernameConflict, USERNAME_TAKEN_MESSAGE } from "@/lib/supabaseErrors";
 
 interface ProfileGateProfile {
   full_name: string | null;
@@ -33,6 +34,10 @@ export default function ProfileGate({
   onClose,
   onComplete,
 }: ProfileGateProps) {
+  const hasFullName = Boolean(initialProfile?.full_name?.trim());
+  const hasUsername = Boolean(initialProfile?.username?.trim());
+  const hasUniversity = Boolean(initialProfile?.university?.trim());
+
   const [fullName, setFullName] = useState(initialProfile?.full_name ?? "");
   const [username, setUsername] = useState(initialProfile?.username ?? "");
   const [university, setUniversity] = useState(initialProfile?.university ?? "");
@@ -49,17 +54,11 @@ export default function ProfileGate({
   }, [initialProfile, open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || hasUsername) return;
 
     const normalizedUsername = username.trim().toLowerCase();
     if (!normalizedUsername) {
       setUsernameError("Username is required.");
-      setCheckingUsername(false);
-      return;
-    }
-
-    if (normalizedUsername === (initialProfile?.username ?? "")) {
-      setUsernameError(null);
       setCheckingUsername(false);
       return;
     }
@@ -79,16 +78,15 @@ export default function ProfileGate({
     }, 300);
 
     return () => window.clearTimeout(timeoutId);
-  }, [initialProfile?.username, open, userId, username]);
+  }, [hasUsername, open, userId, username]);
 
   const canSubmit = useMemo(() => {
-    return (
-      fullName.trim().length > 0 &&
-      username.trim().length > 0 &&
-      !usernameError &&
-      !checkingUsername
-    );
-  }, [checkingUsername, fullName, username, usernameError]);
+    if (!hasFullName && !fullName.trim()) return false;
+    if (!hasUsername && (!username.trim() || Boolean(usernameError) || checkingUsername)) {
+      return false;
+    }
+    return true;
+  }, [checkingUsername, fullName, hasFullName, hasUsername, username, usernameError]);
 
   if (!open) return null;
 
@@ -97,12 +95,14 @@ export default function ProfileGate({
     if (!canSubmit) return;
 
     setSaving(true);
-    const normalizedUsername = username.trim().toLowerCase().replace(/\s+/g, "");
     const payload = {
-      full_name: fullName.trim(),
-      username: normalizedUsername,
-      university: university.trim() || null,
-      onboarding_completed: true,
+      full_name: hasFullName ? (initialProfile?.full_name ?? "") : fullName.trim(),
+      username: hasUsername
+        ? (initialProfile?.username ?? "")
+        : username.trim().toLowerCase().replace(/\s+/g, ""),
+      university: hasUniversity
+        ? (initialProfile?.university ?? null)
+        : university.trim() || null,
     };
 
     const supabase = createClient();
@@ -114,7 +114,7 @@ export default function ProfileGate({
     setSaving(false);
 
     if (error) {
-      setUsernameError(error.message);
+      setUsernameError(isUsernameConflict(error) ? USERNAME_TAKEN_MESSAGE : error.message);
       return;
     }
 
@@ -144,49 +144,55 @@ export default function ProfileGate({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Full name
-            </label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-              className={INPUT_STYLES}
-              placeholder="Your full name"
-            />
-          </div>
+          {!hasFullName ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Full name
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                className={INPUT_STYLES}
+                placeholder="Your full name"
+              />
+            </div>
+          ) : null}
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Username
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(event) =>
-                setUsername(event.target.value.toLowerCase().replace(/\s+/g, ""))
-              }
-              className={`${INPUT_STYLES} ${usernameError ? "border-red-300" : ""}`}
-              placeholder="yourhandle"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              This becomes your public @handle.
-            </p>
-            {checkingUsername ? (
-              <p className="mt-1 text-xs text-gray-400">Checking availability…</p>
-            ) : null}
-            {usernameError ? (
-              <p className="mt-1 text-xs text-red-500">{usernameError}</p>
-            ) : null}
-          </div>
+          {!hasUsername ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(event) =>
+                  setUsername(event.target.value.toLowerCase().replace(/\s+/g, ""))
+                }
+                className={`${INPUT_STYLES} ${usernameError ? "border-red-300" : ""}`}
+                placeholder="yourhandle"
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                This becomes your public @handle.
+              </p>
+              {checkingUsername ? (
+                <p className="mt-1 text-xs text-gray-400">Checking availability…</p>
+              ) : null}
+              {usernameError ? (
+                <p className="mt-1 text-xs text-red-500">{usernameError}</p>
+              ) : null}
+            </div>
+          ) : null}
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              University
-            </label>
-            <UniversitySelect value={university} onChange={setUniversity} />
-          </div>
+          {!hasUniversity ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                University
+              </label>
+              <UniversitySelect value={university} onChange={setUniversity} />
+            </div>
+          ) : null}
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>

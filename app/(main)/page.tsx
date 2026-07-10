@@ -5,7 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import HomeSidebar from "@/components/ui/HomeSidebar";
+import WelcomeBanner from "@/components/ui/WelcomeBanner";
 import { getActivationState, type ActivationState } from "@/lib/activation";
+import { getProfileTypeLabel, isProfileType } from "@/lib/profileTypes";
 import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import ActivationFocusPanel from "./ActivationFocusPanel";
@@ -47,6 +49,7 @@ interface PageProps {
     tab?: string;
     type?: string;
     timeframe?: string;
+    welcome?: string;
   }>;
 }
 
@@ -191,7 +194,7 @@ function deriveSidebarTopics({
 }
 
 export default async function HomePage({ searchParams }: PageProps) {
-  const { guest, tab, type, timeframe } = await searchParams;
+  const { guest, tab, type, timeframe, welcome } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -206,11 +209,13 @@ export default async function HomePage({ searchParams }: PageProps) {
   let userUniversity: string | null = null;
   let userFieldOfStudy: string | null = null;
   let userPoints: number | null = null;
+  let welcomeFirstName: string | null = null;
+  let welcomePrimaryLabel: string | null = null;
 
   if (user) {
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("interests, university, field_of_study, points")
+      .select("interests, university, field_of_study, points, full_name, profile_type")
       .eq("id", user.id)
       .single();
 
@@ -218,7 +223,13 @@ export default async function HomePage({ searchParams }: PageProps) {
     userUniversity = profileData?.university ?? null;
     userFieldOfStudy = profileData?.field_of_study ?? null;
     userPoints = profileData?.points ?? null;
+    welcomeFirstName = profileData?.full_name?.trim().split(/\s+/)[0] ?? null;
+    welcomePrimaryLabel = isProfileType(profileData?.profile_type)
+      ? getProfileTypeLabel(profileData.profile_type)
+      : null;
   }
+
+  const showWelcomeBanner = Boolean(user) && welcome === "1";
 
   const draftCutoff = new Date(
     Date.now() - 14 * 24 * 60 * 60 * 1000
@@ -579,6 +590,13 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   return (
     <div>
+      {showWelcomeBanner ? (
+        <WelcomeBanner
+          firstName={welcomeFirstName ?? "there"}
+          primaryLabel={welcomePrimaryLabel}
+        />
+      ) : null}
+
       {user ? (
         <RetentionEventTracker
           event="home_viewed"
