@@ -96,17 +96,16 @@ export default function SignupPage() {
     setResendNotice(null);
     setResendError(null);
 
-    try {
-      const normalizedEmail = form.email.trim().toLowerCase();
-      const fullName = form.fullName.trim();
-      const result = await withSignupTimeout(
-        sendSignupConfirmationEmail({
-          email: normalizedEmail,
-          password: form.password,
-          fullName,
-        })
-      );
+    const normalizedEmail = form.email.trim().toLowerCase();
+    const fullName = form.fullName.trim();
+    const submitSignup = () =>
+      sendSignupConfirmationEmail({
+        email: normalizedEmail,
+        password: form.password,
+        fullName,
+      });
 
+    const applyResult = (result: Awaited<ReturnType<typeof submitSignup>>) => {
       if (!result.ok) {
         setError(formatAuthError(result.error));
         setCanResendConfirmation(isAlreadyRegisteredAuthError(result.error));
@@ -118,15 +117,29 @@ export default function SignupPage() {
       trackActivationEvent({ event: "signup_completed" });
       setSubmitted(true);
       setLoading(false);
-    } catch (error) {
-      console.error("Signup failed", error);
-      setError(
-        error instanceof Error
-          ? formatAuthError(error.message)
-          : "We could not create your account. Please try again."
-      );
-      setCanResendConfirmation(false);
-      setLoading(false);
+    };
+
+    try {
+      applyResult(await withSignupTimeout(submitSignup()));
+    } catch {
+      // The client gave up waiting, not the server: withSignupTimeout races
+      // a local timer against the request, it doesn't cancel it, so the
+      // account may already exist by now even though this looks like a
+      // failure. Follow up with another attempt instead of dead-ending on
+      // an error: if the account was already created, the fallback inside
+      // sendGeneratedConfirmationEmail reissues a fresh code instead of
+      // erroring, so this resolves cleanly whether the first attempt
+      // succeeded, is still running, or never went through at all.
+      try {
+        applyResult(await withSignupTimeout(submitSignup()));
+      } catch (followUpError) {
+        console.error("Signup failed", followUpError);
+        setError(
+          "Account creation is taking longer than expected. Check your email for a code before trying again, it may already have arrived."
+        );
+        setCanResendConfirmation(true);
+        setLoading(false);
+      }
     }
   };
 
@@ -138,7 +151,6 @@ export default function SignupPage() {
     try {
       const result = await resendSignupConfirmationEmail({
         email: form.email.trim(),
-        password: form.password,
         fullName: form.fullName,
       });
 

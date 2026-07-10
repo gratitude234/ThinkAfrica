@@ -78,6 +78,32 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (isGuestHome) {
+    // Signup's own verify step always forces /onboarding, but that's the
+    // only entry point that does. Logging in, following a magic-link
+    // callback, or just reopening the app with a live session all land
+    // here directly, so enforce both conditions at this shared gate instead
+    // of relying on every auth entry point to remember to redirect.
+    if (!user.email_confirmed_at) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("reason", "email_unconfirmed");
+      return NextResponse.redirect(loginUrl);
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("onboarding_completed")
+      .eq("id", user.id)
+      .single();
+
+    if (profile && !profile.onboarding_completed) {
+      const onboardingUrl = request.nextUrl.clone();
+      onboardingUrl.pathname = "/onboarding";
+      return NextResponse.redirect(onboardingUrl);
+    }
+  }
+
   return supabaseResponse;
 }
 

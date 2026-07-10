@@ -45,6 +45,7 @@ function LoginForm() {
   const redirectTo = getSafeRedirect(searchParams.get("redirectTo"));
   const resetComplete = searchParams.get("reset") === "1";
   const callbackFailed = searchParams.get("error") === "auth_callback_failed";
+  const needsEmailConfirmation = searchParams.get("reason") === "email_unconfirmed";
   const isWritingRedirect = redirectTo.startsWith("/write");
   const introCopy = isWritingRedirect
     ? "Sign in to start your draft and keep autosave tied to your profile."
@@ -93,7 +94,6 @@ function LoginForm() {
     try {
       const result = await resendSignupConfirmationEmail({
         email: form.email.trim(),
-        password: form.password,
       });
 
       if (result.ok) {
@@ -176,6 +176,17 @@ function LoginForm() {
           >
             That email link is invalid or expired. Request a new link and try
             again.
+          </div>
+        ) : null}
+
+        {needsEmailConfirmation ? (
+          <div
+            className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900"
+            role="status"
+            aria-live="polite"
+          >
+            Confirm your email before continuing. Sign in below to get a fresh
+            verification code.
           </div>
         ) : null}
 

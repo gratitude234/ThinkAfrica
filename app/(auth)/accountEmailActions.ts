@@ -10,6 +10,7 @@ import {
   sendUserEmail,
 } from "@/lib/email";
 import { SITE_URL } from "@/lib/site";
+import { isAlreadyRegisteredAuthError } from "./authMessages";
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -81,15 +82,6 @@ function isUnknownRecoveryRecipient(error: unknown) {
   );
 }
 
-function isRateLimitError(error: unknown) {
-  const message = getEmailErrorMessage(error).toLowerCase();
-  return (
-    message.includes("rate limit") ||
-    message.includes("too many") ||
-    message.includes("over_email_send_rate_limit")
-  );
-}
-
 type ConfirmationType = Extract<EmailOtpType, "signup" | "magiclink">;
 
 function getConfirmationTypeFromLink(type: "signup" | "magiclink"): ConfirmationType {
@@ -133,8 +125,10 @@ async function sendGeneratedConfirmationEmail(input: {
       redirectTo: getAuthCallbackUrl("/onboarding"),
     },
   };
-  const { data, error } =
-    input.linkType === "signup"
+
+  let effectiveType: "signup" | "magiclink" = input.linkType;
+  let { data, error } =
+    effectiveType === "signup"
       ? await admin.auth.admin.generateLink({
           type: "signup",
           email: input.email,
@@ -147,6 +141,22 @@ async function sendGeneratedConfirmationEmail(input: {
           ...linkOptions,
         });
 
+  // A previous attempt for this email may have already created the account,
+  // e.g. the client gave up waiting on a slow response even though the
+  // server finished the job. The Admin API's "signup" link type treats an
+  // existing unconfirmed user as an error instead of just reissuing a code
+  // the way client-side signUp() does, so fall back to a magic link, which
+  // works for any existing account and reissues a fresh code without
+  // touching the password already on file.
+  if (error && effectiveType === "signup" && isAlreadyRegisteredAuthError(error.message)) {
+    effectiveType = "magiclink";
+    ({ data, error } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email: input.email,
+      ...linkOptions,
+    }));
+  }
+
   if (error) {
     return { ok: false, error: error.message } as const;
   }
@@ -157,10 +167,11 @@ async function sendGeneratedConfirmationEmail(input: {
     return { ok: false, error: "Unable to create confirmation code." } as const;
   }
 
-  const verificationType = getConfirmationTypeFromLink(input.linkType);
-  const safeActionLink = data.properties.hashed_token
+  const verificationType = getConfirmationTypeFromLink(effectiveType);
+  const hashedToken = data.properties?.hashed_token;
+  const safeActionLink = hashedToken
     ? getAuthConfirmUrl({
-        tokenHash: data.properties.hashed_token,
+        tokenHash: hashedToken,
         type: verificationType,
         nextPath: "/onboarding",
       })
@@ -170,7 +181,7 @@ async function sendGeneratedConfirmationEmail(input: {
   const result = await sendDirectEmail({
     to: input.email,
     subject: "Confirm your Indegenius account",
-    preview: "Use your Indegenius verification code or confirmation link.",
+    preview: `Your Indegenius code: ${emailOtp}. Use it to confirm your account.`,
     title: "Confirm your Indegenius account",
     intro: `Hi ${displayName}. Use this code to activate your Indegenius profile and continue onboarding.`,
     bodyHtml: renderConfirmationCodeHtml(emailOtp, input.email),
@@ -180,7 +191,7 @@ async function sendGeneratedConfirmationEmail(input: {
     ],
     ctaLabel: "Confirm account",
     ctaPath: safeActionLink,
-    idempotencyKey: `signup-confirm:${input.email}:${data.properties.hashed_token ?? emailOtp}`,
+    idempotencyKey: `signup-confirm:${input.email}:${hashedToken ?? emailOtp}`,
   });
 
   logEmailResult(`signup_confirm:${input.email}`, result);
@@ -219,7 +230,6 @@ export async function sendSignupConfirmationEmail(input: {
 
 export async function resendSignupConfirmationEmail(input: {
   email: string;
-  password?: string;
   fullName?: string | null;
 }) {
   const email = normalizeEmail(input.email);
@@ -228,18 +238,17 @@ export async function resendSignupConfirmationEmail(input: {
     return { ok: false, error: "Add a valid email address." } as const;
   }
 
+  // Every real caller only shows a "resend" affordance once an account is
+  // already known to exist (signup's already-registered banner, login's
+  // email-not-confirmed banner), so this never needs to create anything,
+  // just reissue a fresh code without touching the password on file.
   try {
     return await sendGeneratedConfirmationEmail({
       email,
-      password: input.password,
       fullName: input.fullName,
-      linkType: input.password ? "signup" : "magiclink",
+      linkType: "magiclink",
     });
   } catch (error) {
-    if (isRateLimitError(error)) {
-      return { ok: false, error: getEmailErrorMessage(error) } as const;
-    }
-
     return { ok: false, error: getEmailErrorMessage(error) } as const;
   }
 }
@@ -288,7 +297,7 @@ export async function sendPasswordResetEmail(input: { email: string }) {
     const result = await sendDirectEmail({
       to: email,
       subject: "Reset your Indegenius password",
-      preview: "Use your Indegenius password reset code or secure link.",
+      preview: `Your Indegenius reset code: ${emailOtp}. Use it to reset your password.`,
       title: "Reset your password",
       intro:
         "We received a request to reset your Indegenius password. Use this code to choose a new password.",
