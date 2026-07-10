@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AuthShell,
@@ -8,11 +8,7 @@ import {
   PRIMARY_BUTTON_STYLES,
   SECONDARY_LINK_STYLES,
 } from "../AuthShell";
-import {
-  formatAuthError,
-  isAlreadyRegisteredAuthError,
-  isEmailNotConfirmedAuthError,
-} from "../authMessages";
+import { formatAuthError, isAlreadyRegisteredAuthError } from "../authMessages";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -28,8 +24,8 @@ const PROOF_ITEMS = [
 
 type VerificationType = "signup" | "magiclink";
 
-const AUTH_CODE_MIN_LENGTH = 6;
-const AUTH_CODE_MAX_LENGTH = 10;
+const AUTH_CODE_LENGTH = 6;
+const RESEND_COOLDOWN_SECONDS = 45;
 
 function getPasswordHint(password: string) {
   if (!password) return "Use at least 6 characters.";
@@ -66,11 +62,11 @@ export default function SignupPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [verificationType, setVerificationType] = useState<VerificationType>("signup");
   const [verifyLoading, setVerifyLoading] = useState(false);
-  const [externalVerifyLoading, setExternalVerifyLoading] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -78,6 +74,14 @@ export default function SignupPage() {
   });
 
   const passwordReady = form.password.length >= 6;
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timeoutId = setTimeout(() => {
+      setResendCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [resendCooldown]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
@@ -114,6 +118,8 @@ export default function SignupPage() {
       }
 
       setVerificationType(result.type);
+      setVerificationCode("");
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
       trackActivationEvent({ event: "signup_completed" });
       setSubmitted(true);
       setLoading(false);
@@ -144,6 +150,8 @@ export default function SignupPage() {
   };
 
   const handleResendConfirmation = async () => {
+    if (resendCooldown > 0) return;
+
     setResendLoading(true);
     setResendNotice(null);
     setResendError(null);
@@ -156,8 +164,10 @@ export default function SignupPage() {
 
       if (result.ok) {
         setVerificationType(result.type);
+        setVerificationCode("");
         setSubmitted(true);
         setResendNotice("A fresh verification code is on its way.");
+        setResendCooldown(RESEND_COOLDOWN_SECONDS);
       } else {
         setResendError(formatAuthError(result.error));
       }
@@ -172,13 +182,8 @@ export default function SignupPage() {
     }
   };
 
-  const handleVerifyCode = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const token = verificationCode.replace(/\D/g, "");
-    if (token.length < AUTH_CODE_MIN_LENGTH) {
-      setResendError("Enter the full verification code from your email.");
-      return;
-    }
+  const handleVerifyCode = async () => {
+    if (verificationCode.length !== AUTH_CODE_LENGTH || verifyLoading) return;
 
     setVerifyLoading(true);
     setResendError(null);
@@ -187,7 +192,7 @@ export default function SignupPage() {
     const supabase = createClient();
     const { error: verifyError } = await supabase.auth.verifyOtp({
       email: form.email.trim().toLowerCase(),
-      token,
+      token: verificationCode,
       type: verificationType,
     });
 
@@ -200,31 +205,12 @@ export default function SignupPage() {
     window.location.href = "/onboarding";
   };
 
-  const handleVerifiedOnAnotherDevice = async () => {
-    setExternalVerifyLoading(true);
-    setResendError(null);
-    setResendNotice(null);
-
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: form.email.trim().toLowerCase(),
-      password: form.password,
-    });
-
-    setExternalVerifyLoading(false);
-    if (signInError) {
-      if (isEmailNotConfirmedAuthError(signInError.message)) {
-        setResendError(
-          "Still waiting for verification. Enter the code or try again in a moment."
-        );
-        return;
-      }
-      setResendError(formatAuthError(signInError.message));
-      return;
+  useEffect(() => {
+    if (verificationCode.length === AUTH_CODE_LENGTH && !verifyLoading) {
+      void handleVerifyCode();
     }
-
-    window.location.href = "/onboarding";
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verificationCode]);
 
   return (
     <AuthShell
@@ -249,11 +235,14 @@ export default function SignupPage() {
           role="status"
           aria-live="polite"
         >
-          <p>
-            We sent a verification code to {form.email.trim()}. Enter it here to
-            continue on this device, or use the email link on any device.
-          </p>
-          <form onSubmit={handleVerifyCode} className="mt-4 space-y-3">
+          <p>We sent a 6-digit code to {form.email.trim()}. Enter it below to continue.</p>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleVerifyCode();
+            }}
+            className="mt-4 space-y-3"
+          >
             <div>
               <label
                 htmlFor="verificationCode"
@@ -266,40 +255,32 @@ export default function SignupPage() {
                 value={verificationCode}
                 onChange={(event) =>
                   setVerificationCode(
-                    event.target.value.replace(/\D/g, "").slice(0, AUTH_CODE_MAX_LENGTH)
+                    event.target.value.replace(/\D/g, "").slice(0, AUTH_CODE_LENGTH)
                   )
                 }
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                placeholder="12345678"
-                className={`${INPUT_STYLES} bg-white text-center text-lg font-semibold tracking-[0.3em]`}
+                placeholder="123456"
+                autoFocus
+                disabled={verifyLoading}
+                className={`${INPUT_STYLES} bg-white text-center text-lg font-semibold tracking-[0.3em] disabled:opacity-70`}
               />
             </div>
+            {verifyLoading ? <p className="text-emerald-800">Verifying...</p> : null}
             {resendError ? <p className="text-red-700">{resendError}</p> : null}
             {resendNotice ? <p className="text-emerald-800">{resendNotice}</p> : null}
-            <button
-              type="submit"
-              disabled={verifyLoading || verificationCode.length < AUTH_CODE_MIN_LENGTH}
-              className={PRIMARY_BUTTON_STYLES}
-            >
-              {verifyLoading ? "Verifying..." : "Verify code"}
-            </button>
           </form>
           <button
             type="button"
             onClick={handleResendConfirmation}
-            disabled={resendLoading || !form.email.trim()}
+            disabled={resendLoading || resendCooldown > 0 || !form.email.trim()}
             className="mt-3 w-full rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {resendLoading ? "Sending..." : "Resend code"}
-          </button>
-          <button
-            type="button"
-            onClick={handleVerifiedOnAnotherDevice}
-            disabled={externalVerifyLoading}
-            className="mt-3 w-full rounded-lg px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {externalVerifyLoading ? "Checking..." : "I've verified on another device"}
+            {resendLoading
+              ? "Sending..."
+              : resendCooldown > 0
+                ? `Resend code (${resendCooldown}s)`
+                : "Resend code"}
           </button>
         </div>
       ) : (
@@ -403,10 +384,14 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={handleResendConfirmation}
-              disabled={resendLoading || !form.email.trim()}
+              disabled={resendLoading || resendCooldown > 0 || !form.email.trim()}
               className="mt-3 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {resendLoading ? "Sending..." : "Resend verification code"}
+              {resendLoading
+                ? "Sending..."
+                : resendCooldown > 0
+                  ? `Resend verification code (${resendCooldown}s)`
+                  : "Resend verification code"}
             </button>
             {resendNotice ? (
               <p className="mt-3 text-emerald-800">{resendNotice}</p>

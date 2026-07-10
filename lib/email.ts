@@ -43,8 +43,8 @@ type UserEmailInput = {
   intro: string;
   bodyHtml?: string;
   bodyTextLines?: string[];
-  ctaLabel: string;
-  ctaPath: string;
+  ctaLabel?: string;
+  ctaPath?: string;
   idempotencyKey: string;
   preferenceKey?: NotificationPreferenceKey;
 };
@@ -103,14 +103,19 @@ export function renderEmailShell(input: {
   title: string;
   intro: string;
   bodyHtml?: string;
-  ctaLabel: string;
-  ctaHref: string;
+  ctaLabel?: string;
+  ctaHref?: string;
 }) {
   const preview = escapeHtml(input.preview);
   const title = escapeHtml(input.title);
   const intro = escapeHtml(input.intro);
-  const ctaLabel = escapeHtml(input.ctaLabel);
-  const ctaHref = escapeHtml(input.ctaHref);
+  const ctaHtml =
+    input.ctaLabel && input.ctaHref
+      ? `<div style="margin:28px 0 18px;">
+                  <a href="${escapeHtml(input.ctaHref)}" style="display:inline-block;border-radius:10px;background:#047857;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:12px 18px;">${escapeHtml(input.ctaLabel)}</a>
+                </div>
+                <p style="margin:0 0 18px;font-size:12px;line-height:1.6;color:#6b7280;">If the button does not work, open this link:<br><a href="${escapeHtml(input.ctaHref)}" style="color:#047857;">${escapeHtml(input.ctaHref)}</a></p>`
+      : "";
 
   return `<!doctype html>
 <html>
@@ -136,10 +141,7 @@ export function renderEmailShell(input: {
                 <h1 style="margin:0 0 14px;font-size:22px;line-height:1.3;color:#111827;">${title}</h1>
                 <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#374151;">${intro}</p>
                 ${input.bodyHtml ?? ""}
-                <div style="margin:28px 0 18px;">
-                  <a href="${ctaHref}" style="display:inline-block;border-radius:10px;background:#047857;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:12px 18px;">${ctaLabel}</a>
-                </div>
-                <p style="margin:0 0 18px;font-size:12px;line-height:1.6;color:#6b7280;">If the button does not work, open this link:<br><a href="${ctaHref}" style="color:#047857;">${ctaHref}</a></p>
+                ${ctaHtml}
               </td>
             </tr>
             <tr>
@@ -245,7 +247,7 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       return { skipped: true, reason: "recipient_preference_disabled" };
     }
 
-    const ctaHref = absoluteUrl(input.ctaPath);
+    const ctaHref = input.ctaPath ? absoluteUrl(input.ctaPath) : undefined;
     const html = renderEmailShell({
       preview: input.preview,
       title: input.title,
@@ -259,8 +261,7 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       "",
       input.intro,
       ...(input.bodyTextLines ?? []),
-      "",
-      `${input.ctaLabel}: ${ctaHref}`,
+      ...(input.ctaLabel && ctaHref ? ["", `${input.ctaLabel}: ${ctaHref}`] : []),
       "",
       "Manage email preferences in Indegenius notification settings.",
     ].join("\n");
@@ -289,7 +290,7 @@ export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSen
     return { skipped: true, reason: "invalid_email_address" };
   }
 
-  const ctaHref = absoluteUrl(input.ctaPath);
+  const ctaHref = input.ctaPath ? absoluteUrl(input.ctaPath) : undefined;
   const html = renderEmailShell({
     preview: input.preview,
     title: input.title,
@@ -303,8 +304,7 @@ export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSen
     "",
     input.intro,
     ...(input.bodyTextLines ?? []),
-    "",
-    `${input.ctaLabel}: ${ctaHref}`,
+    ...(input.ctaLabel && ctaHref ? ["", `${input.ctaLabel}: ${ctaHref}`] : []),
     "",
     "Manage email preferences in Indegenius notification settings.",
   ].join("\n");

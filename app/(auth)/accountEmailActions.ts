@@ -95,7 +95,7 @@ function renderConfirmationCodeHtml(code: string, email: string) {
     <div style="margin:0 0 18px;border:1px solid #d1fae5;background:#ecfdf5;border-radius:12px;padding:18px;text-align:center;">
       <div style="font-size:30px;line-height:1.2;letter-spacing:8px;font-weight:800;color:#065f46;font-family:Arial,Helvetica,sans-serif;">${escapedCode}</div>
     </div>
-    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">You can also use the button below to confirm directly. This keeps your byline, drafts, follows, and notifications tied to ${escapeHtml(email)}.</p>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">This keeps your byline, drafts, follows, and notifications tied to ${escapeHtml(email)}.</p>
   `;
 }
 
@@ -161,21 +161,12 @@ async function sendGeneratedConfirmationEmail(input: {
     return { ok: false, error: error.message } as const;
   }
 
-  const actionLink = data.properties?.action_link;
   const emailOtp = data.properties?.email_otp;
-  if (!actionLink || !emailOtp) {
+  if (!emailOtp) {
     return { ok: false, error: "Unable to create confirmation code." } as const;
   }
 
   const verificationType = getConfirmationTypeFromLink(effectiveType);
-  const hashedToken = data.properties?.hashed_token;
-  const safeActionLink = hashedToken
-    ? getAuthConfirmUrl({
-        tokenHash: hashedToken,
-        type: verificationType,
-        nextPath: "/onboarding",
-      })
-    : getSafeAuthActionLink(actionLink, "/onboarding");
 
   const displayName = input.fullName?.trim() || "there";
   const result = await sendDirectEmail({
@@ -187,11 +178,9 @@ async function sendGeneratedConfirmationEmail(input: {
     bodyHtml: renderConfirmationCodeHtml(emailOtp, input.email),
     bodyTextLines: [
       `Verification code: ${emailOtp}`,
-      "Enter this code on the device where you started signup, or use the confirmation link below.",
+      "Enter this code on the device where you started signup.",
     ],
-    ctaLabel: "Confirm account",
-    ctaPath: safeActionLink,
-    idempotencyKey: `signup-confirm:${input.email}:${hashedToken ?? emailOtp}`,
+    idempotencyKey: `signup-confirm:${input.email}:${emailOtp}`,
   });
 
   logEmailResult(`signup_confirm:${input.email}`, result);

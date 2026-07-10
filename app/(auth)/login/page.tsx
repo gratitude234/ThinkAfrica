@@ -26,7 +26,7 @@ const PROOF_ITEMS = [
 type VerificationType = "signup" | "magiclink";
 
 const AUTH_CODE_MIN_LENGTH = 6;
-const AUTH_CODE_MAX_LENGTH = 10;
+const AUTH_CODE_MAX_LENGTH = 6;
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -279,7 +279,7 @@ function LoginForm() {
                 }
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                placeholder="12345678"
+                placeholder="123456"
                 className={`${INPUT_STYLES} bg-white text-center text-lg font-semibold tracking-[0.3em]`}
               />
             </div>
