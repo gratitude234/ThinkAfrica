@@ -35,16 +35,20 @@ type SendEmailInput = {
   idempotencyKey: string;
 };
 
+const DEFAULT_FOOTER_NOTE =
+  "You are receiving this because you have an Indegenius account. Manage email preferences in your notification settings.";
+
 type UserEmailInput = {
   recipientId: string;
   subject: string;
   preview: string;
   title: string;
-  intro: string;
+  intro?: string;
   bodyHtml?: string;
   bodyTextLines?: string[];
   ctaLabel?: string;
   ctaPath?: string;
+  footerNote?: string;
   idempotencyKey: string;
   preferenceKey?: NotificationPreferenceKey;
 };
@@ -101,20 +105,24 @@ function preferenceEnabled(
 export function renderEmailShell(input: {
   preview: string;
   title: string;
-  intro: string;
+  intro?: string;
   bodyHtml?: string;
   ctaLabel?: string;
   ctaHref?: string;
+  footerNote?: string;
 }) {
   const preview = escapeHtml(input.preview);
   const title = escapeHtml(input.title);
-  const intro = escapeHtml(input.intro);
+  const introHtml = input.intro
+    ? `<p class="email-text" style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#374151;">${escapeHtml(input.intro)}</p>`
+    : "";
+  const footerNote = escapeHtml(input.footerNote ?? DEFAULT_FOOTER_NOTE);
   const ctaHtml =
     input.ctaLabel && input.ctaHref
       ? `<div style="margin:28px 0 18px;">
-                  <a href="${escapeHtml(input.ctaHref)}" style="display:inline-block;border-radius:10px;background:#047857;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:12px 18px;">${escapeHtml(input.ctaLabel)}</a>
+                  <a href="${escapeHtml(input.ctaHref)}" style="display:inline-block;border-radius:10px;background:#073929;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:12px 18px;">${escapeHtml(input.ctaLabel)}</a>
                 </div>
-                <p style="margin:0 0 18px;font-size:12px;line-height:1.6;color:#6b7280;">If the button does not work, open this link:<br><a href="${escapeHtml(input.ctaHref)}" style="color:#047857;">${escapeHtml(input.ctaHref)}</a></p>`
+                <p class="email-muted" style="margin:0 0 18px;font-size:12px;line-height:1.6;color:#6b7280;">If the button does not work, open this link:<br><a href="${escapeHtml(input.ctaHref)}" style="color:#073929;">${escapeHtml(input.ctaHref)}</a></p>`
       : "";
 
   return `<!doctype html>
@@ -122,31 +130,44 @@ export function renderEmailShell(input: {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
     <title>${title}</title>
+    <style>
+      @media (prefers-color-scheme: dark) {
+        .email-bg { background-color: #101613 !important; }
+        .email-card { background-color: #171d1a !important; border-color: #2a332e !important; }
+        .email-title { color: #f3f4f6 !important; }
+        .email-text { color: #d1d5db !important; }
+        .email-muted { color: #9ca3af !important; }
+        .email-footer { background-color: #131815 !important; border-color: #2a332e !important; }
+        .code-box { background-color: #0d1f16 !important; border-color: #234b36 !important; }
+        .code-text { color: #7fe0b3 !important; }
+      }
+    </style>
   </head>
-  <body style="margin:0;background:#f6f7f5;color:#1f2937;font-family:Arial,Helvetica,sans-serif;">
+  <body class="email-bg" style="margin:0;background:#f6f7f5;color:#1f2937;font-family:Arial,Helvetica,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preview}</div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7f5;padding:28px 14px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="email-bg" style="background:#f6f7f5;padding:28px 14px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="email-card" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
             <tr>
               <td style="padding:22px 26px;border-bottom:1px solid #eef2f0;">
-                <div style="font-size:18px;font-weight:700;color:#047857;">Indegenius</div>
-                <div style="margin-top:4px;font-size:12px;color:#6b7280;">Africa's intellectual network</div>
+                <div style="font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:20px;font-weight:700;color:#073929;">Indegenius</div>
               </td>
             </tr>
             <tr>
               <td style="padding:28px 26px 8px;">
-                <h1 style="margin:0 0 14px;font-size:22px;line-height:1.3;color:#111827;">${title}</h1>
-                <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#374151;">${intro}</p>
+                <h1 class="email-title" style="margin:0 0 14px;font-size:20px;line-height:1.3;color:#111827;">${title}</h1>
+                ${introHtml}
                 ${input.bodyHtml ?? ""}
                 ${ctaHtml}
               </td>
             </tr>
             <tr>
-              <td style="padding:18px 26px;background:#f9fafb;border-top:1px solid #eef2f0;font-size:12px;line-height:1.6;color:#6b7280;">
-                You are receiving this because you have an Indegenius account. Manage email preferences in your notification settings.
+              <td class="email-footer" style="padding:18px 26px;background:#f9fafb;border-top:1px solid #eef2f0;font-size:12px;line-height:1.6;color:#6b7280;">
+                ${footerNote}
               </td>
             </tr>
           </table>
@@ -255,15 +276,16 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       bodyHtml: input.bodyHtml,
       ctaLabel: input.ctaLabel,
       ctaHref,
+      footerNote: input.footerNote,
     });
     const text = [
       input.title,
       "",
-      input.intro,
+      ...(input.intro ? [input.intro] : []),
       ...(input.bodyTextLines ?? []),
       ...(input.ctaLabel && ctaHref ? ["", `${input.ctaLabel}: ${ctaHref}`] : []),
       "",
-      "Manage email preferences in Indegenius notification settings.",
+      input.footerNote ?? "Manage email preferences in Indegenius notification settings.",
     ].join("\n");
 
     return sendEmail({
@@ -298,15 +320,16 @@ export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSen
     bodyHtml: input.bodyHtml,
     ctaLabel: input.ctaLabel,
     ctaHref,
+    footerNote: input.footerNote,
   });
   const text = [
     input.title,
     "",
-    input.intro,
+    ...(input.intro ? [input.intro] : []),
     ...(input.bodyTextLines ?? []),
     ...(input.ctaLabel && ctaHref ? ["", `${input.ctaLabel}: ${ctaHref}`] : []),
     "",
-    "Manage email preferences in Indegenius notification settings.",
+    input.footerNote ?? "Manage email preferences in Indegenius notification settings.",
   ].join("\n");
 
   return sendEmail({

@@ -88,25 +88,34 @@ function getConfirmationTypeFromLink(type: "signup" | "magiclink"): Confirmation
   return type;
 }
 
-function renderConfirmationCodeHtml(code: string, email: string) {
+// Supabase Auth's "Email OTP expiration" is a project-level dashboard
+// setting (like sender name and OTP length), not something generateLink()
+// returns, so this can't be pulled dynamically. Keep this in sync by hand
+// if that setting ever changes.
+const OTP_EXPIRY_LABEL = "1 hour";
+
+function renderCodeBoxHtml(code: string) {
   const escapedCode = escapeHtml(code);
   return `
-    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">Enter this code on the device where you started signup:</p>
-    <div style="margin:0 0 18px;border:1px solid #d1fae5;background:#ecfdf5;border-radius:12px;padding:18px;text-align:center;">
-      <div style="font-size:30px;line-height:1.2;letter-spacing:8px;font-weight:800;color:#065f46;font-family:Arial,Helvetica,sans-serif;">${escapedCode}</div>
+    <div class="code-box" style="margin:0 0 16px;border:1px solid #bcdfcb;background:#eaf6ef;border-radius:12px;padding:22px;text-align:center;">
+      <div class="code-text" style="font-size:34px;line-height:1.2;letter-spacing:10px;font-weight:800;color:#073929;font-family:Arial,Helvetica,sans-serif;">${escapedCode}</div>
     </div>
-    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">This keeps your byline, drafts, follows, and notifications tied to ${escapeHtml(email)}.</p>
+  `;
+}
+
+function renderConfirmationCodeHtml(code: string) {
+  return `
+    ${renderCodeBoxHtml(code)}
+    <p class="email-text" style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#374151;text-align:center;">Enter this code to confirm your account.</p>
+    <p class="email-muted" style="margin:0 0 18px;font-size:12px;line-height:1.5;color:#6b7280;text-align:center;">Expires in ${OTP_EXPIRY_LABEL}.</p>
   `;
 }
 
 function renderPasswordResetCodeHtml(code: string) {
-  const escapedCode = escapeHtml(code);
   return `
-    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">Enter this code on the device where you requested the password reset:</p>
-    <div style="margin:0 0 18px;border:1px solid #d1fae5;background:#ecfdf5;border-radius:12px;padding:18px;text-align:center;">
-      <div style="font-size:30px;line-height:1.2;letter-spacing:8px;font-weight:800;color:#065f46;font-family:Arial,Helvetica,sans-serif;">${escapedCode}</div>
-    </div>
-    <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;">You can also use the button below to reset your password directly.</p>
+    ${renderCodeBoxHtml(code)}
+    <p class="email-text" style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#374151;text-align:center;">Enter this code to reset your password, or use the button below.</p>
+    <p class="email-muted" style="margin:0 0 18px;font-size:12px;line-height:1.5;color:#6b7280;text-align:center;">Expires in ${OTP_EXPIRY_LABEL}.</p>
   `;
 }
 
@@ -168,18 +177,18 @@ async function sendGeneratedConfirmationEmail(input: {
 
   const verificationType = getConfirmationTypeFromLink(effectiveType);
 
-  const displayName = input.fullName?.trim() || "there";
   const result = await sendDirectEmail({
     to: input.email,
     subject: "Confirm your Indegenius account",
     preview: `Your Indegenius code: ${emailOtp}. Use it to confirm your account.`,
-    title: "Confirm your Indegenius account",
-    intro: `Hi ${displayName}. Use this code to activate your Indegenius profile and continue onboarding.`,
-    bodyHtml: renderConfirmationCodeHtml(emailOtp, input.email),
+    title: "Confirm your account",
+    bodyHtml: renderConfirmationCodeHtml(emailOtp),
     bodyTextLines: [
       `Verification code: ${emailOtp}`,
-      "Enter this code on the device where you started signup.",
+      "Enter this code to confirm your account.",
+      `Expires in ${OTP_EXPIRY_LABEL}.`,
     ],
+    footerNote: "Didn't request this? You can ignore this email.",
     idempotencyKey: `signup-confirm:${input.email}:${emailOtp}`,
   });
 
@@ -288,16 +297,15 @@ export async function sendPasswordResetEmail(input: { email: string }) {
       subject: "Reset your Indegenius password",
       preview: `Your Indegenius reset code: ${emailOtp}. Use it to reset your password.`,
       title: "Reset your password",
-      intro:
-        "We received a request to reset your Indegenius password. Use this code to choose a new password.",
       bodyHtml: renderPasswordResetCodeHtml(emailOtp),
       bodyTextLines: [
         `Password reset code: ${emailOtp}`,
-        "Enter this code on the device where you requested the reset, or use the reset link below.",
-        "If you did not request this, you can ignore this email and your password will stay unchanged.",
+        "Enter this code to reset your password, or use the link below.",
+        `Expires in ${OTP_EXPIRY_LABEL}.`,
       ],
       ctaLabel: "Reset password",
       ctaPath: safeActionLink,
+      footerNote: "Didn't request this? You can ignore this email.",
       idempotencyKey: `password-reset:${email}:${data.properties.hashed_token}`,
     });
 
