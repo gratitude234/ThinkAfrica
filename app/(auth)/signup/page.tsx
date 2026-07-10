@@ -11,6 +11,7 @@ import {
 import { formatAuthError, isAlreadyRegisteredAuthError } from "../authMessages";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { createClient } from "@/lib/supabase/client";
+import { useResendCooldown } from "../useResendCooldown";
 import {
   resendSignupConfirmationEmail,
   sendSignupConfirmationEmail,
@@ -62,7 +63,7 @@ export default function SignupPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
+  const resendCooldown = useResendCooldown(RESEND_COOLDOWN_SECONDS);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [verificationType, setVerificationType] = useState<VerificationType>("signup");
@@ -74,14 +75,6 @@ export default function SignupPage() {
   });
 
   const passwordReady = form.password.length >= 6;
-
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const timeoutId = setTimeout(() => {
-      setResendCooldown((current) => Math.max(0, current - 1));
-    }, 1000);
-    return () => clearTimeout(timeoutId);
-  }, [resendCooldown]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
@@ -119,7 +112,7 @@ export default function SignupPage() {
 
       setVerificationType(result.type);
       setVerificationCode("");
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      resendCooldown.start();
       trackActivationEvent({ event: "signup_completed" });
       setSubmitted(true);
       setLoading(false);
@@ -150,7 +143,7 @@ export default function SignupPage() {
   };
 
   const handleResendConfirmation = async () => {
-    if (resendCooldown > 0) return;
+    if (resendCooldown.remaining > 0) return;
 
     setResendLoading(true);
     setResendNotice(null);
@@ -167,7 +160,7 @@ export default function SignupPage() {
         setVerificationCode("");
         setSubmitted(true);
         setResendNotice("A fresh verification code is on its way.");
-        setResendCooldown(RESEND_COOLDOWN_SECONDS);
+        resendCooldown.start();
       } else {
         setResendError(formatAuthError(result.error));
       }
@@ -273,13 +266,13 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={handleResendConfirmation}
-            disabled={resendLoading || resendCooldown > 0 || !form.email.trim()}
+            disabled={resendLoading || resendCooldown.remaining > 0 || !form.email.trim()}
             className="mt-3 w-full rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {resendLoading
               ? "Sending..."
-              : resendCooldown > 0
-                ? `Resend code (${resendCooldown}s)`
+              : resendCooldown.remaining > 0
+                ? `Resend code (${resendCooldown.remaining}s)`
                 : "Resend code"}
           </button>
         </div>
@@ -384,13 +377,13 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={handleResendConfirmation}
-              disabled={resendLoading || resendCooldown > 0 || !form.email.trim()}
+              disabled={resendLoading || resendCooldown.remaining > 0 || !form.email.trim()}
               className="mt-3 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {resendLoading
                 ? "Sending..."
-                : resendCooldown > 0
-                  ? `Resend verification code (${resendCooldown}s)`
+                : resendCooldown.remaining > 0
+                  ? `Resend verification code (${resendCooldown.remaining}s)`
                   : "Resend verification code"}
             </button>
             {resendNotice ? (

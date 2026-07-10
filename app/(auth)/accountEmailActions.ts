@@ -29,45 +29,6 @@ function getAuthCallbackUrl(nextPath: string) {
   return url.toString();
 }
 
-function getAuthConfirmUrl(input: {
-  tokenHash: string;
-  type: EmailOtpType;
-  nextPath: string;
-}) {
-  const configuredUrl = process.env.EMAIL_APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-  const appUrl =
-    configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
-      ? configuredUrl
-      // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
-      : SITE_URL;
-
-  const url = new URL("/auth/confirm", appUrl.replace(/\/+$/, ""));
-  url.searchParams.set("token_hash", input.tokenHash);
-  url.searchParams.set("type", input.type);
-  url.searchParams.set("next", input.nextPath);
-  return url.toString();
-}
-
-function getSafeAuthActionLink(actionLink: string, nextPath: string) {
-  const callbackUrl = getAuthCallbackUrl(nextPath);
-
-  try {
-    const url = new URL(actionLink);
-    const redirectTo = url.searchParams.get("redirect_to");
-
-    if (
-      !redirectTo ||
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(?:\/|$)/i.test(redirectTo)
-    ) {
-      url.searchParams.set("redirect_to", callbackUrl);
-    }
-
-    return url.toString();
-  } catch {
-    return actionLink;
-  }
-}
-
 function getEmailErrorMessage(error: unknown) {
   if (!error) return "Unable to send email.";
   return error instanceof Error ? error.message : String(error);
@@ -114,7 +75,7 @@ function renderConfirmationCodeHtml(code: string) {
 function renderPasswordResetCodeHtml(code: string) {
   return `
     ${renderCodeBoxHtml(code)}
-    <p class="email-text" style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#374151;text-align:center;">Enter this code to reset your password, or use the button below.</p>
+    <p class="email-text" style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#374151;text-align:center;">Enter this code to reset your password.</p>
     <p class="email-muted" style="margin:0 0 18px;font-size:12px;line-height:1.5;color:#6b7280;text-align:center;">Expires in ${OTP_EXPIRY_LABEL}.</p>
   `;
 }
@@ -279,18 +240,10 @@ export async function sendPasswordResetEmail(input: { email: string }) {
       return { ok: false, error: error.message } as const;
     }
 
-    const actionLink = data.properties?.action_link;
     const emailOtp = data.properties?.email_otp;
-    if (!actionLink || !emailOtp) {
+    if (!emailOtp) {
       return { ok: false, error: "Unable to create reset code." } as const;
     }
-    const safeActionLink = data.properties.hashed_token
-      ? getAuthConfirmUrl({
-          tokenHash: data.properties.hashed_token,
-          type: "recovery",
-          nextPath: "/reset-password",
-        })
-      : getSafeAuthActionLink(actionLink, "/reset-password");
 
     const result = await sendDirectEmail({
       to: email,
@@ -300,13 +253,11 @@ export async function sendPasswordResetEmail(input: { email: string }) {
       bodyHtml: renderPasswordResetCodeHtml(emailOtp),
       bodyTextLines: [
         `Password reset code: ${emailOtp}`,
-        "Enter this code to reset your password, or use the link below.",
+        "Enter this code to reset your password.",
         `Expires in ${OTP_EXPIRY_LABEL}.`,
       ],
-      ctaLabel: "Reset password",
-      ctaPath: safeActionLink,
       footerNote: "Didn't request this? You can ignore this email.",
-      idempotencyKey: `password-reset:${email}:${data.properties.hashed_token}`,
+      idempotencyKey: `password-reset:${email}:${emailOtp}`,
     });
 
     logEmailResult(`password_reset:${email}`, result);
