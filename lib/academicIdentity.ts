@@ -124,11 +124,6 @@ export const UNIVERSITIES_BY_COUNTRY: Record<string, string[]> = {
   Zimbabwe: ["University of Zimbabwe"],
 };
 
-export function getUniversitiesForCountry(country: string | null | undefined) {
-  if (!country) return [];
-  return UNIVERSITIES_BY_COUNTRY[country] ?? [];
-}
-
 export function inferCountryFromUniversity(university: string | null | undefined) {
   if (!university) return "";
   const normalized = university.trim().toLowerCase();
