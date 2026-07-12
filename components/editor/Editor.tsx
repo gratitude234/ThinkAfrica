@@ -32,11 +32,8 @@ interface EditorProps {
   references?: PostReferenceRecord[];
   onReferencesChange?: (references: PostReferenceRecord[]) => void;
   onUpdate?: (html: string, wordCount: number) => void;
-  onAutoSave?: () => void | Promise<void>;
   onSelectionUpdate?: () => void;
 }
-
-type SaveStatus = "saved" | "saving" | "unsaved";
 
 function countWordsFromHtml(value: string) {
   return value
@@ -63,7 +60,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   references = [],
   onReferencesChange,
   onUpdate,
-  onAutoSave,
   onSelectionUpdate,
 }, ref) {
   const [imageUploading, setImageUploading] = useState(false);
@@ -81,8 +77,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   const [displayWordCount, setDisplayWordCount] = useState(() =>
     countWordsFromHtml(content)
   );
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
-  const [changeTick, setChangeTick] = useState(0);
   const [localReferences, setLocalReferences] = useState<PostReferenceRecord[]>(
     references
   );
@@ -114,8 +108,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
       const words = editor.storage.characterCount.words() as number;
 
       setRawWordCount(words);
-      setSaveStatus("unsaved");
-      setChangeTick((current) => current + 1);
       onUpdate?.(html, words);
       onSelectionUpdate?.();
     },
@@ -157,28 +149,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
 
     return () => clearTimeout(timer);
   }, [rawWordCount]);
-
-  useEffect(() => {
-    if (!onAutoSave || changeTick === 0) {
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setSaveStatus("saving");
-
-      try {
-        await onAutoSave();
-      } catch {
-        // Autosave is intentionally silent.
-      } finally {
-        setTimeout(() => {
-          setSaveStatus("saved");
-        }, 500);
-      }
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [changeTick, onAutoSave]);
 
   const countClasses =
     minWords > 0 && displayWordCount >= minWords
@@ -237,8 +207,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   const updateReferences = (nextReferences: PostReferenceRecord[]) => {
     setLocalReferences(nextReferences);
     onReferencesChange?.(nextReferences);
-    setSaveStatus("unsaved");
-    setChangeTick((current) => current + 1);
   };
 
   return (
@@ -348,52 +316,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
       </div>
 
       <div className="sticky top-0 z-10 hidden border-b border-gray-100 bg-white px-4 py-1.5 lg:block">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <span className={countClasses}>
-              {displayWordCount.toLocaleString()} words
-              {countMessage ? ` · ${countMessage}` : ""}
-            </span>
-          </div>
-
-          <div className="ml-auto flex items-center gap-1.5">
-            {saveStatus === "saving" ? (
-              <>
-                <svg
-                  className="h-3.5 w-3.5 animate-spin text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  />
-                </svg>
-                <span className="text-xs text-gray-400">saving...</span>
-              </>
-            ) : null}
-
-            {saveStatus === "saved" ? (
-              <span className="text-xs text-emerald-500">Saved</span>
-            ) : null}
-
-            {saveStatus === "unsaved" ? (
-              <>
-                <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
-                <span className="text-xs text-gray-300">Unsaved</span>
-              </>
-            ) : null}
-          </div>
-        </div>
+        <span className={countClasses}>
+          {displayWordCount.toLocaleString()} words
+          {countMessage ? ` · ${countMessage}` : ""}
+        </span>
       </div>
 
       <input

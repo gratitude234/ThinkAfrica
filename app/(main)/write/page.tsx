@@ -17,13 +17,12 @@ import PublishDrawer from "./PublishDrawer";
 import WriteReadinessPanel from "./WriteReadinessPanel";
 import { ensureDraft, savePostReferences } from "./actions";
 import {
-  STARTER_TEMPLATES,
   WRITE_FORMATS,
   getResponseStarterTemplate,
   isPostType,
   isResponseIntent,
 } from "./writeConfig";
-import { composeContentWithSubtitle } from "./writeUtils";
+import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
 import type { EditorHandle } from "@/components/editor/Editor";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
@@ -180,7 +179,6 @@ export default function WritePage() {
   } | null>(null);
   const [loadingProfileInfo, setLoadingProfileInfo] = useState(true);
   const [postType, setPostType] = useState<PostType>(initialPostType);
-  const [showChooser, setShowChooser] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [selectedResponseIntent] = useState(() =>
     isResponseIntent(responseIntentParam)
@@ -221,7 +219,6 @@ export default function WritePage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const responseStarterAppliedRef = useRef(false);
   const topicStarterAppliedRef = useRef(false);
-  const chooserShownRef = useRef(false);
 
   useEffect(() => {
     if (typeParam === "research") {
@@ -524,10 +521,24 @@ export default function WritePage() {
     });
   }, []);
 
-  const handleEditorUpdate = useCallback((html: string, words: number) => {
-    setContent(html);
-    setWordCount(words);
-  }, []);
+  const handleEditorUpdate = useCallback(
+    (html: string, words: number) => {
+      setContent(html);
+      setWordCount(words);
+      void saveDraft(getCurrentData({ content: html }));
+    },
+    [getCurrentData, saveDraft]
+  );
+
+  const handleReferencesChange = useCallback(
+    (nextReferences: PostReferenceRecord[]) => {
+      setReferences(nextReferences);
+      if (publishDraftId) {
+        void savePostReferences({ postId: publishDraftId, references: nextReferences });
+      }
+    },
+    [publishDraftId]
+  );
 
   const handleMetadataChange = useCallback(
     (changes: {
@@ -584,23 +595,6 @@ export default function WritePage() {
     });
   }, []);
 
-  const hasExistingContext = Boolean(
-    draftParam || typeParam || starterParam || responseToSlug ||
-    responseToIdParam || responseIntentParam
-  );
-
-  // Show format chooser automatically for brand-new writes (no existing draft/context).
-  // Only [loadingDraft] in deps — hasExistingContext/initialData/localBackup are intentionally
-  // read once when loading resolves, not re-checked on every change.
-  useEffect(() => {
-    if (loadingDraft) return;
-    if (chooserShownRef.current) return;
-    chooserShownRef.current = true;
-    if (!hasExistingContext && !initialData && !localBackup) {
-      setShowChooser(true);
-    }
-  }, [loadingDraft]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Pick up a highlighted quote stored by HighlightShare when navigating from a post.
   useEffect(() => {
     if (loadingDraft) return;
@@ -609,7 +603,7 @@ export default function WritePage() {
       sessionStorage.removeItem("write_response_quote");
       setResponseQuote(quote);
     }
-  }, [loadingDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadingDraft]);
 
   const canOpenPublish =
     title.trim().length > 0 &&
@@ -628,6 +622,16 @@ export default function WritePage() {
           : null;
   const selectedPostType =
     WRITE_FORMATS.find((item) => item.type === postType) ?? WRITE_FORMATS[0];
+  // Lets the editor's references panel appear for organically long, structured
+  // pieces even before a format is chosen at publish — postType itself stays
+  // "blog" until the writer picks a format in the publish drawer.
+  const inferredLiveType = inferTypeFromContent(content, wordCount);
+  const editorReferencesType: PostType =
+    postType === "policy_brief" || postType === "research"
+      ? postType
+      : inferredLiveType === "policy_brief" || inferredLiveType === "research"
+        ? inferredLiveType
+        : postType;
   const wordProgress = Math.min(
     100,
     (wordCount / selectedPostType.minWords) * 100
@@ -686,33 +690,6 @@ export default function WritePage() {
     setIsDetailsOpen(false);
   };
 
-  const applyTemplate = (templateType: PostType) => {
-    if (templateType === "research") {
-      router.push("/submit/research");
-      return;
-    }
-
-    const template = STARTER_TEMPLATES[templateType];
-    const nextData = getCurrentData({
-      title: template.title,
-      subtitle: template.subtitle,
-      excerpt: template.excerpt,
-      content: template.content,
-      tags: template.tags,
-      postType: templateType,
-    });
-
-    setPostType(templateType);
-    setShowChooser(false);
-    setTitle(template.title);
-    setSubtitle(template.subtitle);
-    setExcerpt(template.excerpt);
-    setTags(template.tags);
-    setContent(template.content);
-    setWordCount(countWords(template.content));
-    void saveDraft(nextData);
-  };
-
   const runMobileToolbarAction = (action: MobileToolbarAction) => {
     if (action === "bold")    editorRef.current?.toggleBold();
     if (action === "italic")  editorRef.current?.toggleItalic();
@@ -759,6 +736,14 @@ export default function WritePage() {
 
   const showStructureStrip =
     starterParam === "1" || (!draftParam && wordCount === 0);
+  const hasContent = title.trim().length > 0 || wordCount > 0;
+  const handleCloseCanvas = () => {
+    if (hasContent) {
+      setShowCancelConfirm(true);
+      return;
+    }
+    router.push("/");
+  };
   const readinessPanel = (
     <WriteReadinessPanel
       postType={postType}
@@ -775,7 +760,6 @@ export default function WritePage() {
       wordCount={wordCount}
       estimatedReadTime={estimatedReadTime}
       wordProgress={wordProgress}
-      onChangeFormat={() => setShowChooser(true)}
     />
   );
 
@@ -796,75 +780,78 @@ export default function WritePage() {
         </div>
       ) : (
         <>
-          {/* Mobile header — single compact row */}
+          {/* Mobile header — close only when empty; Publish + save status once there's content */}
           <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 lg:hidden">
             <button
               type="button"
-              onClick={() => {
-                const hasContent = title.trim().length > 0 || wordCount > 0;
-                if (hasContent) { setShowCancelConfirm(true); return; }
-                router.push("/");
-              }}
-              className="text-sm font-medium text-gray-500"
+              onClick={handleCloseCanvas}
+              aria-label="Close"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
             >
-              Cancel
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-            <Link href="/" className="text-sm font-semibold text-gray-900">
-              Indegenius
-            </Link>
-            <button
-              type="button"
-              disabled={!canOpenPublish}
-              onClick={handleReadyToPublish}
-              className="text-sm font-semibold text-emerald-600 disabled:text-gray-300"
-            >
-              Publish
-            </button>
-          </div>
-          {/* Desktop header */}
-          <div className="mb-6 hidden items-center justify-between border-b border-gray-100 pb-4 lg:flex">
-            <Link href="/" className="text-sm font-semibold tracking-wide text-gray-900">
-              Indegenius
-            </Link>
-            <p className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
-              {saveStatusText}
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setFocusMode(true)}
-                title="Focus mode — hide distractions"
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:border-emerald-200 hover:text-emerald-700"
-              >
-                Focus
-              </button>
-              <Button
-                variant="ghost"
-                type="button"
-                onClick={() => {
-                  const hasContent = title.trim().length > 0 || wordCount > 0;
-                  if (hasContent) { setShowCancelConfirm(true); return; }
-                  router.push("/");
-                }}
-              >
-                Cancel
-              </Button>
-              <div className="group relative">
-                <Button
+            {hasContent ? (
+              <div className="flex items-center gap-3">
+                <span className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}>
+                  {saveStatusText}
+                </span>
+                <button
                   type="button"
-                  size="lg"
                   disabled={!canOpenPublish}
                   onClick={handleReadyToPublish}
+                  className="text-sm font-semibold text-emerald-600 disabled:text-gray-300"
                 >
                   Publish
-                </Button>
-                {!canOpenPublish && publishBlockReason ? (
-                  <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white shadow-lg group-hover:block">
-                    {publishBlockReason}
-                  </div>
-                ) : null}
+                </button>
               </div>
-            </div>
+            ) : null}
+          </div>
+          {/* Desktop header — same close-only-when-empty behavior */}
+          <div className="mb-6 hidden items-center justify-between border-b border-gray-100 pb-4 lg:flex">
+            <button
+              type="button"
+              onClick={handleCloseCanvas}
+              aria-label="Close"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            {hasContent ? (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFocusMode(true)}
+                  title="Focus mode — hide distractions"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" />
+                  </svg>
+                </button>
+                <p className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
+                  {saveStatusText}
+                </p>
+                <div className="group relative">
+                  <Button
+                    type="button"
+                    size="lg"
+                    disabled={!canOpenPublish}
+                    onClick={handleReadyToPublish}
+                  >
+                    Publish
+                  </Button>
+                  {!canOpenPublish && publishBlockReason ? (
+                    <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white shadow-lg group-hover:block">
+                      {publishBlockReason}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
         </>
       )}
@@ -909,107 +896,14 @@ export default function WritePage() {
 
       <div
         className={
-          showChooser || focusMode || sidebarCollapsed
+          focusMode || sidebarCollapsed
             ? ""
             : "grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]"
         }
       >
         <div className="min-w-0">
-      {showChooser ? (
-        <div className="py-6">
-          <div className="mb-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-brand">
-              Choose format
-            </p>
-            <h1 className="mt-2 text-2xl font-bold text-gray-900">
-              What are you creating?
-            </h1>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {WRITE_FORMATS.map((type) => {
-              const selected = postType === type.type;
-
-              return (
-                <button
-                  key={type.type}
-                  type="button"
-                  onClick={() => {
-                    if (type.type === "research") {
-                      router.push("/submit/research");
-                      return;
-                    }
-
-                    setPostType(type.type);
-                    setShowChooser(false);
-                    if (draftId) {
-                      void saveDraft(getCurrentData({ postType: type.type }));
-                    }
-                  }}
-                  className={`rounded-xl border bg-white p-5 text-left transition-[border-color,box-shadow,ring-color] hover:border-emerald-300 hover:ring-2 hover:ring-emerald-100 ${
-                    selected
-                      ? "border-emerald-brand ring-2 ring-emerald-100"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-base font-bold text-gray-900">
-                        {type.label}
-                      </p>
-                      <p className="mt-1 text-sm text-gray-500">{type.desc}</p>
-                      <p className="mt-3 hidden text-xs font-semibold uppercase tracking-wide text-emerald-700 sm:block">
-                        {type.signalLabel}
-                      </p>
-                      <p className="mt-1 hidden text-sm leading-6 text-gray-600 sm:block">
-                        {type.portfolioValue}
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full bg-canvas px-2.5 py-1 text-xs font-medium text-gray-600">
-                      min. {type.minWords.toLocaleString()} words
-                    </span>
-                  </div>
-                  <div className="hidden flex-wrap gap-2 text-xs text-gray-500 sm:flex">
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
-                      {type.readTime}
-                    </span>
-                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">
-                      {type.review}
-                    </span>
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">
-                      {type.requirementsSummary}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {!showChooser ? (
       <div className="space-y-4">
         <div>
-          {!focusMode ? (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand">
-                {selectedPostType.label}
-              </p>
-              <p className="mt-0.5 text-xs text-gray-500">
-                {selectedPostType.desc}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowChooser(true)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-emerald-200 hover:text-emerald-700"
-            >
-              Change format
-            </button>
-          </div>
-          ) : null}
-
           {!focusMode && inResponseToId && inResponseToTitle ? (
             <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
               <div className="min-w-0 flex-1">
@@ -1111,20 +1005,11 @@ export default function WritePage() {
             content={content}
             placeholder={getBodyPlaceholder(postType)}
             minWords={selectedPostType.minWords}
-            postType={postType}
+            postType={editorReferencesType}
             references={references}
-            onReferencesChange={setReferences}
+            onReferencesChange={handleReferencesChange}
             onUpdate={handleEditorUpdate}
             onSelectionUpdate={handleSelectionUpdate}
-            onAutoSave={async () => {
-              await saveDraft(getCurrentData());
-              if (publishDraftId) {
-                await savePostReferences({
-                  postId: publishDraftId,
-                  references,
-                });
-              }
-            }}
           />
           {!focusMode ? (
             <div
@@ -1220,10 +1105,9 @@ export default function WritePage() {
           ) : null}
         </div>
       </div>
-      ) : null}
         </div>
 
-        {!showChooser && !focusMode ? (
+        {!focusMode ? (
           sidebarCollapsed ? (
             <div className="hidden lg:block">
               <button
@@ -1350,10 +1234,8 @@ export default function WritePage() {
             initialExcerpt={excerpt}
             initialPostType={postType}
             initialReferences={references}
-            initialCoAuthors={coAuthors}
             inResponseTo={inResponseToId}
             onMetadataChange={handleMetadataChange}
-            onCoAuthorsChange={setCoAuthors}
           />
           <ProfileGate
             open={isProfileGateOpen}

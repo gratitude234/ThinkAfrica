@@ -612,7 +612,6 @@ export default function EditForm({
               references={references}
               onReferencesChange={setReferences}
               onUpdate={handleEditorUpdate}
-              onAutoSave={() => doSave(true)}
               onSelectionUpdate={handleSelectionUpdate}
             />
           </div>

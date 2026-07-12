@@ -28,7 +28,6 @@ interface WriteReadinessPanelProps {
   wordCount: number;
   estimatedReadTime: number;
   wordProgress: number;
-  onChangeFormat: () => void;
 }
 
 function stripHtml(value: string) {
@@ -67,7 +66,6 @@ export default function WriteReadinessPanel({
   wordCount,
   estimatedReadTime,
   wordProgress,
-  onChangeFormat,
 }: WriteReadinessPanelProps) {
   const completedTrackedRef = useRef<Set<string>>(new Set());
   const selectedFormat =
@@ -215,13 +213,9 @@ export default function WriteReadinessPanel({
           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
             {selectedFormat.label}
           </span>
-          <button
-            type="button"
-            onClick={onChangeFormat}
-            className="text-xs font-medium text-gray-500 transition-colors hover:text-emerald-700"
-          >
-            Change
-          </button>
+          <span className="text-xs font-medium text-gray-400">
+            Suggested from your words
+          </span>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2">
