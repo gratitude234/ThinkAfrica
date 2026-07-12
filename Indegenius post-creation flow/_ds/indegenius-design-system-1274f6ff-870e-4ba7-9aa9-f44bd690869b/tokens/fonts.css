@@ -1,0 +1,13 @@
+/* Indegenius — Font faces
+   Real webfonts used by the product: Bodoni Moda (display/serif) + Inter (sans/UI), both
+   loaded via next/font/google in app/layout.tsx (variables --font-bodoni / --font-inter).
+   No font binaries live in the source repo (next/font fetches + self-hosts them at build
+   time), so this design system links the same families straight from Google Fonts — these
+   are the exact families the product ships, not a substitution. */
+
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;0,6..96,700;1,6..96,400;1,6..96,600&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --font-bodoni: "Bodoni Moda", Georgia, serif;
+  --font-inter: "Inter", system-ui, -apple-system, sans-serif;
+}

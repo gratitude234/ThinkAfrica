@@ -1,0 +1,43 @@
+/* Indegenius — Typography tokens */
+
+:root {
+  /* Font families */
+  --font-display: var(--font-bodoni);   /* headlines, article titles, pull-quotes, drop caps */
+  --font-sans: var(--font-inter);       /* everything else — UI, body copy, labels */
+
+  /* Type scale (px, matches the product's literal Tailwind arbitrary values —
+     not snapped to a 4/8px grid) */
+  --text-display-xl: 64px;   /* landing hero h1, desktop */
+  --text-display-lg: 40px;   /* landing hero h1, mobile / section h2 desktop */
+  --text-display-md: 32px;   /* section h2 */
+  --text-display-sm: 26px;   /* card lead headline */
+  --text-display-xs: 21px;   /* editorial post-card headline */
+
+  --text-article-drop-cap: 5rem;
+
+  --text-2xl: 28px;
+  --text-xl: 22px;
+  --text-lg: 18px;
+  --text-md: 16px;
+  --text-base: 15px;
+  --text-sm: 13px;
+  --text-xs: 11.5px;
+  --text-2xs: 10.5px;   /* eyebrow labels, badges */
+
+  /* Line heights */
+  --leading-tight: 1.14;
+  --leading-snug: 1.24;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+  --leading-article: 1.84;   /* serif article body copy */
+
+  /* Letter spacing */
+  --tracking-eyebrow: 0.18em;   /* uppercase kicker labels */
+  --tracking-normal: 0;
+
+  /* Weights */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+}

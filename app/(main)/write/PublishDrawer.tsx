@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
@@ -17,7 +17,6 @@ import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary, isLowQualityTitle } from "@/lib/postQuality";
 import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
 import { publishPost } from "./actions";
-import { WRITE_FORMATS } from "./writeConfig";
 
 interface PublishDrawerProps {
   open: boolean;
@@ -37,13 +36,65 @@ interface PublishDrawerProps {
   onMetadataChange?: (changes: { postType?: PostType; tags?: string[] }) => void;
 }
 
-const POST_TYPES: PostType[] = ["blog", "essay", "policy_brief"];
+const POST_TYPES: Array<"blog" | "essay" | "policy_brief"> = ["blog", "essay", "policy_brief"];
 
 const CARD_LABELS: Record<PostType, string> = {
   blog: "Quick Take",
   essay: "Essay",
   policy_brief: "Policy Brief",
   research: "Research",
+};
+
+const CARD_META: Record<
+  "blog" | "essay" | "policy_brief",
+  {
+    description: string;
+    icon: ReactNode;
+    iconWrapClass: string;
+    selectedCardClass: string;
+    selectedRadioClass: string;
+    selectedDotClass: string;
+  }
+> = {
+  blog: {
+    description: "A short, sharp reaction — 2 to 5 minutes to read.",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 3L5 14h6l-1 7 9-11h-6z" />
+      </svg>
+    ),
+    iconWrapClass: "bg-green-tint text-emerald-brand",
+    selectedCardClass: "border-emerald-brand bg-green-tint/40",
+    selectedRadioClass: "border-emerald-brand",
+    selectedDotClass: "bg-emerald-brand",
+  },
+  essay: {
+    description: "A developed argument, built across sections.",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 3h7l4 4v14H7z" />
+        <path d="M9 12h6M9 16h6M9 8h3" />
+      </svg>
+    ),
+    iconWrapClass: "bg-gold-tint text-gold-ink",
+    selectedCardClass: "border-gold-ink bg-gold-tint/40",
+    selectedRadioClass: "border-gold-ink",
+    selectedDotClass: "bg-gold-ink",
+  },
+  policy_brief: {
+    description: "A structured recommendation, grounded in evidence.",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="6" y="4" width="12" height="17" rx="2" />
+        <path d="M9 4h6v3H9z" />
+        <path d="M9 13.5l2 2 4-4.5" />
+      </svg>
+    ),
+    iconWrapClass: "bg-purple-tint text-purple-accent",
+    selectedCardClass: "border-purple-accent bg-purple-tint/40",
+    selectedRadioClass: "border-purple-accent",
+    selectedDotClass: "bg-purple-accent",
+  },
 };
 
 interface ProfileRow {
@@ -255,17 +306,20 @@ export default function PublishDrawer({
       />
 
       <div
-        className="absolute inset-x-0 bottom-0 flex max-h-[90vh] flex-col rounded-t-3xl bg-white shadow-2xl sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-full sm:w-[420px] sm:rounded-none"
+        className="absolute inset-x-0 bottom-0 flex max-h-[90vh] flex-col rounded-t-[20px] bg-white shadow-2xl sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-full sm:w-[420px] sm:rounded-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="publish-drawer-title"
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-5 py-4">
+        <div className="mx-auto mt-2.5 h-1 w-9 shrink-0 rounded-full bg-gray-300 sm:hidden" />
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-5 pb-4 pt-3">
           <div>
-            <h2 id="publish-drawer-title" className="text-lg font-semibold text-gray-900">
-              Choose a format
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+              Confirm format
+            </p>
+            <h2 id="publish-drawer-title" className="mt-1 text-lg font-semibold text-gray-900">
+              Ready to publish
             </h2>
-            <p className="text-xs text-gray-500">Pick the format that fits, then publish.</p>
           </div>
           <button
             type="button"
@@ -283,7 +337,7 @@ export default function PublishDrawer({
           <div className="space-y-6 px-5 py-5">
             <section className="space-y-2.5">
               {POST_TYPES.map((type) => {
-                const format = WRITE_FORMATS.find((item) => item.type === type)!;
+                const meta = CARD_META[type];
                 const selected = postType === type;
 
                 return (
@@ -291,25 +345,33 @@ export default function PublishDrawer({
                     key={type}
                     type="button"
                     onClick={() => handleSelectFormat(type)}
-                    className={`w-full rounded-xl border bg-white px-4 py-3.5 text-left transition-colors ${
-                      selected
-                        ? "border-emerald-brand bg-emerald-50/60 ring-2 ring-emerald-100"
-                        : "border-gray-200 hover:border-emerald-300"
+                    aria-pressed={selected}
+                    className={`flex w-full items-center gap-3 rounded-xl border bg-white px-3.5 py-3 text-left transition-colors ${
+                      selected ? meta.selectedCardClass : "border-gray-200 hover:border-gray-300"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-gray-900">
+                    <span
+                      className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg ${meta.iconWrapClass}`}
+                    >
+                      {meta.icon}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14.5px] font-semibold text-gray-900">
                         {CARD_LABELS[type]}
-                      </p>
-                      {type === inferredType ? (
-                        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                          Suggested
-                        </span>
+                      </span>
+                      <span className="mt-0.5 block text-xs leading-5 text-gray-500">
+                        {meta.description}
+                      </span>
+                    </span>
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                        selected ? meta.selectedRadioClass : "border-gray-300"
+                      }`}
+                    >
+                      {selected ? (
+                        <span className={`h-2.5 w-2.5 rounded-full ${meta.selectedDotClass}`} />
                       ) : null}
-                    </div>
-                    <p className="mt-1 text-xs leading-5 text-gray-500">
-                      {format.requirementsSummary}
-                    </p>
+                    </span>
                   </button>
                 );
               })}

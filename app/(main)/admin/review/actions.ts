@@ -6,6 +6,7 @@ import {
   recordAdminAuditEvent,
 } from "@/lib/adminAccess";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
+import { logPushResult, sendPushNotification } from "@/lib/push";
 import {
   getEditorialReviewState,
   publishReviewedPost,
@@ -344,6 +345,21 @@ export async function submitEditorialDecision(input: {
           idempotencyKey: `post-published:${input.postId}:${post.author_id}`,
         });
         logEmailResult(`post_published:${input.postId}:${post.author_id}`, emailResult);
+
+        const pushResult = await sendPushNotification({
+          recipientId: post.author_id,
+          title: "Your submission is published",
+          body: `Your ${post.type === "policy_brief" ? "policy brief" : post.type} "${
+            post.title
+          }" has been accepted and published${
+            publication?.citationId ? `. Citation ID: ${publication.citationId}` : "."
+          }`,
+          path: publication?.citationId
+            ? `/publication/${publication.citationId}`
+            : `/post/${post.slug}`,
+          preferenceKey: "push_published",
+        });
+        logPushResult(`post_published:${input.postId}:${post.author_id}`, pushResult);
       }
 
       await recordAdminAuditEvent({
@@ -414,6 +430,20 @@ export async function submitEditorialDecision(input: {
         idempotencyKey: `revision-requested:${input.postId}:${post.author_id}:${post.current_round}`,
       });
       logEmailResult(`revision_requested:${input.postId}:${post.author_id}`, emailResult);
+
+      const pushResult = await sendPushNotification({
+        recipientId: post.author_id,
+        title: "Revision requested",
+        body: input.notes?.trim()
+          ? `Revision requested for "${post.title}": ${input.notes.trim()}`
+          : `Revision requested for "${post.title}". Visit your dashboard for the editor decision and reviewer notes.`,
+        path:
+          post.type === "research"
+            ? `/submit/research?draft=${post.id}`
+            : `/edit/${post.slug}`,
+        preferenceKey: "push_published",
+      });
+      logPushResult(`revision_requested:${input.postId}:${post.author_id}`, pushResult);
     }
 
     await recordAdminAuditEvent({
@@ -464,6 +494,17 @@ export async function submitEditorialDecision(input: {
       idempotencyKey: `post-rejected:${input.postId}:${post.author_id}:${post.current_round}`,
     });
     logEmailResult(`post_rejected:${input.postId}:${post.author_id}`, emailResult);
+
+    const pushResult = await sendPushNotification({
+      recipientId: post.author_id,
+      title: "Editorial decision recorded",
+      body: input.notes?.trim()
+        ? `Your submission "${post.title}" was rejected: ${input.notes.trim()}`
+        : `Your submission "${post.title}" was rejected. Visit your dashboard for the editorial decision.`,
+      path: "/dashboard",
+      preferenceKey: "push_published",
+    });
+    logPushResult(`post_rejected:${input.postId}:${post.author_id}`, pushResult);
   }
 
   await recordAdminAuditEvent({

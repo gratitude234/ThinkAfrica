@@ -15,6 +15,7 @@ export interface NotificationPrefs {
   email_digest: boolean;
   email_account_security: boolean;
   email_profile_reminders: boolean;
+  push_published: boolean;
 }
 
 const TOGGLE_ROWS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
@@ -27,6 +28,7 @@ const TOGGLE_ROWS: { key: keyof NotificationPrefs; label: string; description: s
   { key: "email_digest", label: "Weekly digest", description: "A weekly summary of top content" },
   { key: "email_account_security", label: "Account and trust updates", description: "Verification, role, and account status emails" },
   { key: "email_profile_reminders", label: "Profile reminders", description: "Occasional reminders to complete your public profile" },
+  { key: "push_published", label: "Push: submission decisions", description: "Browser push when your submission is published, rejected, or sent back for revision (requires enabling notifications)" },
 ];
 
 interface Props {
@@ -60,7 +62,7 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
       <div className="max-w-2xl space-y-6">
         <div>
           <h2 className="mb-4 text-base font-semibold text-gray-900">
-            Email notifications
+            Notifications
           </h2>
           <div className="space-y-3">
             {TOGGLE_ROWS.map(({ key, label, description }) => {

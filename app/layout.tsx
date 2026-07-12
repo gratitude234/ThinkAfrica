@@ -3,6 +3,7 @@ import { Inter, Bodoni_Moda } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
+import ServiceWorkerRegister from "@/components/push/ServiceWorkerRegister";
 
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
@@ -80,7 +81,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${bodoniModa.variable} ${inter.variable}`}>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        {children}
+        <ServiceWorkerRegister />
+      </body>
       {GA_MEASUREMENT_ID ? <GoogleAnalytics gaId={GA_MEASUREMENT_ID} /> : null}
     </html>
   );

@@ -10,6 +10,7 @@ import { trackActivationEvent } from "@/lib/activationEvents";
 import { AFRICAN_COUNTRIES } from "@/lib/academicIdentity";
 import { INTEREST_OPTIONS, MIN_INTERESTS, MAX_INTERESTS } from "@/lib/interests";
 import { PersonaIcon } from "@/lib/personaIcons";
+import NotificationPermissionPrompt from "@/components/push/NotificationPermissionPrompt";
 import {
   PROFILE_TYPE_OPTIONS,
   type ProfileType,
@@ -99,6 +100,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<Step>("persona");
   const [ready, setReady] = useState(false);
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
 
   const [profileType, setProfileType] = useState<ProfileType | null>(null);
   const [secondaryProfileTypes, setSecondaryProfileTypes] = useState<ProfileType[]>([]);
@@ -388,12 +390,19 @@ export default function OnboardingPage() {
       .from("profiles")
       .update({ onboarding_completed: true })
       .eq("id", userId);
+    setLoading(false);
+
     if (!alreadyCompleted) {
       trackActivationEvent({ event: "onboarding_completed" });
+      setShowPushPrompt(true);
+      return;
     }
-    setLoading(false);
-    router.push(alreadyCompleted ? "/" : "/?welcome=1");
+    router.push("/");
   };
+
+  const finishOnboarding = useCallback(() => {
+    router.push("/?welcome=1");
+  }, [router]);
 
   const goBack = () => {
     goToStep(STEP_ORDER[Math.max(currentIndex - 1, 0)]);
@@ -728,6 +737,9 @@ export default function OnboardingPage() {
           </button>
         </div>
       </div>
+      {showPushPrompt && userId ? (
+        <NotificationPermissionPrompt userId={userId} onContinue={finishOnboarding} />
+      ) : null}
     </div>
   );
 }

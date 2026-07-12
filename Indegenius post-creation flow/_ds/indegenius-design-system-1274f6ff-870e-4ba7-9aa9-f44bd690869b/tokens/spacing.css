@@ -1,0 +1,40 @@
+/* Indegenius — Spacing, radius, shadow tokens */
+
+:root {
+  /* Spacing scale (4px base, matches Tailwind defaults used throughout) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* Corner radius scale */
+  --radius-sm: 8px;     /* buttons, inputs — rounded-lg */
+  --radius-md: 10px;    /* nav pills, rail cards — rounded-[10px] */
+  --radius-lg: 12px;    /* standard cards — rounded-xl */
+  --radius-xl: 16px;    /* large cards, sheets, dual-CTA blocks — rounded-2xl */
+  --radius-full: 9999px; /* pills, avatars, badges */
+
+  /* Shadows — the product favors near-invisible resting shadows and a soft lift on hover,
+     never heavy drop shadows */
+  --shadow-resting: 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-card-hover: 0 8px 20px -4px rgba(0, 0, 0, 0.08), 0 2px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-featured-hover: 0 14px 32px -6px rgba(0, 0, 0, 0.10);
+  --shadow-popover: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-modal: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-fab: 0 12px 24px -8px rgba(16, 185, 129, 0.65);
+
+  /* Motion — subtle, editorial. Rises/fades on entrance, a small hover lift on cards.
+     No bounce, no springy overshoot, no infinite decorative loops besides "live" pulses. */
+  --ease-editorial: cubic-bezier(0.25, 0, 0, 1); /* @kind other */
+  --duration-fast: 150ms; /* @kind other */
+  --duration-base: 200ms; /* @kind other */
+  --duration-slow: 550ms; /* @kind other */
+}

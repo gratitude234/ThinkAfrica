@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/indegenius-design-system-1274f6ff-870e-4ba7-9aa9-f44bd690869b/styles.css" />
+  <style>doc-page:not(:defined){visibility:hidden}</style>
+</helmet>
+
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.75in" orientation="portrait" hint-size="8.5in,11in">
+
+  <div style="font-family:var(--font-sans);">
+    <div style="font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.18em; color:var(--text-ink-faint); margin-bottom:10px;">Indegenius · Product prototype</div>
+    <h1 style="font-family:var(--font-display); font-size:32px; font-weight:600; color:var(--text-ink); line-height:1.2; margin:0 0 10px;">Post-creation flow</h1>
+    <p style="font-size:14px; color:var(--text-ink-muted); line-height:1.6; max-width:520px; margin:0 0 12px;">Mobile-first flow for starting a new piece of writing on Indegenius. Tapping Create goes straight into a blank canvas — no format-picker menu first. A separate &quot;Upload research paper&quot; option handles PDF-based research submissions. Once the writer has typed something, a floating toolbar and Publish action appear, and Publish opens a drawer where the writer confirms the format — Quick Take, Essay, or Policy Brief — before sending it live.</p>
+    <p style="font-size:12.5px; color:var(--text-ink-faint); margin:0;">Three screens follow: (1) blank canvas, (2) writing with the floating toolbar, (3) the publish drawer.</p>
+  </div>
+
+  <div style="break-inside:avoid; break-before:page; margin-top:8px;">
+    <div style="font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.16em; color:var(--brand-emerald); margin-bottom:6px;">Screen 1</div>
+    <h2 style="font-family:var(--font-sans); font-size:19px; font-weight:600; color:var(--text-ink); margin:0 0 6px;">Blank canvas</h2>
+    <p style="font-size:13px; color:var(--text-ink-muted); line-height:1.55; max-width:480px; margin:0 0 18px;">Create opens directly into an empty title + body — no intermediate menu. &quot;Upload research paper&quot; sits apart as its own entry point, since research is a PDF upload rather than typed writing.</p>
+    <img src="screenshots/screen-1-blank.png" alt="Blank writing canvas with Upload research paper option" style="display:block; width:320px; height:auto; margin:0 auto; border-radius:14px; box-shadow:var(--shadow-featured-hover);" />
+  </div>
+
+  <div style="break-inside:avoid; break-before:page; margin-top:8px;">
+    <div style="font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.16em; color:var(--brand-emerald); margin-bottom:6px;">Screen 2</div>
+    <h2 style="font-family:var(--font-sans); font-size:19px; font-weight:600; color:var(--text-ink); margin:0 0 6px;">Writing, with the floating toolbar</h2>
+    <p style="font-size:13px; color:var(--text-ink-muted); line-height:1.55; max-width:480px; margin:0 0 18px;">As soon as there is content, a formatting toolbar (bold, list, image, link) floats above the keyboard, a subtle autosave label appears, and Publish becomes available in the top bar.</p>
+    <img src="screenshots/screen-2-writing.png" alt="Writing canvas with sample text and floating formatting toolbar" style="display:block; width:320px; height:auto; margin:0 auto; border-radius:14px; box-shadow:var(--shadow-featured-hover);" />
+  </div>
+
+  <div style="break-inside:avoid; break-before:page; margin-top:8px;">
+    <div style="font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.16em; color:var(--brand-emerald); margin-bottom:6px;">Screen 3</div>
+    <h2 style="font-family:var(--font-sans); font-size:19px; font-weight:600; color:var(--text-ink); margin:0 0 6px;">Publish drawer</h2>
+    <p style="font-size:13px; color:var(--text-ink-muted); line-height:1.55; max-width:480px; margin:0 0 18px;">Once the writer taps Publish, a drawer asks them to confirm the format — Quick Take, Essay, or Policy Brief — each color-coded per the brand's post-type identity. Publish stays disabled until a format is chosen.</p>
+    <img src="screenshots/screen-3-publish.png" alt="Publish drawer with Quick Take, Essay and Policy Brief format options" style="display:block; width:320px; height:auto; margin:0 auto; border-radius:14px; box-shadow:var(--shadow-featured-hover);" />
+  </div>
+
+</x-import>
+
+</x-dc>
+<script>
+addEventListener('load', () => {
+  (async () => {
+    try { await document.fonts.ready; } catch (e) {}
+    const imgs = Array.from(document.images).filter((i) => !i.complete);
+    await Promise.race([
+      Promise.allSettled(imgs.map((i) => i.decode())),
+      new Promise((r) => setTimeout(r, 8000)),
+    ]);
+    setTimeout(() => window.print(), 500);
+  })();
+});
+</script>
+</body>
+</html>

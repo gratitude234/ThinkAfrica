@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/indegenius-design-system-1274f6ff-870e-4ba7-9aa9-f44bd690869b/styles.css" />
+  <style>
+    .idg-title-input::placeholder, .idg-body-input::placeholder { color: var(--text-ink-faint); opacity: 1; }
+    @keyframes idg-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    @keyframes idg-toast-up { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    @keyframes idg-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</helmet>
+
+<div style="min-height:100vh; background:var(--surface-canvas); display:flex; flex-direction:column; align-items:center; padding:56px 20px 72px; font-family:var(--font-sans); box-sizing:border-box;">
+
+  <div style="max-width:420px; text-align:center; margin-bottom:32px;">
+    <div style="font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.18em; color:var(--text-ink-faint); margin-bottom:10px;">Post-creation flow</div>
+    <div style="font-family:var(--font-display); font-size:28px; font-weight:600; color:var(--text-ink); line-height:1.24; margin-bottom:8px;">Blank canvas to published</div>
+    <div style="font-size:14px; color:var(--text-ink-muted); line-height:1.5;">Tap Create and land straight in the writing canvas — no format picker first. Type to see the toolbar and Publish appear live, then confirm a format in the drawer.</div>
+  </div>
+
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ deviceWidth }}" height="{{ deviceHeight }}" keyboard="{{ showKeyboard }}" hint-size="390px,844px">
+
+    <div data-screen-label="{{ screenLabel }}" style="position:relative; height:100%; display:flex; flex-direction:column; background:#fff; overflow:hidden;">
+
+      <!-- Top bar -->
+      <div style="flex-shrink:0; height:52px; display:flex; align-items:center; justify-content:space-between; padding:62px 10px 0 6px; box-sizing:content-box; border-bottom:1px solid var(--border-soft); background:#fff;">
+        <button onClick="{{ jumpBlank }}" aria-label="Close" style="width:36px; height:36px; border-radius:8px; border:none; background:transparent; display:flex; align-items:center; justify-content:center; color:var(--text-ink-muted); cursor:pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+
+        <sc-if value="{{ hasContent }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-size:12.5px; color:var(--text-ink-faint); min-width:44px; text-align:right;">{{ savingLabel }}</span>
+            <button onClick="{{ openSheet }}" style="padding:8px 16px; border-radius:8px; border:none; background:var(--brand-emerald); color:#fff; font-family:var(--font-sans); font-size:13.5px; font-weight:600; cursor:pointer;">Publish</button>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- Upload research paper — separate entry, only before any content exists -->
+      <sc-if value="{{ showUpload }}" hint-placeholder-val="{{ true }}">
+        <div style="flex-shrink:0; display:flex; justify-content:flex-end; padding:12px 16px 0;">
+          <button style="display:flex; align-items:center; gap:6px; padding:7px 13px; border-radius:999px; border:1px solid var(--border-default); background:#fff; color:var(--text-ink-muted); font-family:var(--font-sans); font-size:12.5px; font-weight:500; cursor:pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M12 4l-4 4M12 4l4 4" /><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+            Upload research paper
+          </button>
+        </div>
+      </sc-if>
+
+      <!-- Writing canvas -->
+      <div style="flex:1; overflow-y:auto; padding:14px 20px 32px; box-sizing:border-box;">
+        <input
+          class="idg-title-input"
+          value="{{ title }}"
+          onChange="{{ onTitle }}"
+          placeholder="Title"
+          style="display:block; width:100%; border:none; outline:none; background:transparent; font-family:var(--font-display); font-size:30px; font-weight:600; color:var(--text-ink); line-height:1.24; margin-bottom:14px; padding:0;"
+        />
+        <textarea
+          class="idg-body-input"
+          ref="{{ bodyRef }}"
+          value="{{ body }}"
+          onInput="{{ onBody }}"
+          placeholder="Start writing your quick take, essay, or policy brief…"
+          rows="1"
+          style="display:block; width:100%; border:none; outline:none; background:transparent; resize:none; overflow:hidden; font-family:var(--font-display); font-size:18px; color:var(--text-ink); line-height:1.72; padding:0;"
+        ></textarea>
+      </div>
+
+      <!-- Floating formatting toolbar -->
+      <sc-if value="{{ showToolbar }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ toolbarContainerStyle }}">
+          <button style="width:38px; height:38px; border:none; background:transparent; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--text-ink); cursor:pointer;" aria-label="Bold">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5h6a3.2 3.2 0 010 6.4H7z" /><path d="M7 11.4h6.5a3.3 3.3 0 010 6.6H7z" /></svg>
+          </button>
+          <button style="width:38px; height:38px; border:none; background:transparent; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--text-ink-muted); cursor:pointer;" aria-label="Bulleted list">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none" /><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none" /><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none" /><path d="M9 6h11M9 12h11M9 18h11" /></svg>
+          </button>
+          <button style="width:38px; height:38px; border:none; background:transparent; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--text-ink-muted); cursor:pointer;" aria-label="Insert image">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5" /><circle cx="8.5" cy="10" r="1.4" /><path d="M21 15.5l-5-4.5-4.5 4-2.5-2-5 4.5" /></svg>
+          </button>
+          <button style="width:38px; height:38px; border:none; background:transparent; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--text-ink-muted); cursor:pointer;" aria-label="Insert link">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 14.5l5-5" /><path d="M11 6.3l0.9-0.9a3.7 3.7 0 015.2 5.2l-1 1" /><path d="M13 17.7l-0.9 0.9a3.7 3.7 0 01-5.2-5.2l1-1" /></svg>
+          </button>
+        </div>
+      </sc-if>
+
+      <!-- Publish drawer -->
+      <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeSheet }}" style="position:absolute; inset:0; background:rgba(17,24,39,0.4); z-index:30; animation:idg-fade-in 180ms var(--ease-editorial);">
+          <div onClick="{{ stopProp }}" style="position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:20px 20px 0 0; box-shadow:var(--shadow-modal); padding:10px 20px 26px; animation:idg-sheet-up 300ms var(--ease-editorial); box-sizing:border-box;">
+            <div style="width:36px; height:4px; border-radius:999px; background:var(--gray-300); margin:4px auto 18px;"></div>
+            <div style="font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.16em; color:var(--text-ink-faint); margin-bottom:6px;">Confirm format</div>
+            <div style="font-family:var(--font-sans); font-size:19px; font-weight:600; color:var(--text-ink); margin-bottom:16px;">Ready to publish</div>
+
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div onClick="{{ selectQuick }}" style="{{ qt.card }}">
+                <div style="{{ qt.icon }}">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 14h6l-1 7 9-11h-6z" /></svg>
+                </div>
+                <div style="flex:1;">
+                  <div style="font-size:14.5px; font-weight:600; color:var(--text-ink);">Quick Take</div>
+                  <div style="font-size:12.5px; color:var(--text-ink-muted); margin-top:2px;">A short, sharp reaction — 2 to 5 minutes to read.</div>
+                </div>
+                <div style="{{ qt.radio }}"><div style="{{ qt.dot }}"></div></div>
+              </div>
+
+              <div onClick="{{ selectEssay }}" style="{{ es.card }}">
+                <div style="{{ es.icon }}">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z" /><path d="M9 12h6M9 16h6M9 8h3" /></svg>
+                </div>
+                <div style="flex:1;">
+                  <div style="font-size:14.5px; font-weight:600; color:var(--text-ink);">Essay</div>
+                  <div style="font-size:12.5px; color:var(--text-ink-muted); margin-top:2px;">A developed argument, built across sections.</div>
+                </div>
+                <div style="{{ es.radio }}"><div style="{{ es.dot }}"></div></div>
+              </div>
+
+              <div onClick="{{ selectPolicy }}" style="{{ pb.card }}">
+                <div style="{{ pb.icon }}">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4h6v3H9z" /><path d="M9 13.5l2 2 4-4.5" /></svg>
+                </div>
+                <div style="flex:1;">
+                  <div style="font-size:14.5px; font-weight:600; color:var(--text-ink);">Policy Brief</div>
+                  <div style="font-size:12.5px; color:var(--text-ink-muted); margin-top:2px;">A structured recommendation, grounded in evidence.</div>
+                </div>
+                <div style="{{ pb.radio }}"><div style="{{ pb.dot }}"></div></div>
+              </div>
+            </div>
+
+            <button onClick="{{ doPublish }}" disabled="{{ publishDisabled }}" style="{{ publishBtnStyle }}">{{ publishLabel }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- Toast -->
+      <sc-if value="{{ toastVisible }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; left:50%; bottom:28px; transform:translateX(-50%); background:var(--gray-900); color:#fff; font-family:var(--font-sans); font-size:13.5px; font-weight:500; padding:11px 18px; border-radius:999px; box-shadow:var(--shadow-popover); white-space:nowrap; z-index:40; animation:idg-toast-up 220ms ease-out;">{{ toastMsg }}</div>
+      </sc-if>
+
+    </div>
+  </x-import>
+
+  <div style="margin-top:28px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+    <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.14em; color:var(--text-ink-faint);">Jump to</div>
+    <div style="display:flex; gap:8px;">
+      <button onClick="{{ jumpBlank }}" style="{{ step1Style }}">1 · Blank canvas</button>
+      <button onClick="{{ jumpWriting }}" style="{{ step2Style }}">2 · Writing</button>
+      <button onClick="{{ jumpPublish }}" style="{{ step3Style }}">3 · Publish sheet</button>
+    </div>
+    <div style="max-width:340px; text-align:center; font-size:12.5px; color:var(--text-ink-faint); line-height:1.5; margin-top:4px;">Or type directly into the canvas above — the toolbar, autosave and Publish button respond live to real input.</div>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 720, &quot;height&quot;: 980}, &quot;startScreen&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;blank&quot;, &quot;options&quot;: [&quot;blank&quot;, &quot;writing&quot;, &quot;publish&quot;], &quot;tsType&quot;: &quot;'blank'|'writing'|'publish'&quot;, &quot;section&quot;: &quot;Behavior&quot;}, &quot;toolbarStyle&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;bar&quot;, &quot;options&quot;: [&quot;bar&quot;, &quot;pill&quot;], &quot;tsType&quot;: &quot;'bar'|'pill'&quot;, &quot;section&quot;: &quot;Behavior&quot;}, &quot;requireFormatPick&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot;}}">
+const SAMPLE_TITLE = "Why African Universities Rarely Cite Each Other";
+const SAMPLE_BODY = "A first-year law student in Accra can name three American legal theorists before she can name one scholar at the University of Ibadan. That is not a curriculum accident — it is a citation problem.\n\nCross-border academic exchange within the continent remains rare, not for lack of ideas but for lack of infrastructure connecting them. Journals are siloed by country, institutional repositories rarely interlink, and most undergraduate research never leaves the department that produced it.\n\nIf we want African scholarship to argue with itself before it argues with anyone else, the first fix is embarrassingly simple: read each other.";
+
+const FORMAT_LABELS = { quick_take: 'Quick Take', essay: 'Essay', policy_brief: 'Policy Brief' };
+const FORMAT_COLORS = {
+  quick_take: { fg: 'var(--type-blog)', bg: 'var(--type-blog-bg)' },
+  essay: { fg: 'var(--type-essay)', bg: 'var(--type-essay-bg)' },
+  policy_brief: { fg: 'var(--type-policy)', bg: 'var(--type-policy-bg)' },
+};
+
+class Component extends DCLogic {
+  state = {
+    title: '',
+    body: '',
+    sheetOpen: false,
+    format: null,
+    savingState: null,
+    toastVisible: false,
+    toastMsg: '',
+  };
+
+  bodyRef = React.createRef();
+
+  componentDidMount() {
+    const start = this.props.startScreen ?? 'blank';
+    if (start === 'writing') this.jumpWriting();
+    else if (start === 'publish') this.jumpPublish();
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (prevState.body !== this.state.body && this.bodyRef.current) {
+      const el = this.bodyRef.current;
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+  }
+
+  _touch() {
+    this.setState({ savingState: 'saving' });
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this.setState({ savingState: 'saved' }), 700);
+  }
+
+  setTitle = (e) => {
+    this.setState({ title: e.target.value });
+    this._touch();
+  };
+
+  setBody = (e) => {
+    this.setState({ body: e.target.value });
+    this._touch();
+  };
+
+  openSheet = () => {
+    this.setState((s) => ({
+      sheetOpen: true,
+      format: (this.props.requireFormatPick === false && !s.format) ? 'quick_take' : s.format,
+    }));
+  };
+
+  closeSheet = () => this.setState({ sheetOpen: false });
+  stopProp = (e) => e.stopPropagation();
+
+  selectQuick = () => this.setState({ format: 'quick_take' });
+  selectEssay = () => this.setState({ format: 'essay' });
+  selectPolicy = () => this.setState({ format: 'policy_brief' });
+
+  doPublish = () => {
+    if (!this.state.format) return;
+    const label = FORMAT_LABELS[this.state.format];
+    this.setState({ sheetOpen: false, toastVisible: true, toastMsg: `Published as ${label}` });
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => this.setState({ toastVisible: false }), 3000);
+  };
+
+  jumpBlank = () => {
+    clearTimeout(this._saveTimer);
+    this.setState({ title: '', body: '', sheetOpen: false, format: null, savingState: null, toastVisible: false });
+  };
+
+  jumpWriting = () => {
+    this.setState({ title: SAMPLE_TITLE, body: SAMPLE_BODY, sheetOpen: false, savingState: 'saved' });
+  };
+
+  jumpPublish = () => {
+    this.setState((s) => ({
+      title: s.title || SAMPLE_TITLE,
+      body: s.body || SAMPLE_BODY,
+      savingState: 'saved',
+      sheetOpen: true,
+    }));
+  };
+
+  cardStyle(key) {
+    const selected = this.state.format === key;
+    const c = FORMAT_COLORS[key];
+    return {
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '11px 13px',
+      borderRadius: 12,
+      border: selected ? `1.5px solid ${c.fg}` : '1px solid var(--border-default)',
+      background: selected ? c.bg : '#fff',
+      cursor: 'pointer',
+      transition: 'border-color 150ms, background-color 150ms',
+    };
+  }
+
+  iconStyle(key) {
+    const c = FORMAT_COLORS[key];
+    return {
+      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+      background: c.bg, color: c.fg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    };
+  }
+
+  radioStyle(key) {
+    const selected = this.state.format === key;
+    const c = FORMAT_COLORS[key];
+    return {
+      width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+      border: selected ? `2px solid ${c.fg}` : '2px solid var(--gray-300)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    };
+  }
+
+  dotStyle(key) {
+    const selected = this.state.format === key;
+    const c = FORMAT_COLORS[key];
+    return { width: 10, height: 10, borderRadius: '50%', background: selected ? c.fg : 'transparent' };
+  }
+
+  stepBtnStyle(step, active) {
+    return {
+      padding: '7px 12px', borderRadius: 8, border: '1px solid ' + (active ? 'var(--brand-emerald)' : 'var(--border-default)'),
+      background: active ? 'var(--brand-green-tint)' : '#fff',
+      color: active ? 'var(--brand-emerald)' : 'var(--text-ink-muted)',
+      fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+    };
+  }
+
+  renderVals() {
+    const { title, body, sheetOpen, format, savingState, toastVisible, toastMsg } = this.state;
+    const hasContent = title.trim().length > 0 || body.trim().length > 0;
+    const showToolbar = hasContent && !sheetOpen;
+    const activeStep = sheetOpen ? 3 : (hasContent ? 2 : 1);
+    const screenLabel = sheetOpen ? '03 · Publish sheet' : (hasContent ? '02 · Writing' : '01 · Blank canvas');
+
+    const toolbarStyle = this.props.toolbarStyle ?? 'bar';
+    const toolbarContainerStyle = toolbarStyle === 'pill'
+      ? { position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 6, background: '#fff', borderRadius: 999, padding: '4px 8px', boxShadow: 'var(--shadow-popover)', border: '1px solid var(--border-soft)' }
+      : { position: 'absolute', left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', gap: 22, justifyContent: 'center', background: '#fff', borderTop: '1px solid var(--border-soft)', padding: '5px 12px' };
+
+    const requireFormatPick = this.props.requireFormatPick !== false;
+    const publishDisabled = requireFormatPick ? !format : false;
+    const publishLabel = format ? `Publish as ${FORMAT_LABELS[format]}` : 'Select a format to publish';
+    const publishBtnStyle = {
+      display: 'block', width: '100%', marginTop: 18, height: 48,
+      border: 'none', borderRadius: 10,
+      background: publishDisabled ? 'var(--gray-200)' : 'var(--brand-emerald)',
+      color: publishDisabled ? 'var(--text-ink-faint)' : '#fff',
+      fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600,
+      cursor: publishDisabled ? 'not-allowed' : 'pointer',
+    };
+
+    return {
+      deviceWidth: 390,
+      deviceHeight: 844,
+      title, body,
+      onTitle: this.setTitle,
+      onBody: this.setBody,
+      bodyRef: this.bodyRef,
+      hasContent,
+      showKeyboard: showToolbar,
+      showToolbar,
+      showUpload: !hasContent,
+      savingLabel: savingState === 'saving' ? 'Saving…' : (savingState === 'saved' ? 'Saved' : ''),
+      screenLabel,
+      openSheet: this.openSheet,
+      closeSheet: this.closeSheet,
+      stopProp: this.stopProp,
+      sheetOpen,
+      selectQuick: this.selectQuick,
+      selectEssay: this.selectEssay,
+      selectPolicy: this.selectPolicy,
+      qt: { card: this.cardStyle('quick_take'), icon: this.iconStyle('quick_take'), radio: this.radioStyle('quick_take'), dot: this.dotStyle('quick_take') },
+      es: { card: this.cardStyle('essay'), icon: this.iconStyle('essay'), radio: this.radioStyle('essay'), dot: this.dotStyle('essay') },
+      pb: { card: this.cardStyle('policy_brief'), icon: this.iconStyle('policy_brief'), radio: this.radioStyle('policy_brief'), dot: this.dotStyle('policy_brief') },
+      publishDisabled,
+      publishLabel,
+      publishBtnStyle,
+      doPublish: this.doPublish,
+      toastVisible, toastMsg,
+      toolbarContainerStyle,
+      jumpBlank: this.jumpBlank,
+      jumpWriting: this.jumpWriting,
+      jumpPublish: this.jumpPublish,
+      step1Style: this.stepBtnStyle(1, activeStep === 1),
+      step2Style: this.stepBtnStyle(2, activeStep === 2),
+      step3Style: this.stepBtnStyle(3, activeStep === 3),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

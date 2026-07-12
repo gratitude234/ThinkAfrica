@@ -28,6 +28,7 @@ Optional:
 - `ANTHROPIC_API_KEY` — Claude API for audio summaries (`/api/audio-summary`)
 - `GOOGLE_TTS_API_KEY` — Text-to-speech
 - `CRON_SECRET` — Authenticates Vercel Cron requests to `/api/cron/*` routes (Vercel sends it automatically as `Authorization: Bearer <value>` when set)
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_MAILTO` — Web push (VAPID keypair + contact address for `lib/push.ts`)
 
 ## Architecture Overview
 

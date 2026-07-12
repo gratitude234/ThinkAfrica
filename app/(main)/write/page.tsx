@@ -137,11 +137,8 @@ function countWords(value: string) {
     .filter(Boolean).length;
 }
 
-function getBodyPlaceholder(postType: PostType) {
-  if (postType === "essay") return "Open with the question your essay answers.";
-  if (postType === "policy_brief") return "State the policy problem in one sentence.";
-  if (postType === "research") return "Introduce your research question and methodology.";
-  return "Lead with your argument — the one point you want readers to leave with.";
+function getBodyPlaceholder() {
+  return "Start writing your quick take, essay, or policy brief…";
 }
 
 function normalizeStarterTag(value: string | null) {
@@ -577,6 +574,15 @@ export default function WritePage() {
     [getCurrentData, saveDraft]
   );
 
+  const compactSaveLabel =
+    saveStatus === "saving"
+      ? "Saving…"
+      : saveStatus === "saved"
+        ? "Saved"
+        : saveStatus === "error"
+          ? "Couldn't save"
+          : "";
+
   const saveStatusText = useMemo(() => {
     if (saveStatus === "saving") return "Saving draft...";
     if (saveStatus === "saved" && lastSaved) {
@@ -794,14 +800,16 @@ export default function WritePage() {
             </button>
             {hasContent ? (
               <div className="flex items-center gap-3">
-                <span className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}>
-                  {saveStatusText}
+                <span
+                  className={`min-w-[44px] text-right text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
+                >
+                  {compactSaveLabel}
                 </span>
                 <button
                   type="button"
                   disabled={!canOpenPublish}
                   onClick={handleReadyToPublish}
-                  className="text-sm font-semibold text-emerald-600 disabled:text-gray-300"
+                  className="rounded-lg bg-emerald-brand px-4 py-2 text-[13.5px] font-semibold text-white disabled:bg-gray-200 disabled:text-gray-400"
                 >
                   Publish
                 </button>
@@ -832,8 +840,10 @@ export default function WritePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" />
                   </svg>
                 </button>
-                <p className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
-                  {saveStatusText}
+                <p
+                  className={`min-w-[44px] text-right text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
+                >
+                  {compactSaveLabel}
                 </p>
                 <div className="group relative">
                   <Button
@@ -963,8 +973,8 @@ export default function WritePage() {
               setTitle(event.target.value);
               saveDraft(getCurrentData({ title: event.target.value }));
             }}
-            placeholder="Title your idea"
-            className="mb-3 w-full border-none px-0 text-4xl font-semibold leading-tight text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
+            placeholder="Title"
+            className="mb-3 w-full border-none px-0 font-display text-4xl font-semibold leading-tight text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
           />
 
           <input
@@ -975,7 +985,7 @@ export default function WritePage() {
               saveDraft(getCurrentData({ subtitle: event.target.value }));
             }}
             placeholder="Add a subtitle (optional)"
-            className="mb-5 w-full border-none px-0 text-lg text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-0"
+            className="mb-5 w-full border-none px-0 font-display text-lg text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-0"
           />
 
           {!focusMode && showStructureStrip ? (
@@ -1003,7 +1013,7 @@ export default function WritePage() {
             ref={editorRef}
             key={publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}
             content={content}
-            placeholder={getBodyPlaceholder(postType)}
+            placeholder={getBodyPlaceholder()}
             minWords={selectedPostType.minWords}
             postType={editorReferencesType}
             references={references}
