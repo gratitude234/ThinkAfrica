@@ -10,6 +10,7 @@ import {
 } from "@/lib/email";
 import { isBlockedPair } from "@/lib/blocking";
 import { requireNotSuspended } from "@/lib/suspension";
+import { logPushResult, sendPushNotification } from "@/lib/push";
 
 const MESSAGE_EMAIL_COOLDOWN_MS = 30 * 60 * 1000;
 
@@ -175,6 +176,18 @@ export async function sendConversationMessage(
         recipientId: recipient.user_id,
       });
     }
+  }
+
+  if (recipient) {
+    const senderName = displayName(senderProfile);
+    const pushResult = await sendPushNotification({
+      recipientId: recipient.user_id,
+      title: `${senderName} sent you a message`,
+      body: excerpt(content),
+      path: `/messages/${input.conversationId}`,
+      preferenceKey: "push_messages",
+    });
+    logPushResult(`message:${message.id}:${recipient.user_id}`, pushResult);
   }
 
   return { error: null, message };

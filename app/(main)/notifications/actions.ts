@@ -82,6 +82,7 @@ export async function respondToCoAuthorInvite(input: {
         ctaLabel: "Open post",
         ctaPath: `/post/${post.slug}`,
         idempotencyKey: `co-author-accepted:${input.postId}:${user.id}`,
+        preferenceKey: "email_co_author_accepted",
       });
       logEmailResult(`co_author_accepted:${input.postId}:${post.author_id}`, emailResult);
     }
@@ -135,6 +136,7 @@ export async function respondToCoAuthorInvite(input: {
         ctaLabel: "Open post",
         ctaPath: `/post/${post.slug}`,
         idempotencyKey: `co-author-declined:${input.postId}:${user.id}`,
+        preferenceKey: "email_co_author_declined",
       });
       logEmailResult(`co_author_declined:${input.postId}:${post.author_id}`, emailResult);
     }

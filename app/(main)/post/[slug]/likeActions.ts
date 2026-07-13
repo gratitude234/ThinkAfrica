@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { logEmailResult, sendUserEmail } from "@/lib/email";
+import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
 
 type TogglePostLikeInput = {
   postId: string;
@@ -110,18 +110,15 @@ export async function togglePostLike(input: TogglePostLikeInput): Promise<{
     if (notificationError) {
       console.error(`Failed to create like notification: ${notificationError.message}`);
     } else {
-      const emailResult = await sendUserEmail({
+      const pushResult = await sendPushNotification({
         recipientId: post.author_id,
-        subject: `${actorName} liked your Indegenius post`,
-        preview: `${actorName} liked your post.`,
         title: "New like on your post",
-        intro: `${actorName} liked "${post.title}".`,
-        ctaLabel: "View post",
-        ctaPath,
-        idempotencyKey: `like:${user.id}:${input.postId}`,
-        preferenceKey: "email_likes",
+        body: `${actorName} liked "${post.title}"`,
+        path: ctaPath,
+        preferenceKey: "push_likes",
+        cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
       });
-      logEmailResult(`like:${user.id}:${input.postId}`, emailResult);
+      logPushResult(`like:${user.id}:${input.postId}`, pushResult);
     }
   }
 

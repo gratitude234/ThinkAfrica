@@ -152,6 +152,7 @@ export async function submitOpportunityInquiry(
       ctaLabel: "Open dashboard",
       ctaPath: "/dashboard#opportunity-interest",
       idempotencyKey: `opportunity-inquiry:${inquiry?.id ?? input.talentProfileId}:${target.user_id}`,
+      preferenceKey: "email_opportunity_inquiry",
     });
     logEmailResult(`opportunity_inquiry:${input.talentProfileId}:${target.user_id}`, emailResult);
   }

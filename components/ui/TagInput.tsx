@@ -10,6 +10,7 @@ interface TagInputProps {
   placeholder?: string;
   helperText?: string;
   maxTags?: number;
+  showLabel?: boolean;
 }
 
 interface TagRow {
@@ -27,6 +28,7 @@ export default function TagInput({
   placeholder = "Type a topic and press Enter",
   helperText,
   maxTags = 5,
+  showLabel = true,
 }: TagInputProps) {
   const [query, setQuery] = useState("");
   const [allTags, setAllTags] = useState<string[]>([]);
@@ -112,11 +114,15 @@ export default function TagInput({
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">
-        {label}
-      </label>
-      {helperText ? (
-        <p className="mb-2 text-xs text-gray-400">{helperText}</p>
+      {showLabel ? (
+        <>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            {label}
+          </label>
+          {helperText ? (
+            <p className="mb-2 text-xs text-gray-400">{helperText}</p>
+          ) : null}
+        </>
       ) : null}
 
       <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">

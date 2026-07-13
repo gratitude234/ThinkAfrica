@@ -44,6 +44,11 @@ export default async function SettingsPage({ searchParams }: PageProps) {
 
   if (!profile) redirect("/login");
 
+  const { count: pushSubscriptionCount } = await supabase
+    .from("push_subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
   const credibilitySummary = getProfileCredibilitySummary({
     profile: {
       full_name: profile.full_name,
@@ -74,7 +79,18 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     email_digest: true,
     email_account_security: true,
     email_profile_reminders: true,
+    email_review_assigned: true,
+    email_review_started: true,
+    email_review_reminder: true,
+    email_co_author_invite: true,
+    email_co_author_accepted: true,
+    email_co_author_declined: true,
+    email_opportunity_inquiry: true,
     push_published: true,
+    push_messages: true,
+    push_comments: true,
+    push_likes: true,
+    push_follows: true,
     ...((profile.notification_prefs as Partial<NotificationPrefs>) ?? {}),
   };
 
@@ -171,7 +187,11 @@ export default async function SettingsPage({ searchParams }: PageProps) {
         )}
         {tab === "account" && <AccountForm email={user.email!} />}
         {tab === "notifications" && (
-          <NotificationsForm profileId={profile.id} notificationPrefs={notifPrefs} />
+          <NotificationsForm
+            profileId={profile.id}
+            notificationPrefs={notifPrefs}
+            hasPushSubscription={Boolean(pushSubscriptionCount && pushSubscriptionCount > 0)}
+          />
         )}
         {tab === "privacy" && (
           <PrivacyForm profileId={profile.id} privacySettings={privacySettings} />

@@ -4,12 +4,23 @@ import webpush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { absoluteUrl } from "@/lib/email";
 
-export type PushPreferenceKey = "push_published";
+export type PushPreferenceKey =
+  | "push_published"
+  | "push_messages"
+  | "push_comments"
+  | "push_likes"
+  | "push_follows";
 
 export type PushSendResult =
   | { ok: true; sent: number }
   | { skipped: true; reason: string }
   | { ok: false; error: string };
+
+// Shared cooldown for bursty, many-senders-to-one-recipient events (comments,
+// likes, follows) so a recipient can't be buzzed repeatedly within a short
+// window regardless of which event type triggered it. Not used by DMs or
+// editorial decisions, which are already low-frequency or per-conversation.
+export const ENGAGEMENT_PUSH_COOLDOWN_MS = 30 * 60 * 1000;
 
 type PushSendInput = {
   recipientId: string;
@@ -17,6 +28,7 @@ type PushSendInput = {
   body: string;
   path?: string;
   preferenceKey?: PushPreferenceKey;
+  cooldownMs?: number;
 };
 
 type SubscriptionRow = {
@@ -68,7 +80,7 @@ export async function sendPushNotification(input: PushSendInput): Promise<PushSe
 
   const { data: profile, error: profileError } = await admin
     .from("profiles")
-    .select("notification_prefs")
+    .select("notification_prefs, last_engagement_push_notified_at")
     .eq("id", input.recipientId)
     .maybeSingle();
 
@@ -79,6 +91,16 @@ export async function sendPushNotification(input: PushSendInput): Promise<PushSe
   const prefs = isRecord(profile?.notification_prefs) ? profile.notification_prefs : {};
   if (!preferenceEnabled(prefs, input.preferenceKey)) {
     return { skipped: true, reason: "recipient_preference_disabled" };
+  }
+
+  if (input.cooldownMs) {
+    const lastNotifiedAt = profile?.last_engagement_push_notified_at as string | null;
+    if (lastNotifiedAt) {
+      const elapsed = Date.now() - new Date(lastNotifiedAt).getTime();
+      if (!Number.isNaN(elapsed) && elapsed < input.cooldownMs) {
+        return { skipped: true, reason: "cooldown_active" };
+      }
+    }
   }
 
   const { data: subscriptions, error: subscriptionsError } = await admin
@@ -126,6 +148,13 @@ export async function sendPushNotification(input: PushSendInput): Promise<PushSe
       }
     })
   );
+
+  if (input.cooldownMs) {
+    await admin
+      .from("profiles")
+      .update({ last_engagement_push_notified_at: new Date().toISOString() })
+      .eq("id", input.recipientId);
+  }
 
   return { ok: true, sent };
 }

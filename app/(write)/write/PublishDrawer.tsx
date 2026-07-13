@@ -12,7 +12,7 @@ import {
   POST_TYPE_LABELS,
   type PostType,
 } from "@/lib/utils";
-import { CANONICAL_TAGS, getSuggestedTags, normalizeTagValue } from "@/lib/tags";
+import { getSuggestedTags, normalizeTagValue } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary, isLowQualityTitle } from "@/lib/postQuality";
 import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
@@ -402,10 +402,9 @@ export default function PublishDrawer({
               ) : null}
 
               <TagInput
-                label="Topics"
                 value={tags}
                 maxTags={5}
-                helperText={`Suggested from ${CANONICAL_TAGS.length} canonical tags. Freeform tags still work for now.`}
+                showLabel={false}
                 placeholder="Add a topic"
                 onChange={handleTagChange}
               />

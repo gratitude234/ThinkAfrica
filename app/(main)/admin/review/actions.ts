@@ -108,6 +108,7 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
       ctaLabel: "Open review",
       ctaPath: `/review/${postId}`,
       idempotencyKey: `review-assigned:${postId}:${reviewerId}:${round}`,
+      preferenceKey: "email_review_assigned",
     });
     logEmailResult(`review_assigned:${postId}:${reviewerId}`, emailResult);
   }
@@ -131,6 +132,7 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
         ctaLabel: "View submission",
         ctaPath: `/post/${post.slug}`,
         idempotencyKey: `review-started:${postId}:${round}`,
+        preferenceKey: "email_review_started",
       });
       logEmailResult(`review_started:${postId}:${post.author_id}`, authorEmailResult);
     }

@@ -269,6 +269,7 @@ async function syncAuthors(
           ctaLabel: "Review invitation",
           ctaPath: `/post/${slug}`,
           idempotencyKey: `co-author-invite:${postId}:${coAuthor.user_id}`,
+          preferenceKey: "email_co_author_invite",
         });
         logEmailResult(`co_author_invite:${postId}:${coAuthor.user_id}`, emailResult);
       }

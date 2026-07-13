@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { escapeHtml, logEmailResult, sendUserEmail } from "@/lib/email";
 import { requireNotSuspended } from "@/lib/suspension";
+import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
 
 type CommentAuthor = {
   username: string | null;
@@ -155,8 +156,19 @@ export async function submitComment(input: SubmitCommentInput): Promise<{
         ctaPath,
         idempotencyKey: `comment:${comment.id}:${recipientId}`,
         preferenceKey: "email_comments",
+        cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
       });
       logEmailResult(`comment:${comment.id}:${recipientId}`, emailResult);
+
+      const pushResult = await sendPushNotification({
+        recipientId,
+        title: parentId ? "New reply to your comment" : "New comment on your post",
+        body: `${actorName} ${commentKind}: ${commentPreview}`,
+        path: ctaPath,
+        preferenceKey: "push_comments",
+        cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
+      });
+      logPushResult(`comment:${comment.id}:${recipientId}`, pushResult);
     }
   }
 

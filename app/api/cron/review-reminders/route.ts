@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
         ctaLabel: "Open review",
         ctaPath: `/review/${review.post_id}`,
         idempotencyKey: `review-reminder:${review.id}`,
+        preferenceKey: "email_review_reminder",
       });
       logEmailResult(`review_reminder:${review.id}`, emailResult);
     }

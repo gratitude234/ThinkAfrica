@@ -13,7 +13,14 @@ export type NotificationPreferenceKey =
   | "email_published"
   | "email_digest"
   | "email_account_security"
-  | "email_profile_reminders";
+  | "email_profile_reminders"
+  | "email_review_assigned"
+  | "email_review_started"
+  | "email_review_reminder"
+  | "email_co_author_invite"
+  | "email_co_author_accepted"
+  | "email_co_author_declined"
+  | "email_opportunity_inquiry";
 
 export type EmailSendResult =
   | { ok: true; id: string | null }
@@ -25,6 +32,7 @@ type EmailRecipient = {
   email: string;
   displayName: string;
   notificationPrefs: Record<string, unknown>;
+  lastCommentEmailNotifiedAt: string | null;
 };
 
 type SendEmailInput = {
@@ -51,6 +59,7 @@ type UserEmailInput = {
   footerNote?: string;
   idempotencyKey: string;
   preferenceKey?: NotificationPreferenceKey;
+  cooldownMs?: number;
 };
 
 type DirectEmailInput = Omit<UserEmailInput, "recipientId" | "preferenceKey"> & {
@@ -227,7 +236,7 @@ export async function getEmailRecipient(userId: string): Promise<EmailRecipient 
     await Promise.all([
       admin
         .from("profiles")
-        .select("id, full_name, username, signup_email, notification_prefs")
+        .select("id, full_name, username, signup_email, notification_prefs, last_comment_email_notified_at")
         .eq("id", userId)
         .maybeSingle(),
       admin.auth.admin.getUserById(userId),
@@ -254,6 +263,8 @@ export async function getEmailRecipient(userId: string): Promise<EmailRecipient 
     notificationPrefs: isRecord(profile?.notification_prefs)
       ? profile.notification_prefs
       : {},
+    lastCommentEmailNotifiedAt:
+      (profile?.last_comment_email_notified_at as string | null) ?? null,
   };
 }
 
@@ -266,6 +277,13 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
 
     if (!preferenceEnabled(recipient.notificationPrefs, input.preferenceKey)) {
       return { skipped: true, reason: "recipient_preference_disabled" };
+    }
+
+    if (input.cooldownMs && recipient.lastCommentEmailNotifiedAt) {
+      const elapsed = Date.now() - new Date(recipient.lastCommentEmailNotifiedAt).getTime();
+      if (!Number.isNaN(elapsed) && elapsed < input.cooldownMs) {
+        return { skipped: true, reason: "cooldown_active" };
+      }
     }
 
     const ctaHref = input.ctaPath ? absoluteUrl(input.ctaPath) : undefined;
@@ -288,13 +306,22 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       input.footerNote ?? "Manage email preferences in Indegenius notification settings.",
     ].join("\n");
 
-    return sendEmail({
+    const result = await sendEmail({
       to: recipient.email,
       subject: input.subject,
       html,
       text,
       idempotencyKey: input.idempotencyKey,
     });
+
+    if (input.cooldownMs && "ok" in result && result.ok) {
+      await createAdminClient()
+        .from("profiles")
+        .update({ last_comment_email_notified_at: new Date().toISOString() })
+        .eq("id", input.recipientId);
+    }
+
+    return result;
   } catch (error) {
     return {
       ok: false,

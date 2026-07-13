@@ -29,7 +29,7 @@
     "app/(main)/post/[slug]/CommentsLoader.tsx",
     "app/(main)/post/[slug]/CommentsSection.tsx",
     "app/(main)/post/commentActions.ts",
-    "app/(main)/write/actions.ts",
+    "app/(write)/write/actions.ts",
     "app/(main)/messages/[id]/actions.ts",
     "app/(main)/PostsFeedSection.tsx",
     "app/api/feed/route.ts"

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { logEmailResult, sendUserEmail } from "@/lib/email";
+import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
 
 type ToggleFollowInput = {
   followingId: string;
@@ -91,18 +91,15 @@ export async function toggleFollow(input: ToggleFollowInput): Promise<{
   if (notificationError) {
     console.error(`Failed to create follow notification: ${notificationError.message}`);
   } else {
-    const emailResult = await sendUserEmail({
+    const pushResult = await sendPushNotification({
       recipientId: input.followingId,
-      subject: `${actorName} followed you on Indegenius`,
-      preview: `${actorName} started following you.`,
       title: "You have a new follower",
-      intro: `${actorName} started following you on Indegenius.`,
-      ctaLabel: "View profile",
-      ctaPath,
-      idempotencyKey: `follow:${user.id}:${input.followingId}`,
-      preferenceKey: "email_follows",
+      body: `${actorName} started following you on Indegenius.`,
+      path: ctaPath,
+      preferenceKey: "push_follows",
+      cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
     });
-    logEmailResult(`follow:${user.id}:${input.followingId}`, emailResult);
+    logPushResult(`follow:${user.id}:${input.followingId}`, pushResult);
   }
 
   if (input.pathname) revalidatePath(input.pathname);

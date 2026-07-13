@@ -66,6 +66,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [bubbleLinkMode, setBubbleLinkMode] = useState(false);
   const [bubbleLinkUrl, setBubbleLinkUrl] = useState("");
+  const [toolbarLinkOpen, setToolbarLinkOpen] = useState(false);
+  const [toolbarLinkUrl, setToolbarLinkUrl] = useState("");
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   useEffect(() => {
@@ -223,30 +225,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
             </svg>
           </ToolbarButton>
           <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleItalic().run()}
-            active={editor?.isActive("italic")}
-            title="Italic"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 4h-9M14 20H5M15 4 9 20" />
-            </svg>
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-            active={editor?.isActive("heading", { level: 2 })}
-            title="Heading 2"
-          >
-            <span className="text-sm font-bold">H2</span>
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
-            active={editor?.isActive("heading", { level: 3 })}
-            title="Heading 3"
-          >
-            <span className="text-sm font-bold">H3</span>
-          </ToolbarButton>
-          <div className="mx-1 h-5 w-px bg-gray-300" />
-          <ToolbarButton
             onClick={() => editor?.chain().focus().toggleBulletList().run()}
             active={editor?.isActive("bulletList")}
             title="Bullet list"
@@ -255,34 +233,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
             </svg>
           </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-            active={editor?.isActive("orderedList")}
-            title="Ordered list"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10H3M3 14h2v1h-2v1h2M3 20h2" />
-            </svg>
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-            active={editor?.isActive("blockquote")}
-            title="Blockquote"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1zm12 0c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
-            </svg>
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleCode().run()}
-            active={editor?.isActive("code")}
-            title="Inline code"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l-3 3 3 3M16 9l3 3-3 3" />
-            </svg>
-          </ToolbarButton>
-          <div className="mx-1 h-5 w-px bg-gray-300" />
           <ToolbarButton
             onClick={() => imageInputRef.current?.click()}
             title="Insert image"
@@ -295,24 +245,65 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
               </svg>
             )}
           </ToolbarButton>
-          <div className="mx-1 h-5 w-px bg-gray-300" />
           <ToolbarButton
-            onClick={() => editor?.chain().focus().undo().run()}
-            title="Undo"
+            onClick={() => {
+              if (editor?.isActive("link")) {
+                editor.chain().focus().unsetLink().run();
+                return;
+              }
+              setToolbarLinkUrl(editor?.getAttributes("link").href ?? "");
+              setToolbarLinkOpen((prev) => !prev);
+            }}
+            active={editor?.isActive("link")}
+            title="Link"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4" />
-            </svg>
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().redo().run()}
-            title="Redo"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 10H11a8 8 0 000 16h4M21 10l-4-4M21 10l-4 4" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
           </ToolbarButton>
         </div>
+        {toolbarLinkOpen ? (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="url"
+              autoFocus
+              value={toolbarLinkUrl}
+              onChange={(e) => setToolbarLinkUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  if (toolbarLinkUrl.trim()) {
+                    editor?.chain().focus().setLink({ href: toolbarLinkUrl.trim() }).run();
+                  }
+                  setToolbarLinkOpen(false);
+                  setToolbarLinkUrl("");
+                }
+                if (e.key === "Escape") setToolbarLinkOpen(false);
+              }}
+              placeholder="https://..."
+              className="w-64 max-w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (toolbarLinkUrl.trim()) {
+                  editor?.chain().focus().setLink({ href: toolbarLinkUrl.trim() }).run();
+                }
+                setToolbarLinkOpen(false);
+                setToolbarLinkUrl("");
+              }}
+              className="shrink-0 text-xs font-semibold text-emerald-600"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={() => setToolbarLinkOpen(false)}
+              className="shrink-0 text-xs text-gray-400"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="sticky top-0 z-10 hidden border-b border-gray-100 bg-white px-4 py-1.5 lg:block">
