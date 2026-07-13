@@ -205,12 +205,13 @@ export default function PublishDrawer({
     [content, initialExcerpt, initialReferences, inResponseTo, postType, tags, title, wordCount]
   );
 
-  const blockingReason = useMemo(() => {
-    if (qualitySummary.readyForSubmission) return null;
-    return (
-      qualitySummary.checklist.find((item) => item.blocking && !item.done)?.helper ?? null
-    );
-  }, [qualitySummary]);
+  const warnings = useMemo(
+    () =>
+      qualitySummary.checklist
+        .filter((item) => item.key !== "title" && item.blocking && !item.done)
+        .map((item) => item.helper),
+    [qualitySummary]
+  );
 
   const publishLabel =
     postType === "policy_brief"
@@ -251,7 +252,7 @@ export default function PublishDrawer({
     }
 
     if (!qualitySummary.readyForSubmission) {
-      setError(blockingReason ?? "Complete the required quality checks.");
+      setError(warnings[0] ?? "Complete the required quality checks.");
       return;
     }
 
@@ -413,8 +414,36 @@ export default function PublishDrawer({
         </div>
 
         <div className="shrink-0 space-y-3 border-t border-gray-100 bg-white px-5 py-4">
-          {blockingReason ? (
-            <p className="text-xs text-amber-700">{blockingReason}</p>
+          {warnings.length > 0 ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3">
+              {warnings.map((warning) => (
+                <div key={warning} className="flex items-start gap-2">
+                  <svg
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 3.5L2.5 20h19zM12 9.5v5M12 17h.01"
+                    />
+                  </svg>
+                  <span className="text-xs leading-relaxed text-amber-800">{warning}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {postType === "policy_brief" ? (
+            <div className="rounded-lg bg-purple-tint px-3.5 py-3">
+              <span className="text-xs leading-relaxed text-purple-accent">
+                Policy briefs are reviewed by an editor before they go live. You&apos;ll be
+                notified once review is complete.
+              </span>
+            </div>
           ) : null}
 
           {error ? (

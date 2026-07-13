@@ -15,6 +15,7 @@ import { formatRelativeTime, type PostType } from "@/lib/utils";
 import { useDraftManager, readDraftBackupRaw } from "./DraftManager";
 import PublishDrawer from "./PublishDrawer";
 import WriteReadinessPanel from "./WriteReadinessPanel";
+import ReferencesPanel from "@/components/post/ReferencesPanel";
 import { ensureDraft, savePostReferences } from "./actions";
 import {
   WRITE_FORMATS,
@@ -597,6 +598,8 @@ export default function WritePage() {
       : inferredLiveType === "policy_brief" || inferredLiveType === "research"
         ? inferredLiveType
         : postType;
+  const showReferencesPanel =
+    editorReferencesType === "policy_brief" || editorReferencesType === "research";
   const wordProgress = Math.min(
     100,
     (wordCount / selectedPostType.minWords) * 100
@@ -694,7 +697,8 @@ export default function WritePage() {
     );
   }
 
-  const hasContent = title.trim().length > 0 || wordCount > 0;
+  const hasContent =
+    title.trim().length > 0 || wordCount > 0 || references.length > 0;
   const handleCloseCanvas = () => {
     if (hasContent) {
       setShowCancelConfirm(true);
@@ -719,6 +723,17 @@ export default function WritePage() {
       estimatedReadTime={estimatedReadTime}
       wordProgress={wordProgress}
     />
+  );
+  const uploadResearchPill = (
+    <Link
+      href="/submit/research"
+      className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-gray-200 bg-white px-3.5 py-2 text-[13px] font-medium text-gray-900 hover:border-gray-300"
+    >
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5V4M7 9l5-5 5 5M4.5 19.5h15" />
+      </svg>
+      Upload research paper
+    </Link>
   );
 
   return (
@@ -766,7 +781,9 @@ export default function WritePage() {
                   Publish
                 </button>
               </div>
-            ) : null}
+            ) : (
+              uploadResearchPill
+            )}
           </div>
           {/* Desktop header — same close-only-when-empty behavior */}
           <div className="mb-6 hidden items-center justify-between border-b border-gray-100 pb-4 lg:flex">
@@ -813,7 +830,9 @@ export default function WritePage() {
                   ) : null}
                 </div>
               </div>
-            ) : null}
+            ) : (
+              uploadResearchPill
+            )}
           </div>
         </>
       )}
@@ -946,12 +965,16 @@ export default function WritePage() {
             content={content}
             placeholder={getBodyPlaceholder()}
             minWords={selectedPostType.minWords}
-            postType={editorReferencesType}
-            references={references}
-            onReferencesChange={handleReferencesChange}
             onUpdate={handleEditorUpdate}
             onSelectionUpdate={handleSelectionUpdate}
           />
+
+          {!focusMode && showReferencesPanel ? (
+            <div className="mt-4 lg:hidden">
+              <ReferencesPanel references={references} onChange={handleReferencesChange} />
+            </div>
+          ) : null}
+
           {!focusMode ? (
             <div
               className="sticky bottom-0 z-20 border-t border-gray-100 bg-white shadow-[0_-4px_12px_rgba(15,23,42,0.06)] lg:hidden"
@@ -1052,6 +1075,15 @@ export default function WritePage() {
                   Collapse
                 </button>
               </div>
+              {showReferencesPanel ? (
+                <div className="mb-3">
+                  <ReferencesPanel
+                    references={references}
+                    onChange={handleReferencesChange}
+                    alwaysExpanded
+                  />
+                </div>
+              ) : null}
               {readinessPanel}
             </div>
           )

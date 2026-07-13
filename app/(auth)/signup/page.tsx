@@ -398,17 +398,6 @@ export default function SignupPage() {
         </button>
         </form>
       )}
-
-      <div className="mt-7 grid grid-cols-3 gap-3 rounded-xl border border-gray-200 bg-canvas p-2 text-center">
-        {["Role", "Topics", "Follows"].map((step, index) => (
-          <div key={step} className="rounded-lg bg-white px-2 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-brand">
-              Step {index + 1}
-            </p>
-            <p className="mt-1 text-xs font-semibold text-gray-800">{step}</p>
-          </div>
-        ))}
-      </div>
     </AuthShell>
   );
 }

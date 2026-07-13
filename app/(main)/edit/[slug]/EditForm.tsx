@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import TagInput from "@/components/ui/TagInput";
 import { MIN_WORD_COUNTS, POST_TYPE_LABELS, type PostType } from "@/lib/utils";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import ReferencesPanel from "@/components/post/ReferencesPanel";
 import type { EditorHandle } from "@/components/editor/Editor";
 import type {
   PostEditorDecisionRecord,
@@ -608,13 +609,19 @@ export default function EditForm({
               ref={editorRef}
               content={content}
               minWords={MIN_WORD_COUNTS[postType]}
-              postType={postType}
-              references={references}
-              onReferencesChange={setReferences}
               onUpdate={handleEditorUpdate}
               onSelectionUpdate={handleSelectionUpdate}
             />
           </div>
+
+          {postType === "policy_brief" || postType === "research" ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                References
+              </label>
+              <ReferencesPanel references={references} onChange={setReferences} alwaysExpanded />
+            </div>
+          ) : null}
 
           {post.status === "pending_revision" ? (
             <div>

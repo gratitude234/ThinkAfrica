@@ -11,6 +11,7 @@ import { AFRICAN_COUNTRIES } from "@/lib/academicIdentity";
 import { INTEREST_OPTIONS, MIN_INTERESTS, MAX_INTERESTS } from "@/lib/interests";
 import { PersonaIcon } from "@/lib/personaIcons";
 import NotificationPermissionPrompt from "@/components/push/NotificationPermissionPrompt";
+import { markPushPromptShown } from "@/lib/pushClient";
 import {
   PROFILE_TYPE_OPTIONS,
   type ProfileType,
@@ -401,8 +402,9 @@ export default function OnboardingPage() {
   };
 
   const finishOnboarding = useCallback(() => {
+    if (userId) void markPushPromptShown(userId);
     router.push("/?welcome=1");
-  }, [router]);
+  }, [router, userId]);
 
   const goBack = () => {
     goToStep(STEP_ORDER[Math.max(currentIndex - 1, 0)]);

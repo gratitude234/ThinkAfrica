@@ -310,11 +310,6 @@ function LoginForm() {
           {loading ? "Signing in..." : "Sign in"}
         </button>
       </form>
-
-      <div className="mt-7 rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-xs leading-6 text-ink-muted">
-        Your byline, drafts, follows, saved posts, and conversations stay tied
-        to one academic profile.
-      </div>
     </AuthShell>
   );
 }

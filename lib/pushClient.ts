@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { PUSH_PROMPT_TERMINAL_COUNT } from "@/lib/pushPromptPolicy";
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -42,4 +43,34 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
   );
 
   return !error;
+}
+
+export async function markPushPromptShown(userId: string) {
+  const supabase = createClient();
+  await supabase
+    .from("profiles")
+    .update({ push_prompt_shown_at: new Date().toISOString() })
+    .eq("id", userId)
+    .is("push_prompt_shown_at", null);
+}
+
+// Home-page retry banner only (see lib/pushPromptPolicy.ts) — distinct from
+// markPushPromptShown, which is onboarding's separate one-shot stamp.
+export async function recordPushPromptDismissed(userId: string, nextAttemptCount: number) {
+  const supabase = createClient();
+  await supabase
+    .from("profiles")
+    .update({
+      push_prompt_attempt_count: nextAttemptCount,
+      push_prompt_last_shown_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+}
+
+export async function recordPushPromptTerminal(userId: string) {
+  const supabase = createClient();
+  await supabase
+    .from("profiles")
+    .update({ push_prompt_attempt_count: PUSH_PROMPT_TERMINAL_COUNT })
+    .eq("id", userId);
 }

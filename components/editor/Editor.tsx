@@ -7,9 +7,6 @@ import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { PostReferenceRecord } from "@/lib/types";
-import type { PostType } from "@/lib/utils";
-import ReferenceRow from "@/components/ui/ReferenceRow";
 
 export interface EditorHandle {
   toggleBold: () => void;
@@ -28,9 +25,6 @@ interface EditorProps {
   content?: string;
   placeholder?: string;
   minWords?: number;
-  postType?: PostType;
-  references?: PostReferenceRecord[];
-  onReferencesChange?: (references: PostReferenceRecord[]) => void;
   onUpdate?: (html: string, wordCount: number) => void;
   onSelectionUpdate?: () => void;
 }
@@ -56,9 +50,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   content = "",
   placeholder = "Start writing your piece...",
   minWords = 0,
-  postType = "blog",
-  references = [],
-  onReferencesChange,
   onUpdate,
   onSelectionUpdate,
 }, ref) {
@@ -79,14 +70,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   const [displayWordCount, setDisplayWordCount] = useState(() =>
     countWordsFromHtml(content)
   );
-  const [localReferences, setLocalReferences] = useState<PostReferenceRecord[]>(
-    references
-  );
   const imageInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setLocalReferences(references);
-  }, [references]);
 
   const editor = useEditor({
     extensions: [
@@ -203,13 +187,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
 
   const countMessage =
     minWords > 0 ? wordCountMessage(displayWordCount, minWords) : "";
-
-  const showReferences = postType === "research" || postType === "policy_brief";
-
-  const updateReferences = (nextReferences: PostReferenceRecord[]) => {
-    setLocalReferences(nextReferences);
-    onReferencesChange?.(nextReferences);
-  };
 
   return (
     <div className="bg-white">
@@ -434,94 +411,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
       ) : null}
 
       <EditorContent editor={editor} className="min-h-[400px]" />
-
-      {showReferences ? (
-        <div className="border-t border-gray-200 bg-canvas px-4 py-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">References</h3>
-              <p className="text-xs text-gray-500">
-                Use structured source data here and cite it inline with `[ref:1]`, `[ref:2]`, and so on in the body.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                updateReferences([
-                  ...localReferences,
-                  {
-                    id: `temp-${Date.now()}-${localReferences.length}`,
-                    post_id: "",
-                    display_order: localReferences.length,
-                    ref_type: "other",
-                    authors: "",
-                    title: "",
-                    year: null,
-                    source: "",
-                    url: "",
-                    doi: "",
-                    raw: "",
-                  },
-                ])
-              }
-              className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
-            >
-              Add reference
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {localReferences.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-5 text-sm text-gray-500">
-                No references yet.
-              </div>
-            ) : (
-              localReferences.map((reference, index) => (
-                <ReferenceRow
-                  key={reference.id || `reference-${index}`}
-                  index={index}
-                  reference={reference}
-                  canMoveUp={index > 0}
-                  canMoveDown={index < localReferences.length - 1}
-                  onMove={(direction) => {
-                    const nextReferences = [...localReferences];
-                    const targetIndex = direction === "up" ? index - 1 : index + 1;
-                    const [item] = nextReferences.splice(index, 1);
-                    nextReferences.splice(targetIndex, 0, item);
-                    updateReferences(
-                      nextReferences.map((row, rowIndex) => ({
-                        ...row,
-                        display_order: rowIndex,
-                      }))
-                    );
-                  }}
-                  onChange={(nextReference) => {
-                    const nextReferences = localReferences.map((row, rowIndex) =>
-                      rowIndex === index
-                        ? {
-                            ...nextReference,
-                            display_order: index,
-                          }
-                        : row
-                    );
-                    updateReferences(nextReferences);
-                  }}
-                  onRemove={() => {
-                    updateReferences(
-                      localReferences
-                        .filter((_, rowIndex) => rowIndex !== index)
-                        .map((row, rowIndex) => ({
-                          ...row,
-                          display_order: rowIndex,
-                        }))
-                    );
-                  }}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 });
