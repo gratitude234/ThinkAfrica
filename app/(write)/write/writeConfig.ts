@@ -106,7 +106,6 @@ const RESPONSE_INTENT_COPY: Record<
   ResponseIntent,
   {
     titlePrefix: string;
-    subtitle: string;
     excerpt: string;
     tags: string[];
     claimPrompt: string;
@@ -118,7 +117,6 @@ const RESPONSE_INTENT_COPY: Record<
 > = {
   extend: {
     titlePrefix: "Extending",
-    subtitle: "A response that builds on the original argument",
     excerpt: "This response extends the original idea with another angle and example.",
     tags: ["response", "student voice"],
     claimPrompt: "State what you agree with, then name the extra idea you want to add.",
@@ -129,7 +127,6 @@ const RESPONSE_INTENT_COPY: Record<
   },
   challenge: {
     titlePrefix: "A response to",
-    subtitle: "A respectful challenge to the original argument",
     excerpt: "This response challenges the original argument with a different reading of the issue.",
     tags: ["response", "counterpoint"],
     claimPrompt: "State the part of the argument you think needs more care or a different conclusion.",
@@ -140,7 +137,6 @@ const RESPONSE_INTENT_COPY: Record<
   },
   evidence: {
     titlePrefix: "Adding evidence to",
-    subtitle: "A response with an example, source, or case",
     excerpt: "This response adds evidence or an example that helps readers judge the original idea.",
     tags: ["response", "evidence"],
     claimPrompt: "Name the evidence or example you are adding and what it shows.",
@@ -171,7 +167,6 @@ export function getResponseStarterTemplate({
 
   return {
     title: `${copy.titlePrefix} "${parentTitle}"`,
-    subtitle: copy.subtitle,
     excerpt: copy.excerpt,
     tags: copy.tags,
     content:

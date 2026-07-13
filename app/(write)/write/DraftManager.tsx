@@ -1,20 +1,15 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { buildSlugFromTitle } from "@/lib/postSlug";
-import {
-  composeContentWithSubtitle,
-  extractSubtitleFromContent,
-} from "./writeUtils";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 interface DraftData {
   title: string;
-  subtitle: string;
   excerpt: string;
   content: string;
   tags: string[];
@@ -96,7 +91,6 @@ export function useDraftManager(): UseDraftManagerReturn {
           const parsedBackup = JSON.parse(savedBackup) as Partial<DraftData>;
           const normalizedBackup: DraftData = {
             title: parsedBackup.title ?? "",
-            subtitle: parsedBackup.subtitle ?? "",
             excerpt: parsedBackup.excerpt ?? "",
             content: parsedBackup.content ?? "",
             tags: parsedBackup.tags ?? [],
@@ -107,7 +101,6 @@ export function useDraftManager(): UseDraftManagerReturn {
 
           const hasContent =
             normalizedBackup.title.trim().length > 0 ||
-            normalizedBackup.subtitle.trim().length > 0 ||
             normalizedBackup.content.trim().length > 0;
 
           if (hasContent) {
@@ -131,13 +124,10 @@ export function useDraftManager(): UseDraftManagerReturn {
       .single()
       .then(({ data }) => {
         if (data) {
-          const parsedContent = extractSubtitleFromContent(data.content ?? "");
-
           setInitialData({
             title: data.title ?? "",
-            subtitle: parsedContent.subtitle,
             excerpt: data.excerpt ?? "",
-            content: parsedContent.content,
+            content: data.content ?? "",
             tags: (data.tags as string[] | null) ?? [],
             postType: data.type ?? "blog",
             coverImageUrl:
@@ -203,10 +193,6 @@ export function useDraftManager(): UseDraftManagerReturn {
         const tags = data.tags
           .map((tag) => tag.trim().toLowerCase())
           .filter(Boolean);
-        const contentWithSubtitle = composeContentWithSubtitle(
-          data.content,
-          data.subtitle
-        );
         const currentDraftId = draftIdRef.current;
 
         if (currentDraftId) {
@@ -215,7 +201,7 @@ export function useDraftManager(): UseDraftManagerReturn {
             .update({
               title: data.title.trim(),
               excerpt: data.excerpt,
-              content: contentWithSubtitle,
+              content: data.content,
               tags,
               type: data.postType,
               cover_image_url: data.coverImageUrl || null,
@@ -240,7 +226,7 @@ export function useDraftManager(): UseDraftManagerReturn {
               title: data.title.trim(),
               slug: uniqueSlug,
               excerpt: data.excerpt,
-              content: contentWithSubtitle,
+              content: data.content,
               tags,
               type: data.postType,
               status: "draft",

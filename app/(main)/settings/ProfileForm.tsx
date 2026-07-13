@@ -264,7 +264,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         profile_type: profileType,
         secondary_profile_types: nextSecondaryProfileTypes,
         country,
-        university,
+        university: university.trim(),
         field_of_study: fieldOfStudy,
         graduation_year: parsedYear,
         organization_name: organizationName.trim() || null,

@@ -31,7 +31,6 @@ export interface DraftCoachingSummary {
 interface DraftCoachingInput {
   postType: PostType;
   title: string;
-  subtitle: string;
   excerpt: string;
   content: string;
   tags: string[];
@@ -90,7 +89,7 @@ export function getDraftCoachingSummary(
       "important because",
       "matters because",
       "significant because",
-    ]) || input.subtitle.trim().length >= 12;
+    ]);
   const hasEvidence =
     includesAny(lowerBody, [
       "for example",

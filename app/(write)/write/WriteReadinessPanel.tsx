@@ -12,7 +12,6 @@ import { getDraftCoachingSummary } from "./draftCoaching";
 interface WriteReadinessPanelProps {
   postType: PostType;
   title: string;
-  subtitle: string;
   content: string;
   excerpt: string;
   tags: string[];
@@ -54,7 +53,6 @@ function CheckIcon({ done }: { done: boolean }) {
 export default function WriteReadinessPanel({
   postType,
   title,
-  subtitle,
   content,
   excerpt,
   tags,
@@ -75,7 +73,6 @@ export default function WriteReadinessPanel({
       getDraftCoachingSummary({
         postType,
         title,
-        subtitle,
         excerpt,
         content,
         tags,
@@ -83,7 +80,7 @@ export default function WriteReadinessPanel({
         wordCount,
         inResponseToTitle,
       }),
-    [content, excerpt, inResponseToTitle, postType, references, subtitle, tags, title, wordCount]
+    [content, excerpt, inResponseToTitle, postType, references, tags, title, wordCount]
   );
 
   const needsReferences = postType === "research" || postType === "policy_brief";

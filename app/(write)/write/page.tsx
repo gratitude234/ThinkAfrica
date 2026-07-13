@@ -23,7 +23,7 @@ import {
   isPostType,
   isResponseIntent,
 } from "./writeConfig";
-import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
+import { inferTypeFromContent } from "./writeUtils";
 import type { EditorHandle } from "@/components/editor/Editor";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
@@ -35,7 +35,6 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
 
 interface DraftPayload {
   title: string;
-  subtitle: string;
   excerpt: string;
   content: string;
   tags: string[];
@@ -156,7 +155,6 @@ export default function WritePage() {
   });
   const editorRef = useRef<EditorHandle>(null);
   const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
@@ -220,7 +218,6 @@ export default function WritePage() {
 
       setPostType((initialData.postType as PostType) ?? "blog");
       setTitle(initialData.title);
-      setSubtitle(initialData.subtitle ?? "");
       setExcerpt(initialData.excerpt);
       setTags(initialData.tags);
       setContent(initialData.content);
@@ -333,7 +330,6 @@ export default function WritePage() {
   const getCurrentData = useCallback(
     (overrides: Partial<DraftPayload> = {}): DraftPayload => ({
       title: overrides.title ?? title,
-      subtitle: overrides.subtitle ?? subtitle,
       excerpt: overrides.excerpt ?? excerpt,
       content: overrides.content ?? content,
       tags: overrides.tags ?? tags,
@@ -341,7 +337,7 @@ export default function WritePage() {
       coverImageUrl: overrides.coverImageUrl ?? coverImageUrl,
       inResponseToId: overrides.inResponseToId ?? inResponseToId,
     }),
-    [title, subtitle, excerpt, content, tags, postType, coverImageUrl, inResponseToId]
+    [title, excerpt, content, tags, postType, coverImageUrl, inResponseToId]
   );
 
   useEffect(() => {
@@ -359,7 +355,6 @@ export default function WritePage() {
           const parsedBackup = JSON.parse(savedBackup) as Partial<DraftPayload>;
           const hasBackupContent =
             (parsedBackup.title ?? "").trim().length > 0 ||
-            (parsedBackup.subtitle ?? "").trim().length > 0 ||
             (parsedBackup.content ?? "")
               .replace(/<[^>]*>/g, " ")
               .trim().length > 0;
@@ -373,7 +368,6 @@ export default function WritePage() {
 
     const hasManualContent =
       title.trim().length > 0 ||
-      subtitle.trim().length > 0 ||
       content.replace(/<[^>]*>/g, " ").trim().length > 0 ||
       tags.length > 0;
 
@@ -385,7 +379,6 @@ export default function WritePage() {
     });
     const nextData = getCurrentData({
       title: template.title,
-      subtitle: template.subtitle,
       excerpt: template.excerpt,
       content: template.content,
       tags: template.tags,
@@ -396,7 +389,6 @@ export default function WritePage() {
     responseStarterAppliedRef.current = true;
     setPostType("essay");
     setTitle(template.title);
-    setSubtitle(template.subtitle);
     setExcerpt(template.excerpt);
     setTags(template.tags);
     setContent(template.content);
@@ -413,7 +405,6 @@ export default function WritePage() {
     saveDraft,
     selectedResponseIntent,
     starterParam,
-    subtitle,
     tags.length,
     title,
   ]);
@@ -431,7 +422,6 @@ export default function WritePage() {
           const parsedBackup = JSON.parse(savedBackup) as Partial<DraftPayload>;
           const hasBackupContent =
             (parsedBackup.title ?? "").trim().length > 0 ||
-            (parsedBackup.subtitle ?? "").trim().length > 0 ||
             (parsedBackup.content ?? "")
               .replace(/<[^>]*>/g, " ")
               .trim().length > 0;
@@ -445,7 +435,6 @@ export default function WritePage() {
 
     const hasManualContent =
       title.trim().length > 0 ||
-      subtitle.trim().length > 0 ||
       content.replace(/<[^>]*>/g, " ").trim().length > 0 ||
       tags.length > 0;
 
@@ -464,7 +453,6 @@ export default function WritePage() {
     saveDraft,
     starterParam,
     starterTag,
-    subtitle,
     tags.length,
     title,
   ]);
@@ -630,13 +618,11 @@ export default function WritePage() {
     }
 
     if (!publishDraftId) {
-      const contentWithSubtitle = composeContentWithSubtitle(content, subtitle);
       const { draftId: ensuredDraftId } = await ensureDraft({
         draftId,
         title,
-        subtitle,
         excerpt,
-        content: contentWithSubtitle,
+        content,
         tags,
         postType,
         coverImageUrl,
@@ -710,7 +696,6 @@ export default function WritePage() {
     <WriteReadinessPanel
       postType={postType}
       title={title}
-      subtitle={subtitle}
       content={content}
       excerpt={excerpt}
       tags={tags}
@@ -945,18 +930,7 @@ export default function WritePage() {
               saveDraft(getCurrentData({ title: event.target.value }));
             }}
             placeholder="Title"
-            className="mb-3 w-full border-none px-0 font-display text-4xl font-semibold leading-tight text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
-          />
-
-          <input
-            type="text"
-            value={subtitle}
-            onChange={(event) => {
-              setSubtitle(event.target.value);
-              saveDraft(getCurrentData({ subtitle: event.target.value }));
-            }}
-            placeholder="Add a subtitle (optional)"
-            className="mb-5 w-full border-none px-0 font-display text-lg text-gray-500 placeholder-gray-300 focus:outline-none focus:ring-0"
+            className="mb-5 w-full border-none px-0 font-display text-4xl font-semibold leading-tight text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
           />
 
           <Editor
@@ -1133,7 +1107,6 @@ export default function WritePage() {
             onClose={() => setIsPublishDrawerOpen(false)}
             draftId={publishDraftId}
             title={title}
-            subtitle={subtitle}
             content={content}
             wordCount={wordCount}
             userId={currentUserId}

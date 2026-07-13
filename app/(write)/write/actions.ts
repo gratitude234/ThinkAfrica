@@ -291,7 +291,6 @@ async function syncAuthors(
 export async function ensureDraft(input: {
   draftId: string | null;
   title: string;
-  subtitle: string;
   excerpt: string;
   content: string;
   tags: string[];
@@ -385,7 +384,6 @@ export async function savePostReferences(input: {
 export async function publishPost(input: {
   draftId: string | null;
   title: string;
-  subtitle: string;
   excerpt: string;
   content: string;
   tags: string[];

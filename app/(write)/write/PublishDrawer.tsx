@@ -15,7 +15,7 @@ import {
 import { getSuggestedTags, normalizeTagValue } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary, isLowQualityTitle } from "@/lib/postQuality";
-import { composeContentWithSubtitle, inferTypeFromContent } from "./writeUtils";
+import { inferTypeFromContent } from "./writeUtils";
 import { publishPost } from "./actions";
 
 interface PublishDrawerProps {
@@ -23,7 +23,6 @@ interface PublishDrawerProps {
   onClose: () => void;
   draftId: string | null;
   title: string;
-  subtitle: string;
   content: string;
   wordCount: number;
   userId: string;
@@ -110,7 +109,6 @@ export default function PublishDrawer({
   onClose,
   draftId,
   title,
-  subtitle,
   content,
   wordCount,
   userId,
@@ -261,13 +259,11 @@ export default function PublishDrawer({
 
     const finalExcerpt = initialExcerpt.trim() || generateExcerpt(content, 220);
     const normalizedTags = tags.map((tag) => normalizeTagValue(tag)).filter(Boolean);
-    const contentWithSubtitle = composeContentWithSubtitle(content, subtitle);
     const { error: publishError, slug: publishedPostSlug } = await publishPost({
       draftId,
       title: title.trim(),
-      subtitle,
       excerpt: finalExcerpt,
-      content: contentWithSubtitle,
+      content,
       tags: normalizedTags,
       postType,
       coverImageUrl: initialCoverImageUrl,

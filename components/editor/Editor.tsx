@@ -189,7 +189,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     minWords > 0 ? wordCountMessage(displayWordCount, minWords) : "";
 
   return (
-    <div className="bg-white">
+    <div>
       <div className="hidden border-b border-gray-200 bg-canvas p-2 lg:block">
         <div className="flex flex-wrap items-center gap-1">
           <ToolbarButton
@@ -283,7 +283,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         ) : null}
       </div>
 
-      <div className="sticky top-0 z-10 hidden border-b border-gray-100 bg-white px-4 py-1.5 lg:block">
+      <div className="sticky top-0 z-10 hidden border-b border-gray-100 bg-canvas px-4 py-1.5 lg:block">
         <span className={countClasses}>
           {displayWordCount.toLocaleString()} words
           {countMessage ? ` · ${countMessage}` : ""}

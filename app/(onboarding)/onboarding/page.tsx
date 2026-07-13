@@ -328,7 +328,7 @@ export default function OnboardingPage() {
       .from("profiles")
       .update({
         country: country.trim(),
-        university: academic ? university.trim() : null,
+        university: academic ? university.trim().replace(/\s+/g, " ") : null,
         field_of_study: academic ? fieldOfStudy.trim() : null,
       })
       .eq("id", userId);
