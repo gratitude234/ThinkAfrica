@@ -951,7 +951,7 @@ export default function WritePage() {
 
           {!focusMode ? (
             <div
-              className="sticky bottom-0 z-20 border-t border-gray-100 bg-white shadow-[0_-4px_12px_rgba(15,23,42,0.06)] lg:hidden"
+              className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-100 bg-white shadow-[0_-4px_12px_rgba(15,23,42,0.06)] lg:hidden"
               style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
               {/* Link URL input — slides in above toolbar when link button tapped */}
