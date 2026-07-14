@@ -185,7 +185,7 @@ export default async function HomePage({ searchParams }: PageProps) {
       supabase
         .from("profiles")
         .select(
-          "interests, university, field_of_study, points, full_name, profile_type, push_prompt_shown_at, push_prompt_attempt_count, push_prompt_last_shown_at"
+          "interests, university, field_of_study, points, full_name, profile_type, push_prompt_attempt_count, push_prompt_last_shown_at"
         )
         .eq("id", user.id)
         .single(),
@@ -207,7 +207,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     const hasPushSubscription = Boolean(pushSubscriptionCount && pushSubscriptionCount > 0);
     pushPromptAttemptCount = profileData?.push_prompt_attempt_count ?? 0;
 
-    if (!profileData?.push_prompt_shown_at && !hasPushSubscription) {
+    if (!hasPushSubscription) {
       if (pushPromptAttemptCount > PUSH_PROMPT_MAX_ATTEMPTS) {
         pushPromptMode = null;
       } else if (pushPromptAttemptCount === PUSH_PROMPT_MAX_ATTEMPTS) {
