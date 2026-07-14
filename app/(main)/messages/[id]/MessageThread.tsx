@@ -202,18 +202,31 @@ export default function MessageThread({
 
     const poll = setInterval(async () => {
       const lastTs = messages.at(-1)?.created_at ?? new Date(0).toISOString();
-      const { data } = await supabase
-        .from("messages")
-        .select("id, sender_id, content, created_at, deleted_at, edited_at")
-        .eq("conversation_id", conversationId)
-        .gt("created_at", lastTs)
-        .order("created_at", { ascending: true });
+      const [{ data }, { data: participant }] = await Promise.all([
+        supabase
+          .from("messages")
+          .select("id, sender_id, content, created_at, deleted_at, edited_at")
+          .eq("conversation_id", conversationId)
+          .gt("created_at", lastTs)
+          .order("created_at", { ascending: true }),
+        otherUserId
+          ? supabase
+              .from("conversation_participants")
+              .select("last_read_at")
+              .eq("conversation_id", conversationId)
+              .eq("user_id", otherUserId)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
       if (data?.length) setMessages((prev) => [...prev, ...(data as Message[])]);
+      if (typeof participant?.last_read_at === "string") {
+        setLiveOtherLastReadAt(participant.last_read_at);
+      }
     }, 12_000);
 
     return () => clearInterval(poll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, supabase, messages.length]);
+  }, [conversationId, supabase, messages.length, otherUserId]);
 
   const seenMessageId = useMemo(() => {
     if (!liveOtherLastReadAt) return null;

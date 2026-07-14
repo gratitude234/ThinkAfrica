@@ -28,6 +28,7 @@ export interface NotificationPrefs {
   push_comments: boolean;
   push_likes: boolean;
   push_follows: boolean;
+  push_daily_brief: boolean;
 }
 
 const EMAIL_ROWS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
@@ -55,6 +56,7 @@ const PUSH_ROWS: { key: keyof NotificationPrefs; label: string; description: str
   { key: "push_comments", label: "Comments", description: "Browser push when someone comments on your post or replies to your comment" },
   { key: "push_likes", label: "Likes", description: "Browser push when someone likes your post" },
   { key: "push_follows", label: "New followers", description: "Browser push when someone follows you" },
+  { key: "push_daily_brief", label: "Daily brief", description: "One browser push a day with today's top post and live debate" },
 ];
 
 type PushState =

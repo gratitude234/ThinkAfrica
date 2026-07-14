@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  hasActivePushSubscription,
   isPushSupported,
+  markPushPromptShown,
   recordPushPromptDismissed,
   recordPushPromptTerminal,
   subscribeToPush,
@@ -40,10 +42,19 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
     }
 
     if (Notification.permission === "granted") {
-      // Already granted but unsubscribed (cleared storage, stale endpoint).
-      // Settings already has a dedicated Resubscribe flow for this — don't
-      // duplicate it here.
-      void recordPushPromptTerminal(userId);
+      void (async () => {
+        const subscribed = await hasActivePushSubscription(userId);
+        if (subscribed) {
+          // Permission and subscription both check out — nothing left to prompt for.
+          void recordPushPromptTerminal(userId);
+          return;
+        }
+        // Permission already granted but no live subscription (revoked,
+        // deleted, or granted on a different device/session) — recreate it
+        // directly, no browser prompt needed.
+        await subscribeToPush(userId);
+        void markPushPromptShown(userId);
+      })();
       return;
     }
 

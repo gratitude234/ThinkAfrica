@@ -12,6 +12,14 @@ import { getActivationState, type ActivationState } from "@/lib/activation";
 import { getProfileTypeLabel, isProfileType } from "@/lib/profileTypes";
 import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
+import {
+  getActiveDebate,
+  getEngagementCounts,
+  getFeaturedPostCandidates,
+  toDebateInterludeData,
+  uniqueFeaturedPosts,
+  type FeaturedPostRow as FeaturedPostRaw,
+} from "@/lib/dailyBrief";
 import ActivationFocusPanel from "./ActivationFocusPanel";
 import DailyBriefStrip from "./DailyBriefStrip";
 import EditorPicksRow from "./EditorPicksRow";
@@ -53,36 +61,6 @@ interface PageProps {
     timeframe?: string;
     welcome?: string;
   }>;
-}
-
-interface FeaturedProfile {
-  username: string | null;
-  full_name: string | null;
-  university: string | null;
-  avatar_url: string | null;
-  verified?: boolean;
-}
-
-interface FeaturedPostRaw {
-  id: string;
-  author_id: string;
-  title: string;
-  slug: string;
-  type: string;
-  excerpt: string | null;
-  tags: string[] | null;
-  cover_image_url: string | null;
-  view_count: number | null;
-  impression_count: number | null;
-  read_count: number | null;
-  featured?: boolean | null;
-  published_at: string | null;
-  citation_id: string | null;
-  published_version_id: string | null;
-  document_original_name: string | null;
-  document_mime_type: string | null;
-  document_size_bytes: number | null;
-  profiles: FeaturedProfile | FeaturedProfile[] | null;
 }
 
 type FeaturedSource = "manual" | "automatic";
@@ -138,26 +116,12 @@ function FeedSkeleton() {
   );
 }
 
-const FEATURED_POST_SELECT = `
-  id, author_id, title, slug, type, excerpt, tags, cover_image_url, view_count, impression_count, read_count, featured, published_at, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes,
-  profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified)
-`;
-
 function logHomeQueryError(
   label: string,
   error?: { message?: string } | null
 ) {
   if (!error) return;
   console.error(`[home] ${label} query failed`, error);
-}
-
-function uniqueFeaturedPosts(posts: FeaturedPostRaw[]) {
-  const seen = new Set<string>();
-  return posts.filter((post) => {
-    if (seen.has(post.id)) return false;
-    seen.add(post.id);
-    return true;
-  });
 }
 
 function deriveSidebarTopics({
@@ -262,17 +226,12 @@ export default async function HomePage({ searchParams }: PageProps) {
   const draftCutoff = new Date(
     Date.now() - 14 * 24 * 60 * 60 * 1000
   ).toISOString();
-  const featuredFallbackCutoff = new Date(
-    Date.now() - 30 * 24 * 60 * 60 * 1000
-  ).toISOString();
 
   const [
     { data: followedUsers },
-    { data: hotDebateRaw },
+    hotDebateResult,
     { data: recentDraft },
-    manualFeaturedResult,
-    recentFeaturedCandidatesResult,
-    latestPublishedResult,
+    featuredCandidates,
     newVoiceResult,
     latestResearchResult,
   ] = await Promise.all([
@@ -283,16 +242,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           .eq("follower_id", user.id)
       : Promise.resolve({ data: [], error: null }),
 
-    supabase
-      .from("debates")
-      .select(
-        "id, title, status, ends_at, motion_for_count, motion_against_count, debate_arguments(count)"
-      )
-      .in("status", ["open", "active"])
-      .order("status", { ascending: true })
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    getActiveDebate(supabase),
 
     user
       ? supabase
@@ -306,31 +256,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
 
-    supabase
-      .from("posts")
-      .select(FEATURED_POST_SELECT)
-      .eq("status", "published")
-      .eq("featured", true)
-      .order("published_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-
-    supabase
-      .from("posts")
-      .select(FEATURED_POST_SELECT)
-      .eq("status", "published")
-      .gte("published_at", featuredFallbackCutoff)
-      .order("view_count", { ascending: false })
-      .order("published_at", { ascending: false })
-      .limit(12),
-
-    supabase
-      .from("posts")
-      .select(FEATURED_POST_SELECT)
-      .eq("status", "published")
-      .order("published_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    getFeaturedPostCandidates(supabase),
 
     supabase
       .from("posts")
@@ -362,6 +288,10 @@ export default async function HomePage({ searchParams }: PageProps) {
       .limit(12),
   ]);
 
+  const { manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult } =
+    featuredCandidates;
+  const hotDebateRaw = hotDebateResult.data;
+
   logHomeQueryError("manual featured post", manualFeaturedResult.error);
   logHomeQueryError(
     "recent featured candidates",
@@ -376,24 +306,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   );
   const followCount = followedIds.length;
 
-  const hotDebateArgumentCount = hotDebateRaw?.debate_arguments
-    ? Array.isArray(hotDebateRaw.debate_arguments)
-      ? ((hotDebateRaw.debate_arguments[0] as unknown as { count: number })
-          ?.count ?? 0)
-      : 0
-    : 0;
-
-  const homeDebate: DebateInterludeData | null = hotDebateRaw
-    ? {
-        id: hotDebateRaw.id,
-        title: hotDebateRaw.title,
-        status: hotDebateRaw.status,
-        endsAt: hotDebateRaw.ends_at,
-        argumentCount: hotDebateArgumentCount,
-        motionForCount: hotDebateRaw.motion_for_count ?? 0,
-        motionAgainstCount: hotDebateRaw.motion_against_count ?? 0,
-      }
-    : null;
+  const homeDebate: DebateInterludeData | null = toDebateInterludeData(hotDebateRaw);
 
   const manualFeaturedRaw =
     (manualFeaturedResult.data as FeaturedPostRaw | null) ?? null;
@@ -419,35 +332,8 @@ export default async function HomePage({ searchParams }: PageProps) {
   }));
 
   const featuredIds = featuredPostsNorm.map((post) => post.id);
-  const [
-    { data: featuredReferences },
-    { data: featuredComments },
-    { data: featuredBookmarks },
-    { data: featuredResponses },
-  ] =
-    featuredIds.length > 0
-      ? await Promise.all([
-          supabase.from("post_references").select("post_id").in("post_id", featuredIds),
-          supabase.from("comments").select("post_id").in("post_id", featuredIds),
-          supabase.from("bookmarks").select("post_id").in("post_id", featuredIds),
-          supabase.from("posts").select("in_response_to").in("in_response_to", featuredIds),
-        ])
-      : [
-          { data: [] },
-          { data: [] },
-          { data: [] },
-          { data: [] },
-        ];
-  const countBy = (rows: Array<Record<string, string | null>>, key: string) =>
-    rows.reduce((acc: Record<string, number>, row) => {
-      const id = row[key];
-      if (id) acc[id] = (acc[id] ?? 0) + 1;
-      return acc;
-    }, {});
-  const referenceCounts = countBy((featuredReferences ?? []) as Array<Record<string, string | null>>, "post_id");
-  const commentCounts = countBy((featuredComments ?? []) as Array<Record<string, string | null>>, "post_id");
-  const bookmarkCounts = countBy((featuredBookmarks ?? []) as Array<Record<string, string | null>>, "post_id");
-  const responseCounts = countBy((featuredResponses ?? []) as Array<Record<string, string | null>>, "in_response_to");
+  const { referenceCounts, commentCounts, bookmarkCounts, responseCounts } =
+    await getEngagementCounts(supabase, featuredIds);
   const qualityRankedFeaturedPosts = featuredPostsNorm
     .map((post) => {
       const interestMatch = Boolean(

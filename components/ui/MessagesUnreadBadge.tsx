@@ -75,6 +75,20 @@ export default function MessagesUnreadBadge({
     };
   }, [supabase, userId, fetchCount]);
 
+  // Polling fallback when Realtime is disabled. This badge sits in the nav
+  // and stays mounted across every page (not just one open thread), so it
+  // uses a longer interval than the 12s message poll to keep aggregate
+  // query volume down across the whole logged-in session.
+  useEffect(() => {
+    if (shouldUseRealtime()) return;
+
+    const poll = setInterval(() => {
+      void fetchCount();
+    }, 25_000);
+
+    return () => clearInterval(poll);
+  }, [fetchCount]);
+
   if (!count) return null;
 
   return (

@@ -54,6 +54,15 @@ export async function markPushPromptShown(userId: string) {
     .is("push_prompt_shown_at", null);
 }
 
+export async function hasActivePushSubscription(userId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { count } = await supabase
+    .from("push_subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+  return Boolean(count && count > 0);
+}
+
 // Home-page retry banner only (see lib/pushPromptPolicy.ts) — distinct from
 // markPushPromptShown, which is onboarding's separate one-shot stamp.
 export async function recordPushPromptDismissed(userId: string, nextAttemptCount: number) {
@@ -67,10 +76,17 @@ export async function recordPushPromptDismissed(userId: string, nextAttemptCount
     .eq("id", userId);
 }
 
+// Terminal covers every "stop asking" reason (unsupported browser, already
+// resolved, exhausted retries) — push_prompt_shown_at must be stamped in the
+// same write so the two fields can't drift apart again.
 export async function recordPushPromptTerminal(userId: string) {
   const supabase = createClient();
   await supabase
     .from("profiles")
-    .update({ push_prompt_attempt_count: PUSH_PROMPT_TERMINAL_COUNT })
-    .eq("id", userId);
+    .update({
+      push_prompt_attempt_count: PUSH_PROMPT_TERMINAL_COUNT,
+      push_prompt_shown_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .is("push_prompt_shown_at", null);
 }

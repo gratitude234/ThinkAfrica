@@ -91,6 +91,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     push_comments: true,
     push_likes: true,
     push_follows: true,
+    push_daily_brief: true,
     ...((profile.notification_prefs as Partial<NotificationPrefs>) ?? {}),
   };
 
