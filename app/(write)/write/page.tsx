@@ -739,7 +739,10 @@ export default function WritePage() {
       ) : (
         <>
           {/* Mobile header — close only when empty; Publish + save status once there's content */}
-          <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 lg:hidden">
+          <div
+            className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 lg:hidden"
+            style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+          >
             <button
               type="button"
               onClick={handleCloseCanvas}
@@ -836,7 +839,7 @@ export default function WritePage() {
         </div>
       ) : null}
 
-      {!focusMode && localBackup ? (
+      {!focusMode && localBackup && !hasContent ? (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
           <span className="text-amber-800">
             We found an unsaved draft: &quot;{localBackup.title || "Untitled"}&quot;
