@@ -19,7 +19,7 @@ interface Props {
 
 export default function PushPromptBanner({ userId, mode, attemptCount }: Props) {
   const router = useRouter();
-  const [display, setDisplay] = useState<"cta" | "terminal" | null>(null);
+  const [display, setDisplay] = useState<"cta" | "cta-final" | "blocked" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,15 +29,10 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
       return;
     }
 
-    if (mode === "terminal") {
-      setDisplay("terminal");
-      return;
-    }
-
     if (Notification.permission === "denied") {
-      // Browser-level block detected on a fresh visit — never re-prompt via
-      // this banner again; point to Settings once instead.
-      setDisplay("terminal");
+      // Browser-level block — JS can't re-trigger the permission dialog once
+      // denied, so pointing to Settings is the only path that actually works.
+      setDisplay("blocked");
       return;
     }
 
@@ -58,7 +53,9 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
       return;
     }
 
-    setDisplay("cta");
+    // Permission is still "default" — a direct prompt still works even once
+    // retries are exhausted, so there's no need to detour through Settings.
+    setDisplay(mode === "terminal" ? "cta-final" : "cta");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -67,7 +64,12 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
     setDisplay(null);
   };
 
-  const dismissTerminal = () => {
+  const dismissFinal = () => {
+    void recordPushPromptTerminal(userId);
+    setDisplay(null);
+  };
+
+  const dismissBlocked = () => {
     void recordPushPromptTerminal(userId);
     setDisplay(null);
   };
@@ -102,7 +104,7 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
 
   if (!display) return null;
 
-  if (display === "terminal") {
+  if (display === "blocked") {
     return (
       <section className="mb-6 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
@@ -114,7 +116,7 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
         <div className="flex shrink-0 gap-3">
           <button
             type="button"
-            onClick={dismissTerminal}
+            onClick={dismissBlocked}
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-canvas"
           >
             Dismiss
@@ -147,7 +149,7 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
       <div className="flex shrink-0 gap-3">
         <button
           type="button"
-          onClick={dismissRetry}
+          onClick={display === "cta-final" ? dismissFinal : dismissRetry}
           disabled={busy}
           className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-canvas disabled:opacity-40"
         >
