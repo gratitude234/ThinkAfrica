@@ -202,7 +202,11 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     minWords > 0 ? wordCountMessage(displayWordCount, minWords) : "";
 
   return (
-    <div>
+    <div
+      className={
+        canvasMode && displayWordCount === 0 ? "write-canvas-compact" : undefined
+      }
+    >
       {!canvasMode ? (
       <div className="hidden border-b border-gray-200 bg-canvas p-2 lg:block">
         <div className="flex flex-wrap items-center gap-1">
@@ -429,7 +433,13 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
 
       <EditorContent
         editor={editor}
-        className={canvasMode ? "min-h-[430px]" : "min-h-[400px]"}
+        className={
+          canvasMode
+            ? displayWordCount === 0
+              ? "min-h-[280px] lg:min-h-[380px]"
+              : "min-h-[430px]"
+            : "min-h-[400px]"
+        }
       />
 
       {canvasMode && displayWordCount > 0 ? (

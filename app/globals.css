@@ -96,7 +96,17 @@
 }
 
 .write-canvas-editor p.is-editor-empty:first-child::before {
-  color: #b7b3bd;
+  color: #98949f;
+}
+
+.write-canvas-compact .write-canvas-editor {
+  min-height: 280px;
+}
+
+@media (min-width: 1024px) {
+  .write-canvas-compact .write-canvas-editor {
+    min-height: 380px;
+  }
 }
 
 .write-canvas-editor h2,

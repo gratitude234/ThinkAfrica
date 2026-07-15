@@ -11,6 +11,7 @@ import type { PostReferenceRecord } from "@/lib/types";
 import { type PostType } from "@/lib/utils";
 import { useDraftManager, readDraftBackupRaw } from "./DraftManager";
 import PublishDrawer from "./PublishDrawer";
+import WriteCanvasSkeleton from "./WriteCanvasSkeleton";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import { ensureDraft, savePostReferences } from "./actions";
 import {
@@ -24,7 +25,10 @@ import type { EditorHandle } from "@/components/editor/Editor";
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
   loading: () => (
-    <div className="min-h-[400px] animate-pulse rounded-lg border border-gray-200 bg-canvas" />
+    <div className="min-h-[280px] animate-pulse py-1 lg:min-h-[380px]">
+      <div className="h-5 w-full rounded bg-gray-200/50" />
+      <div className="mt-3 h-5 w-3/4 rounded bg-gray-200/50" />
+    </div>
   ),
 });
 
@@ -515,7 +519,7 @@ export default function WritePage() {
         ? "Saved"
         : saveStatus === "error"
           ? "Couldn't save"
-          : "";
+          : "Draft";
 
   // Pick up a highlighted quote stored by HighlightShare when navigating from a post.
   useEffect(() => {
@@ -609,23 +613,7 @@ export default function WritePage() {
   };
 
   if (loadingDraft) {
-    return (
-      <div className="mx-auto min-h-screen max-w-[1080px] animate-pulse px-5 pb-24 sm:px-8 lg:px-10">
-        <div className="flex items-center justify-between py-4">
-          <div className="h-9 w-9 rounded-lg bg-gray-200" />
-          <div className="h-8 w-40 rounded-full bg-gray-200" />
-        </div>
-        <div className="grid items-start gap-10 pt-3 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="space-y-4">
-            <div className="h-10 w-3/4 rounded bg-gray-200" />
-            <div className="h-[430px] w-full rounded-lg bg-gray-100" />
-          </div>
-          <div className="hidden lg:block">
-            <div className="h-48 w-full rounded-xl bg-gray-100" />
-          </div>
-        </div>
-      </div>
-    );
+    return <WriteCanvasSkeleton />;
   }
 
   const hasContent =
@@ -637,15 +625,17 @@ export default function WritePage() {
     }
     router.push("/");
   };
-  const uploadResearchPill = (
+  const uploadResearchLink = (
     <Link
       href="/submit/research"
-      className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-gray-200 bg-white px-3.5 py-2 text-[13px] font-medium text-gray-900 hover:border-gray-300"
+      className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-xs font-medium text-gray-500 transition-colors hover:bg-white hover:text-gray-800"
+      aria-label="Upload a research paper"
+      title="Upload a research paper"
     >
       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5V4M7 9l5-5 5 5M4.5 19.5h15" />
       </svg>
-      Upload research paper
+      <span className="hidden min-[480px]:inline">Research PDF</span>
     </Link>
   );
 
@@ -666,26 +656,24 @@ export default function WritePage() {
           </svg>
         </button>
 
-        {hasContent ? (
-          <div className="flex shrink-0 items-center gap-3">
-            <span
-              className={`min-w-[44px] text-right text-xs font-medium ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
-            >
-              {compactSaveLabel}
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              disabled={!canOpenPublish}
-              onClick={handleReadyToPublish}
-              title={publishBlockReason ?? undefined}
-            >
-              Publish
-            </Button>
-          </div>
-        ) : (
-          uploadResearchPill
-        )}
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+          {uploadResearchLink}
+          <span
+            className={`min-w-[44px] text-right text-xs font-medium ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
+            aria-live="polite"
+          >
+            {compactSaveLabel}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!canOpenPublish}
+            onClick={handleReadyToPublish}
+            title={publishBlockReason ?? undefined}
+          >
+            Publish
+          </Button>
+        </div>
       </header>
 
       {!loadingProfileInfo && currentUserId && !profileInfo?.username ? (
@@ -788,7 +776,7 @@ export default function WritePage() {
               saveDraft(getCurrentData({ title: event.target.value }));
             }}
             placeholder="Title"
-            className="w-full border-none bg-transparent px-0 py-1 font-display text-[32px] font-semibold leading-[1.2] text-ink placeholder:text-gray-300 focus:outline-none focus:ring-0"
+            className="w-full border-none bg-transparent px-0 py-1 font-display text-[32px] font-semibold leading-[1.2] text-ink placeholder:text-gray-400 focus:outline-none focus:ring-0"
           />
 
           <Editor
@@ -816,14 +804,13 @@ export default function WritePage() {
         </aside>
       </div>
 
-      {hasContent ? (
-        <div
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white shadow-[0_-4px_16px_rgba(15,23,42,0.05)]"
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-        >
-          <div className="mx-auto max-w-[1080px] px-5 sm:px-8 lg:px-10">
-            <div className="lg:w-[calc(100%-340px)]">
-              {showLinkPopover ? (
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white shadow-[0_-4px_16px_rgba(15,23,42,0.05)]"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="mx-auto max-w-[1080px] px-5 sm:px-8 lg:px-10">
+          <div className="lg:w-[calc(100%-340px)]">
+            {showLinkPopover ? (
                 <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-2 py-2">
                   <input
                     type="url"
@@ -860,31 +847,30 @@ export default function WritePage() {
                     Cancel
                   </button>
                 </div>
-              ) : null}
-              <div
-                className="flex items-center gap-1 overflow-x-auto py-2.5"
-                style={{ scrollbarWidth: "none" }}
-              >
-                {MOBILE_TOOLBAR_BUTTONS.map((btn) => (
-                  <button
-                    key={btn.title}
-                    type="button"
-                    title={btn.title}
-                    onClick={() => runMobileToolbarAction(btn.action)}
-                    className={`flex h-9 min-w-[36px] shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition-colors ${
-                      btn.markKey && activeMarks[btn.markKey]
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "text-gray-600 hover:bg-gray-100 active:bg-gray-100"
-                    }`}
-                  >
-                    {btn.icon}
-                  </button>
-                ))}
-              </div>
+            ) : null}
+            <div
+              className="flex items-center gap-1 overflow-x-auto py-2.5"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {MOBILE_TOOLBAR_BUTTONS.map((btn) => (
+                <button
+                  key={btn.title}
+                  type="button"
+                  title={btn.title}
+                  onClick={() => runMobileToolbarAction(btn.action)}
+                  className={`flex h-9 min-w-[36px] shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition-colors ${
+                    btn.markKey && activeMarks[btn.markKey]
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "text-gray-600 hover:bg-gray-100 active:bg-gray-100"
+                  }`}
+                >
+                  {btn.icon}
+                </button>
+              ))}
             </div>
           </div>
         </div>
-      ) : null}
+      </div>
 
       {showCancelConfirm ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">

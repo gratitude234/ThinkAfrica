@@ -25,6 +25,30 @@ function PlusIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+function ComposeIcon({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13.5 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6.5"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m11.75 14.25.45-2.35 5.55-5.55a1.6 1.6 0 0 1 2.25 0l.15.15a1.6 1.6 0 0 1 0 2.25l-5.55 5.55-2.35.45.5-2.35"
+      />
+    </svg>
+  );
+}
+
 function actionTone(category: string) {
   if (category === "community") return "bg-purple-50 text-purple-700";
   if (category === "profile") return "bg-blue-50 text-blue-700";
@@ -71,17 +95,13 @@ export default function CreateLauncher({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="group fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_12px_24px_-8px_rgb(16_185_129/0.65)] transition-[background-color,transform] duration-200 hover:bg-[#0E4B37] active:scale-95 motion-reduce:transition-none"
-          aria-label="Create"
+          className="group fixed bottom-[calc(72px+env(safe-area-inset-bottom))] right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition-[background-color,box-shadow,transform] duration-200 hover:bg-emerald-700 hover:shadow-[0_10px_24px_-7px_rgb(7_57_41/0.55)] active:scale-[0.96] motion-reduce:transition-none"
+          aria-label="Open create menu"
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
         >
-          <PlusIcon
-            className={`h-6 w-6 transition-transform duration-200 motion-reduce:transition-none ${
-              open ? "rotate-45" : "group-active:rotate-45"
-            }`}
-          />
+          <ComposeIcon className="h-[25px] w-[25px] transition-transform duration-200 group-active:scale-95 motion-reduce:transition-none" />
         </button>
 
         {open ? (
