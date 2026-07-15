@@ -91,85 +91,14 @@ export default function CreateLauncher({
 
   if (variant === "mobileFab") {
     return (
-      <div ref={rootRef} className="md:hidden">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
+      <div className="md:hidden">
+        <Link
+          href={getCreateHref("/write", userId)}
           className="group fixed bottom-[calc(72px+env(safe-area-inset-bottom))] right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition-[background-color,box-shadow,transform] duration-200 hover:bg-emerald-700 hover:shadow-[0_10px_24px_-7px_rgb(7_57_41/0.55)] active:scale-[0.96] motion-reduce:transition-none"
-          aria-label="Open create menu"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-controls={open ? panelId : undefined}
+          aria-label="Start writing"
         >
           <ComposeIcon className="h-[25px] w-[25px] transition-transform duration-200 group-active:scale-95 motion-reduce:transition-none" />
-        </button>
-
-        {open ? (
-          <div className="fixed inset-0 z-[70] animate-fade-in bg-black/40 motion-reduce:animate-none">
-            <button
-              type="button"
-              className="absolute inset-0 cursor-default"
-              onClick={() => setOpen(false)}
-              aria-label="Close create menu"
-            />
-            <div
-              id={panelId}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={`${panelId}-title`}
-              className="absolute inset-x-0 bottom-0 max-h-[82vh] animate-create-sheet-up overflow-y-auto rounded-t-3xl bg-white px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-4 shadow-2xl motion-reduce:animate-none"
-            >
-              <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-gray-200" />
-              <div className="mb-4 flex items-start justify-between gap-4">
-                <div>
-                  <h2 id={`${panelId}-title`} className="text-lg font-semibold text-ink">
-                    Create
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Start with the contribution that fits your idea.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-lg px-2 py-1 text-2xl leading-none text-gray-400 hover:bg-canvas hover:text-gray-600"
-                  aria-label="Close create menu"
-                >
-                  x
-                </button>
-              </div>
-              <div className="space-y-2">
-                {CREATE_ACTIONS.map((action, index) => (
-                  <Link
-                    key={action.id}
-                    href={getCreateHref(action.href, userId)}
-                    onClick={() => setOpen(false)}
-                    className="block animate-create-item-in rounded-2xl border border-gray-200 bg-white p-4 opacity-0 transition-colors hover:border-emerald-200 hover:bg-canvas motion-reduce:animate-none motion-reduce:opacity-100"
-                    style={{ animationDelay: `${index * 35}ms` }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {action.label}
-                        </p>
-                        <p className="mt-1 text-sm leading-5 text-gray-500">
-                          {action.description}
-                        </p>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${actionTone(
-                          action.category
-                        )}`}
-                      >
-                        {action.badge}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : null}
+        </Link>
       </div>
     );
   }
