@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
 
 type ToggleFollowInput = {
@@ -79,7 +80,8 @@ export async function toggleFollow(input: ToggleFollowInput): Promise<{
   const actorName = displayName(actorProfile);
   const ctaPath = actorProfile?.username ? `/${actorProfile.username}` : "/notifications";
 
-  const { error: notificationError } = await supabase.from("notifications").insert({
+  const admin = createAdminClient();
+  const { error: notificationError } = await admin.from("notifications").insert({
     user_id: input.followingId,
     type: "follow",
     message: `${actorName} started following you on Indegenius.`,

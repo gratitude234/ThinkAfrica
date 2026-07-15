@@ -7,6 +7,7 @@ import {
 } from "@/lib/opportunities";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 interface SubmitOpportunityInquiryInput {
   talentProfileId: string;
@@ -135,7 +136,8 @@ export async function submitOpportunityInquiry(
   }
 
   const typeLabel = getOpportunityShortLabel(opportunityType);
-  const { error: notificationError } = await supabase.from("notifications").insert({
+  const admin = createAdminClient();
+  const { error: notificationError } = await admin.from("notifications").insert({
     user_id: target.user_id,
     actor_id: user.id,
     type: "opportunity_inquiry",

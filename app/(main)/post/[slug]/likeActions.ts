@@ -150,12 +150,14 @@ export async function togglePostLike(
     const actorName = displayName(actorProfile);
     const ctaPath = `/post/${post.slug}`;
 
-    // uniq_unread_like_notification (partial unique index on notifications) collapses
-    // repeated unlike/relike toggles into one pending notification atomically — a
-    // pre-check-then-insert here can't work because the SELECT runs as the liker and
-    // notifications SELECT RLS only permits reading rows where auth.uid() = user_id
-    // (the recipient), and it would be racy under concurrent toggles regardless.
-    const { error: notificationError } = await supabase.from("notifications").insert({
+    // notifications no longer has a client-facing INSERT policy (it was previously
+    // WITH CHECK (true), forgeable by any authenticated user) — creating one requires
+    // the admin client. uniq_unread_like_notification (partial unique index) still
+    // collapses repeated unlike/relike toggles into one pending notification
+    // atomically; a pre-check-then-insert can't work here regardless, since the
+    // liker is never the recipient the SELECT RLS would need to allow reading.
+    const admin = createAdminClient();
+    const { error: notificationError } = await admin.from("notifications").insert({
       user_id: post.author_id,
       type: "like",
       message: `${actorName} liked your post: ${post.title}`,

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml, logEmailResult, sendUserEmail } from "@/lib/email";
 import { requireNotSuspended } from "@/lib/suspension";
 import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
@@ -127,7 +128,8 @@ export async function submitComment(input: SubmitCommentInput): Promise<{
     const actorName = displayName(actorProfile);
     const commentKind = parentId ? "replied to your comment" : "commented on your post";
     const ctaPath = `/post/${post.slug}#comments`;
-    const { error: notificationError } = await supabase.from("notifications").insert({
+    const admin = createAdminClient();
+    const { error: notificationError } = await admin.from("notifications").insert({
       user_id: recipientId,
       type: "comment",
       message: `${actorName} ${commentKind}: ${post.title}`,

@@ -1,0 +1,16 @@
+-- The "System can insert notifications" policy (WITH CHECK (true), added in
+-- 20260420193000_journal_system.sql) let any authenticated client insert an
+-- arbitrary notification row for any user_id/actor_id/post_id/type -- including
+-- pre-creating a fake unread "like" notification to collide with
+-- uniq_unread_like_notification and suppress a real like's notification/push/email.
+--
+-- Every legitimate notification-creation call site (likeActions.ts,
+-- commentActions.ts, write/actions.ts, notifications/actions.ts, followActions.ts,
+-- opportunityInquiryActions.ts) has been moved to the admin/service-role client,
+-- which bypasses RLS entirely and needs no policy. admin/review/actions.ts,
+-- admin/moderation/actions.ts, and the review-reminders cron route already used the
+-- admin client. With no remaining legitimate client-facing insert path, drop the
+-- permissive policy outright rather than trying to scope it -- RLS defaults to deny
+-- once no policy grants the operation, so authenticated/anon can no longer insert
+-- into notifications at all.
+DROP POLICY IF EXISTS "System can insert notifications" ON public.notifications;

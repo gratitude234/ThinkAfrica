@@ -230,6 +230,8 @@ async function syncAuthors(
     throw new Error(ownerError.message);
   }
 
+  const admin = createAdminClient();
+
   for (const coAuthor of sanitized) {
     const existingAcceptedAt = existingByUserId.get(coAuthor.user_id) ?? null;
     const { error } = await supabase.from("post_authors").upsert(
@@ -250,7 +252,7 @@ async function syncAuthors(
     }
 
     if (!existingByUserId.has(coAuthor.user_id)) {
-      const { error: notificationError } = await supabase.from("notifications").insert({
+      const { error: notificationError } = await admin.from("notifications").insert({
         user_id: coAuthor.user_id,
         type: "co_author_invite",
         message: `${ownerName} has invited you to co-author this post.`,
@@ -538,7 +540,8 @@ export async function publishPost(input: {
       responseParentPath = `/post/${parentPost.slug}`;
 
       if (parentPost.author_id !== user.id) {
-        const { error: notificationError } = await supabase.from("notifications").insert({
+        const admin = createAdminClient();
+        const { error: notificationError } = await admin.from("notifications").insert({
           user_id: parentPost.author_id,
           type: "response_post",
           message: `${ownerProfile?.full_name ?? "An Indegenius author"} wrote a response to your post.`,

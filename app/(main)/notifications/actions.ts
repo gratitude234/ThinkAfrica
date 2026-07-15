@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 
@@ -11,6 +12,7 @@ export async function respondToCoAuthorInvite(input: {
   accept: boolean;
 }) {
   const supabase = await createClient();
+  const admin = createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -63,7 +65,7 @@ export async function respondToCoAuthorInvite(input: {
     if (error) return { error: error.message };
     if (!invite) return { error: "Invitation no longer exists." };
 
-    const { error: notificationError } = await supabase.from("notifications").insert({
+    const { error: notificationError } = await admin.from("notifications").insert({
       user_id: post.author_id,
       type: "co_author_accepted",
       message: `${actorName} accepted your co-author invitation on: ${post.title}`,
@@ -117,7 +119,7 @@ export async function respondToCoAuthorInvite(input: {
         .eq("user_id", post.author_id);
     }
 
-    const { error: notificationError } = await supabase.from("notifications").insert({
+    const { error: notificationError } = await admin.from("notifications").insert({
       user_id: post.author_id,
       type: "co_author_declined",
       message: `${actorName} declined your co-author invitation on: ${post.title}`,
