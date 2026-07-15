@@ -44,11 +44,6 @@ export default async function SettingsPage({ searchParams }: PageProps) {
 
   if (!profile) redirect("/login");
 
-  const { count: pushSubscriptionCount } = await supabase
-    .from("push_subscriptions")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id);
-
   const credibilitySummary = getProfileCredibilitySummary({
     profile: {
       full_name: profile.full_name,
@@ -191,7 +186,6 @@ export default async function SettingsPage({ searchParams }: PageProps) {
           <NotificationsForm
             profileId={profile.id}
             notificationPrefs={notifPrefs}
-            hasPushSubscription={Boolean(pushSubscriptionCount && pushSubscriptionCount > 0)}
           />
         )}
         {tab === "privacy" && (

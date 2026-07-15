@@ -27,6 +27,7 @@ interface EditorProps {
   minWords?: number;
   onUpdate?: (html: string, wordCount: number) => void;
   onSelectionUpdate?: () => void;
+  canvasMode?: boolean;
 }
 
 function countWordsFromHtml(value: string) {
@@ -52,6 +53,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   minWords = 0,
   onUpdate,
   onSelectionUpdate,
+  canvasMode = false,
 }, ref) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -86,7 +88,9 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     content,
     editorProps: {
       attributes: {
-        class: "tiptap prose max-w-none focus:outline-none p-4",
+        class: canvasMode
+          ? "tiptap write-canvas-editor prose max-w-none focus:outline-none"
+          : "tiptap prose max-w-none focus:outline-none p-4",
       },
     },
     onUpdate({ editor }) {
@@ -127,6 +131,15 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
       editor?.destroy();
     };
   }, [editor]);
+
+  useEffect(() => {
+    if (!editor || editor.getHTML() === content) return;
+
+    editor.commands.setContent(content, false);
+    const nextWordCount = countWordsFromHtml(content);
+    setRawWordCount(nextWordCount);
+    setDisplayWordCount(nextWordCount);
+  }, [content, editor]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -190,6 +203,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
 
   return (
     <div>
+      {!canvasMode ? (
       <div className="hidden border-b border-gray-200 bg-canvas p-2 lg:block">
         <div className="flex flex-wrap items-center gap-1">
           <ToolbarButton
@@ -282,13 +296,16 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
           </div>
         ) : null}
       </div>
+      ) : null}
 
+      {!canvasMode ? (
       <div className="sticky top-0 z-10 hidden border-b border-gray-100 bg-canvas px-4 py-1.5 lg:block">
         <span className={countClasses}>
           {displayWordCount.toLocaleString()} words
           {countMessage ? ` · ${countMessage}` : ""}
         </span>
       </div>
+      ) : null}
 
       <input
         ref={imageInputRef}
@@ -410,7 +427,16 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         </BubbleMenu>
       ) : null}
 
-      <EditorContent editor={editor} className="min-h-[400px]" />
+      <EditorContent
+        editor={editor}
+        className={canvasMode ? "min-h-[430px]" : "min-h-[400px]"}
+      />
+
+      {canvasMode && displayWordCount > 0 ? (
+        <div className="pb-1 text-right text-xs text-gray-400">
+          {displayWordCount.toLocaleString()} word{displayWordCount === 1 ? "" : "s"}
+        </div>
+      ) : null}
     </div>
   );
 });

@@ -1,10 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { isPushSupported, subscribeToPush } from "@/lib/pushClient";
+import { trackActivationEvent } from "@/lib/activationEvents";
+import {
+  getCurrentPushDeviceState,
+  getPushOperationErrorMessage,
+  requestPushPermission,
+  subscribeCurrentDevice,
+  unsubscribeCurrentDevice,
+} from "@/lib/pushClient";
+import {
+  recordPushPermissionDenied,
+  recordPushPermissionRestored,
+  type PushPermissionState,
+} from "@/lib/pushPromptPolicy";
+import {
+  loadPushNudgeState,
+  savePushNudgeState,
+  setPushNudgeDisabled,
+} from "@/lib/pushNudgeStorage";
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
+import { sendCurrentDeviceTestPush } from "./pushActions";
 
 export interface NotificationPrefs {
   email_comments: boolean;
@@ -59,48 +77,71 @@ const PUSH_ROWS: { key: keyof NotificationPrefs; label: string; description: str
   { key: "push_daily_brief", label: "Daily brief", description: "One browser push a day with today's top post and live debate" },
 ];
 
-type PushState =
-  | "checking"
-  | "unsupported"
-  | "default"
-  | "denied"
-  | "active"
-  | "unsubscribed";
+type PushState = "checking" | "unsupported" | "default" | "denied" | "active" | "unsubscribed";
 
 interface Props {
   profileId: string;
   notificationPrefs: NotificationPrefs;
-  hasPushSubscription: boolean;
 }
 
-export default function NotificationsForm({
-  profileId,
-  notificationPrefs,
-  hasPushSubscription,
-}: Props) {
+const TEST_ERROR_MESSAGES = {
+  missing_configuration: "Test notifications are not configured right now.",
+  not_found: "This device subscription could not be found. Try resubscribing.",
+  expired_subscription: "This device subscription expired. Resubscribe and try again.",
+  delivery_failed: "The test notification could not be delivered.",
+} as const;
+
+export default function NotificationsForm({ profileId, notificationPrefs }: Props) {
   const [prefs, setPrefs] = useState<NotificationPrefs>(notificationPrefs);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-
   const [pushState, setPushState] = useState<PushState>("checking");
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
+  const [endpoint, setEndpoint] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isPushSupported()) {
+  const refreshDeviceState = useCallback(async () => {
+    setPushState("checking");
+    const device = await getCurrentPushDeviceState();
+    if (!device.supported) {
       setPushState("unsupported");
       return;
     }
-    if (Notification.permission === "denied") {
+    if (device.permission === "denied") {
       setPushState("denied");
       return;
     }
-    if (Notification.permission === "default") {
-      setPushState("default");
+    if (device.subscription) {
+      setEndpoint(device.subscription.endpoint);
+      setPushState("active");
       return;
     }
-    setPushState(hasPushSubscription ? "active" : "unsubscribed");
-  }, [hasPushSubscription]);
+    setEndpoint(null);
+    setPushState(device.permission === "default" ? "default" : "unsubscribed");
+    if (device.errorCode) setPushError(getPushOperationErrorMessage(device.errorCode));
+  }, []);
+
+  useEffect(() => {
+    void refreshDeviceState();
+  }, [refreshDeviceState]);
+
+  function syncNudgePermission(permission: PushPermissionState) {
+    const current = loadPushNudgeState(profileId, null, permission);
+    savePushNudgeState(
+      profileId,
+      permission === "denied"
+        ? recordPushPermissionDenied(current)
+        : recordPushPermissionRestored(current)
+    );
+  }
+
+  function trackDeviceOperation(operation: string, result: string, errorCode: string | null = null) {
+    trackActivationEvent({
+      event: "push_device_operation",
+      source: "settings",
+      metadata: { surface: "settings", operation, result, errorCode },
+    });
+  }
 
   const handleSave = async () => {
     setSaving(true);
@@ -110,67 +151,95 @@ export default function NotificationsForm({
       .update({ notification_prefs: prefs })
       .eq("id", profileId);
     setSaving(false);
-
-    if (error) {
-      setToast(error.message);
-      return;
-    }
-    setToast("Preferences saved.");
+    setToast(error ? error.message : "Preferences saved.");
   };
 
-  const handleEnablePush = async () => {
+  const subscribe = async (requestPermission: boolean) => {
     setPushBusy(true);
     setPushError(null);
     try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setPushState(permission === "denied" ? "denied" : "default");
+      if (requestPermission) {
+        const permission = await requestPushPermission();
+        syncNudgePermission(permission);
+        trackActivationEvent({
+          event: "push_permission_resolved",
+          source: "settings",
+          metadata: { surface: "settings", result: permission },
+        });
+        if (permission !== "granted") {
+          setPushState(permission === "denied" ? "denied" : "default");
+          return;
+        }
+      }
+
+      const result = await subscribeCurrentDevice(profileId);
+      trackDeviceOperation("subscribe", result.ok ? "success" : "failure", result.ok ? null : result.code);
+      if (!result.ok) {
+        setPushError(getPushOperationErrorMessage(result.code));
         return;
       }
-      const ok = await subscribeToPush(profileId);
-      if (!ok) {
-        setPushError("Could not finish enabling push notifications. Try again.");
-        return;
-      }
+      syncNudgePermission("granted");
+      setPushNudgeDisabled(profileId, false);
+      setEndpoint(result.endpoint);
       setPushState("active");
+      setToast("Push notifications enabled on this device.");
     } catch {
       setPushError("Could not enable push notifications.");
+      trackDeviceOperation("subscribe", "failure", "unexpected");
     } finally {
       setPushBusy(false);
     }
   };
 
-  const handleResubscribe = async () => {
+  const handleDisable = async () => {
     setPushBusy(true);
     setPushError(null);
     try {
-      const ok = await subscribeToPush(profileId);
-      if (!ok) {
-        setPushError("Could not resubscribe. Try again.");
+      const result = await unsubscribeCurrentDevice(profileId);
+      const locallyOff = result.ok || result.localUnsubscribed;
+      trackDeviceOperation("unsubscribe", result.ok ? "success" : locallyOff ? "partial" : "failure", result.ok ? null : result.code);
+      if (!result.ok && !result.localUnsubscribed) {
+        setPushError(getPushOperationErrorMessage(result.code));
         return;
       }
-      setPushState("active");
-    } catch {
-      setPushError("Could not resubscribe.");
+      const current = loadPushNudgeState(profileId, null, Notification.permission);
+      savePushNudgeState(profileId, { ...current, disabledByUser: true });
+      setEndpoint(null);
+      setPushState(Notification.permission === "denied" ? "denied" : Notification.permission === "default" ? "default" : "unsubscribed");
+      if (!result.ok) setPushError(getPushOperationErrorMessage(result.code));
+      else setToast("Push notifications disabled on this device.");
     } finally {
       setPushBusy(false);
     }
   };
 
-  const pushTogglesDisabled = pushState !== "active";
+  const handleTest = async () => {
+    if (!endpoint) return;
+    setPushBusy(true);
+    setPushError(null);
+    try {
+      const result = await sendCurrentDeviceTestPush(endpoint);
+      trackDeviceOperation("test", result.ok ? "success" : "failure", result.ok ? null : result.code);
+      if (!result.ok) {
+        setPushError(TEST_ERROR_MESSAGES[result.code]);
+        if (result.code === "expired_subscription" || result.code === "not_found") {
+          await refreshDeviceState();
+        }
+        return;
+      }
+      setToast("Test notification sent.");
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   function renderToggleRow(
     { key, label, description }: { key: keyof NotificationPrefs; label: string; description: string },
-    disabled: boolean
+    channel: "Email" | "Push"
   ) {
     const value = prefs[key];
     return (
-      <div
-        key={key}
-        className={`flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 ${
-          disabled ? "opacity-50" : ""
-        }`}
-      >
+      <div key={key} className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
         <div>
           <p className="text-sm font-medium text-gray-800">{label}</p>
           <p className="mt-0.5 text-xs text-gray-500">{description}</p>
@@ -178,18 +247,12 @@ export default function NotificationsForm({
         <button
           type="button"
           role="switch"
+          aria-label={`${channel}: ${label}`}
           aria-checked={value}
-          disabled={disabled}
-          onClick={() => setPrefs((p) => ({ ...p, [key]: !p[key] }))}
-          className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors ${
-            disabled ? "cursor-not-allowed" : "cursor-pointer"
-          } ${value ? "bg-emerald-500" : "bg-gray-200"}`}
+          onClick={() => setPrefs((current) => ({ ...current, [key]: !current[key] }))}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${value ? "bg-emerald-500" : "bg-gray-200"}`}
         >
-          <span
-            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-              value ? "translate-x-5" : "translate-x-0"
-            }`}
-          />
+          <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${value ? "translate-x-5" : "translate-x-0"}`} />
         </button>
       </div>
     );
@@ -200,68 +263,57 @@ export default function NotificationsForm({
       <div className="max-w-2xl space-y-6">
         <div>
           <h2 className="mb-4 text-base font-semibold text-gray-900">Email</h2>
-          <div className="space-y-3">
-            {EMAIL_ROWS.map((row) => renderToggleRow(row, false))}
-          </div>
+          <div className="space-y-3">{EMAIL_ROWS.map((row) => renderToggleRow(row, "Email"))}</div>
         </div>
 
         <div>
-          <h2 className="mb-4 text-base font-semibold text-gray-900">
-            Push notifications
-          </h2>
+          <h2 className="mb-1 text-base font-semibold text-gray-900">Push notifications</h2>
+          <p className="mb-4 text-xs text-gray-500">
+            Device enrollment applies to this browser. The preferences below apply to every subscribed device.
+          </p>
 
-          {pushState === "unsupported" ? (
-            <p className="mb-3 text-xs text-gray-500">
-              Your browser doesn&apos;t support push notifications, so these can&apos;t be
-              turned on here.
-            </p>
-          ) : null}
-
-          {pushState === "default" ? (
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-              <p className="text-sm text-gray-700">
-                Turn on push notifications to get real-time alerts on this device.
+          <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+            {pushState === "checking" ? <p className="text-sm text-gray-600">Checking this device...</p> : null}
+            {pushState === "unsupported" ? <p className="text-sm text-gray-700">This browser does not support push notifications.</p> : null}
+            {pushState === "default" ? (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-gray-700">Push notifications are not enabled on this device.</p>
+                <Button size="sm" loading={pushBusy} onClick={() => subscribe(true)}>Enable push</Button>
+              </div>
+            ) : null}
+            {pushState === "denied" ? (
+              <p className="text-sm text-amber-800">
+                Notifications are blocked for Indegenius. Re-enable them in your browser or device site settings, then refresh this page.
               </p>
-              <Button size="sm" loading={pushBusy} onClick={handleEnablePush}>
-                Enable push
-              </Button>
-            </div>
-          ) : null}
-
-          {pushState === "denied" ? (
-            <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Push notifications are blocked for Indegenius in your browser. Re-enable them
-              from your browser or device&apos;s site settings, then refresh this page.
-            </p>
-          ) : null}
-
-          {pushState === "unsubscribed" ? (
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-              <p className="text-sm text-gray-700">
-                Notifications are allowed, but this device isn&apos;t currently subscribed.
-              </p>
-              <Button size="sm" loading={pushBusy} onClick={handleResubscribe}>
-                Resubscribe
-              </Button>
-            </div>
-          ) : null}
-
-          {pushError ? (
-            <p className="mb-3 text-sm text-red-600">{pushError}</p>
-          ) : null}
-
-          <div className="space-y-3">
-            {PUSH_ROWS.map((row) => renderToggleRow(row, pushTogglesDisabled))}
+            ) : null}
+            {pushState === "unsubscribed" ? (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-gray-700">Permission is allowed, but this device is not subscribed.</p>
+                <Button size="sm" loading={pushBusy} onClick={() => subscribe(false)}>Resubscribe</Button>
+              </div>
+            ) : null}
+            {pushState === "active" ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-emerald-800">Enabled on this device</p>
+                  <p className="mt-0.5 text-xs text-gray-500">You can verify delivery or disable only this browser.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" loading={pushBusy} onClick={handleTest}>Send test</Button>
+                  <Button size="sm" variant="danger" loading={pushBusy} onClick={handleDisable}>Disable</Button>
+                </div>
+              </div>
+            ) : null}
           </div>
+
+          {pushError ? <p className="mb-3 text-sm text-red-600" role="alert">{pushError}</p> : null}
+          <div className="space-y-3">{PUSH_ROWS.map((row) => renderToggleRow(row, "Push"))}</div>
         </div>
 
         <div className="flex justify-end pt-2">
-          <Button loading={saving} onClick={handleSave}>
-            Save preferences
-          </Button>
+          <Button loading={saving} onClick={handleSave}>Save preferences</Button>
         </div>
       </div>
-
       {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
     </>
   );

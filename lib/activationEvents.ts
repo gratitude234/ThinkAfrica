@@ -50,7 +50,11 @@ export type ActivationEventName =
   | "coauthor_invite_declined"
   | "message_started"
   | "message_sent"
-  | "response_thread_opened";
+  | "response_thread_opened"
+  | "push_nudge_shown"
+  | "push_nudge_action"
+  | "push_permission_resolved"
+  | "push_device_operation";
 
 interface ActivationEventPayload {
   event: ActivationEventName;

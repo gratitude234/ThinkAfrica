@@ -56,6 +56,10 @@ const ALLOWED_EVENTS = new Set<ActivationEventName>([
   "message_started",
   "message_sent",
   "response_thread_opened",
+  "push_nudge_shown",
+  "push_nudge_action",
+  "push_permission_resolved",
+  "push_device_operation",
 ]);
 
 const ANONYMOUS_VIEW_EVENTS = new Set<ActivationEventName>([

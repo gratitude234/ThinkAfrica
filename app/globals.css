@@ -77,6 +77,33 @@
 .tiptap strong { @apply font-bold; }
 .tiptap em { @apply italic; }
 
+/* Distraction-free writing canvas */
+.write-canvas-editor {
+  min-height: 430px;
+  padding: 0.25rem 0;
+  color: var(--ta-ink);
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-size: 1.1875rem;
+  line-height: 1.65;
+}
+
+.write-canvas-editor p,
+.write-canvas-editor li {
+  margin-bottom: 1.15em;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.write-canvas-editor p.is-editor-empty:first-child::before {
+  color: #b7b3bd;
+}
+
+.write-canvas-editor h2,
+.write-canvas-editor h3 {
+  font-weight: 600;
+}
+
 /* Lite Mode */
 /* Activated by the .lite-mode class on the layout wrapper.
    Strips images and reduces data usage on slow connections. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
@@ -37,6 +37,17 @@ interface PublishDrawerProps {
 
 const POST_TYPES: Array<"blog" | "essay" | "policy_brief"> = ["blog", "essay", "policy_brief"];
 
+const SUGGESTED_TOPICS = [
+  "Governance",
+  "Economics",
+  "Education Policy",
+  "Climate & Environment",
+  "Public Health",
+  "Press Freedom",
+  "Technology",
+  "Youth & Employment",
+];
+
 const CARD_LABELS: Record<PostType, string> = {
   blog: "Quick Take",
   essay: "Essay",
@@ -48,51 +59,28 @@ const CARD_META: Record<
   "blog" | "essay" | "policy_brief",
   {
     description: string;
-    icon: ReactNode;
-    iconWrapClass: string;
+    dotClass: string;
     selectedCardClass: string;
-    selectedRadioClass: string;
-    selectedDotClass: string;
+    checkClass: string;
   }
 > = {
   blog: {
-    description: "A short, sharp reaction — 2 to 5 minutes to read.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M13 3L5 14h6l-1 7 9-11h-6z" />
-      </svg>
-    ),
-    iconWrapClass: "bg-green-tint text-emerald-brand",
-    selectedCardClass: "border-emerald-brand bg-green-tint/40",
-    selectedRadioClass: "border-emerald-brand",
-    selectedDotClass: "bg-emerald-brand",
+    description: "Short-form take, under 500 words.",
+    dotClass: "bg-emerald-brand",
+    selectedCardClass: "border-emerald-brand bg-green-tint/70",
+    checkClass: "bg-emerald-brand",
   },
   essay: {
-    description: "A developed argument, built across sections.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M7 3h7l4 4v14H7z" />
-        <path d="M9 12h6M9 16h6M9 8h3" />
-      </svg>
-    ),
-    iconWrapClass: "bg-gold-tint text-gold-ink",
-    selectedCardClass: "border-gold-ink bg-gold-tint/40",
-    selectedRadioClass: "border-gold-ink",
-    selectedDotClass: "bg-gold-ink",
+    description: "Long-form argument, 400+ words.",
+    dotClass: "bg-gold-ink",
+    selectedCardClass: "border-gold-ink bg-gold-tint/70",
+    checkClass: "bg-gold-ink",
   },
   policy_brief: {
-    description: "A structured recommendation, grounded in evidence.",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <rect x="6" y="4" width="12" height="17" rx="2" />
-        <path d="M9 4h6v3H9z" />
-        <path d="M9 13.5l2 2 4-4.5" />
-      </svg>
-    ),
-    iconWrapClass: "bg-purple-tint text-purple-accent",
-    selectedCardClass: "border-purple-accent bg-purple-tint/40",
-    selectedRadioClass: "border-purple-accent",
-    selectedDotClass: "bg-purple-accent",
+    description: "Structured analysis, editor-reviewed.",
+    dotClass: "bg-purple-accent",
+    selectedCardClass: "border-purple-accent bg-purple-tint/70",
+    checkClass: "bg-purple-accent",
   },
 };
 
@@ -186,6 +174,17 @@ export default function PublishDrawer({
     [content, platformTags, profile?.field_of_study]
   );
 
+  const topicSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+
+    return [...SUGGESTED_TOPICS, ...suggestedTags].filter((tag) => {
+      const normalized = normalizeTagValue(tag);
+      if (!normalized || seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    }).slice(0, 8);
+  }, [suggestedTags]);
+
   const qualitySummary = useMemo(
     () =>
       getPostQualitySummary({
@@ -227,9 +226,13 @@ export default function PublishDrawer({
     onMetadataChange?.({ tags: nextTags });
   };
 
-  const addSuggestedTag = (tag: string) => {
+  const toggleSuggestedTag = (tag: string) => {
     const normalized = normalizeTagValue(tag);
-    if (tags.includes(normalized) || tags.length >= 5) return;
+    if (tags.includes(normalized)) {
+      handleTagChange(tags.filter((value) => value !== normalized));
+      return;
+    }
+    if (tags.length >= 5) return;
     handleTagChange([...tags, normalized]);
   };
 
@@ -294,7 +297,7 @@ export default function PublishDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40">
+    <div className="fixed inset-0 z-50 animate-fade-in bg-black/[0.45]">
       <button
         type="button"
         onClick={onClose}
@@ -303,115 +306,103 @@ export default function PublishDrawer({
       />
 
       <div
-        className="absolute inset-x-0 bottom-0 flex max-h-[90vh] flex-col rounded-t-[20px] bg-white shadow-2xl sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-full sm:w-[420px] sm:rounded-none"
+        className="absolute inset-x-0 bottom-0 mx-auto max-h-[88vh] w-full max-w-[560px] animate-slide-up overflow-y-auto rounded-t-[20px] bg-white px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="publish-drawer-title"
       >
-        <div className="mx-auto mt-2.5 h-1 w-9 shrink-0 rounded-full bg-gray-300 sm:hidden" />
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-5 pb-4 pt-3">
-          <div>
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-gray-400">
-              Confirm format
-            </p>
-            <h2 id="publish-drawer-title" className="mt-1 text-lg font-semibold text-gray-900">
-              Ready to publish
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-600"
-            aria-label="Close publish drawer"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        <div className="mx-auto mb-[18px] mt-1.5 h-1 w-9 rounded-full bg-gray-300" />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6 px-5 py-5">
-            <section className="space-y-2.5">
-              {POST_TYPES.map((type) => {
-                const meta = CARD_META[type];
-                const selected = postType === type;
+        <h2
+          id="publish-drawer-title"
+          className="mb-[18px] font-display text-[22px] font-semibold leading-tight text-ink"
+        >
+          Ready to publish.
+        </h2>
 
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => handleSelectFormat(type)}
-                    aria-pressed={selected}
-                    className={`flex w-full items-center gap-3 rounded-xl border bg-white px-3.5 py-3 text-left transition-colors ${
-                      selected ? meta.selectedCardClass : "border-gray-200 hover:border-gray-300"
-                    }`}
+        <section className="mb-5 grid grid-cols-3 gap-2.5">
+          {POST_TYPES.map((type) => {
+            const meta = CARD_META[type];
+            const selected = postType === type;
+
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => handleSelectFormat(type)}
+                aria-pressed={selected}
+                className={`relative flex min-h-[112px] flex-col items-start gap-1 rounded-xl border px-3 py-3 text-left transition-colors ${
+                  selected
+                    ? meta.selectedCardClass
+                    : "border-gray-200 bg-white hover:border-gray-300"
+                }`}
+              >
+                <span className={`mb-0.5 h-2 w-2 rounded-full ${meta.dotClass}`} />
+                <span className="text-[13.5px] font-semibold leading-5 text-ink">
+                  {CARD_LABELS[type]}
+                </span>
+                <span className="text-[11.5px] leading-[1.4] text-gray-500">
+                  {meta.description}
+                </span>
+                {selected ? (
+                  <span
+                    className={`absolute right-2.5 top-2.5 flex h-[18px] w-[18px] items-center justify-center rounded-full text-white ${meta.checkClass}`}
                   >
-                    <span
-                      className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg ${meta.iconWrapClass}`}
-                    >
-                      {meta.icon}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[14.5px] font-semibold text-gray-900">
-                        {CARD_LABELS[type]}
-                      </span>
-                      <span className="mt-0.5 block text-xs leading-5 text-gray-500">
-                        {meta.description}
-                      </span>
-                    </span>
-                    <span
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                        selected ? meta.selectedRadioClass : "border-gray-300"
-                      }`}
-                    >
-                      {selected ? (
-                        <span className={`h-2.5 w-2.5 rounded-full ${meta.selectedDotClass}`} />
-                      ) : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </section>
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </section>
 
-            <section className="space-y-3">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Topics</p>
-                <p className="mt-1 text-xs text-gray-500">
-                  Pick 1 to 5 topics so the right readers find this piece.
-                </p>
-              </div>
+        <div className="mb-[18px] h-px bg-gray-100" />
 
-              {suggestedTags.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {suggestedTags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => addSuggestedTag(tag)}
-                      disabled={tags.includes(normalizeTagValue(tag))}
-                      className="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-brand hover:text-emerald-brand disabled:cursor-not-allowed disabled:bg-canvas disabled:text-gray-400"
-                    >
-                      + {tag}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              <TagInput
-                value={tags}
-                maxTags={5}
-                showLabel={false}
-                placeholder="Add a topic"
-                onChange={handleTagChange}
-              />
-            </section>
+        <section className="mb-5">
+          <div className="mb-2.5 flex items-baseline justify-between">
+            <p className="text-[13px] font-semibold text-ink">Topics</p>
+            <span className="text-xs text-gray-400">{tags.length}/5</span>
           </div>
-        </div>
 
-        <div className="shrink-0 space-y-3 border-t border-gray-100 bg-white px-5 py-4">
+          <div className="mb-3 flex flex-wrap gap-2">
+            {topicSuggestions.map((tag) => {
+              const normalized = normalizeTagValue(tag);
+              const selected = tags.includes(normalized);
+              const disabled = !selected && tags.length >= 5;
+
+              return (
+                <button
+                  key={normalized}
+                  type="button"
+                  onClick={() => toggleSuggestedTag(tag)}
+                  disabled={disabled}
+                  aria-pressed={selected}
+                  className={`rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+                    selected
+                      ? "border-emerald-brand bg-green-tint text-emerald-brand"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-emerald-brand hover:text-emerald-brand disabled:cursor-not-allowed disabled:opacity-45"
+                  }`}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+
+          <TagInput
+            value={tags}
+            maxTags={5}
+            showLabel={false}
+            placeholder={tags.length >= 5 ? "Topic limit reached" : "Add a topic"}
+            onChange={handleTagChange}
+          />
+        </section>
+
+        <div className="space-y-3">
           {warnings.length > 0 ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3">
+            <div className="flex flex-col gap-2 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-3">
               {warnings.map((warning) => (
                 <div key={warning} className="flex items-start gap-2">
                   <svg
@@ -434,8 +425,8 @@ export default function PublishDrawer({
           ) : null}
 
           {postType === "policy_brief" ? (
-            <div className="rounded-lg bg-purple-tint px-3.5 py-3">
-              <span className="text-xs leading-relaxed text-purple-accent">
+            <div className="rounded-[10px] bg-purple-tint px-3.5 py-3">
+              <span className="text-[12.5px] leading-relaxed text-purple-accent">
                 Policy briefs are reviewed by an editor before they go live. You&apos;ll be
                 notified once review is complete.
               </span>

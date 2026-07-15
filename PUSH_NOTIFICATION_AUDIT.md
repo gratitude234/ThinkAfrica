@@ -15,9 +15,24 @@ Push notifications are live. Infrastructure (subscription table, service worker,
 | VAPID config | env vars: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_MAILTO` | `sendPushNotification()` no-ops (`skipped: "missing_vapid_configuration"`) if unset, rather than throwing. |
 | Service worker | [public/sw.js](public/sw.js) | Handles `push` (shows notification) and `notificationclick` (focuses existing tab or opens a new one). |
 | SW registration | [components/push/ServiceWorkerRegister.tsx](components/push/ServiceWorkerRegister.tsx) | Mounted globally in [app/layout.tsx](app/layout.tsx) — registers on every page load, not just for logged-in users. |
-| Permission prompt | [components/push/NotificationPermissionPrompt.tsx](components/push/NotificationPermissionPrompt.tsx) | Fires once, at the final "Finish setup" step of [onboarding](app/(onboarding)/onboarding/page.tsx) — after a completed multi-step commitment, not mid-signup. 8s timeout guard so a hung `subscribe()` can't block onboarding. |
+| Permission prompt | [components/push/NotificationPermissionPrompt.tsx](components/push/NotificationPermissionPrompt.tsx) and [components/push/PushPromptBanner.tsx](components/push/PushPromptBanner.tsx) | Onboarding and home share the V2 device-aware policy. Native permission is requested only after an explicit Enable click, and failed setup remains recoverable. |
 | Manifest | [app/manifest.ts](app/manifest.ts) | Served at `/manifest.webmanifest`. |
 | Settings toggles | [app/(main)/settings/NotificationsForm.tsx](app/(main)/settings/NotificationsForm.tsx) | One toggle per preference key, listed below. |
+
+## Push nudge V2 policy
+
+- Enrollment truth comes from the current browser's `PushManager.getSubscription()`, not a user-wide database count.
+- Browser-local state is stored under `indegenius:push-nudge:v2:{userId}`. Legacy profile fields seed it once and are otherwise read-only.
+- An offer counts when visibly rendered. A browser receives at most three offers, separated by a full 20-day cooldown.
+- Explicit permission denial suppresses enable prompts. After 20 days, home can show one settings-only recovery reminder.
+- Settings keeps account-wide category preferences editable while separately supporting current-device enable, repair, test, and disable actions.
+- Service-worker and Push API operations time out after 10 seconds. Subscription persistence failures remain visible and retryable.
+
+### Funnel events and rollout metrics
+
+The existing `activation_events` pipeline records `push_nudge_shown`, `push_nudge_action`, `push_permission_resolved`, and `push_device_operation`. Metadata is limited to surface, mode, offer number, permission, action/operation, result, and stable error code; endpoints and key material are never recorded.
+
+Monitor impression-to-enable rate, permission grant and denial rates, subscription success/error rates, Settings recovery, test-send success, and unsubscribe rate.
 
 ## Touchpoints wired in
 

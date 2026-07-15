@@ -17,6 +17,13 @@ export type PushSendResult =
   | { skipped: true; reason: string }
   | { ok: false; error: string };
 
+export type TestPushResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code: "missing_configuration" | "not_found" | "expired_subscription" | "delivery_failed";
+    };
+
 // Shared cooldown for bursty, many-senders-to-one-recipient events (comments,
 // likes, follows) so a recipient can't be buzzed repeatedly within a short
 // window regardless of which event type triggered it. Not used by DMs or
@@ -70,6 +77,49 @@ function ensureVapidConfigured() {
 function isGoneStatus(error: unknown): boolean {
   const statusCode = (error as { statusCode?: number } | null)?.statusCode;
   return statusCode === 404 || statusCode === 410;
+}
+
+export async function sendTestPushNotification(
+  recipientId: string,
+  endpoint: string
+): Promise<TestPushResult> {
+  if (!ensureVapidConfigured()) return { ok: false, code: "missing_configuration" };
+
+  const admin = createAdminClient();
+  const { data: subscription, error } = await admin
+    .from("push_subscriptions")
+    .select("id, endpoint, p256dh, auth")
+    .eq("user_id", recipientId)
+    .eq("endpoint", endpoint)
+    .maybeSingle<SubscriptionRow>();
+
+  if (error || !subscription) return { ok: false, code: "not_found" };
+
+  try {
+    await webpush.sendNotification(
+      {
+        endpoint: subscription.endpoint,
+        keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+      },
+      JSON.stringify({
+        title: "Test notification",
+        body: "Notifications are working on this device.",
+        url: absoluteUrl("/settings?tab=notifications"),
+      })
+    );
+    return { ok: true };
+  } catch (sendError) {
+    if (isGoneStatus(sendError)) {
+      await admin.from("push_subscriptions").delete().eq("id", subscription.id);
+      return { ok: false, code: "expired_subscription" };
+    }
+    console.error(
+      `Test push failed for subscription ${subscription.id}: ${
+        sendError instanceof Error ? sendError.message : "Unknown push error"
+      }`
+    );
+    return { ok: false, code: "delivery_failed" };
+  }
 }
 
 export async function sendPushNotification(input: PushSendInput): Promise<PushSendResult> {

@@ -1,20 +1,16 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { type ReactNode, useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
-import CoAuthorPicker, {
-  type CoAuthorProfile,
-} from "@/components/collaboration/CoAuthorPicker";
 import ProfileGate from "@/components/ui/ProfileGate";
 import type { PostReferenceRecord } from "@/lib/types";
-import { formatRelativeTime, type PostType } from "@/lib/utils";
+import { type PostType } from "@/lib/utils";
 import { useDraftManager, readDraftBackupRaw } from "./DraftManager";
 import PublishDrawer from "./PublishDrawer";
-import WriteReadinessPanel from "./WriteReadinessPanel";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import { ensureDraft, savePostReferences } from "./actions";
 import {
@@ -23,7 +19,6 @@ import {
   isPostType,
   isResponseIntent,
 } from "./writeConfig";
-import { inferTypeFromContent } from "./writeUtils";
 import type { EditorHandle } from "@/components/editor/Editor";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
@@ -122,7 +117,6 @@ export default function WritePage() {
   const {
     draftId,
     saveStatus,
-    lastSaved,
     saveDraft,
     initialData,
     loadingDraft,
@@ -139,7 +133,6 @@ export default function WritePage() {
   } | null>(null);
   const [loadingProfileInfo, setLoadingProfileInfo] = useState(true);
   const [postType, setPostType] = useState<PostType>(initialPostType);
-  const [focusMode, setFocusMode] = useState(false);
   const [selectedResponseIntent] = useState(() =>
     isResponseIntent(responseIntentParam)
       ? responseIntentParam
@@ -147,12 +140,6 @@ export default function WritePage() {
         ? "extend"
         : null
   );
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("write_sidebar_collapsed") === "1";
-    }
-    return false;
-  });
   const editorRef = useRef<EditorHandle>(null);
   const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
@@ -166,7 +153,6 @@ export default function WritePage() {
   const [inResponseToAuthor, setInResponseToAuthor] = useState<string | null>(null);
   const [responseQuote, setResponseQuote] = useState<string | null>(null);
   const [references, setReferences] = useState<PostReferenceRecord[]>([]);
-  const [coAuthors, setCoAuthors] = useState<CoAuthorProfile[]>([]);
   const [wordCount, setWordCount] = useState(0);
   const [isPublishDrawerOpen, setIsPublishDrawerOpen] = useState(false);
   const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
@@ -531,24 +517,6 @@ export default function WritePage() {
           ? "Couldn't save"
           : "";
 
-  const saveStatusText = useMemo(() => {
-    if (saveStatus === "saving") return "Saving draft...";
-    if (saveStatus === "saved" && lastSaved) {
-      return `Saved ${formatRelativeTime(lastSaved.toISOString())}`;
-    }
-    if (saveStatus === "error") return "Couldn't save draft";
-    if (saveStatus === "idle") return draftId ? "Draft ready" : "Autosave on";
-    return "Unsaved changes";
-  }, [draftId, lastSaved, saveStatus]);
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("write_sidebar_collapsed", next ? "1" : "0");
-      return next;
-    });
-  }, []);
-
   // Pick up a highlighted quote stored by HighlightShare when navigating from a post.
   useEffect(() => {
     if (loadingDraft) return;
@@ -576,23 +544,6 @@ export default function WritePage() {
           : null;
   const selectedPostType =
     WRITE_FORMATS.find((item) => item.type === postType) ?? WRITE_FORMATS[0];
-  // Lets the editor's references panel appear for organically long, structured
-  // pieces even before a format is chosen at publish — postType itself stays
-  // "blog" until the writer picks a format in the publish drawer.
-  const inferredLiveType = inferTypeFromContent(content, wordCount);
-  const editorReferencesType: PostType =
-    postType === "policy_brief" || postType === "research"
-      ? postType
-      : inferredLiveType === "policy_brief" || inferredLiveType === "research"
-        ? inferredLiveType
-        : postType;
-  const showReferencesPanel =
-    editorReferencesType === "policy_brief" || editorReferencesType === "research";
-  const wordProgress = Math.min(
-    100,
-    (wordCount / selectedPostType.minWords) * 100
-  );
-  const estimatedReadTime = Math.max(1, Math.ceil(wordCount / 200));
   const responseStarterTemplate =
     selectedResponseIntent && inResponseToTitle
       ? getResponseStarterTemplate({
@@ -659,24 +610,18 @@ export default function WritePage() {
 
   if (loadingDraft) {
     return (
-      <div className="mx-auto max-w-6xl animate-pulse pb-24 lg:pb-0">
-        <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-4">
-          <div className="h-5 w-28 rounded bg-gray-200" />
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-16 rounded-lg bg-gray-200" />
-            <div className="h-8 w-32 rounded-lg bg-gray-200" />
-          </div>
+      <div className="mx-auto min-h-screen max-w-[1080px] animate-pulse px-5 pb-24 sm:px-8 lg:px-10">
+        <div className="flex items-center justify-between py-4">
+          <div className="h-9 w-9 rounded-lg bg-gray-200" />
+          <div className="h-8 w-40 rounded-full bg-gray-200" />
         </div>
-        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid items-start gap-10 pt-3 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="space-y-4">
-            <div className="h-14 w-full rounded-xl bg-gray-100" />
-            <div className="h-12 w-3/4 rounded bg-gray-200" />
-            <div className="h-7 w-1/2 rounded bg-gray-100" />
-            <div className="h-96 w-full rounded-lg bg-gray-100" />
+            <div className="h-10 w-3/4 rounded bg-gray-200" />
+            <div className="h-[430px] w-full rounded-lg bg-gray-100" />
           </div>
-          <div className="hidden space-y-3 lg:block">
+          <div className="hidden lg:block">
             <div className="h-48 w-full rounded-xl bg-gray-100" />
-            <div className="h-32 w-full rounded-xl bg-gray-100" />
           </div>
         </div>
       </div>
@@ -692,23 +637,6 @@ export default function WritePage() {
     }
     router.push("/");
   };
-  const readinessPanel = (
-    <WriteReadinessPanel
-      postType={postType}
-      title={title}
-      content={content}
-      excerpt={excerpt}
-      tags={tags}
-      references={references}
-      coAuthors={coAuthors}
-      profileInfo={profileInfo}
-      inResponseToTitle={inResponseToTitle}
-      saveStatusText={saveStatusText}
-      wordCount={wordCount}
-      estimatedReadTime={estimatedReadTime}
-      wordProgress={wordProgress}
-    />
-  );
   const uploadResearchPill = (
     <Link
       href="/submit/research"
@@ -722,110 +650,45 @@ export default function WritePage() {
   );
 
   return (
-    <div className={`mx-auto max-w-6xl pb-16 lg:pb-0 ${focusMode ? "focus-mode" : ""}`}>
-      {focusMode ? (
-        <div className="fixed right-4 top-4 z-50 flex items-center gap-3 rounded-full border border-gray-200 bg-white/90 px-4 py-2 shadow-md backdrop-blur-sm">
-          <span className={`text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}>
-            {wordCount.toLocaleString()} words · {saveStatusText}
-          </span>
-          <button
-            type="button"
-            onClick={() => setFocusMode(false)}
-            className="text-xs font-semibold text-gray-500 hover:text-gray-800"
-          >
-            Exit focus
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Mobile header — close only when empty; Publish + save status once there's content */}
-          <div
-            className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 lg:hidden"
-            style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
-          >
-            <button
-              type="button"
-              onClick={handleCloseCanvas}
-              aria-label="Close"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            {hasContent ? (
-              <div className="flex items-center gap-3">
-                <span
-                  className={`min-w-[44px] text-right text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
-                >
-                  {compactSaveLabel}
-                </span>
-                <button
-                  type="button"
-                  disabled={!canOpenPublish}
-                  onClick={handleReadyToPublish}
-                  className="rounded-lg bg-emerald-brand px-4 py-2 text-[13.5px] font-semibold text-white disabled:bg-gray-200 disabled:text-gray-400"
-                >
-                  Publish
-                </button>
-              </div>
-            ) : (
-              uploadResearchPill
-            )}
-          </div>
-          {/* Desktop header — same close-only-when-empty behavior */}
-          <div className="mb-6 hidden items-center justify-between border-b border-gray-100 pb-4 lg:flex">
-            <button
-              type="button"
-              onClick={handleCloseCanvas}
-              aria-label="Close"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            {hasContent ? (
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setFocusMode(true)}
-                  title="Focus mode — hide distractions"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" />
-                  </svg>
-                </button>
-                <p
-                  className={`min-w-[44px] text-right text-xs ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
-                >
-                  {compactSaveLabel}
-                </p>
-                <div className="group relative">
-                  <Button
-                    type="button"
-                    size="lg"
-                    disabled={!canOpenPublish}
-                    onClick={handleReadyToPublish}
-                  >
-                    Publish
-                  </Button>
-                  {!canOpenPublish && publishBlockReason ? (
-                    <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-lg bg-gray-900 px-3 py-1.5 text-xs text-white shadow-lg group-hover:block">
-                      {publishBlockReason}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ) : (
-              uploadResearchPill
-            )}
-          </div>
-        </>
-      )}
+    <div className="mx-auto min-h-screen max-w-[1080px] px-5 pb-24 sm:px-8 lg:px-10">
+      <header
+        className="sticky top-0 z-30 mb-3 flex items-center justify-between gap-3 bg-canvas/95 py-3.5 backdrop-blur-sm"
+        style={{ paddingTop: "max(0.875rem, env(safe-area-inset-top))" }}
+      >
+        <button
+          type="button"
+          onClick={handleCloseCanvas}
+          aria-label="Close"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white hover:text-gray-800"
+        >
+          <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
 
-      {!focusMode && !loadingProfileInfo && currentUserId && !profileInfo?.username ? (
+        {hasContent ? (
+          <div className="flex shrink-0 items-center gap-3">
+            <span
+              className={`min-w-[44px] text-right text-xs font-medium ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
+            >
+              {compactSaveLabel}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canOpenPublish}
+              onClick={handleReadyToPublish}
+              title={publishBlockReason ?? undefined}
+            >
+              Publish
+            </Button>
+          </div>
+        ) : (
+          uploadResearchPill
+        )}
+      </header>
+
+      {!loadingProfileInfo && currentUserId && !profileInfo?.username ? (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
           <span className="text-amber-800">
             You&apos;ll need a complete profile to publish. You can still draft now.
@@ -839,41 +702,33 @@ export default function WritePage() {
         </div>
       ) : null}
 
-      {!focusMode && localBackup && !hasContent ? (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
-          <span className="text-amber-800">
+      {localBackup && !hasContent ? (
+        <div className="mb-5 flex animate-slide-up items-center justify-between gap-3 rounded-xl border border-green-wash-border bg-green-wash px-4 py-3.5 text-sm">
+          <span className="min-w-0 text-[13.5px] leading-5 text-ink">
             We found an unsaved draft: &quot;{localBackup.title || "Untitled"}&quot;
           </span>
-          <div className="ml-4 flex flex-shrink-0 gap-3">
-            <button
-              type="button"
-              onClick={restoreFromBackup}
-              className="font-medium text-amber-700 underline hover:text-amber-900"
-            >
-              Restore
-            </button>
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={dismissBackup}
-              className="text-amber-500 hover:text-amber-700"
+              className="rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-gray-500 hover:bg-white/70 hover:text-gray-700"
             >
               Dismiss
+            </button>
+            <button
+              type="button"
+              onClick={restoreFromBackup}
+              className="rounded-lg bg-emerald-brand px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-[#0E4B37]"
+            >
+              Restore
             </button>
           </div>
         </div>
       ) : null}
 
-      <div
-        className={
-          focusMode || sidebarCollapsed
-            ? ""
-            : "grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]"
-        }
-      >
-        <div className="min-w-0">
-      <div className="space-y-4">
-        <div>
-          {!focusMode && inResponseToId && inResponseToTitle ? (
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <main className="min-w-0">
+          {inResponseToId && inResponseToTitle ? (
             <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
@@ -933,7 +788,7 @@ export default function WritePage() {
               saveDraft(getCurrentData({ title: event.target.value }));
             }}
             placeholder="Title"
-            className="mb-5 w-full border-none px-0 font-display text-4xl font-semibold leading-tight text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0"
+            className="w-full border-none bg-transparent px-0 py-1 font-display text-[32px] font-semibold leading-[1.2] text-ink placeholder:text-gray-300 focus:outline-none focus:ring-0"
           />
 
           <Editor
@@ -944,22 +799,32 @@ export default function WritePage() {
             minWords={selectedPostType.minWords}
             onUpdate={handleEditorUpdate}
             onSelectionUpdate={handleSelectionUpdate}
+            canvasMode
           />
 
-          {!focusMode && showReferencesPanel ? (
-            <div className="mt-4 lg:hidden">
-              <ReferencesPanel references={references} onChange={handleReferencesChange} />
-            </div>
-          ) : null}
+          <div className="mt-6 lg:hidden">
+            <ReferencesPanel references={references} onChange={handleReferencesChange} />
+          </div>
+        </main>
 
-          {!focusMode ? (
-            <div
-              className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-100 bg-white shadow-[0_-4px_12px_rgba(15,23,42,0.06)] lg:hidden"
-              style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-            >
-              {/* Link URL input — slides in above toolbar when link button tapped */}
+        <aside className="hidden lg:sticky lg:top-[92px] lg:block">
+          <ReferencesPanel
+            references={references}
+            onChange={handleReferencesChange}
+            alwaysExpanded
+          />
+        </aside>
+      </div>
+
+      {hasContent ? (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white shadow-[0_-4px_16px_rgba(15,23,42,0.05)]"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div className="mx-auto max-w-[1080px] px-5 sm:px-8 lg:px-10">
+            <div className="lg:w-[calc(100%-340px)]">
               {showLinkPopover ? (
-                <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-3 py-2">
+                <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-2 py-2">
                   <input
                     type="url"
                     autoFocus
@@ -996,9 +861,8 @@ export default function WritePage() {
                   </button>
                 </div>
               ) : null}
-              {/* Single-row toolbar: bold, list, image, link */}
               <div
-                className="flex items-center gap-0.5 overflow-x-auto px-2 py-1.5"
+                className="flex items-center gap-1 overflow-x-auto py-2.5"
                 style={{ scrollbarWidth: "none" }}
               >
                 {MOBILE_TOOLBAR_BUTTONS.map((btn) => (
@@ -1010,7 +874,7 @@ export default function WritePage() {
                     className={`flex h-9 min-w-[36px] shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition-colors ${
                       btn.markKey && activeMarks[btn.markKey]
                         ? "bg-emerald-100 text-emerald-700"
-                        : "text-gray-600 active:bg-gray-100"
+                        : "text-gray-600 hover:bg-gray-100 active:bg-gray-100"
                     }`}
                   >
                     {btn.icon}
@@ -1018,54 +882,9 @@ export default function WritePage() {
                 ))}
               </div>
             </div>
-          ) : null}
+          </div>
         </div>
-      </div>
-        </div>
-
-        {!focusMode ? (
-          sidebarCollapsed ? (
-            <div className="hidden lg:block">
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                title="Show sidebar"
-                className="sticky top-[76px] flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm hover:border-emerald-200 hover:text-emerald-700"
-              >
-                <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <div className="hidden lg:sticky lg:top-[76px] lg:block">
-              <div className="mb-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={toggleSidebar}
-                  title="Collapse sidebar"
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                  </svg>
-                  Collapse
-                </button>
-              </div>
-              {showReferencesPanel ? (
-                <div className="mb-3">
-                  <ReferencesPanel
-                    references={references}
-                    onChange={handleReferencesChange}
-                    alwaysExpanded
-                  />
-                </div>
-              ) : null}
-              {readinessPanel}
-            </div>
-          )
-        ) : null}
-      </div>
+      ) : null}
 
       {showCancelConfirm ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">

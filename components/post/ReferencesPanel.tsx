@@ -65,7 +65,7 @@ export default function ReferencesPanel({
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border border-gray-200 bg-canvas ${className}`}
+      className={`overflow-hidden rounded-xl border border-gray-200 bg-white ${className}`}
     >
       <div
         onClick={() => setOpen((prev) => !prev)}

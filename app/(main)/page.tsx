@@ -7,7 +7,7 @@ import RetentionEventTracker from "@/components/retention/RetentionEventTracker"
 import PushPromptBanner from "@/components/push/PushPromptBanner";
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import WelcomeBanner from "@/components/ui/WelcomeBanner";
-import { PUSH_PROMPT_COOLDOWN_MS, PUSH_PROMPT_MAX_ATTEMPTS } from "@/lib/pushPromptPolicy";
+import type { LegacyPushPromptSeed } from "@/lib/pushPromptPolicy";
 import { getActivationState, type ActivationState } from "@/lib/activation";
 import { getProfileTypeLabel, isProfileType } from "@/lib/profileTypes";
 import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
@@ -176,23 +176,20 @@ export default async function HomePage({ searchParams }: PageProps) {
   let userPoints: number | null = null;
   let welcomeFirstName: string | null = null;
   let welcomePrimaryLabel: string | null = null;
-  let pushPromptMode: "cta" | "terminal" | null = null;
-  let pushPromptAttemptCount = 0;
+  let legacyPushSeed: LegacyPushPromptSeed = {
+    attemptCount: 0,
+    lastShownAt: null,
+    shownAt: null,
+  };
 
   if (user) {
-    const [{ data: profileData }, { count: pushSubscriptionCount }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select(
-          "interests, university, field_of_study, points, full_name, profile_type, push_prompt_attempt_count, push_prompt_last_shown_at"
-        )
-        .eq("id", user.id)
-        .single(),
-      supabase
-        .from("push_subscriptions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id),
-    ]);
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select(
+        "interests, university, field_of_study, points, full_name, profile_type, push_prompt_attempt_count, push_prompt_last_shown_at, push_prompt_shown_at"
+      )
+      .eq("id", user.id)
+      .single();
 
     userInterests = (profileData?.interests as string[] | null) ?? [];
     userUniversity = profileData?.university ?? null;
@@ -203,21 +200,11 @@ export default async function HomePage({ searchParams }: PageProps) {
       ? getProfileTypeLabel(profileData.profile_type)
       : null;
 
-    const hasPushSubscription = Boolean(pushSubscriptionCount && pushSubscriptionCount > 0);
-    pushPromptAttemptCount = profileData?.push_prompt_attempt_count ?? 0;
-
-    if (!hasPushSubscription) {
-      if (pushPromptAttemptCount > PUSH_PROMPT_MAX_ATTEMPTS) {
-        pushPromptMode = null;
-      } else if (pushPromptAttemptCount === PUSH_PROMPT_MAX_ATTEMPTS) {
-        pushPromptMode = "terminal";
-      } else {
-        const lastShownAt = profileData?.push_prompt_last_shown_at ?? null;
-        const cooldownElapsed =
-          !lastShownAt || Date.now() - new Date(lastShownAt).getTime() >= PUSH_PROMPT_COOLDOWN_MS;
-        pushPromptMode = cooldownElapsed ? "cta" : null;
-      }
-    }
+    legacyPushSeed = {
+      attemptCount: profileData?.push_prompt_attempt_count ?? 0,
+      lastShownAt: profileData?.push_prompt_last_shown_at ?? null,
+      shownAt: profileData?.push_prompt_shown_at ?? null,
+    };
   }
 
   const showWelcomeBanner = Boolean(user) && welcome === "1";
@@ -510,13 +497,7 @@ export default async function HomePage({ searchParams }: PageProps) {
         />
       ) : null}
 
-      {user && pushPromptMode ? (
-        <PushPromptBanner
-          userId={user.id}
-          mode={pushPromptMode}
-          attemptCount={pushPromptAttemptCount}
-        />
-      ) : null}
+      {user ? <PushPromptBanner userId={user.id} legacySeed={legacyPushSeed} /> : null}
 
       {user ? (
         <RetentionEventTracker

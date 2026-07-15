@@ -1,122 +1,117 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { trackActivationEvent } from "@/lib/activationEvents";
 import {
-  hasActivePushSubscription,
-  isPushSupported,
-  markPushPromptShown,
-  recordPushPromptDismissed,
-  recordPushPromptTerminal,
-  subscribeToPush,
+  getPushOperationErrorMessage,
+  requestPushPermission,
+  subscribeCurrentDevice,
 } from "@/lib/pushClient";
+import type { LegacyPushPromptSeed } from "@/lib/pushPromptPolicy";
+import { usePushNudge } from "@/components/push/usePushNudge";
 
 interface Props {
   userId: string;
-  mode: "cta" | "terminal";
-  attemptCount: number;
+  legacySeed: LegacyPushPromptSeed;
 }
 
-export default function PushPromptBanner({ userId, mode, attemptCount }: Props) {
+export default function PushPromptBanner({ userId, legacySeed }: Props) {
   const router = useRouter();
-  const [display, setDisplay] = useState<"cta" | "cta-final" | "blocked" | null>(null);
+  const { status, offerNumber, permission, hide, notePermission } = usePushNudge({
+    userId,
+    surface: "home",
+    legacySeed,
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isPushSupported()) {
-      void recordPushPromptTerminal(userId);
-      return;
-    }
+  function trackAction(action: string) {
+    trackActivationEvent({
+      event: "push_nudge_action",
+      source: "home",
+      metadata: { surface: "home", mode: status, action, offerNumber, permission },
+    });
+  }
 
-    if (Notification.permission === "denied") {
-      // Browser-level block — JS can't re-trigger the permission dialog once
-      // denied, so pointing to Settings is the only path that actually works.
-      setDisplay("blocked");
-      return;
-    }
-
-    if (Notification.permission === "granted") {
-      void (async () => {
-        const subscribed = await hasActivePushSubscription(userId);
-        if (subscribed) {
-          // Permission and subscription both check out — nothing left to prompt for.
-          void recordPushPromptTerminal(userId);
-          return;
-        }
-        // Permission already granted but no live subscription (revoked,
-        // deleted, or granted on a different device/session) — recreate it
-        // directly, no browser prompt needed.
-        await subscribeToPush(userId);
-        void markPushPromptShown(userId);
-      })();
-      return;
-    }
-
-    // Permission is still "default" — a direct prompt still works even once
-    // retries are exhausted, so there's no need to detour through Settings.
-    setDisplay(mode === "terminal" ? "cta-final" : "cta");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const dismissRetry = () => {
-    void recordPushPromptDismissed(userId, attemptCount + 1);
-    setDisplay(null);
-  };
-
-  const dismissFinal = () => {
-    void recordPushPromptTerminal(userId);
-    setDisplay(null);
-  };
-
-  const dismissBlocked = () => {
-    void recordPushPromptTerminal(userId);
-    setDisplay(null);
+  const dismiss = () => {
+    trackAction(error ? "continue_without" : "not_now");
+    hide();
   };
 
   const goToSettings = () => {
-    void recordPushPromptTerminal(userId);
+    trackAction("open_settings");
+    hide();
     router.push("/settings?tab=notifications");
   };
 
   const handleEnable = async () => {
     setBusy(true);
     setError(null);
+    trackAction(error ? "retry" : "enable");
     try {
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") {
-        const ok = await subscribeToPush(userId);
-        if (!ok) setError("Could not finish enabling push notifications.");
-        await recordPushPromptTerminal(userId);
-        setDisplay(null);
+      let nextPermission = permission;
+      if (nextPermission === "default") {
+        nextPermission = await requestPushPermission();
+        notePermission(nextPermission);
+        trackActivationEvent({
+          event: "push_permission_resolved",
+          source: "home",
+          metadata: { surface: "home", result: nextPermission, offerNumber },
+        });
+      }
+
+      if (nextPermission !== "granted") {
+        hide();
         return;
       }
-      // Denied right now, or dismissed without choosing — either way this
-      // counts as one used attempt toward the retry cap.
-      await recordPushPromptDismissed(userId, attemptCount + 1);
-      setDisplay(null);
+
+      const result = await subscribeCurrentDevice(userId);
+      trackActivationEvent({
+        event: "push_device_operation",
+        source: "home",
+        metadata: {
+          surface: "home",
+          operation: "subscribe",
+          result: result.ok ? "success" : "failure",
+          errorCode: result.ok ? null : result.code,
+        },
+      });
+      if (!result.ok) {
+        setError(getPushOperationErrorMessage(result.code));
+        return;
+      }
+      hide();
     } catch {
-      setError("Could not enable push notifications.");
+      setError("Could not enable push notifications. Please try again.");
+      trackActivationEvent({
+        event: "push_device_operation",
+        source: "home",
+        metadata: { surface: "home", operation: "subscribe", result: "failure", errorCode: "unexpected" },
+      });
     } finally {
       setBusy(false);
     }
   };
 
-  if (!display) return null;
+  if (status === "checking" || status === "hidden") return null;
 
-  if (display === "blocked") {
+  if (status === "denied-recovery") {
     return (
       <section className="mb-6 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-gray-900">Notifications are off</h2>
           <p className="mt-1 max-w-xl text-sm text-gray-500">
-            You can turn on push notifications any time from your notification settings.
+            Your browser blocked notifications. You can review the recovery steps in Settings.
           </p>
         </div>
         <div className="flex shrink-0 gap-3">
           <button
             type="button"
-            onClick={dismissBlocked}
+            onClick={() => {
+              trackAction("dismiss_recovery");
+              hide();
+            }}
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-canvas"
           >
             Dismiss
@@ -126,7 +121,7 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
             onClick={goToSettings}
             className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37]"
           >
-            Manage in Settings
+            Recovery steps
           </button>
         </div>
       </section>
@@ -144,16 +139,20 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
           Get notified when your submissions are published, someone messages you, or comments
           on your post — even when Indegenius isn&apos;t open in your browser.
         </p>
-        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+        {error ? (
+          <p className="mt-2 text-sm text-red-600" role="alert" aria-live="assertive">
+            {error}
+          </p>
+        ) : null}
       </div>
       <div className="flex shrink-0 gap-3">
         <button
           type="button"
-          onClick={display === "cta-final" ? dismissFinal : dismissRetry}
+          onClick={dismiss}
           disabled={busy}
           className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-canvas disabled:opacity-40"
         >
-          Not now
+          {error ? "Continue without notifications" : "Not now"}
         </button>
         <button
           type="button"
@@ -161,7 +160,7 @@ export default function PushPromptBanner({ userId, mode, attemptCount }: Props) 
           disabled={busy}
           className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-60"
         >
-          {busy ? "Enabling..." : "Enable notifications"}
+          {busy ? "Enabling..." : error ? "Try again" : permission === "granted" ? "Restore notifications" : "Enable notifications"}
         </button>
       </div>
     </section>
