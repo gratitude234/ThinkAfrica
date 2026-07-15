@@ -14,6 +14,7 @@ interface PostEngagementState {
   bookmarkPending: boolean;
   bookmarkError: string | null;
   syncLiked: (value: boolean) => void;
+  syncLikeCount: (value: number) => void;
   syncBookmarked: (value: boolean) => void;
   toggleLike: () => Promise<void>;
   toggleBookmark: () => Promise<void>;
@@ -24,19 +25,17 @@ const PostEngagementContext = createContext<PostEngagementState | null>(null);
 interface PostEngagementProviderProps {
   postId: string;
   userId: string | null;
-  initialLikeCount: number;
   children: React.ReactNode;
 }
 
 export function PostEngagementProvider({
   postId,
   userId,
-  initialLikeCount,
   children,
 }: PostEngagementProviderProps) {
   const router = useRouter();
   const [liked, setLiked] = useState<boolean | null>(null);
-  const [likeCount, setLikeCount] = useState(initialLikeCount);
+  const [likeCount, setLikeCount] = useState(0);
   const [likePending, setLikePending] = useState(false);
   const [likeError, setLikeError] = useState<string | null>(null);
 
@@ -48,12 +47,19 @@ export function PostEngagementProvider({
   // state on mount; only the first report should set it, so a later report
   // never clobbers a value the user has since toggled.
   const likeSynced = useRef(false);
+  const likeCountSynced = useRef(false);
   const bookmarkSynced = useRef(false);
 
   const syncLiked = useCallback((value: boolean) => {
     if (likeSynced.current) return;
     likeSynced.current = true;
     setLiked(value);
+  }, []);
+
+  const syncLikeCount = useCallback((value: number) => {
+    if (likeCountSynced.current) return;
+    likeCountSynced.current = true;
+    setLikeCount(value);
   }, []);
 
   const syncBookmarked = useCallback((value: boolean) => {
@@ -137,6 +143,7 @@ export function PostEngagementProvider({
       bookmarkPending,
       bookmarkError,
       syncLiked,
+      syncLikeCount,
       syncBookmarked,
       toggleLike,
       toggleBookmark: toggleBookmarkAction,
@@ -150,6 +157,7 @@ export function PostEngagementProvider({
       bookmarkPending,
       bookmarkError,
       syncLiked,
+      syncLikeCount,
       syncBookmarked,
       toggleLike,
       toggleBookmarkAction,

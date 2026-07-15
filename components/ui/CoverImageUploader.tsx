@@ -142,7 +142,8 @@ export default function CoverImageUploader({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-gray-800"
+            disabled={uploading}
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Change
           </button>
@@ -153,7 +154,8 @@ export default function CoverImageUploader({
               setPreview(null);
               onRemove();
             }}
-            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white"
+            disabled={uploading}
+            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Remove
           </button>

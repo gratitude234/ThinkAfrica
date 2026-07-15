@@ -161,6 +161,44 @@ describe("CoverImageUploader", () => {
     ).toBeInTheDocument();
   });
 
+  it("disables Change and Remove while a replacement upload is in flight", async () => {
+    let resolveGetUser: (value: { data: { user: { id: string } } }) => void = () => {};
+    mockGetUser.mockReturnValue(
+      new Promise((resolve) => {
+        resolveGetUser = resolve;
+      })
+    );
+
+    const { onRemove, getFileInput } = renderUploader({
+      initialUrl: "https://cdn.example/old.png",
+    });
+
+    const uploadPromise = userEvent.upload(getFileInput(), makeFile());
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Change" })).toBeDisabled()
+    );
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
+
+    // A user attempting to remove the cover mid-upload must not succeed —
+    // otherwise the cover would vanish and then reappear once the in-flight
+    // upload resolves, contradicting the removal.
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(onRemove).not.toHaveBeenCalled();
+    expect(screen.getByRole("img", { name: "Cover" })).toBeInTheDocument();
+
+    mockUpload.mockResolvedValue({ error: null });
+    mockGetPublicUrl.mockReturnValue({
+      data: { publicUrl: "https://cdn.example/new.png" },
+    });
+    resolveGetUser({ data: { user: { id: "user-1" } } });
+    await uploadPromise;
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Remove" })).toBeEnabled()
+    );
+  });
+
   it("reflects the latest persisted cover when closed and reopened", () => {
     const { unmount } = renderUploader({
       initialUrl: "https://cdn.example/a.png",

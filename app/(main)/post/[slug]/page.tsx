@@ -80,7 +80,6 @@ interface PostRecord {
   view_count: number | null;
   impression_count: number | null;
   read_count: number | null;
-  like_count: number | null;
   cover_image_url: string | null;
   citation_id: string | null;
   published_version_id: string | null;
@@ -961,6 +960,7 @@ async function PostReadingChrome({
       postId={post.id}
       userId={userId}
       initialLiked={viewer.userLiked}
+      initialLikeCount={secondary.likeCount}
       initialBookmarked={viewer.userBookmarked}
       title={post.title}
       slug={post.slug}
@@ -1179,6 +1179,7 @@ async function PostEngagementSection({
         <LikeButton
           postId={post.id}
           initialLiked={viewer.userLiked}
+          initialLikeCount={secondary.likeCount}
           userId={userId}
         />
         <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
@@ -1523,6 +1524,7 @@ async function PostSidebar({
               <LikeButton
                 postId={post.id}
                 initialLiked={viewer.userLiked}
+                initialLikeCount={secondary.likeCount}
                 userId={userId}
               />
               <BookmarkButton
@@ -2011,6 +2013,7 @@ async function ResearchDossierSidebar({
                 <LikeButton
                   postId={post.id}
                   initialLiked={viewer.userLiked}
+                  initialLikeCount={secondary.likeCount}
                   userId={userId}
                 />
                 <BookmarkButton
@@ -2160,7 +2163,7 @@ export default async function PostPage({ params }: PageProps) {
     .select(
       `
       id, title, slug, content, excerpt, type, tags, status, author_id,
-      created_at, published_at, view_count, impression_count, read_count, like_count, cover_image_url, citation_id,
+      created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id,
       published_version_id, current_round, revision_due_at,
       in_response_to,
       audio_summary_url,
@@ -2260,11 +2263,7 @@ export default async function PostPage({ params }: PageProps) {
 
   if (isResearchPost) {
     return (
-      <PostEngagementProvider
-        postId={post.id}
-        userId={userId}
-        initialLikeCount={post.like_count ?? 0}
-      >
+      <PostEngagementProvider postId={post.id} userId={userId}>
       <div className="relative">
         {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
         {isPublished ? (
@@ -2460,11 +2459,7 @@ export default async function PostPage({ params }: PageProps) {
   }
 
   return (
-    <PostEngagementProvider
-      postId={post.id}
-      userId={userId}
-      initialLikeCount={post.like_count ?? 0}
-    >
+    <PostEngagementProvider postId={post.id} userId={userId}>
     <div className="relative">
       {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
       {isPublished ? (

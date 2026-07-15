@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Button from "@/components/ui/Button";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 
 interface CoverImageDialogProps {
@@ -10,6 +11,10 @@ interface CoverImageDialogProps {
   onUpload: (url: string) => void;
   onRemove: () => void;
   onUploadingChange: (uploading: boolean) => void;
+  uploading: boolean;
+  canReviewPublish: boolean;
+  onContinue: () => void;
+  onReviewPublish: () => void;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -22,6 +27,10 @@ export default function CoverImageDialog({
   onUpload,
   onRemove,
   onUploadingChange,
+  uploading,
+  canReviewPublish,
+  onContinue,
+  onReviewPublish,
 }: CoverImageDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -114,6 +123,49 @@ export default function CoverImageDialog({
             previewHeightClass="h-44 sm:h-52"
           />
         </div>
+
+        {coverImageUrl ? (
+          <div
+            aria-busy={uploading}
+            className="mt-4 border-t border-gray-100 pt-4 sm:flex sm:items-center sm:justify-between sm:gap-4"
+          >
+            <div className="mb-3 sm:mb-0">
+              <p className="text-sm font-semibold text-emerald-700" aria-live="polite">
+                {uploading ? "Uploading…" : "Cover added ✓"}
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                {uploading
+                  ? "Hang tight while your new cover finishes uploading."
+                  : "Your image has been uploaded and will appear at the top of your article."}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <Button
+                type="button"
+                variant={canReviewPublish ? "secondary" : "primary"}
+                size="sm"
+                onClick={onContinue}
+                disabled={uploading}
+                className="w-full sm:w-auto"
+              >
+                Continue writing
+              </Button>
+              {canReviewPublish ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={onReviewPublish}
+                  disabled={uploading}
+                  className="w-full sm:w-auto"
+                >
+                  Review & publish
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

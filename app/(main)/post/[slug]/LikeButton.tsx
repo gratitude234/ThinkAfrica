@@ -6,15 +6,17 @@ import { usePostEngagement } from "./PostEngagementContext";
 interface LikeButtonProps {
   postId: string;
   initialLiked: boolean;
+  initialLikeCount: number;
   userId: string | null;
 }
 
-export default function LikeButton({ initialLiked }: LikeButtonProps) {
-  const { liked, likeCount, likePending, likeError, syncLiked, toggleLike } =
+export default function LikeButton({ initialLiked, initialLikeCount }: LikeButtonProps) {
+  const { liked, likeCount, likePending, likeError, syncLiked, syncLikeCount, toggleLike } =
     usePostEngagement();
 
   useEffect(() => {
     syncLiked(initialLiked);
+    syncLikeCount(initialLikeCount);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

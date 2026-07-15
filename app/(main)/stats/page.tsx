@@ -44,22 +44,22 @@ export default async function StatsPage() {
 
   const { data: publishedPosts } = await supabase
     .from("posts")
-    .select("id, title, slug, type, view_count, read_count, like_count, created_at, published_at")
+    .select("id, title, slug, type, view_count, read_count, created_at, published_at")
     .eq("author_id", profile.id)
     .eq("status", "published")
     .order("read_count", { ascending: false });
 
+  const theirPostIds = (publishedPosts ?? []).map((p) => p.id);
   const totalReads = (publishedPosts ?? []).reduce(
     (sum, p) => sum + ((p as { read_count?: number | null }).read_count ?? 0),
     0
   );
-  const totalLikes = (publishedPosts ?? []).reduce(
-    (sum, p) => sum + ((p as { like_count?: number | null }).like_count ?? 0),
-    0
-  );
 
-  const [{ count: followerCount }, { count: newFollowerCount }] =
+  const [{ data: likeCountRows }, { count: followerCount }, { count: newFollowerCount }] =
     await Promise.all([
+      theirPostIds.length > 0
+        ? supabase.from("post_like_counts").select("like_count").in("post_id", theirPostIds)
+        : Promise.resolve({ data: [] as { like_count: number }[] }),
       supabase
         .from("follows")
         .select("*", { count: "exact", head: true })
@@ -70,6 +70,11 @@ export default async function StatsPage() {
         .eq("following_id", profile.id)
         .gte("created_at", weekAgo),
     ]);
+
+  const totalLikes = (likeCountRows ?? []).reduce(
+    (sum, row) => sum + row.like_count,
+    0
+  );
   const tier = getPointTier(profile.points);
   const nextTier = getNextTier(profile.points);
   const progressPercent = nextTier

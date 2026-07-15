@@ -37,7 +37,7 @@ type PublicFeedCacheInput = Pick<
 >;
 
 const POST_SELECT =
-  "id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, impression_count, read_count, like_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
+  "id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
 
 function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   if (timeframe === "week") {
@@ -71,6 +71,31 @@ export async function getCountsByPostId(
   );
 }
 
+// post_like_counts stores an already-maintained aggregate per post (see
+// increment/decrement_post_like_count triggers), so it's a direct lookup rather
+// than a row-count like getCountsByPostId does for likes/bookmarks/comments.
+async function getLikeCountsByPostId(
+  supabase: {
+    from: (table: string) => any;
+  },
+  postIds: string[]
+): Promise<Record<string, number>> {
+  if (postIds.length === 0) return {};
+
+  const { data } = await supabase
+    .from("post_like_counts")
+    .select("post_id, like_count")
+    .in("post_id", postIds);
+
+  return ((data ?? []) as Array<{ post_id: string; like_count: number }>).reduce(
+    (acc, row) => {
+      acc[row.post_id] = row.like_count;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+}
+
 async function enrichPosts(
   supabase: {
     from: (table: string) => any;
@@ -88,6 +113,7 @@ async function enrichPosts(
   );
 
   const [
+    likeCounts,
     bookmarkCounts,
     commentCounts,
     referenceCounts,
@@ -95,6 +121,7 @@ async function enrichPosts(
     profilesResult,
     postAuthorsResult,
   ] = await Promise.all([
+    getLikeCountsByPostId(supabase, ids),
     getCountsByPostId(supabase, "bookmarks", ids),
     getCountsByPostId(supabase, "comments", ids),
     getCountsByPostId(supabase, "post_references", ids),
@@ -218,7 +245,7 @@ async function enrichPosts(
       referenceCount: referenceCounts[id] ?? 0,
       responseCount: responseCountsByPostId[id] ?? 0,
       commentCount: commentCounts[id] ?? 0,
-      likeCount: (post.like_count as number | null) ?? 0,
+      likeCount: likeCounts[id] ?? 0,
       bookmarkCount: bookmarkCounts[id] ?? 0,
       viewCount: post.view_count as number | null,
       publishedAt: post.published_at as string | null,
@@ -234,7 +261,7 @@ async function enrichPosts(
       ...(post as object),
       profiles: profile,
       co_authors: coAuthors,
-      like_count: (post.like_count as number | null) ?? 0,
+      like_count: likeCounts[id] ?? 0,
       bookmark_count: bookmarkCounts[id] ?? 0,
       comment_count: commentCounts[id] ?? 0,
       reference_count: referenceCounts[id] ?? 0,

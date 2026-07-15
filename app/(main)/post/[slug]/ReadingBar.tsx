@@ -9,6 +9,7 @@ interface Props {
   postId: string;
   userId: string | null;
   initialLiked: boolean;
+  initialLikeCount: number;
   initialBookmarked: boolean;
   title: string;
   slug: string;
@@ -18,6 +19,7 @@ export default function ReadingBar({
   postId,
   userId,
   initialLiked,
+  initialLikeCount,
   initialBookmarked,
   title,
   slug,
@@ -31,6 +33,7 @@ export default function ReadingBar({
     likeError,
     bookmarkError,
     syncLiked,
+    syncLikeCount,
     syncBookmarked,
     toggleLike,
     toggleBookmark,
@@ -38,6 +41,7 @@ export default function ReadingBar({
 
   useEffect(() => {
     syncLiked(initialLiked);
+    syncLikeCount(initialLikeCount);
     syncBookmarked(initialBookmarked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

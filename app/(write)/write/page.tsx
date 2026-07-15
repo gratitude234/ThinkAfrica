@@ -228,6 +228,7 @@ export default function WritePage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const responseStarterAppliedRef = useRef(false);
   const topicStarterAppliedRef = useRef(false);
+  const reviewPublishInFlightRef = useRef(false);
 
   useEffect(() => {
     if (typeParam === "research") {
@@ -676,6 +677,15 @@ export default function WritePage() {
     setIsPublishDrawerOpen(true);
   };
 
+  const handleReviewPublishFromCover = () => {
+    if (reviewPublishInFlightRef.current) return;
+    reviewPublishInFlightRef.current = true;
+    closeCoverDialog();
+    void handleReadyToPublish().finally(() => {
+      reviewPublishInFlightRef.current = false;
+    });
+  };
+
   const runToolbarAction = (action: EditorToolbarAction) => {
     if (action === "bold")  editorRef.current?.toggleBold();
     if (action === "italic") editorRef.current?.toggleItalic();
@@ -1108,6 +1118,10 @@ export default function WritePage() {
             onUpload={(url) => handleMetadataChange({ coverImageUrl: url })}
             onRemove={() => handleMetadataChange({ coverImageUrl: "" })}
             onUploadingChange={setCoverUploading}
+            uploading={coverUploading}
+            canReviewPublish={canOpenPublish}
+            onContinue={closeCoverDialog}
+            onReviewPublish={handleReviewPublishFromCover}
           />
           <PublishDrawer
             open={isPublishDrawerOpen}

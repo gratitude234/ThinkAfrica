@@ -194,7 +194,7 @@ export default async function DashboardPage() {
     .from("posts")
     .select(
       `
-      id, author_id, title, slug, content, excerpt, tags, type, status, impression_count, view_count, read_count, like_count,
+      id, author_id, title, slug, content, excerpt, tags, type, status, impression_count, view_count, read_count,
       created_at, published_at, revision_due_at, citation_id, published_version_id,
       current_round, in_response_to,
       document_path, document_original_name, document_mime_type, document_size_bytes,
@@ -212,6 +212,7 @@ export default async function DashboardPage() {
   let commentCounts: Record<string, number> = {};
   let bookmarkCounts: Record<string, number> = {};
   let responseCounts: Record<string, number> = {};
+  let likeCounts: Record<string, number> = {};
 
   if (postIds.length > 0) {
     const [
@@ -219,6 +220,7 @@ export default async function DashboardPage() {
       { data: comments },
       { data: bookmarks },
       { data: responses },
+      { data: likeCountRows },
     ] = await Promise.all([
       supabase.from("post_references").select("post_id").in("post_id", postIds),
       supabase.from("comments").select("post_id").in("post_id", postIds),
@@ -228,6 +230,7 @@ export default async function DashboardPage() {
         .select("in_response_to")
         .eq("status", "published")
         .in("in_response_to", postIds),
+      supabase.from("post_like_counts").select("post_id, like_count").in("post_id", postIds),
     ]);
 
     referenceCounts = ((references ?? []) as Array<{ post_id: string | null }>).reduce(
@@ -258,6 +261,15 @@ export default async function DashboardPage() {
         if (row.in_response_to) {
           acc[row.in_response_to] = (acc[row.in_response_to] ?? 0) + 1;
         }
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    likeCounts = (
+      (likeCountRows ?? []) as Array<{ post_id: string; like_count: number }>
+    ).reduce(
+      (acc, row) => {
+        acc[row.post_id] = row.like_count;
         return acc;
       },
       {} as Record<string, number>
@@ -492,7 +504,7 @@ export default async function DashboardPage() {
     impression_count: (p as { impression_count?: number | null }).impression_count ?? 0,
     view_count: p.view_count ?? 0,
     read_count: (p as { read_count?: number | null }).read_count ?? 0,
-    like_count: (p as { like_count?: number | null }).like_count ?? 0,
+    like_count: likeCounts[p.id] ?? 0,
     revision_due_at: p.revision_due_at ?? null,
     citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
     published_version_id:
@@ -541,7 +553,7 @@ export default async function DashboardPage() {
         reviewCount: reviews.length,
         completedReviewCount: reviews.filter((review) => review.submitted_at).length,
         commentCount: commentCounts[post.id] ?? 0,
-        likeCount: (post as { like_count?: number | null }).like_count ?? 0,
+        likeCount: likeCounts[post.id] ?? 0,
         bookmarkCount: bookmarkCounts[post.id] ?? 0,
       });
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
 
@@ -19,7 +20,7 @@ function displayName(profile: ProfileSummary | null) {
   return profile?.full_name?.trim() || profile?.username?.trim() || "An Indegenius reader";
 }
 
-function isDuplicateLikeError(error: { code?: string; message?: string }) {
+function isDuplicateKeyError(error: { code?: string; message?: string }) {
   const message = error.message?.toLowerCase() ?? "";
   return error.code === "23505" || message.includes("duplicate key");
 }
@@ -34,13 +35,23 @@ async function getLikeCount(
   supabase: Awaited<ReturnType<typeof createClient>>,
   postId: string
 ): Promise<number> {
-  const { data } = await supabase
-    .from("posts")
+  const { data, error } = await supabase
+    .from("post_like_counts")
     .select("like_count")
-    .eq("id", postId)
+    .eq("post_id", postId)
     .maybeSingle();
 
-  return data?.like_count ?? 0;
+  if (!error) return data?.like_count ?? 0;
+
+  // A transient failure reading the maintained counter shouldn't report "0 likes"
+  // right after a successful toggle — fall back to an exact count of the source
+  // of truth instead of trusting an unreachable/errored aggregate.
+  const { count } = await supabase
+    .from("likes")
+    .select("*", { count: "exact", head: true })
+    .eq("post_id", postId);
+
+  return count ?? 0;
 }
 
 function finish(
@@ -127,7 +138,7 @@ export async function togglePostLike(
   });
 
   if (likeError) {
-    if (isDuplicateLikeError(likeError)) {
+    if (isDuplicateKeyError(likeError)) {
       return finish(supabase, post.slug, input.postId, true);
     }
 
@@ -139,56 +150,51 @@ export async function togglePostLike(
     const actorName = displayName(actorProfile);
     const ctaPath = `/post/${post.slug}`;
 
-    // Collapse repeated unlike/relike toggles into one pending notification instead
-    // of spamming the author — if they haven't seen this actor's last like yet, skip.
-    const { data: existingNotification } = await supabase
-      .from("notifications")
-      .select("id")
-      .eq("user_id", post.author_id)
-      .eq("type", "like")
-      .eq("actor_id", user.id)
-      .eq("post_id", input.postId)
-      .eq("read", false)
-      .maybeSingle();
+    // uniq_unread_like_notification (partial unique index on notifications) collapses
+    // repeated unlike/relike toggles into one pending notification atomically — a
+    // pre-check-then-insert here can't work because the SELECT runs as the liker and
+    // notifications SELECT RLS only permits reading rows where auth.uid() = user_id
+    // (the recipient), and it would be racy under concurrent toggles regardless.
+    const { error: notificationError } = await supabase.from("notifications").insert({
+      user_id: post.author_id,
+      type: "like",
+      message: `${actorName} liked your post: ${post.title}`,
+      link: ctaPath,
+      actor_id: user.id,
+      post_id: input.postId,
+      read: false,
+    });
 
-    if (!existingNotification) {
-      const { error: notificationError } = await supabase.from("notifications").insert({
-        user_id: post.author_id,
-        type: "like",
-        message: `${actorName} liked your post: ${post.title}`,
-        link: ctaPath,
-        actor_id: user.id,
-        post_id: input.postId,
-        read: false,
-      });
-
-      if (notificationError) {
+    if (notificationError) {
+      if (!isDuplicateKeyError(notificationError)) {
         console.error(`Failed to create like notification: ${notificationError.message}`);
-      } else {
-        const pushResult = await sendPushNotification({
-          recipientId: post.author_id,
-          title: "New like on your post",
-          body: `${actorName} liked "${post.title}"`,
-          path: ctaPath,
-          preferenceKey: "push_likes",
-          cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
-        });
-        logPushResult(`like:${user.id}:${input.postId}`, pushResult);
-
-        const emailResult = await sendUserEmail({
-          recipientId: post.author_id,
-          subject: `${actorName} liked your Indegenius post`,
-          preview: `${actorName} liked "${post.title}".`,
-          title: "New like on your post",
-          intro: `${actorName} liked "${post.title}".`,
-          ctaLabel: "View your post",
-          ctaPath,
-          idempotencyKey: `like:${input.postId}:${post.author_id}:${user.id}`,
-          preferenceKey: "email_likes",
-          cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
-        });
-        logEmailResult(`like:${input.postId}:${post.author_id}`, emailResult);
       }
+      // Duplicate = the author already has an unread like notification from this
+      // actor for this post; they've already been told, so skip push/email too.
+    } else {
+      const pushResult = await sendPushNotification({
+        recipientId: post.author_id,
+        title: "New like on your post",
+        body: `${actorName} liked "${post.title}"`,
+        path: ctaPath,
+        preferenceKey: "push_likes",
+        cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
+      });
+      logPushResult(`like:${user.id}:${input.postId}`, pushResult);
+
+      const emailResult = await sendUserEmail({
+        recipientId: post.author_id,
+        subject: `${actorName} liked your Indegenius post`,
+        preview: `${actorName} liked "${post.title}".`,
+        title: "New like on your post",
+        intro: `${actorName} liked "${post.title}".`,
+        ctaLabel: "View your post",
+        ctaPath,
+        idempotencyKey: `like:${input.postId}:${post.author_id}:${user.id}`,
+        preferenceKey: "email_likes",
+        cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
+      });
+      logEmailResult(`like:${input.postId}:${post.author_id}`, emailResult);
     }
   }
 
