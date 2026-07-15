@@ -48,51 +48,57 @@ export default function CoverImageUploader({
         return;
       }
 
+      const failWith = (message: string) => {
+        setError(message);
+        setPreview(initialUrl ?? null);
+      };
+
       setError(null);
       setPreview(URL.createObjectURL(file));
       setUploading(true);
       onUploadingChange?.(true);
 
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!user) {
-        setError("You must be logged in to upload images.");
+        if (!user) {
+          failWith("You must be logged in to upload images.");
+          return;
+        }
+
+        if (ensureBucket) {
+          await supabase.storage.createBucket(bucket, { public: true }).catch(() => null);
+        }
+
+        const path = buildPath(user.id, file);
+
+        const { error: uploadError } = await supabase.storage
+          .from(bucket)
+          .upload(path, file, { upsert: true });
+
+        if (uploadError) {
+          failWith(`Upload failed: ${uploadError.message}`);
+          return;
+        }
+
+        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+        onUpload(urlData.publicUrl);
+      } catch {
+        failWith("Upload failed. Please try again.");
+      } finally {
         setUploading(false);
         onUploadingChange?.(false);
-        return;
       }
-
-      if (ensureBucket) {
-        await supabase.storage.createBucket(bucket, { public: true }).catch(() => null);
-      }
-
-      const path = buildPath(user.id, file);
-
-      const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(path, file, { upsert: true });
-
-      if (uploadError) {
-        setError(`Upload failed: ${uploadError.message}`);
-        setUploading(false);
-        onUploadingChange?.(false);
-        return;
-      }
-
-      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
-
-      setUploading(false);
-      onUploadingChange?.(false);
-      onUpload(urlData.publicUrl);
     },
-    [bucket, buildPath, ensureBucket, onUpload, onUploadingChange]
+    [bucket, buildPath, ensureBucket, initialUrl, onUpload, onUploadingChange]
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (file) handleFile(file);
   };
 
