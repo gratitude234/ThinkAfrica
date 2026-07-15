@@ -1173,39 +1173,46 @@ async function PostEngagementSection({
   ]);
 
   return (
-    <div className="mb-8 flex flex-col gap-3 border-y border-[#EDE9E2] py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="article-engagement-bar mb-9 flex justify-center">
+      <div className="inline-flex max-w-full items-center gap-1 rounded-full border border-gray-200 bg-white p-1.5 shadow-[0_4px_16px_-10px_rgba(0,0,0,0.18)]">
         <LikeButton
           postId={post.id}
           initialLiked={viewer.userLiked}
           initialCount={secondary.likeCount}
           userId={userId}
         />
+        <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
+        <a
+          href="#comments"
+          className="inline-flex min-h-9 items-center gap-2 rounded-full px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-emerald-brand"
+          aria-label={`${secondary.commentCount} comments`}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z" />
+          </svg>
+          {secondary.commentCount}
+        </a>
+        <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
         <BookmarkButton
           postId={post.id}
           initialBookmarked={viewer.userBookmarked}
           userId={userId}
         />
+        <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
+        <ShareButtons
+          title={post.title}
+          slug={post.slug}
+          excerpt={sanitizedExcerpt}
+          authorName={author?.full_name ?? null}
+        />
       </div>
-      <ShareButtons
-        title={post.title}
-        slug={post.slug}
-        excerpt={sanitizedExcerpt}
-        authorName={author?.full_name ?? null}
-      />
-      {typeof post.read_count === "number" && post.read_count > 0 ? (
-        <span className="text-[11px] font-medium text-gray-400">
-          {post.read_count.toLocaleString()}{" "}
-          {post.read_count === 1 ? "read" : "reads"}
-        </span>
-      ) : null}
       {userId && author && userId !== author.id ? (
         <ReportButton
           targetType="post"
           targetId={post.id}
           targetLabel={`"${post.title}"`}
           variant="text"
-          className="lg:hidden"
+          className="hidden"
         />
       ) : null}
     </div>
@@ -1219,6 +1226,7 @@ async function AuthorAndCollaborationSection({
   authorName,
   secondaryDataPromise,
   viewerDataPromise,
+  showCollaboration = true,
 }: {
   post: PostRecord;
   author: AuthorProfile | null;
@@ -1226,6 +1234,7 @@ async function AuthorAndCollaborationSection({
   authorName: string;
   secondaryDataPromise: Promise<SecondaryData>;
   viewerDataPromise: Promise<ViewerData>;
+  showCollaboration?: boolean;
 }) {
   if (!author) return null;
   const [secondary, viewer] = await Promise.all([
@@ -1249,9 +1258,6 @@ async function AuthorAndCollaborationSection({
 
   return (
     <>
-      {post.status === "published" ? (
-        <CollaborationPanel summary={collaborationSummary} authorName={authorName} />
-      ) : null}
       <AuthorBioCard
         author={author}
         userId={userId}
@@ -1268,6 +1274,11 @@ async function AuthorAndCollaborationSection({
             },
           }))}
       />
+      {showCollaboration && post.status === "published" ? (
+        <div className="mt-6">
+          <CollaborationPanel summary={collaborationSummary} authorName={authorName} />
+        </div>
+      ) : null}
     </>
   );
 }
@@ -2138,10 +2149,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-function getPostHeroMode(): "editorial" | "magazine" {
-  return "magazine";
-}
-
 export default async function PostPage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
@@ -2220,7 +2227,6 @@ export default async function PostPage({ params }: PageProps) {
   const sanitizedExcerpt = sanitizePostExcerpt(post.excerpt);
   const readTime = estimateReadTime(sanitizedContent);
   const wordCount = countWords(sanitizedContent);
-  const headings = extractHeadings(sanitizedContent);
   const contentWithIds = renderReferenceShortcodes(
     injectHeadingIds(sanitizedContent)
   );
@@ -2242,7 +2248,6 @@ export default async function PostPage({ params }: PageProps) {
     supabase,
   });
   const isResearchPost = post.type === "research";
-  const postHeroMode = getPostHeroMode();
   const articleJsonLd = isPublished
     ? buildArticleJsonLd({
         post,
@@ -2469,225 +2474,82 @@ export default async function PostPage({ params }: PageProps) {
         </>
       ) : null}
 
-      {postHeroMode === "editorial" ? (
-        <header className="relative left-1/2 -mt-6 w-[calc(100vw-16px)] -translate-x-1/2 overflow-hidden border-t-[3px] border-emerald-brand bg-canvas">
-          <div className="mx-auto max-w-[1200px] px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
-            {/* Kicker row */}
-            <div className="mb-3.5 flex flex-wrap items-center gap-2.5 font-sans">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-brand">
-                {basicQualitySummary.contentLabel}
-              </span>
-              <span className="h-[3px] w-[3px] rounded-full bg-ink-muted opacity-50" aria-hidden="true" />
-              <span className="text-[12px] text-ink-muted">{readTime} min read</span>
-              <span className="h-[3px] w-[3px] rounded-full bg-ink-muted opacity-50" aria-hidden="true" />
-              <span className="text-[12px] text-ink-muted">{wordCount.toLocaleString()} words</span>
-            </div>
-
-            {/* Tags */}
-            {post.tags && post.tags.length > 0 ? (
-              <div className="mb-4 flex flex-wrap gap-1.5">
-                {post.tags.slice(0, 5).map((tag, index) => (
-                  <Link
-                    key={tag}
-                    href={`/topics/${encodeURIComponent(tag)}`}
-                    className={`inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-0.5 text-[10.5px] font-medium text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900 ${index >= 3 ? "hidden sm:inline-flex" : ""}`}
-                  >
-                    {tag}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
-
-            <Suspense fallback={null}>
-              <ParentPostLink parentPostId={parentPostId} mode="editorial" />
-            </Suspense>
-
-            <h1 className="font-display max-w-[760px] text-[32px] font-bold leading-[1.1] tracking-[-0.015em] text-ink sm:text-[50px] sm:leading-[1.04] lg:text-[52px]">
-              {post.title}
-            </h1>
-
-            {sanitizedExcerpt ? (
-              <p className="font-display mt-4 max-w-[640px] text-[16px] font-normal italic leading-[1.62] text-gray-600 sm:text-[19px] sm:leading-[1.65]">
-                {sanitizedExcerpt}
-              </p>
-            ) : null}
-
-            {author ? (
-              <div className="mt-6 flex max-w-[760px] flex-wrap items-center gap-3 border-t border-gray-100 pt-3.5 sm:flex-nowrap sm:gap-4">
-                <Link href={`/${author.username}`} className="shrink-0">
-                  <UserAvatar
-                    name={authorName}
-                    src={author.avatar_url}
-                    size={44}
-                    className="flex-shrink-0 overflow-hidden rounded-full ring-1 ring-gray-200"
-                  />
-                </Link>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      href={`/${author.username}`}
-                      className="text-[13.5px] font-semibold text-ink transition-colors hover:text-emerald-brand"
-                    >
-                      {authorName}
-                    </Link>
-                    {author.verified ? (
-                      <span
-                        title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
-                        className="inline-flex items-center gap-1 rounded-full bg-emerald-brand px-2 py-0.5 text-[9.5px] font-bold text-white"
-                      >
-                        {"\u2713"}{" "}
-                        {author.verified_type
-                          ? author.verified_type.charAt(0).toUpperCase() + author.verified_type.slice(1)
-                          : "Verified"}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-0.5 text-[11.5px] text-ink-muted">
-                    {[author.field_of_study, author.university].filter(Boolean).join(" / ")}
-                  </p>
-                </div>
-                <div className="w-full shrink-0 border-t border-gray-100 pt-3 text-left sm:ml-auto sm:w-auto sm:border-t-0 sm:pt-0 sm:text-right">
-                  <p className="text-[13px] font-semibold text-ink">
-                    {formatDate(post.published_at ?? post.created_at)}
-                  </p>
-                  {typeof post.read_count === "number" && post.read_count > 0 ? (
-                    <p className="mt-0.5 text-[10.5px] text-ink-muted">
-                      {post.read_count.toLocaleString()} reads
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-
-            <Suspense fallback={null}>
-              <HeaderCoAuthors
-                authorId={author?.id ?? null}
-                secondaryDataPromise={secondaryDataPromise}
-                mode="editorial"
-              />
-            </Suspense>
+      <header className="relative left-1/2 -mt-6 w-screen -translate-x-1/2 overflow-hidden bg-emerald-brand text-white">
+        <div className="mx-auto max-w-[760px] px-6 pb-16 pt-12 sm:pb-[74px] sm:pt-14">
+          <div className="mb-5 flex flex-wrap items-center gap-2.5">
+            <span className="rounded-full bg-gold px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white">
+              {basicQualitySummary.contentLabel}
+            </span>
+            <span className="text-[11px] font-medium text-white/65">
+              {readTime} min read
+            </span>
           </div>
-        </header>
-      ) : (
-        <header className="relative left-1/2 -mt-6 w-[calc(100vw-16px)] -translate-x-1/2 overflow-hidden bg-gradient-to-br from-[#022c22] via-[#064e3b] to-[#115e59] px-4 py-14 text-white sm:px-6 sm:py-16 lg:px-8">
-          <div
-            className="absolute inset-0 opacity-40"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.14) 1px, transparent 0)",
-              backgroundSize: "22px 22px",
-            }}
-            aria-hidden="true"
-          />
-          <div className="relative z-10 mx-auto max-w-[1200px]">
-            {/* Kicker row */}
-            <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">
-                {basicQualitySummary.contentLabel}
-              </span>
-              <span className="h-[3px] w-[3px] rounded-full bg-white opacity-40" aria-hidden="true" />
-              <span className="text-[12px] text-white/60">{readTime} min read</span>
-              <span className="h-[3px] w-[3px] rounded-full bg-white opacity-40" aria-hidden="true" />
-              <span className="text-[12px] text-white/60">{wordCount.toLocaleString()} words</span>
-            </div>
 
-            {/* Tags */}
-            {post.tags && post.tags.length > 0 ? (
-              <div className="mb-4 flex flex-wrap gap-1.5">
-                {post.tags.slice(0, 5).map((tag, index) => (
-                  <Link
-                    key={tag}
-                    href={`/topics/${encodeURIComponent(tag)}`}
-                    className={`inline-flex items-center rounded-full border border-white/15 bg-white/[0.08] px-3 py-0.5 text-[10.5px] font-medium text-white/75 transition-colors hover:border-white/35 hover:text-white ${index >= 3 ? "hidden sm:inline-flex" : ""}`}
-                  >
-                    {tag}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
+          <Suspense fallback={null}>
+            <ParentPostLink parentPostId={parentPostId} mode="magazine" />
+          </Suspense>
 
-            <Suspense fallback={null}>
-              <ParentPostLink parentPostId={parentPostId} mode="magazine" />
-            </Suspense>
+          <h1 className="font-display max-w-[700px] text-[34px] font-semibold uppercase leading-[0.98] tracking-[-0.025em] text-white sm:text-[52px] lg:text-[58px]">
+            {post.title}
+          </h1>
 
-            <h1 className="font-display max-w-[760px] text-[32px] font-bold leading-[1.12] tracking-normal text-white sm:text-[50px] sm:leading-[1.04] lg:text-[56px]">
-              {post.title}
-            </h1>
+          {sanitizedExcerpt ? (
+            <p className="font-display mt-5 max-w-[640px] text-[16px] italic leading-[1.55] text-white/75 sm:text-[20px]">
+              {sanitizedExcerpt}
+            </p>
+          ) : null}
 
-            {sanitizedExcerpt ? (
-              <p className="font-display mt-4 line-clamp-4 max-w-[650px] text-[16px] font-normal italic leading-[1.62] text-white/80 sm:line-clamp-none sm:text-[21px] sm:leading-[1.55]">
-                {sanitizedExcerpt}
-              </p>
-            ) : null}
-
-            {author ? (
-              <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-white/10 pt-3.5 sm:flex-nowrap sm:gap-4">
-                <Link href={`/${author.username}`} className="shrink-0">
-                  <UserAvatar
-                    name={authorName}
-                    src={author.avatar_url}
-                    size={44}
-                    className="flex-shrink-0 overflow-hidden rounded-full ring-2 ring-white/25"
-                  />
+          {author ? (
+            <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-white/15 pt-5 sm:flex-nowrap">
+              <Link href={`/${author.username}`} className="shrink-0">
+                <UserAvatar
+                  name={authorName}
+                  src={author.avatar_url}
+                  size={44}
+                  className="overflow-hidden rounded-full ring-1 ring-white/20"
+                />
+              </Link>
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/${author.username}`}
+                  className="text-[13px] font-semibold text-white transition-colors hover:text-gold-tint"
+                >
+                  {authorName}
                 </Link>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      href={`/${author.username}`}
-                      className="text-[13.5px] font-semibold text-white transition-colors hover:text-emerald-100"
-                    >
-                      {authorName}
-                    </Link>
-                    {author.verified ? (
-                      <span
-                        title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
-                        className="inline-flex items-center gap-1 rounded-full bg-emerald-brand px-2 py-0.5 text-[9.5px] font-bold text-white"
-                      >
-                        {"\u2713"}{" "}
-                        {author.verified_type
-                          ? author.verified_type.charAt(0).toUpperCase() + author.verified_type.slice(1)
-                          : "Verified"}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-0.5 text-[11.5px] text-white/55">
-                    {[author.field_of_study, author.university].filter(Boolean).join(" / ")}
-                  </p>
-                </div>
-                <div className="w-full shrink-0 border-t border-white/10 pt-3 text-left sm:ml-auto sm:w-auto sm:border-t-0 sm:pt-0 sm:text-right">
-                  <p className="text-[12px] font-semibold text-white/75">
-                    {formatDate(post.published_at ?? post.created_at)}
-                  </p>
-                  {typeof post.read_count === "number" && post.read_count > 0 ? (
-                    <p className="mt-0.5 text-[10.5px] text-white/45">
-                      {post.read_count.toLocaleString()} reads
-                    </p>
-                  ) : null}
-                </div>
+                <p className="mt-0.5 text-[11px] text-white/55">
+                  {[author.field_of_study, author.university].filter(Boolean).join(" · ")}
+                </p>
               </div>
-            ) : null}
+              <p className="w-full text-[11px] text-white/50 sm:ml-auto sm:w-auto sm:text-right">
+                {formatDate(post.published_at ?? post.created_at)}
+              </p>
+            </div>
+          ) : null}
 
-            <Suspense fallback={null}>
-              <HeaderCoAuthors
-                authorId={author?.id ?? null}
-                secondaryDataPromise={secondaryDataPromise}
-                mode="magazine"
-              />
-            </Suspense>
-          </div>
-        </header>
-      )}
+          <Suspense fallback={null}>
+            <HeaderCoAuthors
+              authorId={author?.id ?? null}
+              secondaryDataPromise={secondaryDataPromise}
+              mode="magazine"
+            />
+          </Suspense>
+        </div>
+      </header>
 
-      {postHeroMode === "magazine" ? (
-        <div
-          className="relative left-1/2 h-12 w-[calc(100vw-16px)] -translate-x-1/2 bg-gradient-to-b from-[#115e59]/20 to-canvas"
-          aria-hidden="true"
+      <div className="relative z-10 mx-auto -mt-7 max-w-[760px] px-4 sm:px-6">
+        <PostCover
+          src={post.cover_image_url}
+          alt={post.title}
+          type={post.type}
+          sizes="(max-width: 760px) 100vw, 760px"
+          priority
+          className="h-[230px] rounded-2xl border border-black/10 shadow-[0_12px_30px_-16px_rgba(0,0,0,0.3)] sm:h-[400px]"
+          imageClassName="object-cover"
         />
-      ) : (
-        <div className="h-6" aria-hidden="true" />
-      )}
+        <p className="mt-2.5 text-center text-[10px] text-gray-400">Cover image</p>
+      </div>
 
-      <div className="mx-auto grid max-w-[1200px] grid-cols-1 items-start gap-0 px-4 pb-20 pt-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_272px] lg:gap-[52px] lg:px-8">
+      <div className="mx-auto max-w-[680px] px-4 pb-20 pt-10 sm:px-6 sm:pt-12">
         <main className="min-w-0">
           <Suspense fallback={null}>
             <PostPublishSuccessSection
@@ -2714,20 +2576,11 @@ export default async function PostPage({ params }: PageProps) {
             />
           </Suspense>
 
-          <Suspense fallback={<SectionSkeleton rows={2} />}>
-            <PublicationSignalBlock
-              post={post}
-              author={author}
-              secondaryDataPromise={secondaryDataPromise}
-              variant="standalone"
-            />
-          </Suspense>
-
           {post.audio_summary_url ? (
             <AudioSummaryPlayer audioUrl={post.audio_summary_url} />
           ) : null}
 
-          <div className="article-journal-body relative mb-10 sm:mb-16">
+          <div className="article-journal-body article-redesign-body relative mb-12 sm:mb-16">
             <HighlightShare containerId="post-article-prose" postSlug={post.slug} postId={post.id} />
             <div
               id="post-article-prose"
@@ -2735,20 +2588,6 @@ export default async function PostPage({ params }: PageProps) {
               dangerouslySetInnerHTML={{ __html: contentWithIds }}
             />
           </div>
-
-          {isPublished ? <ResponsePromptPanel postId={post.id} /> : null}
-
-          <Suspense fallback={<SectionSkeleton rows={2} />}>
-            <MobileCredibilitySection
-              post={post}
-              author={author}
-              sanitizedContent={sanitizedContent}
-              wordCount={wordCount}
-              parentPostId={parentPostId}
-              isPublished={isPublished}
-              secondaryDataPromise={secondaryDataPromise}
-            />
-          </Suspense>
 
           <Suspense fallback={<SectionSkeleton rows={4} />}>
             <PostReferencesAndCitation
@@ -2777,16 +2616,9 @@ export default async function PostPage({ params }: PageProps) {
               authorName={authorName}
               secondaryDataPromise={secondaryDataPromise}
               viewerDataPromise={viewerDataPromise}
+              showCollaboration={false}
             />
           </Suspense>
-
-          <hr className="my-9 border-gray-200/80" />
-
-          <Suspense fallback={<SectionSkeleton rows={3} />}>
-            <PostRelatedSection secondaryDataPromise={secondaryDataPromise} />
-          </Suspense>
-
-          <hr className="mb-8 border-gray-200/80" />
 
           <Suspense fallback={<CommentsSkeleton />}>
             <CommentsLoader
@@ -2799,32 +2631,11 @@ export default async function PostPage({ params }: PageProps) {
           <Suspense fallback={<SectionSkeleton rows={3} />}>
             <PostResponsesSection secondaryDataPromise={secondaryDataPromise} />
           </Suspense>
-        </main>
 
-        <Suspense
-          fallback={
-            <aside className="hidden lg:block">
-              <div className="sticky top-24 space-y-4">
-                <SectionSkeleton rows={5} />
-                <SectionSkeleton rows={3} />
-              </div>
-            </aside>
-          }
-        >
-          <PostSidebar
-            post={post}
-            author={author}
-            userId={userId}
-            headings={headings}
-            sanitizedContent={sanitizedContent}
-            sanitizedExcerpt={sanitizedExcerpt}
-            wordCount={wordCount}
-            parentPostId={parentPostId}
-            isPublished={isPublished}
-            secondaryDataPromise={secondaryDataPromise}
-            viewerDataPromise={viewerDataPromise}
-          />
-        </Suspense>
+          <Suspense fallback={<SectionSkeleton rows={3} />}>
+            <PostRelatedSection secondaryDataPromise={secondaryDataPromise} />
+          </Suspense>
+        </main>
       </div>
     </div>
   );

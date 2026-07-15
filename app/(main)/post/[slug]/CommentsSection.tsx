@@ -354,15 +354,20 @@ export default function CommentsSection({
   );
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 sm:rounded-lg sm:p-5">
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <h3 className="text-[15px] font-bold text-gray-900">
-          {totalCount} {totalCount === 1 ? "Comment" : "Comments"}
+    <section id="comments" className="flex scroll-mt-24 flex-col">
+      <div className="order-1 rounded-t-2xl border border-[#DCE7E0] bg-green-wash px-5 py-5 sm:px-6">
+        <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-brand">
+          Join the conversation
+        </p>
+        <h3 className="font-display text-[22px] font-semibold leading-tight text-gray-900 sm:text-2xl">
+          Have a response to this piece?
         </h3>
-        <span className="hidden h-px flex-1 bg-gray-200 sm:block" aria-hidden="true" />
       </div>
 
-      <div className="mb-8 space-y-6">
+      <div className="order-3 mb-10 mt-10 space-y-6">
+        <h3 className="font-display text-[21px] font-semibold text-gray-900">
+          Comments <span className="font-normal text-gray-400">({totalCount})</span>
+        </h3>
         {totalCount === 0 ? (
           <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-4 py-5 text-center sm:rounded-lg">
             <p className="text-sm font-medium text-gray-900">
@@ -456,7 +461,7 @@ export default function CommentsSection({
 
       {userId ? (
         <form
-          className="rounded-xl border border-gray-200 bg-canvas p-3 sm:rounded-lg sm:p-4"
+          className="order-2 rounded-b-2xl border border-t-0 border-[#DCE7E0] bg-white p-5 shadow-[0_10px_26px_-18px_rgba(7,57,41,0.3)] sm:p-6"
           onSubmit={(event) => {
             event.preventDefault();
             void handleSubmit();
@@ -465,9 +470,9 @@ export default function CommentsSection({
           <textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Ask a question, add evidence, offer a counterpoint, or request clarification..."
-            rows={3}
-            className="mb-3 min-h-[116px] w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-3 text-sm leading-6 focus:border-emerald-brand focus:outline-none focus:ring-0"
+            placeholder="Share your thoughts on this piece..."
+            rows={2}
+            className="mb-3 min-h-[84px] w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm leading-6 focus:border-emerald-brand focus:outline-none focus:ring-0"
           />
           <div className="mb-3 flex flex-wrap gap-2">
             {COMMENT_PROMPTS.map((prompt) => (
@@ -508,9 +513,36 @@ export default function CommentsSection({
               {loading ? "Posting..." : "Post comment"}
             </button>
           </div>
+          <div className="my-5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-gray-200" />
+            <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+              Or take it further
+            </span>
+            <span className="h-px flex-1 bg-gray-200" />
+          </div>
+          <div className="flex flex-col gap-4 rounded-xl border border-[#EBDBBB] bg-gold-tint p-4 sm:flex-row sm:items-center">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gold text-white">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gold-ink">Write a full response post</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-gold-ink/80">
+                Argue back at length in your own essay and cite this piece as the springboard.
+              </p>
+            </div>
+            <ResponseStartLink
+              postId={postId}
+              source="article_conversation"
+              className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-gold px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-gold-ink"
+            >
+              Start writing
+            </ResponseStartLink>
+          </div>
         </form>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-canvas px-4 py-4 text-sm leading-6 text-gray-500 sm:rounded-lg">
+        <div className="order-2 rounded-b-2xl border border-t-0 border-[#DCE7E0] bg-white px-5 py-6 text-sm leading-6 text-gray-500 shadow-[0_10px_26px_-18px_rgba(7,57,41,0.3)] sm:px-6">
           <Link
             href="/login"
             className="font-medium text-emerald-brand hover:underline"

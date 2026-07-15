@@ -246,6 +246,66 @@ font-family: var(--font-inter), system-ui, sans-serif;
   font-weight: 700;
 }
 
+/* Editorial post detail — mirrors the centered standalone article mockup. */
+.article-redesign-body .prose {
+  margin-inline: auto;
+}
+
+.article-redesign-body .prose > p:first-of-type::first-letter {
+  color: #8A5D1E !important;
+}
+
+.article-redesign-body .prose blockquote {
+  border-left-color: #CE932B;
+  color: #242424;
+  font-size: 1.35rem;
+}
+
+.article-redesign-body .prose blockquote p {
+  color: #242424;
+  font-size: inherit;
+}
+
+.article-engagement-bar > div > div {
+  width: auto;
+}
+
+.article-engagement-bar button {
+  min-height: 2.25rem !important;
+  width: auto !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  padding: 0 0.75rem !important;
+  box-shadow: none !important;
+}
+
+.article-engagement-bar button:hover {
+  background: #F9FAFB !important;
+}
+
+.article-engagement-bar button svg {
+  height: 1rem;
+  width: 1rem;
+}
+
+@media (max-width: 420px) {
+  .article-engagement-bar button,
+  .article-engagement-bar a {
+    padding-inline: 0.6rem !important;
+  }
+
+  .article-engagement-bar button {
+    font-size: 0;
+    gap: 0 !important;
+  }
+
+  .article-engagement-bar button svg {
+    height: 1.1rem;
+    width: 1.1rem;
+  }
+}
+
 @media (max-width: 639px) {
   .article-journal-body .prose p,
   .article-journal-body .prose li {
