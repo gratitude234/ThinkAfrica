@@ -576,6 +576,8 @@ export default function WritePage() {
     [getCurrentData, saveDraft]
   );
 
+  const closeCoverDialog = useCallback(() => setIsCoverDialogOpen(false), []);
+
   const compactSaveLabel =
     saveStatus === "saving"
       ? "Saving…"
@@ -1101,7 +1103,7 @@ export default function WritePage() {
         <>
           <CoverImageDialog
             open={isCoverDialogOpen}
-            onClose={() => setIsCoverDialogOpen(false)}
+            onClose={closeCoverDialog}
             coverImageUrl={coverImageUrl}
             onUpload={(url) => handleMetadataChange({ coverImageUrl: url })}
             onRemove={() => handleMetadataChange({ coverImageUrl: "" })}

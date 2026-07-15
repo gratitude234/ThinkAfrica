@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
@@ -50,11 +50,7 @@ function finish(
   liked: boolean
 ) {
   revalidatePath(`/post/${slug}`);
-  // Next 16's revalidateTag requires a cache-life "profile" second argument; a named
-  // profile (e.g. "max") marks the tag stale-but-servable for that profile's whole
-  // expire window instead of invalidating now. An empty string keeps it falsy
-  // internally, which triggers immediate invalidation — the behavior we want.
-  revalidateTag("feed", "");
+  updateTag("feed");
   return getLikeCount(supabase, postId).then((count) => ({
     error: null,
     liked,
@@ -142,42 +138,57 @@ export async function togglePostLike(
   if (post.author_id !== user.id) {
     const actorName = displayName(actorProfile);
     const ctaPath = `/post/${post.slug}`;
-    const { error: notificationError } = await supabase.from("notifications").insert({
-      user_id: post.author_id,
-      type: "like",
-      message: `${actorName} liked your post: ${post.title}`,
-      link: ctaPath,
-      actor_id: user.id,
-      post_id: input.postId,
-      read: false,
-    });
 
-    if (notificationError) {
-      console.error(`Failed to create like notification: ${notificationError.message}`);
-    } else {
-      const pushResult = await sendPushNotification({
-        recipientId: post.author_id,
-        title: "New like on your post",
-        body: `${actorName} liked "${post.title}"`,
-        path: ctaPath,
-        preferenceKey: "push_likes",
-        cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
-      });
-      logPushResult(`like:${user.id}:${input.postId}`, pushResult);
+    // Collapse repeated unlike/relike toggles into one pending notification instead
+    // of spamming the author — if they haven't seen this actor's last like yet, skip.
+    const { data: existingNotification } = await supabase
+      .from("notifications")
+      .select("id")
+      .eq("user_id", post.author_id)
+      .eq("type", "like")
+      .eq("actor_id", user.id)
+      .eq("post_id", input.postId)
+      .eq("read", false)
+      .maybeSingle();
 
-      const emailResult = await sendUserEmail({
-        recipientId: post.author_id,
-        subject: `${actorName} liked your Indegenius post`,
-        preview: `${actorName} liked "${post.title}".`,
-        title: "New like on your post",
-        intro: `${actorName} liked "${post.title}".`,
-        ctaLabel: "View your post",
-        ctaPath,
-        idempotencyKey: `like:${input.postId}:${post.author_id}`,
-        preferenceKey: "email_likes",
-        cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
+    if (!existingNotification) {
+      const { error: notificationError } = await supabase.from("notifications").insert({
+        user_id: post.author_id,
+        type: "like",
+        message: `${actorName} liked your post: ${post.title}`,
+        link: ctaPath,
+        actor_id: user.id,
+        post_id: input.postId,
+        read: false,
       });
-      logEmailResult(`like:${input.postId}:${post.author_id}`, emailResult);
+
+      if (notificationError) {
+        console.error(`Failed to create like notification: ${notificationError.message}`);
+      } else {
+        const pushResult = await sendPushNotification({
+          recipientId: post.author_id,
+          title: "New like on your post",
+          body: `${actorName} liked "${post.title}"`,
+          path: ctaPath,
+          preferenceKey: "push_likes",
+          cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
+        });
+        logPushResult(`like:${user.id}:${input.postId}`, pushResult);
+
+        const emailResult = await sendUserEmail({
+          recipientId: post.author_id,
+          subject: `${actorName} liked your Indegenius post`,
+          preview: `${actorName} liked "${post.title}".`,
+          title: "New like on your post",
+          intro: `${actorName} liked "${post.title}".`,
+          ctaLabel: "View your post",
+          ctaPath,
+          idempotencyKey: `like:${input.postId}:${post.author_id}:${user.id}`,
+          preferenceKey: "email_likes",
+          cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
+        });
+        logEmailResult(`like:${input.postId}:${post.author_id}`, emailResult);
+      }
     }
   }
 

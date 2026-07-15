@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import Toast from "@/components/ui/Toast";
 import { usePostEngagement } from "./PostEngagementContext";
 
 interface Props {
@@ -22,10 +23,13 @@ export default function ReadingBar({
   slug,
 }: Props) {
   const [visible, setVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const {
     liked,
     likeCount,
     bookmarked,
+    likeError,
+    bookmarkError,
     syncLiked,
     syncBookmarked,
     toggleLike,
@@ -37,6 +41,14 @@ export default function ReadingBar({
     syncBookmarked(initialBookmarked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (likeError) setToastMessage(likeError);
+  }, [likeError]);
+
+  useEffect(() => {
+    if (bookmarkError) setToastMessage(bookmarkError);
+  }, [bookmarkError]);
 
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 300);
@@ -63,10 +75,15 @@ export default function ReadingBar({
     }
   };
 
-  if (!visible) return null;
+  if (!visible && !toastMessage) return null;
 
   return (
     <>
+      {toastMessage ? (
+        <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
+      ) : null}
+      {!visible ? null : (
+        <>
       {/* ── Mobile / tablet: horizontal pill at bottom ── */}
       <div
         className="fixed inset-x-0 z-40 px-4 lg:hidden"
@@ -180,6 +197,8 @@ export default function ReadingBar({
           </Link>
         </div>
       </div>
+        </>
+      )}
     </>
   );
 }

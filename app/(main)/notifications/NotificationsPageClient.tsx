@@ -10,7 +10,6 @@ import {
   type ActionInboxItem,
 } from "@/lib/actionInbox";
 import { trackActivationEvent } from "@/lib/activationEvents";
-import { shouldUseRealtime } from "@/lib/realtime";
 import NotificationItem from "./NotificationItem";
 import {
   fetchNotificationRows,
@@ -105,15 +104,18 @@ export default function NotificationsPageClient({
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
-    const rows = await fetchNotificationRows(supabase, userId);
+    const { rows, error } = await fetchNotificationRows(supabase, userId);
+    // Leave the currently-displayed notifications alone on a transient fetch
+    // failure rather than wiping them out with an empty result.
+    if (error) return;
     setLocalSections(sectionsFromNotifications(rows));
     setUnreadCount(rows.filter((notification) => !notification.read).length);
   }, [userId]);
 
-  // Polling fallback since this page has no realtime subscription of its own.
+  // Unconditional polling — this page has no realtime subscription of its own, and
+  // `notifications` stays out of the Realtime publication regardless of the
+  // shouldUseRealtime() flag (see NotificationBell.tsx for the same reasoning).
   useEffect(() => {
-    if (shouldUseRealtime()) return;
-
     const poll = setInterval(() => {
       void refresh();
     }, 30_000);

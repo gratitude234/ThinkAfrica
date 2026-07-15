@@ -69,18 +69,23 @@ type NotificationsQueryClient = {
   from: (table: string) => any;
 };
 
+export interface NotificationRowsResult {
+  rows: NotificationData[];
+  error: string | null;
+}
+
 export async function fetchNotificationRows(
   supabase: NotificationsQueryClient,
   userId: string
-): Promise<NotificationData[]> {
-  const { data: raw } = await supabase
+): Promise<NotificationRowsResult> {
+  const { data: raw, error } = await supabase
     .from("notifications")
     .select(NOTIFICATIONS_SELECT)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(50);
 
-  return ((raw ?? []) as Array<Record<string, unknown>>).map((notification) => {
+  const rows = ((raw ?? []) as Array<Record<string, unknown>>).map((notification) => {
     const rawActor = notification.actor as
       | NotificationData["actor"]
       | NotificationData["actor"][]
@@ -106,4 +111,6 @@ export async function fetchNotificationRows(
       post_slug: post?.slug ?? null,
     };
   });
+
+  return { rows, error: error?.message ?? null };
 }

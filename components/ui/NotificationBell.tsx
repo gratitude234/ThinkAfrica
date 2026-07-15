@@ -96,10 +96,12 @@ export default function NotificationBell({ userId }: { userId: string }) {
     void fetchNotifications();
   }, [fetchNotifications]);
 
-  // Polling fallback when Realtime is disabled — mirrors MessagesUnreadBadge.tsx.
+  // Unconditional polling fallback. `notifications` is excluded from the Realtime
+  // publication at the Postgres level regardless of shouldUseRealtime()'s flag check
+  // (see 20260521000001_disable_realtime_for_launch_stability.sql), so gating this on
+  // that flag would silently stop delivery if Realtime is ever enabled for other
+  // tables (e.g. messages) without also being re-enabled for this one.
   useEffect(() => {
-    if (shouldUseRealtime()) return;
-
     const poll = setInterval(() => {
       void fetchNotifications();
     }, 30_000);

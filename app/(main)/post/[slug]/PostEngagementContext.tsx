@@ -73,7 +73,7 @@ export function PostEngagementProvider({
     const prevCount = likeCount;
 
     setLiked(!wasLiked);
-    setLikeCount(wasLiked ? prevCount - 1 : prevCount + 1);
+    setLikeCount(wasLiked ? Math.max(0, prevCount - 1) : prevCount + 1);
     setLikePending(true);
     setLikeError(null);
 

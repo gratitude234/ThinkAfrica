@@ -11,7 +11,7 @@ export default async function NotificationsPage() {
 
   if (!user) redirect("/login?redirectTo=/notifications");
 
-  const notifications = await fetchNotificationRows(supabase, user.id);
+  const { rows: notifications } = await fetchNotificationRows(supabase, user.id);
   const sections = sectionsFromNotifications(notifications);
   const unreadCount = notifications.filter((notification) => !notification.read).length;
 

@@ -138,7 +138,7 @@ export default function CoverImageUploader({
           alt="Cover"
           className={`w-full rounded-lg object-cover ${previewHeightClass}`}
         />
-        <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/20 opacity-0 transition-opacity hover:opacity-100">
+        <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/20 opacity-100 transition-opacity sm:opacity-0 sm:hover:opacity-100 sm:focus-within:opacity-100">
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
