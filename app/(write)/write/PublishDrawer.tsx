@@ -297,7 +297,7 @@ export default function PublishDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 animate-fade-in bg-black/[0.45]">
+    <div className="fixed inset-0 z-50 animate-fade-in bg-black/[0.45] lg:flex lg:items-center lg:justify-center lg:p-8">
       <button
         type="button"
         onClick={onClose}
@@ -306,16 +306,27 @@ export default function PublishDrawer({
       />
 
       <div
-        className="absolute inset-x-0 bottom-0 mx-auto max-h-[88vh] w-full max-w-[560px] animate-slide-up overflow-y-auto rounded-t-[20px] bg-white px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-2xl"
+        className="absolute inset-x-0 bottom-0 mx-auto max-h-[88vh] w-full max-w-[560px] animate-slide-up overflow-y-auto rounded-t-[20px] bg-white px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-2xl lg:relative lg:inset-auto lg:max-h-[86vh] lg:max-w-[720px] lg:animate-create-menu-in lg:rounded-[24px] lg:px-8 lg:pb-8 lg:pt-7"
         role="dialog"
         aria-modal="true"
         aria-labelledby="publish-drawer-title"
       >
-        <div className="mx-auto mb-[18px] mt-1.5 h-1 w-9 rounded-full bg-gray-300" />
+        <div className="mx-auto mb-[18px] mt-1.5 h-1 w-9 rounded-full bg-gray-300 lg:hidden" />
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-5 top-5 hidden h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 lg:flex"
+          aria-label="Close publish dialog"
+        >
+          <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
 
         <h2
           id="publish-drawer-title"
-          className="mb-[18px] font-display text-[22px] font-semibold leading-tight text-ink"
+          className="mb-[18px] font-display text-[22px] font-semibold leading-tight text-ink lg:pr-12 lg:text-[28px]"
         >
           Ready to publish.
         </h2>
@@ -331,7 +342,7 @@ export default function PublishDrawer({
                 type="button"
                 onClick={() => handleSelectFormat(type)}
                 aria-pressed={selected}
-                className={`relative flex min-h-[112px] flex-col items-start gap-1 rounded-xl border px-3 py-3 text-left transition-colors ${
+                className={`relative flex min-h-[112px] flex-col items-start gap-1 rounded-xl border px-3 py-3 text-left transition-colors lg:min-h-[128px] lg:px-4 lg:py-4 ${
                   selected
                     ? meta.selectedCardClass
                     : "border-gray-200 bg-white hover:border-gray-300"

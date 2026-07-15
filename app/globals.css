@@ -105,6 +105,12 @@
 }
 
 @media (min-width: 1024px) {
+  .write-canvas-editor {
+    min-height: 560px;
+    font-size: 1.25rem;
+    line-height: 1.72;
+  }
+
   .write-canvas-compact .write-canvas-editor {
     min-height: 380px;
   }

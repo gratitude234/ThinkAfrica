@@ -42,14 +42,25 @@ interface DraftPayload {
   inResponseToId: string | null;
 }
 
-type MobileToolbarAction = "bold" | "list" | "image" | "link";
+type EditorToolbarAction =
+  | "bold"
+  | "italic"
+  | "heading"
+  | "list"
+  | "quote"
+  | "image"
+  | "link"
+  | "undo"
+  | "redo";
 
-const MOBILE_TOOLBAR_BUTTONS: Array<{
+interface ToolbarButtonDefinition {
   title: string;
-  action: MobileToolbarAction;
+  action: EditorToolbarAction;
   markKey?: string;
   icon: ReactNode;
-}> = [
+}
+
+const MOBILE_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
   {
     title: "Bold",
     action: "bold",
@@ -86,6 +97,53 @@ const MOBILE_TOOLBAR_BUTTONS: Array<{
     icon: (
       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+    ),
+  },
+];
+
+const DESKTOP_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
+  MOBILE_TOOLBAR_BUTTONS[0],
+  {
+    title: "Italic",
+    action: "italic",
+    markKey: "italic",
+    icon: <span className="font-display text-base italic leading-none">I</span>,
+  },
+  {
+    title: "Heading",
+    action: "heading",
+    markKey: "heading",
+    icon: <span className="text-xs font-semibold leading-none">H2</span>,
+  },
+  MOBILE_TOOLBAR_BUTTONS[1],
+  {
+    title: "Quote",
+    action: "quote",
+    markKey: "blockquote",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 8H6.75A2.75 2.75 0 004 10.75v1.5A2.75 2.75 0 006.75 15H8v2.5M20 8h-2.75a2.75 2.75 0 00-2.75 2.75v1.5A2.75 2.75 0 0017.25 15h1.25v2.5" />
+      </svg>
+    ),
+  },
+  MOBILE_TOOLBAR_BUTTONS[2],
+  MOBILE_TOOLBAR_BUTTONS[3],
+  {
+    title: "Undo",
+    action: "undo",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 8 5 12l4 4M6 12h7a6 6 0 0 1 6 6" />
+      </svg>
+    ),
+  },
+  {
+    title: "Redo",
+    action: "redo",
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="m15 8 4 4-4 4m3-4h-7a6 6 0 0 0-6 6" />
       </svg>
     ),
   },
@@ -451,7 +509,10 @@ export default function WritePage() {
     if (!editorRef.current) return;
     setActiveMarks({
       bold: editorRef.current.isActive("bold"),
+      italic: editorRef.current.isActive("italic"),
+      heading: editorRef.current.isActive("heading", { level: 2 }),
       bulletList: editorRef.current.isActive("bulletList"),
+      blockquote: editorRef.current.isActive("blockquote"),
       link: editorRef.current.isActive("link"),
     });
   }, []);
@@ -598,10 +659,15 @@ export default function WritePage() {
     setIsPublishDrawerOpen(true);
   };
 
-  const runMobileToolbarAction = (action: MobileToolbarAction) => {
+  const runToolbarAction = (action: EditorToolbarAction) => {
     if (action === "bold")  editorRef.current?.toggleBold();
+    if (action === "italic") editorRef.current?.toggleItalic();
+    if (action === "heading") editorRef.current?.toggleH2();
     if (action === "list")  editorRef.current?.toggleBulletList();
+    if (action === "quote") editorRef.current?.toggleBlockquote();
     if (action === "image") editorRef.current?.triggerImageUpload();
+    if (action === "undo") editorRef.current?.undo();
+    if (action === "redo") editorRef.current?.redo();
     if (action === "link") {
       if (activeMarks.link) {
         editorRef.current?.insertLink("");
@@ -641,26 +707,34 @@ export default function WritePage() {
   );
 
   return (
-    <div className="mx-auto min-h-screen max-w-[1080px] px-5 pb-24 sm:px-8 lg:px-10">
+    <div className="mx-auto min-h-screen max-w-[1240px] px-5 pb-24 sm:px-8 lg:px-8 xl:px-10">
       <header
-        className="sticky top-0 z-30 mb-3 flex items-center justify-between gap-3 bg-canvas/95 py-3.5 backdrop-blur-sm"
+        className="sticky top-0 z-30 mb-3 flex items-center justify-between gap-3 border-b border-transparent bg-canvas/95 py-3.5 backdrop-blur-sm lg:mb-7 lg:border-gray-200/80"
         style={{ paddingTop: "max(0.875rem, env(safe-area-inset-top))" }}
       >
-        <button
-          type="button"
-          onClick={handleCloseCanvas}
-          aria-label="Close"
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white hover:text-gray-800"
-        >
-          <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleCloseCanvas}
+            aria-label="Close"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white hover:text-gray-800"
+          >
+            <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <div className="hidden lg:block">
+            <p className="text-sm font-semibold text-ink">Draft workspace</p>
+            <p className="mt-0.5 text-xs text-gray-400">
+              Shape the argument, then choose its format.
+            </p>
+          </div>
+        </div>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
           {uploadResearchLink}
           <span
-            className={`min-w-[44px] text-right text-xs font-medium ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
+            className={`min-w-[44px] text-right text-xs font-medium lg:hidden ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
             aria-live="polite"
           >
             {compactSaveLabel}
@@ -724,7 +798,7 @@ export default function WritePage() {
         </div>
       ) : null}
 
-      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-12 xl:grid-cols-[780px_300px] xl:justify-center">
         <main className="min-w-0">
           {inResponseToId && inResponseToTitle ? (
             <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -777,6 +851,81 @@ export default function WritePage() {
             </div>
           ) : null}
 
+          <div className="sticky top-[92px] z-20 mb-8 hidden lg:block">
+            <div className="flex min-h-[52px] items-center gap-1 rounded-xl border border-gray-200 bg-white/95 px-2.5 py-2 shadow-sm shadow-black/[0.03] backdrop-blur">
+              {DESKTOP_TOOLBAR_BUTTONS.map((btn) => (
+                <button
+                  key={btn.title}
+                  type="button"
+                  title={btn.title}
+                  aria-label={btn.title}
+                  aria-pressed={
+                    btn.markKey ? Boolean(activeMarks[btn.markKey]) : undefined
+                  }
+                  onClick={() => runToolbarAction(btn.action)}
+                  className={`flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 ${
+                    btn.markKey && activeMarks[btn.markKey]
+                      ? "bg-emerald-50 text-emerald-700"
+                      : ""
+                  }`}
+                >
+                  {btn.icon}
+                </button>
+              ))}
+
+              <div className="ml-auto flex items-center gap-3 border-l border-gray-100 pl-4 pr-1 text-xs">
+                <span className="tabular-nums text-gray-400">
+                  {wordCount.toLocaleString()} {wordCount === 1 ? "word" : "words"}
+                </span>
+                <span
+                  className={`font-medium ${saveStatus === "error" ? "text-amber-600" : "text-gray-500"}`}
+                  aria-live="polite"
+                >
+                  {compactSaveLabel}
+                </span>
+              </div>
+            </div>
+
+            {showLinkPopover ? (
+              <div className="absolute left-0 right-0 top-[calc(100%+8px)] hidden items-center gap-2 rounded-xl border border-emerald-100 bg-white p-3 shadow-lg lg:flex">
+                <input
+                  type="url"
+                  autoFocus
+                  value={linkPopoverUrl}
+                  onChange={(event) => setLinkPopoverUrl(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      editorRef.current?.insertLink(linkPopoverUrl);
+                      setShowLinkPopover(false);
+                      setLinkPopoverUrl("");
+                    }
+                    if (event.key === "Escape") setShowLinkPopover(false);
+                  }}
+                  placeholder="Paste a link"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-canvas px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    editorRef.current?.insertLink(linkPopoverUrl);
+                    setShowLinkPopover(false);
+                    setLinkPopoverUrl("");
+                  }}
+                  className="rounded-lg bg-emerald-brand px-3.5 py-2 text-sm font-medium text-white"
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLinkPopover(false)}
+                  className="rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : null}
+          </div>
+
           <input
             type="text"
             value={title}
@@ -786,7 +935,7 @@ export default function WritePage() {
               saveDraft(getCurrentData({ title: event.target.value }));
             }}
             placeholder="Title"
-            className="w-full border-none bg-transparent px-0 py-1 font-display text-[32px] font-semibold leading-[1.2] text-ink placeholder:text-gray-400 focus:outline-none focus:ring-0"
+            className="w-full border-none bg-transparent px-0 py-1 font-display text-[32px] font-semibold leading-[1.2] text-ink placeholder:text-gray-400 focus:outline-none focus:ring-0 lg:text-[48px] lg:leading-[1.08]"
           />
 
           <Editor
@@ -815,13 +964,13 @@ export default function WritePage() {
       </div>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white shadow-[0_-4px_16px_rgba(15,23,42,0.05)]"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white shadow-[0_-4px_16px_rgba(15,23,42,0.05)] lg:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="mx-auto max-w-[1080px] px-5 sm:px-8 lg:px-10">
           <div className="lg:w-[calc(100%-340px)]">
             {showLinkPopover ? (
-                <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-2 py-2">
+                <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-2 py-2 lg:hidden">
                   <input
                     type="url"
                     autoFocus
@@ -867,7 +1016,7 @@ export default function WritePage() {
                   key={btn.title}
                   type="button"
                   title={btn.title}
-                  onClick={() => runMobileToolbarAction(btn.action)}
+                  onClick={() => runToolbarAction(btn.action)}
                   className={`flex h-9 min-w-[36px] shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition-colors ${
                     btn.markKey && activeMarks[btn.markKey]
                       ? "bg-emerald-100 text-emerald-700"

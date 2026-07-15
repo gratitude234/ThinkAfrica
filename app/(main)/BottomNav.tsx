@@ -31,7 +31,16 @@ export default function BottomNav({
   const pathname = usePathname();
   const isPostPage = pathname.startsWith("/post/");
   const isMessagesThread = /^\/messages\/.+/.test(pathname);
-  if (pathname.startsWith("/write") || isMessagesThread) return null;
+  const isEditPage = pathname.startsWith("/edit/");
+  const isResearchSubmitPage = pathname.startsWith("/submit/research");
+  if (
+    pathname.startsWith("/write") ||
+    isEditPage ||
+    isResearchSubmitPage ||
+    isMessagesThread
+  ) {
+    return null;
+  }
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -54,7 +63,7 @@ export default function BottomNav({
 
   return (
     <>
-      <CreateLauncher userId={userId} variant="mobileFab" />
+      <CreateLauncher userId={userId} variant="mobileFab" isPostPage={isPostPage} />
 
       {!isPostPage ? (
         <nav
