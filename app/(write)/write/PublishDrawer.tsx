@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import TagInput from "@/components/ui/TagInput";
+import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import type { PostReferenceRecord } from "@/lib/types";
 import {
   generateExcerpt,
@@ -32,7 +33,11 @@ interface PublishDrawerProps {
   initialPostType?: PostType;
   initialReferences?: PostReferenceRecord[];
   inResponseTo?: string | null;
-  onMetadataChange?: (changes: { postType?: PostType; tags?: string[] }) => void;
+  onMetadataChange?: (changes: {
+    postType?: PostType;
+    tags?: string[];
+    coverImageUrl?: string;
+  }) => void;
 }
 
 const POST_TYPES: Array<"blog" | "essay" | "policy_brief"> = ["blog", "essay", "policy_brief"];
@@ -114,6 +119,7 @@ export default function PublishDrawer({
   );
   const [tags, setTags] = useState<string[]>(initialTags);
   const [publishing, setPublishing] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [platformTags, setPlatformTags] = useState<string[]>([]);
@@ -331,6 +337,16 @@ export default function PublishDrawer({
           Ready to publish.
         </h2>
 
+        <section className="mb-5">
+          <p className="mb-2.5 text-[13px] font-semibold text-ink">Cover image</p>
+          <CoverImageUploader
+            initialUrl={initialCoverImageUrl}
+            onUpload={(url) => onMetadataChange?.({ coverImageUrl: url })}
+            onRemove={() => onMetadataChange?.({ coverImageUrl: "" })}
+            onUploadingChange={setCoverUploading}
+          />
+        </section>
+
         <section className="mb-5 grid grid-cols-3 gap-2.5">
           {POST_TYPES.map((type) => {
             const meta = CARD_META[type];
@@ -455,7 +471,7 @@ export default function PublishDrawer({
             size="lg"
             className="w-full"
             loading={publishing}
-            disabled={!qualitySummary.readyForSubmission}
+            disabled={!qualitySummary.readyForSubmission || coverUploading}
             onClick={handlePublish}
           >
             {publishLabel}

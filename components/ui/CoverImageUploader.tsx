@@ -7,6 +7,7 @@ interface CoverImageUploaderProps {
   initialUrl?: string;
   onUpload: (url: string) => void;
   onRemove: () => void;
+  onUploadingChange?: (uploading: boolean) => void;
   bucket?: string;
   ensureBucket?: boolean;
   buildPath?: (userId: string, file: File) => string;
@@ -19,6 +20,7 @@ export default function CoverImageUploader({
   initialUrl,
   onUpload,
   onRemove,
+  onUploadingChange,
   bucket = "post-images",
   ensureBucket = false,
   buildPath = (userId, file) => {
@@ -49,6 +51,7 @@ export default function CoverImageUploader({
       setError(null);
       setPreview(URL.createObjectURL(file));
       setUploading(true);
+      onUploadingChange?.(true);
 
       const supabase = createClient();
       const {
@@ -58,6 +61,7 @@ export default function CoverImageUploader({
       if (!user) {
         setError("You must be logged in to upload images.");
         setUploading(false);
+        onUploadingChange?.(false);
         return;
       }
 
@@ -74,15 +78,17 @@ export default function CoverImageUploader({
       if (uploadError) {
         setError(`Upload failed: ${uploadError.message}`);
         setUploading(false);
+        onUploadingChange?.(false);
         return;
       }
 
       const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
 
       setUploading(false);
+      onUploadingChange?.(false);
       onUpload(urlData.publicUrl);
     },
-    [bucket, buildPath, ensureBucket, onUpload]
+    [bucket, buildPath, ensureBucket, onUpload, onUploadingChange]
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,6 +134,18 @@ export default function CoverImageUploader({
         {uploading ? (
           <div className="absolute inset-0 flex items-center justify-center bg-white/70">
             <span className="text-sm text-gray-500">Uploading...</span>
+          </div>
+        ) : null}
+        {error ? (
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-red-600/95 px-3 py-1.5">
+            <span className="text-xs font-medium text-white">{error}</span>
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="shrink-0 text-xs font-semibold text-white underline"
+            >
+              Retry
+            </button>
           </div>
         ) : null}
         <input

@@ -2546,7 +2546,9 @@ export default async function PostPage({ params }: PageProps) {
           className="h-[230px] rounded-2xl border border-black/10 shadow-[0_12px_30px_-16px_rgba(0,0,0,0.3)] sm:h-[400px]"
           imageClassName="object-cover"
         />
-        <p className="mt-2.5 text-center text-[10px] text-gray-400">Cover image</p>
+        {post.cover_image_url ? (
+          <p className="mt-2.5 text-center text-[10px] text-gray-400">Cover image</p>
+        ) : null}
       </div>
 
       <div className="mx-auto max-w-[680px] px-4 pb-20 pt-10 sm:px-6 sm:pt-12">
