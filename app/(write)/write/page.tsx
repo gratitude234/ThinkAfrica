@@ -11,6 +11,7 @@ import type { PostReferenceRecord } from "@/lib/types";
 import { type PostType } from "@/lib/utils";
 import { useDraftManager, readDraftBackupRaw } from "./DraftManager";
 import PublishDrawer from "./PublishDrawer";
+import CoverImageDialog from "./CoverImageDialog";
 import WriteCanvasSkeleton from "./WriteCanvasSkeleton";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import { ensureDraft, savePostReferences } from "./actions";
@@ -82,7 +83,7 @@ const MOBILE_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
     ),
   },
   {
-    title: "Image",
+    title: "Insert image in article",
     action: "image",
     icon: (
       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,6 +218,8 @@ export default function WritePage() {
   const [references, setReferences] = useState<PostReferenceRecord[]>([]);
   const [wordCount, setWordCount] = useState(0);
   const [isPublishDrawerOpen, setIsPublishDrawerOpen] = useState(false);
+  const [isCoverDialogOpen, setIsCoverDialogOpen] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
   const [publishDraftId, setPublishDraftId] = useState<string | null>(null);
   const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
@@ -582,6 +585,18 @@ export default function WritePage() {
           ? "Couldn't save"
           : "Draft";
 
+  const coverButtonLabel = coverUploading
+    ? "Uploading…"
+    : coverImageUrl
+      ? "Cover added ✓"
+      : "Add cover";
+  const coverButtonShortLabel = coverUploading ? "…" : coverImageUrl ? "✓" : "Cover";
+  const coverButtonAriaLabel = coverUploading
+    ? "Cover image uploading"
+    : coverImageUrl
+      ? "Cover image added. Change or remove the cover image"
+      : "Add a cover image";
+
   // Pick up a highlighted quote stored by HighlightShare when navigating from a post.
   useEffect(() => {
     if (loadingDraft) return;
@@ -741,6 +756,21 @@ export default function WritePage() {
           </span>
           <Button
             type="button"
+            variant="secondary"
+            size="sm"
+            disabled={coverUploading}
+            onClick={() => setIsCoverDialogOpen(true)}
+            aria-label={coverButtonAriaLabel}
+            className="gap-1.5 whitespace-nowrap"
+          >
+            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="hidden min-[480px]:inline">{coverButtonLabel}</span>
+            <span className="min-[480px]:hidden">{coverButtonShortLabel}</span>
+          </Button>
+          <Button
+            type="button"
             size="sm"
             disabled={!canOpenPublish}
             onClick={handleReadyToPublish}
@@ -755,7 +785,7 @@ export default function WritePage() {
                 : undefined
             }
           >
-            Publish
+            Review & publish
           </Button>
         </div>
       </header>
@@ -1069,6 +1099,14 @@ export default function WritePage() {
 
       {currentUserId ? (
         <>
+          <CoverImageDialog
+            open={isCoverDialogOpen}
+            onClose={() => setIsCoverDialogOpen(false)}
+            coverImageUrl={coverImageUrl}
+            onUpload={(url) => handleMetadataChange({ coverImageUrl: url })}
+            onRemove={() => handleMetadataChange({ coverImageUrl: "" })}
+            onUploadingChange={setCoverUploading}
+          />
           <PublishDrawer
             open={isPublishDrawerOpen}
             onClose={() => setIsPublishDrawerOpen(false)}
@@ -1084,6 +1122,8 @@ export default function WritePage() {
             initialReferences={references}
             inResponseTo={inResponseToId}
             onMetadataChange={handleMetadataChange}
+            coverUploading={coverUploading}
+            onCoverUploadingChange={setCoverUploading}
           />
           <ProfileGate
             open={isProfileGateOpen}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Toast from "@/components/ui/Toast";
@@ -10,26 +10,13 @@ import {
   type ActionInboxItem,
 } from "@/lib/actionInbox";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { shouldUseRealtime } from "@/lib/realtime";
 import NotificationItem from "./NotificationItem";
-
-interface NotificationData {
-  id: string;
-  type: string;
-  read: boolean;
-  created_at: string;
-  message?: string | null;
-  link?: string | null;
-  post_id?: string | null;
-  actor: { full_name: string | null; username: string; avatar_url?: string | null } | null;
-  actor_username: string | null;
-  post_title: string | null;
-  post_slug: string | null;
-}
-
-interface NotificationSection {
-  label: string;
-  items: NotificationData[];
-}
+import {
+  fetchNotificationRows,
+  sectionsFromNotifications,
+  type NotificationSection,
+} from "./notificationData";
 
 interface NotificationsPageClientProps {
   userId: string;
@@ -115,6 +102,24 @@ export default function NotificationsPageClient({
   const [activeFilter, setActiveFilter] = useState<FilterKey>("needs_attention");
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const supabase = createClient();
+    const rows = await fetchNotificationRows(supabase, userId);
+    setLocalSections(sectionsFromNotifications(rows));
+    setUnreadCount(rows.filter((notification) => !notification.read).length);
+  }, [userId]);
+
+  // Polling fallback since this page has no realtime subscription of its own.
+  useEffect(() => {
+    if (shouldUseRealtime()) return;
+
+    const poll = setInterval(() => {
+      void refresh();
+    }, 30_000);
+
+    return () => clearInterval(poll);
+  }, [refresh]);
 
   const notifications = localSections.flatMap((section) => section.items);
   const summary = useMemo(

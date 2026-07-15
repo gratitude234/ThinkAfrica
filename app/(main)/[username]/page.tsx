@@ -78,6 +78,7 @@ interface ProfilePost {
   published_at: string | null;
   view_count: number | null;
   read_count: number | null;
+  like_count: number | null;
   cover_image_url: string | null;
   profiles: {
     username: string;
@@ -459,7 +460,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("posts")
       .select(
-        "id, author_id, title, slug, in_response_to, excerpt, type, tags, citation_id, created_at, published_at, view_count, read_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type), post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
+        "id, author_id, title, slug, in_response_to, excerpt, type, tags, citation_id, created_at, published_at, view_count, read_count, like_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type), post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
       )
       .eq("author_id", profile.id)
       .eq("status", "published")
@@ -467,7 +468,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("post_authors")
       .select(
-        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, in_response_to, excerpt, type, status, tags, citation_id, created_at, published_at, view_count, read_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
+        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, in_response_to, excerpt, type, status, tags, citation_id, created_at, published_at, view_count, read_count, like_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
       )
       .eq("user_id", profile.id)
       .not("accepted_at", "is", null),
@@ -596,12 +597,6 @@ export default async function UserProfilePage({ params }: PageProps) {
     ),
   ] as PortfolioPost[];
 
-  const portfolioPostIds = mergedPosts.map((post) => post.id);
-  const { data: portfolioLikes } =
-    portfolioPostIds.length > 0
-      ? await supabase.from("likes").select("post_id").in("post_id", portfolioPostIds)
-      : { data: [] };
-
   const badges = (userBadges ?? [])
     .map((userBadge) =>
       Array.isArray(userBadge.badges) ? userBadge.badges[0] : userBadge.badges
@@ -612,7 +607,10 @@ export default async function UserProfilePage({ params }: PageProps) {
     (sum, post) => sum + (post.read_count ?? 0),
     0
   );
-  const totalLikes = (portfolioLikes ?? []).length;
+  const totalLikes = mergedPosts.reduce(
+    (sum, post) => sum + (post.like_count ?? 0),
+    0
+  );
   const citableWorkCount = mergedPosts.filter((post) => Boolean(post.citation_id)).length;
   const reviewedWorkCount = mergedPosts.filter(isReviewedWork).length;
   const coAuthoredWorkCount = mergedPosts.filter((post) => post.isCoAuthor).length;

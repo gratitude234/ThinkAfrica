@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePostEngagement } from "./PostEngagementContext";
 
 interface Props {
   postId: string;
   userId: string | null;
   initialLiked: boolean;
-  initialLikeCount: number;
   initialBookmarked: boolean;
   title: string;
   slug: string;
@@ -17,15 +17,26 @@ export default function ReadingBar({
   postId,
   userId,
   initialLiked,
-  initialLikeCount,
   initialBookmarked,
   title,
   slug,
 }: Props) {
   const [visible, setVisible] = useState(false);
-  const [liked, setLiked] = useState(initialLiked);
-  const [likeCount, setLikeCount] = useState(initialLikeCount);
-  const [bookmarked, setBookmarked] = useState(initialBookmarked);
+  const {
+    liked,
+    likeCount,
+    bookmarked,
+    syncLiked,
+    syncBookmarked,
+    toggleLike,
+    toggleBookmark,
+  } = usePostEngagement();
+
+  useEffect(() => {
+    syncLiked(initialLiked);
+    syncBookmarked(initialBookmarked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 300);
@@ -33,31 +44,14 @@ export default function ReadingBar({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handleLike = async () => {
+  const handleLike = () => {
     if (!userId) { window.location.href = "/login"; return; }
-    const previous = liked;
-    setLiked(!previous);
-    setLikeCount((c) => (previous ? c - 1 : c + 1));
-    const { createClient } = await import("@/lib/supabase/client");
-    const supabase = createClient();
-    if (previous) {
-      await supabase.from("likes").delete().eq("user_id", userId).eq("post_id", postId);
-    } else {
-      await supabase.from("likes").insert({ user_id: userId, post_id: postId });
-    }
+    void toggleLike();
   };
 
-  const handleBookmark = async () => {
+  const handleBookmark = () => {
     if (!userId) { window.location.href = "/login"; return; }
-    const previous = bookmarked;
-    setBookmarked(!previous);
-    const { createClient } = await import("@/lib/supabase/client");
-    const supabase = createClient();
-    if (previous) {
-      await supabase.from("bookmarks").delete().eq("user_id", userId).eq("post_id", postId);
-    } else {
-      await supabase.from("bookmarks").insert({ user_id: userId, post_id: postId });
-    }
+    void toggleBookmark();
   };
 
   const handleShare = () => {

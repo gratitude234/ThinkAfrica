@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
 
 type TogglePostLikeInput = {
@@ -23,17 +24,58 @@ function isDuplicateLikeError(error: { code?: string; message?: string }) {
   return error.code === "23505" || message.includes("duplicate key");
 }
 
-export async function togglePostLike(input: TogglePostLikeInput): Promise<{
+type ToggleLikeResult = {
   error: string | null;
   liked: boolean;
-}> {
+  count: number;
+};
+
+async function getLikeCount(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  postId: string
+): Promise<number> {
+  const { data } = await supabase
+    .from("posts")
+    .select("like_count")
+    .eq("id", postId)
+    .maybeSingle();
+
+  return data?.like_count ?? 0;
+}
+
+function finish(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  slug: string,
+  postId: string,
+  liked: boolean
+) {
+  revalidatePath(`/post/${slug}`);
+  // Next 16's revalidateTag requires a cache-life "profile" second argument; a named
+  // profile (e.g. "max") marks the tag stale-but-servable for that profile's whole
+  // expire window instead of invalidating now. An empty string keeps it falsy
+  // internally, which triggers immediate invalidation — the behavior we want.
+  revalidateTag("feed", "");
+  return getLikeCount(supabase, postId).then((count) => ({
+    error: null,
+    liked,
+    count,
+  }));
+}
+
+export async function togglePostLike(
+  input: TogglePostLikeInput
+): Promise<ToggleLikeResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { error: "You must be signed in to like posts.", liked: false };
+    return {
+      error: "You must be signed in to like posts.",
+      liked: false,
+      count: 0,
+    };
   }
 
   const [{ data: post, error: postError }, { data: actorProfile }] =
@@ -50,8 +92,8 @@ export async function togglePostLike(input: TogglePostLikeInput): Promise<{
         .maybeSingle<ProfileSummary>(),
     ]);
 
-  if (postError) return { error: postError.message, liked: false };
-  if (!post) return { error: "Post not found.", liked: false };
+  if (postError) return { error: postError.message, liked: false, count: 0 };
+  if (!post) return { error: "Post not found.", liked: false, count: 0 };
 
   if (!input.nextLiked) {
     const { error } = await supabase
@@ -60,10 +102,12 @@ export async function togglePostLike(input: TogglePostLikeInput): Promise<{
       .eq("user_id", user.id)
       .eq("post_id", input.postId);
 
-    if (error) return { error: error.message, liked: true };
+    if (error) {
+      const count = await getLikeCount(supabase, input.postId);
+      return { error: error.message, liked: true, count };
+    }
 
-    revalidatePath(`/post/${post.slug}`);
-    return { error: null, liked: false };
+    return finish(supabase, post.slug, input.postId, false);
   }
 
   const { data: existingLike, error: existingError } = await supabase
@@ -73,11 +117,12 @@ export async function togglePostLike(input: TogglePostLikeInput): Promise<{
     .eq("post_id", input.postId)
     .maybeSingle();
 
-  if (existingError) return { error: existingError.message, liked: false };
+  if (existingError) {
+    return { error: existingError.message, liked: false, count: 0 };
+  }
 
   if (existingLike) {
-    revalidatePath(`/post/${post.slug}`);
-    return { error: null, liked: true };
+    return finish(supabase, post.slug, input.postId, true);
   }
 
   const { error: likeError } = await supabase.from("likes").insert({
@@ -87,11 +132,11 @@ export async function togglePostLike(input: TogglePostLikeInput): Promise<{
 
   if (likeError) {
     if (isDuplicateLikeError(likeError)) {
-      revalidatePath(`/post/${post.slug}`);
-      return { error: null, liked: true };
+      return finish(supabase, post.slug, input.postId, true);
     }
 
-    return { error: likeError.message, liked: false };
+    const count = await getLikeCount(supabase, input.postId);
+    return { error: likeError.message, liked: false, count };
   }
 
   if (post.author_id !== user.id) {
@@ -119,9 +164,22 @@ export async function togglePostLike(input: TogglePostLikeInput): Promise<{
         cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
       });
       logPushResult(`like:${user.id}:${input.postId}`, pushResult);
+
+      const emailResult = await sendUserEmail({
+        recipientId: post.author_id,
+        subject: `${actorName} liked your Indegenius post`,
+        preview: `${actorName} liked "${post.title}".`,
+        title: "New like on your post",
+        intro: `${actorName} liked "${post.title}".`,
+        ctaLabel: "View your post",
+        ctaPath,
+        idempotencyKey: `like:${input.postId}:${post.author_id}`,
+        preferenceKey: "email_likes",
+        cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
+      });
+      logEmailResult(`like:${input.postId}:${post.author_id}`, emailResult);
     }
   }
 
-  revalidatePath(`/post/${post.slug}`);
-  return { error: null, liked: true };
+  return finish(supabase, post.slug, input.postId, true);
 }

@@ -16,6 +16,7 @@ import {
 } from "@/lib/utils";
 import LikeButton from "./LikeButton";
 import BookmarkButton from "./BookmarkButton";
+import { PostEngagementProvider } from "./PostEngagementContext";
 import CommentsLoader from "./CommentsLoader";
 import ViewTracker from "./ViewTracker";
 import ReadingProgressBar from "./ReadingProgressBar";
@@ -79,6 +80,7 @@ interface PostRecord {
   view_count: number | null;
   impression_count: number | null;
   read_count: number | null;
+  like_count: number | null;
   cover_image_url: string | null;
   citation_id: string | null;
   published_version_id: string | null;
@@ -959,7 +961,6 @@ async function PostReadingChrome({
       postId={post.id}
       userId={userId}
       initialLiked={viewer.userLiked}
-      initialLikeCount={secondary.likeCount}
       initialBookmarked={viewer.userBookmarked}
       title={post.title}
       slug={post.slug}
@@ -1178,7 +1179,6 @@ async function PostEngagementSection({
         <LikeButton
           postId={post.id}
           initialLiked={viewer.userLiked}
-          initialCount={secondary.likeCount}
           userId={userId}
         />
         <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
@@ -1523,7 +1523,6 @@ async function PostSidebar({
               <LikeButton
                 postId={post.id}
                 initialLiked={viewer.userLiked}
-                initialCount={secondary.likeCount}
                 userId={userId}
               />
               <BookmarkButton
@@ -2012,7 +2011,6 @@ async function ResearchDossierSidebar({
                 <LikeButton
                   postId={post.id}
                   initialLiked={viewer.userLiked}
-                  initialCount={secondary.likeCount}
                   userId={userId}
                 />
                 <BookmarkButton
@@ -2162,7 +2160,7 @@ export default async function PostPage({ params }: PageProps) {
     .select(
       `
       id, title, slug, content, excerpt, type, tags, status, author_id,
-      created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id,
+      created_at, published_at, view_count, impression_count, read_count, like_count, cover_image_url, citation_id,
       published_version_id, current_round, revision_due_at,
       in_response_to,
       audio_summary_url,
@@ -2262,6 +2260,11 @@ export default async function PostPage({ params }: PageProps) {
 
   if (isResearchPost) {
     return (
+      <PostEngagementProvider
+        postId={post.id}
+        userId={userId}
+        initialLikeCount={post.like_count ?? 0}
+      >
       <div className="relative">
         {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
         {isPublished ? (
@@ -2452,10 +2455,16 @@ export default async function PostPage({ params }: PageProps) {
           </Suspense>
         </div>
       </div>
+      </PostEngagementProvider>
     );
   }
 
   return (
+    <PostEngagementProvider
+      postId={post.id}
+      userId={userId}
+      initialLikeCount={post.like_count ?? 0}
+    >
     <div className="relative">
       {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
       {isPublished ? (
@@ -2536,20 +2545,19 @@ export default async function PostPage({ params }: PageProps) {
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto -mt-7 max-w-[760px] px-4 sm:px-6">
-        <PostCover
-          src={post.cover_image_url}
-          alt={post.title}
-          type={post.type}
-          sizes="(max-width: 760px) 100vw, 760px"
-          priority
-          className="h-[230px] rounded-2xl border border-black/10 shadow-[0_12px_30px_-16px_rgba(0,0,0,0.3)] sm:h-[400px]"
-          imageClassName="object-cover"
-        />
-        {post.cover_image_url ? (
-          <p className="mt-2.5 text-center text-[10px] text-gray-400">Cover image</p>
-        ) : null}
-      </div>
+      {post.cover_image_url ? (
+        <div className="relative z-10 mx-auto -mt-7 max-w-[760px] px-4 sm:px-6">
+          <PostCover
+            src={post.cover_image_url}
+            alt={post.title}
+            type={post.type}
+            sizes="(max-width: 760px) 100vw, 760px"
+            priority
+            className="h-[230px] rounded-2xl border border-black/10 shadow-[0_12px_30px_-16px_rgba(0,0,0,0.3)] sm:h-[400px]"
+            imageClassName="object-cover"
+          />
+        </div>
+      ) : null}
 
       <div className="mx-auto max-w-[680px] px-4 pb-20 pt-10 sm:px-6 sm:pt-12">
         <main className="min-w-0">
@@ -2640,5 +2648,6 @@ export default async function PostPage({ params }: PageProps) {
         </main>
       </div>
     </div>
+      </PostEngagementProvider>
   );
 }

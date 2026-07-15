@@ -38,6 +38,8 @@ interface PublishDrawerProps {
     tags?: string[];
     coverImageUrl?: string;
   }) => void;
+  coverUploading: boolean;
+  onCoverUploadingChange: (uploading: boolean) => void;
 }
 
 const POST_TYPES: Array<"blog" | "essay" | "policy_brief"> = ["blog", "essay", "policy_brief"];
@@ -112,6 +114,8 @@ export default function PublishDrawer({
   initialReferences = [],
   inResponseTo,
   onMetadataChange,
+  coverUploading,
+  onCoverUploadingChange,
 }: PublishDrawerProps) {
   const router = useRouter();
   const [postType, setPostType] = useState<PostType>(
@@ -119,7 +123,6 @@ export default function PublishDrawer({
   );
   const [tags, setTags] = useState<string[]>(initialTags);
   const [publishing, setPublishing] = useState(false);
-  const [coverUploading, setCoverUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [platformTags, setPlatformTags] = useState<string[]>([]);
@@ -343,7 +346,7 @@ export default function PublishDrawer({
             initialUrl={initialCoverImageUrl}
             onUpload={(url) => onMetadataChange?.({ coverImageUrl: url })}
             onRemove={() => onMetadataChange?.({ coverImageUrl: "" })}
-            onUploadingChange={setCoverUploading}
+            onUploadingChange={onCoverUploadingChange}
           />
         </section>
 

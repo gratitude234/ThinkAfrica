@@ -194,7 +194,7 @@ export default async function DashboardPage() {
     .from("posts")
     .select(
       `
-      id, author_id, title, slug, content, excerpt, tags, type, status, impression_count, view_count, read_count,
+      id, author_id, title, slug, content, excerpt, tags, type, status, impression_count, view_count, read_count, like_count,
       created_at, published_at, revision_due_at, citation_id, published_version_id,
       current_round, in_response_to,
       document_path, document_original_name, document_mime_type, document_size_bytes,
@@ -207,24 +207,6 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false });
 
   const postIds = (postsRaw ?? []).map((p) => p.id);
-
-  // Fetch like counts for all posts
-  let likeCounts: Record<string, number> = {};
-  if (postIds.length > 0) {
-    const { data: likes } = await supabase
-      .from("likes")
-      .select("post_id")
-      .in("post_id", postIds);
-    if (likes) {
-      likeCounts = likes.reduce(
-        (acc, like) => {
-          acc[like.post_id] = (acc[like.post_id] ?? 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>
-      );
-    }
-  }
 
   let referenceCounts: Record<string, number> = {};
   let commentCounts: Record<string, number> = {};
@@ -510,7 +492,7 @@ export default async function DashboardPage() {
     impression_count: (p as { impression_count?: number | null }).impression_count ?? 0,
     view_count: p.view_count ?? 0,
     read_count: (p as { read_count?: number | null }).read_count ?? 0,
-    like_count: likeCounts[p.id] ?? 0,
+    like_count: (p as { like_count?: number | null }).like_count ?? 0,
     revision_due_at: p.revision_due_at ?? null,
     citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
     published_version_id:
@@ -559,7 +541,7 @@ export default async function DashboardPage() {
         reviewCount: reviews.length,
         completedReviewCount: reviews.filter((review) => review.submitted_at).length,
         commentCount: commentCounts[post.id] ?? 0,
-        likeCount: likeCounts[post.id] ?? 0,
+        likeCount: (post as { like_count?: number | null }).like_count ?? 0,
         bookmarkCount: bookmarkCounts[post.id] ?? 0,
       });
 

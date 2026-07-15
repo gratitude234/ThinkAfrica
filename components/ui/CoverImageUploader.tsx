@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 interface CoverImageUploaderProps {
   initialUrl?: string;
@@ -28,7 +30,7 @@ export default function CoverImageUploader({
     return `covers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   },
   emptyTitle = "Add a cover image",
-  emptyHint = "PNG, JPG up to 5MB",
+  emptyHint = "JPG, PNG, or WebP, up to 5MB",
   previewHeightClass = "h-48",
 }: CoverImageUploaderProps) {
   const [preview, setPreview] = useState<string | null>(initialUrl ?? null);
@@ -36,11 +38,23 @@ export default function CoverImageUploader({
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
+  const releaseBlobUrl = useCallback(() => {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => releaseBlobUrl, [releaseBlobUrl]);
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (!file.type.startsWith("image/")) {
-        setError("Please select an image file.");
+      if (uploading) return;
+
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        setError("Please select a JPG, PNG, or WebP image.");
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
@@ -49,12 +63,16 @@ export default function CoverImageUploader({
       }
 
       const failWith = (message: string) => {
+        releaseBlobUrl();
         setError(message);
         setPreview(initialUrl ?? null);
       };
 
       setError(null);
-      setPreview(URL.createObjectURL(file));
+      releaseBlobUrl();
+      const objectUrl = URL.createObjectURL(file);
+      blobUrlRef.current = objectUrl;
+      setPreview(objectUrl);
       setUploading(true);
       onUploadingChange?.(true);
 
@@ -85,6 +103,8 @@ export default function CoverImageUploader({
         }
 
         const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+        releaseBlobUrl();
+        setPreview(urlData.publicUrl);
         onUpload(urlData.publicUrl);
       } catch {
         failWith("Upload failed. Please try again.");
@@ -93,7 +113,7 @@ export default function CoverImageUploader({
         onUploadingChange?.(false);
       }
     },
-    [bucket, buildPath, ensureBucket, initialUrl, onUpload, onUploadingChange]
+    [bucket, buildPath, ensureBucket, initialUrl, onUpload, onUploadingChange, releaseBlobUrl, uploading]
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,6 +149,7 @@ export default function CoverImageUploader({
           <button
             type="button"
             onClick={() => {
+              releaseBlobUrl();
               setPreview(null);
               onRemove();
             }}
@@ -157,7 +178,7 @@ export default function CoverImageUploader({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={ACCEPTED_IMAGE_TYPES.join(",")}
           className="hidden"
           onChange={handleInputChange}
         />
@@ -210,7 +231,7 @@ export default function CoverImageUploader({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPTED_IMAGE_TYPES.join(",")}
         className="hidden"
         onChange={handleInputChange}
       />

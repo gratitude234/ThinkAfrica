@@ -230,7 +230,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
           </ToolbarButton>
           <ToolbarButton
             onClick={() => imageInputRef.current?.click()}
-            title="Insert image"
+            title="Insert image in article"
           >
             {imageUploading ? (
               <span className="text-xs text-gray-400">...</span>

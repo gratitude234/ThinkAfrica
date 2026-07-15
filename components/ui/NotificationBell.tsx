@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
@@ -79,22 +79,49 @@ export default function NotificationBell({ userId }: { userId: string }) {
     [notifications]
   );
 
-  useEffect(() => {
-    async function fetchNotifications() {
-      const { data } = await supabase
-        .from("notifications")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(10);
+  const fetchNotifications = useCallback(async () => {
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(10);
 
-      if (data) {
-        setNotifications(data as Notification[]);
-      }
+    if (data) {
+      setNotifications(data as Notification[]);
     }
+  }, [supabase, userId]);
 
+  useEffect(() => {
     void fetchNotifications();
+  }, [fetchNotifications]);
 
+  // Polling fallback when Realtime is disabled — mirrors MessagesUnreadBadge.tsx.
+  useEffect(() => {
+    if (shouldUseRealtime()) return;
+
+    const poll = setInterval(() => {
+      void fetchNotifications();
+    }, 30_000);
+
+    return () => clearInterval(poll);
+  }, [fetchNotifications]);
+
+  // Refetch on open/focus since Realtime for `notifications` is disabled at the
+  // Postgres publication level regardless of the shouldUseRealtime() flag.
+  useEffect(() => {
+    if (open) void fetchNotifications();
+  }, [open, fetchNotifications]);
+
+  useEffect(() => {
+    function onFocus() {
+      void fetchNotifications();
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchNotifications]);
+
+  useEffect(() => {
     if (!shouldUseRealtime()) {
       return;
     }

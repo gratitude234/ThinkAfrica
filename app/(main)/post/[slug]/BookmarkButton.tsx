@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect } from "react";
+import { usePostEngagement } from "./PostEngagementContext";
 
 interface BookmarkButtonProps {
   postId: string;
@@ -10,47 +9,19 @@ interface BookmarkButtonProps {
   userId: string | null;
 }
 
-export default function BookmarkButton({
-  postId,
-  initialBookmarked,
-  userId,
-}: BookmarkButtonProps) {
-  const router = useRouter();
-  const [bookmarked, setBookmarked] = useState(initialBookmarked);
-  const [loading, setLoading] = useState(false);
+export default function BookmarkButton({ initialBookmarked }: BookmarkButtonProps) {
+  const { bookmarked, bookmarkPending, syncBookmarked, toggleBookmark } =
+    usePostEngagement();
 
-  const handleToggle = async () => {
-    if (!userId) {
-      router.push("/login");
-      return;
-    }
-    if (loading) return;
-
-    const wasBookmarked = bookmarked;
-    setBookmarked(!wasBookmarked);
-    setLoading(true);
-
-    const supabase = createClient();
-
-    if (wasBookmarked) {
-      await supabase
-        .from("bookmarks")
-        .delete()
-        .eq("user_id", userId)
-        .eq("post_id", postId);
-    } else {
-      await supabase
-        .from("bookmarks")
-        .insert({ user_id: userId, post_id: postId });
-    }
-
-    setLoading(false);
-  };
+  useEffect(() => {
+    syncBookmarked(initialBookmarked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <button
-      onClick={handleToggle}
-      disabled={loading}
+      onClick={toggleBookmark}
+      disabled={bookmarkPending}
       aria-label={bookmarked ? "Remove bookmark" : "Bookmark this post"}
       title={bookmarked ? "Remove bookmark" : "Save for later"}
       className={`flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-70 ${
