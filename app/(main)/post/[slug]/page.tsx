@@ -1760,7 +1760,7 @@ async function ResearchMetadataStrip({
     : `Round ${post.current_round ?? 1}`;
 
   return (
-    <section className="mx-auto -mt-8 grid max-w-[1200px] grid-cols-2 gap-2 px-4 sm:px-6 md:grid-cols-3 lg:grid-cols-6 lg:px-8">
+    <section className="mx-auto mt-4 grid max-w-[1200px] grid-cols-2 gap-2 px-4 sm:-mt-8 sm:px-6 md:grid-cols-3 lg:grid-cols-6 lg:px-8">
       <ResearchMetaTile
         label="Format"
         value={post.document_path ? "PDF manuscript" : "Abstract only"}
@@ -2296,7 +2296,7 @@ export default async function PostPage({ params }: PageProps) {
 
         <Suspense
           fallback={
-            <section className="mx-auto -mt-8 grid max-w-[1200px] grid-cols-2 gap-2 px-4 sm:px-6 md:grid-cols-3 lg:grid-cols-6 lg:px-8">
+            <section className="mx-auto mt-4 grid max-w-[1200px] grid-cols-2 gap-2 px-4 sm:-mt-8 sm:px-6 md:grid-cols-3 lg:grid-cols-6 lg:px-8">
               {[...Array(6)].map((_, index) => (
                 <div
                   key={index}
