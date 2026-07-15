@@ -56,10 +56,30 @@ export default function NavigationShell({
 
     let animationFrame: number | null = null;
 
+    const isEditableFocused = () => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement)) return false;
+      return (
+        active.tagName === "INPUT" ||
+        active.tagName === "TEXTAREA" ||
+        active.isContentEditable
+      );
+    };
+
     const syncVisualViewport = () => {
       if (animationFrame !== null) cancelAnimationFrame(animationFrame);
 
       animationFrame = requestAnimationFrame(() => {
+        // Only account for the visual viewport shrinking when a keyboard is
+        // plausibly open (an editable element is focused). Otherwise this
+        // diff also picks up the mobile browser's address/toolbar collapsing
+        // on scroll, which shoves fixed bottom UI (e.g. the compose FAB) out
+        // of view until that chrome settles.
+        if (!isEditableFocused()) {
+          root.style.setProperty("--mobile-visual-viewport-bottom", "0px");
+          return;
+        }
+
         const layoutHeight = Math.max(
           window.innerHeight,
           document.documentElement.clientHeight
@@ -83,6 +103,8 @@ export default function NavigationShell({
     visualViewport.addEventListener("scroll", syncVisualViewport);
     window.addEventListener("resize", syncVisualViewport);
     window.addEventListener("orientationchange", syncVisualViewport);
+    document.addEventListener("focusin", syncVisualViewport);
+    document.addEventListener("focusout", syncVisualViewport);
 
     return () => {
       if (animationFrame !== null) cancelAnimationFrame(animationFrame);
@@ -90,6 +112,8 @@ export default function NavigationShell({
       visualViewport.removeEventListener("scroll", syncVisualViewport);
       window.removeEventListener("resize", syncVisualViewport);
       window.removeEventListener("orientationchange", syncVisualViewport);
+      document.removeEventListener("focusin", syncVisualViewport);
+      document.removeEventListener("focusout", syncVisualViewport);
       root.style.removeProperty("--mobile-visual-viewport-bottom");
     };
   }, []);
