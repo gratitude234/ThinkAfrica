@@ -75,8 +75,12 @@ export default function ReadingBar({
     <>
       {/* ── Mobile / tablet: horizontal pill at bottom ── */}
       <div
-        className="fixed inset-x-0 bottom-3 z-40 px-4 lg:hidden"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 4px)" }}
+        className="fixed inset-x-0 z-40 px-4 lg:hidden"
+        style={{
+          bottom:
+            "calc(0.75rem + var(--mobile-visual-viewport-bottom, 0px))",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 4px)",
+        }}
       >
         <div className="mx-auto flex min-h-[56px] max-w-[380px] items-center rounded-2xl border border-gray-200 bg-white/95 px-1 shadow-[0_14px_34px_-14px_rgb(0_0_0/0.42)] backdrop-blur">
           <button

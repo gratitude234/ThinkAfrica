@@ -635,6 +635,7 @@ export default function WritePage() {
       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5V4M7 9l5-5 5 5M4.5 19.5h15" />
       </svg>
+      <span className="min-[480px]:hidden">PDF</span>
       <span className="hidden min-[480px]:inline">Research PDF</span>
     </Link>
   );
@@ -670,6 +671,15 @@ export default function WritePage() {
             disabled={!canOpenPublish}
             onClick={handleReadyToPublish}
             title={publishBlockReason ?? undefined}
+            style={
+              !canOpenPublish
+                ? {
+                    backgroundColor: "#E5E7EB",
+                    color: "#6B7280",
+                    opacity: 1,
+                  }
+                : undefined
+            }
           >
             Publish
           </Button>

@@ -29,8 +29,9 @@ export default function BottomNav({
   hasActiveDebate,
 }: BottomNavProps) {
   const pathname = usePathname();
+  const isPostPage = pathname.startsWith("/post/");
   const isMessagesThread = /^\/messages\/.+/.test(pathname);
-  if (pathname.startsWith("/post/") || pathname.startsWith("/write") || isMessagesThread) return null;
+  if (pathname.startsWith("/write") || isMessagesThread) return null;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -53,13 +54,17 @@ export default function BottomNav({
 
   return (
     <>
-      {userId ? <CreateLauncher userId={userId} variant="mobileFab" /> : null}
+      <CreateLauncher userId={userId} variant="mobileFab" />
 
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-        aria-label="Primary navigation"
-      >
+      {!isPostPage ? (
+        <nav
+          className="fixed left-0 right-0 z-50 border-t border-gray-100 bg-white shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] md:hidden"
+          style={{
+            bottom: "var(--mobile-visual-viewport-bottom, 0px)",
+            paddingBottom: "env(safe-area-inset-bottom)",
+          }}
+          aria-label="Primary navigation"
+        >
         <div className="flex h-[60px] items-center justify-around px-2">
           <Link
             href="/"
@@ -181,7 +186,8 @@ export default function BottomNav({
             </span>
           </Link>
         </div>
-      </nav>
+        </nav>
+      ) : null}
     </>
   );
 }

@@ -45,6 +45,55 @@ export default function NavigationShell({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const visualViewport = window.visualViewport;
+
+    if (!visualViewport) {
+      root.style.setProperty("--mobile-visual-viewport-bottom", "0px");
+      return () => root.style.removeProperty("--mobile-visual-viewport-bottom");
+    }
+
+    let animationFrame: number | null = null;
+
+    const syncVisualViewport = () => {
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+
+      animationFrame = requestAnimationFrame(() => {
+        const layoutHeight = Math.max(
+          window.innerHeight,
+          document.documentElement.clientHeight
+        );
+        const obscuredBottom = Math.max(
+          0,
+          Math.round(
+            layoutHeight - visualViewport.height - visualViewport.offsetTop
+          )
+        );
+
+        root.style.setProperty(
+          "--mobile-visual-viewport-bottom",
+          `${obscuredBottom}px`
+        );
+      });
+    };
+
+    syncVisualViewport();
+    visualViewport.addEventListener("resize", syncVisualViewport);
+    visualViewport.addEventListener("scroll", syncVisualViewport);
+    window.addEventListener("resize", syncVisualViewport);
+    window.addEventListener("orientationchange", syncVisualViewport);
+
+    return () => {
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+      visualViewport.removeEventListener("resize", syncVisualViewport);
+      visualViewport.removeEventListener("scroll", syncVisualViewport);
+      window.removeEventListener("resize", syncVisualViewport);
+      window.removeEventListener("orientationchange", syncVisualViewport);
+      root.style.removeProperty("--mobile-visual-viewport-bottom");
+    };
+  }, []);
+
   return (
     <>
       <NavClient

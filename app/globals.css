@@ -27,6 +27,7 @@
     --ta-ink-faint: #9CA3AF;
     --ta-border: #E5E7EB;
     --ta-border-soft: #F3F4F6;
+    --mobile-visual-viewport-bottom: 0px;
   }
 
   html {
