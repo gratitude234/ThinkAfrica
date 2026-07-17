@@ -97,7 +97,13 @@
 }
 
 .write-canvas-editor p.is-editor-empty:first-child::before {
-  color: #98949f;
+  color: #7d7986;
+}
+
+.write-canvas-editor:focus-visible {
+  outline: 2px solid rgba(7, 57, 41, 0.28);
+  outline-offset: 8px;
+  border-radius: 8px;
 }
 
 .write-canvas-compact .write-canvas-editor {

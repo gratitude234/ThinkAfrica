@@ -226,6 +226,7 @@ export default function WritePage() {
   const [showLinkPopover, setShowLinkPopover] = useState(false);
   const [linkPopoverUrl, setLinkPopoverUrl] = useState("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const responseStarterAppliedRef = useRef(false);
   const topicStarterAppliedRef = useRef(false);
   const reviewPublishInFlightRef = useRef(false);
@@ -593,7 +594,6 @@ export default function WritePage() {
     : coverImageUrl
       ? "Cover added ✓"
       : "Add cover";
-  const coverButtonShortLabel = coverUploading ? "…" : coverImageUrl ? "✓" : "Cover";
   const coverButtonAriaLabel = coverUploading
     ? "Cover image uploading"
     : coverImageUrl
@@ -609,6 +609,15 @@ export default function WritePage() {
       setResponseQuote(quote);
     }
   }, [loadingDraft]);
+
+  useEffect(() => {
+    if (!showMobileMenu) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowMobileMenu(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showMobileMenu]);
 
   const canOpenPublish =
     title.trim().length > 0 &&
@@ -728,77 +737,174 @@ export default function WritePage() {
       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5V4M7 9l5-5 5 5M4.5 19.5h15" />
       </svg>
-      <span className="min-[480px]:hidden">PDF</span>
-      <span className="hidden min-[480px]:inline">Research PDF</span>
+      <span>Research PDF</span>
     </Link>
   );
 
   return (
-    <div className="mx-auto min-h-screen max-w-[1240px] px-5 pb-24 sm:px-8 lg:px-8 xl:px-10">
+    <div className="mx-auto min-h-screen max-w-[1240px] px-5 pb-28 sm:px-8 lg:px-8 lg:pb-12 xl:px-10">
       <header
-        className="sticky top-0 z-30 mb-3 flex items-center justify-between gap-3 border-b border-transparent bg-canvas/95 py-3.5 backdrop-blur-sm lg:mb-7 lg:border-gray-200/80"
+        className="sticky top-0 z-30 mb-3 border-b border-transparent bg-canvas/95 py-3.5 backdrop-blur-sm lg:relative lg:mb-7 lg:border-gray-200/80"
         style={{ paddingTop: "max(0.875rem, env(safe-area-inset-top))" }}
       >
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleCloseCanvas}
-            aria-label="Close"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white hover:text-gray-800"
-          >
-            <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <div className="hidden lg:block">
-            <p className="text-sm font-semibold text-ink">Draft workspace</p>
-            <p className="mt-0.5 text-xs text-gray-400">
-              Shape the argument, then choose its format.
-            </p>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleCloseCanvas}
+              aria-label="Close editor"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white hover:text-gray-800 lg:h-9 lg:w-9"
+            >
+              <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="hidden lg:block">
+              <p className="text-sm font-semibold text-ink">Draft workspace</p>
+              <p className="mt-0.5 text-xs text-gray-400">
+                Shape the argument, then choose its format.
+              </p>
+            </div>
+            <span
+              className={`min-w-0 truncate text-xs font-medium lg:hidden ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
+              aria-live="polite"
+            >
+              <span
+                aria-hidden="true"
+                className={`mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle ${
+                  saveStatus === "saving"
+                    ? "animate-pulse bg-amber-400"
+                    : saveStatus === "error"
+                      ? "bg-red-500"
+                      : saveStatus === "saved"
+                        ? "bg-emerald-500"
+                        : "bg-gray-300"
+                }`}
+              />
+              {compactSaveLabel}
+            </span>
           </div>
-        </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-          {uploadResearchLink}
-          <span
-            className={`min-w-[44px] text-right text-xs font-medium lg:hidden ${saveStatus === "error" ? "text-amber-600" : "text-gray-400"}`}
-            aria-live="polite"
-          >
-            {compactSaveLabel}
-          </span>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={coverUploading}
-            onClick={() => setIsCoverDialogOpen(true)}
-            aria-label={coverButtonAriaLabel}
-            className="gap-1.5 whitespace-nowrap"
-          >
-            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="hidden min-[480px]:inline">{coverButtonLabel}</span>
-            <span className="min-[480px]:hidden">{coverButtonShortLabel}</span>
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={!canOpenPublish}
-            onClick={handleReadyToPublish}
-            title={publishBlockReason ?? undefined}
-            style={
-              !canOpenPublish
-                ? {
-                    backgroundColor: "#E5E7EB",
-                    color: "#6B7280",
-                    opacity: 1,
-                  }
-                : undefined
-            }
-          >
-            Review & publish
-          </Button>
+          <div className="hidden shrink-0 items-center gap-2.5 lg:flex">
+            {uploadResearchLink}
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={coverUploading}
+              onClick={() => setIsCoverDialogOpen(true)}
+              aria-label={coverButtonAriaLabel}
+              className="gap-1.5 whitespace-nowrap"
+            >
+              <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {coverButtonLabel}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canOpenPublish}
+              onClick={handleReadyToPublish}
+              title={publishBlockReason ?? undefined}
+              style={
+                !canOpenPublish
+                  ? {
+                      backgroundColor: "#E5E7EB",
+                      color: "#6B7280",
+                      opacity: 1,
+                    }
+                  : undefined
+              }
+            >
+              Review & publish
+            </Button>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5 lg:hidden">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowMobileMenu((prev) => !prev)}
+                aria-label="More editor actions"
+                aria-haspopup="menu"
+                aria-expanded={showMobileMenu}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-white hover:text-gray-800 ${showMobileMenu ? "bg-white text-gray-800" : "text-gray-500"}`}
+              >
+                <svg className="h-[18px] w-[18px]" fill="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="5" r="1.75" />
+                  <circle cx="12" cy="12" r="1.75" />
+                  <circle cx="12" cy="19" r="1.75" />
+                </svg>
+              </button>
+
+              {showMobileMenu ? (
+                <>
+                  <button
+                    type="button"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    onClick={() => setShowMobileMenu(false)}
+                    className="fixed inset-0 z-30"
+                  />
+                  <div
+                    role="menu"
+                    aria-label="More editor actions"
+                    className="absolute right-0 top-full z-40 mt-2 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg shadow-black/10"
+                  >
+                    <Link
+                      href="/submit/research"
+                      role="menuitem"
+                      onClick={() => setShowMobileMenu(false)}
+                      className="flex items-center gap-2.5 rounded-lg px-3 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5V4M7 9l5-5 5 5M4.5 19.5h15" />
+                      </svg>
+                      Upload research PDF
+                    </Link>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={coverUploading}
+                      onClick={() => {
+                        setIsCoverDialogOpen(true);
+                        setShowMobileMenu(false);
+                      }}
+                      aria-label={coverButtonAriaLabel}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {coverButtonLabel}
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canOpenPublish}
+              onClick={handleReadyToPublish}
+              title={publishBlockReason ?? undefined}
+              aria-label="Review and publish"
+              className="h-11 px-4"
+              style={
+                !canOpenPublish
+                  ? {
+                      backgroundColor: "#E5E7EB",
+                      color: "#6B7280",
+                      opacity: 1,
+                    }
+                  : undefined
+              }
+            >
+              Review
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -977,21 +1083,24 @@ export default function WritePage() {
               saveDraft(getCurrentData({ title: event.target.value }));
             }}
             placeholder="Title"
-            className="w-full border-none bg-transparent px-0 py-1 font-display text-[32px] font-semibold leading-[1.2] text-ink placeholder:text-gray-400 focus:outline-none focus:ring-0 lg:text-[48px] lg:leading-[1.08]"
+            aria-label="Post title"
+            className="w-full rounded-md border-none bg-transparent px-0 py-1.5 font-display text-[32px] font-semibold leading-[1.2] text-ink placeholder:text-gray-500 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-brand/30 lg:text-[48px] lg:leading-[1.08]"
           />
 
-          <Editor
-            ref={editorRef}
-            key={publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}
-            content={content}
-            placeholder={getBodyPlaceholder()}
-            minWords={selectedPostType.minWords}
-            onUpdate={handleEditorUpdate}
-            onSelectionUpdate={handleSelectionUpdate}
-            canvasMode
-          />
+          <div className="mt-2 lg:mt-4">
+            <Editor
+              ref={editorRef}
+              key={publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}
+              content={content}
+              placeholder={getBodyPlaceholder()}
+              minWords={selectedPostType.minWords}
+              onUpdate={handleEditorUpdate}
+              onSelectionUpdate={handleSelectionUpdate}
+              canvasMode
+            />
+          </div>
 
-          <div className="mt-6 lg:hidden">
+          <div className="mt-10 border-t border-gray-100 pt-6 lg:hidden">
             <ReferencesPanel references={references} onChange={handleReferencesChange} />
           </div>
         </main>
@@ -1012,7 +1121,7 @@ export default function WritePage() {
         <div className="mx-auto max-w-[1080px] px-5 sm:px-8 lg:px-10">
           <div className="lg:w-[calc(100%-340px)]">
             {showLinkPopover ? (
-                <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-2 py-2 lg:hidden">
+                <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-3 py-2.5 lg:hidden">
                   <input
                     type="url"
                     autoFocus
@@ -1027,7 +1136,8 @@ export default function WritePage() {
                       if (e.key === "Escape") setShowLinkPopover(false);
                     }}
                     placeholder="https://..."
-                    className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                    aria-label="Link URL"
+                    className="h-11 min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand"
                   />
                   <button
                     type="button"
@@ -1036,21 +1146,21 @@ export default function WritePage() {
                       setShowLinkPopover(false);
                       setLinkPopoverUrl("");
                     }}
-                    className="shrink-0 rounded-lg bg-emerald-brand px-3 py-1.5 text-sm font-medium text-white"
+                    className="h-11 shrink-0 rounded-lg bg-emerald-brand px-3.5 text-sm font-medium text-white"
                   >
                     Apply
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowLinkPopover(false)}
-                    className="shrink-0 text-sm text-gray-400"
+                    className="h-11 shrink-0 px-2 text-sm text-gray-400"
                   >
                     Cancel
                   </button>
                 </div>
             ) : null}
             <div
-              className="flex items-center gap-1 overflow-x-auto py-2.5"
+              className="flex items-center gap-1.5 overflow-x-auto py-2"
               style={{ scrollbarWidth: "none" }}
             >
               {MOBILE_TOOLBAR_BUTTONS.map((btn) => (
@@ -1058,8 +1168,12 @@ export default function WritePage() {
                   key={btn.title}
                   type="button"
                   title={btn.title}
+                  aria-label={btn.title}
+                  aria-pressed={
+                    btn.markKey ? Boolean(activeMarks[btn.markKey]) : undefined
+                  }
                   onClick={() => runToolbarAction(btn.action)}
-                  className={`flex h-9 min-w-[36px] shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition-colors ${
+                  className={`flex h-11 min-w-[44px] shrink-0 items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors ${
                     btn.markKey && activeMarks[btn.markKey]
                       ? "bg-emerald-100 text-emerald-700"
                       : "text-gray-600 hover:bg-gray-100 active:bg-gray-100"

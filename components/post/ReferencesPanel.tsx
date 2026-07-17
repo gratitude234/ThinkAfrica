@@ -71,6 +71,8 @@ export default function ReferencesPanel({
         onClick={() => setOpen((prev) => !prev)}
         role={alwaysExpanded ? undefined : "button"}
         tabIndex={alwaysExpanded ? undefined : 0}
+        aria-expanded={alwaysExpanded ? undefined : expanded}
+        aria-label={alwaysExpanded ? undefined : `${expanded ? "Collapse" : "Expand"} references`}
         onKeyDown={
           alwaysExpanded
             ? undefined
@@ -81,8 +83,10 @@ export default function ReferencesPanel({
                 }
               }
         }
-        className={`flex items-center justify-between gap-3 px-4 py-3.5 ${
-          alwaysExpanded ? "" : "cursor-pointer select-none"
+        className={`flex min-h-[52px] items-center justify-between gap-3 px-4 py-3.5 transition-colors ${
+          alwaysExpanded
+            ? ""
+            : `cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-brand/40 ${expanded ? "bg-gray-50/70" : "hover:bg-gray-50/60"}`
         }`}
       >
         <div className="flex items-center gap-2">
@@ -95,7 +99,8 @@ export default function ReferencesPanel({
         </div>
         {!alwaysExpanded ? (
           <svg
-            className={`h-[18px] w-[18px] text-gray-500 transition-transform ${expanded ? "rotate-180" : ""}`}
+            aria-hidden="true"
+            className={`h-[18px] w-[18px] shrink-0 text-gray-500 transition-transform ${expanded ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             strokeWidth={2}
