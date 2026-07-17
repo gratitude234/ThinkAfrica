@@ -10,6 +10,7 @@ import { buildSlugFromTitle, looksLikeUrl } from "@/lib/postSlug";
 import { isLowQualityTitle } from "@/lib/postQuality";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { requireNotSuspended } from "@/lib/suspension";
+import { articleFormatFromLegacyType, contentKindFromLegacyType } from "@/lib/contentModel";
 import {
   createVersionSnapshot,
   getSubmissionTrack,
@@ -314,6 +315,8 @@ export async function ensureDraft(input: {
   const slug = buildSlugFromTitle(input.title, "untitled", Date.now().toString(36));
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
+  const contentKind = contentKindFromLegacyType(input.postType);
+  const articleFormat = articleFormatFromLegacyType(input.postType);
 
   if (input.draftId) {
     const { error } = await supabase
@@ -324,6 +327,8 @@ export async function ensureDraft(input: {
         content: sanitizedContent,
         tags: normalizedTags,
         type: input.postType,
+        content_kind: contentKind,
+        article_format: articleFormat,
         cover_image_url: input.coverImageUrl || null,
         in_response_to: input.inResponseTo ?? null,
       })
@@ -343,6 +348,8 @@ export async function ensureDraft(input: {
       content: sanitizedContent,
       tags: normalizedTags,
       type: input.postType,
+      content_kind: contentKind,
+      article_format: articleFormat,
       status: "draft",
       cover_image_url: input.coverImageUrl || null,
       in_response_to: input.inResponseTo ?? null,
@@ -456,6 +463,8 @@ export async function publishPost(input: {
   const publishedAt = submitStatus === "published" ? now : null;
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
+  const contentKind = contentKindFromLegacyType(input.postType);
+  const articleFormat = articleFormatFromLegacyType(input.postType);
 
   let postId = input.draftId;
   let responseParentPath: string | null = null;
@@ -483,6 +492,8 @@ export async function publishPost(input: {
         content: sanitizedContent,
         tags: normalizedTags,
         type: input.postType,
+        content_kind: contentKind,
+        article_format: articleFormat,
         cover_image_url: input.coverImageUrl || null,
         in_response_to: input.inResponseTo ?? null,
         status: submitStatus,
@@ -508,6 +519,8 @@ export async function publishPost(input: {
         content: sanitizedContent,
         excerpt: input.excerpt,
         type: input.postType,
+        content_kind: contentKind,
+        article_format: articleFormat,
         tags: normalizedTags,
         in_response_to: input.inResponseTo ?? null,
         status: submitStatus,

@@ -5,13 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Production build
-npm run lint     # Run ESLint
-npm start        # Start production server
+npm run dev          # Start development server
+npm run build        # Production build
+npm run lint         # Run ESLint
+npm start            # Start production server
+npm run typecheck    # Type-check selected files (tsconfig.check.json)
+npm test             # Run Vitest test suite once
+npm run test:watch   # Run Vitest in watch mode
 ```
 
-No test framework is configured in this project.
+Tests use Vitest with jsdom. Test files live alongside source files (`*.test.ts`, `*.test.tsx`). The `typecheck` script only covers the files listed in `tsconfig.check.json` — not the entire codebase.
 
 ## Environment Variables
 

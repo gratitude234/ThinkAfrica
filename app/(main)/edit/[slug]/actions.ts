@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { createVersionSnapshot, requiresEditorialWorkflow } from "@/lib/reviewWorkflow";
+import { articleFormatFromLegacyType, contentKindFromLegacyType } from "@/lib/contentModel";
 import type { PostReferenceRecord, PostStatus } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
 
@@ -183,6 +184,8 @@ export async function saveEditedPost(input: {
       content: sanitizedContent,
       tags: input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean),
       type: input.postType,
+      content_kind: contentKindFromLegacyType(input.postType),
+      article_format: articleFormatFromLegacyType(input.postType),
       cover_image_url: input.coverImageUrl || null,
       status: nextStatus,
       current_round: nextRound,

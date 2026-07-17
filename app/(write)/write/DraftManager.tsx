@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { buildSlugFromTitle } from "@/lib/postSlug";
+import { articleFormatFromLegacyType, contentKindFromLegacyType } from "@/lib/contentModel";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -194,6 +195,8 @@ export function useDraftManager(): UseDraftManagerReturn {
           .map((tag) => tag.trim().toLowerCase())
           .filter(Boolean);
         const currentDraftId = draftIdRef.current;
+        const contentKind = contentKindFromLegacyType(data.postType);
+        const articleFormat = articleFormatFromLegacyType(data.postType);
 
         if (currentDraftId) {
           const { error } = await supabase
@@ -204,6 +207,8 @@ export function useDraftManager(): UseDraftManagerReturn {
               content: data.content,
               tags,
               type: data.postType,
+              content_kind: contentKind,
+              article_format: articleFormat,
               cover_image_url: data.coverImageUrl || null,
               in_response_to: data.inResponseToId,
             })
@@ -229,6 +234,8 @@ export function useDraftManager(): UseDraftManagerReturn {
               content: data.content,
               tags,
               type: data.postType,
+              content_kind: contentKind,
+              article_format: articleFormat,
               status: "draft",
               cover_image_url: data.coverImageUrl || null,
               in_response_to: data.inResponseToId,

@@ -1,5 +1,6 @@
 import type { PostType } from "@/lib/utils";
 import type { ProfileType } from "@/lib/profileTypes";
+import type { ArticleFormat, ContentKind } from "@/lib/contentModel";
 
 export type { ProfileType } from "@/lib/profileTypes";
 
@@ -136,6 +137,8 @@ export interface ExtendedPostRecord {
   content: string | null;
   excerpt: string | null;
   type: PostType;
+  content_kind?: ContentKind | null;
+  article_format?: ArticleFormat | null;
   status: PostStatus;
   tags: string[] | null;
   view_count?: number | null;

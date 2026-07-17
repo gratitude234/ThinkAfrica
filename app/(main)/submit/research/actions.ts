@@ -7,6 +7,7 @@ import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { createVersionSnapshot } from "@/lib/reviewWorkflow";
 import { buildSlugFromTitle } from "@/lib/postSlug";
+import { contentKindFromLegacyType } from "@/lib/contentModel";
 import type { PostReferenceRecord } from "@/lib/types";
 
 type ReferenceInput = Omit<PostReferenceRecord, "post_id"> & {
@@ -335,6 +336,8 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
         content,
         tags: normalizedTags,
         type: "research",
+        content_kind: contentKindFromLegacyType("research"),
+        article_format: null,
         status: nextStatus,
         published_at: nextStatus === "published" ? undefined : null,
         current_round: nextRound,
@@ -368,6 +371,8 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
         content,
         tags: normalizedTags,
         type: "research",
+        content_kind: contentKindFromLegacyType("research"),
+        article_format: null,
         status,
         current_round: 1,
         published_at: null,
@@ -542,6 +547,8 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
       content,
       tags,
       type: "research",
+      content_kind: contentKindFromLegacyType("research"),
+      article_format: null,
       status: "draft",
       current_round: 1,
       published_at: null,
