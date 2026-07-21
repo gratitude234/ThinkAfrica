@@ -355,6 +355,8 @@ export default async function LandingPage() {
                       src={leadPost.cover_image_url}
                       alt={getPostDisplayTitle(leadPost)}
                       type={leadPost.type}
+                      content_kind={leadPost.content_kind}
+                      article_format={leadPost.article_format}
                       sizes="440px"
                       className="h-[156px] border-b border-gray-100"
                       imageClassName="object-cover"
@@ -479,6 +481,8 @@ export default async function LandingPage() {
                         src={post.cover_image_url}
                         alt={displayTitle}
                         type={post.type}
+                        content_kind={post.content_kind}
+                        article_format={post.article_format}
                         sizes="(max-width: 768px) 100vw, 280px"
                         className="h-[188px] border-b border-gray-100 md:h-full md:min-h-[240px] md:border-b-0 md:border-r"
                         imageClassName="object-cover"
@@ -506,6 +510,8 @@ export default async function LandingPage() {
                         src={post.cover_image_url}
                         alt={displayTitle}
                         type={post.type}
+                        content_kind={post.content_kind}
+                        article_format={post.article_format}
                         sizes="(max-width: 768px) 100vw, 33vw"
                         className="h-[150px] border-b border-gray-100"
                         imageClassName="object-cover"
