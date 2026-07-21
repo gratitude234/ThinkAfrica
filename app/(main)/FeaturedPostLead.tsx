@@ -156,6 +156,8 @@ export default function FeaturedPostLead({
             src={post.cover_image_url}
             alt={displayTitle}
             type={post.type}
+            content_kind={post.content_kind}
+            article_format={post.article_format}
             sizes="(max-width: 1024px) 100vw, 820px"
             priority
             className="h-full w-full"

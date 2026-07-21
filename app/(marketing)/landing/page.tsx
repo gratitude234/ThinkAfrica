@@ -252,6 +252,8 @@ export default async function LandingPage() {
                     src={leadPost.cover_image_url}
                     alt={getPostDisplayTitle(leadPost)}
                     type={leadPost.type}
+                    content_kind={leadPost.content_kind}
+                    article_format={leadPost.article_format}
                     sizes="88px"
                     className="h-[92px] rounded-[10px]"
                     imageClassName="object-cover"

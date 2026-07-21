@@ -92,6 +92,8 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
                   src={pick.cover_image_url}
                   alt={displayTitle}
                   type={pick.type}
+                  content_kind={pick.content_kind}
+                  article_format={pick.article_format}
                   sizes="(max-width: 1024px) 50vw, 33vw"
                   className="h-[88px] w-full"
                   imageClassName="object-cover"

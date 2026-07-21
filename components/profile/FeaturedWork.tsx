@@ -116,6 +116,8 @@ export default function FeaturedWork({
                   src={post.cover_image_url}
                   alt={displayTitle}
                   type={post.type}
+                  content_kind={post.content_kind}
+                  article_format={post.article_format}
                   sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                   className="aspect-video"
                   imageClassName="object-cover transition-transform duration-300 group-hover:scale-[1.02]"

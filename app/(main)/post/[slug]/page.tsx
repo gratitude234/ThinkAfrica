@@ -2700,6 +2700,8 @@ export default async function PostPage({ params }: PageProps) {
             src={post.cover_image_url}
             alt={post.title}
             type={post.type}
+            content_kind={post.content_kind}
+            article_format={post.article_format}
             sizes="(max-width: 760px) 100vw, 760px"
             priority
             className="h-[230px] rounded-2xl border border-black/10 shadow-[0_12px_30px_-16px_rgba(0,0,0,0.3)] sm:h-[400px]"
