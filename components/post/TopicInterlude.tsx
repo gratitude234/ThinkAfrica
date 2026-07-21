@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { PostCardData } from "./PostCard";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 
 function getTopTopic(posts: PostCardData[]) {
   const counts = new Map<string, number>();
@@ -41,7 +42,7 @@ export default function TopicInterlude({ posts }: { posts: PostCardData[] }) {
             href={`/post/${post.slug}`}
             className="mb-1.5 block rounded-lg bg-white px-3.5 py-2.5 text-[13px] font-medium text-gray-700 transition-colors last:mb-0 hover:bg-gray-50"
           >
-            <span className="line-clamp-2">{post.title}</span>
+            <span className="line-clamp-2">{getPostMetadataTitle(post, post.profiles)}</span>
           </Link>
         ))}
       </div>

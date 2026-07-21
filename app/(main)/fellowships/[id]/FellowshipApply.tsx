@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 
 interface Props {
   fellowshipId: string;
@@ -13,7 +14,7 @@ interface Props {
   opportunityType?: string | null;
   proofPosts?: Array<{
     id: string;
-    title: string;
+    title: string | null;
     slug: string;
     type: string;
     citation_id: string | null;
@@ -175,7 +176,7 @@ export default function FellowshipApply({
                 <option value="">No Indegenius proof attached</option>
                 {proofPosts.map((post) => (
                   <option key={post.id} value={post.id}>
-                    {post.title}
+                    {getPostMetadataTitle(post)}
                     {post.citation_id ||
                     post.type === "research" ||
                     post.type === "policy_brief"

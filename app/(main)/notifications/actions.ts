@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
+import { getPostReferenceQuoted, getPostReferenceSuffix } from "@/lib/postDisplay";
 
 export async function respondToCoAuthorInvite(input: {
   notificationId: string;
@@ -68,7 +69,7 @@ export async function respondToCoAuthorInvite(input: {
     const { error: notificationError } = await admin.from("notifications").insert({
       user_id: post.author_id,
       type: "co_author_accepted",
-      message: `${actorName} accepted your co-author invitation on: ${post.title}`,
+      message: `${actorName} accepted your co-author invitation${getPostReferenceSuffix(post)}`,
       link: `/post/${post.slug}`,
       actor_id: user.id,
       post_id: input.postId,
@@ -80,7 +81,7 @@ export async function respondToCoAuthorInvite(input: {
         subject: `${actorName} accepted your Indegenius co-author invitation`,
         preview: `${actorName} accepted your co-author invitation.`,
         title: "Co-author invitation accepted",
-        intro: `${actorName} accepted your co-author invitation on "${post.title}".`,
+        intro: `${actorName} accepted your co-author invitation on ${getPostReferenceQuoted(post)}.`,
         ctaLabel: "Open post",
         ctaPath: `/post/${post.slug}`,
         idempotencyKey: `co-author-accepted:${input.postId}:${user.id}`,
@@ -122,7 +123,7 @@ export async function respondToCoAuthorInvite(input: {
     const { error: notificationError } = await admin.from("notifications").insert({
       user_id: post.author_id,
       type: "co_author_declined",
-      message: `${actorName} declined your co-author invitation on: ${post.title}`,
+      message: `${actorName} declined your co-author invitation${getPostReferenceSuffix(post)}`,
       link: `/post/${post.slug}`,
       actor_id: user.id,
       post_id: input.postId,
@@ -134,7 +135,7 @@ export async function respondToCoAuthorInvite(input: {
         subject: `${actorName} declined your Indegenius co-author invitation`,
         preview: `${actorName} declined your co-author invitation.`,
         title: "Co-author invitation declined",
-        intro: `${actorName} declined your co-author invitation on "${post.title}".`,
+        intro: `${actorName} declined your co-author invitation on ${getPostReferenceQuoted(post)}.`,
         ctaLabel: "Open post",
         ctaPath: `/post/${post.slug}`,
         idempotencyKey: `co-author-declined:${input.postId}:${user.id}`,

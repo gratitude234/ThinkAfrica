@@ -43,6 +43,10 @@ const TYPE_ICONS: Record<string, string> = {
   co_author_declined: "NO",
   response_post: "RE",
   opportunity_inquiry: "OP",
+  debate_v2_round_change: "!",
+  debate_v2_final_vote: "V",
+  debate_v2_direct_response: "?",
+  debate_v2_evidence_requested: "E",
 };
 
 function buildMessage(notification: NotificationData): string {
@@ -127,7 +131,7 @@ export default function NotificationItem({
   const link = buildLink(notification);
   const icon = TYPE_ICONS[notification.type] ?? "N";
   const writeBackHref = notification.post_id
-    ? `/write?inResponseTo=${notification.post_id}&type=essay&starter=response&responseIntent=extend`
+    ? `/write?inResponseTo=${notification.post_id}&kind=article&starter=response&responseIntent=extend`
     : null;
   const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");
   const [localRead, setLocalRead] = useState(notification.read);

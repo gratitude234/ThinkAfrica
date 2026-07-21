@@ -42,6 +42,14 @@ import { getMessageEligibility } from "@/lib/messaging";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
 import { getPostQualitySummary } from "@/lib/postQuality";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
+import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  isFormallyReviewed,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -61,17 +69,19 @@ interface AuthorProfile {
 
 interface ParentPostRef {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
 }
 
 interface PostRecord {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   content: string | null;
   excerpt: string | null;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   tags: string[] | null;
   status: string;
   author_id: string;
@@ -117,7 +127,7 @@ interface CoAuthorRecord {
 
 interface ResponsePostRow {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   excerpt: string | null;
   published_at: string | null;
@@ -158,13 +168,21 @@ interface ResponsePostProfile {
 
 interface RelatedPost {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   published_at: string | null;
   created_at: string;
   cover_image_url: string | null;
   profiles: { full_name: string | null; username: string } | null;
+}
+
+interface PostNavigationItem {
+  id: string;
+  title: string | null;
+  slug: string;
 }
 
 interface SecondaryData {
@@ -183,6 +201,8 @@ interface SecondaryData {
   commentCount: number;
   bookmarkCount: number;
   relatedPosts: RelatedPost[];
+  previousPost: PostNavigationItem | null;
+  nextPost: PostNavigationItem | null;
 }
 
 interface ViewerData {
@@ -236,8 +256,11 @@ function getAuthor(post: PostRecord): AuthorProfile | null {
   return Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles;
 }
 
-function isReviewedWork(post: { type?: string | null; citation_id?: string | null }) {
-  return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+// Evidence-based, not name-based: a post's type/kind says its workflow
+// *requires* review, but only citation_id/published_version_id prove a
+// specific record actually completed it (see lib/contentModel.ts).
+function isReviewedWork(post: { citation_id?: string | null; published_version_id?: string | null }) {
+  return isFormallyReviewed(post);
 }
 
 function buildArticleJsonLd({
@@ -252,7 +275,7 @@ function buildArticleJsonLd({
   return {
     "@context": "https://schema.org",
     "@type": "Article",
-    headline: post.title,
+    headline: getPostMetadataTitle(post, { full_name: authorName }),
     description,
     datePublished: post.published_at ?? post.created_at,
     author: { "@type": "Person", name: authorName },
@@ -463,6 +486,8 @@ function getBasicQualitySummary({
 }) {
   return getPostQualitySummary({
     type: post.type,
+    content_kind: post.content_kind,
+    article_format: post.article_format,
     status: post.status,
     title: post.title,
     excerpt: post.excerpt,
@@ -499,6 +524,8 @@ function getFullQualitySummary({
 }) {
   return getPostQualitySummary({
     type: post.type,
+    content_kind: post.content_kind,
+    article_format: post.article_format,
     status: post.status,
     title: post.title,
     excerpt: post.excerpt,
@@ -523,7 +550,8 @@ function getFullQualitySummary({
 async function getSecondaryData(
   postId: string,
   tags: string[],
-  isPublished: boolean
+  isPublished: boolean,
+  publishedAt: string | null
 ): Promise<SecondaryData> {
   const supabase = await createClient();
 
@@ -538,6 +566,8 @@ async function getSecondaryData(
     { count: commentCount },
     { count: bookmarkCount },
     relatedResult,
+    previousPostResult,
+    nextPostResult,
   ] = await Promise.all([
     supabase
       .from("likes")
@@ -592,7 +622,7 @@ async function getSecondaryData(
       ? supabase
           .from("posts")
           .select(
-            "id, title, slug, type, published_at, created_at, cover_image_url, profiles!posts_author_id_fkey (full_name, username)"
+            "id, title, slug, type, content_kind, article_format, published_at, created_at, cover_image_url, profiles!posts_author_id_fkey (full_name, username)"
           )
           .eq("status", "published")
           .neq("id", postId)
@@ -600,6 +630,28 @@ async function getSecondaryData(
           .order("published_at", { ascending: false })
           .limit(3)
       : Promise.resolve({ data: [], error: null }),
+    isPublished && publishedAt
+      ? supabase
+          .from("posts")
+          .select("id, title, slug")
+          .eq("status", "published")
+          .neq("id", postId)
+          .lt("published_at", publishedAt)
+          .order("published_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    isPublished && publishedAt
+      ? supabase
+          .from("posts")
+          .select("id, title, slug")
+          .eq("status", "published")
+          .neq("id", postId)
+          .gt("published_at", publishedAt)
+          .order("published_at", { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const coAuthors = ((coAuthorsRaw ?? []) as Array<
@@ -660,6 +712,8 @@ async function getSecondaryData(
     commentCount: commentCount ?? 0,
     bookmarkCount: bookmarkCount ?? 0,
     relatedPosts,
+    previousPost: (previousPostResult.data as PostNavigationItem | null) ?? null,
+    nextPost: (nextPostResult.data as PostNavigationItem | null) ?? null,
   };
 }
 
@@ -782,7 +836,7 @@ async function ParentPostLink({
       <span>
         In response to:{" "}
         <span className={`font-medium ${mode === "editorial" ? "text-ink" : "text-white/80"}`}>
-          {(parentPost as ParentPostRef).title}
+          {getPostDisplayTitle(parentPost as ParentPostRef) ?? "this post"}
         </span>
       </span>
     </Link>
@@ -838,7 +892,18 @@ async function PublicationSignalBlock({
 
   const { references, reviews, decisions, versions } = await secondaryDataPromise;
   const reviewed = isReviewedWork(post);
-  const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
+  // An Article (generic or a legacy Essay/Policy Brief) always leads with
+  // "Article" -- the historical format, if any, is a secondary detail, not
+  // a replacement for the primary identity (see docs/content-model.md).
+  const resolvedKind = resolveContentKind(post);
+  const resolvedFormat = resolveArticleFormat(post);
+  const formatLabel = getArticleFormatLabel(resolvedFormat);
+  const typeLabel =
+    resolvedKind === "article"
+      ? formatLabel
+        ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
+        : getContentKindLabel(resolvedKind)
+      : (POST_TYPE_LABELS[post.type as PostType] ?? post.type);
   const editorialSummary = getEditorialTrustSummary({
     type: post.type,
     status: post.status,
@@ -962,7 +1027,7 @@ async function PostReadingChrome({
       initialLiked={viewer.userLiked}
       initialLikeCount={secondary.likeCount}
       initialBookmarked={viewer.userBookmarked}
-      title={post.title}
+      title={getPostMetadataTitle(post)}
       slug={post.slug}
     />
   );
@@ -1142,7 +1207,7 @@ async function PostReferencesAndCitation({
           <CiteThis
             citationId={post.citation_id}
             citationPath={`/publication/${post.citation_id}`}
-            title={post.title}
+            title={getPostMetadataTitle(post, author)}
             publishedAt={post.published_at ?? post.created_at}
             authors={citationAuthors}
           />
@@ -1201,7 +1266,7 @@ async function PostEngagementSection({
         />
         <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
         <ShareButtons
-          title={post.title}
+          title={getPostMetadataTitle(post, author)}
           slug={post.slug}
           excerpt={sanitizedExcerpt}
           authorName={author?.full_name ?? null}
@@ -1211,7 +1276,7 @@ async function PostEngagementSection({
         <ReportButton
           targetType="post"
           targetId={post.id}
-          targetLabel={`"${post.title}"`}
+          targetLabel={`"${getPostMetadataTitle(post, author)}"`}
           variant="text"
           className="hidden"
         />
@@ -1284,50 +1349,118 @@ async function AuthorAndCollaborationSection({
   );
 }
 
-async function PostRelatedSection({
+async function PostContinueExploringSection({
   secondaryDataPromise,
 }: {
   secondaryDataPromise: Promise<SecondaryData>;
 }) {
-  const { relatedPosts } = await secondaryDataPromise;
-  if (relatedPosts.length === 0) return null;
+  const { relatedPosts, previousPost, nextPost } = await secondaryDataPromise;
 
   return (
-    <section className="mb-9">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-          Related
-        </h2>
-        <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
+    <section className="my-9 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-[0_12px_36px_-28px_rgba(0,75,58,0.55)]">
+      <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 px-5 py-6 text-white sm:px-7 sm:py-7">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-200">
+          Keep reading
+        </p>
+        <div className="mt-2 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="font-display text-2xl font-semibold leading-tight sm:text-[28px]">
+              Continue exploring Indegenius
+            </h2>
+            <p className="mt-2 max-w-lg text-sm leading-6 text-emerald-50/75">
+              Discover the latest ideas, research, and perspectives from across the community.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-emerald-950 transition-colors hover:bg-emerald-50"
+            >
+              Latest stories
+            </Link>
+            <Link
+              href="/explore"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+            >
+              Explore topics
+            </Link>
+          </div>
+        </div>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {relatedPosts.map((item) => (
-          <Link
-            key={item.id}
-            href={`/post/${item.slug}`}
-            className="group flex overflow-hidden rounded-lg border border-gray-200 bg-white transition-all hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:flex-col"
-          >
-            <div className="h-[92px] w-[112px] shrink-0 overflow-hidden sm:h-[96px] sm:w-full">
-              <PostCover
-                src={item.cover_image_url}
-                alt={item.title}
-                type={item.type}
-                sizes="200px"
-                className="h-full w-full"
-                imageClassName="object-cover"
-              />
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col p-3">
-              <p className="line-clamp-2 text-[12.5px] font-semibold leading-snug text-gray-900 transition-colors group-hover:text-emerald-brand">
-                {item.title}
-              </p>
-              <p className="mt-auto pt-2 text-[10px] text-gray-400">
-                {item.profiles?.full_name ?? item.profiles?.username}
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
+
+      {previousPost || nextPost ? (
+        <div className="grid border-b border-gray-100 sm:grid-cols-2 sm:divide-x sm:divide-gray-100">
+          {previousPost ? (
+            <Link
+              href={`/post/${previousPost.slug}`}
+              className="group flex min-h-[104px] flex-col justify-center border-b border-gray-100 px-5 py-4 transition-colors hover:bg-emerald-50/60 sm:border-b-0 sm:px-7"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">
+                &larr; Previous story
+              </span>
+              <span className="mt-2 line-clamp-2 text-sm font-semibold leading-snug text-gray-900 group-hover:text-emerald-800">
+                {getPostMetadataTitle(previousPost)}
+              </span>
+            </Link>
+          ) : (
+            <div className="hidden sm:block" aria-hidden="true" />
+          )}
+          {nextPost ? (
+            <Link
+              href={`/post/${nextPost.slug}`}
+              className="group flex min-h-[104px] flex-col justify-center px-5 py-4 text-right transition-colors hover:bg-emerald-50/60 sm:px-7"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">
+                Next story &rarr;
+              </span>
+              <span className="mt-2 line-clamp-2 text-sm font-semibold leading-snug text-gray-900 group-hover:text-emerald-800">
+                {getPostMetadataTitle(nextPost)}
+              </span>
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+
+      {relatedPosts.length > 0 ? (
+        <div className="px-5 py-6 sm:px-7">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+              More like this
+            </h3>
+            <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {relatedPosts.map((item) => (
+              <Link
+                key={item.id}
+                href={`/post/${item.slug}`}
+                className="group flex overflow-hidden rounded-lg border border-gray-200 bg-white transition-all hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:flex-col"
+              >
+                <div className="h-[92px] w-[112px] shrink-0 overflow-hidden sm:h-[96px] sm:w-full">
+                  <PostCover
+                    src={item.cover_image_url}
+                    alt={getPostDisplayTitle(item)}
+                    type={item.type}
+                    content_kind={item.content_kind}
+                    article_format={item.article_format}
+                    sizes="200px"
+                    className="h-full w-full"
+                    imageClassName="object-cover"
+                  />
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col p-3">
+                  <p className="line-clamp-2 text-[12.5px] font-semibold leading-snug text-gray-900 transition-colors group-hover:text-emerald-brand">
+                    {getPostMetadataTitle(item, item.profiles)}
+                  </p>
+                  <p className="mt-auto pt-2 text-[10px] text-gray-400">
+                    {item.profiles?.full_name ?? item.profiles?.username}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1350,7 +1483,7 @@ async function PostPublishSuccessSection({
     <PublishedToast
       postId={post.id}
       postType={post.type}
-      title={post.title}
+      title={getPostMetadataTitle(post, author)}
       slug={post.slug}
       points={points}
       username={author?.username ?? ""}
@@ -1358,7 +1491,7 @@ async function PostPublishSuccessSection({
         related
           ? {
               id: related.id,
-              title: related.title,
+              title: getPostMetadataTitle(related, related.profiles),
               slug: related.slug,
             }
           : null
@@ -1458,7 +1591,7 @@ async function PostResponsesSection({
                   </span>
                 </div>
                 <p className="text-sm font-semibold leading-snug text-gray-900">
-                  {response.title}
+                  {getPostMetadataTitle(response, responseAuthor)}
                 </p>
                 {response.excerpt ? (
                   <p className="mt-1 line-clamp-2 text-xs text-gray-500">
@@ -1533,7 +1666,7 @@ async function PostSidebar({
                 userId={userId}
               />
               <ShareButtons
-                title={post.title}
+                title={getPostMetadataTitle(post, author)}
                 slug={post.slug}
                 excerpt={sanitizedExcerpt}
                 authorName={author?.full_name ?? null}
@@ -1557,7 +1690,7 @@ async function PostSidebar({
                 <ReportButton
                   targetType="post"
                   targetId={post.id}
-                  targetLabel={`"${post.title}"`}
+                  targetLabel={`"${getPostMetadataTitle(post, author)}"`}
                 />
               ) : null}
             </div>
@@ -2022,7 +2155,7 @@ async function ResearchDossierSidebar({
                   userId={userId}
                 />
                 <ShareButtons
-                  title={post.title}
+                  title={getPostMetadataTitle(post, author)}
                   slug={post.slug}
                   excerpt={sanitizedExcerpt}
                   authorName={author?.full_name ?? null}
@@ -2113,6 +2246,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
   const authorLabel = author?.full_name ?? author?.username ?? "a student";
+  const metadataTitle = getPostMetadataTitle(post, author);
   const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
   const description = getPostMetaDescription({
     excerpt: post.excerpt,
@@ -2122,7 +2256,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? SITE_URL;
   const ogImageUrl = `${appUrl}/api/og?${new URLSearchParams({
-    title: post.title,
+    title: metadataTitle,
     author: author?.full_name ?? "",
     university: author?.university ?? "",
     type: post.type ?? "essay",
@@ -2130,11 +2264,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const ogImage = coverUrl ?? ogImageUrl;
 
   return {
-    title: `${post.title} - Indegenius`,
+    title: `${metadataTitle} - Indegenius`,
     description,
     alternates: { canonical: canonicalPath(`/post/${post.slug}`) },
     openGraph: {
-      title: post.title,
+      title: metadataTitle,
       description,
       url: `${appUrl}/post/${post.slug}`,
       siteName: "Indegenius",
@@ -2143,7 +2277,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
     twitter: {
       card: "summary_large_image",
-      title: post.title,
+      title: metadataTitle,
       description,
       images: [ogImage],
     },
@@ -2162,7 +2296,7 @@ export default async function PostPage({ params }: PageProps) {
     .from("posts")
     .select(
       `
-      id, title, slug, content, excerpt, type, tags, status, author_id,
+      id, title, slug, content, excerpt, type, content_kind, article_format, tags, status, author_id,
       created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id,
       published_version_id, current_round, revision_due_at,
       in_response_to,
@@ -2232,6 +2366,8 @@ export default async function PostPage({ params }: PageProps) {
     injectHeadingIds(sanitizedContent)
   );
   const authorName = author?.full_name ?? author?.username ?? "Anonymous";
+  const displayTitle = getPostDisplayTitle(post);
+  const metadataTitle = getPostMetadataTitle(post, author);
   const parentPostId = post.in_response_to ?? null;
   const basicQualitySummary = getBasicQualitySummary({
     post,
@@ -2241,7 +2377,12 @@ export default async function PostPage({ params }: PageProps) {
     parentPostId,
   });
   const userId = user?.id ?? null;
-  const secondaryDataPromise = getSecondaryData(post.id, post.tags ?? [], isPublished);
+  const secondaryDataPromise = getSecondaryData(
+    post.id,
+    post.tags ?? [],
+    isPublished,
+    post.published_at
+  );
   const viewerDataPromise = getViewerData({
     postId: post.id,
     userId,
@@ -2408,13 +2549,17 @@ export default async function PostPage({ params }: PageProps) {
               />
             </Suspense>
 
-            <hr className="my-9 border-gray-200/80" />
-
-            <Suspense fallback={<SectionSkeleton rows={3} />}>
-              <PostRelatedSection secondaryDataPromise={secondaryDataPromise} />
-            </Suspense>
-
-            <hr className="mb-8 border-gray-200/80" />
+            {isPublished ? (
+              <>
+                <hr className="my-9 border-gray-200/80" />
+                <Suspense fallback={<SectionSkeleton rows={3} />}>
+                  <PostContinueExploringSection
+                    secondaryDataPromise={secondaryDataPromise}
+                  />
+                </Suspense>
+                <hr className="mb-8 border-gray-200/80" />
+              </>
+            ) : null}
 
             <Suspense fallback={<CommentsSkeleton />}>
               <CommentsLoader
@@ -2473,7 +2618,9 @@ export default async function PostPage({ params }: PageProps) {
               viewerDataPromise={viewerDataPromise}
             />
           </Suspense>
-          <ReadingProgressBar />
+          {/* A scroll-progress affordance implies a long-form read; skip it
+              for titleless lightweight Posts, which are short by design. */}
+          {displayTitle ? <ReadingProgressBar /> : null}
           <ViewTracker slug={slug} wordCount={wordCount} />
         </>
       ) : null}
@@ -2493,11 +2640,18 @@ export default async function PostPage({ params }: PageProps) {
             <ParentPostLink parentPostId={parentPostId} mode="magazine" />
           </Suspense>
 
-          <h1 className="font-display max-w-[700px] text-[34px] font-semibold uppercase leading-[0.98] tracking-[-0.025em] text-white sm:text-[52px] lg:text-[58px]">
-            {post.title}
-          </h1>
+          {displayTitle ? (
+            <h1 className="font-display max-w-[700px] text-[34px] font-semibold uppercase leading-[0.98] tracking-[-0.025em] text-white sm:text-[52px] lg:text-[58px]">
+              {displayTitle}
+            </h1>
+          ) : null}
 
-          {sanitizedExcerpt ? (
+          {/* Titleless lightweight Posts render the excerpt again as-is
+              via the body below (it's a same-content preview, not a
+              distinct summary) -- showing it here too would print the
+              opening of a short post twice. Only render it as a distinct
+              hero "dek" when there's an actual title above it. */}
+          {displayTitle && sanitizedExcerpt ? (
             <p className="font-display mt-5 max-w-[640px] text-[16px] italic leading-[1.55] text-white/75 sm:text-[20px]">
               {sanitizedExcerpt}
             </p>
@@ -2625,6 +2779,14 @@ export default async function PostPage({ params }: PageProps) {
             />
           </Suspense>
 
+          {isPublished ? (
+            <Suspense fallback={<SectionSkeleton rows={3} />}>
+              <PostContinueExploringSection
+                secondaryDataPromise={secondaryDataPromise}
+              />
+            </Suspense>
+          ) : null}
+
           <Suspense fallback={<CommentsSkeleton />}>
             <CommentsLoader
               postId={post.id}
@@ -2635,10 +2797,6 @@ export default async function PostPage({ params }: PageProps) {
 
           <Suspense fallback={<SectionSkeleton rows={3} />}>
             <PostResponsesSection secondaryDataPromise={secondaryDataPromise} />
-          </Suspense>
-
-          <Suspense fallback={<SectionSkeleton rows={3} />}>
-            <PostRelatedSection secondaryDataPromise={secondaryDataPromise} />
           </Suspense>
         </main>
       </div>

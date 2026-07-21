@@ -4,6 +4,13 @@ import {
   POST_TYPE_LABELS,
   type PostType,
 } from "@/lib/utils";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  isFormallyReviewed,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
 
 export type QualityTone = "good" | "neutral" | "warning";
 
@@ -23,6 +30,8 @@ export interface CredibilitySignal {
 
 export interface PostQualityInput {
   type?: string | null;
+  content_kind?: string | null;
+  article_format?: string | null;
   status?: string | null;
   title?: string | null;
   excerpt?: string | null;
@@ -130,8 +139,14 @@ function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
 }
 
-function isReviewedType(type: string | null | undefined) {
-  return type === "research" || type === "policy_brief";
+// Evidence-based, not name-based: a type/kind says a workflow *requires*
+// review, but only citation_id/published_version_id prove a specific
+// record actually completed it (see lib/contentModel.ts).
+function hasReviewEvidence(input: PublicQualityInput) {
+  return isFormallyReviewed({
+    citation_id: input.citationId,
+    published_version_id: input.publishedVersionId,
+  });
 }
 
 export function getQualityScore(input: PublicQualityInput): number {
@@ -141,7 +156,7 @@ export function getQualityScore(input: PublicQualityInput): number {
   const bookmarkCount = input.bookmarkCount ?? 0;
   const likeCount = input.likeCount ?? 0;
   const viewCount = input.viewCount ?? 0;
-  const reviewed = isReviewedType(input.type) || Boolean(input.publishedVersionId);
+  const reviewed = hasReviewEvidence(input);
   const citable = Boolean(input.citationId);
   const publishedAt = input.publishedAt ?? input.createdAt;
   const ageHours = publishedAt
@@ -175,7 +190,7 @@ export function getPublicQualitySignals(
   if (referenceCount > 0) {
     badges.push({ key: "source_backed", label: "Source-backed", tone: "emerald" });
   }
-  if (isReviewedType(input.type) || input.publishedVersionId) {
+  if (hasReviewEvidence(input)) {
     badges.push({ key: "reviewed", label: "Reviewed", tone: "purple" });
   }
   if (input.citationId) {
@@ -206,7 +221,7 @@ export function getFeedSurfaceReason(input: PublicQualityInput): string | null {
   if (input.referenceCount && input.referenceCount > 0) {
     return "Source-backed post";
   }
-  if (input.citationId || isReviewedType(input.type) || input.publishedVersionId) {
+  if (hasReviewEvidence(input)) {
     return "Reviewed or citable work";
   }
   if ((input.responseCount ?? 0) > 0) return "Active response thread";
@@ -241,6 +256,15 @@ export function getPostQualitySummary(
   input: PostQualityInput
 ): PostQualitySummary {
   const postType = normalizePostType(input.type);
+  const resolvesToPost =
+    resolveContentKind({ content_kind: input.content_kind, type: input.type }) === "post";
+  // A legacy titled Blog also resolves to "post", but it isn't the new
+  // lightweight experience -- it already has a title, tags, and a length
+  // expectation from before Phase 2, and none of that should silently
+  // relax just because its content_kind now resolves the same way a new
+  // titleless Post's does. Only a genuinely titleless record gets the new
+  // exemptions below.
+  const isNewLightweightPost = resolvesToPost && !input.title?.trim();
   const wordCount = input.wordCount ?? countWords(input.content);
   const quickTake = isQuickTake(postType, wordCount);
   const requiresReview = postType === "research" || postType === "policy_brief";
@@ -269,8 +293,11 @@ export function getPostQualitySummary(
     {
       key: "title",
       label: "Clear title",
-      done: Boolean(input.title?.trim()),
-      blocking: true,
+      // Posts intentionally have no title -- a null title is the correct
+      // state for them, not an incomplete one, so this is never blocking
+      // (and always "done") for a genuinely titleless Post.
+      done: isNewLightweightPost || Boolean(input.title?.trim()),
+      blocking: !isNewLightweightPost,
       helper: "Add a title readers can understand in the feed.",
     },
     {
@@ -283,15 +310,19 @@ export function getPostQualitySummary(
     {
       key: "tags",
       label: "Topics selected",
-      done: tags.length > 0,
-      blocking: true,
+      // Topics are optional for Posts (see docs/content-model.md).
+      done: isNewLightweightPost || tags.length > 0,
+      blocking: !isNewLightweightPost,
       helper: "Add at least one topic so the right students can find it.",
     },
     {
       key: "word_count",
       label: quickTake ? "Quick Take length" : "Minimum depth",
-      done: wordCount >= minWords,
-      blocking: requiresReview,
+      // A titleless Post is short by design -- there's no minimum length
+      // to nag about, unlike a Quick-Take-flavored (but titled) legacy
+      // Blog, which keeps its existing depth expectation.
+      done: isNewLightweightPost || wordCount >= minWords,
+      blocking: !isNewLightweightPost && requiresReview,
       helper: quickTake
         ? "Quick Takes stay lightweight, but need enough context to be useful."
         : `Aim for at least ${minWords.toLocaleString()} words for this format.`,
@@ -336,7 +367,29 @@ export function getPostQualitySummary(
         ? "warning"
         : "neutral";
 
-  const contentLabel = quickTake ? "Quick Take" : POST_TYPE_LABELS[postType];
+  // Only a genuinely titleless record gets the new "Post" label -- a
+  // legacy titled Blog (also resolves to "post") keeps its existing
+  // "Blog"/"Quick Take" label so historical content isn't relabeled. An
+  // Article (generic or a legacy Essay/Policy Brief) always leads with
+  // "Article" -- the historical format, if any, is a secondary suffix, not
+  // a replacement for the primary identity (see docs/content-model.md).
+  const resolvedKind = resolveContentKind({ content_kind: input.content_kind, type: input.type });
+  const articleFormatLabel = getArticleFormatLabel(
+    resolveArticleFormat({
+      content_kind: input.content_kind,
+      article_format: input.article_format,
+      type: input.type,
+    })
+  );
+  const contentLabel = isNewLightweightPost
+    ? "Post"
+    : quickTake
+      ? "Quick Take"
+      : resolvedKind === "article"
+        ? articleFormatLabel
+          ? `${getContentKindLabel(resolvedKind)} · ${articleFormatLabel}`
+          : getContentKindLabel(resolvedKind)
+        : POST_TYPE_LABELS[postType];
 
   return {
     contentLabel,

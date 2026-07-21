@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateProfileFeaturedPosts } from "@/app/(main)/[username]/actions";
 import { formatDate } from "@/lib/utils";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 
 interface FeaturedWorkOption {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   type: string;
   published_at: string | null;
@@ -141,7 +142,7 @@ export default function FeaturedWorkManager({
                     >
                       <div className="min-w-0">
                         <p className="truncate font-medium text-gray-900">
-                          {index + 1}. {post.title}
+                          {index + 1}. {getPostMetadataTitle(post)}
                         </p>
                         <p className="text-xs text-gray-500">
                           {(post.read_count ?? 0).toLocaleString()} reads
@@ -191,7 +192,7 @@ export default function FeaturedWorkManager({
                   >
                     <div className="min-w-0">
                       <p className="line-clamp-2 text-sm font-semibold text-gray-900">
-                        {post.title}
+                        {getPostMetadataTitle(post)}
                       </p>
                       <p className="mt-1 text-xs text-gray-500">
                         {formatDate(displayDate)} / {(post.read_count ?? 0).toLocaleString()} reads

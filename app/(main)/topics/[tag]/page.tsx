@@ -7,6 +7,7 @@ import {
   getFeedSurfaceReason,
   getPublicQualitySignals,
 } from "@/lib/postQuality";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 
 interface PageProps {
   params: Promise<{ tag: string }>;
@@ -21,7 +22,7 @@ export default async function TopicPage({ params }: PageProps) {
   const { data: postsRaw } = await supabase
     .from("posts")
     .select(`
-      id, author_id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id,
+      id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id,
       profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
       post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
     `)
@@ -147,7 +148,7 @@ export default async function TopicPage({ params }: PageProps) {
             </p>
           </div>
           <Link
-            href={`/write?type=blog&starter=1&tag=${encodeURIComponent(decodedTag)}`}
+            href={`/write?kind=article&starter=1&tag=${encodeURIComponent(decodedTag)}`}
             className="w-fit rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-[#0E4B37]"
           >
             Write about #{decodedTag}
@@ -179,6 +180,10 @@ export default async function TopicPage({ params }: PageProps) {
                     (post as { in_response_to?: string | null }).in_response_to ?? null,
                   excerpt: post.excerpt,
                   type: post.type,
+                  content_kind:
+                    (post as { content_kind?: string | null }).content_kind ?? null,
+                  article_format:
+                    (post as { article_format?: string | null }).article_format ?? null,
                   tags: post.tags,
                   created_at: post.created_at,
                   published_at: post.published_at,
@@ -252,7 +257,7 @@ export default async function TopicPage({ params }: PageProps) {
                     className="block rounded-lg bg-canvas p-3 hover:bg-[#F5F3EE]"
                   >
                     <p className="line-clamp-2 text-sm font-semibold text-gray-900">
-                      {post.title}
+                      {getPostMetadataTitle(post, post.profiles)}
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
                       {post.response_count ?? 0} responses / {post.comment_count ?? 0} comments

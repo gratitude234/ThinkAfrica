@@ -8,6 +8,7 @@ import {
 } from "@/lib/adminAccess";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
+import { getPostDisplayTitle } from "@/lib/postDisplay";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -122,10 +123,16 @@ export async function removeReportedPost(reportId: string) {
 
     await markReport(admin, context, reportId, "resolved", "post_removed");
 
+    // "Your post" already precedes the reference below, so a titleless
+    // Post gets the plain "Your post" phrase rather than a redundant
+    // "Your post your post".
+    const displayTitle = getPostDisplayTitle(post);
+    const postLabel = displayTitle ? `Your post "${displayTitle}"` : "Your post";
+
     const { error: notificationError } = await admin.from("notifications").insert({
       user_id: post.author_id,
       type: "moderation_post_removed",
-      message: `Your post "${post.title}" was removed for breaking our community guidelines.`,
+      message: `${postLabel} was removed for breaking our community guidelines.`,
       link: "/editorial-standards",
       post_id: post.id,
       read: false,
@@ -140,7 +147,7 @@ export async function removeReportedPost(reportId: string) {
       subject: "Your post was removed from Indegenius",
       preview: "A post of yours was removed by our moderation team.",
       title: "Post removed",
-      intro: `Your post "${post.title}" was removed because it breaks our community guidelines. If you believe this was a mistake, reply to this email.`,
+      intro: `${postLabel} was removed because it breaks our community guidelines. If you believe this was a mistake, reply to this email.`,
       ctaLabel: "Read our guidelines",
       ctaPath: "/editorial-standards",
       idempotencyKey: `moderation:post_removed:${post.id}`,

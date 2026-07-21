@@ -4,7 +4,7 @@ type TypeFilter = "all" | "research" | "essay" | "policy_brief" | "blog";
 
 const TYPE_OPTIONS: Array<{ label: string; value: TypeFilter }> = [
   { label: "All", value: "all" },
-  { label: "Essays", value: "essay" },
+  { label: "Articles", value: "essay" },
   { label: "Research", value: "research" },
   { label: "Policy Briefs", value: "policy_brief" },
   { label: "Quick Takes", value: "blog" },

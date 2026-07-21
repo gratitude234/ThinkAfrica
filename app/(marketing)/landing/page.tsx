@@ -6,6 +6,7 @@ import RetentionEventTracker from "@/components/retention/RetentionEventTracker"
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicTopicCounts, type TopicCount } from "@/lib/discoverData";
+import { getPostDisplayTitle, getPostMetadataTitle, isLightweightPost } from "@/lib/postDisplay";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
@@ -15,9 +16,11 @@ import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/s
 
 type LandingPost = {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   excerpt: string | null;
   cover_image_url: string | null;
   view_count: number | null;
@@ -93,14 +96,28 @@ const VALUE_PROPS = [
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function typeBadge(type: string): { classes: string; label: string } {
-  switch (type) {
+function typeBadge(post: LandingPost): { classes: string; label: string } {
+  // A genuinely titleless lightweight Post gets the new "Post" label; a
+  // legacy titled Blog (also resolves to "post") keeps its existing
+  // "Blog" label below, same rule as lib/postQuality.ts's contentLabel.
+  if (isLightweightPost(post)) {
+    return { classes: "bg-green-tint text-emerald-brand", label: "Post" };
+  }
+
+  switch (post.type) {
     case "essay":        return { classes: "bg-gold-tint text-gold-ink",         label: "Essay" };
     case "research":     return { classes: "bg-purple-tint text-purple-accent",  label: "Research" };
     case "policy_brief": return { classes: "bg-purple-tint text-purple-accent",  label: "Policy Brief" };
     case "quick_take":   return { classes: "bg-green-tint text-emerald-brand",   label: "Quick Take" };
     default:             return { classes: "bg-green-tint text-emerald-brand",   label: "Blog" };
   }
+}
+
+/** Titleless lightweight Post: lead with the excerpt instead of a blank/fabricated headline. */
+function postHeadline(post: LandingPost): string {
+  return (
+    getPostDisplayTitle(post) ?? post.excerpt?.trim() ?? getPostMetadataTitle(post, post.profiles)
+  );
 }
 
 function relativeDate(dateStr: string | null): string {
@@ -129,7 +146,7 @@ async function fetchLandingData(
       supabase
         .from("posts")
         .select(
-          `id, title, slug, type, excerpt, cover_image_url, view_count, published_at, featured,
+          `id, title, slug, type, content_kind, article_format, excerpt, cover_image_url, view_count, published_at, featured,
            profiles!posts_author_id_fkey (username, full_name, university)`
         )
         .eq("status", "published")
@@ -233,7 +250,7 @@ export default async function LandingPage() {
                 >
                   <PostCover
                     src={leadPost.cover_image_url}
-                    alt={leadPost.title}
+                    alt={getPostDisplayTitle(leadPost)}
                     type={leadPost.type}
                     sizes="88px"
                     className="h-[92px] rounded-[10px]"
@@ -244,7 +261,7 @@ export default async function LandingPage() {
                       Featured read
                     </p>
                     <h2 className="font-display line-clamp-2 text-[18px] font-semibold leading-snug text-ink">
-                      {leadPost.title}
+                      {postHeadline(leadPost)}
                     </h2>
                     <p className="mt-2 line-clamp-1 text-xs text-ink-muted">
                       {authorLine(leadPost).name}
@@ -334,7 +351,7 @@ export default async function LandingPage() {
                   >
                     <PostCover
                       src={leadPost.cover_image_url}
-                      alt={leadPost.title}
+                      alt={getPostDisplayTitle(leadPost)}
                       type={leadPost.type}
                       sizes="440px"
                       className="h-[156px] border-b border-gray-100"
@@ -342,13 +359,13 @@ export default async function LandingPage() {
                     />
                     <div className="p-3.5">
                       <div className="mb-2 flex items-center justify-between">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${typeBadge(leadPost.type).classes}`}>
-                          {typeBadge(leadPost.type).label}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${typeBadge(leadPost).classes}`}>
+                          {typeBadge(leadPost).label}
                         </span>
                         <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Read</span>
                       </div>
                       <h2 className="mb-1.5 line-clamp-2 font-display text-[17px] font-semibold leading-snug text-ink">
-                        {leadPost.title}
+                        {postHeadline(leadPost)}
                       </h2>
                       <p className="text-[11px] text-ink-muted">
                         {authorLine(leadPost).name}
@@ -359,7 +376,7 @@ export default async function LandingPage() {
 
                   {/* Compact rail items */}
                   {railPosts.map((post, i) => {
-                    const badge  = typeBadge(post.type);
+                    const badge  = typeBadge(post);
                     const author = authorLine(post);
                     return (
                       <LandingTrackedLink
@@ -373,7 +390,7 @@ export default async function LandingPage() {
                           {badge.label}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-ink">{post.title}</p>
+                          <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-ink">{postHeadline(post)}</p>
                           <p className="mt-0.5 text-[11px] text-ink-muted">
                             {author.name}{author.university ? ` · ${author.university}` : ""}
                           </p>
@@ -441,9 +458,10 @@ export default async function LandingPage() {
 
           <div id="post-grid" className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {gridPosts.map((post, i) => {
-              const badge    = typeBadge(post.type);
-              const author   = authorLine(post);
-              const isWide   = i === 0;
+              const badge       = typeBadge(post);
+              const author      = authorLine(post);
+              const isWide      = i === 0;
+              const displayTitle = getPostDisplayTitle(post);
 
               return (
                 <LandingTrackedLink
@@ -457,7 +475,7 @@ export default async function LandingPage() {
                     <div className="grid md:grid-cols-[280px_1fr]">
                       <PostCover
                         src={post.cover_image_url}
-                        alt={post.title}
+                        alt={displayTitle}
                         type={post.type}
                         sizes="(max-width: 768px) 100vw, 280px"
                         className="h-[188px] border-b border-gray-100 md:h-full md:min-h-[240px] md:border-b-0 md:border-r"
@@ -468,8 +486,8 @@ export default async function LandingPage() {
                           <div className="mb-2.5 flex items-center">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
                           </div>
-                          <h2 className="mb-2 line-clamp-3 font-display text-[20px] font-semibold leading-snug text-ink sm:text-[22px]">{post.title}</h2>
-                          {post.excerpt && (
+                          <h2 className="mb-2 line-clamp-3 font-display text-[20px] font-semibold leading-snug text-ink sm:text-[22px]">{postHeadline(post)}</h2>
+                          {displayTitle && post.excerpt && (
                             <p className="mb-3 line-clamp-2 text-sm leading-relaxed text-ink-muted">{post.excerpt}</p>
                           )}
                         </div>
@@ -484,7 +502,7 @@ export default async function LandingPage() {
                     <>
                       <PostCover
                         src={post.cover_image_url}
-                        alt={post.title}
+                        alt={displayTitle}
                         type={post.type}
                         sizes="(max-width: 768px) 100vw, 33vw"
                         className="h-[150px] border-b border-gray-100"
@@ -494,8 +512,8 @@ export default async function LandingPage() {
                         <div className="mb-2.5">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
                         </div>
-                        <h2 className="mb-2 line-clamp-2 font-display text-[17px] font-semibold leading-snug text-ink">{post.title}</h2>
-                        {post.excerpt && (
+                        <h2 className="mb-2 line-clamp-2 font-display text-[17px] font-semibold leading-snug text-ink">{postHeadline(post)}</h2>
+                        {displayTitle && post.excerpt && (
                           <p className="mb-3 line-clamp-2 text-[13px] leading-relaxed text-ink-muted">{post.excerpt}</p>
                         )}
                         <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3 text-xs text-ink-muted">

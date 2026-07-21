@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
-import { buildSlugFromTitle } from "@/lib/postSlug";
-import { articleFormatFromLegacyType, contentKindFromLegacyType } from "@/lib/contentModel";
+import { ensureDraft } from "./actions";
+import type { PostType } from "@/lib/utils";
+import { resolveArticleFormat, type ArticleFormat } from "@/lib/contentModel";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -15,6 +16,12 @@ interface DraftData {
   content: string;
   tags: string[];
   postType: string;
+  // Phase 4A: optional Article genre, lifted to page.tsx state (mirroring
+  // postType) and hydrated from the loaded draft's own stored value -- see
+  // page.tsx and PublishDrawer.tsx. null means "General"; every DraftData
+  // snapshot always carries a concrete value (never omitted), so
+  // saveDraft() always tells ensureDraft() exactly what to persist.
+  articleFormat: ArticleFormat | null;
   coverImageUrl: string;
   inResponseToId: string | null;
 }
@@ -96,6 +103,7 @@ export function useDraftManager(): UseDraftManagerReturn {
             content: parsedBackup.content ?? "",
             tags: parsedBackup.tags ?? [],
             postType: parsedBackup.postType ?? "blog",
+            articleFormat: parsedBackup.articleFormat ?? null,
             coverImageUrl: parsedBackup.coverImageUrl ?? "",
             inResponseToId: parsedBackup.inResponseToId ?? null,
           };
@@ -119,7 +127,9 @@ export function useDraftManager(): UseDraftManagerReturn {
     const supabase = createClient();
     supabase
       .from("posts")
-      .select("id, title, excerpt, content, tags, type, cover_image_url, in_response_to")
+      .select(
+        "id, title, excerpt, content, tags, type, content_kind, article_format, cover_image_url, in_response_to"
+      )
       .eq("id", draftIdParam)
       .eq("status", "draft")
       .single()
@@ -131,12 +141,27 @@ export function useDraftManager(): UseDraftManagerReturn {
             content: data.content ?? "",
             tags: (data.tags as string[] | null) ?? [],
             postType: data.type ?? "blog",
+            // Caught in review: load the draft's own stored genre so
+            // PublishDrawer can hydrate from it instead of always resetting
+            // to "General" -- see resolveArticleFormat() in
+            // lib/contentModel.ts (prefers content_kind/article_format,
+            // falls back to legacy `type`).
+            articleFormat: resolveArticleFormat(data),
             coverImageUrl:
               (data as { cover_image_url?: string | null }).cover_image_url ??
               "",
             inResponseToId:
               (data as { in_response_to?: string | null }).in_response_to ?? null,
           });
+        } else {
+          // The `draft=` URL param doesn't resolve to a row this user can
+          // still edit as a draft here (wrong owner, wrong status -- e.g. it
+          // was since published/submitted/removed -- or it never existed).
+          // Forget it entirely rather than leaving it in draftIdRef: autosave
+          // must never fall through to updating an arbitrary post merely
+          // because a stale/forged id was sitting in the URL.
+          draftIdRef.current = null;
+          setDraftId(null);
         }
         setLoadingDraft(false);
       });
@@ -179,83 +204,55 @@ export function useDraftManager(): UseDraftManagerReturn {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
       debounceTimer.current = setTimeout(async () => {
+        // A generic Article always requires a non-blank title (see
+        // posts_title_required_unless_post_check in the Phase 2 migration).
+        // Before that title exists, there is nothing safe to persist to the
+        // "posts" row itself -- attempting to would either violate that
+        // constraint or force a fake placeholder title into it. The
+        // periodic localStorage backup (below) is what protects this work
+        // in the meantime; remote persistence simply waits.
+        if (!data.title.trim()) {
+          return;
+        }
+
         setSaveStatus("saving");
 
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        // Routed through the same server action /write's "ready to publish"
+        // step uses, rather than writing to Supabase directly from the
+        // browser: ensureDraft() independently verifies ownership, refuses
+        // to touch a draftId that isn't actually still an editable draft
+        // (e.g. one that was since published or submitted for review), and
+        // sanitizes content -- guarantees a raw client `.update()` call here
+        // could not provide on its own.
+        const result = await ensureDraft({
+          draftId: draftIdRef.current,
+          title: data.title,
+          excerpt: data.excerpt,
+          content: data.content,
+          tags: data.tags,
+          postType: data.postType as PostType,
+          articleFormat: data.articleFormat,
+          coverImageUrl: data.coverImageUrl,
+          inResponseTo: data.inResponseToId,
+        });
 
-        if (!user) {
+        if (result.error || !result.draftId) {
           setSaveStatus("error");
           return;
         }
 
-        const tags = data.tags
-          .map((tag) => tag.trim().toLowerCase())
-          .filter(Boolean);
-        const currentDraftId = draftIdRef.current;
-        const contentKind = contentKindFromLegacyType(data.postType);
-        const articleFormat = articleFormatFromLegacyType(data.postType);
+        const isNewDraft = !draftIdRef.current;
+        draftIdRef.current = result.draftId;
+        setDraftId(result.draftId);
+        setSaveStatus("saved");
+        setLastSaved(new Date());
 
-        if (currentDraftId) {
-          const { error } = await supabase
-            .from("posts")
-            .update({
-              title: data.title.trim(),
-              excerpt: data.excerpt,
-              content: data.content,
-              tags,
-              type: data.postType,
-              content_kind: contentKind,
-              article_format: articleFormat,
-              cover_image_url: data.coverImageUrl || null,
-              in_response_to: data.inResponseToId,
-            })
-            .eq("id", currentDraftId)
-            .eq("author_id", user.id);
-
-          if (error) {
-            setSaveStatus("error");
-          } else {
-            setSaveStatus("saved");
-            setLastSaved(new Date());
-          }
-        } else {
-          const uniqueSlug = buildSlugFromTitle(data.title, "untitled", Date.now().toString(36));
-
-          const { data: inserted, error } = await supabase
-            .from("posts")
-            .insert({
-              author_id: user.id,
-              title: data.title.trim(),
-              slug: uniqueSlug,
-              excerpt: data.excerpt,
-              content: data.content,
-              tags,
-              type: data.postType,
-              content_kind: contentKind,
-              article_format: articleFormat,
-              status: "draft",
-              cover_image_url: data.coverImageUrl || null,
-              in_response_to: data.inResponseToId,
-            })
-            .select("id")
-            .single();
-
-          if (error || !inserted) {
-            setSaveStatus("error");
-          } else {
-            draftIdRef.current = inserted.id;
-            setDraftId(inserted.id);
-            setSaveStatus("saved");
-            setLastSaved(new Date());
-            trackActivationEvent({
-              event: "draft_started",
-              metadata: { draftId: inserted.id, postType: data.postType },
-            });
-            router.replace(`/write?draft=${inserted.id}`);
-          }
+        if (isNewDraft) {
+          trackActivationEvent({
+            event: "draft_started",
+            metadata: { draftId: result.draftId, postType: data.postType },
+          });
+          router.replace(`/write?draft=${result.draftId}`);
         }
       }, AUTOSAVE_DELAY);
     },

@@ -1,3 +1,5 @@
+import { isFormallyReviewed } from "@/lib/contentModel";
+
 export interface OpportunityProfileInput {
   full_name?: string | null;
   username?: string | null;
@@ -20,6 +22,7 @@ export interface OpportunityPostInput {
   type?: string | null;
   status?: string | null;
   citation_id?: string | null;
+  published_version_id?: string | null;
   referenceCount?: number | null;
 }
 
@@ -41,13 +44,11 @@ export interface OpportunityReadinessSummary {
   statusLabel: string;
 }
 
+// Evidence-based, not name-based: see the equivalent comment in
+// lib/opportunityMatch.ts's hasReviewedOrSourceBackedWork().
 function hasReviewedOrReferencedWork(posts: OpportunityPostInput[]) {
   return posts.some(
-    (post) =>
-      Boolean(post.citation_id) ||
-      (post.referenceCount ?? 0) > 0 ||
-      post.type === "research" ||
-      post.type === "policy_brief"
+    (post) => isFormallyReviewed(post) || (post.referenceCount ?? 0) > 0
   );
 }
 

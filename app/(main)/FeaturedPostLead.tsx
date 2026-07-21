@@ -5,12 +5,21 @@ import {
   sanitizePostExcerpt,
   type PostType,
 } from "@/lib/utils";
+import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
 
 interface FeaturedPost {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   excerpt: string | null;
   cover_image_url: string | null;
   published_at: string | null;
@@ -116,7 +125,15 @@ export default function FeaturedPostLead({
 
   const author = post.profiles;
   const authorName = author?.full_name ?? author?.username ?? "Indegenius";
-  const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
+  const displayTitle = getPostDisplayTitle(post);
+  const resolvedKind = resolveContentKind(post);
+  const formatLabel = getArticleFormatLabel(resolveArticleFormat(post));
+  const typeLabel =
+    resolvedKind === "article"
+      ? formatLabel
+        ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
+        : getContentKindLabel(resolvedKind)
+      : (POST_TYPE_LABELS[post.type as PostType] ?? post.type);
   const documentSize = formatDocumentSize(post.document_size_bytes);
   const readingLabel =
     post.type === "research"
@@ -125,6 +142,7 @@ export default function FeaturedPostLead({
         : "PDF manuscript"
       : `${estimateReadTime(post.excerpt)} min`;
   const excerpt = sanitizePostExcerpt(post.excerpt);
+  const headline = displayTitle ?? excerpt ?? getPostMetadataTitle(post, author);
   const stamp = TYPE_STAMPS[post.type] ?? "T";
   const gradient = TYPE_GRADIENTS[post.type] ?? TYPE_GRADIENTS.blog;
   const hasCoverImage = Boolean(post.cover_image_url?.trim());
@@ -136,7 +154,7 @@ export default function FeaturedPostLead({
         <Link href={`/post/${post.slug}`} className="relative block h-[230px] overflow-hidden sm:h-[280px]">
           <PostCover
             src={post.cover_image_url}
-            alt={post.title}
+            alt={displayTitle}
             type={post.type}
             sizes="(max-width: 1024px) 100vw, 820px"
             priority
@@ -156,7 +174,7 @@ export default function FeaturedPostLead({
             {stamp}
           </span>
           <h2 className="font-display absolute bottom-5 left-5 right-5 line-clamp-2 text-[22px] font-semibold leading-[1.15] text-white sm:text-[27px]">
-            {post.title}
+            {headline}
           </h2>
         </Link>
 
@@ -209,10 +227,10 @@ export default function FeaturedPostLead({
         </div>
         <Link href={`/post/${post.slug}`}>
           <h2 className="font-display text-[24px] font-semibold leading-[1.16] text-white transition-colors group-hover:text-white/90 sm:text-[28px]">
-            {post.title}
+            {headline}
           </h2>
         </Link>
-        {excerpt ? (
+        {displayTitle && excerpt ? (
           <p className="mt-3 line-clamp-2 text-[14px] leading-[1.65] text-white/70 sm:text-[14.5px]">
             {excerpt}
           </p>

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { type DebatePhase } from "@/lib/debatePhases";
 import { formatDate, formatRelativeTime, formatTimeUntil } from "@/lib/utils";
+import { resolveDebateExperienceVersion } from "@/lib/debateV2Ui";
+import { decideActivation } from "@/lib/debateV2Lifecycle";
 import {
   DebateStatusPill,
   PhasePill,
@@ -17,6 +19,8 @@ import DebateRecap from "./DebateRecap";
 import DebateCountdown from "./DebateCountdown";
 import ShareButton from "./ShareButton";
 import RecapPoller from "./RecapPoller";
+import ActivateDebateV2 from "./ActivateDebateV2";
+import DebateV2Page from "./v2/DebateV2Page";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -79,6 +83,17 @@ export default async function DebatePage({ params }: PageProps) {
     .single();
 
   if (!debate) notFound();
+
+  // V1/V2 compatibility boundary: resolve format_version from the row we
+  // already fetched (no extra query) and branch here, before any V1-only
+  // query below runs. A V2 debate never falls through to the V1 rendering
+  // path or the V1 queries/components after this point; DebateV2Page owns
+  // its own complete data load (lib/debateV2Ui.ts's
+  // resolveDebateExperienceVersion is the single point of truth for this
+  // decision, exercised directly by lib/debateV2Ui.test.ts).
+  if (resolveDebateExperienceVersion(debate.format_version) === "v2") {
+    return <DebateV2Page debateId={id} />;
+  }
 
   const { data: rawArgs } = await supabase
     .from("debate_arguments")
@@ -162,6 +177,39 @@ export default async function DebatePage({ params }: PageProps) {
     (argument) => resolveStance(argument) === "against"
   );
   const argumentCount = argumentsWithProfiles.length;
+
+  // Debate V2 activation entry point (moderator-only, open debates only).
+  // This is a deliberate scope decision for Phase 3: V2 is not made the
+  // default creation format, and no existing debate is ever silently
+  // converted -- a moderator may opt an eligible open debate in. See
+  // decideActivation's own comment for the exact eligibility ordering this
+  // mirrors (already-V2 / not-open / has-arguments / has-rounds), which
+  // matches activate_debate_v2()'s SQL precondition checks exactly.
+  //
+  // Gated behind DEBATE_V2_ACTIVATION_ENABLED: staging concurrency/grant
+  // verification and cron scheduling for advance_due_debate_rounds_v2 are
+  // still open deployment gates (see docs/debate-v2-phase2-lifecycle.md),
+  // so activation stays off in production until those are confirmed even
+  // though the UI and RPCs are complete. Flip the env var per-environment
+  // once verified -- no code change needed. Mirrored server-side in
+  // activateDebateV2Action so the RPC call itself is refused even if this
+  // render-time gate were ever bypassed.
+  const debateV2ActivationEnabled = process.env.DEBATE_V2_ACTIVATION_ENABLED === "1";
+  let activationDecision: ReturnType<typeof decideActivation> | null = null;
+  if (debateV2ActivationEnabled && isModeratorOfDebate && status === "open") {
+    const { count: roundCount } = await supabase
+      .from("debate_rounds")
+      .select("id", { count: "exact", head: true })
+      .eq("debate_id", id);
+
+    activationDecision = decideActivation({
+      formatVersion: 1,
+      status,
+      existingArgumentCount: argumentCount,
+      existingRoundCount: roundCount ?? 0,
+    });
+  }
+
   const forVotes = debate.motion_for_count ?? 0;
   const againstVotes = debate.motion_against_count ?? 0;
   const voteSplit = getVoteSplit(forVotes, againstVotes);
@@ -344,6 +392,14 @@ export default async function DebatePage({ params }: PageProps) {
             </aside>
           </div>
         </section>
+
+        {activationDecision ? (
+          <ActivateDebateV2
+            debateId={id}
+            eligible={activationDecision.outcome === "activate"}
+            ineligibleReason={activationDecision.outcome === "rejected" ? activationDecision.reason : null}
+          />
+        ) : null}
 
         <LiveArguments
           debateId={id}

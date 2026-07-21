@@ -9,6 +9,7 @@ import {
 import { getOpportunityMatchSummary } from "@/lib/opportunityMatch";
 import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
 import { formatDate } from "@/lib/utils";
+import { resolveContentKind } from "@/lib/contentModel";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import SaveOpportunityButton from "@/components/opportunities/SaveOpportunityButton";
@@ -40,9 +41,11 @@ export default async function FellowshipPage({ params }: PageProps) {
   let currentTalentProfile = null;
   let currentPosts: Array<{
     id: string;
-    title: string;
+    title: string | null;
     slug: string;
     type: string;
+    content_kind?: string | null;
+    article_format?: string | null;
     status: string;
     citation_id: string | null;
     tags: string[] | null;
@@ -74,7 +77,7 @@ export default async function FellowshipPage({ params }: PageProps) {
         .maybeSingle(),
       supabase
         .from("posts")
-        .select("id, title, slug, type, status, citation_id, tags")
+        .select("id, title, slug, type, content_kind, article_format, status, citation_id, tags")
         .eq("author_id", user.id)
         .order("published_at", { ascending: false, nullsFirst: false }),
       supabase
@@ -109,6 +112,9 @@ export default async function FellowshipPage({ params }: PageProps) {
       : null;
   const proofPosts = currentPosts
     .filter((post) => post.status === "published")
+    // Lightweight Posts are not formally reviewed or citable, so they
+    // don't qualify as formal application proof -- only Article/Research.
+    .filter((post) => resolveContentKind(post) !== "post")
     .sort((left, right) => {
       const score = (post: typeof left) =>
         (post.citation_id ? 3 : 0) +

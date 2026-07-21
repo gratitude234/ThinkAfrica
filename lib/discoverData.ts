@@ -1,4 +1,5 @@
 import type { PostCardData } from "@/components/post/PostCard";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { unstable_cache } from "next/cache";
 import {
   fetchCitableFeed,
@@ -531,7 +532,7 @@ function buildActiveConversations(posts: PostCardData[]): DiscoverConversation[]
     .slice(0, 3)
     .map((post) => ({
       postId: post.id,
-      title: post.title,
+      title: getPostMetadataTitle(post, post.profiles),
       slug: post.slug,
       tag: post.tags?.[0] ?? null,
       reason:

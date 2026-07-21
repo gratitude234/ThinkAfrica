@@ -11,6 +11,7 @@ import type { LegacyPushPromptSeed } from "@/lib/pushPromptPolicy";
 import { getActivationState, type ActivationState } from "@/lib/activation";
 import { getProfileTypeLabel, isProfileType } from "@/lib/profileTypes";
 import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import {
   getActiveDebate,
@@ -508,7 +509,14 @@ export default async function HomePage({ searchParams }: PageProps) {
 
       {user ? (
         <DailyBriefStrip
-          featuredPost={featuredPost}
+          featuredPost={
+            featuredPost
+              ? {
+                  title: getPostMetadataTitle(featuredPost, featuredPost.profiles),
+                  slug: featuredPost.slug,
+                }
+              : null
+          }
           activeDebate={homeDebate}
           points={userPoints}
         />

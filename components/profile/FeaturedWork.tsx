@@ -3,13 +3,16 @@ import type { ReactNode } from "react";
 import PostCover from "@/components/post/PostCover";
 import Badge from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
+import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 
 interface FeaturedPost {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   excerpt: string | null;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   view_count?: number | null;
   read_count?: number | null;
   citation_id?: string | null;
@@ -100,6 +103,8 @@ export default function FeaturedWork({
         {posts.map((post) => {
           const readTime = estimateReadTime(post.excerpt);
           const publishedDate = post.published_at ?? post.created_at ?? null;
+          const displayTitle = getPostDisplayTitle(post);
+          const headline = displayTitle ?? post.excerpt ?? getPostMetadataTitle(post);
 
           return (
             <article
@@ -109,7 +114,7 @@ export default function FeaturedWork({
               <Link href={`/post/${post.slug}`} className="block">
                 <PostCover
                   src={post.cover_image_url}
-                  alt={post.title}
+                  alt={displayTitle}
                   type={post.type}
                   sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                   className="aspect-video"
@@ -119,7 +124,11 @@ export default function FeaturedWork({
 
               <div className="space-y-3 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge type={post.type} />
+                  <Badge
+                    type={post.type}
+                    content_kind={post.content_kind}
+                    article_format={post.article_format}
+                  />
                   {post.isCoAuthor ? (
                     <span className="rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
                       Co-author
@@ -136,10 +145,10 @@ export default function FeaturedWork({
                 </div>
                 <Link href={`/post/${post.slug}`} className="block">
                   <h3 className="font-display line-clamp-2 text-[17px] font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
-                    {post.title}
+                    {headline}
                   </h3>
                 </Link>
-                {post.excerpt ? (
+                {displayTitle && post.excerpt ? (
                   <p className="line-clamp-2 text-sm leading-relaxed text-gray-500">
                     {post.excerpt}
                   </p>

@@ -1,3 +1,4 @@
+import { isFormallyReviewed } from "@/lib/contentModel";
 import {
   getOpportunityReadinessSummary,
   type OpportunityPostInput,
@@ -43,13 +44,10 @@ export interface TalentDiscoveryInput {
   };
 }
 
+// Evidence-based, not name-based: see the equivalent comment in
+// lib/opportunityMatch.ts's hasReviewedOrSourceBackedWork().
 function countReviewedOrCitable(posts: OpportunityPostInput[]) {
-  return posts.filter(
-    (post) =>
-      Boolean(post.citation_id) ||
-      post.type === "research" ||
-      post.type === "policy_brief"
-  ).length;
+  return posts.filter((post) => isFormallyReviewed(post)).length;
 }
 
 function countSourceBacked(posts: OpportunityPostInput[]) {

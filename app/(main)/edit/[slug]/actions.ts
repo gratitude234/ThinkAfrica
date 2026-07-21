@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { createVersionSnapshot, requiresEditorialWorkflow } from "@/lib/reviewWorkflow";
-import { articleFormatFromLegacyType, contentKindFromLegacyType } from "@/lib/contentModel";
-import type { PostReferenceRecord, PostStatus } from "@/lib/types";
+import { resolveArticleFormat, resolveContentKind } from "@/lib/contentModel";
+import type { PostReferenceRecord } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
 
 type ReferenceInput = Omit<PostReferenceRecord, "post_id"> & {
@@ -116,10 +116,7 @@ export async function saveEditedPost(input: {
   excerpt: string;
   content: string;
   tags: string[];
-  postType: PostType;
   coverImageUrl: string;
-  currentStatus: PostStatus;
-  currentRound: number;
   authorNote: string;
   references: ReferenceInput[];
 }) {
@@ -134,7 +131,7 @@ export async function saveEditedPost(input: {
 
   const { data: post } = await supabase
     .from("posts")
-    .select("author_id, slug, type, status")
+    .select("author_id, slug, type, content_kind, article_format, status, current_round")
     .eq("id", input.postId)
     .single();
 
@@ -155,13 +152,24 @@ export async function saveEditedPost(input: {
     };
   }
 
-  const referenceError = validateReferences(input.postType, input.references);
+  // Editing never reclassifies a post, and never drives its own workflow
+  // transition from client input -- there is no client-supplied `postType`,
+  // `currentStatus`, or `currentRound` trusted here at all. Every check and
+  // every write below uses only the post's own stored, freshly-fetched
+  // values, so a modified request (e.g. claiming `currentStatus: "published"`
+  // for a post that is actually "pending_revision") cannot skip the
+  // author-note requirement or self-publish unreviewed work.
+  const effectiveType = post.type as PostType;
+  const effectiveContentKind = resolveContentKind(post);
+  const effectiveArticleFormat = resolveArticleFormat(post);
+
+  const referenceError = validateReferences(effectiveType, input.references);
   if (referenceError) {
     return { error: referenceError };
   }
 
   if (
-    input.currentStatus === "pending_revision" &&
+    post.status === "pending_revision" &&
     requiresEditorialWorkflow(post.type) &&
     !input.authorNote.trim()
   ) {
@@ -170,10 +178,9 @@ export async function saveEditedPost(input: {
 
   await syncReferences(supabase, input.postId, input.references);
 
-  const nextStatus =
-    input.currentStatus === "pending_revision" ? "pending" : input.currentStatus;
+  const nextStatus = post.status === "pending_revision" ? "pending" : post.status;
   const nextRound =
-    input.currentStatus === "pending_revision" ? input.currentRound + 1 : input.currentRound;
+    post.status === "pending_revision" ? post.current_round + 1 : post.current_round;
   const sanitizedContent = sanitizePostHtml(input.content);
 
   const { error } = await supabase
@@ -183,13 +190,13 @@ export async function saveEditedPost(input: {
       excerpt: input.excerpt,
       content: sanitizedContent,
       tags: input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean),
-      type: input.postType,
-      content_kind: contentKindFromLegacyType(input.postType),
-      article_format: articleFormatFromLegacyType(input.postType),
+      type: effectiveType,
+      content_kind: effectiveContentKind,
+      article_format: effectiveArticleFormat,
       cover_image_url: input.coverImageUrl || null,
       status: nextStatus,
       current_round: nextRound,
-      revision_due_at: input.currentStatus === "pending_revision" ? null : undefined,
+      revision_due_at: post.status === "pending_revision" ? null : undefined,
     })
     .eq("id", input.postId)
     .eq("author_id", user.id);
@@ -198,14 +205,14 @@ export async function saveEditedPost(input: {
     return { error: error.message };
   }
 
-  if (input.currentStatus === "pending_revision") {
+  if (post.status === "pending_revision") {
     const admin = createAdminClient();
 
     try {
       await createVersionSnapshot({
         admin,
         postId: input.postId,
-        round: input.currentRound,
+        round: post.current_round,
         versionKind: "revision",
         authorNote: input.authorNote,
         submittedBy: user.id,

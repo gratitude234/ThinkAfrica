@@ -11,6 +11,7 @@ interface TagInputProps {
   helperText?: string;
   maxTags?: number;
   showLabel?: boolean;
+  disabled?: boolean;
 }
 
 interface TagRow {
@@ -29,6 +30,7 @@ export default function TagInput({
   helperText,
   maxTags = 5,
   showLabel = true,
+  disabled = false,
 }: TagInputProps) {
   const [query, setQuery] = useState("");
   const [allTags, setAllTags] = useState<string[]>([]);
@@ -136,7 +138,8 @@ export default function TagInput({
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                className="text-emerald-500 transition-colors hover:text-emerald-700"
+                disabled={disabled}
+                className="text-emerald-500 transition-colors hover:text-emerald-700 disabled:pointer-events-none disabled:opacity-40"
                 aria-label={`Remove ${tag}`}
               >
                 x
@@ -144,7 +147,7 @@ export default function TagInput({
             </span>
           ))}
 
-          {value.length < maxTags ? (
+          {value.length < maxTags && !disabled ? (
             <div className="relative min-w-[180px] flex-1">
               <input
                 type="text"

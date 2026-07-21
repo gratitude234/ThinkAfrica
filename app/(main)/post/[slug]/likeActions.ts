@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
+import { getPostReferenceQuoted, getPostReferenceSuffix } from "@/lib/postDisplay";
 
 type TogglePostLikeInput = {
   postId: string;
@@ -160,7 +161,7 @@ export async function togglePostLike(
     const { error: notificationError } = await admin.from("notifications").insert({
       user_id: post.author_id,
       type: "like",
-      message: `${actorName} liked your post: ${post.title}`,
+      message: `${actorName} liked your post${getPostReferenceSuffix(post)}`,
       link: ctaPath,
       actor_id: user.id,
       post_id: input.postId,
@@ -174,10 +175,11 @@ export async function togglePostLike(
       // Duplicate = the author already has an unread like notification from this
       // actor for this post; they've already been told, so skip push/email too.
     } else {
+      const postReference = getPostReferenceQuoted(post);
       const pushResult = await sendPushNotification({
         recipientId: post.author_id,
         title: "New like on your post",
-        body: `${actorName} liked "${post.title}"`,
+        body: `${actorName} liked ${postReference}`,
         path: ctaPath,
         preferenceKey: "push_likes",
         cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
@@ -187,9 +189,9 @@ export async function togglePostLike(
       const emailResult = await sendUserEmail({
         recipientId: post.author_id,
         subject: `${actorName} liked your Indegenius post`,
-        preview: `${actorName} liked "${post.title}".`,
+        preview: `${actorName} liked ${postReference}.`,
         title: "New like on your post",
-        intro: `${actorName} liked "${post.title}".`,
+        intro: `${actorName} liked ${postReference}.`,
         ctaLabel: "View your post",
         ctaPath,
         idempotencyKey: `like:${input.postId}:${post.author_id}:${user.id}`,

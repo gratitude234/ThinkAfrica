@@ -8,13 +8,17 @@ import { createClient } from "@/lib/supabase/client";
 import Badge from "@/components/ui/Badge";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
+import { isFormallyReviewed } from "@/lib/contentModel";
 
 interface PostResult {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   excerpt: string | null;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   citation_id?: string | null;
   published_version_id?: string | null;
   published_at: string | null;
@@ -75,8 +79,11 @@ type TrendingRow = {
   tags: string[] | null;
 };
 
-function isReviewedWork(post: { type?: string | null; citation_id?: string | null }) {
-  return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+// Evidence-based, not name-based: a type says a workflow *requires* review,
+// but only citation_id/published_version_id prove a specific record
+// actually completed it (see lib/contentModel.ts).
+function isReviewedWork(post: { citation_id?: string | null; published_version_id?: string | null }) {
+  return isFormallyReviewed(post);
 }
 
 function getPersonSignal(person: PersonResult) {
@@ -189,7 +196,7 @@ function SearchPageContent() {
         supabase
           .from("posts")
           .select(
-            "id, title, slug, excerpt, type, citation_id, published_version_id, published_at, profiles!posts_author_id_fkey(username, full_name, university)"
+            "id, title, slug, excerpt, type, content_kind, article_format, citation_id, published_version_id, published_at, profiles!posts_author_id_fkey(username, full_name, university)"
           )
           .eq("status", "published")
           .or(`title.ilike.%${trimmed}%,excerpt.ilike.%${trimmed}%`)
@@ -485,7 +492,7 @@ function SearchPageContent() {
                     className="rounded-xl border border-gray-200/70 bg-white p-5 transition-shadow hover:shadow-md"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge type={post.type} />
+                      <Badge type={post.type} content_kind={post.content_kind} article_format={post.article_format} />
                       {isReviewedWork(post) ? (
                         <SearchSignalBadge>Reviewed</SearchSignalBadge>
                       ) : null}
@@ -513,7 +520,7 @@ function SearchPageContent() {
                         }}
                       >
                         <p className="font-display mt-3 line-clamp-2 text-xl font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
-                          {post.title}
+                          {getPostMetadataTitle(post, post.profiles)}
                         </p>
                       </Link>
                       <p className="mt-3 text-xs text-gray-500">

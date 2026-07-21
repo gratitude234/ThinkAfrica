@@ -32,6 +32,7 @@ Optional:
 - `GOOGLE_TTS_API_KEY` — Text-to-speech
 - `CRON_SECRET` — Authenticates Vercel Cron requests to `/api/cron/*` routes (Vercel sends it automatically as `Authorization: Bearer <value>` when set)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_MAILTO` — Web push (VAPID keypair + contact address for `lib/push.ts`)
+- `DEBATE_V2_ACTIVATION_ENABLED` — Set to `1` to expose the moderator-facing "convert to Debate V2" control and allow `activate_debate_v2` to run. Off by default until staging concurrency/grant verification and cron scheduling for round auto-advancement are confirmed (see `docs/debate-v2-phase2-lifecycle.md`).
 
 ## Architecture Overview
 

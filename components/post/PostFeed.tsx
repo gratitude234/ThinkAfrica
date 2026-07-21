@@ -56,7 +56,7 @@ export default function PostFeed({
               No posts match this view yet.
             </p>
             <p className="text-sm text-gray-500">
-              Try the latest feed or start the first quick take in this space.
+              Try the latest feed or share the first post in this space.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <Link
@@ -66,10 +66,10 @@ export default function PostFeed({
                 View latest
               </Link>
               <Link
-                href="/write?type=blog&starter=1"
+                href="/create/post"
                 className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
               >
-                Write a quick take
+                Share a post
               </Link>
             </div>
           </div>

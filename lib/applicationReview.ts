@@ -1,3 +1,4 @@
+import { isFormallyReviewed } from "@/lib/contentModel";
 import {
   getOpportunityMatchSummary,
   type OpportunityMatchSummary,
@@ -68,12 +69,14 @@ export interface ApplicationReviewInput {
     type?: string | null;
     status?: string | null;
     citation_id?: string | null;
+    published_version_id?: string | null;
     referenceCount?: number | null;
   } | null;
   posts?: Array<{
     type?: string | null;
     status?: string | null;
     citation_id?: string | null;
+    published_version_id?: string | null;
     tags?: string[] | null;
     referenceCount?: number | null;
   }>;
@@ -90,12 +93,15 @@ function countWords(value: string | null | undefined) {
   return value?.trim().split(/\s+/).filter(Boolean).length ?? 0;
 }
 
+// Evidence-based, not name-based: a post's type/genre says a workflow
+// *requires* review, but only citation_id/published_version_id prove a
+// specific record actually completed it (see isFormallyReviewed() in
+// lib/contentModel.ts). A pending or draft research/policy_brief proof
+// post has never been reviewed and must not claim otherwise here.
 function proofSignalFor(post: ApplicationReviewInput["proofPost"]) {
   if (!post) return null;
   if (post.citation_id) return "Citable proof attached";
-  if (post.type === "research" || post.type === "policy_brief") {
-    return "Reviewed-format proof attached";
-  }
+  if (isFormallyReviewed(post)) return "Reviewed-format proof attached";
   if ((post.referenceCount ?? 0) > 0) return "Source-backed proof attached";
   return "Published proof attached";
 }
@@ -127,12 +133,10 @@ export function getApplicationReviewSummary(
         stats: {
           publishedCount: posts.filter((post) => post.status === "published").length,
           citableCount: posts.filter((post) => post.citation_id).length,
-          reviewedCount: posts.filter(
-            (post) =>
-              post.type === "research" ||
-              post.type === "policy_brief" ||
-              post.citation_id
-          ).length,
+          // Evidence-based: counts posts that have actually completed
+          // review, not posts of a type/genre that merely requires it --
+          // see proofSignalFor()'s comment above.
+          reviewedCount: posts.filter((post) => isFormallyReviewed(post)).length,
           topicCount: new Set(posts.flatMap((post) => post.tags ?? [])).size,
           isOpenToOpportunities: input.talentProfile?.open_to_opportunities,
           opportunityReadinessScore: readinessSummary?.score ?? null,

@@ -7,10 +7,16 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Button from "@/components/ui/Button";
 import TagInput from "@/components/ui/TagInput";
-import { MIN_WORD_COUNTS, POST_TYPE_LABELS, type PostType } from "@/lib/utils";
+import { MIN_WORD_COUNTS, type PostType } from "@/lib/utils";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import type { EditorHandle } from "@/components/editor/Editor";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
 import type {
   PostEditorDecisionRecord,
   PostReferenceRecord,
@@ -27,8 +33,6 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
     <div className="min-h-[400px] animate-pulse rounded-lg border border-gray-200 bg-canvas" />
   ),
 });
-
-const POST_TYPES: PostType[] = ["blog", "essay", "research", "policy_brief"];
 
 type MobileToolbarAction =
   | "bold" | "italic" | "heading" | "list" | "quote" | "link" | "undo" | "redo";
@@ -90,6 +94,8 @@ interface Post {
   excerpt: string | null;
   content: string | null;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   status: PostStatus;
   tags: string[] | null;
   cover_image_url: string | null;
@@ -134,7 +140,14 @@ export default function EditForm({
   authorHistory,
 }: EditFormProps) {
   const router = useRouter();
-  const [postType, setPostType] = useState<PostType>((post.type as PostType) ?? "blog");
+  // Editing never reclassifies a post (see saveEditedPost) -- this is a
+  // fixed value derived from the post's own stored type, not a picker.
+  const postType = (post.type as PostType) ?? "blog";
+  const resolvedKind = resolveContentKind(post);
+  const resolvedFormat = resolveArticleFormat(post);
+  const classificationBadge = resolvedFormat
+    ? `${getContentKindLabel(resolvedKind)} · ${getArticleFormatLabel(resolvedFormat)}`
+    : getContentKindLabel(resolvedKind);
   const [title, setTitle] = useState(post.title);
   const [excerpt, setExcerpt] = useState(post.excerpt ?? "");
   const [tags, setTags] = useState<string[]>(post.tags ?? []);
@@ -198,10 +211,7 @@ export default function EditForm({
         excerpt,
         content,
         tags,
-        postType,
         coverImageUrl,
-        currentStatus: post.status,
-        currentRound: post.current_round,
         authorNote,
         references,
       });
@@ -225,10 +235,7 @@ export default function EditForm({
       excerpt,
       content,
       tags,
-      postType,
       coverImageUrl,
-      post.status,
-      post.current_round,
       authorNote,
       references,
       router,
@@ -550,23 +557,9 @@ export default function EditForm({
           />
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Post type</label>
-            <div className="flex flex-wrap gap-2">
-              {POST_TYPES.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setPostType(type)}
-                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                    postType === type
-                      ? "border-emerald-brand bg-emerald-brand text-white"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
-                  }`}
-                >
-                  {POST_TYPE_LABELS[type]}
-                </button>
-              ))}
-            </div>
+            <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
+              {classificationBadge}
+            </span>
           </div>
 
           <div>

@@ -11,6 +11,14 @@ import {
   POST_TYPE_LABELS,
   type PostType,
 } from "@/lib/utils";
+import { getPostDisplayTitle } from "@/lib/postDisplay";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
+import { withdrawSubmission } from "@/app/(write)/write/actions";
 
 export interface DashboardPostReview {
   assigned_at: string;
@@ -26,9 +34,11 @@ export interface DashboardEditorDecision {
 export interface DashboardPost {
   id: string;
   author_id?: string;
-  title: string;
+  title: string | null;
   slug: string;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   status: string;
   citation_id?: string | null;
   published_version_id?: string | null;
@@ -59,6 +69,7 @@ const STATUS_COLORS: Record<string, string> = {
   pending_revision: "bg-orange-100 text-orange-700",
   published: "bg-emerald-100 text-emerald-700",
   rejected: "bg-red-100 text-red-600",
+  withdrawn: "bg-gray-100 text-gray-500",
 };
 
 const TABS = [
@@ -68,6 +79,7 @@ const TABS = [
   "pending_revision",
   "draft",
   "rejected",
+  "withdrawn",
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -118,6 +130,7 @@ export default function PostsTable({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
   const [rows, setRows] = useState<DashboardPost[]>(posts);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const statusMapRef = useRef<Map<string, string>>(new Map());
@@ -261,10 +274,46 @@ export default function PostsTable({
     if (!confirm("Delete this draft? This cannot be undone.")) return;
     setDeletingId(id);
     const supabase = createClient();
-    await supabase.from("posts").delete().eq("id", id);
+    const { error } = await supabase.from("posts").delete().eq("id", id);
+    setDeletingId(null);
+
+    if (error) {
+      // The delete button only shows for status="draft" rows, but the
+      // actual protection lives in the guard_locked_post_write DB trigger,
+      // which now only allows an author to hard-delete a draft, full stop
+      // -- if this post's status changed underneath this tab (e.g.
+      // submitted in another tab) the delete is rejected here rather than
+      // silently reported as done.
+      setToastMessage(error.message || "Couldn't delete this post.");
+      return;
+    }
+
     statusMapRef.current.delete(id);
     setRows((prev) => prev.filter((post) => post.id !== id));
-    setDeletingId(null);
+  };
+
+  const handleWithdraw = async (id: string) => {
+    if (
+      !confirm(
+        "Withdraw this submission? It will stop being reviewed, but your draft content, references, and review history stay intact -- this is not the same as deleting it."
+      )
+    ) {
+      return;
+    }
+
+    setWithdrawingId(id);
+    const { error } = await withdrawSubmission({ postId: id });
+    setWithdrawingId(null);
+
+    if (error) {
+      setToastMessage(error);
+      return;
+    }
+
+    statusMapRef.current.set(id, "withdrawn");
+    setRows((prev) =>
+      prev.map((post) => (post.id === id ? { ...post, status: "withdrawn" } : post))
+    );
   };
 
   return (
@@ -333,6 +382,14 @@ export default function PostsTable({
                     post.status === "published" &&
                     (post.type === "research" || post.type === "policy_brief");
                   const reviewStatus = getReviewStatus(post);
+                  const resolvedKind = resolveContentKind(post);
+                  const formatLabel = getArticleFormatLabel(resolveArticleFormat(post));
+                  const typeLabel =
+                    resolvedKind === "article"
+                      ? formatLabel
+                        ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
+                        : getContentKindLabel(resolvedKind)
+                      : (POST_TYPE_LABELS[post.type as PostType] ?? post.type);
                   const actionHref =
                     post.type === "research" &&
                     (post.status === "draft" || post.status === "pending_revision")
@@ -342,11 +399,21 @@ export default function PostsTable({
                       : reviewedPublication && post.citation_id
                         ? `/publication/${post.citation_id}`
                         : `/edit/${post.slug}`;
+                  // A withdrawn (or otherwise no-longer-editable) research
+                  // submission still routes to /submit/research -- that form
+                  // now shows a read-only banner and disables Save/Submit
+                  // for it -- but the link here should say "View", not
+                  // "Edit", so it isn't misleading before the user even
+                  // opens it.
+                  const isEditableEntry =
+                    post.type !== "research" ||
+                    post.status === "draft" ||
+                    post.status === "pending_revision";
                   return (
                     <tr key={post.id} className="hover:bg-canvas transition-colors">
                       <td className="px-4 py-3 max-w-[200px]">
                         <p className="font-medium text-gray-900 truncate">
-                          {post.title}
+                          {getPostDisplayTitle(post) ?? "Untitled post"}
                         </p>
                         {post.co_authors && post.co_authors.length > 0 ? (
                           <p className="mt-1 truncate text-xs text-gray-500">
@@ -382,9 +449,7 @@ export default function PostsTable({
                         ) : null}
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
-                        <span className="text-gray-500 text-xs">
-                          {POST_TYPE_LABELS[post.type as PostType] ?? post.type}
-                        </span>
+                        <span className="text-gray-500 text-xs">{typeLabel}</span>
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -414,7 +479,7 @@ export default function PostsTable({
                             href={actionHref}
                             className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
                           >
-                            {reviewedPublication ? "View" : "Edit"}
+                            {reviewedPublication || !isEditableEntry ? "View" : "Edit"}
                           </Link>
                           {post.status === "draft" && (
                             <button
@@ -423,6 +488,15 @@ export default function PostsTable({
                               className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
                             >
                               {deletingId === post.id ? "Deleting" : "Delete"}
+                            </button>
+                          )}
+                          {(post.status === "pending" || post.status === "pending_revision") && (
+                            <button
+                              onClick={() => handleWithdraw(post.id)}
+                              disabled={withdrawingId === post.id}
+                              className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
+                            >
+                              {withdrawingId === post.id ? "Withdrawing" : "Withdraw"}
                             </button>
                           )}
                         </div>

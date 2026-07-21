@@ -1,6 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import EditForm from "./EditForm";
+import PostEditForm from "./PostEditForm";
+import { isLightweightPost } from "@/lib/postDisplay";
+import { shortPostHtmlToText } from "@/lib/shortPostContent";
 import type {
   PostEditorDecisionRecord,
   PostReferenceRecord,
@@ -26,7 +29,7 @@ export default async function EditPage({ params }: PageProps) {
   const { data: post } = await supabase
     .from("posts")
     .select(
-      "id, title, slug, excerpt, content, type, status, tags, cover_image_url, author_id, current_round, revision_due_at, citation_id, published_version_id"
+      "id, title, slug, excerpt, content, type, content_kind, article_format, status, tags, cover_image_url, author_id, current_round, revision_due_at, citation_id, published_version_id"
     )
     .eq("slug", slug)
     .single();
@@ -42,9 +45,33 @@ export default async function EditPage({ params }: PageProps) {
     );
   }
 
+  if (post.status === "removed") {
+    return (
+      <div className="mx-auto max-w-3xl py-20 text-center">
+        <p className="mb-2 text-2xl font-bold text-gray-900">This post was removed</p>
+        <p className="text-gray-500">Removed content can no longer be edited.</p>
+      </div>
+    );
+  }
+
   if (post.type === "research") {
     redirect(
       post.status === "published" ? `/post/${post.slug}` : `/submit/research?draft=${post.id}`
+    );
+  }
+
+  // Lightweight Posts (resolved kind = post, no title) get the plain
+  // text-first editor instead of the full Article editor -- a legacy
+  // titled Blog stays on the existing EditForm path below until a later
+  // migration moves it over.
+  if (isLightweightPost(post)) {
+    return (
+      <PostEditForm
+        postId={post.id}
+        slug={post.slug}
+        initialBody={shortPostHtmlToText(post.content ?? "")}
+        initialImageUrl={post.cover_image_url ?? null}
+      />
     );
   }
 
@@ -179,6 +206,8 @@ export default async function EditPage({ params }: PageProps) {
         excerpt: post.excerpt ?? null,
         content: post.content ?? null,
         type: post.type,
+        content_kind: post.content_kind ?? null,
+        article_format: post.article_format ?? null,
         status: post.status,
         tags: post.tags as string[] | null,
         cover_image_url:

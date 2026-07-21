@@ -5,12 +5,13 @@ import type { PostReferenceRecord, ReferenceType } from "@/lib/types";
 interface ReferenceFieldsProps {
   reference: PostReferenceRecord;
   onChange: (reference: PostReferenceRecord) => void;
+  disabled?: boolean;
 }
 
 const inputClasses =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand";
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand disabled:bg-gray-50 disabled:text-gray-400";
 
-export default function ReferenceFields({ reference, onChange }: ReferenceFieldsProps) {
+export default function ReferenceFields({ reference, onChange, disabled = false }: ReferenceFieldsProps) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <label className="text-xs font-medium text-gray-600">
@@ -23,6 +24,7 @@ export default function ReferenceFields({ reference, onChange }: ReferenceFields
               ref_type: event.target.value as ReferenceType,
             })
           }
+          disabled={disabled}
           className={`${inputClasses} mt-1`}
         >
           {["journal", "book", "website", "report", "other"].map((option) => (
@@ -38,6 +40,7 @@ export default function ReferenceFields({ reference, onChange }: ReferenceFields
           type="text"
           value={reference.authors ?? ""}
           onChange={(event) => onChange({ ...reference, authors: event.target.value })}
+          disabled={disabled}
           className={`${inputClasses} mt-1`}
         />
       </label>
@@ -47,6 +50,7 @@ export default function ReferenceFields({ reference, onChange }: ReferenceFields
           type="text"
           value={reference.title}
           onChange={(event) => onChange({ ...reference, title: event.target.value })}
+          disabled={disabled}
           className={`${inputClasses} mt-1`}
         />
       </label>
@@ -61,6 +65,7 @@ export default function ReferenceFields({ reference, onChange }: ReferenceFields
               year: event.target.value ? Number(event.target.value) : null,
             })
           }
+          disabled={disabled}
           className={`${inputClasses} mt-1`}
         />
       </label>
@@ -70,6 +75,7 @@ export default function ReferenceFields({ reference, onChange }: ReferenceFields
           type="text"
           value={reference.source ?? ""}
           onChange={(event) => onChange({ ...reference, source: event.target.value })}
+          disabled={disabled}
           className={`${inputClasses} mt-1`}
         />
       </label>
@@ -79,6 +85,7 @@ export default function ReferenceFields({ reference, onChange }: ReferenceFields
           type="url"
           value={reference.url ?? ""}
           onChange={(event) => onChange({ ...reference, url: event.target.value })}
+          disabled={disabled}
           className={`${inputClasses} mt-1`}
         />
       </label>
@@ -88,6 +95,7 @@ export default function ReferenceFields({ reference, onChange }: ReferenceFields
           type="text"
           value={reference.doi ?? ""}
           onChange={(event) => onChange({ ...reference, doi: event.target.value })}
+          disabled={disabled}
           className={`${inputClasses} mt-1`}
         />
       </label>
@@ -97,6 +105,7 @@ export default function ReferenceFields({ reference, onChange }: ReferenceFields
           value={reference.raw ?? ""}
           onChange={(event) => onChange({ ...reference, raw: event.target.value })}
           rows={2}
+          disabled={disabled}
           className={`${inputClasses} mt-1 resize-none`}
           placeholder="Optional note for edition, page range, archive details, or context."
         />

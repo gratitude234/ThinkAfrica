@@ -16,7 +16,10 @@ import {
 import { getSuggestedTags, normalizeTagValue } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary, isLowQualityTitle } from "@/lib/postQuality";
-import { inferTypeFromContent } from "./writeUtils";
+import {
+  ARTICLE_FORMAT_LABELS,
+  type ArticleFormat,
+} from "@/lib/contentModel";
 import { publishPost } from "./actions";
 
 interface PublishDrawerProps {
@@ -31,18 +34,17 @@ interface PublishDrawerProps {
   initialCoverImageUrl?: string;
   initialExcerpt?: string;
   initialPostType?: PostType;
+  initialArticleFormat?: ArticleFormat | null;
   initialReferences?: PostReferenceRecord[];
   inResponseTo?: string | null;
   onMetadataChange?: (changes: {
-    postType?: PostType;
     tags?: string[];
     coverImageUrl?: string;
+    articleFormat?: ArticleFormat | null;
   }) => void;
   coverUploading: boolean;
   onCoverUploadingChange: (uploading: boolean) => void;
 }
-
-const POST_TYPES: Array<"blog" | "essay" | "policy_brief"> = ["blog", "essay", "policy_brief"];
 
 const SUGGESTED_TOPICS = [
   "Governance",
@@ -54,42 +56,6 @@ const SUGGESTED_TOPICS = [
   "Technology",
   "Youth & Employment",
 ];
-
-const CARD_LABELS: Record<PostType, string> = {
-  blog: "Quick Take",
-  essay: "Essay",
-  policy_brief: "Policy Brief",
-  research: "Research",
-};
-
-const CARD_META: Record<
-  "blog" | "essay" | "policy_brief",
-  {
-    description: string;
-    dotClass: string;
-    selectedCardClass: string;
-    checkClass: string;
-  }
-> = {
-  blog: {
-    description: "Short-form take, under 500 words.",
-    dotClass: "bg-emerald-brand",
-    selectedCardClass: "border-emerald-brand bg-green-tint/70",
-    checkClass: "bg-emerald-brand",
-  },
-  essay: {
-    description: "Long-form argument, 400+ words.",
-    dotClass: "bg-gold-ink",
-    selectedCardClass: "border-gold-ink bg-gold-tint/70",
-    checkClass: "bg-gold-ink",
-  },
-  policy_brief: {
-    description: "Structured analysis, editor-reviewed.",
-    dotClass: "bg-purple-accent",
-    selectedCardClass: "border-purple-accent bg-purple-tint/70",
-    checkClass: "bg-purple-accent",
-  },
-};
 
 interface ProfileRow {
   field_of_study: string | null;
@@ -111,6 +77,7 @@ export default function PublishDrawer({
   initialCoverImageUrl = "",
   initialExcerpt = "",
   initialPostType,
+  initialArticleFormat = null,
   initialReferences = [],
   inResponseTo,
   onMetadataChange,
@@ -118,28 +85,46 @@ export default function PublishDrawer({
   onCoverUploadingChange,
 }: PublishDrawerProps) {
   const router = useRouter();
-  const [postType, setPostType] = useState<PostType>(
-    initialPostType ?? inferTypeFromContent(content, wordCount)
-  );
+  // /write is the Article composer -- a brand-new draft is always
+  // "essay" (the generic-Article legacy value). An *existing* draft that
+  // predates this phase (e.g. an in-progress legacy Policy Brief) keeps
+  // showing and publishing as whatever it already is via `initialPostType`;
+  // there is no picker to change it either way (see writeConfig/actions).
+  const [postType, setPostType] = useState<PostType>(initialPostType ?? "essay");
+  // Phase 4A: an optional Article *genre* -- purely descriptive metadata
+  // (see docs/content-model.md). Only offered for the generic-Article path
+  // (postType === "essay", which covers every brand-new Article regardless
+  // of genre -- see NEW_ARTICLE_TYPE in ./actions.ts); a legacy Policy
+  // Brief draft (postType === "policy_brief") keeps its existing,
+  // unmodified publish flow below and never sees this picker. Selecting a
+  // genre never changes isInstantPublish/publishLabel -- both depend only
+  // on postType, which this picker never touches.
+  //
+  // Caught in review: initialized from -- and, below, reset to --
+  // initialArticleFormat rather than a hardcoded null, and every selection
+  // is propagated to the parent via onMetadataChange (mirroring tags),
+  // which keeps initialArticleFormat itself live-updated. Without that
+  // round-trip, closing and reopening this drawer within the same session
+  // silently reset an already-picked genre back to "General" the moment
+  // the [open] effect below re-ran -- the parent had no way to know a
+  // selection had been made, so it kept handing back the original,
+  // now-stale value.
+  const [articleFormat, setArticleFormat] = useState<ArticleFormat | null>(initialArticleFormat);
   const [tags, setTags] = useState<string[]>(initialTags);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [platformTags, setPlatformTags] = useState<string[]>([]);
 
-  const inferredType = useMemo(
-    () => inferTypeFromContent(content, wordCount),
-    [content, wordCount]
-  );
-
   useEffect(() => {
     if (!open) return;
 
     trackActivationEvent({
       event: "publish_drawer_opened",
-      metadata: { draftId, postType: initialPostType ?? inferredType, wordCount },
+      metadata: { draftId, postType: initialPostType ?? "essay", wordCount },
     });
-    setPostType(initialPostType ?? inferredType);
+    setPostType(initialPostType ?? "essay");
+    setArticleFormat(initialArticleFormat);
     setTags(initialTags);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -222,9 +207,11 @@ export default function PublishDrawer({
   const publishLabel =
     postType === "policy_brief"
       ? "Submit for Editorial Review"
-      : isQuickTake(postType, wordCount)
-        ? "Publish Quick Take"
-        : `Publish ${POST_TYPE_LABELS[postType]}`;
+      : postType === "essay"
+        ? "Publish Article"
+        : isQuickTake(postType, wordCount)
+          ? "Publish Quick Take"
+          : `Publish ${POST_TYPE_LABELS[postType]}`;
 
   if (!open) return null;
 
@@ -245,9 +232,9 @@ export default function PublishDrawer({
     handleTagChange([...tags, normalized]);
   };
 
-  const handleSelectFormat = (type: PostType) => {
-    setPostType(type);
-    onMetadataChange?.({ postType: type });
+  const handleArticleFormatChange = (nextFormat: ArticleFormat | null) => {
+    setArticleFormat(nextFormat);
+    onMetadataChange?.({ articleFormat: nextFormat });
   };
 
   const handlePublish = async () => {
@@ -278,6 +265,7 @@ export default function PublishDrawer({
       content,
       tags: normalizedTags,
       postType,
+      articleFormat: postType === "essay" ? articleFormat : undefined,
       coverImageUrl: initialCoverImageUrl,
       inResponseTo,
       references: initialReferences,
@@ -350,44 +338,6 @@ export default function PublishDrawer({
           />
         </section>
 
-        <section className="mb-5 grid grid-cols-3 gap-2.5">
-          {POST_TYPES.map((type) => {
-            const meta = CARD_META[type];
-            const selected = postType === type;
-
-            return (
-              <button
-                key={type}
-                type="button"
-                onClick={() => handleSelectFormat(type)}
-                aria-pressed={selected}
-                className={`relative flex min-h-[112px] flex-col items-start gap-1 rounded-xl border px-3 py-3 text-left transition-colors lg:min-h-[128px] lg:px-4 lg:py-4 ${
-                  selected
-                    ? meta.selectedCardClass
-                    : "border-gray-200 bg-white hover:border-gray-300"
-                }`}
-              >
-                <span className={`mb-0.5 h-2 w-2 rounded-full ${meta.dotClass}`} />
-                <span className="text-[13.5px] font-semibold leading-5 text-ink">
-                  {CARD_LABELS[type]}
-                </span>
-                <span className="text-[11.5px] leading-[1.4] text-gray-500">
-                  {meta.description}
-                </span>
-                {selected ? (
-                  <span
-                    className={`absolute right-2.5 top-2.5 flex h-[18px] w-[18px] items-center justify-center rounded-full text-white ${meta.checkClass}`}
-                  >
-                    <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </section>
-
         <div className="mb-[18px] h-px bg-gray-100" />
 
         <section className="mb-5">
@@ -429,6 +379,42 @@ export default function PublishDrawer({
             onChange={handleTagChange}
           />
         </section>
+
+        {postType === "essay" ? (
+          <section className="mb-5">
+            <p className="mb-1 text-[13px] font-semibold text-ink">Genre (optional)</p>
+            <p className="mb-2.5 text-xs text-gray-500">
+              Descriptive metadata only -- it doesn&apos;t change when or how this
+              Article publishes, and it isn&apos;t a review or credibility claim.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { value: null, label: "General" },
+                  { value: "essay" as ArticleFormat, label: ARTICLE_FORMAT_LABELS.essay },
+                  { value: "policy_brief" as ArticleFormat, label: ARTICLE_FORMAT_LABELS.policy_brief },
+                ] as const
+              ).map((option) => {
+                const selected = articleFormat === option.value;
+                return (
+                  <button
+                    key={option.label}
+                    type="button"
+                    onClick={() => handleArticleFormatChange(option.value)}
+                    aria-pressed={selected}
+                    className={`rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+                      selected
+                        ? "border-emerald-brand bg-green-tint text-emerald-brand"
+                        : "border-gray-200 bg-white text-gray-700 hover:border-emerald-brand hover:text-emerald-brand"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
 
         <div className="space-y-3">
           {warnings.length > 0 ? (

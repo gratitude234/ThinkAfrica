@@ -3,14 +3,26 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { formatDate } from "@/lib/utils";
+import { getPostDisplayTitle } from "@/lib/postDisplay";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  isFormallyReviewed,
+  resolveArticleFormat,
+  resolveContentKind,
+  type ContentKind,
+} from "@/lib/contentModel";
 
 interface PublicationPost {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   excerpt: string | null;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   citation_id?: string | null;
+  published_version_id?: string | null;
   created_at: string;
   published_at: string | null;
   view_count?: number | null;
@@ -27,16 +39,15 @@ interface PublicationsSectionProps {
   fullName: string;
 }
 
-const GROUP_CONFIG = [
-  { type: "research", label: "Research" },
-  { type: "policy_brief", label: "Policy Briefs" },
-  { type: "essay", label: "Essays" },
-  { type: "blog", label: "Quick Takes" },
-] as const;
-
-function isReviewedWork(post: PublicationPost) {
-  return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
-}
+// Grouped by resolved content_kind, not legacy `type` -- a generic Article
+// (article_format null) and a legacy Essay/Policy Brief all belong in the
+// same "Articles" group; only their secondary format badge differs. "post"
+// is deliberately absent: resolved Post content lives in the separate
+// PostsSection instead — Publications is reserved for Article/Research.
+const GROUPS: Array<{ kind: Extract<ContentKind, "research" | "article">; label: string }> = [
+  { kind: "research", label: "Research" },
+  { kind: "article", label: "Articles" },
+];
 
 function PublicationSignalBadge({
   children,
@@ -65,11 +76,19 @@ export default function PublicationsSection({
   posts,
   fullName,
 }: PublicationsSectionProps) {
-  const [expandedTypes, setExpandedTypes] = useState<Record<string, boolean>>(
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     {}
   );
 
-  if (posts.length === 0) {
+  // Not just "posts.length === 0": posts may be non-empty but contain only
+  // kinds that no longer group here (e.g. all Post records), in which case
+  // Publications should still show its empty state rather than a heading
+  // with no groups under it.
+  const hasPublications = GROUPS.some(({ kind }) =>
+    posts.some((post) => resolveContentKind(post) === kind)
+  );
+
+  if (!hasPublications) {
     return (
       <section className="rounded-xl border border-gray-200 bg-white p-8 text-center">
         <h2 className="text-lg font-semibold text-gray-900">Publications</h2>
@@ -94,16 +113,16 @@ export default function PublicationsSection({
         </p>
       </div>
 
-      {GROUP_CONFIG.map(({ type, label }) => {
-        const groupPosts = posts.filter((post) => post.type === type);
+      {GROUPS.map(({ kind, label }) => {
+        const groupPosts = posts.filter((post) => resolveContentKind(post) === kind);
         if (groupPosts.length === 0) return null;
 
-        const expanded = expandedTypes[type] ?? false;
+        const expanded = expandedGroups[kind] ?? false;
         const visiblePosts = expanded ? groupPosts : groupPosts.slice(0, 5);
 
         return (
           <div
-            key={type}
+            key={kind}
             className="min-w-0 rounded-xl border border-gray-200 bg-white p-5"
           >
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -114,9 +133,9 @@ export default function PublicationsSection({
                 <button
                   type="button"
                   onClick={() =>
-                    setExpandedTypes((current) => ({
+                    setExpandedGroups((current) => ({
                       ...current,
-                      [type]: !expanded,
+                      [kind]: !expanded,
                     }))
                   }
                   className="text-sm font-medium text-emerald-brand transition-colors hover:text-emerald-700"
@@ -129,6 +148,8 @@ export default function PublicationsSection({
             <div className="divide-y divide-gray-100">
               {visiblePosts.map((post) => {
                 const publishedDate = post.published_at ?? post.created_at;
+                const articleFormat = resolveArticleFormat(post);
+                const formatLabel = getArticleFormatLabel(articleFormat);
                 return (
                   <article
                     key={post.id}
@@ -140,11 +161,16 @@ export default function PublicationsSection({
                         className="block transition-colors hover:text-emerald-brand"
                       >
                         <h4 className="truncate text-sm font-semibold text-gray-900">
-                        {post.title}
+                        {getPostDisplayTitle(post) ?? "Untitled"}
                         </h4>
                       </Link>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        {isReviewedWork(post) ? (
+                        {formatLabel ? (
+                          <PublicationSignalBadge variant="gray">
+                            {getContentKindLabel(kind)} · {formatLabel}
+                          </PublicationSignalBadge>
+                        ) : null}
+                        {isFormallyReviewed(post) ? (
                           <PublicationSignalBadge variant="emerald">
                             Reviewed
                           </PublicationSignalBadge>

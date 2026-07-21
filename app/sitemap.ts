@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SITE_URL, absoluteUrl } from "@/lib/site";
 import { isLowQualityTitle } from "@/lib/postQuality";
+import { isLightweightPost } from "@/lib/postDisplay";
 
 export const revalidate = 3600;
 
@@ -32,7 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const [postsResult, debatesResult, profilesResult, publishedAuthorsResult] = await Promise.all([
       supabase
         .from("posts")
-        .select("slug, title, published_at, created_at, updated_at")
+        .select("slug, title, type, content_kind, published_at, created_at, updated_at")
         .eq("status", "published")
         .not("slug", "is", null)
         .order("published_at", { ascending: false, nullsFirst: false })
@@ -61,7 +62,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const postRoutes =
       postsResult.data
-        ?.filter((post) => !isLowQualityTitle(post.title))
+        ?.filter(
+          (post) =>
+            // A genuinely titleless lightweight Post has no title to judge
+            // for quality -- don't let its absence exclude it from the
+            // sitemap. A legacy titled Blog (also resolves to "post") still
+            // goes through the normal title-quality check below, same as
+            // any other titled content -- resolveContentKind() alone would
+            // wrongly exempt a titled Blog named "test" or "untitled" too.
+            isLightweightPost(post) || !isLowQualityTitle(post.title)
+        )
         .map((post) => ({
           url: absoluteUrl(`/post/${post.slug}`),
           lastModified: post.updated_at ?? post.published_at ?? post.created_at ?? undefined,

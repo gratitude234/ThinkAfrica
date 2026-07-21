@@ -190,3 +190,30 @@ export function isPostType(value: string | null): value is PostType {
     value === "research"
   );
 }
+
+/**
+ * Old URLs and saved drafts must keep resolving safely once Blog/Essay/Policy
+ * Brief are no longer selectable creation options. `type=research`/
+ * `kind=research` still redirect to the research submission flow (that
+ * workflow never lived at /write), and `kind=post` redirects to the
+ * lightweight Post composer. Everything else -- including legacy
+ * `type=essay`/`type=policy_brief` links -- resolves to the Article composer
+ * itself, so no redirect is returned.
+ */
+export function resolveWriteRedirectPath(params: {
+  typeParam: string | null;
+  kindParam: string | null;
+  draftParam: string | null;
+}): string | null {
+  if (params.typeParam === "research" || params.kindParam === "research") {
+    return params.draftParam
+      ? `/submit/research?draft=${params.draftParam}`
+      : "/submit/research";
+  }
+
+  if (params.kindParam === "post") {
+    return "/create/post";
+  }
+
+  return null;
+}

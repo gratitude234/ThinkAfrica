@@ -5,13 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Badge from "@/components/ui/Badge";
+import { isFormallyReviewed } from "@/lib/contentModel";
 
 interface SearchResult {
   id: string;
   title: string;
   slug: string;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   citation_id?: string | null;
+  published_version_id?: string | null;
   url: string;
   profiles: { full_name: string | null; username: string } | null;
 }
@@ -59,7 +63,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     const { data } = await supabase
       .from("posts")
       .select(
-        "id, title, slug, type, citation_id, profiles!posts_author_id_fkey(full_name, username)"
+        "id, title, slug, type, content_kind, article_format, citation_id, published_version_id, profiles!posts_author_id_fkey(full_name, username)"
       )
       .eq("status", "published")
       .ilike("title", `%${q}%`)
@@ -233,10 +237,12 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                 ) : null}
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
-                <Badge type={result.type} />
-                {result.citation_id ||
-                result.type === "research" ||
-                result.type === "policy_brief" ? (
+                <Badge
+                  type={result.type}
+                  content_kind={result.content_kind}
+                  article_format={result.article_format}
+                />
+                {result.citation_id || isFormallyReviewed(result) ? (
                   <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                     {result.citation_id ? "Citable" : "Reviewed"}
                   </span>

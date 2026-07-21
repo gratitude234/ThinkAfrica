@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isFormallyReviewed } from "@/lib/contentModel";
 import TopicsClient from "./TopicsClient";
 
 export const revalidate = 3600;
@@ -94,12 +95,15 @@ export default async function TopicsPage() {
   }
 
   const counts: Record<string, number> = {};
-  let citablePostCount = 0;
-  let reviewedPostCount = 0;
+  // Evidence-based, not name-based: a type merely qualifying for the
+  // editorial workflow (e.g. a still-pending policy brief) does not count
+  // as "reviewed" until a record actually completes it (see
+  // lib/contentModel.ts). A single counter avoids double-counting a post
+  // that is both citable and formally reviewed.
+  let citableOrReviewedCount = 0;
   ((postsRaw ?? []) as TagRow[]).forEach((post) =>
     {
-      if (post.citation_id || post.published_version_id) citablePostCount++;
-      if (post.type === "research" || post.type === "policy_brief") reviewedPostCount++;
+      if (isFormallyReviewed(post)) citableOrReviewedCount++;
       (post.tags ?? []).forEach((tag) => {
         counts[tag] = (counts[tag] ?? 0) + 1;
       });
@@ -168,7 +172,7 @@ export default async function TopicsPage() {
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <p className="text-xs font-medium text-gray-500">Citable or reviewed</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">
-            {(citablePostCount + reviewedPostCount).toLocaleString()}
+            {citableOrReviewedCount.toLocaleString()}
           </p>
         </div>
       </div>

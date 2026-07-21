@@ -6,6 +6,7 @@ import {
 } from "@/lib/adminAccess";
 import { absoluteUrl, escapeHtml, logEmailResult, sendUserEmail } from "@/lib/email";
 import { POST_POINTS, type PostType } from "@/lib/utils";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 
 type AdminClient = Awaited<ReturnType<typeof createAdminActionClient>>["admin"];
 
@@ -131,7 +132,7 @@ async function buildWeeklyDigest(admin: AdminClient) {
               `<li style="margin:0 0 12px;"><a href="${escapeHtml(
                 absoluteUrl(`/post/${post.slug}`)
               )}" style="color:#047857;font-weight:700;text-decoration:none;">${escapeHtml(
-                post.title
+                getPostMetadataTitle(post, post.profiles)
               )}</a><br><span style="color:#6b7280;font-size:13px;">${escapeHtml(
                 post.profiles?.full_name ?? post.profiles?.username ?? "Indegenius"
               )} - ${post.view_count ?? 0} views - ${escapeHtml(
@@ -197,7 +198,7 @@ async function buildWeeklyDigest(admin: AdminClient) {
     "Top posts:",
     ...posts.map(
       (post) =>
-        `- ${post.title} (${post.view_count ?? 0} views): ${absoluteUrl(`/post/${post.slug}`)}`
+        `- ${getPostMetadataTitle(post, post.profiles)} (${post.view_count ?? 0} views): ${absoluteUrl(`/post/${post.slug}`)}`
     ),
     "",
     topDebate

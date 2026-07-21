@@ -10,6 +10,7 @@ import {
   type DiscoverTab,
 } from "@/lib/discoverData";
 import { type PostCardData } from "@/components/post/PostCard";
+import { resolveArticleFormat, resolveContentKind } from "@/lib/contentModel";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import UserAvatar from "@/components/ui/UserAvatar";
 import FollowButton from "@/components/ui/FollowButton";
@@ -75,13 +76,12 @@ type DiscoveryPromptSource = DiscoverData["personalizedPrompts"][number]["source
 const TYPE_FILTERS: Array<{
   value: ExploreTypeFilter;
   label: string;
-  types: string[] | null;
 }> = [
-  { value: "all", label: "All", types: null },
-  { value: "essay", label: "Essays", types: ["essay"] },
-  { value: "research", label: "Research", types: ["research"] },
-  { value: "policy_brief", label: "Policy", types: ["policy_brief"] },
-  { value: "blog", label: "Blogs", types: ["blog"] },
+  { value: "all", label: "All" },
+  { value: "essay", label: "Articles" },
+  { value: "research", label: "Research" },
+  { value: "policy_brief", label: "Policy" },
+  { value: "blog", label: "Blogs" },
 ];
 
 function getExploreTypeFilter(value: string | null | undefined): ExploreTypeFilter {
@@ -108,13 +108,36 @@ function getExploreHref(
   return query ? `/explore?${query}` : "/explore";
 }
 
-function filterPostsByType(
+export function filterPostsByType(
   posts: PostCardData[],
   typeFilter: ExploreTypeFilter
 ) {
-  const config = TYPE_FILTERS.find((filter) => filter.value === typeFilter);
-  if (!config?.types) return posts;
-  return posts.filter((post) => config.types?.includes(post.type));
+  // Every filter is resolved against the new-model columns, never the
+  // legacy `type` column directly (see docs/content-model.md):
+  //   - "essay" is the "Articles" chip: a content-kind filter, so it must
+  //     include Policy-Brief-format Articles too (both resolve to
+  //     content_kind "article").
+  //   - "policy_brief" is an Article *genre* filter. Matching legacy
+  //     `type` alone (the pre-Phase-4A behavior) missed every Policy-
+  //     Brief-format Article created after Phase 3, since a brand-new
+  //     Article always dual-writes type="essay" regardless of genre --
+  //     only article_format carries "policy_brief" for those rows.
+  //   - "research"/"blog" filter by resolved content_kind for the same
+  //     reason, so a future titleless Post with no legacy type still
+  //     matches "blog".
+  if (typeFilter === "essay") {
+    return posts.filter((post) => resolveContentKind(post) === "article");
+  }
+  if (typeFilter === "policy_brief") {
+    return posts.filter((post) => resolveArticleFormat(post) === "policy_brief");
+  }
+  if (typeFilter === "research") {
+    return posts.filter((post) => resolveContentKind(post) === "research");
+  }
+  if (typeFilter === "blog") {
+    return posts.filter((post) => resolveContentKind(post) === "post");
+  }
+  return posts;
 }
 
 const PROMPT_STYLES: Record<

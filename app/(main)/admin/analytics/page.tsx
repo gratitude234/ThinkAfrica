@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createAdminActionClient } from "@/lib/adminAccess";
+import { isFormallyReviewed } from "@/lib/contentModel";
 import { AdminAccessError, createAdminClient } from "@/lib/supabase/admin";
 import AnalyticsCharts from "./AnalyticsCharts";
 import ProfileReminderButton from "./ProfileReminderButton";
@@ -314,7 +315,7 @@ export default async function AdminAnalyticsPage() {
       .gte("published_at", thirtyDaysAgo),
     supabase
       .from("posts")
-      .select("author_id, type, citation_id")
+      .select("author_id, type, citation_id, published_version_id")
       .eq("status", "published"),
     supabase
       .from("activation_events")
@@ -367,7 +368,7 @@ export default async function AdminAnalyticsPage() {
     opportunityProofPostIds.length > 0
       ? await supabase
           .from("posts")
-          .select("id, type, citation_id")
+          .select("id, type, citation_id, published_version_id")
           .in("id", opportunityProofPostIds)
       : { data: [] };
   const opportunityProofPosts = new Map(
@@ -439,7 +440,13 @@ export default async function AdminAnalyticsPage() {
   for (const p of allPublishedAuthorsRaw ?? []) {
     authorPostCount[p.author_id] = (authorPostCount[p.author_id] ?? 0) + 1;
     if (p.citation_id) citableProfileUsers.add(p.author_id);
-    if (p.type === "research" || p.type === "policy_brief" || p.citation_id) {
+    // Evidence-based, not name-based: a published post's type/genre says a
+    // workflow *requires* review, but only citation_id/published_version_id
+    // prove it actually completed one (see isFormallyReviewed() in
+    // lib/contentModel.ts) -- a published Policy-Brief-format Article never
+    // goes through review at all, so it must not count here just because
+    // of its genre.
+    if (isFormallyReviewed(p)) {
       reviewedProfileUsers.add(p.author_id);
     }
   }
@@ -695,11 +702,9 @@ export default async function AdminAnalyticsPage() {
   const reviewedProofApplications = opportunityApplications.filter((application) => {
     if (!application.proof_post_id) return false;
     const proof = opportunityProofPosts.get(application.proof_post_id);
-    return Boolean(
-      proof?.citation_id ||
-        proof?.type === "research" ||
-        proof?.type === "policy_brief"
-    );
+    // Evidence-based, not name-based -- see the comment above
+    // reviewedProfileUsers.
+    return Boolean(proof && isFormallyReviewed(proof));
   }).length;
   const reviewedApplicationDurations = opportunityApplications
     .map((application) => {

@@ -18,12 +18,14 @@ export default function CoAuthorPicker({
   onChange,
   source,
   max = 5,
+  disabled = false,
 }: {
   userId: string;
   value: CoAuthorProfile[];
   onChange: (next: CoAuthorProfile[]) => void;
   source: "write" | "publish_drawer";
   max?: number;
+  disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CoAuthorProfile[]>([]);
@@ -92,7 +94,7 @@ export default function CoAuthorPicker({
         type="text"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        disabled={value.length >= max}
+        disabled={disabled || value.length >= max}
         placeholder={
           value.length >= max
             ? "Maximum collaborators reached"
@@ -139,7 +141,8 @@ export default function CoAuthorPicker({
               <button
                 type="button"
                 onClick={() => removeCoAuthor(coAuthor.id)}
-                className="text-emerald-600 hover:text-emerald-900"
+                disabled={disabled}
+                className="text-emerald-600 hover:text-emerald-900 disabled:pointer-events-none disabled:opacity-40"
                 aria-label={`Remove ${coAuthor.username}`}
               >
                 remove

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml, logEmailResult, sendUserEmail } from "@/lib/email";
 import { requireNotSuspended } from "@/lib/suspension";
 import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
+import { getPostDisplayTitle, getPostReferenceSuffix } from "@/lib/postDisplay";
 
 type CommentAuthor = {
   username: string | null;
@@ -132,7 +133,7 @@ export async function submitComment(input: SubmitCommentInput): Promise<{
     const { error: notificationError } = await admin.from("notifications").insert({
       user_id: recipientId,
       type: "comment",
-      message: `${actorName} ${commentKind}: ${post.title}`,
+      message: `${actorName} ${commentKind}${getPostReferenceSuffix(post)}`,
       link: ctaPath,
       actor_id: user.id,
       post_id: input.postId,
@@ -151,7 +152,13 @@ export async function submitComment(input: SubmitCommentInput): Promise<{
           : `${actorName} commented on your Indegenius post`,
         preview: `${actorName} ${commentKind}.`,
         title: parentId ? "New reply to your comment" : "New comment on your post",
-        intro: `${actorName} ${commentKind} on "${post.title}".`,
+        // "commentKind" already says "...on your post" / "...to your comment",
+        // so the title (when present) is an additional " on \"Title\"" clause
+        // rather than a full replacement -- and is simply omitted when null,
+        // instead of producing a redundant "...your post on your post.".
+        intro: `${actorName} ${commentKind}${
+          getPostDisplayTitle(post) ? ` on "${getPostDisplayTitle(post)}"` : ""
+        }.`,
         bodyHtml: `<p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;border-left:3px solid #10b981;padding-left:14px;">${escapeHtml(commentPreview)}</p>`,
         bodyTextLines: [`Comment: ${commentPreview}`],
         ctaLabel: "Open discussion",

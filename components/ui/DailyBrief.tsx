@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getPointTier, getNextTier } from "@/lib/utils";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 
 interface Props {
   userId: string;
@@ -37,6 +38,12 @@ export default async function DailyBrief({ userId: _userId, points }: Props) {
 
   const tier = getPointTier(points);
   const nextTier = getNextTier(points);
+  const topPostAuthor = topPost
+    ? Array.isArray(topPost.profiles)
+      ? (topPost.profiles[0] ?? null)
+      : topPost.profiles
+    : null;
+  const topPostTitle = topPost ? getPostMetadataTitle(topPost, topPostAuthor) : null;
 
   const hotDebateArgCount = hotDebate?.debate_arguments
     ? Array.isArray(hotDebate.debate_arguments)
@@ -62,9 +69,9 @@ export default async function DailyBrief({ userId: _userId, points }: Props) {
               href={`/post/${topPost.slug}`}
               className="text-sm font-semibold text-gray-900 hover:text-emerald-brand transition-colors line-clamp-2 leading-snug block"
             >
-              {topPost.title.length > 50
-                ? topPost.title.substring(0, 50) + "…"
-                : topPost.title}
+              {(topPostTitle?.length ?? 0) > 50
+                ? topPostTitle?.substring(0, 50) + "…"
+                : topPostTitle}
             </Link>
             <p className="text-xs text-gray-400 mt-1">
               {topPost.view_count ?? 0} views

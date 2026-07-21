@@ -199,11 +199,11 @@ export async function getActivationState(
     },
     {
       key: "start",
-      label: "Start a quick take",
+      label: "Share a quick post",
       description: firstContributionLabel
         ? `${firstContributionLabel}. Keep shaping it into a public idea.`
-        : "Turn one clear point from class, campus, or the news into a short draft.",
-      href: "/write?type=blog&starter=1&welcome=1",
+        : "Turn one clear point from class, campus, or the news into a short post.",
+      href: "/create/post",
       done: firstContributionStarted,
     },
   ];

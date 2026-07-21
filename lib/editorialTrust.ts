@@ -1,4 +1,5 @@
 import { POST_TYPE_LABELS, type PostType } from "@/lib/utils";
+import { isFormallyReviewed } from "@/lib/contentModel";
 
 export type EditorialTimelineStepStatus = "complete" | "active" | "upcoming";
 export type EditorialSignalTone = "emerald" | "sky" | "purple" | "amber" | "gray";
@@ -69,7 +70,11 @@ export interface EditorialTrustInput {
 
 const REVIEWED_TYPES = new Set(["research", "policy_brief"]);
 
-function isReviewedType(type: string | null | undefined) {
+// Legitimately type-based: this asks whether a type's workflow *requires*
+// formal review at all (so the panel/timeline render for a still-pending
+// submission), not whether a given record has completed it. For an actual
+// "has this been reviewed" claim, use isFormallyReviewed() instead.
+function typeRequiresFormalReview(type: string | null | undefined) {
   return REVIEWED_TYPES.has(type ?? "");
 }
 
@@ -87,7 +92,7 @@ function getStatusLabel(input: EditorialTrustInput, completedReviewCount: number
   const typeLabel =
     POST_TYPE_LABELS[input.type as PostType] ?? input.type?.replace("_", " ") ?? "Work";
 
-  if (!isReviewedType(input.type) && !input.citationId && !input.publishedVersionId) {
+  if (!typeRequiresFormalReview(input.type) && !input.citationId && !input.publishedVersionId) {
     return "Community published";
   }
   if (input.status === "pending_revision") return "Revision requested";
@@ -131,7 +136,7 @@ export function getEditorialTrustSummary(input: EditorialTrustInput): EditorialT
   const referenceCount = input.referenceCount ?? 0;
   const reviewRound = input.currentRound ?? 1;
   const applies =
-    isReviewedType(input.type) ||
+    typeRequiresFormalReview(input.type) ||
     Boolean(input.citationId) ||
     Boolean(input.publishedVersionId);
 
@@ -194,7 +199,12 @@ export function getEditorialTrustSummary(input: EditorialTrustInput): EditorialT
   ];
 
   const publicSignals: EditorialTrustSignal[] = [];
-  if (applies) publicSignals.push({ key: "reviewed", label: "Reviewed", tone: "purple" });
+  // Evidence-based, unlike `applies`: a type merely qualifying for the
+  // editorial workflow (e.g. a policy brief still pending review) must not
+  // show a "Reviewed" signal until a record actually completes it.
+  if (isFormallyReviewed({ citation_id: input.citationId, published_version_id: input.publishedVersionId })) {
+    publicSignals.push({ key: "reviewed", label: "Reviewed", tone: "purple" });
+  }
   if (input.citationId) publicSignals.push({ key: "citable", label: "Citable", tone: "sky" });
   if (referenceCount > 0) {
     publicSignals.push({

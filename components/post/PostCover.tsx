@@ -3,11 +3,26 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { POST_TYPE_LABELS, type PostType } from "@/lib/utils";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
 
 interface PostCoverProps {
   src?: string | null;
-  alt: string;
+  alt: string | null | undefined;
   type?: string | null;
+  // Optional new-model columns, mirroring components/ui/Badge.tsx -- when a
+  // caller supplies these, the fallback placeholder's label (shown when
+  // there's no cover image) stays consistent with the resolved label shown
+  // in the adjacent Badge for the same post, instead of a raw `type` label
+  // that can diverge for a Policy-Brief-format Article (whose legacy type
+  // is always "essay" -- see lib/contentModel.ts). Callers that don't pass
+  // them yet still get the legacy-type-only label, unchanged.
+  content_kind?: string | null;
+  article_format?: string | null;
   className?: string;
   imageClassName?: string;
   fit?: "cover" | "contain";
@@ -54,6 +69,8 @@ export default function PostCover({
   src,
   alt,
   type,
+  content_kind,
+  article_format,
   className = "",
   imageClassName,
   fit = "cover",
@@ -63,7 +80,19 @@ export default function PostCover({
 }: PostCoverProps) {
   const [failed, setFailed] = useState(false);
   const postType = normalizeType(type);
-  const typeLabel = POST_TYPE_LABELS[postType] ?? "Post";
+  // Mirrors Badge.tsx's label logic exactly: an Article (generic or a
+  // legacy Essay/Policy Brief) always leads with "Article", with the
+  // format (if any) as a secondary suffix.
+  const resolvedKind = resolveContentKind({ content_kind, type });
+  const resolvedFormat = resolveArticleFormat({ content_kind, article_format, type });
+  const formatLabel = getArticleFormatLabel(resolvedFormat);
+  const typeLabel =
+    resolvedKind === "article"
+      ? formatLabel
+        ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
+        : getContentKindLabel(resolvedKind)
+      : (POST_TYPE_LABELS[postType] ?? "Post");
+  const resolvedAlt = alt?.trim() || `${typeLabel} cover image`;
   const fallbackStyle = FALLBACK_STYLES[postType] ?? FALLBACK_STYLES.blog;
   const imageUnoptimized = useMemo(
     () => unoptimized ?? shouldBypassOptimizer(src),
@@ -92,7 +121,7 @@ export default function PostCover({
     >
       <Image
         src={src}
-        alt={alt}
+        alt={resolvedAlt}
         fill
         sizes={sizes}
         preload={priority}

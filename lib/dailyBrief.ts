@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getQualityScore } from "@/lib/postQuality";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 
 export interface DailyBriefProfile {
@@ -15,9 +16,11 @@ export interface DailyBriefProfile {
 export interface FeaturedPostRow {
   id: string;
   author_id: string;
-  title: string;
+  title: string | null;
   slug: string;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   excerpt: string | null;
   tags: string[] | null;
   cover_image_url: string | null;
@@ -45,7 +48,7 @@ interface HotDebateRow {
 }
 
 export const FEATURED_POST_SELECT = `
-  id, author_id, title, slug, type, excerpt, tags, cover_image_url, view_count, impression_count, read_count, featured, published_at, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes,
+  id, author_id, title, slug, type, content_kind, article_format, excerpt, tags, cover_image_url, view_count, impression_count, read_count, featured, published_at, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes,
   profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified)
 `;
 
@@ -254,7 +257,11 @@ export async function getDailyBriefContent(
 
   return {
     featuredPost: featuredPost
-      ? { id: featuredPost.id, title: featuredPost.title, slug: featuredPost.slug }
+      ? {
+          id: featuredPost.id,
+          title: getPostMetadataTitle(featuredPost, featuredPost.profiles),
+          slug: featuredPost.slug,
+        }
       : null,
     activeDebate: toDebateInterludeData(hotDebateRaw),
   };

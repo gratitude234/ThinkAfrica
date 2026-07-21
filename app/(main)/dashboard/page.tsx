@@ -18,6 +18,7 @@ import TrackedActionLink from "@/components/retention/TrackedActionLink";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import Button from "@/components/ui/Button";
 import { getActivationState } from "@/lib/activation";
+import { isFormallyReviewed } from "@/lib/contentModel";
 import { getCollaborationSuggestions } from "@/lib/collaboration";
 import {
   getOpportunityShortLabel,
@@ -30,6 +31,7 @@ import { getPostQualitySummary } from "@/lib/postQuality";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
 import { getActionInboxSummary } from "@/lib/actionInbox";
 import { isAcademicProfileType, isProfileType } from "@/lib/profileTypes";
+import { getPostDisplayTitle } from "@/lib/postDisplay";
 import { updateOpportunityInquiryStatus } from "./opportunityInquiryActions";
 
 function WorkUnderReviewPanel({
@@ -194,7 +196,7 @@ export default async function DashboardPage() {
     .from("posts")
     .select(
       `
-      id, author_id, title, slug, content, excerpt, tags, type, status, impression_count, view_count, read_count,
+      id, author_id, title, slug, content, excerpt, tags, type, content_kind, article_format, status, impression_count, view_count, read_count,
       created_at, published_at, revision_due_at, citation_id, published_version_id,
       current_round, in_response_to,
       document_path, document_original_name, document_mime_type, document_size_bytes,
@@ -538,6 +540,8 @@ export default async function DashboardPage() {
       const reviews = post.post_reviews ?? [];
       const summary = getPostQualitySummary({
         type: post.type,
+        content_kind: (post as { content_kind?: string | null }).content_kind,
+        article_format: (post as { article_format?: string | null }).article_format,
         status: post.status,
         title: post.title,
         excerpt: post.excerpt,
@@ -559,7 +563,7 @@ export default async function DashboardPage() {
 
       return {
         id: post.id,
-        title: post.title,
+        title: getPostDisplayTitle(post) ?? "Untitled post",
         status: post.status,
         actionHref:
           post.type === "research" &&
@@ -609,11 +613,14 @@ export default async function DashboardPage() {
       authorProfile?.full_name &&
       (authorIsAcademic ? authorProfile?.university : true)
   );
-  const reviewedOrCitableCount = publishedPosts.filter(
-    (post) =>
-      post.citation_id ||
-      post.type === "research" ||
-      post.type === "policy_brief"
+  // Evidence-based, not name-based: a published post's type/genre says a
+  // workflow *requires* review, but only citation_id/published_version_id
+  // prove it actually completed one (see isFormallyReviewed() in
+  // lib/contentModel.ts) -- a published Policy-Brief-format Article never
+  // goes through review at all, so it must not count here just because of
+  // its genre.
+  const reviewedOrCitableCount = publishedPosts.filter((post) =>
+    isFormallyReviewed(post)
   ).length;
   const coAuthoredCount = posts.filter(
     (post) => (post.co_authors ?? []).length > 0
@@ -681,7 +688,10 @@ export default async function DashboardPage() {
     })
     .map((post) => ({
       id: post.id,
-      title: post.title,
+      // research/policy_brief always have a title (enforced at the DB
+      // level); this fallback only guards the type, it should never
+      // actually be exercised.
+      title: getPostDisplayTitle(post) ?? "Untitled",
       slug: post.slug,
       status: post.status,
       type: post.type,
@@ -755,8 +765,8 @@ export default async function DashboardPage() {
     : publishedPosts.length === 0
       ? {
           label: "Publish your first portfolio piece",
-          body: "Start with a Quick Take or Essay, then build toward reviewed formats.",
-          href: "/write",
+          body: "Write your first Article, then build toward Research.",
+          href: "/write?kind=article",
           cta: "Start writing",
         }
       : reviewedDraftMissingReferences

@@ -9,6 +9,7 @@ import FeaturePolicyButton from "@/app/(main)/policy/FeaturePolicyButton";
 import FeaturePostButton from "./FeaturePostButton";
 import AssignReviewers from "./AssignReviewers";
 import { requiresEditorialWorkflow } from "@/lib/reviewWorkflow";
+import { isFormallyReviewed } from "@/lib/contentModel";
 import { getPostQualitySummary } from "@/lib/postQuality";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
 import { getProfileCredibilitySummary } from "@/lib/profileCredibility";
@@ -95,6 +96,7 @@ export default async function AdminReviewPage() {
         `
         id, title, excerpt, content, type, status, tags, created_at, author_id, current_round,
         document_path, document_original_name, document_size_bytes,
+        citation_id, published_version_id,
         post_references(id),
         profiles!posts_author_id_fkey (username, full_name, university, field_of_study, verified, verified_type)
       `
@@ -282,7 +284,16 @@ export default async function AdminReviewPage() {
                   const credibilitySummary = getProfileCredibilitySummary({
                     profile: post.profiles,
                     stats: {
-                      reviewedCount: requiresEditorialWorkflow(post.type) ? 1 : 0,
+                      // Evidence-based, not name-based: every post in this
+                      // queue is still pending/pending_revision/rejected by
+                      // definition, so it can never itself have completed
+                      // review yet regardless of type/genre --
+                      // isFormallyReviewed() (citation_id/
+                      // published_version_id) correctly reflects that,
+                      // where requiresEditorialWorkflow(post.type) would
+                      // wrongly report 1 for every research/policy_brief
+                      // submission shown here, reviewed or not.
+                      reviewedCount: isFormallyReviewed(post) ? 1 : 0,
                     },
                   });
 

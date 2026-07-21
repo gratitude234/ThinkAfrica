@@ -15,6 +15,7 @@ export async function proxy(request: NextRequest) {
 
   const protectedPaths = [
     "/write",
+    "/create",
     "/admin",
     "/debates/create",
     "/onboarding",

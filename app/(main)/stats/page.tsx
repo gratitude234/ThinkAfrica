@@ -44,7 +44,7 @@ export default async function StatsPage() {
 
   const { data: publishedPosts } = await supabase
     .from("posts")
-    .select("id, title, slug, type, view_count, read_count, created_at, published_at")
+    .select("id, title, slug, type, content_kind, article_format, view_count, read_count, created_at, published_at")
     .eq("author_id", profile.id)
     .eq("status", "published")
     .order("read_count", { ascending: false });
@@ -133,7 +133,11 @@ export default async function StatsPage() {
                     {formatDate(post.published_at ?? post.created_at)}
                   </p>
                 </div>
-                <Badge type={post.type} />
+                <Badge
+                  type={post.type}
+                  content_kind={(post as { content_kind?: string | null }).content_kind}
+                  article_format={(post as { article_format?: string | null }).article_format}
+                />
                 <div className="text-right flex-shrink-0">
                   <p className="text-sm font-semibold text-gray-900">
                     {((post as { read_count?: number | null }).read_count ?? 0).toLocaleString()}

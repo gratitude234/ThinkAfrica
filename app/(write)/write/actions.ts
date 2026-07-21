@@ -10,7 +10,15 @@ import { buildSlugFromTitle, looksLikeUrl } from "@/lib/postSlug";
 import { isLowQualityTitle } from "@/lib/postQuality";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { requireNotSuspended } from "@/lib/suspension";
-import { articleFormatFromLegacyType, contentKindFromLegacyType } from "@/lib/contentModel";
+import {
+  legacyTypeForNewContent,
+  parseArticleFormat,
+  resolveArticleFormat,
+  resolveContentKind,
+  type ArticleFormat,
+  type ContentKind,
+} from "@/lib/contentModel";
+import { getPostReferenceQuoted } from "@/lib/postDisplay";
 import {
   createVersionSnapshot,
   getSubmissionTrack,
@@ -291,6 +299,13 @@ async function syncAuthors(
   }
 }
 
+// /write is the Article composer (Phase 3, see docs/content-model.md):
+// every NEW draft/post it creates is a generic Article, no matter what a
+// client sends as `postType` -- that field is legacy plumbing (word-count
+// targets, reference requirements for an *existing* draft) and must never
+// be trusted to decide a NEW row's classification.
+const NEW_ARTICLE_TYPE: PostType = (legacyTypeForNewContent("article") ?? "essay") as PostType;
+
 export async function ensureDraft(input: {
   draftId: string | null;
   title: string;
@@ -298,6 +313,12 @@ export async function ensureDraft(input: {
   content: string;
   tags: string[];
   postType: PostType;
+  // Phase 4A: optional Article genre, persisted by autosave so it survives
+  // closing/reopening the publish drawer and navigating away entirely --
+  // see the note on publishPost()'s articleFormat field below for the
+  // undefined-vs-null distinction and why it's scoped to
+  // effectiveType === NEW_ARTICLE_TYPE only.
+  articleFormat?: ArticleFormat | null;
   coverImageUrl: string;
   inResponseTo?: string | null;
 }) {
@@ -312,31 +333,100 @@ export async function ensureDraft(input: {
     return { error: suspensionError, draftId: null as string | null };
   }
 
-  const slug = buildSlugFromTitle(input.title, "untitled", Date.now().toString(36));
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
-  const contentKind = contentKindFromLegacyType(input.postType);
-  const articleFormat = articleFormatFromLegacyType(input.postType);
 
   if (input.draftId) {
-    const { error } = await supabase
+    // A modified request must not be able to reclassify an existing draft
+    // (e.g. into "research") by sending a different `postType` -- the
+    // draft's own stored `type` is the only trusted source for what it is.
+    const { data: existing, error: existingError } = await supabase
+      .from("posts")
+      .select("type, content_kind, article_format, status, author_id")
+      .eq("id", input.draftId)
+      .maybeSingle();
+
+    if (existingError || !existing || existing.author_id !== user.id) {
+      return {
+        error: "You do not have permission to edit this draft.",
+        draftId: null as string | null,
+      };
+    }
+
+    if (existing.type === "research") {
+      return {
+        error: "Research papers must be edited through the research submission flow.",
+        draftId: null as string | null,
+      };
+    }
+
+    // /write (and its autosave) may only ever touch a row that is still an
+    // unpublished draft. Once a post has been submitted/published, it moves
+    // to /edit's own workflow-aware action -- without this check, a stale
+    // or forged `draftId` (e.g. an old `?draft=` URL/link kept around after
+    // the post was accepted) would let this action silently overwrite a
+    // published or in-review post's content, bypassing citation locks and
+    // the editorial workflow entirely.
+    if (existing.status !== "draft") {
+      return {
+        error: "This post is no longer an editable draft.",
+        draftId: null as string | null,
+      };
+    }
+
+    const effectiveType = existing.type as PostType;
+    // Preserve the row's own content_kind/article_format rather than
+    // recomputing from `type` -- recomputing would collapse a generic
+    // Article (type="essay", article_format=null) back into a legacy
+    // Essay, since both share the same legacy type value and the
+    // recompute has no way to tell them apart.
+    const effectiveContentKind = resolveContentKind(existing);
+    let effectiveArticleFormat = resolveArticleFormat(existing);
+    // Caught in review: only overwrite when the caller actually included
+    // articleFormat (a real genre, or an explicit null for "General") --
+    // `undefined` means "this call doesn't know/care about genre" (e.g. an
+    // autosave tick that only changed content) and must preserve whatever
+    // is already stored, not silently clear it. Scoped to
+    // NEW_ARTICLE_TYPE only, so a legacy Policy Brief draft's article_format
+    // is never touched by this path at all.
+    if (effectiveType === NEW_ARTICLE_TYPE && input.articleFormat !== undefined) {
+      effectiveArticleFormat = parseArticleFormat(input.articleFormat);
+    }
+
+    // The `status = "draft"` filter here (not just the pre-check above) is
+    // what makes this safe against a race: if the row was published/
+    // submitted by a concurrent publishPost() call between the select above
+    // and this update, the WHERE clause excludes it and zero rows are
+    // affected, rather than silently overwriting the now-submitted content.
+    const { data: updated, error } = await supabase
       .from("posts")
       .update({
         title: input.title.trim(),
         excerpt: input.excerpt,
         content: sanitizedContent,
         tags: normalizedTags,
-        type: input.postType,
-        content_kind: contentKind,
-        article_format: articleFormat,
+        type: effectiveType,
+        content_kind: effectiveContentKind,
+        article_format: effectiveArticleFormat,
         cover_image_url: input.coverImageUrl || null,
         in_response_to: input.inResponseTo ?? null,
       })
       .eq("id", input.draftId)
-      .eq("author_id", user.id);
+      .eq("author_id", user.id)
+      .eq("status", "draft")
+      .select("id");
+
+    if (!error && (!updated || updated.length === 0)) {
+      return {
+        error: "This post is no longer an editable draft.",
+        draftId: null as string | null,
+      };
+    }
 
     return { error: error?.message ?? null, draftId: input.draftId };
   }
+
+  const slug = buildSlugFromTitle(input.title, "untitled", Date.now().toString(36));
 
   const { data, error } = await supabase
     .from("posts")
@@ -347,9 +437,9 @@ export async function ensureDraft(input: {
       excerpt: input.excerpt,
       content: sanitizedContent,
       tags: normalizedTags,
-      type: input.postType,
-      content_kind: contentKind,
-      article_format: articleFormat,
+      type: NEW_ARTICLE_TYPE,
+      content_kind: "article",
+      article_format: parseArticleFormat(input.articleFormat ?? null),
       status: "draft",
       cover_image_url: input.coverImageUrl || null,
       in_response_to: input.inResponseTo ?? null,
@@ -372,12 +462,35 @@ export async function savePostReferences(input: {
 
   const { data: post } = await supabase
     .from("posts")
-    .select("author_id, type")
+    .select("author_id, type, status")
     .eq("id", input.postId)
     .single();
 
   if (!post || post.author_id !== user.id) {
     return { error: "You do not have permission to edit these references." };
+  }
+
+  // This action is only ever meant to touch an in-progress draft (it is
+  // called from /write, before first publish) -- without this, a stale
+  // `publishDraftId` (e.g. from a request racing a concurrent publish)
+  // could edit the reference list on an already-submitted or accepted post.
+  //
+  // This check is not atomic with the writes below, and the
+  // guard_locked_post_child_write DB trigger on post_references (see
+  // supabase/migrations/20260720000001_lock_accepted_and_removed_posts.sql,
+  // not yet applied) does NOT fully close that gap either: it guarantees a
+  // write can never land once the post has actually become locked
+  // (published research/policy_brief, or removed), but it intentionally
+  // still permits 'pending'/'pending_revision' -- saveEditedPost() (edit/
+  // [slug]/actions.ts) legitimately edits references in those states, and
+  // the trigger is shared by both callers. So a narrow window remains: if
+  // a concurrent publishPost() moves this exact row from 'draft' to
+  // 'pending' between this select and the writes below, this action's own
+  // stricter "must still be exactly draft" contract is not enforced by
+  // either layer. Only a dedicated transactional RPC could close that
+  // fully; this is a known, accepted gap, not a solved one.
+  if (post.status !== "draft") {
+    return { error: "This post is no longer an editable draft." };
   }
 
   try {
@@ -397,6 +510,14 @@ export async function publishPost(input: {
   content: string;
   tags: string[];
   postType: PostType;
+  // Phase 4A: optional Article genre (see docs/content-model.md). Only
+  // ever honored below when this is a brand-new generic Article (see the
+  // effectiveType === NEW_ARTICLE_TYPE guard) -- never for a legacy
+  // Policy Brief draft, and never able to influence effectiveType,
+  // submitStatus, or which legacy `type` value gets dual-written, so a
+  // genre choice can never change publish timing or route a new Article
+  // into editorial review.
+  articleFormat?: ArticleFormat | null;
   coverImageUrl: string;
   inResponseTo?: string | null;
   customSlug?: string;
@@ -429,12 +550,112 @@ export async function publishPost(input: {
     };
   }
 
-  const track = await getSubmissionTrack(input.postType);
+  // As in ensureDraft(): a modified request must not be able to publish a
+  // draft as a *different* classification than what it actually is (e.g.
+  // spoofing `postType: "essay"` to force an existing policy_brief draft
+  // straight to "published", skipping its review). An existing draft's
+  // stored `type` is the only trusted source; only a brand-new row (no
+  // draftId yet) gets the new generic-Article classification.
+  let effectiveType: PostType = NEW_ARTICLE_TYPE;
+  // Mirrors ensureDraft(): preserved from the existing row rather than
+  // recomputed from `type`, so a generic Article's null article_format
+  // doesn't collapse back into a legacy Essay/Policy Brief label merely by
+  // publishing (see the comment on effectiveContentKind in ensureDraft()).
+  let effectiveContentKind: ContentKind = "article";
+  let effectiveArticleFormat: ArticleFormat | null = null;
+
+  if (input.draftId) {
+    const { data: existingPost, error: existingError } = await supabase
+      .from("posts")
+      .select("status, type, content_kind, article_format")
+      .eq("id", input.draftId)
+      .eq("author_id", user.id)
+      .maybeSingle();
+
+    if (existingError || !existingPost) {
+      return {
+        error: "You do not have permission to publish this draft.",
+        slug: null as string | null,
+      };
+    }
+
+    if (existingPost.status === "removed") {
+      return {
+        error: "This post was removed by moderators and cannot be republished.",
+        slug: null as string | null,
+      };
+    }
+
+    if (existingPost.type === "research") {
+      return {
+        error: "Research papers must be published through the research submission flow.",
+        slug: null as string | null,
+      };
+    }
+
+    // /write's publish action is only for a composition's *first* publish.
+    // Once a post has been submitted (pending/pending_revision) or published,
+    // further changes go through /edit's workflow-aware action instead --
+    // without this check, a stale or forged `draftId` (e.g. an old
+    // `?draft=` link kept around after acceptance) would let this action
+    // silently overwrite/resubmit an already-published or in-review post,
+    // bypassing citation locks and the editorial workflow entirely.
+    if (existingPost.status !== "draft") {
+      return {
+        error: "This post is no longer an editable draft. Use the edit page to make further changes.",
+        slug: null as string | null,
+      };
+    }
+
+    effectiveType = existingPost.type as PostType;
+    effectiveContentKind = resolveContentKind(existingPost) ?? "article";
+    effectiveArticleFormat = resolveArticleFormat(existingPost);
+
+    // Caught in review: a legacy Policy Brief that is still a DRAFT (never
+    // submitted -- status is still 'draft' here, guaranteed by the check
+    // above) is not "in flight" in any legacy workflow --
+    // isLegacyPolicyBriefInFlight() (lib/contentModel.ts) only recognizes
+    // pending/pending_revision -- and publishing it now must not start a
+    // brand-new one. Convert it to an ordinary Policy-Brief-format Article
+    // at the moment of first publish: dual-write type="essay" like any
+    // other new Article (so submitStatus below resolves to "published",
+    // not "pending"), while effectiveArticleFormat above already correctly
+    // preserved its "policy_brief" genre from the row's own stored
+    // classification -- nothing else needs to change for that to carry
+    // through. A row already pending/pending_revision never reaches this
+    // function at all (its status !== "draft" check above already rejects
+    // it; edit/[slug]'s workflow-aware action owns those), so this can
+    // only ever affect a submission that was never actually in flight.
+    if (effectiveType === "policy_brief") {
+      effectiveType = NEW_ARTICLE_TYPE;
+    }
+  }
+
+  // Phase 4A genre picker (PublishDrawer): only ever honored for a brand-
+  // new generic Article -- effectiveType is NEW_ARTICLE_TYPE ("essay") for
+  // every new Article regardless of chosen genre, and is never itself set
+  // from input.articleFormat, so this cannot reach a legacy Policy Brief
+  // draft still routed into review (there is none left after the
+  // conversion above) or change effectiveType/submitStatus below.
+  // parseArticleFormat() fails safe: an unrecognized value becomes null
+  // ("General"), never a genre the user didn't pick.
+  //
+  // Caught in review: only overwrite when the caller actually included
+  // articleFormat -- `undefined` means "no opinion, preserve whatever this
+  // draft already has" (its own stored genre, read into
+  // effectiveArticleFormat above -- including the "policy_brief" the
+  // conversion just preserved), not "clear it". An explicit `null` is how
+  // a user actively picks "General" to clear an existing genre.
+  if (effectiveType === NEW_ARTICLE_TYPE && input.articleFormat !== undefined) {
+    effectiveArticleFormat = parseArticleFormat(input.articleFormat);
+  }
+
+  const track = await getSubmissionTrack(effectiveType);
   if (!track) {
     return { error: "Submission track is not configured for this format.", slug: null as string | null };
   }
 
-  const validationError = validateReferences(input.postType, input.references ?? []);
+  const validationError = validateReferences(effectiveType, input.references ?? []);
   if (validationError) {
     return { error: validationError, slug: null as string | null };
   }
@@ -459,41 +680,30 @@ export async function publishPost(input: {
       buildSlugFromTitle(input.title, "post", Date.now().toString(36))
     : buildSlugFromTitle(input.title, "post", Date.now().toString(36));
   const submitStatus =
-    input.postType === "blog" || input.postType === "essay" ? "published" : "pending";
+    effectiveType === "blog" || effectiveType === "essay" ? "published" : "pending";
   const publishedAt = submitStatus === "published" ? now : null;
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
-  const contentKind = contentKindFromLegacyType(input.postType);
-  const articleFormat = articleFormatFromLegacyType(input.postType);
 
   let postId = input.draftId;
   let responseParentPath: string | null = null;
 
   if (postId) {
-    const { data: existingPost } = await supabase
-      .from("posts")
-      .select("status")
-      .eq("id", postId)
-      .eq("author_id", user.id)
-      .maybeSingle();
-
-    if (existingPost?.status === "removed") {
-      return {
-        error: "This post was removed by moderators and cannot be republished.",
-        slug: null as string | null,
-      };
-    }
-
-    const { error } = await supabase
+    // As in ensureDraft(): `status = "draft"` is part of the WHERE clause,
+    // not just a pre-check, so a concurrent publish/autosave race can't
+    // slip a write through between the earlier select and this update --
+    // if the row is no longer a draft by the time this runs, zero rows are
+    // affected instead of silently republishing/overwriting it.
+    const { data: updatedRows, error } = await supabase
       .from("posts")
       .update({
         title: input.title.trim(),
         excerpt: input.excerpt,
         content: sanitizedContent,
         tags: normalizedTags,
-        type: input.postType,
-        content_kind: contentKind,
-        article_format: articleFormat,
+        type: effectiveType,
+        content_kind: effectiveContentKind,
+        article_format: effectiveArticleFormat,
         cover_image_url: input.coverImageUrl || null,
         in_response_to: input.inResponseTo ?? null,
         status: submitStatus,
@@ -504,10 +714,19 @@ export async function publishPost(input: {
         published_version_id: submitStatus === "published" ? undefined : null,
       })
       .eq("id", postId)
-      .eq("author_id", user.id);
+      .eq("author_id", user.id)
+      .eq("status", "draft")
+      .select("id");
 
     if (error) {
       return { error: error.message, slug: null as string | null };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        error: "This post is no longer an editable draft. Use the edit page to make further changes.",
+        slug: null as string | null,
+      };
     }
   } else {
     const { data, error } = await supabase
@@ -518,9 +737,9 @@ export async function publishPost(input: {
         slug,
         content: sanitizedContent,
         excerpt: input.excerpt,
-        type: input.postType,
-        content_kind: contentKind,
-        article_format: articleFormat,
+        type: effectiveType,
+        content_kind: effectiveContentKind,
+        article_format: effectiveArticleFormat,
         tags: normalizedTags,
         in_response_to: input.inResponseTo ?? null,
         status: submitStatus,
@@ -570,7 +789,7 @@ export async function publishPost(input: {
             subject: `${authorName} responded to your Indegenius post`,
             preview: `${authorName} wrote a response to your post.`,
             title: "New response to your post",
-            intro: `${authorName} wrote a response to "${parentPost.title}".`,
+            intro: `${authorName} wrote a response to ${getPostReferenceQuoted(parentPost)}.`,
             ctaLabel: "Read the response",
             ctaPath: `/post/${slug}`,
             idempotencyKey: `response-post:${postId}:${parentPost.author_id}`,
@@ -621,7 +840,7 @@ export async function publishPost(input: {
     };
   }
 
-  if (requiresEditorialWorkflow(input.postType)) {
+  if (requiresEditorialWorkflow(effectiveType)) {
     const admin = createAdminClient();
     const { data: existingVersion } = await admin
       .from("post_versions")
@@ -670,7 +889,7 @@ export async function publishPost(input: {
         title: input.title.trim(),
         content: sanitizedContent,
         authorName: ownerProfile?.full_name ?? "An Indegenius author",
-        postType: input.postType,
+        postType: effectiveType,
       }),
     }).catch(() => {
       // Audio summary generation is best-effort.
@@ -683,7 +902,7 @@ export async function publishPost(input: {
     userId: user.id,
     metadata: {
       postId,
-      postType: input.postType,
+      postType: effectiveType,
       status: submitStatus,
     },
     source: "server_action",
@@ -693,6 +912,48 @@ export async function publishPost(input: {
   return {
     error: null,
     slug,
-    submittedForReview: requiresEditorialWorkflow(input.postType),
+    submittedForReview: requiresEditorialWorkflow(effectiveType),
   };
+}
+
+// Product decision (Phase 3 DB review): authenticated users may hard-delete
+// only drafts (see the DELETE branch of guard_locked_post_write in
+// supabase/migrations/20260720000001_lock_accepted_and_removed_posts.sql).
+// A pending/pending_revision research paper or policy brief -- already
+// submitted into the editorial workflow -- is withdrawn instead: its
+// status moves to 'withdrawn' rather than the row being deleted, so its
+// post_versions/post_references/post_authors/post_reviews/
+// post_editor_decisions all survive intact. Does not resubmit anything;
+// resubmission (if ever built) would be a separate action.
+//
+// Withdrawal must also retire any reviewers still actively assigned --
+// otherwise the reviewer queue, /review/[postId], and the review-reminder
+// cron (which all already filter on post_reviews.removed_at) would keep
+// treating a withdrawn submission as open for review. That has to happen
+// in the same transaction as the status change, not as a second
+// best-effort step from here, and the author has no RLS grant to touch
+// post_reviews at all -- so both are delegated to the
+// withdraw_post_submission() Postgres function (SECURITY DEFINER, with its
+// own auth.uid()-based ownership check) rather than done as two separate
+// calls from this action.
+export async function withdrawSubmission(input: { postId: string }) {
+  const { supabase, user } = await getCurrentUser();
+
+  if (!user) {
+    return { error: "You must be signed in." };
+  }
+
+  const { error } = await supabase.rpc("withdraw_post_submission", {
+    target_post_id: input.postId,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/admin/review");
+  revalidatePath("/review");
+
+  return { error: null };
 }

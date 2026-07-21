@@ -23,7 +23,7 @@ export default function ResponseStartLink({
 }) {
   const params = new URLSearchParams({
     inResponseTo: postId,
-    type: "essay",
+    kind: "article",
   });
 
   if (starter) params.set("starter", starter);

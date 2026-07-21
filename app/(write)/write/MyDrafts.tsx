@@ -4,11 +4,19 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { POST_TYPE_LABELS } from "@/lib/utils";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
 
 interface Draft {
   id: string;
   title: string;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   updated_at: string;
 }
 
@@ -36,7 +44,7 @@ export default function MyDrafts({
       if (!user) return;
       supabase
         .from("posts")
-        .select("id, title, type, updated_at")
+        .select("id, title, type, content_kind, article_format, updated_at")
         .eq("author_id", user.id)
         .eq("status", "draft")
         .order("updated_at", { ascending: false })
@@ -83,28 +91,39 @@ export default function MyDrafts({
 
       {open && (
         <ul className="divide-y divide-gray-200 border-t border-gray-200">
-          {filtered.map((draft) => (
-            <li key={draft.id}>
-              <Link
-                href={`/write?draft=${draft.id}`}
-                className={`flex items-center justify-between transition-colors hover:bg-canvas ${
-                  compact ? "px-3 py-2.5" : "px-4 py-3 hover:bg-white"
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {draft.title || "Untitled draft"}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {POST_TYPE_LABELS[draft.type as keyof typeof POST_TYPE_LABELS] ?? draft.type} · saved {timeAgo(draft.updated_at)}
-                  </p>
-                </div>
-                <span className="ml-3 text-xs text-emerald-600 font-medium flex-shrink-0">
-                  Resume →
-                </span>
-              </Link>
-            </li>
-          ))}
+          {filtered.map((draft) => {
+            const resolvedKind = resolveContentKind(draft);
+            const formatLabel = getArticleFormatLabel(resolveArticleFormat(draft));
+            const draftTypeLabel =
+              resolvedKind === "article"
+                ? formatLabel
+                  ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
+                  : getContentKindLabel(resolvedKind)
+                : (POST_TYPE_LABELS[draft.type as keyof typeof POST_TYPE_LABELS] ?? draft.type);
+
+            return (
+              <li key={draft.id}>
+                <Link
+                  href={`/write?draft=${draft.id}`}
+                  className={`flex items-center justify-between transition-colors hover:bg-canvas ${
+                    compact ? "px-3 py-2.5" : "px-4 py-3 hover:bg-white"
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {draft.title || "Untitled draft"}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {draftTypeLabel} · saved {timeAgo(draft.updated_at)}
+                    </p>
+                  </div>
+                  <span className="ml-3 text-xs text-emerald-600 font-medium flex-shrink-0">
+                    Resume →
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

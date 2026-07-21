@@ -9,6 +9,8 @@ import Button from "@/components/ui/Button";
 import ProfileGate from "@/components/ui/ProfileGate";
 import type { PostReferenceRecord } from "@/lib/types";
 import { type PostType } from "@/lib/utils";
+import type { ArticleFormat } from "@/lib/contentModel";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { useDraftManager, readDraftBackupRaw } from "./DraftManager";
 import PublishDrawer from "./PublishDrawer";
 import CoverImageDialog from "./CoverImageDialog";
@@ -18,8 +20,8 @@ import { ensureDraft, savePostReferences } from "./actions";
 import {
   WRITE_FORMATS,
   getResponseStarterTemplate,
-  isPostType,
   isResponseIntent,
+  resolveWriteRedirectPath,
 } from "./writeConfig";
 import type { EditorHandle } from "@/components/editor/Editor";
 
@@ -39,6 +41,7 @@ interface DraftPayload {
   content: string;
   tags: string[];
   postType: PostType;
+  articleFormat: ArticleFormat | null;
   coverImageUrl: string;
   inResponseToId: string | null;
 }
@@ -159,7 +162,7 @@ function countWords(value: string) {
 }
 
 function getBodyPlaceholder() {
-  return "Start writing your quick take, essay, or policy brief…";
+  return "Start writing your article…";
 }
 
 function normalizeStarterTag(value: string | null) {
@@ -172,11 +175,16 @@ export default function WritePage() {
   const responseToSlug = searchParams.get("response_to");
   const responseToIdParam = searchParams.get("inResponseTo");
   const typeParam = searchParams.get("type");
+  // "kind=article" is the preferred, stable URL for this composer (see
+  // createActions.ts); legacy `type=essay`/`type=policy_brief` links keep
+  // working for backward compatibility -- both just land on the same
+  // Article composer, since which legacy value applies to a *new* draft is
+  // never user-choosable here anymore (see write/actions.ts).
+  const kindParam = searchParams.get("kind");
   const draftParam = searchParams.get("draft");
   const starterParam = searchParams.get("starter");
   const responseIntentParam = searchParams.get("responseIntent");
   const starterTag = normalizeStarterTag(searchParams.get("tag"));
-  const initialPostType = isPostType(typeParam) ? typeParam : "blog";
   const {
     draftId,
     saveStatus,
@@ -195,7 +203,19 @@ export default function WritePage() {
     university: string | null;
   } | null>(null);
   const [loadingProfileInfo, setLoadingProfileInfo] = useState(true);
-  const [postType, setPostType] = useState<PostType>(initialPostType);
+  // Never seeded from a URL param -- a legacy `type=`/`kind=` value must not
+  // drive this composer's displayed classification (word-count target,
+  // publish-label, review messaging) for what is actually a brand-new
+  // generic Article. It is only ever set from `initialData`, i.e. once a
+  // *confirmed, still-editable* legacy draft has actually loaded.
+  const [postType, setPostType] = useState<PostType>("essay");
+  // Phase 4A: optional Article genre, lifted here (mirroring postType)
+  // rather than owned locally by PublishDrawer, so a selection survives
+  // closing/reopening the drawer within the same session -- see
+  // handleMetadataChange and PublishDrawer's initialArticleFormat prop.
+  // Like postType, only ever set from initialData once a real draft has
+  // loaded, never from a URL param.
+  const [articleFormat, setArticleFormat] = useState<ArticleFormat | null>(null);
   const [selectedResponseIntent] = useState(() =>
     isResponseIntent(responseIntentParam)
       ? responseIntentParam
@@ -232,12 +252,11 @@ export default function WritePage() {
   const reviewPublishInFlightRef = useRef(false);
 
   useEffect(() => {
-    if (typeParam === "research") {
-      router.replace(
-        draftParam ? `/submit/research?draft=${draftParam}` : "/submit/research"
-      );
+    const redirectPath = resolveWriteRedirectPath({ typeParam, kindParam, draftParam });
+    if (redirectPath) {
+      router.replace(redirectPath);
     }
-  }, [draftParam, router, typeParam]);
+  }, [draftParam, kindParam, router, typeParam]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -269,7 +288,8 @@ export default function WritePage() {
         return;
       }
 
-      setPostType((initialData.postType as PostType) ?? "blog");
+      setPostType((initialData.postType as PostType) ?? "essay");
+      setArticleFormat(initialData.articleFormat);
       setTitle(initialData.title);
       setExcerpt(initialData.excerpt);
       setTags(initialData.tags);
@@ -297,7 +317,7 @@ export default function WritePage() {
             ? parentPost.profiles[0]
             : (parentPost.profiles as { username: string } | null);
           setInResponseToId(parentPost.id);
-          setInResponseToTitle(parentPost.title);
+          setInResponseToTitle(getPostMetadataTitle(parentPost, authorProfile));
           setInResponseToAuthor(authorProfile?.username ?? null);
           return;
         }
@@ -321,7 +341,7 @@ export default function WritePage() {
             ? parentPost.profiles[0]
             : (parentPost.profiles as { username: string } | null);
           setInResponseToId(parentPost.id);
-          setInResponseToTitle(parentPost.title);
+          setInResponseToTitle(getPostMetadataTitle(parentPost, authorProfile));
           setInResponseToAuthor(authorProfile?.username ?? null);
           return;
         }
@@ -344,7 +364,7 @@ export default function WritePage() {
             ? parentPost.profiles[0]
             : (parentPost.profiles as { username: string } | null);
           setInResponseToId(parentPost.id);
-          setInResponseToTitle(parentPost.title);
+          setInResponseToTitle(getPostMetadataTitle(parentPost, authorProfile));
           setInResponseToAuthor(authorProfile?.username ?? null);
           return;
         }
@@ -387,10 +407,11 @@ export default function WritePage() {
       content: overrides.content ?? content,
       tags: overrides.tags ?? tags,
       postType: overrides.postType ?? postType,
+      articleFormat: "articleFormat" in overrides ? (overrides.articleFormat ?? null) : articleFormat,
       coverImageUrl: overrides.coverImageUrl ?? coverImageUrl,
       inResponseToId: overrides.inResponseToId ?? inResponseToId,
     }),
-    [title, excerpt, content, tags, postType, coverImageUrl, inResponseToId]
+    [title, excerpt, content, tags, postType, articleFormat, coverImageUrl, inResponseToId]
   );
 
   useEffect(() => {
@@ -544,6 +565,7 @@ export default function WritePage() {
   const handleMetadataChange = useCallback(
     (changes: {
       postType?: PostType;
+      articleFormat?: ArticleFormat | null;
       tags?: string[];
       coverImageUrl?: string;
       excerpt?: string;
@@ -551,6 +573,10 @@ export default function WritePage() {
       inResponseToId?: string | null;
     }) => {
       if (changes.postType) setPostType(changes.postType);
+      // "articleFormat" in changes (not a truthiness/undefined check) so an
+      // explicit null -- the user picking "General" to clear a genre -- is
+      // applied, not ignored the way `if (changes.articleFormat)` would.
+      if ("articleFormat" in changes) setArticleFormat(changes.articleFormat ?? null);
       if (changes.tags) setTags(changes.tags);
       if (typeof changes.coverImageUrl === "string") {
         setCoverImageUrl(changes.coverImageUrl);
@@ -568,6 +594,7 @@ export default function WritePage() {
       void saveDraft(
         getCurrentData({
           postType: changes.postType,
+          ...("articleFormat" in changes ? { articleFormat: changes.articleFormat ?? null } : {}),
           tags: changes.tags,
           coverImageUrl: changes.coverImageUrl,
           excerpt: changes.excerpt,
@@ -760,9 +787,9 @@ export default function WritePage() {
               </svg>
             </button>
             <div className="hidden lg:block">
-              <p className="text-sm font-semibold text-ink">Draft workspace</p>
+              <p className="text-sm font-semibold text-ink">Write an Article</p>
               <p className="mt-0.5 text-xs text-gray-400">
-                Shape the argument, then choose its format.
+                Long-form, with a title — publishes immediately.
               </p>
             </div>
             <span
@@ -1249,6 +1276,7 @@ export default function WritePage() {
             initialCoverImageUrl={coverImageUrl}
             initialExcerpt={excerpt}
             initialPostType={postType}
+            initialArticleFormat={articleFormat}
             initialReferences={references}
             inResponseTo={inResponseToId}
             onMetadataChange={handleMetadataChange}

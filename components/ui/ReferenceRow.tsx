@@ -11,6 +11,7 @@ interface ReferenceRowProps {
   onMove: (direction: "up" | "down") => void;
   onChange: (reference: PostReferenceRecord) => void;
   onRemove: () => void;
+  disabled?: boolean;
 }
 
 export default function ReferenceRow({
@@ -21,6 +22,7 @@ export default function ReferenceRow({
   onMove,
   onChange,
   onRemove,
+  disabled = false,
 }: ReferenceRowProps) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -30,7 +32,7 @@ export default function ReferenceRow({
           <button
             type="button"
             onClick={() => onMove("up")}
-            disabled={!canMoveUp}
+            disabled={disabled || !canMoveUp}
             className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
           >
             ↑
@@ -38,7 +40,7 @@ export default function ReferenceRow({
           <button
             type="button"
             onClick={() => onMove("down")}
-            disabled={!canMoveDown}
+            disabled={disabled || !canMoveDown}
             className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-40"
           >
             ↓
@@ -46,14 +48,15 @@ export default function ReferenceRow({
           <button
             type="button"
             onClick={onRemove}
-            className="rounded border border-red-200 px-2 py-1 text-xs text-red-600"
+            disabled={disabled}
+            className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 disabled:opacity-40"
           >
             Remove
           </button>
         </div>
       </div>
 
-      <ReferenceFields reference={reference} onChange={onChange} />
+      <ReferenceFields reference={reference} onChange={onChange} disabled={disabled} />
     </div>
   );
 }

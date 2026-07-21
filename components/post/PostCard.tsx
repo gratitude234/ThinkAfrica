@@ -7,14 +7,24 @@ import {
   sanitizePostExcerpt,
   type PostType,
 } from "@/lib/utils";
+import { getPostDisplayTitle, isLightweightPost } from "@/lib/postDisplay";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  isFormallyReviewed,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
 
 export interface PostCardData {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   in_response_to?: string | null;
   excerpt: string | null;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   tags: string[] | null;
   created_at: string;
   published_at: string | null;
@@ -214,7 +224,21 @@ function BookmarkIcon() {
 export default function PostCard({ post, variant = "standard" }: PostCardProps) {
   const author = post.profiles;
   const displayDate = post.published_at ?? post.created_at;
-  const typeLabel = POST_TYPE_LABELS[post.type as PostType] ?? post.type;
+  const displayTitle = getPostDisplayTitle(post);
+  const isLightweight = isLightweightPost(post);
+  // An Article (generic or a legacy Essay/Policy Brief) always leads with
+  // "Article" -- the historical format, if any, is a secondary suffix, not
+  // a replacement for the primary identity (see docs/content-model.md).
+  const resolvedKind = resolveContentKind(post);
+  const resolvedFormat = resolveArticleFormat(post);
+  const formatLabel = getArticleFormatLabel(resolvedFormat);
+  const typeLabel = isLightweight
+    ? "Post"
+    : resolvedKind === "article"
+      ? formatLabel
+        ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
+        : getContentKindLabel(resolvedKind)
+      : (POST_TYPE_LABELS[post.type as PostType] ?? post.type);
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const readTime = estimateReadTime(excerpt);
   const documentSize = formatDocumentSize(post.document_size_bytes);
@@ -227,8 +251,9 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
   const authorHref = author?.username ? `/${author.username}` : null;
   const coAuthorCount = post.co_authors?.length ?? 0;
-  const isReviewed =
-    Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+  // Evidence-based: a type/kind says a workflow *requires* review, but only
+  // citation_id/published_version_id prove a specific record completed it.
+  const isReviewed = isFormallyReviewed(post);
   const authorLine =
     coAuthorCount > 0 ? `${authorName} + ${coAuthorCount} others` : authorName;
   const verifiedBg =
@@ -251,8 +276,10 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
   const thumbnail = hasCoverImage ? (
     <PostCover
       src={post.cover_image_url}
-      alt={post.title}
+      alt={displayTitle}
       type={post.type}
+      content_kind={post.content_kind}
+      article_format={post.article_format}
       sizes={isExplore ? "72px" : isEditorial ? "112px" : "96px"}
       className={
         isExplore
@@ -355,21 +382,39 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
             ))}
           </div>
 
-          <Link href={`/post/${post.slug}`}>
-            <h2
-              className={`font-display line-clamp-2 font-semibold text-ink transition-colors group-hover:text-gray-700 ${
-                isEditorial
-                  ? "text-[19px] leading-[1.19] sm:text-[21px]"
-                  : isExplore
-                    ? "text-[15px] leading-[1.28] sm:text-[16.5px] sm:leading-[1.28]"
-                  : "text-[16.5px] leading-[1.24] sm:text-[18px] sm:leading-[1.22]"
-              }`}
-            >
-              {post.title}
-            </h2>
-          </Link>
+          {displayTitle ? (
+            <Link href={`/post/${post.slug}`}>
+              <h2
+                className={`font-display line-clamp-2 font-semibold text-ink transition-colors group-hover:text-gray-700 ${
+                  isEditorial
+                    ? "text-[19px] leading-[1.19] sm:text-[21px]"
+                    : isExplore
+                      ? "text-[15px] leading-[1.28] sm:text-[16.5px] sm:leading-[1.28]"
+                    : "text-[16.5px] leading-[1.24] sm:text-[18px] sm:leading-[1.22]"
+                }`}
+              >
+                {displayTitle}
+              </h2>
+            </Link>
+          ) : (
+            // Titleless lightweight Post: lead with the body text itself
+            // instead of a heading — no empty <h2>, no fabricated title.
+            <Link href={`/post/${post.slug}`}>
+              <p
+                className={`font-display line-clamp-3 font-semibold text-ink transition-colors group-hover:text-gray-700 ${
+                  isEditorial
+                    ? "text-[17px] leading-[1.3] sm:text-[19px]"
+                    : isExplore
+                      ? "text-[14px] leading-[1.32] sm:text-[15px]"
+                    : "text-[15px] leading-[1.3] sm:text-[16px]"
+                }`}
+              >
+                {excerpt || "View post"}
+              </p>
+            </Link>
+          )}
 
-          {excerpt ? (
+          {displayTitle && excerpt ? (
             <p
               className={`mt-2 text-gray-500 max-[359px]:hidden ${
                 isEditorial

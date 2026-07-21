@@ -5,12 +5,21 @@ import {
   sanitizePostExcerpt,
   type PostType,
 } from "@/lib/utils";
+import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
+import {
+  getArticleFormatLabel,
+  getContentKindLabel,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
 
 interface PickPost {
   id: string;
-  title: string;
+  title: string | null;
   slug: string;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   excerpt: string | null;
   cover_image_url: string | null;
   published_at: string | null;
@@ -56,8 +65,18 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
       <div className={`mb-6 grid gap-2.5 ${picks.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
         {picks.map((pick) => {
           const author = pick.profiles;
-          const typeLabel = POST_TYPE_LABELS[pick.type as PostType] ?? pick.type;
-          const readTime = estimateReadTime(sanitizePostExcerpt(pick.excerpt));
+          const displayTitle = getPostDisplayTitle(pick);
+          const excerpt = sanitizePostExcerpt(pick.excerpt);
+          const headline = displayTitle ?? excerpt ?? getPostMetadataTitle(pick, author);
+          const resolvedKind = resolveContentKind(pick);
+          const formatLabel = getArticleFormatLabel(resolveArticleFormat(pick));
+          const typeLabel =
+            resolvedKind === "article"
+              ? formatLabel
+                ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
+                : getContentKindLabel(resolvedKind)
+              : (POST_TYPE_LABELS[pick.type as PostType] ?? pick.type);
+          const readTime = estimateReadTime(excerpt);
           const hasCoverImage = Boolean(pick.cover_image_url?.trim());
           const gradient = TYPE_GRADIENTS[pick.type] ?? TYPE_GRADIENTS.blog;
           const stamp = TYPE_STAMPS[pick.type] ?? "T";
@@ -71,7 +90,7 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
               {hasCoverImage ? (
                 <PostCover
                   src={pick.cover_image_url}
-                  alt={pick.title}
+                  alt={displayTitle}
                   type={pick.type}
                   sizes="(max-width: 1024px) 50vw, 33vw"
                   className="h-[88px] w-full"
@@ -89,7 +108,7 @@ export default function EditorPicksRow({ picks }: { picks: PickPost[] }) {
                   {typeLabel} {"\u00B7"} {readTime} min
                 </p>
                 <h3 className="font-display line-clamp-2 text-[13px] font-semibold leading-[1.3] text-ink transition-colors group-hover:text-gray-700">
-                  {pick.title}
+                  {headline}
                 </h3>
                 {author ? (
                   <p className="mt-1 truncate text-[11px] text-ink-muted">

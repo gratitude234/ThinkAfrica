@@ -9,6 +9,7 @@ import OpportunityProfileEditor from "@/components/opportunities/OpportunityProf
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import PublicationsSection from "@/components/profile/PublicationsSection";
+import PostsSection from "@/components/profile/PostsSection";
 import TopArguments from "@/components/profile/TopArguments";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import TrackedActionLink from "@/components/retention/TrackedActionLink";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/profileCredibility";
 import { createClient } from "@/lib/supabase/server";
 import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
+import { isFormallyReviewed, resolveContentKind } from "@/lib/contentModel";
 
 interface PageProps {
   params: Promise<{ username: string }>;
@@ -67,13 +69,16 @@ interface TalentProfile {
 interface ProfilePost {
   id: string;
   author_id?: string;
-  title: string;
+  title: string | null;
   slug: string;
   in_response_to?: string | null;
   excerpt: string | null;
   type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
   tags: string[] | null;
   citation_id?: string | null;
+  published_version_id?: string | null;
   created_at: string;
   published_at: string | null;
   view_count: number | null;
@@ -166,8 +171,11 @@ function clampText(value: string, maxLength: number) {
   return `${value.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
-function isReviewedWork(post: { type?: string | null; citation_id?: string | null }) {
-  return Boolean(post.citation_id) || post.type === "research" || post.type === "policy_brief";
+// Evidence-based, not name-based: a post's kind/type says its workflow
+// *requires* review, but only citation_id/published_version_id prove a
+// specific record actually completed it (see lib/contentModel.ts).
+function isReviewedWork(post: { citation_id?: string | null; published_version_id?: string | null }) {
+  return isFormallyReviewed(post);
 }
 
 function PortfolioSummary({
@@ -459,7 +467,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("posts")
       .select(
-        "id, author_id, title, slug, in_response_to, excerpt, type, tags, citation_id, created_at, published_at, view_count, read_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type), post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
+        "id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, citation_id, published_version_id, created_at, published_at, view_count, read_count, cover_image_url, profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type), post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
       )
       .eq("author_id", profile.id)
       .eq("status", "published")
@@ -467,7 +475,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("post_authors")
       .select(
-        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, in_response_to, excerpt, type, status, tags, citation_id, created_at, published_at, view_count, read_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
+        "post_id, posts!post_authors_post_id_fkey(id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, status, tags, citation_id, published_version_id, created_at, published_at, view_count, read_count, cover_image_url, profiles!posts_author_id_fkey(username, full_name, university, avatar_url, verified, verified_type))"
       )
       .eq("user_id", profile.id)
       .not("accepted_at", "is", null),
@@ -610,6 +618,19 @@ export default async function UserProfilePage({ params }: PageProps) {
       Array.isArray(userBadge.badges) ? userBadge.badges[0] : userBadge.badges
     )
     .filter(Boolean) as Badge[];
+
+  // Posts (lightweight, resolveContentKind === "post") are not formal
+  // publications: keep them out of the Publications/portfolio section and
+  // show them in their own Posts/activity area instead. Legacy `blog`
+  // records resolve to "post" the same way a new titleless Post does, so
+  // both land here; everything that resolves to "article"/"research"
+  // (essay, policy_brief, research) stays in Publications.
+  const publicationPosts = mergedPosts.filter(
+    (post) => resolveContentKind(post) !== "post"
+  );
+  const lightweightPosts = mergedPosts.filter(
+    (post) => resolveContentKind(post) === "post"
+  );
 
   const totalViews = mergedPosts.reduce(
     (sum, post) => sum + (post.read_count ?? 0),
@@ -851,7 +872,9 @@ export default async function UserProfilePage({ params }: PageProps) {
             }
           />
 
-          <PublicationsSection posts={mergedPosts} fullName={displayName} />
+          <PublicationsSection posts={publicationPosts} fullName={displayName} />
+
+          <PostsSection posts={lightweightPosts} fullName={displayName} />
 
           <div className="lg:hidden">
             <CredentialsCard

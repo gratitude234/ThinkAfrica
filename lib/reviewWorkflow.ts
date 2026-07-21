@@ -314,6 +314,23 @@ export async function createVersionSnapshot(input: {
   return data as PostVersionRecord;
 }
 
+// Known race, documented rather than fixed here (flagged in Phase 3 DB
+// review): this reads and freezes the "publication" post_versions snapshot
+// (references, authors, content) via createVersionSnapshot() below, then
+// updates posts.status to 'published' as a *separate* database call. The
+// row is still 'pending' between those two calls, and
+// guard_locked_post_child_write (see
+// supabase/migrations/20260720000001_lock_accepted_and_removed_posts.sql)
+// deliberately still allows editing references/co-authors while a post is
+// 'pending' -- saveEditedPost() needs that for the ordinary revision cycle.
+// So a reference/co-author edit that lands in this window is captured in
+// neither the snapshot (already read) nor guaranteed to be reflected
+// consistently once status flips -- the live posts_references/post_authors
+// rows and the citable "publication" version can end up disagreeing about
+// what was actually accepted. Closing this fully needs the snapshot read,
+// the posts update, and a lock against concurrent reference/author writes
+// to happen inside one transactional acceptance RPC; two sequential admin
+// calls from application code cannot make that atomic.
 export async function publishReviewedPost(input: {
   postId: string;
   round: number;

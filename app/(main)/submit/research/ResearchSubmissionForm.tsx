@@ -62,6 +62,14 @@ function emptyReference(): PostReferenceRecord {
   };
 }
 
+const NON_EDITABLE_STATUS_COPY: Record<string, string> = {
+  withdrawn: "This submission was withdrawn and can no longer be edited or resubmitted from here.",
+  pending: "This submission is awaiting a reviewer decision and can't be edited right now.",
+  published: "This paper was accepted and its record is locked so its citation stays stable.",
+  rejected: "This submission was declined and can no longer be edited.",
+  removed: "This post was removed and can no longer be edited.",
+};
+
 function CheckItem({ done, label }: { done: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -130,7 +138,6 @@ export default function ResearchSubmissionForm({
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const status = initialDraft?.status ?? "draft";
-  const currentRound = initialDraft?.currentRound ?? 1;
   const needsAuthorNote = status === "pending_revision";
   const metadataReady =
     title.trim().length > 0 && abstract.trim().length > 0 && tags.length > 0;
@@ -139,9 +146,21 @@ export default function ResearchSubmissionForm({
   const referencesReady = references.some((ref) => ref.title?.trim());
   const submittedForReview = status === "pending" || status === "pending_revision";
   const canChangePdf = status === "draft" || status === "pending_revision";
+  // Mirrors the server's own allowlist exactly (upsertResearchPost in
+  // ./actions.ts): saving or submitting is only legal from draft or
+  // pending_revision. A submission that's pending (awaiting a decision),
+  // published (accepted), rejected, removed, or withdrawn can't be saved
+  // no matter what this form shows -- without this, "Save draft"/"Submit"
+  // stayed clickable regardless of status, so the only way to discover a
+  // submission couldn't be edited was the server rejecting it after the
+  // fact.
+  const isEditable = status === "draft" || status === "pending_revision";
   const reviewerDecision =
     status === "pending_revision" || status === "published" || status === "rejected";
   const citationArchived = status === "published";
+  const statusNoticeCopy = !isEditable
+    ? (NON_EDITABLE_STATUS_COPY[status] ?? "This submission can no longer be edited from here.")
+    : null;
   const timeline = [
     {
       label: "Metadata",
@@ -196,8 +215,6 @@ export default function ResearchSubmissionForm({
       corresponding_author: false,
     })),
     authorNote,
-    currentStatus: status,
-    currentRound,
   };
 
   const handleUpload = async (file: File | null) => {
@@ -304,6 +321,12 @@ export default function ResearchSubmissionForm({
         </p>
       </div>
 
+      {statusNoticeCopy ? (
+        <div className="rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-700">
+          {statusNoticeCopy} The fields below are read-only.
+        </div>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <main className="space-y-5">
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -317,7 +340,8 @@ export default function ResearchSubmissionForm({
                   id="research-title"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                  disabled={!isEditable}
+                  className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand disabled:bg-gray-50 disabled:text-gray-400"
                   placeholder="Research title"
                 />
               </div>
@@ -330,7 +354,8 @@ export default function ResearchSubmissionForm({
                   value={abstract}
                   onChange={(event) => setAbstract(event.target.value)}
                   rows={8}
-                  className="mt-2 w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm leading-6 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                  disabled={!isEditable}
+                  className="mt-2 w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm leading-6 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand disabled:bg-gray-50 disabled:text-gray-400"
                   placeholder="Summarize the research question, method, findings, and contribution."
                 />
               </div>
@@ -341,6 +366,7 @@ export default function ResearchSubmissionForm({
                 helperText="Add 1 to 5 topics so reviewers and readers can classify the paper."
                 placeholder="Add topic"
                 onChange={setTags}
+                disabled={!isEditable}
               />
             </div>
           </section>
@@ -443,6 +469,7 @@ export default function ResearchSubmissionForm({
                         .map((r, i) => ({ ...r, display_order: i }))
                     )
                   }
+                  disabled={!isEditable}
                 />
               ))}
             </div>
@@ -455,7 +482,8 @@ export default function ResearchSubmissionForm({
                   { ...emptyReference(), display_order: current.length },
                 ])
               }
-              className="mt-3 w-full rounded-lg border border-dashed border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+              disabled={!isEditable}
+              className="mt-3 w-full rounded-lg border border-dashed border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 disabled:pointer-events-none disabled:opacity-40"
             >
               + Add reference
             </button>
@@ -487,6 +515,7 @@ export default function ResearchSubmissionForm({
             value={coAuthors}
             onChange={setCoAuthors}
             source="write"
+            disabled={!isEditable}
           />
 
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -551,7 +580,7 @@ export default function ResearchSubmissionForm({
                 type="button"
                 variant="secondary"
                 className="w-full"
-                disabled={isPending || uploading}
+                disabled={isPending || uploading || !isEditable}
                 onClick={saveDraft}
               >
                 Save draft
@@ -560,7 +589,7 @@ export default function ResearchSubmissionForm({
                 type="button"
                 className="w-full"
                 loading={isPending}
-                disabled={uploading || !canChangePdf}
+                disabled={uploading || !isEditable}
                 onClick={submit}
               >
                 {needsAuthorNote ? "Resubmit" : "Submit for review"}
@@ -599,7 +628,7 @@ export default function ResearchSubmissionForm({
             type="button"
             variant="secondary"
             className="flex-1"
-            disabled={isPending || uploading}
+            disabled={isPending || uploading || !isEditable}
             onClick={saveDraft}
           >
             Save draft
@@ -608,7 +637,7 @@ export default function ResearchSubmissionForm({
             type="button"
             className="flex-1"
             loading={isPending}
-            disabled={uploading || !canChangePdf}
+            disabled={uploading || !isEditable}
             onClick={submit}
           >
             {needsAuthorNote ? "Resubmit" : "Submit for review"}

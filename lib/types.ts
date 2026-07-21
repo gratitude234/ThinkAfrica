@@ -17,7 +17,9 @@ export type PostStatus =
   | "pending"
   | "pending_revision"
   | "published"
-  | "rejected";
+  | "rejected"
+  | "removed"
+  | "withdrawn";
 
 export type ReviewRecommendation = "accept" | "revise" | "reject";
 export type EditorDecision = "accept" | "request_revision" | "reject";
@@ -132,7 +134,7 @@ export interface PostEditorDecisionRecord {
 export interface ExtendedPostRecord {
   id: string;
   author_id: string;
-  title: string;
+  title: string | null;
   slug: string;
   content: string | null;
   excerpt: string | null;

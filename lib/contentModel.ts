@@ -110,6 +110,16 @@ export function resolveArticleFormat(record: ClassifiableRecord): ArticleFormat 
   if (isArticleFormat(record.article_format)) {
     return record.article_format;
   }
+  // Only fall back to inferring a format from the legacy `type` when
+  // content_kind itself isn't an explicit, populated new-model value. Once a
+  // record has an explicit content_kind, it is authoritative -- a null
+  // article_format means "no format" (a generic Article), not "go infer one
+  // from the legacy type". Without this guard, a brand-new generic Article
+  // dual-written as type="essay"/content_kind="article"/article_format=null
+  // would be indistinguishable from a genuine legacy Essay.
+  if (isContentKind(record.content_kind)) {
+    return null;
+  }
   return articleFormatFromLegacyType(record.type ?? null);
 }
 
@@ -222,4 +232,94 @@ export function isFormallyReviewed(record: {
   published_version_id?: string | null;
 }): boolean {
   return Boolean(record.citation_id) || Boolean(record.published_version_id);
+}
+
+/**
+ * Phase 3 (the "migrate" step): the temporary legacy `type` value to
+ * dual-write when creating NEW content of a given kind, since `type`
+ * still has a NOT NULL constraint. This is the single place that decides
+ * what a brand-new Post or Article's legacy value is -- server actions
+ * should call this instead of hardcoding "blog"/"essay" independently.
+ *
+ * Deliberately returns null for "research": research records are created
+ * through their own dedicated submission flow (app/(main)/submit/research),
+ * never through this generic new-content mapping, so there is no safe
+ * guess to synthesize here -- a caller that ends up with null for
+ * "research" has a bug to fix, not a value to fall back on.
+ *
+ * Deliberately IGNORES article_format: a brand-new Article always
+ * dual-writes type="essay" regardless of its chosen genre (including
+ * "policy_brief"). This is not an oversight -- it is load-bearing. See
+ * isLegacyPolicyBriefInFlight() below for why a NEW Policy-Brief-format
+ * Article must never be written with the literal legacy value
+ * type="policy_brief".
+ */
+export function legacyTypeForNewContent(kind: ContentKind): LegacyPostType | null {
+  if (kind === "post") return "blog";
+  if (kind === "article") return "essay";
+  return null;
+}
+
+/**
+ * Phase 4A: three distinct concepts that must never collapse into one
+ * boolean (see docs/content-model-phase4a-audit.md):
+ *   1. "Requires review by product policy"     -> contentKindRequiresFormalReview()
+ *   2. "Already entered a legacy review workflow" -> isLegacyPolicyBriefInFlight() (this section)
+ *   3. "Has completed formal review"            -> isFormallyReviewed()
+ *
+ * Under the target model, only content_kind "research" requires formal
+ * review; an Article's article_format ("essay"/"policy_brief") is
+ * descriptive metadata and must never by itself trigger, imply, or prove
+ * review. But existing legacy Policy Brief submissions that were already
+ * pending/pending_revision *before* this phase shipped are mid-workflow --
+ * a reviewer may already be assigned, an editor may already be mid-
+ * decision -- and must be allowed to finish exactly as they would have
+ * under the old model (be accepted, rejected, sent back for revision, or
+ * withdrawn) rather than being silently ejected from review or stranded.
+ *
+ * This is a NARROWLY SCOPED, TEMPORARY compatibility path, isolated to
+ * this one function so every caller that needs it is explicit about why:
+ *   - Scoped to the literal legacy `type === "policy_brief"` value, never
+ *     to `article_format === "policy_brief"`. A brand-new Policy-Brief-
+ *     format Article always dual-writes type="essay" (see
+ *     legacyTypeForNewContent() above), so it can never match here --
+ *     only a row that predates Phase 4A (or was written by code that
+ *     still hasn't been migrated) carries the literal type="policy_brief"
+ *     value at all.
+ *   - Scoped to status IN (pending, pending_revision) -- the two states
+ *     that mean "actively inside the reviewer/editor workflow right now".
+ *     A published (accepted) legacy Policy Brief is handled by
+ *     isFormallyReviewed()/contentKindIsFormalPublication() instead (it's
+ *     done, not in flight); a draft/rejected/removed/withdrawn one needs
+ *     no special workflow routing at all.
+ *
+ * Phase 4B removes this function (and every caller's use of it) once
+ * every legacy pending/pending_revision Policy Brief has been resolved --
+ * see docs/content-model.md for the exact exit criterion.
+ */
+export function isLegacyPolicyBriefInFlight(record: {
+  type?: string | null;
+  status?: string | null;
+}): boolean {
+  return record.type === "policy_brief" && (record.status === "pending" || record.status === "pending_revision");
+}
+
+/**
+ * The composite decision callers actually need when routing a specific
+ * record through (or away from) editorial workflow -- e.g. "does
+ * submitting/editing this post right now need to go through reviewers".
+ * Deliberately a thin OR over the two independent concepts above rather
+ * than a new primitive: a record needs editorial workflow either because
+ * product policy requires it for its kind (research), or because it's a
+ * legacy Policy Brief already mid-workflow. Neither on its own is
+ * sufficient, and this function must never be used as a substitute for
+ * isFormallyReviewed() -- needing workflow and having completed it are
+ * opposite ends of the same process, not the same fact.
+ */
+export function needsEditorialWorkflow(record: {
+  type?: string | null;
+  content_kind?: string | null;
+  status?: string | null;
+}): boolean {
+  return contentKindRequiresFormalReview(resolveContentKind(record)) || isLegacyPolicyBriefInFlight(record);
 }

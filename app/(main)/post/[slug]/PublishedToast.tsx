@@ -163,7 +163,7 @@ export default function PublishedToast({
 
             {relatedTarget ? (
               <Link
-                href={`/write?inResponseTo=${relatedTarget.id}&type=essay`}
+                href={`/write?inResponseTo=${relatedTarget.id}&kind=article`}
                 onClick={() => {
                   trackNextAction("write_response");
                   trackActivationEvent({

@@ -11,16 +11,24 @@ export interface CreateAction {
 
 export const CREATE_ACTIONS: CreateAction[] = [
   {
-    id: "write",
-    label: "Write",
-    description: "Start writing now — choose the format when you publish.",
-    badge: "Start writing",
-    href: "/write",
+    id: "post",
+    label: "Post",
+    description: "Share a quick thought — publishes immediately, no title needed.",
+    badge: "Quick post",
+    href: "/create/post",
+    category: "write",
+  },
+  {
+    id: "article",
+    label: "Article",
+    description: "Write a long-form piece with a title — publishes immediately.",
+    badge: "Long-form",
+    href: "/write?kind=article",
     category: "write",
   },
   {
     id: "research-paper",
-    label: "Upload research paper",
+    label: "Research Paper",
     description: "Submit a finished research manuscript as a PDF.",
     badge: "PDF review",
     href: "/submit/research",

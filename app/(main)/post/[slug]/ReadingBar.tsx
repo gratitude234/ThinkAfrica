@@ -97,7 +97,18 @@ export default function ReadingBar({
           paddingBottom: "calc(env(safe-area-inset-bottom) + 4px)",
         }}
       >
-        <div className="mx-auto flex min-h-[56px] max-w-[380px] items-center rounded-2xl border border-gray-200 bg-white/95 px-1 shadow-[0_14px_34px_-14px_rgb(0_0_0/0.42)] backdrop-blur">
+        <div className="mx-auto flex min-h-[56px] max-w-[420px] items-center rounded-2xl border border-gray-200 bg-white/95 px-1 shadow-[0_14px_34px_-14px_rgb(0_0_0/0.42)] backdrop-blur">
+          <Link
+            href="/"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2 text-gray-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+            aria-label="Go to the Indegenius home page"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 10.75L12 3l9 7.75V21H14.75v-5.5h-5.5V21H3V10.75z" />
+            </svg>
+            <span className="text-[11px] font-semibold">Home</span>
+          </Link>
+
           <button
             onClick={handleLike}
             className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2 transition-colors hover:bg-gray-50 ${liked ? "text-red-500" : "text-gray-500"}`}

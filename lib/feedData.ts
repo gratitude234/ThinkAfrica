@@ -37,7 +37,7 @@ type PublicFeedCacheInput = Pick<
 >;
 
 const POST_SELECT =
-  "id, title, slug, in_response_to, excerpt, type, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
+  "id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
 
 function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   if (timeframe === "week") {
@@ -305,28 +305,23 @@ async function fetchCitableFeedUncached(
     .order("published_at", { ascending: false })
     .limit(safePageSize);
 
-  const rows = [...(citableRows ?? [])];
-
-  if (rows.length < safePageSize) {
-    const existingIds = new Set(rows.map((post: { id?: string }) => post.id));
-    const { data: reviewedRows } = await reader
-      .from("posts")
-      .select(POST_SELECT)
-      .eq("status", "published")
-      .in("type", ["research", "policy_brief"])
-      .order("published_at", { ascending: false })
-      .limit(safePageSize * 2);
-
-    for (const row of reviewedRows ?? []) {
-      if (rows.length >= safePageSize) break;
-      if (!existingIds.has(row.id)) {
-        rows.push(row);
-        existingIds.add(row.id);
-      }
-    }
-  }
-
-  return enrichPosts(reader, rows.slice(0, safePageSize));
+  // Phase 4A: this used to pad a short "Citable" shelf with
+  // .in("type", ["research", "policy_brief"]) rows regardless of whether
+  // they actually carried citation_id -- name-based, not evidence-based.
+  // In practice that padding was already a no-op for legacy content
+  // (guard_locked_post_write blocks a research/policy_brief row from ever
+  // reaching status='published' without publishReviewedPost() setting
+  // citation_id in the same call -- see
+  // supabase/migrations/20260720000001_lock_accepted_and_removed_posts.sql),
+  // but for the new model it was also silently wrong in the other
+  // direction: a published Policy-Brief-*format* Article (content_kind
+  // "article", article_format "policy_brief") is never formally reviewed
+  // and must never appear here just because of its genre. Rather than
+  // pad with a second, weaker query, this shelf now shows only what the
+  // evidence-based query above actually found -- fewer than pageSize
+  // items is correct when fewer than pageSize posts have real citation
+  // evidence yet.
+  return enrichPosts(reader, (citableRows ?? []).slice(0, safePageSize));
 }
 
 const fetchCachedCitableFeed = unstable_cache(
@@ -338,7 +333,7 @@ const fetchCachedCitableFeed = unstable_cache(
   { revalidate: 300, tags: ["feed", "citable-feed"] }
 );
 
-function applyPostFilters(
+export function applyPostFilters(
   query: any,
   {
     type,
@@ -352,7 +347,32 @@ function applyPostFilters(
 ) {
   let nextQuery = query.eq("status", "published");
   if (type && type !== "all") {
-    nextQuery = nextQuery.eq("type", type);
+    // Every filter value is resolved against the new-model columns
+    // (populated for every row since the Phase 1 migration), never the
+    // legacy `type` column directly -- see docs/content-model.md.
+    //   - "essay" is the "Articles" chip: a content-kind filter, not a
+    //     legacy-type one, so it must include Policy Brief-format Articles
+    //     too (both resolve to content_kind "article").
+    //   - "policy_brief" and "research" are Article-*genre*/content-kind
+    //     filters respectively. Filtering "policy_brief" by legacy `type`
+    //     alone (the pre-Phase-4A behavior) missed every Policy-Brief-
+    //     format Article created after Phase 3 shipped, since a brand-new
+    //     Article always dual-writes type="essay" regardless of genre
+    //     (see legacyTypeForNewContent() in lib/contentModel.ts) -- only
+    //     article_format carries "policy_brief" for those rows.
+    //   - "blog" filters by content_kind "post" for the same reason, so a
+    //     future titleless Post with no legacy type at all still matches.
+    if (type === "essay") {
+      nextQuery = nextQuery.eq("content_kind", "article");
+    } else if (type === "policy_brief") {
+      nextQuery = nextQuery.eq("article_format", "policy_brief");
+    } else if (type === "research") {
+      nextQuery = nextQuery.eq("content_kind", "research");
+    } else if (type === "blog") {
+      nextQuery = nextQuery.eq("content_kind", "post");
+    } else {
+      nextQuery = nextQuery.eq("type", type);
+    }
   }
   if (cutoff) {
     nextQuery = nextQuery.gte("published_at", cutoff);

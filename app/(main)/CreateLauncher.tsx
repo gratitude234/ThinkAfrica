@@ -139,7 +139,7 @@ export default function CreateLauncher({
           <div className="border-b border-gray-100 px-4 py-3">
             <p className="text-sm font-semibold text-ink">Create on Indegenius</p>
             <p className="mt-0.5 text-xs text-gray-500">
-              Format is chosen when you publish.
+              Choose the format that fits what you want to share.
             </p>
           </div>
           <div className="grid gap-1 p-2">

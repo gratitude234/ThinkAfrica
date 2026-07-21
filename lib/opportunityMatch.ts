@@ -1,3 +1,4 @@
+import { isFormallyReviewed } from "@/lib/contentModel";
 import { normalizeOpportunityType, type OpportunityType } from "@/lib/opportunities";
 
 export type OpportunityMatchTone = "emerald" | "sky" | "purple" | "amber" | "gray";
@@ -48,6 +49,7 @@ export interface OpportunityMatchInput {
     type?: string | null;
     status?: string | null;
     citation_id?: string | null;
+    published_version_id?: string | null;
     tags?: string[] | null;
     referenceCount?: number | null;
   }>;
@@ -67,14 +69,18 @@ function unique(values: Array<string | null | undefined>) {
   );
 }
 
+// Evidence-based, not name-based: a post's type/genre says a workflow
+// *requires* review, but only citation_id/published_version_id prove a
+// specific record actually completed it (see isFormallyReviewed() in
+// lib/contentModel.ts). A published research/policy_brief post with no
+// review evidence yet (not possible for research under Phase 3's locking,
+// but always possible for a Policy-Brief-format Article, which publishes
+// immediately with no review at all) must not count as "reviewed" here.
 function hasReviewedOrSourceBackedWork(posts: OpportunityMatchInput["posts"]) {
   return (posts ?? []).some(
     (post) =>
       post.status === "published" &&
-      (Boolean(post.citation_id) ||
-        (post.referenceCount ?? 0) > 0 ||
-        post.type === "research" ||
-        post.type === "policy_brief")
+      (isFormallyReviewed(post) || (post.referenceCount ?? 0) > 0)
   );
 }
 

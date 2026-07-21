@@ -36,8 +36,6 @@ interface ResearchPayload {
   references: ReferenceInput[];
   coAuthors: CoAuthorInput[];
   authorNote?: string;
-  currentStatus?: string;
-  currentRound?: number;
 }
 
 interface ResearchUploadDraftInput {
@@ -101,7 +99,11 @@ function normalizeReferences(references: ReferenceInput[]) {
     );
 }
 
-function validateResearchPayload(input: ResearchPayload, forSubmit: boolean) {
+function validateResearchPayload(
+  input: ResearchPayload,
+  forSubmit: boolean,
+  effectiveStatus: string | null
+) {
   if (!input.title.trim()) {
     return "Add a research title so reviewers can identify the paper.";
   }
@@ -134,7 +136,7 @@ function validateResearchPayload(input: ResearchPayload, forSubmit: boolean) {
 
   if (
     forSubmit &&
-    input.currentStatus === "pending_revision" &&
+    effectiveStatus === "pending_revision" &&
     !input.authorNote?.trim()
   ) {
     return "Add an author response note explaining what changed before resubmitting this revision.";
@@ -295,22 +297,26 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
     return { error: "You must be signed in.", postId: null as string | null, slug: null as string | null };
   }
 
-  const validationError = validateResearchPayload(input, status === "pending");
-  if (validationError) {
-    return { error: validationError, postId: null, slug: null };
-  }
-
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const content = buildResearchContent(input.abstract, input.document.originalName);
   const now = new Date().toISOString();
 
   let postId = input.draftId;
   let slug: string | null = null;
+  // Never trusted from the client -- this action derives every workflow
+  // decision (whether an author note is required, what round/version_kind
+  // a resubmission's snapshot gets, whether a fresh submit is even legal)
+  // from the row's own stored state, fetched below. A previous version of
+  // this file took `currentStatus`/`currentRound` as client-supplied input
+  // fields instead, the same anti-pattern already fixed for Article/Post
+  // editing in app/(main)/edit/[slug]/actions.ts's saveEditedPost().
+  let effectiveStatus: string | null = null;
+  let effectiveRound = 1;
 
   if (postId) {
     const { data: existingPost } = await supabase
       .from("posts")
-      .select("id, author_id, slug, status, current_round")
+      .select("id, author_id, slug, status, current_round, type")
       .eq("id", postId)
       .single();
 
@@ -318,17 +324,52 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
       return { error: "You do not have permission to edit this research submission.", postId: null, slug: null };
     }
 
-    slug = existingPost.slug;
-    const nextStatus =
-      status === "draft" && existingPost.status !== "draft"
-        ? existingPost.status
-        : status;
-    const nextRound =
-      status === "pending" && existingPost.status === "pending_revision"
-        ? (existingPost.current_round ?? 1) + 1
-        : (existingPost.current_round ?? 1);
+    if (existingPost.type !== "research") {
+      return { error: "This submission is not a research paper.", postId: null, slug: null };
+    }
 
-    const { error } = await supabase
+    // Saving or submitting is only legal from draft or pending_revision --
+    // not an already-pending, published, rejected, removed, or withdrawn
+    // row. Without this, submitResearchPaper() could take an already-
+    // withdrawn submission (see withdraw_post_submission() in
+    // supabase/migrations/20260720000001_lock_accepted_and_removed_posts.sql)
+    // straight back to 'pending', resurrecting it outside any real
+    // resubmission flow and past reviewer assignments already retired via
+    // post_reviews.removed_at. guard_locked_post_write independently
+    // backstops this at the database level for withdrawn/removed/
+    // published-formal rows, but this check gives a clear error instead of
+    // a wasted, rejected write.
+    if (!["draft", "pending_revision"].includes(existingPost.status)) {
+      return {
+        error: "This research submission can no longer be edited from here.",
+        postId: null,
+        slug: null,
+      };
+    }
+
+    slug = existingPost.slug;
+    effectiveStatus = existingPost.status;
+    effectiveRound = existingPost.current_round ?? 1;
+  }
+
+  const validationError = validateResearchPayload(input, status === "pending", effectiveStatus);
+  if (validationError) {
+    return { error: validationError, postId: null, slug: null };
+  }
+
+  if (postId) {
+    const nextStatus =
+      status === "draft" && effectiveStatus !== "draft" ? effectiveStatus : status;
+    const nextRound =
+      status === "pending" && effectiveStatus === "pending_revision"
+        ? effectiveRound + 1
+        : effectiveRound;
+
+    // The status filter is part of the WHERE clause itself, not just the
+    // pre-check above, so a concurrent write changing this row's status
+    // can't be raced past -- mirrors the atomic-update pattern used
+    // throughout app/(write)/write/actions.ts.
+    const { data: updatedRows, error } = await supabase
       .from("posts")
       .update({
         title: input.title.trim(),
@@ -348,13 +389,23 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
         document_size_bytes: input.document.sizeBytes,
       })
       .eq("id", postId)
-      .eq("author_id", user.id);
+      .eq("author_id", user.id)
+      .in("status", ["draft", "pending_revision"])
+      .select("id");
 
     if (error) {
       return {
         error:
           userSafeDatabaseError(error.message) ??
           "Failed to save research submission.",
+        postId: null,
+        slug: null,
+      };
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        error: "This research submission can no longer be edited from here.",
         postId: null,
         slug: null,
       };
@@ -417,15 +468,15 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
 
   if (status === "pending") {
     const admin = createAdminClient();
+    const isRevisionResubmission = effectiveStatus === "pending_revision";
+    const snapshotRound = isRevisionResubmission ? effectiveRound : 1;
+    const snapshotKind = isRevisionResubmission ? "revision" : "submission";
     const { data: existingVersion } = await admin
       .from("post_versions")
       .select("id")
       .eq("post_id", postId)
-      .eq("round", input.currentRound ?? 1)
-      .eq(
-        "version_kind",
-        input.currentStatus === "pending_revision" ? "revision" : "submission"
-      )
+      .eq("round", snapshotRound)
+      .eq("version_kind", snapshotKind)
       .maybeSingle();
 
     if (!existingVersion) {
@@ -433,8 +484,8 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
         await createVersionSnapshot({
           admin,
           postId,
-          round: input.currentStatus === "pending_revision" ? input.currentRound ?? 1 : 1,
-          versionKind: input.currentStatus === "pending_revision" ? "revision" : "submission",
+          round: snapshotRound,
+          versionKind: snapshotKind,
           authorNote: input.authorNote,
           submittedBy: user.id,
         });
