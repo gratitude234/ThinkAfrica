@@ -6,6 +6,7 @@ import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
 import { formatRelativeTime } from "@/lib/utils";
 import { respondToCoAuthorInvite } from "./actions";
+import ResponseStartLink from "@/components/post/ResponseStartLink";
 
 interface NotificationData {
   id: string;
@@ -130,9 +131,6 @@ export default function NotificationItem({
   const message = inboxItem?.description ?? buildMessage(notification);
   const link = buildLink(notification);
   const icon = TYPE_ICONS[notification.type] ?? "N";
-  const writeBackHref = notification.post_id
-    ? `/write?inResponseTo=${notification.post_id}&kind=article&starter=response&responseIntent=extend`
-    : null;
   const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");
   const [localRead, setLocalRead] = useState(notification.read);
 
@@ -300,10 +298,11 @@ export default function NotificationItem({
               Read response
             </Link>
           ) : null}
-          {writeBackHref ? (
-            <Link
-              href={writeBackHref}
-              onClick={() => {
+          {notification.post_id ? (
+            <ResponseStartLink
+              postId={notification.post_id}
+              source="notifications_response"
+              onTriggerClick={() => {
                 trackActivationEvent({
                   event: "next_action_clicked",
                   metadata: {
@@ -315,19 +314,11 @@ export default function NotificationItem({
                     postId: notification.post_id ?? null,
                   },
                 });
-                trackActivationEvent({
-                  event: "response_started",
-                  metadata: {
-                    postId: notification.post_id ?? null,
-                    source: "notifications_response",
-                    responseIntent: "extend",
-                  },
-                });
               }}
               className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
             >
               Write back
-            </Link>
+            </ResponseStartLink>
           ) : null}
         </div>
       </div>

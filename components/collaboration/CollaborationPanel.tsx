@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { findOrCreateConversation } from "@/lib/messaging";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { toggleFollow } from "@/components/ui/followActions";
+import ResponseStartLink from "@/components/post/ResponseStartLink";
 import type { CollaborationSummary } from "@/lib/collaboration";
 
 export default function CollaborationPanel({
@@ -123,8 +124,6 @@ export default function CollaborationPanel({
     }
   };
 
-  const responseHref = summary.viewerId ? summary.responseHref : summary.signInHref;
-
   return (
     <section className="mb-8 rounded-xl bg-gray-950 px-4 py-5 text-white sm:rounded-lg sm:px-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -153,24 +152,14 @@ export default function CollaborationPanel({
       </div>
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <Link
-          href={responseHref}
-          onClick={() => {
-            trackClick("write_response");
-            if (summary.viewerId) {
-              trackActivationEvent({
-                event: "response_started",
-                metadata: {
-                  postId: summary.postId,
-                  source: "collaboration_panel",
-                },
-              });
-            }
-          }}
+        <ResponseStartLink
+          postId={summary.postId}
+          source="collaboration_panel"
+          onTriggerClick={() => trackClick("write_response")}
           className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] sm:min-h-10"
         >
           Write a response
-        </Link>
+        </ResponseStartLink>
         <button
           type="button"
           onClick={handleFollow}

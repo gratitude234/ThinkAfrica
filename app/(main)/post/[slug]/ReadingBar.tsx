@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Toast from "@/components/ui/Toast";
+import ResponseStartLink from "@/components/post/ResponseStartLink";
 import { usePostEngagement } from "./PostEngagementContext";
 
 interface Props {
@@ -200,16 +201,23 @@ export default function ReadingBar({
           <div className="my-0.5 h-px w-6 rounded-full bg-gray-200" />
 
           {/* Write a response */}
-          <Link
-            href={`/write?response_to=${slug}&inResponseTo=${postId}`}
+          <ResponseStartLink
+            postId={postId}
+            source="reading_bar"
             className="flex h-10 w-10 items-center justify-center rounded-xl text-emerald-600 transition-colors hover:bg-emerald-50"
-            aria-label="Write a response"
-            title="Write a response"
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <span className="sr-only">Write a response</span>
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4" />
             </svg>
-          </Link>
+          </ResponseStartLink>
         </div>
       </div>
         </>

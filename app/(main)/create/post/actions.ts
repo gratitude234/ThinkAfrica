@@ -13,6 +13,7 @@ import {
   SHORT_POST_MAX_CHARACTERS,
 } from "@/lib/shortPostContent";
 import { buildShortPostHtml } from "@/lib/shortPostHtml";
+import { notifyResponseParentAuthor, validateResponseParent } from "@/lib/responsePost";
 
 // CoverImageUploader's default bucket/path convention (components/ui/CoverImageUploader.tsx).
 const POST_IMAGE_BUCKET = "post-images";
@@ -54,7 +55,11 @@ function uniqueSlugSuffix(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function createPost(input: { body: string; imageUrl?: string | null }) {
+export async function createPost(input: {
+  body: string;
+  imageUrl?: string | null;
+  inResponseTo?: string | null;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -82,6 +87,23 @@ export async function createPost(input: { body: string; imageUrl?: string | null
     };
   }
 
+  // A "Quick response" Post never trusts the client's claimed parent --
+  // the composer's own display of "Responding to X" is resolved
+  // server-side by the page, but the actual publish re-validates
+  // independently, so a modified request (or a parent that became
+  // unavailable between opening the composer and publishing) can't
+  // silently attach to, or spoof, a relationship. Mirrors the same
+  // validation the Article ("Long-form response") flow uses --
+  // see lib/responsePost.ts.
+  let responseParent: Awaited<ReturnType<typeof validateResponseParent>>["parent"] = null;
+  if (input.inResponseTo) {
+    const parentValidation = await validateResponseParent(supabase, input.inResponseTo, null);
+    if (parentValidation.error) {
+      return { error: parentValidation.error, slug: null as string | null };
+    }
+    responseParent = parentValidation.parent;
+  }
+
   const normalizedBody = normalizeShortPostText(input.body);
   const sanitizedContent = buildShortPostHtml(input.body);
   const excerpt = deriveShortPostExcerpt(normalizedBody);
@@ -105,6 +127,7 @@ export async function createPost(input: { body: string; imageUrl?: string | null
       published_at: now,
       current_round: 1,
       cover_image_url: imageUrl,
+      in_response_to: responseParent?.id ?? null,
     })
     .select("id")
     .single();
@@ -116,6 +139,24 @@ export async function createPost(input: { body: string; imageUrl?: string | null
   revalidatePath("/dashboard");
   revalidatePath(`/post/${slug}`);
   revalidatePath("/");
+
+  if (responseParent) {
+    revalidatePath(`/post/${responseParent.slug}`);
+
+    const { data: ownerProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+
+    await notifyResponseParentAuthor({
+      parent: responseParent,
+      responderId: user.id,
+      responderName: ownerProfile?.full_name ?? "An Indegenius author",
+      responsePostId: data.id,
+      responseSlug: slug,
+    });
+  }
 
   await recordActivationEvent({
     supabase,

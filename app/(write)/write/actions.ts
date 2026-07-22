@@ -18,12 +18,12 @@ import {
   type ArticleFormat,
   type ContentKind,
 } from "@/lib/contentModel";
-import { getPostReferenceQuoted } from "@/lib/postDisplay";
 import {
   createVersionSnapshot,
   getSubmissionTrack,
   requiresEditorialWorkflow,
 } from "@/lib/reviewWorkflow";
+import { notifyResponseParentAuthor, validateResponseParent } from "@/lib/responsePost";
 import type { PostReferenceRecord } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
 
@@ -335,6 +335,25 @@ export async function ensureDraft(input: {
 
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
+
+  // The server, not the browser, is what actually validates and persists
+  // a claimed parent relationship -- /write's own client-side parent
+  // lookup (its `loadParentPost` effect) only drives what's *displayed*;
+  // a modified request could call this action directly with an arbitrary
+  // `inResponseTo`. Re-validated here on every save (not just the first),
+  // so a parent that becomes unavailable mid-session (removed, unpublished)
+  // surfaces as a clear error instead of silently persisting a stale or
+  // spoofed relationship.
+  if (input.inResponseTo) {
+    const parentValidation = await validateResponseParent(
+      supabase,
+      input.inResponseTo,
+      input.draftId ?? null
+    );
+    if (parentValidation.error) {
+      return { error: parentValidation.error, draftId: null as string | null };
+    }
+  }
 
   if (input.draftId) {
     // A modified request must not be able to reclassify an existing draft
@@ -685,6 +704,24 @@ export async function publishPost(input: {
   const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
 
+  // Re-validated here (not just trusted from an earlier ensureDraft() call)
+  // so a parent that became unavailable between opening the composer and
+  // clicking publish -- removed, or otherwise no longer published -- is
+  // rejected with a clear error instead of silently publishing the
+  // response without its relationship, or with a stale/spoofed one.
+  let responseParent: Awaited<ReturnType<typeof validateResponseParent>>["parent"] = null;
+  if (input.inResponseTo) {
+    const parentValidation = await validateResponseParent(
+      supabase,
+      input.inResponseTo,
+      input.draftId ?? null
+    );
+    if (parentValidation.error) {
+      return { error: parentValidation.error, slug: null as string | null };
+    }
+    responseParent = parentValidation.parent;
+  }
+
   let postId = input.draftId;
   let responseParentPath: string | null = null;
 
@@ -705,7 +742,7 @@ export async function publishPost(input: {
         content_kind: effectiveContentKind,
         article_format: effectiveArticleFormat,
         cover_image_url: input.coverImageUrl || null,
-        in_response_to: input.inResponseTo ?? null,
+        in_response_to: responseParent?.id ?? null,
         status: submitStatus,
         published_at: publishedAt,
         slug,
@@ -741,7 +778,7 @@ export async function publishPost(input: {
         content_kind: effectiveContentKind,
         article_format: effectiveArticleFormat,
         tags: normalizedTags,
-        in_response_to: input.inResponseTo ?? null,
+        in_response_to: responseParent?.id ?? null,
         status: submitStatus,
         published_at: publishedAt,
         current_round: 1,
@@ -761,44 +798,15 @@ export async function publishPost(input: {
     return { error: "Unable to resolve the draft.", slug: null as string | null };
   }
 
-  if (input.inResponseTo) {
-    const { data: parentPost } = await supabase
-      .from("posts")
-      .select("author_id, slug, title")
-      .eq("id", input.inResponseTo)
-      .maybeSingle();
-
-    if (parentPost) {
-      responseParentPath = `/post/${parentPost.slug}`;
-
-      if (parentPost.author_id !== user.id) {
-        const admin = createAdminClient();
-        const { error: notificationError } = await admin.from("notifications").insert({
-          user_id: parentPost.author_id,
-          type: "response_post",
-          message: `${ownerProfile?.full_name ?? "An Indegenius author"} wrote a response to your post.`,
-          link: `/post/${slug}`,
-          actor_id: user.id,
-          post_id: postId,
-          read: false,
-        });
-        if (!notificationError) {
-          const authorName = ownerProfile?.full_name ?? "An Indegenius author";
-          const emailResult = await sendUserEmail({
-            recipientId: parentPost.author_id,
-            subject: `${authorName} responded to your Indegenius post`,
-            preview: `${authorName} wrote a response to your post.`,
-            title: "New response to your post",
-            intro: `${authorName} wrote a response to ${getPostReferenceQuoted(parentPost)}.`,
-            ctaLabel: "Read the response",
-            ctaPath: `/post/${slug}`,
-            idempotencyKey: `response-post:${postId}:${parentPost.author_id}`,
-            preferenceKey: "email_responses",
-          });
-          logEmailResult(`response_post:${postId}:${parentPost.author_id}`, emailResult);
-        }
-      }
-    }
+  if (responseParent) {
+    responseParentPath = `/post/${responseParent.slug}`;
+    await notifyResponseParentAuthor({
+      parent: responseParent,
+      responderId: user.id,
+      responderName: ownerProfile?.full_name ?? "An Indegenius author",
+      responsePostId: postId,
+      responseSlug: slug,
+    });
   }
 
   try {

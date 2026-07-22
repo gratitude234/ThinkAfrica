@@ -182,6 +182,90 @@ describe("ensureDraft", () => {
     expect(result.error).toMatch(/no longer an editable draft/i);
     expect(result.draftId).toBeNull();
   });
+
+  describe("response parent validation (Pass 3: Response Creation UX)", () => {
+    it("rejects a new draft whose claimed parent doesn't exist or isn't published, without inserting anything", async () => {
+      fakeSupabase.current = makeFakeSupabase({
+        posts: queueResults({ data: null, error: null }),
+      });
+
+      const result = await ensureDraft(
+        baseDraftInput({ draftId: null, inResponseTo: "missing-parent" })
+      );
+
+      expect(result).toEqual({
+        error: "That post is no longer available to respond to.",
+        draftId: null,
+      });
+      expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+    });
+
+    it("rejects an existing draft naming itself as its own parent, before touching the database at all", async () => {
+      fakeSupabase.current = makeFakeSupabase({ posts: queueResults() });
+
+      const result = await ensureDraft(
+        baseDraftInput({ draftId: "draft-1", inResponseTo: "draft-1" })
+      );
+
+      expect(result).toEqual({
+        error: "A post can't be a response to itself.",
+        draftId: null,
+      });
+      expect(fakeSupabase.current!.builders.posts ?? []).toHaveLength(0);
+    });
+
+    it("stores the server-validated parent id on a brand-new draft", async () => {
+      fakeSupabase.current = makeFakeSupabase({
+        posts: queueResults(
+          {
+            data: { id: "parent-1", author_id: "parent-author", slug: "p", title: "T" },
+            error: null,
+          },
+          { data: { id: "new-draft-id" }, error: null }
+        ),
+      });
+
+      const result = await ensureDraft(
+        baseDraftInput({ draftId: null, inResponseTo: "parent-1" })
+      );
+
+      expect(result).toEqual({ error: null, draftId: "new-draft-id" });
+      const insertedWith = fakeSupabase.current!.builders.posts[1].insertedWith as Record<
+        string,
+        unknown
+      >;
+      expect(insertedWith.in_response_to).toBe("parent-1");
+    });
+
+    it("rejects saving an existing draft whose previously-attached parent is no longer published (e.g. removed mid-session)", async () => {
+      fakeSupabase.current = makeFakeSupabase({
+        posts: queueResults({ data: null, error: null }),
+      });
+
+      const result = await ensureDraft(
+        baseDraftInput({ draftId: "draft-1", inResponseTo: "parent-1" })
+      );
+
+      expect(result).toEqual({
+        error: "That post is no longer available to respond to.",
+        draftId: null,
+      });
+      // Only the parent-validation read happened -- the existing-draft
+      // classification select and the update were never reached.
+      expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+    });
+
+    it("does not require any parent validation at all when inResponseTo is absent", async () => {
+      fakeSupabase.current = makeFakeSupabase({
+        posts: queueResults({ data: { id: "new-draft-id" }, error: null }),
+      });
+
+      const result = await ensureDraft(baseDraftInput({ draftId: null, inResponseTo: null }));
+
+      expect(result).toEqual({ error: null, draftId: "new-draft-id" });
+      expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+    });
+  });
 });
 
 describe("publishPost", () => {
@@ -356,6 +440,84 @@ describe("publishPost", () => {
 
     expect(result.error).toMatch(/no longer an editable draft/i);
     expect(result.slug).toBeNull();
+  });
+
+  describe("response parent validation (Pass 3: Response Creation UX)", () => {
+    it("rejects publishing a brand-new response whose claimed parent doesn't exist or isn't published", async () => {
+      fakeSupabase.current = makeFakeSupabase({
+        ...standardPublishRoutes(),
+        posts: queueResults({ data: null, error: null }),
+      });
+
+      const result = await publishPost(
+        basePublishInput({ draftId: null, inResponseTo: "missing-parent" })
+      );
+
+      expect(result).toEqual({
+        error: "That post is no longer available to respond to.",
+        slug: null,
+      });
+      expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+    });
+
+    it("rejects an existing draft naming itself as its own parent", async () => {
+      fakeSupabase.current = makeFakeSupabase({
+        ...standardPublishRoutes(),
+        posts: queueResults({
+          data: { status: "draft", type: "essay", content_kind: "article", article_format: null },
+          error: null,
+        }),
+      });
+
+      const result = await publishPost(
+        basePublishInput({ draftId: "draft-1", inResponseTo: "draft-1" })
+      );
+
+      expect(result).toEqual({
+        error: "A post can't be a response to itself.",
+        slug: null,
+      });
+      // Only the existing-draft classification read happened -- the
+      // self-reference guard short-circuits before any further query
+      // (the parent-lookup select) and before any write.
+      expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+    });
+
+    it("stores the server-validated parent id when publishing a brand-new response", async () => {
+      fakeSupabase.current = makeFakeSupabase({
+        ...standardPublishRoutes(),
+        posts: queueResults(
+          {
+            data: { id: "parent-1", author_id: "parent-author", slug: "p", title: "T" },
+            error: null,
+          },
+          { data: { id: "new-post-id" }, error: null }
+        ),
+      });
+
+      const result = await publishPost(
+        basePublishInput({ draftId: null, inResponseTo: "parent-1" })
+      );
+
+      expect(result.error).toBeNull();
+      const insertedWith = fakeSupabase.current!.builders.posts[1].insertedWith as Record<
+        string,
+        unknown
+      >;
+      expect(insertedWith.in_response_to).toBe("parent-1");
+    });
+
+    it("does not require any parent validation at all when inResponseTo is absent", async () => {
+      fakeSupabase.current = makeFakeSupabase({
+        ...standardPublishRoutes(),
+        posts: queueResults({ data: { id: "new-post-id" }, error: null }),
+      });
+
+      const result = await publishPost(basePublishInput({ draftId: null, inResponseTo: null }));
+
+      expect(result.error).toBeNull();
+      expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+    });
   });
 });
 

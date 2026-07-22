@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { APP_DOMAIN } from "@/lib/site";
+import ResponseStartLink from "@/components/post/ResponseStartLink";
 
 interface RelatedTarget {
   id: string;
@@ -162,22 +163,14 @@ export default function PublishedToast({
             </Link>
 
             {relatedTarget ? (
-              <Link
-                href={`/write?inResponseTo=${relatedTarget.id}&kind=article`}
-                onClick={() => {
-                  trackNextAction("write_response");
-                  trackActivationEvent({
-                    event: "response_started",
-                    metadata: {
-                      postId: relatedTarget.id,
-                      source: "post_publish_success",
-                    },
-                  });
-                }}
+              <ResponseStartLink
+                postId={relatedTarget.id}
+                source="post_publish_success"
+                onTriggerClick={() => trackNextAction("write_response")}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
               >
                 Write a response
-              </Link>
+              </ResponseStartLink>
             ) : isLive ? (
               <Link
                 href={username ? `/${username}#featured-work` : "/dashboard"}
