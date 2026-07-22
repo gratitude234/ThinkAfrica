@@ -19,6 +19,7 @@ import ReferencesPanel from "@/components/post/ReferencesPanel";
 import { ensureDraft, savePostReferences } from "./actions";
 import {
   WRITE_FORMATS,
+  getPublishGateCopy,
   getResponseStarterTemplate,
   isResponseIntent,
   resolveWriteRedirectPath,
@@ -663,6 +664,7 @@ export default function WritePage() {
           : null;
   const selectedPostType =
     WRITE_FORMATS.find((item) => item.type === postType) ?? WRITE_FORMATS[0];
+  const publishGateCopy = getPublishGateCopy(postType);
   const responseStarterTemplate =
     selectedResponseIntent && inResponseToTitle
       ? getResponseStarterTemplate({
@@ -844,7 +846,7 @@ export default function WritePage() {
                   : undefined
               }
             >
-              Review & publish
+              {publishGateCopy.desktopLabel}
             </Button>
           </div>
 
@@ -917,7 +919,7 @@ export default function WritePage() {
               disabled={!canOpenPublish}
               onClick={handleReadyToPublish}
               title={publishBlockReason ?? undefined}
-              aria-label="Review and publish"
+              aria-label={publishGateCopy.ariaLabel}
               className="h-11 px-4"
               style={
                 !canOpenPublish
@@ -929,7 +931,7 @@ export default function WritePage() {
                   : undefined
               }
             >
-              Review
+              {publishGateCopy.mobileLabel}
             </Button>
           </div>
         </div>
@@ -1110,7 +1112,7 @@ export default function WritePage() {
               saveDraft(getCurrentData({ title: event.target.value }));
             }}
             placeholder="Title"
-            aria-label="Post title"
+            aria-label="Article title"
             className="w-full rounded-md border-none bg-transparent px-0 py-1.5 font-display text-[32px] font-semibold leading-[1.2] text-ink placeholder:text-gray-500 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-brand/30 lg:text-[48px] lg:leading-[1.08]"
           />
 
@@ -1263,6 +1265,7 @@ export default function WritePage() {
             canReviewPublish={canOpenPublish}
             onContinue={closeCoverDialog}
             onReviewPublish={handleReviewPublishFromCover}
+            publishLabel={publishGateCopy.desktopLabel}
           />
           <PublishDrawer
             open={isPublishDrawerOpen}

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Indegenius",
     short_name: "Indegenius",
     description:
-      "Research, essays, and policy briefs from African university students.",
+      "Posts, articles, and research from African university students.",
     start_url: "/",
     scope: "/",
     display: "standalone",

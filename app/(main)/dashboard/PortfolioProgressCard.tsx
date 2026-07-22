@@ -1,4 +1,5 @@
 import Link from "next/link";
+import CreateTrigger from "@/app/(main)/CreateTrigger";
 
 export interface PortfolioProgressItem {
   key: string;
@@ -14,14 +15,24 @@ export interface PortfolioNextAction {
   body: string;
   href: string;
   cta: string;
+  /**
+   * When true, `cta` opens the shared Create chooser instead of linking
+   * straight to `href` -- for the generic "keep writing" nudge, which
+   * doesn't ask for a specific content type. Every other next-action here
+   * (complete profile, add references to a specific draft, manage
+   * profile, ...) is content-specific and keeps linking directly.
+   */
+  openChooser?: boolean;
 }
 
 export default function PortfolioProgressCard({
   items,
   nextAction,
+  userId,
 }: {
   items: PortfolioProgressItem[];
   nextAction: PortfolioNextAction;
+  userId: string | null;
 }) {
   const completedCount = items.filter((item) => item.done).length;
   const progress = Math.round((completedCount / items.length) * 100);
@@ -91,12 +102,22 @@ export default function PortfolioProgressCard({
             {nextAction.body}
           </p>
         </div>
-        <Link
-          href={nextAction.href}
-          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-        >
-          {nextAction.cta}
-        </Link>
+        {nextAction.openChooser ? (
+          <CreateTrigger
+            userId={userId}
+            presentation="popover"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
+          >
+            {nextAction.cta}
+          </CreateTrigger>
+        ) : (
+          <Link
+            href={nextAction.href}
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
+          >
+            {nextAction.cta}
+          </Link>
+        )}
       </div>
     </section>
   );

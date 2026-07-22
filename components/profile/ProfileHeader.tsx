@@ -100,7 +100,12 @@ export default function ProfileHeader({
       : `Writing since ${writingSince}`,
   ].filter(Boolean);
   const statsItems = [
-    { label: "Publications", value: stats.postCount },
+    // Renamed from "Publications" -- this count includes every published
+    // work (short Posts included, not just formal Article/Research
+    // publications), so calling it "Publications" overclaimed. See
+    // PublicationsSection, which correctly scopes "Publications" to
+    // Article/Research only.
+    { label: "Published", value: stats.postCount },
     { label: "Citable", value: stats.citableCount },
     { label: "Reviewed", value: stats.reviewedCount },
     { label: "Co-authored", value: stats.coAuthoredCount },

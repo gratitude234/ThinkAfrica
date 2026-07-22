@@ -47,14 +47,14 @@ type LandingData = {
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "African Student Essays, Research and Policy Ideas",
+  title: "African Student Posts, Articles, and Research",
   description:
-    "Read serious essays, research, policy briefs, and debates from African university students and emerging thinkers.",
+    "Read serious posts, articles, research, and debates from African university students and emerging thinkers.",
   alternates: { canonical: canonicalPath("/landing") },
   openGraph: {
-    title: "Indegenius - African Student Essays, Research and Policy Ideas",
+    title: "Indegenius - African Student Posts, Articles, and Research",
     description:
-      "Read serious essays, research, policy briefs, and debates from African university students and emerging thinkers.",
+      "Read serious posts, articles, research, and debates from African university students and emerging thinkers.",
     url: absoluteUrl("/landing"),
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
@@ -62,9 +62,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Indegenius - African Student Essays, Research and Policy Ideas",
+    title: "Indegenius - African Student Posts, Articles, and Research",
     description:
-      "Read serious essays, research, policy briefs, and debates from African university students and emerging thinkers.",
+      "Read serious posts, articles, research, and debates from African university students and emerging thinkers.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };
@@ -78,7 +78,7 @@ const VALUE_PROPS = [
     num: "01",
     numStyle: "bg-emerald-100 text-emerald-600",
     title: "Find serious student ideas",
-    desc: "Read essays, research, and policy briefs from students writing beyond the quick-take feed — with real citations, arguments, and bylines.",
+    desc: "Read articles and research from students writing beyond the quick-take feed — with real citations, arguments, and bylines.",
   },
   {
     num: "02",
@@ -238,7 +238,7 @@ export default async function LandingPage() {
               </h1>
 
               <p className="hero-animate hero-sub mt-4 mb-6 max-w-[480px] text-[15px] leading-[1.65] text-ink-muted sm:mt-6 sm:mb-9 sm:text-lg">
-                Essays, research, and policy briefs written by university students across Africa, rigorously argued and openly published.
+                Posts, articles, and research written by university students across Africa, rigorously argued and openly published.
               </p>
 
               {leadPost ? (
@@ -322,7 +322,7 @@ export default async function LandingPage() {
                       students already publishing
                     </>
                   ) : (
-                    "Read student essays, research, and policy briefs already live on Indegenius"
+                    "Read student posts, articles, and research already live on Indegenius"
                   )}
                 </p>
               </div>
@@ -703,7 +703,7 @@ export default async function LandingPage() {
               Start exploring student ideas today
             </h2>
             <p className="mb-7 text-[15px] leading-relaxed opacity-80">
-              No account needed to read. Browse essays, research, and policy briefs from students
+              No account needed to read. Browse posts, articles, and research from students
               at 142 African universities.
             </p>
             <LandingTrackedLink
@@ -724,7 +724,7 @@ export default async function LandingPage() {
             </h2>
             <p className="mb-7 text-[15px] leading-relaxed opacity-80">
               Claim your handle, complete your student profile, and start with a Quick Take.
-              Essays and research papers earn points toward your Scholar tier.
+              Articles and research papers earn points toward your Scholar tier.
             </p>
             <LandingTrackedLink
               href="/signup"

@@ -406,7 +406,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     : clampText(
         `${displayName}, ${profile.field_of_study ?? "student"} at ${
           profile.university ?? "their university"
-        }. ${(postCount ?? 0).toLocaleString()} publications on Indegenius.`,
+        }. ${(postCount ?? 0).toLocaleString()} published works on Indegenius.`,
         155
       );
   const image = profile.avatar_url ?? "/logo.png";
@@ -862,6 +862,7 @@ export default async function UserProfilePage({ params }: PageProps) {
             curated={curatedFeaturedPosts.length > 0}
             isOwnProfile={isOwnProfile}
             profileName={displayName}
+            currentUserId={user?.id ?? null}
             action={
               isOwnProfile ? (
                 <FeaturedWorkManager

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPostType, resolveWriteRedirectPath } from "./writeConfig";
+import { getPublishGateCopy, isPostType, resolveWriteRedirectPath } from "./writeConfig";
 
 describe("isPostType", () => {
   it("accepts every legacy post type", () => {
@@ -14,6 +14,30 @@ describe("isPostType", () => {
     expect(isPostType("article")).toBe(false);
     expect(isPostType(null)).toBe(false);
     expect(isPostType("")).toBe(false);
+  });
+});
+
+describe("getPublishGateCopy (Article composer publish-gate wording)", () => {
+  it("uses 'Preview & publish' for a Post/Article draft -- not 'Review', which implies a formal review step it doesn't have", () => {
+    expect(getPublishGateCopy("blog").desktopLabel).toBe("Preview & publish");
+    expect(getPublishGateCopy("essay").desktopLabel).toBe("Preview & publish");
+    expect(getPublishGateCopy("blog").mobileLabel).toBe("Publish");
+    expect(getPublishGateCopy("essay").mobileLabel).toBe("Publish");
+  });
+
+  it("preserves 'Review & publish' for a legacy Policy Brief draft still in the editorial workflow", () => {
+    const copy = getPublishGateCopy("policy_brief");
+    expect(copy.desktopLabel).toBe("Review & publish");
+    expect(copy.mobileLabel).toBe("Review");
+    expect(copy.ariaLabel).toBe("Review and publish");
+  });
+
+  it("never uses raw 'Review' alone for a plain Article/Post -- only 'Publish' or 'Preview & publish'", () => {
+    for (const type of ["blog", "essay"] as const) {
+      const copy = getPublishGateCopy(type);
+      expect(copy.mobileLabel).not.toBe("Review");
+      expect(copy.desktopLabel).not.toContain("Review");
+    }
   });
 });
 

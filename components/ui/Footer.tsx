@@ -1,14 +1,22 @@
 ﻿import Link from "next/link";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import CreateTrigger from "@/app/(main)/CreateTrigger";
 
+// "Write" is ambiguous (Post/Article/Research Paper), so it renders the
+// shared Create chooser (CreateTrigger) instead of linking straight to
+// /write -- the landing page (Footer's only caller) is guest-only, so
+// userId is always null here; the chooser routes each choice through
+// login with the right destination preserved.
 const platformLinks = [
   { label: "Home", href: "/" },
   { label: "Explore", href: "/explore" },
-  { label: "Write", href: "/write" },
   { label: "Opportunities", href: "/opportunities" },
   { label: "Policy Hub", href: "/policy" },
   ...(FEATURE_FLAGS.debates ? [{ label: "Debates", href: "/debates" }] : []),
 ];
+
+const FOOTER_LINK_CLASS =
+  "text-sm text-gray-400 hover:text-emerald-400 transition-colors";
 
 const communityLinks = [
   ...(FEATURE_FLAGS.ambassadors
@@ -52,14 +60,16 @@ export default function Footer({ landing = false }: { landing?: boolean }) {
             <ul className="space-y-2">
               {platformLinks.map(({ label, href }) => (
                 <li key={href}>
-                  <Link
-                    href={href}
-                    className="text-sm text-gray-400 hover:text-emerald-400 transition-colors"
-                  >
+                  <Link href={href} className={FOOTER_LINK_CLASS}>
                     {label}
                   </Link>
                 </li>
               ))}
+              <li>
+                <CreateTrigger userId={null} presentation="popover" className={FOOTER_LINK_CLASS}>
+                  Write
+                </CreateTrigger>
+              </li>
             </ul>
           </div>
 

@@ -10,6 +10,7 @@ import PortfolioProgressCard, {
   type PortfolioProgressItem,
 } from "./PortfolioProgressCard";
 import CollaborationDashboardCard from "@/components/collaboration/CollaborationDashboardCard";
+import CreateTrigger from "@/app/(main)/CreateTrigger";
 import ActionInboxPanel from "@/components/notifications/ActionInboxPanel";
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
@@ -802,6 +803,7 @@ export default async function DashboardPage() {
                   body: "Add another source-backed or co-authored piece to make your record stronger.",
                   href: "/write",
                   cta: "Write next piece",
+                  openChooser: true,
                 };
   const opportunityInquiries = opportunityInquiriesRaw ?? [];
 
@@ -819,12 +821,16 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Manage your posts and track your performance.
+            Manage your work and track your performance.
           </p>
         </div>
-        <Link href="/write">
-          <Button>+ New post</Button>
-        </Link>
+        <CreateTrigger
+          userId={user.id}
+          presentation="popover"
+          className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+        >
+          + New
+        </CreateTrigger>
       </div>
 
       {activationState.activated ? (
@@ -842,9 +848,11 @@ export default async function DashboardPage() {
       <PortfolioProgressCard
         items={portfolioItems}
         nextAction={portfolioNextAction}
+        userId={user.id}
       />
 
       <CollaborationDashboardCard
+        userId={user.id}
         pendingInvites={pendingInvites}
         recentResponses={recentResponses}
         unreadMessageCount={unreadMessageCount}

@@ -23,14 +23,14 @@ import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/s
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Explore African Student Essays, Research and Ideas",
+  title: "Explore African Student Posts, Articles, and Research",
   description:
-    "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on Indegenius.",
+    "Discover trending posts, articles, citable research, topics, and emerging African student writers on Indegenius.",
   alternates: { canonical: canonicalPath("/explore") },
   openGraph: {
-    title: "Explore African Student Essays, Research and Ideas",
+    title: "Explore African Student Posts, Articles, and Research",
     description:
-      "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on Indegenius.",
+      "Discover trending posts, articles, citable research, topics, and emerging African student writers on Indegenius.",
     url: absoluteUrl("/explore"),
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
@@ -38,9 +38,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Explore African Student Essays, Research and Ideas",
+    title: "Explore African Student Posts, Articles, and Research",
     description:
-      "Discover trending essays, citable research, policy briefs, topics, and emerging African student writers on Indegenius.",
+      "Discover trending posts, articles, citable research, topics, and emerging African student writers on Indegenius.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };
@@ -49,6 +49,7 @@ interface PageProps {
   searchParams: Promise<{
     tab?: string;
     type?: string;
+    genre?: string;
   }>;
 }
 
@@ -70,29 +71,76 @@ const TABS: Array<{
   { value: "people", label: "People", href: "/explore?tab=people" },
 ];
 
-type ExploreTypeFilter = "all" | "essay" | "research" | "policy_brief" | "blog";
+// Primary Explore filters are the three top-level content kinds (plus
+// "All"). "Blog" and "Policy" used to be shown as peer-level primary
+// filters, but Blog/Essay/Policy Brief are not top-level content types --
+// see docs/content-model.md. Essay/Policy Brief now live one level down,
+// as a genre *refinement* that only applies while "Articles" is active.
+export type ExplorePrimaryFilter = "all" | "post" | "article" | "research";
+export type ExploreGenreFilter = "all" | "general" | "essay" | "policy_brief";
 type DiscoveryPromptSource = DiscoverData["personalizedPrompts"][number]["source"];
 
-const TYPE_FILTERS: Array<{
-  value: ExploreTypeFilter;
+export const PRIMARY_FILTERS: Array<{
+  value: ExplorePrimaryFilter;
   label: string;
 }> = [
   { value: "all", label: "All" },
-  { value: "essay", label: "Articles" },
+  { value: "post", label: "Posts" },
+  { value: "article", label: "Articles" },
   { value: "research", label: "Research" },
-  { value: "policy_brief", label: "Policy" },
-  { value: "blog", label: "Blogs" },
 ];
 
-function getExploreTypeFilter(value: string | null | undefined): ExploreTypeFilter {
-  return TYPE_FILTERS.some((filter) => filter.value === value)
-    ? (value as ExploreTypeFilter)
-    : "all";
+export const GENRE_FILTERS: Array<{
+  value: ExploreGenreFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All genres" },
+  { value: "general", label: "General" },
+  { value: "essay", label: "Essay" },
+  { value: "policy_brief", label: "Policy Brief" },
+];
+
+function isExploreGenreFilter(value: string): value is ExploreGenreFilter {
+  return (
+    value === "all" || value === "general" || value === "essay" || value === "policy_brief"
+  );
+}
+
+// Legacy `?type=` values from before the three-content-kind model. Kept so
+// old links/bookmarks keep resolving:
+//   - `blog` (the old flat type) -> Posts.
+//   - `essay`/`policy_brief` (the old flat types) -> Articles, narrowed to
+//     that specific genre -- these historically meant "only this genre",
+//     unlike the current `article` value which means "all genres".
+//   - `post`/`article`/`research` are the current primary-filter values.
+const LEGACY_TYPE_PARAM: Record<string, { primary: ExplorePrimaryFilter; genre: ExploreGenreFilter }> = {
+  blog: { primary: "post", genre: "all" },
+  post: { primary: "post", genre: "all" },
+  article: { primary: "article", genre: "all" },
+  essay: { primary: "article", genre: "essay" },
+  policy_brief: { primary: "article", genre: "policy_brief" },
+  research: { primary: "research", genre: "all" },
+};
+
+export function getExploreFilters(
+  typeParam: string | null | undefined,
+  genreParam: string | null | undefined
+): { primary: ExplorePrimaryFilter; genre: ExploreGenreFilter } {
+  if (!typeParam || !(typeParam in LEGACY_TYPE_PARAM)) {
+    return { primary: "all", genre: "all" };
+  }
+
+  const mapped = LEGACY_TYPE_PARAM[typeParam];
+  if (mapped.primary === "article" && genreParam && isExploreGenreFilter(genreParam)) {
+    return { primary: "article", genre: genreParam };
+  }
+  return mapped;
 }
 
 function getExploreHref(
   tab: DiscoverTab,
-  typeFilter: ExploreTypeFilter = "all"
+  primary: ExplorePrimaryFilter = "all",
+  genre: ExploreGenreFilter = "all"
 ) {
   const params = new URLSearchParams();
 
@@ -100,42 +148,42 @@ function getExploreHref(
     params.set("tab", tab);
   }
 
-  if (typeFilter !== "all" && (tab === "for-you" || tab === "trending")) {
-    params.set("type", typeFilter);
+  if (primary !== "all" && (tab === "for-you" || tab === "trending")) {
+    params.set("type", primary);
+    if (primary === "article" && genre !== "all") {
+      params.set("genre", genre);
+    }
   }
 
   const query = params.toString();
   return query ? `/explore?${query}` : "/explore";
 }
 
-export function filterPostsByType(
+export function filterPostsByExplore(
   posts: PostCardData[],
-  typeFilter: ExploreTypeFilter
+  primary: ExplorePrimaryFilter,
+  genre: ExploreGenreFilter = "all"
 ) {
   // Every filter is resolved against the new-model columns, never the
-  // legacy `type` column directly (see docs/content-model.md):
-  //   - "essay" is the "Articles" chip: a content-kind filter, so it must
-  //     include Policy-Brief-format Articles too (both resolve to
-  //     content_kind "article").
-  //   - "policy_brief" is an Article *genre* filter. Matching legacy
-  //     `type` alone (the pre-Phase-4A behavior) missed every Policy-
-  //     Brief-format Article created after Phase 3, since a brand-new
-  //     Article always dual-writes type="essay" regardless of genre --
-  //     only article_format carries "policy_brief" for those rows.
-  //   - "research"/"blog" filter by resolved content_kind for the same
-  //     reason, so a future titleless Post with no legacy type still
-  //     matches "blog".
-  if (typeFilter === "essay") {
-    return posts.filter((post) => resolveContentKind(post) === "article");
+  // legacy `type` column directly (see docs/content-model.md), so a
+  // brand-new Policy-Brief-format Article (whose legacy `type` is always
+  // "essay") and a future titleless Post with no legacy type are still
+  // classified correctly.
+  if (primary === "post") {
+    return posts.filter((post) => resolveContentKind(post) === "post");
   }
-  if (typeFilter === "policy_brief") {
-    return posts.filter((post) => resolveArticleFormat(post) === "policy_brief");
-  }
-  if (typeFilter === "research") {
+  if (primary === "research") {
     return posts.filter((post) => resolveContentKind(post) === "research");
   }
-  if (typeFilter === "blog") {
-    return posts.filter((post) => resolveContentKind(post) === "post");
+  if (primary === "article") {
+    const articles = posts.filter((post) => resolveContentKind(post) === "article");
+    if (genre === "general") {
+      return articles.filter((post) => resolveArticleFormat(post) === null);
+    }
+    if (genre === "essay" || genre === "policy_brief") {
+      return articles.filter((post) => resolveArticleFormat(post) === genre);
+    }
+    return articles;
   }
   return posts;
 }
@@ -324,10 +372,12 @@ function SearchEntry({
 
 function DiscoverTabs({
   activeTab,
-  typeFilter,
+  activePrimary,
+  activeGenre,
 }: {
   activeTab: DiscoverTab;
-  typeFilter: ExploreTypeFilter;
+  activePrimary: ExplorePrimaryFilter;
+  activeGenre: ExploreGenreFilter;
 }) {
   return (
     <div className="sticky top-[60px] z-30 -mx-4 mb-5 max-w-[calc(100%+2rem)] overflow-x-auto border-b border-gray-200 bg-canvas/95 px-4 pt-1 backdrop-blur [scrollbar-width:none] sm:-mx-6 sm:mb-6 sm:max-w-[calc(100%+3rem)] sm:px-6 lg:mx-0 lg:max-w-full lg:px-0 [&::-webkit-scrollbar]:hidden">
@@ -341,7 +391,8 @@ function DiscoverTabs({
               key={tab.value}
               href={getExploreHref(
                 tab.value,
-                shouldPreserveType ? typeFilter : "all"
+                shouldPreserveType ? activePrimary : "all",
+                shouldPreserveType ? activeGenre : "all"
               )}
               event="discover_tab_changed"
               metadata={{ tab: tab.value, surface: "explore" }}
@@ -368,38 +419,113 @@ function DiscoverTabs({
   );
 }
 
-function TypeFilterBar({
-  activeTab,
-  activeType,
+function FilterChip({
+  href,
+  active,
+  label,
+  metadata,
 }: {
-  activeTab: DiscoverTab;
-  activeType: ExploreTypeFilter;
+  href: string;
+  active: boolean;
+  label: string;
+  metadata: Record<string, string | number | boolean | null>;
 }) {
   return (
-    <div className="mb-4 flex max-w-full gap-2 overflow-x-auto pb-1 pr-8 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pr-0 [&::-webkit-scrollbar]:hidden">
-      {TYPE_FILTERS.map((filter) => {
-        const active = activeType === filter.value;
-        return (
-          <DiscoverTrackedLink
+    <DiscoverTrackedLink
+      href={href}
+      metadata={metadata}
+      ariaCurrent={active ? "page" : undefined}
+      className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+        active
+          ? "border-emerald-brand bg-emerald-50 text-emerald-700"
+          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-ink"
+      }`}
+    >
+      {active ? (
+        <svg
+          className="h-3 w-3 shrink-0"
+          aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+        </svg>
+      ) : null}
+      {label}
+    </DiscoverTrackedLink>
+  );
+}
+
+function PrimaryFilterBar({
+  activeTab,
+  activePrimary,
+  activeGenre,
+}: {
+  activeTab: DiscoverTab;
+  activePrimary: ExplorePrimaryFilter;
+  activeGenre: ExploreGenreFilter;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Filter by content type"
+      className="mb-4 flex max-w-full gap-2 overflow-x-auto pb-1 pr-8 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pr-0 [&::-webkit-scrollbar]:hidden"
+    >
+      {PRIMARY_FILTERS.map((filter) => (
+        <FilterChip
+          key={filter.value}
+          href={getExploreHref(
+            activeTab,
+            filter.value,
+            filter.value === "article" ? activeGenre : "all"
+          )}
+          active={activePrimary === filter.value}
+          label={filter.label}
+          metadata={{
+            item: "primary_filter",
+            type: filter.value,
+            tab: activeTab,
+            surface: "explore",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function GenreFilterBar({
+  activeTab,
+  activeGenre,
+}: {
+  activeTab: DiscoverTab;
+  activeGenre: ExploreGenreFilter;
+}) {
+  return (
+    <div className="-mt-2.5 mb-4">
+      <div
+        role="group"
+        aria-label="Refine Articles by genre. Genre is descriptive only -- it does not affect review status or credibility."
+        className="flex max-w-full gap-2 overflow-x-auto pb-1 pr-8 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pr-0 [&::-webkit-scrollbar]:hidden"
+      >
+        {GENRE_FILTERS.map((filter) => (
+          <FilterChip
             key={filter.value}
-            href={getExploreHref(activeTab, filter.value)}
+            href={getExploreHref(activeTab, "article", filter.value)}
+            active={activeGenre === filter.value}
+            label={filter.label}
             metadata={{
-              item: "type_filter",
-              type: filter.value,
+              item: "genre_filter",
+              genre: filter.value,
               tab: activeTab,
               surface: "explore",
             }}
-            ariaCurrent={active ? "page" : undefined}
-            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-              active
-                ? "border-emerald-brand bg-emerald-50 text-emerald-700"
-                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-ink"
-            }`}
-          >
-            {filter.label}
-          </DiscoverTrackedLink>
-        );
-      })}
+          />
+        ))}
+      </div>
+      <p className="mt-1.5 text-[11px] leading-4 text-ink-muted">
+        Genre is descriptive only -- it doesn&apos;t change review status or credibility.
+      </p>
     </div>
   );
 }
@@ -1025,18 +1151,23 @@ function DiscoverAside({
 function ForYouSection({
   data,
   signedIn,
-  activeType,
+  activePrimary,
+  activeGenre,
 }: {
   data: DiscoverData;
   signedIn: boolean;
-  activeType: ExploreTypeFilter;
+  activePrimary: ExplorePrimaryFilter;
+  activeGenre: ExploreGenreFilter;
 }) {
-  const posts = filterPostsByType(data.forYouPosts, activeType);
+  const posts = filterPostsByExplore(data.forYouPosts, activePrimary, activeGenre);
 
   return (
     <>
       <DiscoveryBrief data={data} activeTab="for-you" />
-      <TypeFilterBar activeTab="for-you" activeType={activeType} />
+      <PrimaryFilterBar activeTab="for-you" activePrimary={activePrimary} activeGenre={activeGenre} />
+      {activePrimary === "article" ? (
+        <GenreFilterBar activeTab="for-you" activeGenre={activeGenre} />
+      ) : null}
       <TopicStrip data={data} />
       <ActiveConversations data={data} />
       {sectionTitle(
@@ -1053,17 +1184,22 @@ function ForYouSection({
 function TrendingSection({
   data,
   signedIn,
-  activeType,
+  activePrimary,
+  activeGenre,
 }: {
   data: DiscoverData;
   signedIn: boolean;
-  activeType: ExploreTypeFilter;
+  activePrimary: ExplorePrimaryFilter;
+  activeGenre: ExploreGenreFilter;
 }) {
-  const posts = filterPostsByType(data.trendingPosts, activeType);
+  const posts = filterPostsByExplore(data.trendingPosts, activePrimary, activeGenre);
 
   return (
     <>
-      <TypeFilterBar activeTab="trending" activeType={activeType} />
+      <PrimaryFilterBar activeTab="trending" activePrimary={activePrimary} activeGenre={activeGenre} />
+      {activePrimary === "article" ? (
+        <GenreFilterBar activeTab="trending" activeGenre={activeGenre} />
+      ) : null}
       {sectionTitle(
         "Trending this week",
         "Recent posts with the strongest engagement and freshness signals."
@@ -1084,7 +1220,7 @@ function CitableSection({
     <>
       {sectionTitle(
         "Citable works",
-        "Archived publications, research, and policy briefs with the strongest academic signal."
+        "Archived research and articles with the strongest academic signal."
       )}
       <PostList posts={data.citablePosts} signedIn={signedIn} surface="explore-citable" />
     </>
@@ -1146,12 +1282,14 @@ function PeopleSection({
 
 function ActiveSection({
   activeTab,
-  activeType,
+  activePrimary,
+  activeGenre,
   data,
   userId,
 }: {
   activeTab: DiscoverTab;
-  activeType: ExploreTypeFilter;
+  activePrimary: ExplorePrimaryFilter;
+  activeGenre: ExploreGenreFilter;
   data: DiscoverData;
   userId: string | null;
 }) {
@@ -1160,7 +1298,8 @@ function ActiveSection({
       <TrendingSection
         data={data}
         signedIn={Boolean(userId)}
-        activeType={activeType}
+        activePrimary={activePrimary}
+        activeGenre={activeGenre}
       />
     );
   }
@@ -1181,15 +1320,16 @@ function ActiveSection({
     <ForYouSection
       data={data}
       signedIn={Boolean(userId)}
-      activeType={activeType}
+      activePrimary={activePrimary}
+      activeGenre={activeGenre}
     />
   );
 }
 
 export default async function ExplorePage({ searchParams }: PageProps) {
-  const { tab, type } = await searchParams;
+  const { tab, type, genre } = await searchParams;
   const activeTab = getDiscoverTab(tab);
-  const activeType = getExploreTypeFilter(type);
+  const { primary: activePrimary, genre: activeGenre } = getExploreFilters(type, genre);
   const supabase = await createClient();
   const {
     data: { user },
@@ -1219,24 +1359,25 @@ export default async function ExplorePage({ searchParams }: PageProps) {
         </h1>
         <p className="mt-1.5 max-w-2xl text-[13px] leading-5 text-ink-muted sm:mt-2 sm:text-sm sm:leading-6">
           <span className="sm:hidden">
-            Posts, writers, topics, debates, and opportunities across Indegenius.
+            Posts, articles, and research across Indegenius.
           </span>
           <span className="hidden sm:inline">
-            Essays, research, debates, and opportunities across Indegenius,
-            ranked to match your interests.
+            Posts, articles, research, debates, and opportunities across
+            Indegenius, ranked to match your interests.
           </span>
         </p>
         <SearchEntry activeTab={activeTab} topics={data.topics} />
       </div>
 
-      <DiscoverTabs activeTab={activeTab} typeFilter={activeType} />
+      <DiscoverTabs activeTab={activeTab} activePrimary={activePrimary} activeGenre={activeGenre} />
       <MobileDebateBanner data={data} />
 
       <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_312px] lg:gap-8">
         <main className="min-w-0">
           <ActiveSection
             activeTab={activeTab}
-            activeType={activeType}
+            activePrimary={activePrimary}
+            activeGenre={activeGenre}
             data={data}
             userId={user?.id ?? null}
           />
