@@ -1,20 +1,25 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
-import type { ActivationState } from "@/lib/activation";
-import { formatRelativeTime, formatTimeUntil } from "@/lib/utils";
+import PostCover from "@/components/post/PostCover";
 import FollowButton from "@/components/ui/FollowButton";
 import UserAvatar from "@/components/ui/UserAvatar";
+import type { ActivationState } from "@/lib/activation";
+import { resolveContentKind } from "@/lib/contentModel";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
+import { formatRelativeTime, formatTimeUntil } from "@/lib/utils";
 
-interface NewVoice {
-  count: number;
-  totalPosts?: number;
-  firstPublishedAt?: string | null;
-  profile: {
+interface FeaturedPost {
+  title: string | null;
+  slug: string;
+  excerpt: string | null;
+  type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
+  cover_image_url?: string | null;
+  profiles: {
     username: string | null;
     full_name: string | null;
-    university: string | null;
-    avatar_url: string | null;
   } | null;
 }
 
@@ -22,6 +27,8 @@ interface RecentDraft {
   id: string;
   title: string | null;
   updated_at: string;
+  type: string;
+  content_kind?: string | null;
 }
 
 interface SuggestedPerson {
@@ -34,7 +41,7 @@ interface SuggestedPerson {
 
 interface Props {
   activeDebate: DebateInterludeData | null;
-  newVoice: NewVoice | null;
+  featuredPost: FeaturedPost | null;
   recentDraft: RecentDraft | null;
   activationState: ActivationState | null;
   peopleSuggestions: SuggestedPerson[];
@@ -42,351 +49,137 @@ interface Props {
   topics: string[];
 }
 
-function SideKicker({
-  children,
-  className = "mb-2.5",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <p
-      className={`${className} flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-muted`}
-    >
-      {children}
-    </p>
-  );
-}
-
 function SideCard({ children }: { children: ReactNode }) {
+  return <section className="rounded-xl border border-gray-200 bg-white p-4">{children}</section>;
+}
+
+function Kicker({ children }: { children: ReactNode }) {
+  return <p className="mb-2 text-[10.5px] font-bold uppercase tracking-[0.16em] text-gray-500">{children}</p>;
+}
+
+function draftHref(draft: RecentDraft) {
+  return resolveContentKind(draft) === "research"
+    ? `/submit/research?draft=${draft.id}`
+    : `/write?draft=${draft.id}`;
+}
+
+function PersonalAction({
+  recentDraft,
+  activationState,
+}: {
+  recentDraft: RecentDraft | null;
+  activationState: ActivationState | null;
+}) {
+  if (recentDraft) {
+    return (
+      <SideCard>
+        <Kicker>Continue writing</Kicker>
+        <Link href={draftHref(recentDraft)} className="group block rounded-lg bg-canvas p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand">
+          <p className="font-display line-clamp-2 text-[14px] font-semibold leading-snug text-ink group-hover:text-emerald-800">{recentDraft.title?.trim() || "Untitled draft"}</p>
+          <p className="mt-1 text-[11.5px] text-gray-500">Saved {formatRelativeTime(recentDraft.updated_at)}</p>
+        </Link>
+      </SideCard>
+    );
+  }
+
+  if (!activationState || activationState.activated || !activationState.nextTask) return null;
+  const done = activationState.tasks.filter((task) => task.done).length;
+  const progress = Math.round((done / activationState.tasks.length) * 100);
+
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
-      {children}
-    </section>
+    <SideCard>
+      <Kicker>Complete your setup</Kicker>
+      <p className="text-[13px] font-semibold text-ink">{activationState.nextTask.label}</p>
+      <p className="mt-1 text-xs leading-5 text-gray-500">{activationState.nextTask.description}</p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100" aria-label={`${progress}% complete`} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+        <div className="h-full rounded-full bg-emerald-brand" style={{ width: `${progress}%` }} />
+      </div>
+      <Link href={activationState.nextTask.href} className="mt-3 inline-flex min-h-10 items-center text-xs font-semibold text-emerald-700 hover:underline">Continue setup →</Link>
+    </SideCard>
   );
 }
 
-function getDebateShare(debate: DebateInterludeData) {
+function FeaturedCard({ post }: { post: FeaturedPost }) {
+  const title = getPostMetadataTitle(post, post.profiles);
+  const author = post.profiles?.full_name ?? post.profiles?.username;
+  const hasCover = Boolean(post.cover_image_url?.trim());
+
+  return (
+    <SideCard>
+      <Kicker>Featured today</Kicker>
+      <div className="flex gap-3">
+        <div className="min-w-0 flex-1">
+          <Link href={`/post/${post.slug}`} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand">
+            <h2 className="font-display line-clamp-3 text-[16px] font-semibold leading-[1.25] text-ink hover:text-emerald-800">{title}</h2>
+          </Link>
+          {author ? <p className="mt-1.5 truncate text-[11.5px] text-gray-500">By {author}</p> : null}
+        </div>
+        {hasCover ? (
+          <Link href={`/post/${post.slug}`} className="shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand">
+            <PostCover src={post.cover_image_url} alt={title} type={post.type} content_kind={post.content_kind} article_format={post.article_format} sizes="72px" className="h-[72px] w-[72px] rounded-lg bg-gray-100" imageClassName="object-cover" />
+          </Link>
+        ) : null}
+      </div>
+    </SideCard>
+  );
+}
+
+function DebateCard({ debate }: { debate: DebateInterludeData }) {
   const forCount = debate.motionForCount ?? 0;
   const againstCount = debate.motionAgainstCount ?? 0;
   const total = forCount + againstCount;
   const forPct = total > 0 ? Math.round((forCount / total) * 100) : 50;
-
-  return {
-    forPct,
-    againstPct: 100 - forPct,
-    total,
-  };
-}
-
-function PromptCard({
-  kicker,
-  title,
-  body,
-  href,
-  cta,
-}: {
-  kicker: string;
-  title: string;
-  body: string;
-  href: string;
-  cta: string;
-}) {
-  return (
-    <SideCard>
-      <SideKicker>{kicker}</SideKicker>
-      <p className="font-display text-base font-semibold leading-snug text-ink">{title}</p>
-      <p className="mt-1.5 text-xs leading-5 text-ink-muted">{body}</p>
-      <Link
-        href={href}
-        className="mt-3 inline-flex rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-brand transition-colors hover:bg-emerald-50"
-      >
-        {cta}
-      </Link>
-    </SideCard>
-  );
-}
-
-function ActivationCard({ state }: { state: ActivationState }) {
-  if (state.activated) return null;
-
-  const doneCount = state.tasks.filter((task) => task.done).length;
-  const pct = Math.round((doneCount / state.tasks.length) * 100);
+  const remaining = formatTimeUntil(debate.endsAt ?? null);
 
   return (
-    <section className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 shadow-sm shadow-black/[0.02]">
-      <div className="mb-3">
-        <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-          First contribution
-        </p>
-        <h2 className="text-[13px] font-semibold text-ink">
-          {state.nextTask?.label ?? "Keep building momentum"}
-        </h2>
-        <p className="mt-1 text-xs leading-5 text-ink-muted">
-          {state.nextTask?.description ??
-            "Complete the first steps that make your profile useful."}
-        </p>
+    <section className="rounded-xl bg-gray-900 p-4 text-white">
+      <p className="mb-2 text-[10.5px] font-bold uppercase tracking-[0.16em] text-emerald-300">Live debate</p>
+      <Link href={`/debates/${debate.id}`}><h2 className="font-display line-clamp-3 text-[16px] font-semibold leading-[1.25] hover:text-emerald-100">{debate.title}</h2></Link>
+      <p className="mt-1.5 text-[11.5px] text-gray-400">{debate.argumentCount} arguments{remaining ? ` · ${remaining}` : ""}</p>
+      <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-gray-700" aria-label={`${forPct}% for, ${100 - forPct}% against`}>
+        <span className="bg-emerald-500" style={{ width: `${forPct}%` }} />
+        <span className="bg-purple-500" style={{ width: `${100 - forPct}%` }} />
       </div>
-      <div className="flex justify-between text-[11px] text-ink-muted">
-        <span>
-          {doneCount} of {state.tasks.length} complete
-        </span>
-        <span>{pct}%</span>
-      </div>
-      <div className="my-2.5 h-1 overflow-hidden rounded-full bg-gray-100">
-        <div
-          className="h-full rounded-full bg-emerald-brand transition-all"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className="mt-2.5 space-y-1.5">
-        {state.tasks.map((task) => (
-          <Link
-            key={task.key}
-            href={task.href}
-            className="flex items-center gap-2 text-xs"
-          >
-            <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[8px] font-bold ${
-                task.done
-                  ? "border-emerald-brand bg-emerald-brand text-white"
-                  : "border-gray-300 text-transparent"
-              }`}
-            >
-              {"\u2713"}
-            </span>
-            <span
-              className={
-                task.done
-                  ? "text-ink line-through decoration-gray-300"
-                  : "text-ink-muted"
-              }
-            >
-              {task.label}
-            </span>
-          </Link>
-        ))}
-      </div>
-      {state.nextTask ? (
-        <Link
-          href={state.nextTask.href}
-          className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#0E4B37]"
-        >
-          {state.nextTask.key === "start" ? "Start quick take" : "Continue setup"}
-        </Link>
-      ) : null}
+      <Link href={`/debates/${debate.id}`} className="mt-3 inline-flex min-h-10 items-center text-xs font-semibold text-emerald-300 hover:text-emerald-200">Join the debate →</Link>
     </section>
   );
 }
 
-function TopicsCard({ topics }: { topics: string[] }) {
-  if (topics.length === 0) return null;
-
+function PeopleCard({ people, currentUserId }: { people: SuggestedPerson[]; currentUserId: string | null }) {
+  if (people.length === 0) return null;
   return (
     <SideCard>
-      <SideKicker>Browse by topic</SideKicker>
-      <div className="flex flex-wrap gap-1.5">
-        {topics.slice(0, 10).map((topic) => (
-          <Link
-            key={topic}
-            href={`/topics/${encodeURIComponent(topic)}`}
-            className="rounded-full border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-ink-muted transition-colors hover:border-emerald-brand hover:bg-emerald-50 hover:text-emerald-800"
-          >
-            {topic}
-          </Link>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <Kicker>Writers to follow</Kicker>
+        <Link href="/leaderboard" className="mb-2 text-[11px] font-semibold text-emerald-700 hover:underline">See all</Link>
+      </div>
+      <div className="space-y-3">
+        {people.slice(0, 3).map((person) => (
+          <div key={person.id} className="flex items-center gap-2.5">
+            <Link href={`/${person.username}`} className="shrink-0"><UserAvatar name={person.full_name ?? person.username} src={person.avatar_url} size={36} /></Link>
+            <div className="min-w-0 flex-1">
+              <Link href={`/${person.username}`} className="block truncate text-[12.5px] font-semibold text-ink hover:text-emerald-700">{person.full_name ?? person.username}</Link>
+              {person.university ? <p className="truncate text-[10.5px] text-gray-500">{person.university}</p> : null}
+            </div>
+            {currentUserId ? <FollowButton followerId={currentUserId} followingId={person.id} /> : <Link href={`/${person.username}`} className="text-[11px] font-semibold text-emerald-700">View</Link>}
+          </div>
         ))}
       </div>
     </SideCard>
   );
 }
 
-export default function HomeSidebar({
-  activeDebate,
-  newVoice,
-  recentDraft,
-  activationState,
-  peopleSuggestions,
-  currentUserId,
-  topics,
-}: Props) {
-  const debateShare = activeDebate ? getDebateShare(activeDebate) : null;
-  const debateRemaining = activeDebate
-    ? formatTimeUntil(activeDebate.endsAt ?? null)
-    : null;
-
+export default function HomeSidebar({ activeDebate, featuredPost, recentDraft, activationState, peopleSuggestions, currentUserId, topics }: Props) {
   return (
-    <div className="flex flex-col gap-4">
-      {activationState ? <ActivationCard state={activationState} /> : null}
-
-      {recentDraft ? (
-        <SideCard>
-          <SideKicker>Continue writing</SideKicker>
-          <Link
-            href={`/write?draft=${recentDraft.id}`}
-            className="flex items-center gap-2.5 rounded-[9px] bg-canvas p-3 transition-colors hover:bg-[#F5F3EE]"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-ink-muted">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a4 4 0 01-2.828 1.172H7v-2a4 4 0 011.172-2.828z" />
-              </svg>
-            </span>
-            <span className="min-w-0">
-              <span className="line-clamp-2 text-[13px] font-medium leading-snug text-ink">
-                {recentDraft.title?.trim() || "Untitled draft"}
-              </span>
-              <span className="mt-0.5 block text-[11px] text-ink-muted">
-                Saved {formatRelativeTime(recentDraft.updated_at)}
-              </span>
-            </span>
-          </Link>
-        </SideCard>
-      ) : null}
-
-      {activeDebate ? (
-        <section className="rounded-xl bg-gray-900 p-4 text-white shadow-sm">
-          <SideKicker>
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-            <span className="text-emerald-300">Happening now</span>
-          </SideKicker>
-          <Link href={`/debates/${activeDebate.id}`}>
-            <h3 className="font-display mb-2 text-base font-semibold leading-snug text-white transition-colors hover:text-emerald-100">
-              {activeDebate.title}
-            </h3>
-          </Link>
-          <p className="mb-3 text-xs text-gray-400">
-            {activeDebate.argumentCount.toLocaleString()} arguments
-            {debateRemaining ? ` - ${debateRemaining}` : ""}
-          </p>
-          <div className="mb-2 flex h-1.5 overflow-hidden rounded-full bg-gray-700">
-            <span
-              className="h-full rounded-full bg-emerald-brand"
-              style={{ width: `${debateShare?.forPct ?? 50}%` }}
-            />
-            <span
-              className="h-full rounded-full bg-purple-accent"
-              style={{ width: `${debateShare?.againstPct ?? 50}%` }}
-            />
-          </div>
-          <div className="mb-2.5 flex justify-between text-[11px] font-medium">
-            <span className="text-emerald-300">For - {debateShare?.forPct ?? 50}%</span>
-            <span className="text-purple-300">
-              Against - {debateShare?.againstPct ?? 50}%
-            </span>
-          </div>
-          {debateShare && debateShare.total === 0 ? (
-            <p className="mb-2.5 text-[11px] text-gray-400">
-              No motion votes yet. Be one of the first voices in.
-            </p>
-          ) : null}
-          <Link
-            href={`/debates/${activeDebate.id}`}
-            className="inline-flex w-full justify-center rounded-lg bg-emerald-brand px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-          >
-            Join the debate -&gt;
-          </Link>
-        </section>
-      ) : (
-        <PromptCard
-          kicker="Debate desk"
-          title="No live motion yet"
-          body="Start a focused argument and invite the network to take a side."
-          href="/debates/create"
-          cta="Start a debate"
-        />
-      )}
-
-      <TopicsCard topics={topics} />
-
-      {newVoice?.profile?.username ? (
-        <SideCard>
-          <div className="mb-2.5 flex items-center justify-between gap-3">
-            <SideKicker className="mb-0">New voice this week</SideKicker>
-            {newVoice.totalPosts && newVoice.totalPosts <= 2 ? (
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                New
-              </span>
-            ) : null}
-          </div>
-          <Link
-            href={`/${newVoice.profile.username}`}
-            className="group flex items-center gap-3"
-          >
-            <UserAvatar
-              name={newVoice.profile.full_name ?? newVoice.profile.username}
-              src={newVoice.profile.avatar_url}
-              size={42}
-            />
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-medium text-ink group-hover:text-gray-700">
-                {newVoice.profile.full_name ?? newVoice.profile.username}
-              </span>
-              <span className="mt-0.5 block truncate text-[11px] text-ink-muted">
-                {newVoice.count} recent {newVoice.count === 1 ? "piece" : "pieces"}
-                {newVoice.profile.university ? ` - ${newVoice.profile.university}` : ""}
-              </span>
-            </span>
-          </Link>
-          <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-[11px] leading-5 text-ink-muted">
-            {newVoice.totalPosts && newVoice.totalPosts <= 1
-              ? "First publication on Indegenius. Worth catching early."
-              : `${newVoice.totalPosts ?? newVoice.count} total publications, newly active this month.`}
-          </p>
-        </SideCard>
-      ) : null}
-
-      {peopleSuggestions.length > 0 ? (
-        <SideCard>
-          <div className="mb-2.5 flex items-center justify-between">
-            <SideKicker className="mb-0">Writers to follow</SideKicker>
-            <Link
-              href="/leaderboard"
-              className="text-[11px] font-semibold text-emerald-brand hover:underline"
-            >
-              See all -&gt;
-            </Link>
-          </div>
-          <div>
-            {peopleSuggestions.map((person) => (
-              <div
-                key={person.id}
-                className="flex items-center gap-2.5 border-b border-gray-100 py-2 last:border-b-0 last:pb-0"
-              >
-                <Link href={`/${person.username}`} className="shrink-0">
-                  <UserAvatar
-                    name={person.full_name ?? person.username}
-                    src={person.avatar_url}
-                    size={38}
-                  />
-                </Link>
-                <div className="min-w-0 flex-1">
-                  <Link href={`/${person.username}`}>
-                    <p className="truncate text-[13px] font-medium text-ink hover:text-emerald-brand">
-                      {person.full_name ?? person.username}
-                    </p>
-                  </Link>
-                  {person.university ? (
-                    <p className="mt-0.5 truncate text-[11px] text-ink-muted">
-                      {person.university}
-                    </p>
-                  ) : null}
-                </div>
-                {currentUserId ? (
-                  <FollowButton
-                    followerId={currentUserId}
-                    followingId={person.id}
-                  />
-                ) : (
-                  <Link
-                    href={`/${person.username}`}
-                    className="rounded-full border border-gray-200 px-3 py-1 text-[11px] font-medium text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
-                  >
-                    View
-                  </Link>
-                )}
-              </div>
-            ))}
-          </div>
-        </SideCard>
+    <div className="flex flex-col gap-3.5">
+      <PersonalAction recentDraft={recentDraft} activationState={activationState} />
+      {featuredPost ? <FeaturedCard post={featuredPost} /> : null}
+      {activeDebate ? <DebateCard debate={activeDebate} /> : null}
+      <PeopleCard people={peopleSuggestions} currentUserId={currentUserId} />
+      {topics.length > 0 ? (
+        <nav aria-label="Browse popular topics" className="flex flex-wrap gap-x-3 gap-y-2 px-1 text-[11.5px] text-gray-500">
+          {topics.slice(0, 7).map((topic) => <Link key={topic} href={`/topics/${encodeURIComponent(topic)}`} className="hover:text-emerald-700">{topic}</Link>)}
+        </nav>
       ) : null}
     </div>
   );

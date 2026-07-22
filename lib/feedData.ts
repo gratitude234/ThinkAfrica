@@ -9,6 +9,22 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type FeedTabKey = "home" | "following" | "latest";
 export type FeedTimeframe = "all" | "week" | "month";
+export type FeedContentFilter = "all" | "post" | "article" | "research";
+
+export function normalizeFeedContentFilter(
+  value: string | null | undefined
+): FeedContentFilter {
+  if (value === "post" || value === "blog") return "post";
+  if (
+    value === "article" ||
+    value === "essay" ||
+    value === "policy_brief"
+  ) {
+    return "article";
+  }
+  if (value === "research") return "research";
+  return "all";
+}
 
 export interface FeedPageResult {
   posts: PostCardData[];
@@ -22,7 +38,7 @@ interface FeedOptions {
   tab: FeedTabKey;
   page: number;
   pageSize: number;
-  type: string | null;
+  type: FeedContentFilter | null;
   timeframe: FeedTimeframe;
   userId: string | null;
   userInterests: string[];
@@ -120,6 +136,8 @@ async function enrichPosts(
     responseCounts,
     profilesResult,
     postAuthorsResult,
+    viewerLikesResult,
+    viewerBookmarksResult,
   ] = await Promise.all([
     getLikeCountsByPostId(supabase, ids),
     getCountsByPostId(supabase, "bookmarks", ids),
@@ -143,6 +161,20 @@ async function enrichPosts(
           .in("post_id", ids)
           .not("accepted_at", "is", null)
           .order("display_order", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    ids.length > 0 && rankingContext?.userId
+      ? supabase
+          .from("likes")
+          .select("post_id")
+          .eq("user_id", rankingContext.userId)
+          .in("post_id", ids)
+      : Promise.resolve({ data: [], error: null }),
+    ids.length > 0 && rankingContext?.userId
+      ? supabase
+          .from("bookmarks")
+          .select("post_id")
+          .eq("user_id", rankingContext.userId)
+          .in("post_id", ids)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -187,6 +219,16 @@ async function enrichPosts(
       : { data: [], error: null };
 
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const viewerLikedIds = new Set(
+    ((viewerLikesResult.data ?? []) as Array<{ post_id: string }>).map(
+      (row) => row.post_id
+    )
+  );
+  const viewerBookmarkedIds = new Set(
+    ((viewerBookmarksResult.data ?? []) as Array<{ post_id: string }>).map(
+      (row) => row.post_id
+    )
+  );
   const coAuthorProfilesById = new Map(
     ((coAuthorProfilesResult.data ?? []) as Array<{
       id: string;
@@ -269,6 +311,8 @@ async function enrichPosts(
       quality_badges: qualitySignals.badges,
       surface_reason: getFeedSurfaceReason(qualityInput),
       quality_score: qualitySignals.score,
+      viewer_liked: viewerLikedIds.has(id),
+      viewer_bookmarked: viewerBookmarkedIds.has(id),
     } as PostCardData;
   });
 }
@@ -340,39 +384,16 @@ export function applyPostFilters(
     cutoff,
     excludedAuthorIds,
   }: {
-    type: string | null;
+    type: FeedContentFilter | null;
     cutoff: string | null;
     excludedAuthorIds?: string[];
   }
 ) {
   let nextQuery = query.eq("status", "published");
   if (type && type !== "all") {
-    // Every filter value is resolved against the new-model columns
-    // (populated for every row since the Phase 1 migration), never the
-    // legacy `type` column directly -- see docs/content-model.md.
-    //   - "essay" is the "Articles" chip: a content-kind filter, not a
-    //     legacy-type one, so it must include Policy Brief-format Articles
-    //     too (both resolve to content_kind "article").
-    //   - "policy_brief" and "research" are Article-*genre*/content-kind
-    //     filters respectively. Filtering "policy_brief" by legacy `type`
-    //     alone (the pre-Phase-4A behavior) missed every Policy-Brief-
-    //     format Article created after Phase 3 shipped, since a brand-new
-    //     Article always dual-writes type="essay" regardless of genre
-    //     (see legacyTypeForNewContent() in lib/contentModel.ts) -- only
-    //     article_format carries "policy_brief" for those rows.
-    //   - "blog" filters by content_kind "post" for the same reason, so a
-    //     future titleless Post with no legacy type at all still matches.
-    if (type === "essay") {
-      nextQuery = nextQuery.eq("content_kind", "article");
-    } else if (type === "policy_brief") {
-      nextQuery = nextQuery.eq("article_format", "policy_brief");
-    } else if (type === "research") {
-      nextQuery = nextQuery.eq("content_kind", "research");
-    } else if (type === "blog") {
-      nextQuery = nextQuery.eq("content_kind", "post");
-    } else {
-      nextQuery = nextQuery.eq("type", type);
-    }
+    // Home filters use the three top-level content kinds. Article genres
+    // remain descriptive metadata and are deliberately not peer filters.
+    nextQuery = nextQuery.eq("content_kind", type);
   }
   if (cutoff) {
     nextQuery = nextQuery.gte("published_at", cutoff);

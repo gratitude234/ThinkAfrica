@@ -25,7 +25,7 @@ export default function TopicInterlude({ posts }: { posts: PostCardData[] }) {
   if (!topic) return null;
 
   return (
-    <section className="my-2 rounded-xl border border-gray-200 bg-canvas px-5 py-[18px]">
+    <section className="-mx-4 my-3 border-y border-gray-200 bg-canvas px-4 py-[18px] sm:mx-0 sm:rounded-xl sm:border sm:px-5">
       <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">
         Topic spotlight
       </p>

@@ -1,13 +1,12 @@
 "use client";
 
-type TypeFilter = "all" | "research" | "essay" | "policy_brief" | "blog";
+import type { FeedContentFilter } from "@/lib/feedData";
 
-const TYPE_OPTIONS: Array<{ label: string; value: TypeFilter }> = [
+const TYPE_OPTIONS: Array<{ label: string; value: FeedContentFilter }> = [
   { label: "All", value: "all" },
-  { label: "Articles", value: "essay" },
+  { label: "Posts", value: "post" },
+  { label: "Articles", value: "article" },
   { label: "Research", value: "research" },
-  { label: "Policy Briefs", value: "policy_brief" },
-  { label: "Quick Takes", value: "blog" },
 ];
 
 function Chip({
@@ -23,7 +22,8 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-9 shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+      aria-pressed={active}
+      className={`min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-2 ${
         active
           ? "border-ink bg-ink text-white"
           : "border-gray-200 bg-white text-ink-muted hover:border-emerald-brand hover:bg-emerald-50 hover:text-emerald-brand"
@@ -38,11 +38,15 @@ export default function FeedFilterChips({
   type,
   onTypeChange,
 }: {
-  type: TypeFilter;
-  onTypeChange: (value: TypeFilter) => void;
+  type: FeedContentFilter;
+  onTypeChange: (value: FeedContentFilter) => void;
 }) {
   return (
-    <div className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div
+      className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      role="group"
+      aria-label="Filter feed by content type"
+    >
       {TYPE_OPTIONS.map((option) => (
         <Chip
           key={option.value}

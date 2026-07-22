@@ -1,6 +1,8 @@
 import PostsFeedTabs from "./PostsFeedTabs";
 import {
   fetchFeedPage,
+  normalizeFeedContentFilter,
+  type FeedContentFilter,
   type FeedTimeframe,
   type FeedTabKey,
 } from "@/lib/feedData";
@@ -35,16 +37,8 @@ function getInitialTab(tab: string, showFollowingEligible: boolean): FeedTabKey 
   return "home";
 }
 
-function getInitialType(type: string | null) {
-  if (
-    type === "research" ||
-    type === "essay" ||
-    type === "policy_brief" ||
-    type === "blog"
-  ) {
-    return type;
-  }
-  return "all";
+function getInitialType(type: string | null): FeedContentFilter {
+  return normalizeFeedContentFilter(type);
 }
 
 function getInitialTimeframe(timeframe: string | null): FeedTimeframe {
@@ -76,7 +70,7 @@ export default async function PostsFeedSection({
     supabase,
     tab: initialTab,
     page: 1,
-    pageSize: 20,
+    pageSize: 12,
     type: initialType === "all" ? null : initialType,
     timeframe: initialTimeframe,
     userId,

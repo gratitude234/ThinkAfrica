@@ -25,7 +25,7 @@ export default function DebateInterlude({
   const status = debate.status ?? "active";
 
   return (
-    <section className="my-3 grid gap-4 rounded-xl bg-gray-900 p-4 text-white sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5">
+    <section className="-mx-4 my-3 grid gap-4 border-y border-gray-800 bg-gray-900 p-4 text-white sm:mx-0 sm:rounded-xl sm:border sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5">
       <div className="min-w-0">
         <div className="mb-2 flex items-center gap-2">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />

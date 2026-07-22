@@ -152,7 +152,7 @@ export default async function StatsPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center mb-8">
           <p className="text-gray-400 text-sm">
             No published posts yet.{" "}
-            <Link href="/write" className="text-emerald-brand font-medium hover:underline">
+            <Link href="/create/post" className="text-emerald-brand font-medium hover:underline">
               Write your first post →
             </Link>
           </p>

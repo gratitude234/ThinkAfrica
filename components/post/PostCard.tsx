@@ -45,6 +45,8 @@ export interface PostCardData {
   cover_image_url?: string | null;
   score?: number;
   quality_score?: number;
+  viewer_liked?: boolean;
+  viewer_bookmarked?: boolean;
   quality_badges?: Array<{
     key: string;
     label: string;

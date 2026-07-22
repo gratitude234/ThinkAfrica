@@ -1,11 +1,49 @@
 import Link from "next/link";
 import { PostCardData } from "./PostCard";
-import PostCardImpression from "./PostCardImpression";
+import HomeFeedCardImpression from "./HomeFeedCardImpression";
 import DebateInterlude, { type DebateInterludeData } from "./DebateInterlude";
 import PeopleInterlude from "./PeopleInterlude";
 import TopicInterlude from "./TopicInterlude";
 
 type FeedTabKey = "home" | "following" | "latest";
+export type DiscoveryModule = "people" | "debate" | "topic";
+
+export function getDiscoveryModuleOrder({
+  prioritizePeople,
+  hasPeople,
+  hasDebate,
+  hasTopic,
+}: {
+  prioritizePeople: boolean;
+  hasPeople: boolean;
+  hasDebate: boolean;
+  hasTopic: boolean;
+}): DiscoveryModule[] {
+  const order: DiscoveryModule[] = prioritizePeople
+    ? ["people", "debate", "topic"]
+    : ["debate", "people", "topic"];
+
+  return order.filter((module) => {
+    if (module === "people") return hasPeople;
+    if (module === "debate") return hasDebate;
+    return hasTopic;
+  });
+}
+
+export function getDiscoveryModuleAt({
+  activeTab,
+  completedCount,
+  modules,
+}: {
+  activeTab: FeedTabKey;
+  completedCount: number;
+  modules: DiscoveryModule[];
+}) {
+  if (activeTab !== "home" || completedCount < 8 || completedCount % 8 !== 0) {
+    return null;
+  }
+  return modules[completedCount / 8 - 1] ?? null;
+}
 
 interface PostFeedProps {
   posts: PostCardData[];
@@ -33,7 +71,29 @@ export default function PostFeed({
   currentUserId = null,
 }: PostFeedProps) {
   const topicPosts = posts.filter((post) => (post.tags ?? []).length > 0);
-  const canShowDebateInterlude = activeTab === "home" || activeTab === "latest";
+  const discoveryModules = getDiscoveryModuleOrder({
+    prioritizePeople: prioritizePeopleSuggestions,
+    hasPeople: peopleSuggestions.length > 0,
+    hasDebate: Boolean(activeDebate),
+    hasTopic: topicPosts.length > 1,
+  });
+
+  const renderDiscoveryModule = (module: DiscoveryModule) => {
+    if (module === "people") {
+      return (
+        <PeopleInterlude
+          people={peopleSuggestions}
+          reason={peopleSuggestionReason}
+          currentUserId={currentUserId}
+        />
+      );
+    }
+    if (module === "debate" && activeDebate) {
+      return <DebateInterlude debate={activeDebate} />;
+    }
+    if (module === "topic") return <TopicInterlude posts={topicPosts} />;
+    return null;
+  };
 
   return (
     <div>
@@ -76,52 +136,30 @@ export default function PostFeed({
         )
       ) : (
         <div>
-          {prioritizePeopleSuggestions && peopleSuggestions.length > 0 ? (
-            <PeopleInterlude
-              people={peopleSuggestions}
-              reason={peopleSuggestionReason}
-              currentUserId={currentUserId}
-            />
-          ) : null}
+          {posts.map((post, index) => {
+            const completedCount = index + 1;
+            const discoveryModule = getDiscoveryModuleAt({
+              activeTab,
+              completedCount,
+              modules: discoveryModules,
+            });
 
-          <div className="mb-3.5 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
-            Latest in your feed
-            <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
-          </div>
-
-          {posts.map((post, index) => (
-            <div key={post.id}>
-              {canShowDebateInterlude &&
-              index === 5 &&
-              activeDebate ? (
-                <DebateInterlude debate={activeDebate} />
-              ) : null}
-
-              <PostCardImpression
-                post={post}
-                variant={index % 3 === 1 ? "editorial" : "standard"}
-                currentUserId={currentUserId}
-                surface={activeTab}
-              />
-
-              {canShowDebateInterlude &&
-              index > 5 &&
-              (index + 1) % 8 === 0 &&
-              activeDebate ? (
-                <DebateInterlude debate={activeDebate} />
-              ) : null}
-              {!prioritizePeopleSuggestions && index === 11 && peopleSuggestions.length > 0 ? (
-                <PeopleInterlude
-                  people={peopleSuggestions}
-                  reason={peopleSuggestionReason}
+            return (
+              <div key={post.id}>
+                <HomeFeedCardImpression
+                  post={post}
                   currentUserId={currentUserId}
+                  surface={activeTab}
+                  priority={index === 0}
                 />
-              ) : null}
-              {index === 17 && topicPosts.length > 1 ? (
-                <TopicInterlude posts={topicPosts} />
-              ) : null}
-            </div>
-          ))}
+                {discoveryModule ? (
+                  <div className="lg:hidden">
+                    {renderDiscoveryModule(discoveryModule)}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

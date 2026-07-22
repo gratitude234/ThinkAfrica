@@ -11,7 +11,6 @@ import type { LegacyPushPromptSeed } from "@/lib/pushPromptPolicy";
 import { getActivationState, type ActivationState } from "@/lib/activation";
 import { getProfileTypeLabel, isProfileType } from "@/lib/profileTypes";
 import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
-import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import {
   getActiveDebate,
@@ -21,24 +20,20 @@ import {
   uniqueFeaturedPosts,
   type FeaturedPostRow as FeaturedPostRaw,
 } from "@/lib/dailyBrief";
-import DailyBriefStrip from "./DailyBriefStrip";
-import EditorPicksRow from "./EditorPicksRow";
-import FeaturedPostLead from "./FeaturedPostLead";
-import LatestResearchShelf, { type LatestResearchItem } from "./LatestResearchShelf";
 import PostsFeedSection from "./PostsFeedSection";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl, canonicalPath } from "@/lib/site";
 
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "African Student Essays, Research and Policy Ideas",
+  title: "African Student Posts, Articles and Research",
   description:
-    "Indegenius is an intellectual social network for African student essays, research, debates, and policy ideas.",
+    "Discover posts, articles, research, debates, and policy ideas from African students and scholars.",
   alternates: { canonical: canonicalPath("/") },
   openGraph: {
     title: "Indegenius - Africa's Intellectual Social Network",
     description:
-      "Indegenius is an intellectual social network for African student essays, research, debates, and policy ideas.",
+      "Discover posts, articles, research, debates, and policy ideas from African students and scholars.",
     url: SITE_URL,
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
@@ -48,7 +43,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Indegenius - Africa's Intellectual Social Network",
     description:
-      "Indegenius is an intellectual social network for African student essays, research, debates, and policy ideas.",
+      "Discover posts, articles, research, debates, and policy ideas from African students and scholars.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };
@@ -61,14 +56,6 @@ interface PageProps {
     timeframe?: string;
     welcome?: string;
   }>;
-}
-
-type FeaturedSource = "manual" | "automatic";
-
-interface VoicePostRaw {
-  author_id: string;
-  published_at: string | null;
-  profiles: VoiceProfile | VoiceProfile[] | null;
 }
 
 const DEFAULT_SIDEBAR_TOPICS = [
@@ -84,20 +71,13 @@ const DEFAULT_SIDEBAR_TOPICS = [
   "Urban Planning",
 ];
 
-interface VoiceProfile {
-  username: string | null;
-  full_name: string | null;
-  university: string | null;
-  avatar_url: string | null;
-}
-
 function FeedSkeleton() {
   return (
-    <div className="space-y-4 animate-pulse">
-      {[...Array(4)].map((_, i) => (
+    <div className="animate-pulse">
+      {[...Array(3)].map((_, i) => (
         <div
           key={i}
-          className="rounded-2xl border border-gray-100 bg-white p-5"
+          className="-mx-4 mb-2 border-y border-gray-200 bg-white p-4 sm:mx-0 sm:mb-3 sm:rounded-xl sm:border sm:p-5"
         >
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -127,11 +107,9 @@ function logHomeQueryError(
 function deriveSidebarTopics({
   userInterests,
   featuredPosts,
-  latestResearch,
 }: {
   userInterests: string[];
   featuredPosts: Array<{ tags: string[] | null }>;
-  latestResearch: Array<{ tags: string[] | null }>;
 }) {
   const scores = new Map<string, number>();
 
@@ -142,12 +120,6 @@ function deriveSidebarTopics({
   for (const post of featuredPosts) {
     for (const tag of post.tags ?? []) {
       scores.set(tag, (scores.get(tag) ?? 0) + 2);
-    }
-  }
-
-  for (const paper of latestResearch) {
-    for (const tag of paper.tags ?? []) {
-      scores.set(tag, (scores.get(tag) ?? 0) + 1);
     }
   }
 
@@ -174,7 +146,6 @@ export default async function HomePage({ searchParams }: PageProps) {
   let userInterests: string[] = [];
   let userUniversity: string | null = null;
   let userFieldOfStudy: string | null = null;
-  let userPoints: number | null = null;
   let welcomeFirstName: string | null = null;
   let welcomePrimaryLabel: string | null = null;
   let legacyPushSeed: LegacyPushPromptSeed = {
@@ -187,7 +158,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     const { data: profileData } = await supabase
       .from("profiles")
       .select(
-        "interests, university, field_of_study, points, full_name, profile_type, push_prompt_attempt_count, push_prompt_last_shown_at, push_prompt_shown_at"
+        "interests, university, field_of_study, full_name, profile_type, push_prompt_attempt_count, push_prompt_last_shown_at, push_prompt_shown_at"
       )
       .eq("id", user.id)
       .single();
@@ -195,7 +166,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     userInterests = (profileData?.interests as string[] | null) ?? [];
     userUniversity = profileData?.university ?? null;
     userFieldOfStudy = profileData?.field_of_study ?? null;
-    userPoints = profileData?.points ?? null;
     welcomeFirstName = profileData?.full_name?.trim().split(/\s+/)[0] ?? null;
     welcomePrimaryLabel = isProfileType(profileData?.profile_type)
       ? getProfileTypeLabel(profileData.profile_type)
@@ -219,8 +189,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     hotDebateResult,
     { data: recentDraft },
     featuredCandidates,
-    newVoiceResult,
-    latestResearchResult,
   ] = await Promise.all([
     user
       ? supabase
@@ -234,7 +202,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     user
       ? supabase
           .from("posts")
-          .select("id, title, updated_at")
+          .select("id, title, updated_at, type, content_kind")
           .eq("author_id", user.id)
           .eq("status", "draft")
           .gte("updated_at", draftCutoff)
@@ -244,35 +212,6 @@ export default async function HomePage({ searchParams }: PageProps) {
       : Promise.resolve({ data: null, error: null }),
 
     getFeaturedPostCandidates(supabase),
-
-    supabase
-      .from("posts")
-      .select(
-        `
-        author_id,
-        published_at,
-        profiles!posts_author_id_fkey (username, full_name, university, avatar_url)
-      `
-      )
-      .eq("status", "published")
-      .gte(
-        "published_at",
-        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      )
-      .limit(50),
-
-    supabase
-      .from("posts")
-      .select(
-        `
-        id, title, slug, excerpt, tags, citation_id, document_size_bytes, published_at,
-        profiles!posts_author_id_fkey (username, full_name, university)
-      `
-      )
-      .eq("status", "published")
-      .eq("type", "research")
-      .order("published_at", { ascending: false })
-      .limit(12),
   ]);
 
   const { manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult } =
@@ -285,8 +224,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     recentFeaturedCandidatesResult.error
   );
   logHomeQueryError("latest published fallback", latestPublishedResult.error);
-  logHomeQueryError("new voice", newVoiceResult.error);
-  logHomeQueryError("latest research", latestResearchResult.error);
 
   const followedIds = (followedUsers ?? []).map(
     (row: { following_id: string }) => row.following_id
@@ -306,13 +243,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     ...recentFeaturedCandidatesRaw,
     ...(latestPublishedRaw ? [latestPublishedRaw] : []),
   ]);
-  const newVoiceRaw = (newVoiceResult.data ?? []) as VoicePostRaw[];
-  const latestResearchRaw = (latestResearchResult.data ?? []) as Array<
-    Omit<LatestResearchItem, "profiles"> & {
-      profiles: LatestResearchItem["profiles"] | LatestResearchItem["profiles"][];
-    }
-  >;
-
   const featuredPostsNorm = featuredPostsRaw.map((post) => ({
     ...post,
     profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
@@ -358,112 +288,10 @@ export default async function HomePage({ searchParams }: PageProps) {
       (post) => post.id !== manualFeaturedPost?.id
     ) ?? null;
   const featuredPost = manualFeaturedPost ?? automaticFeaturedPost;
-  const featuredSource: FeaturedSource =
-    manualFeaturedPost && featuredPost?.id === manualFeaturedPost.id
-      ? "manual"
-      : "automatic";
-  const editorPicks = qualityRankedFeaturedPosts
-    .filter((post) => post.id !== featuredPost?.id)
-    .slice(0, 2);
-  const newVoiceAuthorIds = Array.from(
-    new Set(
-      newVoiceRaw
-        .map((row) => row.author_id)
-        .filter((authorId) => authorId && authorId !== featuredPost?.author_id)
-    )
-  );
-  const { data: newVoiceTotalRows } =
-    newVoiceAuthorIds.length > 0
-      ? await supabase
-          .from("posts")
-          .select("author_id")
-          .eq("status", "published")
-          .in("author_id", newVoiceAuthorIds)
-      : { data: [] };
-  const totalPostsByAuthor = (newVoiceTotalRows ?? []).reduce(
-    (acc: Record<string, number>, row: { author_id?: string }) => {
-      if (!row.author_id) return acc;
-      acc[row.author_id] = (acc[row.author_id] ?? 0) + 1;
-      return acc;
-    },
-    {}
-  );
-
-  const voiceCounts = new Map<
-    string,
-    {
-      count: number;
-      totalPosts: number;
-      firstPublishedAt: string | null;
-      profile: VoiceProfile | null;
-    }
-  >();
-
-  for (const row of newVoiceRaw) {
-    if (!row.author_id || row.author_id === featuredPost?.author_id) continue;
-    const profile = Array.isArray(row.profiles)
-      ? row.profiles[0] ?? null
-      : row.profiles;
-    const existing = voiceCounts.get(row.author_id);
-    voiceCounts.set(row.author_id, {
-      count: (existing?.count ?? 0) + 1,
-      totalPosts: totalPostsByAuthor[row.author_id] ?? existing?.totalPosts ?? 1,
-      firstPublishedAt:
-        !existing?.firstPublishedAt ||
-        (row.published_at &&
-          new Date(row.published_at).getTime() <
-            new Date(existing.firstPublishedAt).getTime())
-          ? row.published_at
-          : existing.firstPublishedAt,
-      profile,
-    });
-  }
-
-  const newVoice =
-    Array.from(voiceCounts.values()).sort((left, right) => {
-      if (left.totalPosts !== right.totalPosts) {
-        return left.totalPosts - right.totalPosts;
-      }
-      if (left.count !== right.count) return right.count - left.count;
-      return (
-        new Date(right.firstPublishedAt ?? 0).getTime() -
-        new Date(left.firstPublishedAt ?? 0).getTime()
-      );
-    })[0] ?? null;
-
-  const latestResearch = latestResearchRaw
-    .map((paper) => ({
-      ...paper,
-      profiles: Array.isArray(paper.profiles)
-        ? paper.profiles[0] ?? null
-        : paper.profiles,
-    }))
-    .sort((left, right) => {
-      const score = (paper: LatestResearchItem) => {
-        const interestMatch = Boolean(
-          paper.tags?.some((tag) => userInterests.includes(tag))
-        );
-        const universityMatch = Boolean(
-          userUniversity &&
-            paper.profiles?.university &&
-            paper.profiles.university === userUniversity
-        );
-        return (
-          (paper.citation_id ? 100 : 0) +
-          (interestMatch ? 25 : 0) +
-          (universityMatch ? 20 : 0) +
-          new Date(paper.published_at ?? 0).getTime() / 100000000000
-        );
-      };
-
-      return score(right) - score(left);
-    })
-    .slice(0, 3);
 
   const sidebarTopics = deriveSidebarTopics({
     userInterests,
     featuredPosts: qualityRankedFeaturedPosts,
-    latestResearch,
   });
 
   let peopleResult: SuggestedPeopleResult = { suggestions: [], reason: "" };
@@ -485,7 +313,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   const activeTab =
     tab === "following" && showFollowingEligible
       ? "following"
-      : tab === "latest" || (!user && !tab)
+      : tab === "latest"
         ? "latest"
         : "home";
 
@@ -507,34 +335,8 @@ export default async function HomePage({ searchParams }: PageProps) {
         />
       ) : null}
 
-      {user ? (
-        <DailyBriefStrip
-          featuredPost={
-            featuredPost
-              ? {
-                  title: getPostMetadataTitle(featuredPost, featuredPost.profiles),
-                  slug: featuredPost.slug,
-                }
-              : null
-          }
-          activeDebate={homeDebate}
-          points={userPoints}
-        />
-      ) : null}
-
-      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_296px]">
+      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,700px)_minmax(280px,304px)] lg:justify-center lg:gap-8 xl:gap-10">
         <div className="min-w-0">
-          <FeaturedPostLead
-            post={featuredPost}
-            label={
-              featuredSource === "manual" ? "Editor's pick" : "Featured today"
-            }
-          />
-
-          {user ? <EditorPicksRow picks={editorPicks} /> : null}
-
-          <LatestResearchShelf papers={latestResearch} />
-
           <Suspense fallback={<FeedSkeleton />}>
             <PostsFeedSection
               tab={activeTab}
@@ -556,7 +358,7 @@ export default async function HomePage({ searchParams }: PageProps) {
         <aside className="hidden self-start lg:sticky lg:top-[76px] lg:block">
           <HomeSidebar
             activeDebate={homeDebate}
-            newVoice={newVoice}
+            featuredPost={featuredPost}
             recentDraft={recentDraft ?? null}
             activationState={activationState}
             peopleSuggestions={peopleResult.suggestions}

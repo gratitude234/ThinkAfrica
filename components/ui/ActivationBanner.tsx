@@ -27,7 +27,10 @@ export default function ActivationBanner({
     () => [
       {
         label: "Write your first post",
-        href: "/write",
+        // Explicitly "post" -- goes straight to the Post composer and
+        // bypasses the generic Create chooser, unlike an ambiguous "Write"
+        // entry point.
+        href: "/create/post",
         done: hasPublished,
       },
       {

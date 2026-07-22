@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BottomNav from "./BottomNav";
 
@@ -15,14 +15,21 @@ describe("BottomNav compose access", () => {
 
   afterEach(() => cleanup());
 
-  it("shows the compose FAB to guests and redirects them through login", () => {
+  it("shows the compose FAB to guests and opens the create chooser instead of navigating directly", () => {
     render(
       <BottomNav username={null} userId={null} hasActiveDebate={false} />
     );
 
-    expect(screen.getByRole("link", { name: "Start writing" })).toHaveAttribute(
+    const trigger = screen.getByRole("button", { name: "Start writing" });
+    expect(screen.queryByRole("link", { name: "Start writing" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: "Create" });
+    expect(within(dialog).getByRole("link", { name: /^Post/ })).toHaveAttribute(
       "href",
-      "/login?redirectTo=%2Fwrite"
+      "/login?redirectTo=%2Fcreate%2Fpost"
     );
   });
 
@@ -33,10 +40,7 @@ describe("BottomNav compose access", () => {
       <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
     );
 
-    expect(screen.getByRole("link", { name: "Start writing" })).toHaveAttribute(
-      "href",
-      "/write"
-    );
+    expect(screen.getByRole("button", { name: "Start writing" })).toBeInTheDocument();
     expect(
       screen.queryByRole("navigation", { name: "Primary navigation" })
     ).not.toBeInTheDocument();

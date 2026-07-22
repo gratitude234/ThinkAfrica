@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   fetchFeedPage,
+  normalizeFeedContentFilter,
   type FeedTabKey,
   type FeedTimeframe,
 } from "@/lib/feedData";
@@ -18,16 +19,8 @@ function getTimeframe(param: string | null): FeedTimeframe {
 }
 
 function getType(param: string | null) {
-  if (!param || param === "all") return null;
-  if (
-    param === "research" ||
-    param === "essay" ||
-    param === "policy_brief" ||
-    param === "blog"
-  ) {
-    return param;
-  }
-  return null;
+  const normalized = normalizeFeedContentFilter(param);
+  return normalized === "all" ? null : normalized;
 }
 
 function getPositiveInteger(param: string | null, fallback: number) {
@@ -40,7 +33,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const params = request.nextUrl.searchParams;
   const page = getPositiveInteger(params.get("page"), 1);
-  const pageSize = getPositiveInteger(params.get("pageSize"), 20);
+  const pageSize = getPositiveInteger(params.get("pageSize"), 12);
   const tab = getTab(params.get("tab"));
   const timeframe = getTimeframe(params.get("timeframe"));
   const type = getType(params.get("type"));

@@ -5,12 +5,10 @@ import Link from "next/link";
 import PostFeed from "@/components/post/PostFeed";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { PostCardData } from "@/components/post/PostCard";
-import type { FeedTimeframe } from "@/lib/feedData";
+import type { FeedContentFilter, FeedTimeframe } from "@/lib/feedData";
 import FeedFilterChips from "./FeedFilterChips";
 
 type TabKey = "home" | "following" | "latest";
-type TypeFilter = "all" | "research" | "essay" | "policy_brief" | "blog";
-
 const EMPTY_POSTS: PostCardData[] = [];
 
 interface FeedResponse {
@@ -25,13 +23,13 @@ interface FeedCacheEntry extends FeedResponse {
 
 function feedCacheKey(
   tab: TabKey,
-  type: TypeFilter,
+  type: FeedContentFilter,
   timeframe: FeedTimeframe
 ) {
   return `${tab}:${type}:${timeframe}`;
 }
 
-function buildFeedUrl(tab: TabKey, type: TypeFilter, timeframe: FeedTimeframe) {
+function buildFeedUrl(tab: TabKey, type: FeedContentFilter, timeframe: FeedTimeframe) {
   const params = new URLSearchParams(window.location.search);
   params.set("tab", tab);
   if (type === "all") {
@@ -51,14 +49,14 @@ function buildFeedUrl(tab: TabKey, type: TypeFilter, timeframe: FeedTimeframe) {
 
 async function fetchFeed(
   tab: TabKey,
-  type: TypeFilter,
+  type: FeedContentFilter,
   timeframe: FeedTimeframe,
   page: number
 ): Promise<FeedResponse> {
   const params = new URLSearchParams();
   params.set("tab", tab);
   params.set("page", page.toString());
-  params.set("pageSize", "20");
+  params.set("pageSize", "12");
   if (type !== "all") params.set("type", type);
   if (timeframe !== "all") params.set("timeframe", timeframe);
 
@@ -123,10 +121,9 @@ function PostFeedSkeleton() {
       {Array.from({ length: 3 }).map((_, index) => (
         <article
           key={index}
-          className="relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-3.5 py-3.5 sm:px-5 sm:py-[18px]"
+          className="relative -mx-4 mb-2 overflow-hidden border-y border-gray-200 bg-white px-4 py-4 sm:mx-0 sm:mb-3 sm:rounded-xl sm:border sm:px-5 sm:py-5"
         >
-          <span className="absolute bottom-4 left-0 top-4 w-1 rounded-r-full bg-gray-200" />
-          <div className="flex gap-3 pl-1 sm:gap-4">
+          <div className="flex gap-3 sm:gap-4">
             <div className="min-w-0 flex-1 animate-pulse">
               <div className="mb-3 flex items-center gap-2">
                 <div className="h-5 w-16 rounded-full bg-gray-100" />
@@ -168,7 +165,7 @@ export default function PostsFeedTabs({
   currentUserId,
 }: {
   initialTab: TabKey;
-  initialType: TypeFilter;
+  initialType: FeedContentFilter;
   initialTimeframe: FeedTimeframe;
   initialPosts: PostCardData[];
   initialHasMore: boolean;
@@ -186,7 +183,7 @@ export default function PostsFeedTabs({
   currentUserId: string | null;
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>(initialType);
+  const [typeFilter, setTypeFilter] = useState<FeedContentFilter>(initialType);
   const [timeframe, setTimeframe] = useState<FeedTimeframe>(initialTimeframe);
   const [feedCache, setFeedCache] = useState<Record<string, FeedCacheEntry>>(() => ({
     [feedCacheKey(initialTab, initialType, initialTimeframe)]: {
@@ -223,8 +220,28 @@ export default function PostsFeedTabs({
     setError(null);
   }, [initialHasMore, initialPosts, initialTab, initialTimeframe, initialType]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const currentType = params.get("type");
+    const canonicalType = initialType === "all" ? null : initialType;
+    if (currentType === canonicalType) return;
+
+    if (canonicalType) params.set("type", canonicalType);
+    else params.delete("type");
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      query ? `${window.location.pathname}?${query}` : window.location.pathname
+    );
+  }, [initialType]);
+
   const syncUrl = useCallback(
-    (nextTab: TabKey, nextType: TypeFilter, nextTimeframe: FeedTimeframe) => {
+    (
+      nextTab: TabKey,
+      nextType: FeedContentFilter,
+      nextTimeframe: FeedTimeframe
+    ) => {
       window.history.replaceState(
         null,
         "",
@@ -237,7 +254,7 @@ export default function PostsFeedTabs({
   const requestFeedPage = useCallback(
     (
       nextTab: TabKey,
-      nextType: TypeFilter,
+      nextType: FeedContentFilter,
       nextTimeframe: FeedTimeframe,
       nextPage: number
     ) => {
@@ -290,7 +307,7 @@ export default function PostsFeedTabs({
   const reloadFeed = useCallback(
     async (
       nextTab: TabKey,
-      nextType: TypeFilter,
+      nextType: FeedContentFilter,
       nextTimeframe: FeedTimeframe,
       {
         requestId,
@@ -323,7 +340,7 @@ export default function PostsFeedTabs({
   );
 
   const updateState = useCallback(
-    (nextTab: TabKey, nextType: TypeFilter, nextTimeframe: FeedTimeframe) => {
+    (nextTab: TabKey, nextType: FeedContentFilter, nextTimeframe: FeedTimeframe) => {
       const nextKey = feedCacheKey(nextTab, nextType, nextTimeframe);
       const hasCachedFeed = Boolean(feedCache[nextKey]);
       const requestId = activeRequestRef.current + 1;
@@ -378,36 +395,6 @@ export default function PostsFeedTabs({
   ]);
 
   useEffect(() => {
-    const tabsToPrefetch: TabKey[] = currentUserId
-      ? showFollowingTab
-        ? ["following", "latest"]
-        : ["latest"]
-      : ["latest"];
-
-    for (const tab of tabsToPrefetch) {
-      const key = feedCacheKey(tab, typeFilter, timeframe);
-      if (tab === activeTab || feedCache[key]) continue;
-
-      void requestFeedPage(tab, typeFilter, timeframe, 1)
-        .then((result) => {
-          writeFeedPage(key, result, 1, false);
-        })
-        .catch(() => {
-          // Prefetch failures should not interrupt the active feed.
-        });
-    }
-  }, [
-    activeTab,
-    currentUserId,
-    feedCache,
-    requestFeedPage,
-    showFollowingTab,
-    timeframe,
-    typeFilter,
-    writeFeedPage,
-  ]);
-
-  useEffect(() => {
     const currentFeed = feedCache[feedCacheKey(activeTab, typeFilter, timeframe)];
     if (!sentinelRef.current || !currentFeed?.hasMore || isSwitching) return;
 
@@ -436,18 +423,32 @@ export default function PostsFeedTabs({
 
   return (
     <div>
-      <div className="mb-4 flex w-full gap-1 overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mb-5">
+      <div
+        className="sticky top-[60px] z-30 -mx-4 mb-3 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto border-b border-gray-200 bg-canvas/95 px-4 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-full sm:px-0"
+        role="tablist"
+        aria-label="Choose feed"
+      >
         {(["home", "following", "latest"] as const)
           .filter((tab) => tab !== "following" || showFollowingTab)
           .map((tab) => {
             const label =
-              tab === "home" ? "For you" : tab === "following" ? "Following" : "Latest";
+              tab === "home"
+                ? currentUserId
+                  ? "For you"
+                  : "Discover"
+                : tab === "following"
+                  ? "Following"
+                  : "Latest";
             return (
               <button
                 key={tab}
                 type="button"
+                role="tab"
+                id={`feed-tab-${tab}`}
+                aria-controls="home-feed-panel"
+                aria-selected={activeTab === tab}
                 onClick={() => updateState(tab, typeFilter, timeframe)}
-                className={`-mb-px min-h-10 shrink-0 border-b-2 px-3.5 py-2 text-[13.5px] font-semibold transition-colors ${
+                className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-brand ${
                   activeTab === tab
                     ? "border-emerald-brand text-ink"
                     : "border-transparent text-gray-500 hover:text-ink"
@@ -470,7 +471,12 @@ export default function PostsFeedTabs({
         </div>
       ) : null}
 
-      <div aria-busy={showSkeleton || isLoadingMore}>
+      <div
+        id="home-feed-panel"
+        role="tabpanel"
+        aria-labelledby={`feed-tab-${activeTab}`}
+        aria-busy={showSkeleton || isLoadingMore}
+      >
         {showSkeleton ? (
           <PostFeedSkeleton />
         ) : (

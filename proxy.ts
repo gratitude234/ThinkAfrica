@@ -28,6 +28,8 @@ export async function proxy(request: NextRequest) {
   ];
   const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
   const isGuestHome = pathname === "/";
+  const isExplicitGuestHome =
+    isGuestHome && request.nextUrl.searchParams.get("guest") === "1";
 
   if (!isProtected && !isGuestHome) {
     return NextResponse.next({ request });
@@ -66,10 +68,14 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && isGuestHome) {
+  if (!user && isGuestHome && !isExplicitGuestHome) {
     const landingUrl = request.nextUrl.clone();
     landingUrl.pathname = "/landing";
     return NextResponse.redirect(landingUrl);
+  }
+
+  if (!user && isExplicitGuestHome) {
+    return supabaseResponse;
   }
 
   if (!user) {
