@@ -9,6 +9,7 @@ import { createPost } from "./actions";
 
 interface PostComposerFormProps {
   userId: string;
+  parentPost?: { id: string; displayTitle: string } | null;
 }
 
 interface DraftBackup {
@@ -63,7 +64,7 @@ function clearDraftBackup(userId: string) {
   }
 }
 
-export default function PostComposerForm({ userId }: PostComposerFormProps) {
+export default function PostComposerForm({ userId, parentPost = null }: PostComposerFormProps) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -129,7 +130,7 @@ export default function PostComposerForm({ userId }: PostComposerFormProps) {
     setSubmitting(true);
     setError(null);
 
-    const result = await createPost({ body, imageUrl });
+    const result = await createPost({ body, imageUrl, inResponseTo: parentPost?.id ?? null });
 
     if (result.error || !result.slug) {
       setError(result.error ?? "Failed to publish. Please try again.");
@@ -142,7 +143,7 @@ export default function PostComposerForm({ userId }: PostComposerFormProps) {
     // every publish records two rows.
     clearDraftBackup(userId);
     router.push(`/post/${result.slug}`);
-  }, [body, canSubmit, imageUrl, router, submitting, userId]);
+  }, [body, canSubmit, imageUrl, parentPost, router, submitting, userId]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -162,6 +163,17 @@ export default function PostComposerForm({ userId }: PostComposerFormProps) {
           A quick thought — publishes immediately, no title needed.
         </p>
       </div>
+
+      {parentPost ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+            Responding to
+          </p>
+          <p className="mt-0.5 truncate text-sm font-medium text-gray-900">
+            {parentPost.displayTitle}
+          </p>
+        </div>
+      ) : null}
 
       {pendingRestore ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">

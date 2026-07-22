@@ -79,9 +79,15 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!user) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("redirectTo", pathname);
+    // Built fresh (not via request.nextUrl.clone()) so the original
+    // request's own query string doesn't leak onto /login as top-level
+    // params -- it belongs inside `redirectTo` instead, which must carry
+    // the full intended destination (path + query), not just the
+    // pathname. Dropping the query string here previously lost a
+    // response's parent id/format (e.g. /write?inResponseTo=...&kind=...)
+    // on every guest login redirect.
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirectTo", pathname + request.nextUrl.search);
     return NextResponse.redirect(loginUrl);
   }
 
