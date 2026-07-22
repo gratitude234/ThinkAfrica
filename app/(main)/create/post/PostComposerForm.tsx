@@ -157,11 +157,27 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-gray-900">New post</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          A quick thought — publishes immediately, no title needed.
-        </p>
+      <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-gray-500 hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+        >
+          Cancel
+        </button>
+        <div className="min-w-0 flex-1 text-center">
+          <h1 className="font-display text-xl font-semibold text-gray-900">New post</h1>
+          <p className="text-[11px] text-gray-400">Saved on this device automatically</p>
+        </div>
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => void handleSubmit()}
+          disabled={!canSubmit}
+          loading={submitting}
+        >
+          Post
+        </Button>
       </div>
 
       {parentPost ? (
@@ -211,8 +227,8 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
           rows={8}
           autoFocus
           aria-describedby="post-body-count post-body-error"
-          className={`w-full min-h-[180px] resize-y rounded-xl border bg-white p-4 text-base leading-relaxed text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-            isOverLimit ? "border-red-400" : "border-gray-200"
+          className={`min-h-[260px] w-full resize-y rounded-lg border bg-white px-1 py-3 text-[17px] leading-[1.7] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-4 ${
+            isOverLimit ? "border-red-300" : "border-transparent"
           }`}
         />
         <div className="mt-1.5 flex items-center justify-between text-xs">
@@ -246,17 +262,6 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
         </p>
       ) : null}
 
-      <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
-        <Button
-          type="button"
-          variant="primary"
-          onClick={() => void handleSubmit()}
-          disabled={!canSubmit}
-          loading={submitting}
-        >
-          Publish
-        </Button>
-      </div>
     </div>
   );
 }

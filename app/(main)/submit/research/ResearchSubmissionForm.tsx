@@ -33,6 +33,10 @@ interface ResearchSubmissionFormProps {
   initialCoAuthors: CoAuthorProfile[];
 }
 
+type SubmissionStep = 1 | 2 | 3 | 4;
+
+const STEP_LABELS = ["Metadata", "Manuscript", "Contributors", "Review"] as const;
+
 const emptyDocument: ResearchDocumentInput = {
   documentPath: null,
   originalName: null,
@@ -136,6 +140,18 @@ export default function ResearchSubmissionForm({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<SubmissionStep>(() => {
+    if (
+      initialDraft &&
+      initialDraft.status !== "draft" &&
+      initialDraft.status !== "pending_revision"
+    ) {
+      return 4;
+    }
+    if (!initialDraft?.title?.trim() || !initialDraft?.abstract?.trim()) return 1;
+    if (!initialDraft.document.documentPath) return 2;
+    return 3;
+  });
   const [isPending, startTransition] = useTransition();
   const status = initialDraft?.status ?? "draft";
   const needsAuthorNote = status === "pending_revision";
@@ -201,6 +217,21 @@ export default function ResearchSubmissionForm({
       current: false,
     },
   ];
+  const canContinue =
+    currentStep === 1
+      ? metadataReady
+      : currentStep === 2
+        ? pdfUploaded
+        : true;
+  const goBack = () => setCurrentStep((step) => Math.max(1, step - 1) as SubmissionStep);
+  const goNext = () => {
+    if (!canContinue) {
+      setError(currentStep === 1 ? "Add a title, abstract, and at least one topic to continue." : "Upload the PDF manuscript to continue.");
+      return;
+    }
+    setError(null);
+    setCurrentStep((step) => Math.min(4, step + 1) as SubmissionStep);
+  };
 
   const payload = {
     draftId,
@@ -302,23 +333,29 @@ export default function ResearchSubmissionForm({
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-24 lg:pb-16">
-      <div className="rounded-2xl border border-purple-100 bg-purple-50 px-5 py-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-purple-700">
-          Research submission
-        </p>
-        <h1 className="mt-2 text-2xl font-bold text-gray-900">
-          Upload a research paper
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-purple-950/75">
-          Research papers are reviewed from a submitted PDF. Use PDF for final
-          submission because it preserves formatting for review, citation, and
-          archiving.
-        </p>
-        <p className="mt-2 max-w-3xl text-xs leading-5 text-purple-900/70">
-          From Word or Google Docs? Export or download the final manuscript as a
-          PDF before submitting.
-        </p>
+    <div className="mx-auto max-w-[980px] space-y-5 pb-28 lg:pb-16">
+      <div className="rounded-xl border border-purple-100 bg-white px-5 py-5 sm:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="font-display text-[10.5px] font-bold uppercase tracking-[0.18em] text-purple-accent">Research submission</p>
+            <h1 className="mt-1.5 font-display text-2xl font-semibold text-gray-900">Submit a research paper</h1>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">Upload a final PDF and add the metadata reviewers need. Your submission enters formal editorial review.</p>
+          </div>
+          <p className="rounded-full bg-purple-tint px-3 py-1.5 text-xs font-semibold text-purple-accent">Step {currentStep} of 4</p>
+        </div>
+        <ol className="mt-5 grid grid-cols-4 gap-2" aria-label="Submission progress">
+          {STEP_LABELS.map((label, index) => {
+            const step = (index + 1) as SubmissionStep;
+            const active = currentStep === step;
+            const complete = currentStep > step;
+            return (
+              <li key={label} className="min-w-0">
+                <div className={`h-1.5 rounded-full ${active || complete ? "bg-purple-accent" : "bg-gray-200"}`} />
+                <span className={`mt-1.5 block truncate text-[10.5px] ${active ? "font-semibold text-purple-accent" : "text-gray-400"}`}>{label}</span>
+              </li>
+            );
+          })}
+        </ol>
       </div>
 
       {statusNoticeCopy ? (
@@ -329,7 +366,7 @@ export default function ResearchSubmissionForm({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <main className="space-y-5">
-          <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          {currentStep === 1 ? <section className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900">Paper metadata</h2>
             <div className="mt-4 space-y-4">
               <div>
@@ -369,9 +406,9 @@ export default function ResearchSubmissionForm({
                 disabled={!isEditable}
               />
             </div>
-          </section>
+          </section> : null}
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          {currentStep === 2 ? <section className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900">Research PDF</h2>
             <p className="mt-1 text-sm text-gray-500">
               Upload the final manuscript as a PDF. Accepted research keeps this
@@ -430,9 +467,17 @@ export default function ResearchSubmissionForm({
                 page breaks.
               </p>
             </div>
-          </section>
+          </section> : null}
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          {currentStep === 3 ? <div className="space-y-5">
+          <CoAuthorPicker
+            userId={userId}
+            value={coAuthors}
+            onChange={setCoAuthors}
+            source="write"
+            disabled={!isEditable}
+          />
+          <section className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-gray-900">References</h2>
               <p className="mt-1 text-sm text-gray-500">
@@ -488,9 +533,10 @@ export default function ResearchSubmissionForm({
               + Add reference
             </button>
           </section>
+          </div> : null}
 
-          {needsAuthorNote ? (
-            <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          {currentStep === 4 && needsAuthorNote ? (
+            <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
               <h2 className="text-lg font-semibold text-amber-950">
                 Revision requested
               </h2>
@@ -507,17 +553,38 @@ export default function ResearchSubmissionForm({
               />
             </section>
           ) : null}
+
+          {currentStep === 4 ? (
+            <section className="rounded-xl border border-purple-100 bg-white p-5 sm:p-6">
+              <p className="font-display text-[10.5px] font-bold uppercase tracking-[0.16em] text-purple-accent">Final review</p>
+              <h2 className="mt-1.5 font-display text-xl font-semibold text-ink">Ready to send to reviewers?</h2>
+              <p className="mt-1 text-sm leading-6 text-gray-500">Confirm the submission packet below. Once submitted, editing pauses while the paper is under review.</p>
+              <div className="mt-5 grid gap-3 rounded-lg bg-canvas p-4 sm:grid-cols-2">
+                <CheckItem done={title.trim().length > 0} label="Title and abstract" />
+                <CheckItem done={Boolean(document.documentPath)} label="PDF manuscript" />
+                <CheckItem done={tags.length > 0} label="Topics selected" />
+                <CheckItem done={references.some((ref) => ref.title?.trim())} label="References added" />
+              </div>
+              <div className="mt-5 rounded-lg border border-purple-100 bg-purple-tint/30 p-4 text-sm leading-6 text-gray-600">
+                <p className="font-semibold text-ink">{title || "Untitled manuscript"}</p>
+                <p className="mt-1">{document.originalName || "No PDF attached"}</p>
+                <p className="mt-1">{coAuthors.length > 0 ? `${coAuthors.length} co-author${coAuthors.length === 1 ? "" : "s"}` : "No co-authors added"} · {references.filter((ref) => ref.title?.trim()).length} references</p>
+              </div>
+            </section>
+          ) : null}
+
+          <div className="hidden items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 lg:flex">
+            {currentStep > 1 ? <Button type="button" variant="secondary" onClick={goBack}>Back</Button> : <span />}
+            <Button type="button" variant="secondary" className="ml-auto" disabled={isPending || uploading || !isEditable} onClick={saveDraft}>Save draft</Button>
+            {currentStep < 4 ? (
+              <Button type="button" disabled={!canContinue || !isEditable} onClick={goNext}>Continue</Button>
+            ) : (
+              <Button type="button" loading={isPending} disabled={uploading || !isEditable || !metadataReady || !pdfUploaded} onClick={submit}>{needsAuthorNote ? "Resubmit" : "Submit for review"}</Button>
+            )}
+          </div>
         </main>
 
         <aside className="space-y-4 lg:sticky lg:top-[76px] lg:self-start">
-          <CoAuthorPicker
-            userId={userId}
-            value={coAuthors}
-            onChange={setCoAuthors}
-            source="write"
-            disabled={!isEditable}
-          />
-
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-purple-700">
               Review journey
@@ -575,26 +642,6 @@ export default function ResearchSubmissionForm({
               </p>
             ) : null}
 
-            <div className="mt-5 space-y-2">
-              <Button
-                type="button"
-                variant="secondary"
-                className="w-full"
-                disabled={isPending || uploading || !isEditable}
-                onClick={saveDraft}
-              >
-                Save draft
-              </Button>
-              <Button
-                type="button"
-                className="w-full"
-                loading={isPending}
-                disabled={uploading || !isEditable}
-                onClick={submit}
-              >
-                {needsAuthorNote ? "Resubmit" : "Submit for review"}
-              </Button>
-            </div>
           </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -623,25 +670,14 @@ export default function ResearchSubmissionForm({
             {notice}
           </p>
         ) : null}
-        <div className="flex gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            className="flex-1"
-            disabled={isPending || uploading || !isEditable}
-            onClick={saveDraft}
-          >
-            Save draft
-          </Button>
-          <Button
-            type="button"
-            className="flex-1"
-            loading={isPending}
-            disabled={uploading || !isEditable}
-            onClick={submit}
-          >
-            {needsAuthorNote ? "Resubmit" : "Submit for review"}
-          </Button>
+        <div className="flex gap-2">
+          {currentStep > 1 ? <Button type="button" variant="secondary" onClick={goBack}>Back</Button> : null}
+          <Button type="button" variant="secondary" className="min-w-0 flex-1" disabled={isPending || uploading || !isEditable} onClick={saveDraft}>Save</Button>
+          {currentStep < 4 ? (
+            <Button type="button" className="min-w-0 flex-1" disabled={!canContinue || !isEditable} onClick={goNext}>Continue</Button>
+          ) : (
+            <Button type="button" className="min-w-0 flex-1" loading={isPending} disabled={uploading || !isEditable || !metadataReady || !pdfUploaded} onClick={submit}>{needsAuthorNote ? "Resubmit" : "Submit"}</Button>
+          )}
         </div>
       </div>
     </div>

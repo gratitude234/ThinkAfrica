@@ -72,6 +72,24 @@ const ACTION_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   "research-paper": ResearchIcon,
 };
 
+const ACTION_TONES: Record<string, { icon: string; badge: string; hover: string }> = {
+  post: {
+    icon: "bg-green-tint text-emerald-brand",
+    badge: "bg-green-tint text-emerald-brand",
+    hover: "hover:bg-green-wash",
+  },
+  article: {
+    icon: "bg-gold-tint text-gold-ink",
+    badge: "bg-gold-tint text-gold-ink",
+    hover: "hover:bg-[#fcf8f0]",
+  },
+  "research-paper": {
+    icon: "bg-purple-tint text-purple-accent",
+    badge: "bg-purple-tint text-purple-accent",
+    hover: "hover:bg-[#f8f6fb]",
+  },
+};
+
 interface CreateChooserOptionsProps {
   userId: string | null;
   /** "comfortable" = large mobile-sheet rows (~68px). "compact" = desktop popover rows. */
@@ -84,6 +102,7 @@ export function CreateChooserOptions({ userId, size, onSelect }: CreateChooserOp
     <div className={size === "comfortable" ? "flex flex-col gap-1.5 p-3" : "grid gap-1 p-2"}>
       {CREATE_ACTIONS.map((action) => {
         const Icon = ACTION_ICONS[action.id];
+        const tone = ACTION_TONES[action.id] ?? ACTION_TONES.post;
         return (
           <Link
             key={action.id}
@@ -91,12 +110,12 @@ export function CreateChooserOptions({ userId, size, onSelect }: CreateChooserOp
             onClick={onSelect}
             className={
               size === "comfortable"
-                ? "flex min-h-[68px] w-full items-start gap-3.5 rounded-2xl px-4 py-3.5 text-left transition-colors hover:bg-canvas active:bg-canvas"
-                : "flex items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-canvas"
+                ? `flex min-h-[72px] w-full items-start gap-3.5 rounded-xl border border-transparent px-4 py-3.5 text-left transition-colors active:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${tone.hover}`
+                : `flex min-h-[64px] items-start gap-3 rounded-xl border border-transparent px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${tone.hover}`
             }
           >
             <span
-              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"
+              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone.icon}`}
               aria-hidden="true"
             >
               <Icon className={size === "comfortable" ? "h-[18px] w-[18px]" : "h-4 w-4"} />
@@ -108,7 +127,7 @@ export function CreateChooserOptions({ userId, size, onSelect }: CreateChooserOp
               <span className="mt-0.5 block text-[13px] leading-5 text-gray-500">
                 {action.description}
               </span>
-              <span className="mt-1.5 inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+              <span className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone.badge}`}>
                 {action.badge}
               </span>
             </span>

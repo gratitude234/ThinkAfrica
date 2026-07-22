@@ -45,4 +45,15 @@ describe("BottomNav compose access", () => {
       screen.queryByRole("navigation", { name: "Primary navigation" })
     ).not.toBeInTheDocument();
   });
+
+  it("hides mobile navigation inside dedicated creation flows", () => {
+    navigationState.pathname = "/create/post";
+
+    render(
+      <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
+    );
+
+    expect(screen.queryByRole("button", { name: "Start writing" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Primary navigation" })).not.toBeInTheDocument();
+  });
 });

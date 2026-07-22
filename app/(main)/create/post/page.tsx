@@ -46,7 +46,7 @@ export default async function CreatePostPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-[640px] rounded-xl border border-gray-200 bg-white p-4 shadow-[0_1px_2px_rgb(17_24_39/0.025)] sm:p-6">
       <PostComposerForm userId={user.id} parentPost={parentPost} />
     </div>
   );

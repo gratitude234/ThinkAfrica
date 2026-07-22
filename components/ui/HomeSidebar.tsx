@@ -1,27 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
-import PostCover from "@/components/post/PostCover";
 import FollowButton from "@/components/ui/FollowButton";
 import UserAvatar from "@/components/ui/UserAvatar";
 import type { ActivationState } from "@/lib/activation";
 import { resolveContentKind } from "@/lib/contentModel";
-import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { formatRelativeTime, formatTimeUntil } from "@/lib/utils";
-
-interface FeaturedPost {
-  title: string | null;
-  slug: string;
-  excerpt: string | null;
-  type: string;
-  content_kind?: string | null;
-  article_format?: string | null;
-  cover_image_url?: string | null;
-  profiles: {
-    username: string | null;
-    full_name: string | null;
-  } | null;
-}
 
 interface RecentDraft {
   id: string;
@@ -41,7 +25,6 @@ interface SuggestedPerson {
 
 interface Props {
   activeDebate: DebateInterludeData | null;
-  featuredPost: FeaturedPost | null;
   recentDraft: RecentDraft | null;
   activationState: ActivationState | null;
   peopleSuggestions: SuggestedPerson[];
@@ -94,32 +77,7 @@ function PersonalAction({
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100" aria-label={`${progress}% complete`} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
         <div className="h-full rounded-full bg-emerald-brand" style={{ width: `${progress}%` }} />
       </div>
-      <Link href={activationState.nextTask.href} className="mt-3 inline-flex min-h-10 items-center text-xs font-semibold text-emerald-700 hover:underline">Continue setup →</Link>
-    </SideCard>
-  );
-}
-
-function FeaturedCard({ post }: { post: FeaturedPost }) {
-  const title = getPostMetadataTitle(post, post.profiles);
-  const author = post.profiles?.full_name ?? post.profiles?.username;
-  const hasCover = Boolean(post.cover_image_url?.trim());
-
-  return (
-    <SideCard>
-      <Kicker>Featured today</Kicker>
-      <div className="flex gap-3">
-        <div className="min-w-0 flex-1">
-          <Link href={`/post/${post.slug}`} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand">
-            <h2 className="font-display line-clamp-3 text-[16px] font-semibold leading-[1.25] text-ink hover:text-emerald-800">{title}</h2>
-          </Link>
-          {author ? <p className="mt-1.5 truncate text-[11.5px] text-gray-500">By {author}</p> : null}
-        </div>
-        {hasCover ? (
-          <Link href={`/post/${post.slug}`} className="shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand">
-            <PostCover src={post.cover_image_url} alt={title} type={post.type} content_kind={post.content_kind} article_format={post.article_format} sizes="72px" className="h-[72px] w-[72px] rounded-lg bg-gray-100" imageClassName="object-cover" />
-          </Link>
-        ) : null}
-      </div>
+      <Link href={activationState.nextTask.href} className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">Continue setup →</Link>
     </SideCard>
   );
 }
@@ -140,7 +98,7 @@ function DebateCard({ debate }: { debate: DebateInterludeData }) {
         <span className="bg-emerald-500" style={{ width: `${forPct}%` }} />
         <span className="bg-purple-500" style={{ width: `${100 - forPct}%` }} />
       </div>
-      <Link href={`/debates/${debate.id}`} className="mt-3 inline-flex min-h-10 items-center text-xs font-semibold text-emerald-300 hover:text-emerald-200">Join the debate →</Link>
+      <Link href={`/debates/${debate.id}`} className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900">Join the debate →</Link>
     </section>
   );
 }
@@ -169,11 +127,10 @@ function PeopleCard({ people, currentUserId }: { people: SuggestedPerson[]; curr
   );
 }
 
-export default function HomeSidebar({ activeDebate, featuredPost, recentDraft, activationState, peopleSuggestions, currentUserId, topics }: Props) {
+export default function HomeSidebar({ activeDebate, recentDraft, activationState, peopleSuggestions, currentUserId, topics }: Props) {
   return (
     <div className="flex flex-col gap-3.5">
       <PersonalAction recentDraft={recentDraft} activationState={activationState} />
-      {featuredPost ? <FeaturedCard post={featuredPost} /> : null}
       {activeDebate ? <DebateCard debate={activeDebate} /> : null}
       <PeopleCard people={peopleSuggestions} currentUserId={currentUserId} />
       {topics.length > 0 ? (

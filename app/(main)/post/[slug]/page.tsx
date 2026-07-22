@@ -471,42 +471,6 @@ function throwPostQueryError(slug: string, stage: "metadata" | "page", error: un
   throw new Error(`Failed to load post "${slug}".`);
 }
 
-function getBasicQualitySummary({
-  post,
-  author,
-  sanitizedContent,
-  wordCount,
-  parentPostId,
-}: {
-  post: PostRecord;
-  author: AuthorProfile | null;
-  sanitizedContent: string;
-  wordCount: number;
-  parentPostId: string | null;
-}) {
-  return getPostQualitySummary({
-    type: post.type,
-    content_kind: post.content_kind,
-    article_format: post.article_format,
-    status: post.status,
-    title: post.title,
-    excerpt: post.excerpt,
-    content: sanitizedContent,
-    wordCount,
-    tags: post.tags ?? [],
-    citationId: post.citation_id ?? null,
-    isResponse: Boolean(parentPostId),
-    author,
-    referenceCount: 0,
-    responseCount: 0,
-    reviewCount: 0,
-    completedReviewCount: 0,
-    commentCount: 0,
-    likeCount: 0,
-    bookmarkCount: 0,
-  });
-}
-
 function getFullQualitySummary({
   post,
   author,
@@ -1784,9 +1748,9 @@ async function ResearchHero({
   const statusLabel = formatResearchStatus(post.status);
 
   return (
-    <header className="relative left-1/2 -mt-6 w-[calc(100vw-16px)] -translate-x-1/2 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.22),transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_48%,#12322d_100%)] px-4 py-12 text-white sm:px-6 sm:py-16 lg:px-8">
+    <header className="relative mx-auto max-w-[720px] overflow-hidden border-b border-gray-200 bg-white pb-8 pt-1 text-ink sm:px-2 sm:pb-10 sm:pt-3">
       <div
-        className="absolute inset-0 opacity-25"
+        className="absolute inset-0 opacity-0"
         style={{
           backgroundImage:
             "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
@@ -1794,20 +1758,20 @@ async function ResearchHero({
         }}
         aria-hidden="true"
       />
-      <div className="relative z-10 mx-auto max-w-[1200px]">
-        <div className="max-w-[900px]">
+      <div className="relative z-10">
+        <div>
           <div className="mb-5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
+            <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.16em] text-purple-accent">
               Research manuscript
             </span>
-            <span className="rounded-full border border-white/15 bg-white/[0.08] px-3 py-1 text-[10.5px] font-semibold text-white/75">
+            <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10.5px] font-semibold text-gray-600">
               {statusLabel}
             </span>
             {post.tags?.slice(0, 4).map((tag, index) => (
               <Link
                 key={tag}
                 href={`/topics/${encodeURIComponent(tag)}`}
-                className={`rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-[10.5px] font-medium text-white/65 transition-colors hover:border-white/35 hover:text-white ${
+                className={`rounded-full border border-purple-100 bg-purple-tint/40 px-3 py-1 text-[10.5px] font-medium text-purple-accent transition-colors hover:border-purple-200 ${
                   index >= 3 ? "hidden sm:inline-flex" : ""
                 }`}
               >
@@ -1816,20 +1780,20 @@ async function ResearchHero({
             ))}
           </div>
 
-          <h1 className="font-display max-w-[860px] text-[32px] font-semibold leading-[1.12] tracking-normal text-white sm:text-[48px] sm:leading-[1.06] lg:text-[58px]">
+          <h1 className="font-display max-w-[700px] text-[30px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink sm:text-[40px]">
             {post.title}
           </h1>
 
-          <div className="mt-6 max-w-[780px] border-l-2 border-emerald-300/70 pl-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-100/75">
+          <div className="mt-5 max-w-[680px] border-l-2 border-purple-accent/35 pl-4">
+            <p className="font-display text-[10px] font-bold uppercase tracking-[0.18em] text-purple-accent">
               Abstract
             </p>
-            <p className="font-display mt-2 line-clamp-4 text-[17px] italic leading-[1.68] text-white/80 sm:line-clamp-5 sm:text-[21px]">
+            <p className="mt-2 line-clamp-4 text-[16px] leading-[1.7] text-gray-600 sm:line-clamp-5 sm:text-[17px]">
               {sanitizedExcerpt ?? "Abstract not provided for this research record."}
             </p>
           </div>
 
-          <div className="mt-9 grid gap-5 border-t border-white/10 pt-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div className="mt-7 grid gap-5 border-t border-gray-100 pt-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             {author ? (
               <div className="flex items-center gap-3">
                 <Link href={`/${author.username}`} className="shrink-0">
@@ -1837,17 +1801,17 @@ async function ResearchHero({
                     name={authorName}
                     src={author.avatar_url}
                     size={46}
-                    className="flex-shrink-0 overflow-hidden rounded-full ring-2 ring-white/20"
+                    className="flex-shrink-0 overflow-hidden rounded-full ring-1 ring-gray-200"
                   />
                 </Link>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
                     Author line
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-white">
+                  <p className="mt-1 text-sm font-semibold text-ink">
                     {authorLine || authorName}
                   </p>
-                  <p className="mt-0.5 text-[11.5px] text-white/50">
+                  <p className="mt-0.5 text-[11.5px] text-gray-500">
                     {[author.field_of_study, author.university]
                       .filter(Boolean)
                       .join(" / ")}
@@ -1855,28 +1819,28 @@ async function ResearchHero({
                 </div>
               </div>
             ) : null}
-            <div className="grid gap-2 text-left text-[12px] text-white/65 sm:grid-cols-3 lg:min-w-[360px]">
+            <div className="grid gap-2 text-left text-[12px] text-gray-500 sm:grid-cols-3 lg:min-w-[360px]">
               <div>
-                <p className="font-bold uppercase tracking-[0.14em] text-white/40">
+                <p className="font-bold uppercase tracking-[0.14em] text-gray-400">
                   Date
                 </p>
-                <p className="mt-1 font-semibold text-white/80">
+                <p className="mt-1 font-semibold text-gray-700">
                   {formatDate(post.published_at ?? post.created_at)}
                 </p>
               </div>
               <div>
-                <p className="font-bold uppercase tracking-[0.14em] text-white/40">
+                <p className="font-bold uppercase tracking-[0.14em] text-gray-400">
                   Round
                 </p>
-                <p className="mt-1 font-semibold text-white/80">
+                <p className="mt-1 font-semibold text-gray-700">
                   Round {post.current_round ?? 1}
                 </p>
               </div>
               <div>
-                <p className="font-bold uppercase tracking-[0.14em] text-white/40">
+                <p className="font-bold uppercase tracking-[0.14em] text-gray-400">
                   Archive
                 </p>
-                <p className="mt-1 font-semibold text-white/80">
+                <p className="mt-1 font-semibold text-gray-700">
                   {post.citation_id ? "Citation ready" : "Pending citation"}
                 </p>
               </div>
@@ -1905,7 +1869,7 @@ async function ResearchMetadataStrip({
     : `Round ${post.current_round ?? 1}`;
 
   return (
-    <section className="mx-auto mt-4 grid max-w-[1200px] grid-cols-2 gap-2 px-4 sm:-mt-8 sm:px-6 md:grid-cols-3 lg:grid-cols-6 lg:px-8">
+    <section className="mx-auto mt-4 grid max-w-[720px] grid-cols-2 gap-2 md:grid-cols-3">
       <ResearchMetaTile
         label="Format"
         value={post.document_path ? "PDF manuscript" : "Abstract only"}
@@ -1955,7 +1919,7 @@ function ResearchAbstractSection({
       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
         Abstract
       </p>
-      <p className="font-display mt-3 text-[19px] leading-[1.78] text-slate-800 sm:text-[23px]">
+      <p className="mt-3 text-[17px] leading-[1.72] text-slate-800 sm:text-[18px]">
         {sanitizedExcerpt ?? "No abstract was provided for this research record."}
       </p>
     </section>
@@ -2369,13 +2333,6 @@ export default async function PostPage({ params }: PageProps) {
   const displayTitle = getPostDisplayTitle(post);
   const metadataTitle = getPostMetadataTitle(post, author);
   const parentPostId = post.in_response_to ?? null;
-  const basicQualitySummary = getBasicQualitySummary({
-    post,
-    author,
-    sanitizedContent,
-    wordCount,
-    parentPostId,
-  });
   const userId = user?.id ?? null;
   const secondaryDataPromise = getSecondaryData(
     post.id,
@@ -2389,7 +2346,12 @@ export default async function PostPage({ params }: PageProps) {
     authorId: author?.id ?? null,
     supabase,
   });
-  const isResearchPost = post.type === "research";
+  const resolvedKind = resolveContentKind(post);
+  const isResearchPost = resolvedKind === "research";
+  const isArticlePost = resolvedKind === "article";
+  const articleFormatLabel = isArticlePost
+    ? getArticleFormatLabel(resolveArticleFormat(post))
+    : null;
   const articleJsonLd = isPublished
     ? buildArticleJsonLd({
         post,
@@ -2425,7 +2387,7 @@ export default async function PostPage({ params }: PageProps) {
 
         <Suspense
           fallback={
-            <header className="relative left-1/2 -mt-6 h-[420px] w-[calc(100vw-16px)] -translate-x-1/2 bg-slate-950" />
+            <header className="mx-auto h-[340px] max-w-[720px] animate-pulse rounded-xl bg-white" />
           }
         >
           <ResearchHero
@@ -2438,13 +2400,13 @@ export default async function PostPage({ params }: PageProps) {
         </Suspense>
 
         <div
-          className="relative left-1/2 h-14 w-[calc(100vw-16px)] -translate-x-1/2 bg-gradient-to-b from-slate-950/10 to-canvas"
+          className="h-2"
           aria-hidden="true"
         />
 
         <Suspense
           fallback={
-            <section className="mx-auto mt-4 grid max-w-[1200px] grid-cols-2 gap-2 px-4 sm:-mt-8 sm:px-6 md:grid-cols-3 lg:grid-cols-6 lg:px-8">
+            <section className="mx-auto mt-4 grid max-w-[720px] grid-cols-2 gap-2 md:grid-cols-3">
               {[...Array(6)].map((_, index) => (
                 <div
                   key={index}
@@ -2625,23 +2587,21 @@ export default async function PostPage({ params }: PageProps) {
         </>
       ) : null}
 
-      <header className="relative left-1/2 -mt-6 w-screen -translate-x-1/2 overflow-hidden bg-emerald-brand text-white">
-        <div className="mx-auto max-w-[760px] px-6 pb-16 pt-12 sm:pb-[74px] sm:pt-14">
-          <div className="mb-5 flex flex-wrap items-center gap-2.5">
-            <span className="rounded-full bg-gold px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white">
-              {basicQualitySummary.contentLabel}
+      <header className="mx-auto max-w-[720px] border-b border-gray-200 bg-white pb-7 pt-1 sm:px-2 sm:pb-9 sm:pt-3">
+        <div>
+          <div className="mb-4 flex flex-wrap items-center gap-2.5">
+            <span className={`font-display text-[10.5px] font-bold uppercase tracking-[0.16em] ${isArticlePost ? (articleFormatLabel === "Policy Brief" ? "text-purple-accent" : "text-gold-ink") : "text-emerald-brand"}`}>
+              {isArticlePost ? `Article${articleFormatLabel ? ` · ${articleFormatLabel}` : ""}` : "Post"}
             </span>
-            <span className="text-[11px] font-medium text-white/65">
-              {readTime} min read
-            </span>
+            {isArticlePost ? <span className="text-[11px] font-medium text-gray-400">{readTime} min read</span> : null}
           </div>
 
           <Suspense fallback={null}>
-            <ParentPostLink parentPostId={parentPostId} mode="magazine" />
+            <ParentPostLink parentPostId={parentPostId} mode="editorial" />
           </Suspense>
 
           {displayTitle ? (
-            <h1 className="font-display max-w-[700px] text-[34px] font-semibold uppercase leading-[0.98] tracking-[-0.025em] text-white sm:text-[52px] lg:text-[58px]">
+            <h1 className={`font-display max-w-[700px] font-semibold tracking-[-0.02em] text-ink ${isArticlePost ? "text-[30px] leading-[1.08] sm:text-[40px]" : "text-[22px] leading-[1.2] sm:text-[26px]"}`}>
               {displayTitle}
             </h1>
           ) : null}
@@ -2651,34 +2611,34 @@ export default async function PostPage({ params }: PageProps) {
               distinct summary) -- showing it here too would print the
               opening of a short post twice. Only render it as a distinct
               hero "dek" when there's an actual title above it. */}
-          {displayTitle && sanitizedExcerpt ? (
-            <p className="font-display mt-5 max-w-[640px] text-[16px] italic leading-[1.55] text-white/75 sm:text-[20px]">
+          {isArticlePost && displayTitle && sanitizedExcerpt ? (
+            <p className="mt-4 max-w-[640px] text-[16px] leading-[1.65] text-gray-600 sm:text-[17px]">
               {sanitizedExcerpt}
             </p>
           ) : null}
 
           {author ? (
-            <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-white/15 pt-5 sm:flex-nowrap">
+            <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-5 sm:flex-nowrap">
               <Link href={`/${author.username}`} className="shrink-0">
                 <UserAvatar
                   name={authorName}
                   src={author.avatar_url}
                   size={44}
-                  className="overflow-hidden rounded-full ring-1 ring-white/20"
+                  className="overflow-hidden rounded-full ring-1 ring-gray-200"
                 />
               </Link>
               <div className="min-w-0 flex-1">
                 <Link
                   href={`/${author.username}`}
-                  className="text-[13px] font-semibold text-white transition-colors hover:text-gold-tint"
+                  className="text-[13px] font-semibold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
                 >
                   {authorName}
                 </Link>
-                <p className="mt-0.5 text-[11px] text-white/55">
+                <p className="mt-0.5 text-[11px] text-gray-500">
                   {[author.field_of_study, author.university].filter(Boolean).join(" · ")}
                 </p>
               </div>
-              <p className="w-full text-[11px] text-white/50 sm:ml-auto sm:w-auto sm:text-right">
+              <p className="w-full text-[11px] text-gray-400 sm:ml-auto sm:w-auto sm:text-right">
                 {formatDate(post.published_at ?? post.created_at)}
               </p>
             </div>
@@ -2688,29 +2648,29 @@ export default async function PostPage({ params }: PageProps) {
             <HeaderCoAuthors
               authorId={author?.id ?? null}
               secondaryDataPromise={secondaryDataPromise}
-              mode="magazine"
+              mode="editorial"
             />
           </Suspense>
         </div>
       </header>
 
       {post.cover_image_url ? (
-        <div className="relative z-10 mx-auto -mt-7 max-w-[760px] px-4 sm:px-6">
+        <div className="mx-auto mt-6 max-w-[720px]">
           <PostCover
             src={post.cover_image_url}
             alt={post.title}
             type={post.type}
             content_kind={post.content_kind}
             article_format={post.article_format}
-            sizes="(max-width: 760px) 100vw, 760px"
+            sizes="(max-width: 760px) calc(100vw - 32px), 720px"
             priority
-            className="h-[230px] rounded-2xl border border-black/10 shadow-[0_12px_30px_-16px_rgba(0,0,0,0.3)] sm:h-[400px]"
+            className="aspect-[16/9] w-full rounded-[10px] border border-gray-200 bg-gray-100"
             imageClassName="object-cover"
           />
         </div>
       ) : null}
 
-      <div className="mx-auto max-w-[680px] px-4 pb-20 pt-10 sm:px-6 sm:pt-12">
+      <div className="mx-auto max-w-[680px] pb-20 pt-8 sm:pt-10">
         <main className="min-w-0">
           <Suspense fallback={null}>
             <PostPublishSuccessSection

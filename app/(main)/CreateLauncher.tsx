@@ -78,7 +78,7 @@ export default function CreateLauncher({
           ref={triggerRef}
           type="button"
           onClick={chooser.toggle}
-          className="group fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition-[background-color,box-shadow,transform] duration-200 hover:bg-emerald-700 hover:shadow-[0_10px_24px_-7px_rgb(7_57_41/0.55)] active:scale-[0.96] motion-reduce:transition-none"
+          className="group fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition-[background-color,box-shadow,transform] duration-200 hover:bg-[#0E4B37] hover:shadow-[0_10px_24px_-7px_rgb(7_57_41/0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 active:scale-[0.96] motion-reduce:transition-none"
           style={{
             // On post pages the mobile ReadingBar pill (ReadingBar.tsx) also floats
             // near the bottom; its top edge lands right at the 72px mark, so it needs
@@ -112,7 +112,7 @@ export default function CreateLauncher({
         ref={triggerRef}
         type="button"
         onClick={chooser.toggle}
-        className={`inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors ${
+        className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
           isActive ? "bg-ink" : "bg-emerald-brand hover:bg-[#0E4B37]"
         }`}
         aria-haspopup="dialog"

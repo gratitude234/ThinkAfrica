@@ -21,7 +21,6 @@ function getAuthCallbackUrl(nextPath: string) {
   const appUrl =
     configuredUrl && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredUrl)
       ? configuredUrl
-      // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
       : SITE_URL;
 
   const url = new URL("/auth/callback", appUrl.replace(/\/+$/, ""));

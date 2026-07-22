@@ -77,7 +77,7 @@ function FeedSkeleton() {
       {[...Array(3)].map((_, i) => (
         <div
           key={i}
-          className="-mx-4 mb-2 border-y border-gray-200 bg-white p-4 sm:mx-0 sm:mb-3 sm:rounded-xl sm:border sm:p-5"
+          className="mb-3 rounded-xl border border-gray-200 bg-white p-4 sm:p-[18px]"
         >
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -351,6 +351,7 @@ export default async function HomePage({ searchParams }: PageProps) {
               peopleSuggestions={peopleResult.suggestions}
               peopleSuggestionReason={peopleResult.reason}
               prioritizePeopleSuggestions={followCount < 3}
+              featuredPost={featuredPost}
             />
           </Suspense>
         </div>
@@ -358,7 +359,6 @@ export default async function HomePage({ searchParams }: PageProps) {
         <aside className="hidden self-start lg:sticky lg:top-[76px] lg:block">
           <HomeSidebar
             activeDebate={homeDebate}
-            featuredPost={featuredPost}
             recentDraft={recentDraft ?? null}
             activationState={activationState}
             peopleSuggestions={peopleResult.suggestions}

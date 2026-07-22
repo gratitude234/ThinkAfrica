@@ -84,5 +84,6 @@ describe("HomeFeedCard", () => {
       "href",
       "/post/clear-thinking"
     );
+    expect(screen.queryByRole("link", { name: /comments/ })).not.toBeInTheDocument();
   });
 });

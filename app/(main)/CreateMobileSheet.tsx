@@ -78,12 +78,12 @@ export default function CreateMobileSheet({ id, open, onClose, userId }: CreateM
         aria-labelledby={titleId}
         aria-describedby={subtitleId}
         tabIndex={-1}
-        className="absolute inset-x-0 bottom-0 animate-create-sheet-up rounded-t-3xl bg-white shadow-2xl outline-none motion-reduce:animate-none"
+        className="absolute inset-x-0 bottom-0 animate-create-sheet-up rounded-t-[20px] bg-white shadow-2xl outline-none motion-reduce:animate-none"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 pt-5 pb-3">
           <div>
-            <h2 id={titleId} className="text-lg font-semibold text-ink">
+            <h2 id={titleId} className="font-display text-xl font-semibold text-ink">
               {CREATE_CHOOSER_TITLE}
             </h2>
             <p id={subtitleId} className="mt-0.5 text-sm text-ink-muted">
@@ -94,7 +94,7 @@ export default function CreateMobileSheet({ id, open, onClose, userId }: CreateM
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-mr-1.5 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-canvas hover:text-ink"
+            className="-mr-1.5 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
           >
             <svg
               className="h-5 w-5"

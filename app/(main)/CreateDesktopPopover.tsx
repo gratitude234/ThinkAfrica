@@ -14,7 +14,7 @@ interface CreateDesktopPopoverProps {
 }
 
 const DEFAULT_PANEL_CLASS =
-  "absolute right-0 top-[calc(100%+10px)] z-[80] w-[380px] animate-create-menu-in overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl motion-reduce:animate-none";
+  "absolute right-0 top-[calc(100%+10px)] z-[80] w-[380px] animate-create-menu-in overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_50px_-18px_rgb(17_24_39/0.28)] motion-reduce:animate-none";
 
 export default function CreateDesktopPopover({
   id,
@@ -36,7 +36,7 @@ export default function CreateDesktopPopover({
       className={className ?? DEFAULT_PANEL_CLASS}
     >
       <div className="border-b border-gray-100 px-4 py-3">
-        <p id={titleId} className="text-sm font-semibold text-ink">
+        <p id={titleId} className="font-display text-base font-semibold text-ink">
           {CREATE_CHOOSER_TITLE}
         </p>
         <p id={subtitleId} className="mt-0.5 text-xs text-gray-500">

@@ -25,7 +25,7 @@ interface NavClientProps {
 }
 
 function navItemClass(isActive: boolean) {
-  return `rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors ${
+  return `rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
     isActive
       ? "bg-canvas font-semibold text-ink"
       : "text-ink-muted hover:bg-canvas hover:text-ink"
@@ -82,7 +82,7 @@ export default function NavClient({
         </span>
       </div>
       <nav
-        className="h-[60px] border-b border-gray-200 bg-white"
+        className="h-[60px] border-b border-gray-200 bg-white/98"
         aria-label="Primary navigation"
       >
       <div className="mx-auto flex h-full max-w-[1240px] items-center gap-7 px-4 sm:px-6 lg:px-8">
@@ -132,7 +132,7 @@ export default function NavClient({
             <button
               type="button"
               onClick={onOpenSearch}
-              className="ml-auto hidden w-full max-w-[340px] items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3.5 py-2 text-[13px] text-ink-muted transition-colors hover:border-gray-300 hover:bg-white hover:text-ink lg:flex"
+              className="ml-auto hidden min-h-11 w-full max-w-[340px] items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3.5 py-2 text-[13px] text-ink-muted transition-colors hover:border-gray-300 hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 lg:flex"
               aria-label="Open search"
             >
               <svg
@@ -155,7 +155,7 @@ export default function NavClient({
           <div className="ml-auto flex items-center gap-2.5">
             <Link
               href={messagesHref}
-              className="relative rounded-lg p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
+              className="relative flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
               aria-label="Open messages"
             >
               <MessageIcon />

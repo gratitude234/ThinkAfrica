@@ -8,8 +8,7 @@ import OpportunityBanner from "@/components/profile/OpportunityBanner";
 import OpportunityProfileEditor from "@/components/opportunities/OpportunityProfileEditor";
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import ProfileHeader from "@/components/profile/ProfileHeader";
-import PublicationsSection from "@/components/profile/PublicationsSection";
-import PostsSection from "@/components/profile/PostsSection";
+import ProfileContentTabs from "@/components/profile/ProfileContentTabs";
 import TopArguments from "@/components/profile/TopArguments";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import TrackedActionLink from "@/components/retention/TrackedActionLink";
@@ -24,7 +23,7 @@ import {
 } from "@/lib/profileCredibility";
 import { createClient } from "@/lib/supabase/server";
 import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
-import { isFormallyReviewed, resolveContentKind } from "@/lib/contentModel";
+import { isFormallyReviewed } from "@/lib/contentModel";
 
 interface PageProps {
   params: Promise<{ username: string }>;
@@ -619,19 +618,6 @@ export default async function UserProfilePage({ params }: PageProps) {
     )
     .filter(Boolean) as Badge[];
 
-  // Posts (lightweight, resolveContentKind === "post") are not formal
-  // publications: keep them out of the Publications/portfolio section and
-  // show them in their own Posts/activity area instead. Legacy `blog`
-  // records resolve to "post" the same way a new titleless Post does, so
-  // both land here; everything that resolves to "article"/"research"
-  // (essay, policy_brief, research) stays in Publications.
-  const publicationPosts = mergedPosts.filter(
-    (post) => resolveContentKind(post) !== "post"
-  );
-  const lightweightPosts = mergedPosts.filter(
-    (post) => resolveContentKind(post) === "post"
-  );
-
   const totalViews = mergedPosts.reduce(
     (sum, post) => sum + (post.read_count ?? 0),
     0
@@ -821,6 +807,8 @@ export default async function UserProfilePage({ params }: PageProps) {
         }}
       />
 
+      <ProfileContentTabs items={mergedPosts} isOwnProfile={isOwnProfile} />
+
       <CredibilityPanel summary={credibilitySummary} isOwnProfile={isOwnProfile} />
 
       {isOwnProfile ? <ProfileCompletionPanel summary={credibilitySummary} /> : null}
@@ -872,10 +860,6 @@ export default async function UserProfilePage({ params }: PageProps) {
               ) : null
             }
           />
-
-          <PublicationsSection posts={publicationPosts} fullName={displayName} />
-
-          <PostsSection posts={lightweightPosts} fullName={displayName} />
 
           <div className="lg:hidden">
             <CredentialsCard

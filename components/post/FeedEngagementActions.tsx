@@ -14,6 +14,7 @@ interface Props {
   initialLikeCount: number;
   initialBookmarked: boolean;
   commentCount: number;
+  showComments?: boolean;
 }
 
 function loginReturnPath() {
@@ -29,6 +30,7 @@ export default function FeedEngagementActions({
   initialLikeCount,
   initialBookmarked,
   commentCount,
+  showComments = true,
 }: Props) {
   const router = useRouter();
   const [liked, setLiked] = useState(initialLiked);
@@ -103,7 +105,7 @@ export default function FeedEngagementActions({
   };
 
   const actionClass =
-    "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60";
+    "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none";
 
   return (
     <div className="mt-3 border-t border-gray-100 pt-2.5">
@@ -122,16 +124,18 @@ export default function FeedEngagementActions({
           <span>{likeCount}</span>
         </button>
 
-        <Link
-          href={`/post/${slug}#comments`}
-          aria-label={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
-          className={`${actionClass} hover:bg-gray-50 hover:text-emerald-700`}
-        >
-          <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          <span>{commentCount}</span>
-        </Link>
+        {showComments ? (
+          <Link
+            href={`/post/${slug}#comments`}
+            aria-label={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
+            className={`${actionClass} hover:bg-gray-50 hover:text-emerald-700`}
+          >
+            <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>{commentCount}</span>
+          </Link>
+        ) : null}
 
         <button
           type="button"

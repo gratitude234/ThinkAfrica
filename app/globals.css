@@ -66,10 +66,10 @@
 .tiptap h1 { @apply font-display text-3xl font-bold mt-6 mb-3; }
 .tiptap h2 { @apply font-display text-2xl font-bold mt-5 mb-2; }
 .tiptap h3 { @apply font-display text-xl font-bold mt-4 mb-2; }
-.tiptap p { @apply font-display mb-4 leading-relaxed; }
+.tiptap p { @apply mb-4 font-sans leading-relaxed; }
 .tiptap ul { @apply list-disc pl-6 mb-4; }
 .tiptap ol { @apply list-decimal pl-6 mb-4; }
-.tiptap li { @apply font-display mb-1; }
+.tiptap li { @apply mb-1 font-sans; }
 .tiptap blockquote { @apply font-display border-l-4 border-emerald-brand pl-4 italic text-gray-600 my-4; }
 .tiptap code { @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono; }
 .tiptap pre { @apply bg-gray-900 text-gray-100 p-4 rounded-lg my-4 overflow-x-auto; }
@@ -83,9 +83,9 @@
   min-height: 430px;
   padding: 0.25rem 0;
   color: var(--ta-ink);
-  font-family: var(--font-bodoni), Georgia, serif;
-  font-size: 1.1875rem;
-  line-height: 1.65;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.72;
 }
 
 .write-canvas-editor p,
@@ -113,8 +113,8 @@
 @media (min-width: 1024px) {
   .write-canvas-editor {
     min-height: 560px;
-    font-size: 1.25rem;
-    line-height: 1.72;
+    font-size: 1.0625rem;
+    line-height: 1.75;
   }
 
   .write-canvas-compact .write-canvas-editor {
@@ -177,9 +177,9 @@ font-family: var(--font-bodoni), Georgia, serif;
 
 .article-journal-body .prose p,
 .article-journal-body .prose li {
-font-family: var(--font-bodoni), Georgia, serif;
+font-family: var(--font-inter), system-ui, sans-serif;
   font-size: 1.125rem;
-  line-height: 1.84;
+  line-height: 1.75;
   color: #242424;
 }
 

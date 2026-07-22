@@ -7,6 +7,7 @@ import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { PostCardData } from "@/components/post/PostCard";
 import type { FeedContentFilter, FeedTimeframe } from "@/lib/feedData";
 import FeedFilterChips from "./FeedFilterChips";
+import HomeFeaturedLead, { type HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
 
 type TabKey = "home" | "following" | "latest";
 const EMPTY_POSTS: PostCardData[] = [];
@@ -121,10 +122,10 @@ function PostFeedSkeleton() {
       {Array.from({ length: 3 }).map((_, index) => (
         <article
           key={index}
-          className="relative -mx-4 mb-2 overflow-hidden border-y border-gray-200 bg-white px-4 py-4 sm:mx-0 sm:mb-3 sm:rounded-xl sm:border sm:px-5 sm:py-5"
+          className="relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-4 sm:px-[18px] sm:py-[18px]"
         >
-          <div className="flex gap-3 sm:gap-4">
-            <div className="min-w-0 flex-1 animate-pulse">
+          <div className="animate-pulse">
+            <div className="min-w-0">
               <div className="mb-3 flex items-center gap-2">
                 <div className="h-5 w-16 rounded-full bg-gray-100" />
                 <div className="h-3 w-14 rounded-full bg-gray-100" />
@@ -142,8 +143,8 @@ function PostFeedSkeleton() {
                 <div className="h-6 w-6 rounded-full bg-gray-100" />
                 <div className="h-3 w-40 rounded bg-gray-100" />
               </div>
+              <div className="mt-3 aspect-[16/9] w-full rounded-[10px] bg-gray-100" />
             </div>
-            <div className="h-[84px] w-[84px] shrink-0 animate-pulse rounded-[10px] bg-gray-100 min-[420px]:h-[92px] min-[420px]:w-[92px] sm:h-[112px] sm:w-[112px]" />
           </div>
         </article>
       ))}
@@ -163,6 +164,7 @@ export default function PostsFeedTabs({
   peopleSuggestionReason,
   prioritizePeopleSuggestions,
   currentUserId,
+  featuredPost,
 }: {
   initialTab: TabKey;
   initialType: FeedContentFilter;
@@ -181,6 +183,7 @@ export default function PostsFeedTabs({
   peopleSuggestionReason?: string;
   prioritizePeopleSuggestions?: boolean;
   currentUserId: string | null;
+  featuredPost?: HomeFeaturedPost | null;
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [typeFilter, setTypeFilter] = useState<FeedContentFilter>(initialType);
@@ -424,7 +427,7 @@ export default function PostsFeedTabs({
   return (
     <div>
       <div
-        className="sticky top-[60px] z-30 -mx-4 mb-3 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto border-b border-gray-200 bg-canvas/95 px-4 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-full sm:px-0"
+        className="sticky top-[84px] z-30 -mx-4 mb-3 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto border-b border-gray-200 bg-white/95 px-4 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-full sm:px-0"
         role="tablist"
         aria-label="Choose feed"
       >
@@ -448,7 +451,7 @@ export default function PostsFeedTabs({
                 aria-controls="home-feed-panel"
                 aria-selected={activeTab === tab}
                 onClick={() => updateState(tab, typeFilter, timeframe)}
-                className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-brand ${
+                className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${
                   activeTab === tab
                     ? "border-emerald-brand text-ink"
                     : "border-transparent text-gray-500 hover:text-ink"
@@ -464,6 +467,10 @@ export default function PostsFeedTabs({
         type={typeFilter}
         onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
       />
+
+      {activeTab === "home" && typeFilter === "all" && featuredPost ? (
+        <HomeFeaturedLead post={featuredPost} />
+      ) : null}
 
       {error ? (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">

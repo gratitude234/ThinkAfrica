@@ -9,6 +9,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getBlockedUserIds } from "@/lib/blocking";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
+import type { HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
 
 interface Props {
   tab: string;
@@ -29,6 +30,7 @@ interface Props {
   }[];
   peopleSuggestionReason?: string;
   prioritizePeopleSuggestions?: boolean;
+  featuredPost?: HomeFeaturedPost | null;
 }
 
 function getInitialTab(tab: string, showFollowingEligible: boolean): FeedTabKey {
@@ -59,6 +61,7 @@ export default async function PostsFeedSection({
   peopleSuggestions,
   peopleSuggestionReason,
   prioritizePeopleSuggestions = false,
+  featuredPost = null,
 }: Props) {
   const supabase = await createClient();
   const initialTab = getInitialTab(tab, showFollowingEligible);
@@ -93,6 +96,7 @@ export default async function PostsFeedSection({
       peopleSuggestionReason={peopleSuggestionReason}
       prioritizePeopleSuggestions={prioritizePeopleSuggestions}
       currentUserId={userId}
+      featuredPost={featuredPost}
     />
   );
 }

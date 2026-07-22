@@ -25,7 +25,7 @@ function Chip({
       aria-pressed={active}
       className={`min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-2 ${
         active
-          ? "border-ink bg-ink text-white"
+          ? "border-emerald-brand bg-emerald-brand text-white"
           : "border-gray-200 bg-white text-ink-muted hover:border-emerald-brand hover:bg-emerald-50 hover:text-emerald-brand"
       }`}
     >
@@ -43,7 +43,7 @@ export default function FeedFilterChips({
 }) {
   return (
     <div
-      className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="mb-3 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       role="group"
       aria-label="Filter feed by content type"
     >
