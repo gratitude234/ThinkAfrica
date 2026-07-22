@@ -28,6 +28,7 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof CoverImageD
     canReviewPublish: overrides.canReviewPublish ?? false,
     onContinue,
     onReviewPublish,
+    publishLabel: overrides.publishLabel,
   };
   const utils = render(<CoverImageDialog {...props} />);
   return { ...utils, onClose, onUpload, onRemove, onUploadingChange, onContinue, onReviewPublish };
@@ -98,7 +99,7 @@ describe("CoverImageDialog", () => {
 
     expect(screen.queryByText("Cover added ✓")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Continue writing" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Review & publish" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Preview & publish" })).not.toBeInTheDocument();
   });
 
   it("displays the success confirmation once a cover exists", () => {
@@ -124,7 +125,7 @@ describe("CoverImageDialog", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("only shows Review & publish when the draft is eligible and a cover exists", () => {
+  it("only shows Preview & publish when the draft is eligible and a cover exists", () => {
     const { rerender } = render(
       <CoverImageDialog
         open
@@ -139,7 +140,7 @@ describe("CoverImageDialog", () => {
         onReviewPublish={vi.fn()}
       />
     );
-    expect(screen.queryByRole("button", { name: "Review & publish" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Preview & publish" })).not.toBeInTheDocument();
 
     rerender(
       <CoverImageDialog
@@ -155,7 +156,24 @@ describe("CoverImageDialog", () => {
         onReviewPublish={vi.fn()}
       />
     );
+    expect(screen.getByRole("button", { name: "Preview & publish" })).toBeInTheDocument();
+  });
+
+  it("defaults to 'Preview & publish' -- Article composer wording that doesn't imply formal review", () => {
+    renderDialog({ coverImageUrl: "https://cdn.example/cover.png", canReviewPublish: true });
+
+    expect(screen.getByRole("button", { name: "Preview & publish" })).toBeInTheDocument();
+  });
+
+  it("accepts a publishLabel override, for a legacy Policy Brief draft still in the editorial review workflow", () => {
+    renderDialog({
+      coverImageUrl: "https://cdn.example/cover.png",
+      canReviewPublish: true,
+      publishLabel: "Review & publish",
+    });
+
     expect(screen.getByRole("button", { name: "Review & publish" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Preview & publish" })).not.toBeInTheDocument();
   });
 
   it("invokes onReviewPublish exactly once per click", async () => {
@@ -164,7 +182,7 @@ describe("CoverImageDialog", () => {
       canReviewPublish: true,
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "Review & publish" }));
+    await userEvent.click(screen.getByRole("button", { name: "Preview & publish" }));
 
     expect(onReviewPublish).toHaveBeenCalledTimes(1);
   });
@@ -177,7 +195,7 @@ describe("CoverImageDialog", () => {
     });
 
     expect(screen.getByRole("button", { name: "Continue writing" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Review & publish" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Preview & publish" })).toBeDisabled();
     expect(screen.getByText("Uploading…")).toBeInTheDocument();
     expect(screen.queryByText("Cover added ✓")).not.toBeInTheDocument();
   });
@@ -198,7 +216,7 @@ describe("CoverImageDialog", () => {
       />
     );
     expect(screen.getByText("Cover added ✓")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Review & publish" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview & publish" })).toBeInTheDocument();
 
     // Simulates the parent (write/page.tsx) responding to onRemove by clearing
     // its owned coverImageUrl and passing the updated value back down.
@@ -219,7 +237,7 @@ describe("CoverImageDialog", () => {
 
     expect(screen.queryByText("Cover added ✓")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Continue writing" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Review & publish" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Preview & publish" })).not.toBeInTheDocument();
   });
 
   it("never auto-closes or auto-advances when an upload finishes", () => {

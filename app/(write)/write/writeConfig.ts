@@ -191,6 +191,42 @@ export function isPostType(value: string | null): value is PostType {
   );
 }
 
+export interface PublishGateCopy {
+  desktopLabel: string;
+  mobileLabel: string;
+  ariaLabel: string;
+}
+
+/**
+ * Wording for the composer's "open the publish step" button (page.tsx and
+ * CoverImageDialog.tsx) -- distinct from PublishDrawer's own final publish
+ * button, which already has its own postType-aware label. This gate only
+ * *advances* to that drawer, so "Review & publish" over-promised a formal
+ * review step that a Post/Article never has (see docs/content-model.md).
+ *
+ * The one exception is a legacy Policy Brief draft (postType ===
+ * "policy_brief") still inside the pre-Phase-4A editorial workflow -- for
+ * that draft, review is real, so the wording is preserved. A brand-new
+ * Article always dual-writes postType "essay" regardless of genre (see
+ * legacyTypeForNewContent() in lib/contentModel.ts), so this check can
+ * never misfire on new content.
+ */
+export function getPublishGateCopy(postType: PostType): PublishGateCopy {
+  if (postType === "policy_brief") {
+    return {
+      desktopLabel: "Review & publish",
+      mobileLabel: "Review",
+      ariaLabel: "Review and publish",
+    };
+  }
+
+  return {
+    desktopLabel: "Preview & publish",
+    mobileLabel: "Publish",
+    ariaLabel: "Preview and publish",
+  };
+}
+
 /**
  * Old URLs and saved drafts must keep resolving safely once Blog/Essay/Policy
  * Brief are no longer selectable creation options. `type=research`/

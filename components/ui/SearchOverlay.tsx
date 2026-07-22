@@ -167,9 +167,9 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               value={query}
               onChange={handleChange}
               onKeyDown={handleInputKeyDown}
-              placeholder="Search posts, essays, research..."
+              placeholder="Search posts, articles, research..."
               className="flex-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
-              aria-label="Search posts"
+              aria-label="Search Indegenius"
             />
             {query ? (
               <button

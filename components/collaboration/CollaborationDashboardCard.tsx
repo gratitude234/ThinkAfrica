@@ -1,6 +1,7 @@
 import Link from "next/link";
 import UserAvatar from "@/components/ui/UserAvatar";
 import TrackedActionLink from "@/components/retention/TrackedActionLink";
+import CreateTrigger from "@/app/(main)/CreateTrigger";
 import type { CollaborationSuggestion } from "@/lib/collaboration";
 
 interface PendingInvite {
@@ -19,11 +20,13 @@ interface RecentResponse {
 }
 
 export default function CollaborationDashboardCard({
+  userId,
   pendingInvites,
   recentResponses,
   unreadMessageCount,
   suggestions,
 }: {
+  userId: string;
   pendingInvites: PendingInvite[];
   recentResponses: RecentResponse[];
   unreadMessageCount: number;
@@ -72,12 +75,13 @@ export default function CollaborationDashboardCard({
             >
               Read latest
             </Link>
-            <Link
-              href="/write"
+            <CreateTrigger
+              userId={userId}
+              presentation="popover"
               className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
             >
               Start writing
-            </Link>
+            </CreateTrigger>
           </div>
         </div>
       ) : (

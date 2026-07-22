@@ -57,7 +57,7 @@ function Kicker({ children }: { children: ReactNode }) {
   return <p className="mb-2 text-[10.5px] font-bold uppercase tracking-[0.16em] text-gray-500">{children}</p>;
 }
 
-function draftHref(draft: RecentDraft) {
+export function draftHref(draft: RecentDraft) {
   return resolveContentKind(draft) === "research"
     ? `/submit/research?draft=${draft.id}`
     : `/write?draft=${draft.id}`;

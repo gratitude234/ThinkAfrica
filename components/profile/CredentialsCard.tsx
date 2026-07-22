@@ -143,7 +143,9 @@ export default function CredentialsCard({
               <p className="text-lg font-semibold text-gray-900">
                 {postCount.toLocaleString()}
               </p>
-              <p className="text-xs text-gray-500">Publications</p>
+              {/* "Published", not "Publications" -- this count includes
+                  short Posts, not just formal Article/Research work. */}
+              <p className="text-xs text-gray-500">Published</p>
             </div>
             <div className="rounded-xl bg-canvas p-3">
               <p className="text-lg font-semibold text-gray-900">

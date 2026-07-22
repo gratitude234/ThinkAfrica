@@ -15,6 +15,13 @@ interface CoverImageDialogProps {
   canReviewPublish: boolean;
   onContinue: () => void;
   onReviewPublish: () => void;
+  /**
+   * Label for the button that advances to the publish/review-submission
+   * step. Defaults to "Preview & publish" -- callers only override this
+   * for a legacy Policy Brief draft still in the pre-Phase-4A editorial
+   * workflow (see docs/content-model.md), where "review" is accurate.
+   */
+  publishLabel?: string;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -31,6 +38,7 @@ export default function CoverImageDialog({
   canReviewPublish,
   onContinue,
   onReviewPublish,
+  publishLabel = "Preview & publish",
 }: CoverImageDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -160,7 +168,7 @@ export default function CoverImageDialog({
                   disabled={uploading}
                   className="w-full sm:w-auto"
                 >
-                  Review & publish
+                  {publishLabel}
                 </Button>
               ) : null}
             </div>
