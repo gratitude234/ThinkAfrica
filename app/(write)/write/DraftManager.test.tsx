@@ -44,6 +44,7 @@ function baseDraftData(overrides: Partial<Parameters<ReturnType<typeof useDraftM
     content: "<p>Hello</p>",
     tags: [],
     postType: "essay",
+    articleFormat: null,
     coverImageUrl: "",
     inResponseToId: null,
     ...overrides,
@@ -115,4 +116,48 @@ describe("useDraftManager", () => {
       { timeout: 4000 }
     );
   }, 10000);
+
+  it("hydrates initialData.articleFormat from a loaded draft's own stored genre (caught in review: PublishDrawer previously always reset this to null instead of loading it)", async () => {
+    searchParamsState.draft = "draft-1";
+    supabaseLoadResult.current = {
+      data: {
+        title: "A policy-brief-format article",
+        excerpt: "",
+        content: "<p>Hi</p>",
+        tags: [],
+        type: "essay",
+        content_kind: "article",
+        article_format: "policy_brief",
+        cover_image_url: null,
+        in_response_to: null,
+      },
+    };
+
+    const { result } = renderHook(() => useDraftManager());
+
+    await waitFor(() => expect(result.current.loadingDraft).toBe(false));
+    expect(result.current.initialData?.articleFormat).toBe("policy_brief");
+  });
+
+  it("resolves initialData.articleFormat to null for a generic Article draft with no genre", async () => {
+    searchParamsState.draft = "draft-1";
+    supabaseLoadResult.current = {
+      data: {
+        title: "A generic article",
+        excerpt: "",
+        content: "<p>Hi</p>",
+        tags: [],
+        type: "essay",
+        content_kind: "article",
+        article_format: null,
+        cover_image_url: null,
+        in_response_to: null,
+      },
+    };
+
+    const { result } = renderHook(() => useDraftManager());
+
+    await waitFor(() => expect(result.current.loadingDraft).toBe(false));
+    expect(result.current.initialData?.articleFormat).toBeNull();
+  });
 });

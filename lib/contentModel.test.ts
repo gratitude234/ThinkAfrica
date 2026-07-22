@@ -584,6 +584,16 @@ describe("guard_locked_post_write trigger logic (ported from SQL for testability
         };
       }
 
+      // Withdrawal (-> 'withdrawn') is NOT exempted here. withdraw_post_
+      // submission()'s own write never reaches this block at all -- it's
+      // exempted by the current_user bypass at the top of this function,
+      // since it runs SECURITY DEFINER -- so this block only ever sees a
+      // *direct* authenticated write, for which withdrawal is not a
+      // legitimate transition to originate outside that RPC. It's rejected
+      // here, earlier and with a clearer reason, than by the dedicated
+      // withdrawn-transition check further below (which still independently
+      // rejects it too, and is what the RPC's own write is validated
+      // against in spirit even though it bypasses this trigger entirely).
       if (input.old.status === "pending" && newRow.status !== "pending") {
         return {
           allowed: false,
@@ -797,16 +807,37 @@ describe("guard_locked_post_write trigger logic (ported from SQL for testability
     ).toBe(false);
   });
 
-  it("allows the legitimate withdrawal transition: pending/pending_revision research or policy_brief -> withdrawn", () => {
+  it("allows the legitimate withdrawal transition when performed by withdraw_post_submission() -- pending/pending_revision research or policy_brief -> withdrawn", () => {
     for (const type of ["research", "policy_brief"]) {
       for (const oldStatus of ["pending", "pending_revision"]) {
         const result = guardLockedPostWrite({
           role: "authenticated",
+          // The RPC's own write: auth.role() still reads 'authenticated'
+          // (the caller's JWT), but current_user is the function's owner,
+          // not 'authenticated' -- see the execRole bypass at the top of
+          // guardLockedPostWrite. This is the only way this transition is
+          // meant to be reached at all.
+          execRole: "postgres",
           op: "UPDATE",
           old: row({ status: oldStatus, type }),
           new: row({ status: "withdrawn", type }),
         });
         expect(result.allowed).toBe(true);
+      }
+    }
+  });
+
+  it("blocks the identical withdrawal transition when attempted as a direct authenticated write instead of through withdraw_post_submission() -- caught by the reclassification-lock's status-transition restriction, on top of RLS and the dedicated withdrawn-transition check", () => {
+    for (const type of ["research", "policy_brief"]) {
+      for (const oldStatus of ["pending", "pending_revision"]) {
+        const result = guardLockedPostWrite({
+          role: "authenticated",
+          execRole: "authenticated",
+          op: "UPDATE",
+          old: row({ status: oldStatus, type }),
+          new: row({ status: "withdrawn", type }),
+        });
+        expect(result.allowed).toBe(false);
       }
     }
   });

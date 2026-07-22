@@ -250,6 +250,66 @@ describe("publishPost", () => {
     expect(updatedWith.content_kind).toBe("article");
   });
 
+  it("preserves an existing Article draft's stored genre when the client omits articleFormat entirely", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults(
+        { data: { status: "draft", type: "essay", content_kind: "article", article_format: "policy_brief" }, error: null },
+        { data: [{ id: "draft-1" }], error: null }
+      ),
+      ...standardPublishRoutes(),
+    });
+
+    const result = await publishPost(basePublishInput({ draftId: "draft-1" }));
+
+    expect(result.error).toBeNull();
+    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    expect(updatedWith.article_format).toBe("policy_brief");
+    expect(updatedWith.status).toBe("published");
+  });
+
+  it("clears an existing genre when the client explicitly picks General (articleFormat: null)", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults(
+        { data: { status: "draft", type: "essay", content_kind: "article", article_format: "policy_brief" }, error: null },
+        { data: [{ id: "draft-1" }], error: null }
+      ),
+      ...standardPublishRoutes(),
+    });
+
+    const result = await publishPost(basePublishInput({ draftId: "draft-1", articleFormat: null }));
+
+    expect(result.error).toBeNull();
+    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    expect(updatedWith.article_format).toBeNull();
+  });
+
+  it("converts a legacy Policy Brief DRAFT (never submitted) to an ordinary Policy-Brief-format Article at first publish, publishing immediately instead of entering review", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults(
+        { data: { status: "draft", type: "policy_brief" }, error: null },
+        { data: [{ id: "draft-1" }], error: null }
+      ),
+      ...standardPublishRoutes(),
+    });
+
+    const result = await publishPost(basePublishInput({ draftId: "draft-1" }));
+
+    expect(result.error).toBeNull();
+    expect(result.submittedForReview).toBe(false);
+    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    // Dual-writes type="essay" like any other new Article -- never the raw
+    // legacy "policy_brief" value -- while its genre survives as
+    // article_format metadata, per lib/contentModel.ts's
+    // isLegacyPolicyBriefInFlight(): a draft was never actually "in flight"
+    // in the old workflow (only pending/pending_revision counts), so
+    // publishing it now must not start a brand-new review.
+    expect(updatedWith.type).toBe("essay");
+    expect(updatedWith.content_kind).toBe("article");
+    expect(updatedWith.article_format).toBe("policy_brief");
+    expect(updatedWith.status).toBe("published");
+    expect(updatedWith.published_at).not.toBeNull();
+  });
+
   it("refuses to publish an existing research draft through the Article action, regardless of requested postType", async () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults({ data: { status: "draft", type: "research" }, error: null }),
