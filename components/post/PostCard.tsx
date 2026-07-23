@@ -59,6 +59,20 @@ export interface PostCardData {
       full_name: string | null;
     } | null;
   }>;
+  /**
+   * Hydrated parent-post context for a response card (see lib/feedData.ts
+   * enrichPosts). Null/undefined when the post isn't a response, or when
+   * the referenced parent could no longer be resolved (e.g. unpublished) --
+   * callers should fail safe to a generic "another publication" line rather
+   * than crash.
+   */
+  response_to?: {
+    slug: string;
+    title: string | null;
+    content_kind?: string | null;
+    type?: string | null;
+    profiles: { username: string | null; full_name: string | null } | null;
+  } | null;
   profiles: {
     username: string;
     full_name: string | null;

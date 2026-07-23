@@ -8,15 +8,32 @@ import {
   resolveArticleFormat,
   resolveContentKind,
 } from "@/lib/contentModel";
-import { getPostDisplayTitle } from "@/lib/postDisplay";
+import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
+
+interface RespondingToInfo {
+  title: string;
+  author: string;
+  slug?: string | null;
+  authorUsername?: string | null;
+}
 
 interface Props {
   post: PostCardData;
   currentUserId: string | null;
   surface: "home" | "following" | "latest";
   priority?: boolean;
-  respondingTo?: { title: string; author: string } | null;
+  respondingTo?: RespondingToInfo | null;
+}
+
+function deriveRespondingTo(responseTo: PostCardData["response_to"]): RespondingToInfo | null {
+  if (!responseTo) return null;
+  return {
+    title: getPostMetadataTitle(responseTo, responseTo.profiles),
+    author: responseTo.profiles?.full_name ?? responseTo.profiles?.username ?? "another author",
+    slug: responseTo.slug,
+    authorUsername: responseTo.profiles?.username ?? null,
+  };
 }
 
 const CARD_SHELL =
@@ -45,17 +62,18 @@ function documentSize(bytes: number | null | undefined) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function AuthorLine({ post }: { post: PostCardData }) {
+function AuthorLine({ post, avatarSize = 36 }: { post: PostCardData; avatarSize?: number }) {
   const profile = post.profiles;
   const name = profile?.full_name ?? profile?.username ?? "Indegenius member";
   const coauthorCount = post.co_authors?.length ?? 0;
   const byline = coauthorCount > 0 ? `${name} + ${coauthorCount}` : name;
   const date = post.published_at ?? post.created_at;
+  const avatarDimensions = { width: avatarSize, height: avatarSize };
   const avatar = profile?.avatar_url ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={profile.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover" />
+    <img src={profile.avatar_url} alt="" style={avatarDimensions} className="rounded-full object-cover" />
   ) : (
-    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-800">
+    <span style={avatarDimensions} className="flex items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-800">
       {initials(name)}
     </span>
   );
@@ -99,15 +117,36 @@ function ContextLine({
   respondingTo,
 }: Pick<Props, "post" | "surface" | "respondingTo">) {
   if (post.in_response_to) {
+    const parent = respondingTo ?? deriveRespondingTo(post.response_to);
     return (
       <p className="mb-2 flex items-start gap-1.5 text-[11.5px] leading-[1.45] text-gray-500">
         <span aria-hidden="true" className="mt-px">↩</span>
-        <span>
+        <span className="min-w-0">
           Responding to{" "}
-          {respondingTo ? (
+          {parent ? (
             <>
-              <span className="font-semibold text-gray-700">{respondingTo.title}</span>
-              {respondingTo.author ? <> by {respondingTo.author}</> : null}
+              {parent.slug ? (
+                <Link
+                  href={`/post/${parent.slug}`}
+                  className={`font-semibold text-gray-700 hover:text-emerald-700 hover:underline ${FOCUS_RING}`}
+                >
+                  {parent.title}
+                </Link>
+              ) : (
+                <span className="font-semibold text-gray-700">{parent.title}</span>
+              )}
+              {parent.author ? (
+                <>
+                  {" by "}
+                  {parent.authorUsername ? (
+                    <Link href={`/${parent.authorUsername}`} className={`hover:text-emerald-700 hover:underline ${FOCUS_RING}`}>
+                      {parent.author}
+                    </Link>
+                  ) : (
+                    parent.author
+                  )}
+                </>
+              ) : null}
             </>
           ) : (
             "another publication"
@@ -167,7 +206,7 @@ function PostFeedCard({ post, currentUserId, surface, priority, respondingTo }: 
   return (
     <article className={CARD_SHELL}>
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
-      <AuthorLine post={post} />
+      <AuthorLine post={post} avatarSize={32} />
       <div className="mt-3">
         {title ? (
           <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
@@ -195,7 +234,7 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo 
   return (
     <article className={CARD_SHELL}>
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
-      <AuthorLine post={post} />
+      <AuthorLine post={post} avatarSize={28} />
       <div className="mt-3 min-w-0">
         <p className={`mb-1.5 font-display text-[10.5px] font-bold uppercase tracking-[0.14em] ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
           Article{format ? ` · ${format}` : ""}{" "}
@@ -212,10 +251,36 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo 
   );
 }
 
+function ResearchManuscriptRow({ post }: { post: PostCardData }) {
+  const size = documentSize(post.document_size_bytes);
+  const hasDocument = Boolean(post.document_original_name || post.document_mime_type);
+  if (!hasDocument) return null;
+
+  return (
+    <div className="mt-3 flex items-center gap-2.5">
+      <span
+        aria-hidden="true"
+        className="flex h-[26px] w-[22px] shrink-0 items-center justify-center rounded-[3px] bg-purple-accent text-[7.5px] font-bold tracking-wide text-white"
+      >
+        PDF
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[11.5px] text-gray-500">
+        PDF manuscript{size ? ` · ${size}` : ""}
+      </span>
+      <Link
+        href={`/post/${post.slug}`}
+        aria-label="View paper"
+        className={`inline-flex min-h-11 shrink-0 items-center rounded-md px-1.5 text-[11.5px] font-bold text-purple-accent hover:underline ${FOCUS_RING}`}
+      >
+        View paper →
+      </Link>
+    </div>
+  );
+}
+
 function ResearchFeedCard({ post, currentUserId, surface, respondingTo }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled research paper";
   const abstract = sanitizePostExcerpt(post.excerpt);
-  const size = documentSize(post.document_size_bytes);
   const evidence = post.citation_id ? "Citable" : isFormallyReviewed(post) ? "Reviewed" : null;
   const primaryAuthor = post.profiles?.full_name ?? post.profiles?.username ?? "Indegenius researcher";
   const coauthors = (post.co_authors ?? [])
@@ -228,28 +293,15 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo }: Props)
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.15em] text-purple-accent">Research</span>
-        {evidence ? <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{evidence}</span> : null}
+        {evidence ? <span className="ml-auto rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{evidence}</span> : null}
       </div>
       <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-        <h2 className="font-display line-clamp-3 text-[19px] font-semibold leading-[1.2] text-ink sm:text-[21px]">{title}</h2>
+        <h2 className="font-display text-[19px] font-semibold leading-[1.28] text-ink sm:text-[21px]">{title}</h2>
       </Link>
       <p className="mt-2 text-[12px] font-medium leading-[1.45] text-gray-700">{authors}</p>
       {post.profiles?.university ? <p className="mt-0.5 text-[11.5px] text-gray-500">{post.profiles.university}</p> : null}
       {abstract ? <p className="mt-2.5 line-clamp-2 text-[13.5px] leading-[1.6] text-gray-600">{abstract}</p> : null}
-      <div className="mt-3 flex items-center gap-3 rounded-lg border border-purple-100 bg-purple-tint/35 p-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-purple-accent shadow-sm" aria-hidden="true">
-          <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7 3.75h7l3 3V20.25H7V3.75Zm7 0v3h3M9.5 12h5M9.5 15h5" />
-          </svg>
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[11.5px] font-semibold text-gray-700">{post.document_original_name || "PDF manuscript"}</p>
-          <p className="text-[10.5px] text-gray-500">PDF{size ? ` · ${size}` : ""}</p>
-        </div>
-        <Link href={`/post/${post.slug}`} aria-label="View paper" className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-[11.5px] font-semibold text-purple-accent hover:bg-white ${FOCUS_RING}`}>
-          View paper →
-        </Link>
-      </div>
+      <ResearchManuscriptRow post={post} />
       <Actions post={post} currentUserId={currentUserId} showResponses={false} />
     </article>
   );
