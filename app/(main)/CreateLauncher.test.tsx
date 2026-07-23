@@ -4,9 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CreateLauncher from "./CreateLauncher";
 
 const navigationState = vi.hoisted(() => ({ pathname: "/" }));
+const mocks = vi.hoisted(() => ({ requestAuth: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => navigationState.pathname,
+}));
+
+vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
+  useGuestAuthGate: () => ({ requestAuth: mocks.requestAuth }),
 }));
 
 // next/link's app-router Link expects a live router context to handle clicks
@@ -29,6 +34,7 @@ vi.mock("next/link", () => ({
 describe("CreateLauncher -- mobile bottom sheet", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
+    mocks.requestAuth.mockReset();
   });
 
   afterEach(() => cleanup());
@@ -89,19 +95,13 @@ describe("CreateLauncher -- mobile bottom sheet", () => {
     );
   });
 
-  it("redirects a guest through login for every option, preserving the chosen destination", () => {
+  it("opens the contextual sign-in gate for a guest instead of the chooser", () => {
     render(<CreateLauncher userId={null} variant="mobileFab" />);
-    fireEvent.click(screen.getByRole("button", { name: "Start writing" }));
-    const dialog = screen.getByRole("dialog");
 
-    expect(within(dialog).getByRole("link", { name: /^Post/ })).toHaveAttribute(
-      "href",
-      "/login?redirectTo=%2Fcreate%2Fpost"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Research Paper/ })).toHaveAttribute(
-      "href",
-      "/login?redirectTo=%2Fsubmit%2Fresearch"
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Start writing" }));
+
+    expect(mocks.requestAuth).toHaveBeenCalledWith("create");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("moves focus inside the sheet on open", () => {
@@ -185,6 +185,7 @@ describe("CreateLauncher -- mobile bottom sheet", () => {
 describe("CreateLauncher -- desktop popover", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
+    mocks.requestAuth.mockReset();
   });
 
   afterEach(() => cleanup());
@@ -259,6 +260,7 @@ describe("CreateLauncher -- desktop popover", () => {
 describe("CreateLauncher -- no duplicate accessibility labels", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
+    mocks.requestAuth.mockReset();
   });
 
   afterEach(() => cleanup());
@@ -296,6 +298,7 @@ describe("CreateLauncher -- no duplicate accessibility labels", () => {
 describe("CreateLauncher -- responsive breakpoint contract", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
+    mocks.requestAuth.mockReset();
   });
 
   afterEach(() => cleanup());

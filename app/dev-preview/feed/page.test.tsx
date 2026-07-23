@@ -3,17 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import FeedPreviewPage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  push: vi.fn(),
+  requestAuth: vi.fn(),
   like: vi.fn(),
   bookmark: vi.fn(),
 }));
 
-// Preserve the real notFound() (this is the exact behavior under test) while
-// stubbing only useRouter, the same way other card tests do.
-vi.mock("next/navigation", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next/navigation")>();
-  return { ...actual, useRouter: () => ({ push: mocks.push }) };
-});
+// The guest-auth gate every Like/Save button opens instead of writing
+// straight through when there's no signed-in user.
+vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
+  useGuestAuthGate: () => ({ requestAuth: mocks.requestAuth }),
+}));
 
 // The same server actions the real Like/Save buttons call. If a click in
 // this harness ever reached these, it would be a real Supabase write --
@@ -24,7 +23,7 @@ vi.mock("@/app/(main)/post/[slug]/bookmarkActions", () => ({ toggleBookmark: moc
 describe("FeedPreviewPage (dev-only visual fixture harness)", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
-    mocks.push.mockReset();
+    mocks.requestAuth.mockReset();
     mocks.like.mockReset();
     mocks.bookmark.mockReset();
   });
@@ -57,8 +56,8 @@ describe("FeedPreviewPage (dev-only visual fixture harness)", () => {
     render(<FeedPreviewPage />);
 
     // Every card is rendered with currentUserId={null} -- clicking a
-    // pre-"liked" fixture's Unlike control must redirect to login instead
-    // of calling the real like/bookmark server actions.
+    // pre-"liked" fixture's Unlike control must open the guest sign-in gate
+    // instead of calling the real like/bookmark server actions.
     for (const button of screen.getAllByRole("button", { name: /Unlike this item/i })) {
       fireEvent.click(button);
     }
@@ -68,7 +67,6 @@ describe("FeedPreviewPage (dev-only visual fixture harness)", () => {
 
     expect(mocks.like).not.toHaveBeenCalled();
     expect(mocks.bookmark).not.toHaveBeenCalled();
-    expect(mocks.push.mock.calls.every(([to]) => String(to).startsWith("/login"))).toBe(true);
-    expect(mocks.push).toHaveBeenCalled();
+    expect(mocks.requestAuth).toHaveBeenCalled();
   });
 });

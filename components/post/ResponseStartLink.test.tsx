@@ -13,6 +13,12 @@ vi.mock("@/lib/activationEvents", () => ({
   trackActivationEvent: vi.fn(),
 }));
 
+const mocks = vi.hoisted(() => ({ requestAuth: vi.fn() }));
+
+vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
+  useGuestAuthGate: () => ({ requestAuth: mocks.requestAuth }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,
@@ -191,5 +197,41 @@ describe("ResponseStartLink -- starter/responseIntent bypasses the chooser (exis
     fireEvent.click(screen.getByRole("link", { name: "Write a response" }));
 
     expect(onTriggerClick).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ResponseStartLink -- guest gating", () => {
+  beforeEach(() => {
+    navigationState.pathname = "/post/some-post";
+    mocks.requestAuth.mockReset();
+  });
+
+  afterEach(() => cleanup());
+
+  it("opens the contextual sign-in gate for a guest instead of the chooser", () => {
+    render(<ResponseStartLink postId="parent-post-id" userId={null} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Write a response" }));
+
+    expect(mocks.requestAuth).toHaveBeenCalledWith("respond");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("still opens the chooser directly for a signed-in user", () => {
+    render(<ResponseStartLink postId="parent-post-id" userId="user-1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Write a response" }));
+
+    expect(mocks.requestAuth).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Respond" })).toBeInTheDocument();
+  });
+
+  it("gates the starter/responseIntent bypass branch for a guest instead of linking to the composer", () => {
+    render(<ResponseStartLink postId="post-2" starter="response" userId={null} />);
+
+    expect(screen.queryByRole("link", { name: "Write a response" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Write a response" }));
+
+    expect(mocks.requestAuth).toHaveBeenCalledWith("respond");
   });
 });

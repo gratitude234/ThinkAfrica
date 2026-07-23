@@ -167,7 +167,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               value={query}
               onChange={handleChange}
               onKeyDown={handleInputKeyDown}
-              placeholder="Search posts, articles, research..."
+              placeholder="Search posts, articles, research, writers…"
               className="flex-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
               aria-label="Search Indegenius"
             />
@@ -202,7 +202,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
         <div className="max-h-80 overflow-y-auto">
           {!query ? (
             <div className="px-4 py-8 text-center text-sm text-gray-400">
-              Search posts, essays, research...
+              Search posts, articles, research, writers…
             </div>
           ) : null}
           {query && loading ? (

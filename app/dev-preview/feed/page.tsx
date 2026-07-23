@@ -8,7 +8,8 @@ import PostFeed from "@/components/post/PostFeed";
 import DebateInterlude from "@/components/post/DebateInterlude";
 import PeopleInterlude from "@/components/post/PeopleInterlude";
 import TopicInterlude from "@/components/post/TopicInterlude";
-import { EndStateCard, PostFeedSkeleton } from "@/app/(main)/PostsFeedTabs";
+import { EndStateCard } from "@/app/(main)/PostsFeedTabs";
+import FeedSkeleton from "@/components/post/FeedSkeleton";
 import {
   ACTIVATION_FALLBACK_FIXTURE,
   ARTICLE_FIXTURES,
@@ -94,11 +95,12 @@ function ErrorBanner({ children }: { children: ReactNode }) {
  *  - Every card is rendered with currentUserId={null} on purpose: the real
  *    Like/Save/Follow controls are the actual production components (for
  *    visual fidelity), and with a null viewer id their click handlers only
- *    ever do a client-side redirect to /login -- never a server action
- *    against real data. "Authenticated" engagement states are simulated
- *    with pre-set viewer_liked/viewer_bookmarked fixture flags instead of
- *    a real session, so this page can never write fixture data to
- *    Supabase no matter what a visitor clicks.
+ *    ever open the guest sign-in gate (GuestAuthGateProvider, mounted once
+ *    in the root layout) -- never a server action against real data.
+ *    "Authenticated" engagement states are simulated with pre-set
+ *    viewer_liked/viewer_bookmarked fixture flags instead of a real
+ *    session, so this page can never write fixture data to Supabase no
+ *    matter what a visitor clicks.
  *  - Cards are rendered via HomeFeedCard directly, not
  *    HomeFeedCardImpression/PostFeed's impression wrapper, so scrolling
  *    this page never fires the real /api/posts/[slug]/impression beacon
@@ -218,7 +220,7 @@ export default function FeedPreviewPage() {
         <div>
           <p className="mb-2 font-mono text-[11px] uppercase tracking-wide text-purple-accent">Loading</p>
           <div className="mx-auto max-w-[680px]">
-            <PostFeedSkeleton />
+            <FeedSkeleton />
           </div>
         </div>
 

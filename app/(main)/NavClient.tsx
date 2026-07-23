@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
+import BrandWordmark from "@/components/ui/BrandWordmark";
 import NavUserMenu from "./NavUserMenu";
 import MobileNav from "./MobileNav";
 import CreateLauncher from "./CreateLauncher";
@@ -87,13 +87,9 @@ export default function NavClient({
       >
       <div className="mx-auto flex h-full max-w-[1240px] items-center gap-7 px-4 sm:px-6 lg:px-8">
           <Link href="/" className="shrink-0" aria-label="Indegenius home">
-            <Image
-              src="/brand/indegenius-icon-wordmark-color.svg"
-              alt="Indegenius"
-              width={139}
-              height={107}
-              priority
-              className="h-7 w-auto"
+            <BrandWordmark
+              iconClassName="hidden h-6 w-6 md:block"
+              textClassName="text-[18px] md:text-[19px]"
             />
           </Link>
 
@@ -148,7 +144,7 @@ export default function NavClient({
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
-              <span className="truncate">Search articles, writers, universities...</span>
+              <span className="truncate">Search posts, articles, research, writers…</span>
             </button>
           </div>
 

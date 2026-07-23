@@ -28,10 +28,12 @@ export default function CredibilityPanel({
   postId,
   summary,
   isPublished,
+  userId = null,
 }: {
   postId: string;
   summary: PostQualitySummary;
   isPublished: boolean;
+  userId?: string | null;
 }) {
   const signals = summary.credibilitySignals.filter((signal) =>
     PANEL_SIGNALS.has(signal.label)
@@ -83,6 +85,7 @@ export default function CredibilityPanel({
           <ResponseStartLink
             postId={postId}
             source="credibility_panel"
+            userId={userId}
             className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
           >
             Write a response
@@ -156,6 +159,7 @@ export default function CredibilityPanel({
           <ResponseStartLink
             postId={postId}
             source="credibility_panel"
+            userId={userId}
             className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
           >
             Write a response

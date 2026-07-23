@@ -4,6 +4,9 @@ import HomeFeedCard from "./HomeFeedCard";
 import type { PostCardData } from "./PostCard";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
+  useGuestAuthGate: () => ({ requestAuth: vi.fn() }),
+}));
 
 function post(overrides: Partial<PostCardData> = {}): PostCardData {
   return {

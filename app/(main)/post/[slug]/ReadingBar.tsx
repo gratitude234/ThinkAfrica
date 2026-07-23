@@ -62,12 +62,10 @@ export default function ReadingBar({
   }, []);
 
   const handleLike = () => {
-    if (!userId) { window.location.href = "/login"; return; }
     void toggleLike();
   };
 
   const handleBookmark = () => {
-    if (!userId) { window.location.href = "/login"; return; }
     void toggleBookmark();
   };
 
@@ -204,6 +202,7 @@ export default function ReadingBar({
           <ResponseStartLink
             postId={postId}
             source="reading_bar"
+            userId={userId}
             className="flex h-10 w-10 items-center justify-center rounded-xl text-emerald-600 transition-colors hover:bg-emerald-50"
           >
             <span className="sr-only">Write a response</span>

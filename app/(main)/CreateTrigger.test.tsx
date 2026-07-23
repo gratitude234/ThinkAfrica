@@ -4,9 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CreateTrigger from "./CreateTrigger";
 
 const navigationState = vi.hoisted(() => ({ pathname: "/" }));
+const mocks = vi.hoisted(() => ({ requestAuth: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => navigationState.pathname,
+}));
+
+vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
+  useGuestAuthGate: () => ({ requestAuth: mocks.requestAuth }),
 }));
 
 vi.mock("next/link", () => ({
@@ -29,6 +34,7 @@ vi.mock("next/link", () => ({
 describe("CreateTrigger -- reusable outside navigation", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
+    mocks.requestAuth.mockReset();
   });
 
   afterEach(() => cleanup());
@@ -68,7 +74,7 @@ describe("CreateTrigger -- reusable outside navigation", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("routes Post/Article/Research Paper identically to the nav chooser, since both read CREATE_ACTIONS", () => {
+  it("opens the contextual sign-in gate for a guest instead of the chooser", () => {
     render(
       <CreateTrigger userId={null} presentation="popover">
         Write
@@ -76,20 +82,9 @@ describe("CreateTrigger -- reusable outside navigation", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Write" }));
-    const dialog = screen.getByRole("dialog");
 
-    expect(within(dialog).getByRole("link", { name: /^Post/ })).toHaveAttribute(
-      "href",
-      "/login?redirectTo=%2Fcreate%2Fpost"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Article/ })).toHaveAttribute(
-      "href",
-      "/login?redirectTo=%2Fwrite%3Fkind%3Darticle"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Research Paper/ })).toHaveAttribute(
-      "href",
-      "/login?redirectTo=%2Fsubmit%2Fresearch"
-    );
+    expect(mocks.requestAuth).toHaveBeenCalledWith("create");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("does not collide with a second, independently-mounted trigger elsewhere on the page", () => {
