@@ -144,7 +144,6 @@ export function toDebateInterludeData(
 
 export interface EngagementCounts {
   referenceCounts: Record<string, number>;
-  commentCounts: Record<string, number>;
   bookmarkCounts: Record<string, number>;
   responseCounts: Record<string, number>;
 }
@@ -162,13 +161,12 @@ export async function getEngagementCounts(
   featuredIds: string[]
 ): Promise<EngagementCounts> {
   if (featuredIds.length === 0) {
-    return { referenceCounts: {}, commentCounts: {}, bookmarkCounts: {}, responseCounts: {} };
+    return { referenceCounts: {}, bookmarkCounts: {}, responseCounts: {} };
   }
 
-  const [{ data: references }, { data: comments }, { data: bookmarks }, { data: responses }] =
+  const [{ data: references }, { data: bookmarks }, { data: responses }] =
     await Promise.all([
       supabase.from("post_references").select("post_id").in("post_id", featuredIds),
-      supabase.from("comments").select("post_id").in("post_id", featuredIds),
       supabase.from("bookmarks").select("post_id").in("post_id", featuredIds),
       supabase.from("posts").select("in_response_to").in("in_response_to", featuredIds),
     ]);
@@ -178,7 +176,6 @@ export async function getEngagementCounts(
       (references ?? []) as Array<Record<string, string | null>>,
       "post_id"
     ),
-    commentCounts: countBy((comments ?? []) as Array<Record<string, string | null>>, "post_id"),
     bookmarkCounts: countBy(
       (bookmarks ?? []) as Array<Record<string, string | null>>,
       "post_id"
@@ -238,7 +235,6 @@ export async function getDailyBriefContent(
         publishedVersionId: post.published_version_id,
         referenceCount: engagementCounts.referenceCounts[post.id] ?? 0,
         responseCount: engagementCounts.responseCounts[post.id] ?? 0,
-        commentCount: engagementCounts.commentCounts[post.id] ?? 0,
         bookmarkCount: engagementCounts.bookmarkCounts[post.id] ?? 0,
         viewCount: post.view_count,
         publishedAt: post.published_at,

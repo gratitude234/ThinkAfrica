@@ -17,7 +17,6 @@ import {
 import LikeButton from "./LikeButton";
 import BookmarkButton from "./BookmarkButton";
 import { PostEngagementProvider } from "./PostEngagementContext";
-import CommentsLoader from "./CommentsLoader";
 import ViewTracker from "./ViewTracker";
 import ReadingProgressBar from "./ReadingProgressBar";
 import ReadingBar from "./ReadingBar";
@@ -33,6 +32,9 @@ import PostCover from "@/components/post/PostCover";
 import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
 import ReportButton from "@/components/moderation/ReportButton";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
+import HomeFeedCard from "@/components/post/HomeFeedCard";
+import type { PostCardData } from "@/components/post/PostCard";
+import { fetchResponseCards } from "@/lib/feedData";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import ResponseStartLink, {
   type ResponseIntent,
@@ -125,18 +127,6 @@ interface CoAuthorRecord {
   } | null;
 }
 
-interface ResponsePostRow {
-  id: string;
-  title: string | null;
-  slug: string;
-  excerpt: string | null;
-  published_at: string | null;
-  profiles:
-    | ResponsePostProfile
-    | ResponsePostProfile[]
-    | null;
-}
-
 const RESPONSE_PROMPTS: Array<{
   intent: ResponseIntent;
   label: string;
@@ -158,13 +148,6 @@ const RESPONSE_PROMPTS: Array<{
     body: "Bring in a source, statistic, case, or lived observation that sharpens the discussion.",
   },
 ];
-
-interface ResponsePostProfile {
-  username: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  verified?: boolean;
-}
 
 interface RelatedPost {
   id: string;
@@ -188,7 +171,7 @@ interface PostNavigationItem {
 interface SecondaryData {
   references: ReferenceRecord[];
   coAuthors: CoAuthorRecord[];
-  responsePosts: Array<Omit<ResponsePostRow, "profiles"> & { profiles: ResponsePostProfile | null }>;
+  responseCards: PostCardData[];
   reviews: Array<{
     assigned_at: string | null;
     submitted_at: string | null;
@@ -198,7 +181,7 @@ interface SecondaryData {
   decisions: Array<{ decision: string | null; created_at: string | null; round: number | null }>;
   versions: Array<{ id: string; version_kind: string | null; round: number | null; created_at: string | null }>;
   likeCount: number;
-  commentCount: number;
+  responseCount: number;
   bookmarkCount: number;
   relatedPosts: RelatedPost[];
   previousPost: PostNavigationItem | null;
@@ -500,12 +483,11 @@ function getFullQualitySummary({
     isResponse: Boolean(parentPostId),
     author,
     referenceCount: secondary.references.length,
-    responseCount: secondary.responsePosts.length,
+    responseCount: secondary.responseCount,
     reviewCount: secondary.reviews.length,
     completedReviewCount: secondary.reviews.filter((review) =>
       Boolean(review.submitted_at)
     ).length,
-    commentCount: secondary.commentCount,
     likeCount: secondary.likeCount,
     bookmarkCount: secondary.bookmarkCount,
   });
@@ -515,7 +497,8 @@ async function getSecondaryData(
   postId: string,
   tags: string[],
   isPublished: boolean,
-  publishedAt: string | null
+  publishedAt: string | null,
+  viewerId: string | null
 ): Promise<SecondaryData> {
   const supabase = await createClient();
 
@@ -523,11 +506,11 @@ async function getSecondaryData(
     { count: likeCount },
     { data: referencesRaw },
     { data: coAuthorsRaw },
-    { data: responsePostsRaw },
+    responseCards,
     { data: reviewsRaw },
     { data: decisionsRaw },
     { data: versionsRaw },
-    { count: commentCount },
+    { count: responseCount },
     { count: bookmarkCount },
     relatedResult,
     previousPostResult,
@@ -550,15 +533,7 @@ async function getSecondaryData(
       .eq("post_id", postId)
       .not("accepted_at", "is", null)
       .order("display_order", { ascending: true }),
-    supabase
-      .from("posts")
-      .select(
-        "id, title, slug, excerpt, published_at, profiles!posts_author_id_fkey(username, full_name, avatar_url, verified)"
-      )
-      .eq("in_response_to", postId)
-      .eq("status", "published")
-      .order("published_at", { ascending: false })
-      .limit(10),
+    fetchResponseCards(supabase, postId, viewerId),
     supabase
       .from("post_reviews")
       .select("assigned_at, submitted_at, recommendation, round")
@@ -575,9 +550,10 @@ async function getSecondaryData(
       .eq("post_id", postId)
       .order("created_at", { ascending: true }),
     supabase
-      .from("comments")
+      .from("posts")
       .select("*", { count: "exact", head: true })
-      .eq("post_id", postId),
+      .eq("in_response_to", postId)
+      .eq("status", "published"),
     supabase
       .from("bookmarks")
       .select("*", { count: "exact", head: true })
@@ -630,15 +606,6 @@ async function getSecondaryData(
     profile: Array.isArray(item.profile) ? item.profile[0] ?? null : item.profile,
   }));
 
-  const responsePosts = ((responsePostsRaw ?? []) as ResponsePostRow[]).map(
-    (response) => ({
-      ...response,
-      profiles: Array.isArray(response.profiles)
-        ? response.profiles[0] ?? null
-        : response.profiles,
-    })
-  );
-
   const relatedPosts = ((relatedResult.data ?? []) as Array<
     Omit<RelatedPost, "profiles"> & {
       profiles:
@@ -654,7 +621,7 @@ async function getSecondaryData(
   return {
     references: (referencesRaw ?? []) as ReferenceRecord[],
     coAuthors,
-    responsePosts,
+    responseCards,
     reviews: (reviewsRaw ?? []) as Array<{
       assigned_at: string | null;
       submitted_at: string | null;
@@ -673,7 +640,7 @@ async function getSecondaryData(
       created_at: string | null;
     }>,
     likeCount: likeCount ?? 0,
-    commentCount: commentCount ?? 0,
+    responseCount: responseCount ?? 0,
     bookmarkCount: bookmarkCount ?? 0,
     relatedPosts,
     previousPost: (previousPostResult.data as PostNavigationItem | null) ?? null,
@@ -746,24 +713,6 @@ function SectionSkeleton({ rows = 3 }: { rows?: number }) {
       <div className="h-4 w-24 rounded bg-gray-200" />
       {[...Array(rows)].map((_, index) => (
         <div key={index} className="h-4 rounded bg-gray-100" />
-      ))}
-    </div>
-  );
-}
-
-function CommentsSkeleton() {
-  return (
-    <div className="animate-pulse space-y-4">
-      <div className="h-5 w-24 rounded bg-gray-200" />
-      {[...Array(3)].map((_, index) => (
-        <div key={index} className="flex gap-3">
-          <div className="h-8 w-8 shrink-0 rounded-full bg-gray-200" />
-          <div className="flex-1 space-y-2">
-            <div className="h-3 w-28 rounded bg-gray-200" />
-            <div className="h-3 w-full rounded bg-gray-100" />
-            <div className="h-3 w-4/5 rounded bg-gray-100" />
-          </div>
-        </div>
       ))}
     </div>
   );
@@ -1212,16 +1161,16 @@ async function PostEngagementSection({
           userId={userId}
         />
         <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
-        <a
-          href="#comments"
+        <ResponseStartLink
+          postId={post.id}
+          source="article_action_bar"
           className="inline-flex min-h-9 items-center gap-2 rounded-full px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-emerald-brand"
-          aria-label={`${secondary.commentCount} comments`}
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z" />
           </svg>
-          {secondary.commentCount}
-        </a>
+          Respond
+        </ResponseStartLink>
         <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
         <BookmarkButton
           postId={post.id}
@@ -1279,7 +1228,7 @@ async function AuthorAndCollaborationSection({
     postSlug: post.slug,
     authorId: author.id,
     viewerId: userId,
-    responseCount: secondary.responsePosts.length,
+    responseCount: secondary.responseCount,
     coauthorCount: coAuthors.length,
     isFollowingAuthor: viewer.userFollowsAuthor,
     messageEligible: viewer.messageEligibility?.eligible ?? false,
@@ -1510,63 +1459,58 @@ function ResponsePromptPanel({ postId }: { postId: string }) {
 }
 
 async function PostResponsesSection({
+  post,
+  author,
+  userId,
   secondaryDataPromise,
 }: {
+  post: PostRecord;
+  author: AuthorProfile | null;
+  userId: string | null;
   secondaryDataPromise: Promise<SecondaryData>;
 }) {
-  const { responsePosts } = await secondaryDataPromise;
-  if (responsePosts.length === 0) return null;
+  const { responseCards, responseCount } = await secondaryDataPromise;
+  const parentTitle = getPostMetadataTitle(post, author);
+  const parentAuthor =
+    author?.full_name ?? author?.username ?? "the author";
 
   return (
     <section id="responses" className="mt-10 scroll-mt-24">
-      <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-        Responses ({responsePosts.length})
+      <h2 className="font-display mb-4 text-[20px] font-semibold text-ink">
+        Responses{responseCount > 0 ? ` · ${responseCount}` : ""}
       </h2>
-      <div className="space-y-4">
-        {responsePosts.map((response) => {
-          const responseAuthor = response.profiles;
 
-          return (
-            <Link
-              key={response.id}
-              href={`/post/${response.slug}`}
-              className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:rounded-lg"
+      {responseCards.length === 0 ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center sm:rounded-lg">
+          <p className="text-[15px] text-gray-600">
+            No responses yet. Be the first to weigh in.
+          </p>
+          <div className="mt-4 flex justify-center">
+            <ResponseStartLink
+              postId={post.id}
+              source="responses_empty_state"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0a4d37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
             >
-              <div className="w-1 flex-shrink-0 self-stretch rounded-full bg-emerald-brand" />
-              <div className="min-w-0 flex-1">
-                <div className="mb-1 flex items-center gap-2">
-                  <UserAvatar
-                    name={
-                      responseAuthor?.full_name ??
-                      responseAuthor?.username ??
-                      "Unknown"
-                    }
-                    src={responseAuthor?.avatar_url ?? null}
-                    size={20}
-                  />
-                  <span className="text-xs text-gray-500">
-                    <span className="font-medium text-gray-700">
-                      {responseAuthor?.full_name ?? responseAuthor?.username ?? "Unknown"}
-                    </span>
-                    {" / "}
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 not-italic">
-                      Response
-                    </span>
-                  </span>
-                </div>
-                <p className="text-sm font-semibold leading-snug text-gray-900">
-                  {getPostMetadataTitle(response, responseAuthor)}
-                </p>
-                {response.excerpt ? (
-                  <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                    {response.excerpt}
-                  </p>
-                ) : null}
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z" />
+              </svg>
+              Respond
+            </ResponseStartLink>
+          </div>
+        </div>
+      ) : (
+        <div>
+          {responseCards.map((response) => (
+            <HomeFeedCard
+              key={response.id}
+              post={response}
+              currentUserId={userId}
+              surface="latest"
+              respondingTo={{ title: parentTitle, author: parentAuthor }}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -2338,7 +2282,8 @@ export default async function PostPage({ params }: PageProps) {
     post.id,
     post.tags ?? [],
     isPublished,
-    post.published_at
+    post.published_at,
+    userId
   );
   const viewerDataPromise = getViewerData({
     postId: post.id,
@@ -2523,16 +2468,13 @@ export default async function PostPage({ params }: PageProps) {
               </>
             ) : null}
 
-            <Suspense fallback={<CommentsSkeleton />}>
-              <CommentsLoader
-                postId={post.id}
-                userId={userId}
-                userProfileId={userId}
-              />
-            </Suspense>
-
             <Suspense fallback={<SectionSkeleton rows={3} />}>
-              <PostResponsesSection secondaryDataPromise={secondaryDataPromise} />
+              <PostResponsesSection
+                post={post}
+                author={author}
+                userId={userId}
+                secondaryDataPromise={secondaryDataPromise}
+              />
             </Suspense>
           </main>
 
@@ -2749,16 +2691,13 @@ export default async function PostPage({ params }: PageProps) {
             </Suspense>
           ) : null}
 
-          <Suspense fallback={<CommentsSkeleton />}>
-            <CommentsLoader
-              postId={post.id}
-              userId={userId}
-              userProfileId={userId}
-            />
-          </Suspense>
-
           <Suspense fallback={<SectionSkeleton rows={3} />}>
-            <PostResponsesSection secondaryDataPromise={secondaryDataPromise} />
+            <PostResponsesSection
+              post={post}
+              author={author}
+              userId={userId}
+              secondaryDataPromise={secondaryDataPromise}
+            />
           </Suspense>
         </main>
       </div>

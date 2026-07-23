@@ -141,7 +141,7 @@ interface TopArgumentRow extends Omit<TopArgumentRecord, "debates"> {
 
 const ACTIVITY_TYPE_ICONS: Record<string, string> = {
   like: "Like",
-  comment: "Comment",
+  response: "Response",
   debate: "Debate",
 };
 
@@ -529,9 +529,11 @@ export default async function UserProfilePage({ params }: PageProps) {
             .order("created_at", { ascending: false })
             .limit(10),
           supabase
-            .from("comments")
-            .select("created_at, content, posts!comments_post_id_fkey(title, slug)")
+            .from("posts")
+            .select("created_at, title, slug")
             .eq("author_id", profile.id)
+            .not("in_response_to", "is", null)
+            .eq("status", "published")
             .order("created_at", { ascending: false })
             .limit(10),
           supabase
@@ -676,7 +678,7 @@ export default async function UserProfilePage({ params }: PageProps) {
 
   const recentActivity = isOwnProfile && activityData
     ? (() => {
-        const [likesResult, commentsResult, debatesResult] = activityData;
+        const [likesResult, responsesResult, debatesResult] = activityData;
         const likeActivity = (likesResult.data ?? []).map((like) => {
           const post = Array.isArray(like.posts) ? like.posts[0] : like.posts;
           return {
@@ -687,15 +689,14 @@ export default async function UserProfilePage({ params }: PageProps) {
           };
         });
 
-        const commentActivity = (commentsResult.data ?? []).map((comment) => {
-          const post = Array.isArray(comment.posts)
-            ? comment.posts[0]
-            : comment.posts;
+        const responseActivity = (responsesResult.data ?? []).map((response) => {
           return {
-            type: "comment" as const,
-            description: `Commented on "${post?.title ?? "a post"}"`,
-            link: post ? `/post/${post.slug}` : "#",
-            created_at: comment.created_at,
+            type: "response" as const,
+            description: response.title
+              ? `Responded with "${response.title}"`
+              : "Posted a response",
+            link: response.slug ? `/post/${response.slug}` : "#",
+            created_at: response.created_at,
           };
         });
 
@@ -711,7 +712,7 @@ export default async function UserProfilePage({ params }: PageProps) {
           };
         });
 
-        return [...likeActivity, ...commentActivity, ...debateActivity]
+        return [...likeActivity, ...responseActivity, ...debateActivity]
           .sort(
             (left, right) =>
               new Date(right.created_at).getTime() -

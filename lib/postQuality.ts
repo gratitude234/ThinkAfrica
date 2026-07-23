@@ -52,7 +52,6 @@ export interface PostQualityInput {
   responseCount?: number | null;
   reviewCount?: number | null;
   completedReviewCount?: number | null;
-  commentCount?: number | null;
   likeCount?: number | null;
   bookmarkCount?: number | null;
 }
@@ -91,7 +90,6 @@ export interface PublicQualityInput {
   publishedVersionId?: string | null;
   referenceCount?: number | null;
   responseCount?: number | null;
-  commentCount?: number | null;
   likeCount?: number | null;
   bookmarkCount?: number | null;
   viewCount?: number | null;
@@ -152,7 +150,6 @@ function hasReviewEvidence(input: PublicQualityInput) {
 export function getQualityScore(input: PublicQualityInput): number {
   const referenceCount = input.referenceCount ?? 0;
   const responseCount = input.responseCount ?? 0;
-  const commentCount = input.commentCount ?? 0;
   const bookmarkCount = input.bookmarkCount ?? 0;
   const likeCount = input.likeCount ?? 0;
   const viewCount = input.viewCount ?? 0;
@@ -167,7 +164,6 @@ export function getQualityScore(input: PublicQualityInput): number {
   return Math.round(
     referenceCount * 18 +
       responseCount * 16 +
-      commentCount * 10 +
       bookmarkCount * 14 +
       likeCount * 5 +
       Math.min(viewCount, 500) * 0.6 +
@@ -183,7 +179,6 @@ export function getPublicQualitySignals(
 ): PublicQualitySignals {
   const referenceCount = input.referenceCount ?? 0;
   const responseCount = input.responseCount ?? 0;
-  const commentCount = input.commentCount ?? 0;
   const bookmarkCount = input.bookmarkCount ?? 0;
   const badges: PublicQualityBadge[] = [];
 
@@ -198,9 +193,6 @@ export function getPublicQualitySignals(
   }
   if (responseCount > 0) {
     badges.push({ key: "response_thread", label: "Response thread", tone: "amber" });
-  }
-  if (commentCount >= 3) {
-    badges.push({ key: "discussion", label: "Strong discussion", tone: "amber" });
   }
   if (bookmarkCount >= 3) {
     badges.push({ key: "saved", label: "Saved often", tone: "emerald" });
@@ -225,7 +217,6 @@ export function getFeedSurfaceReason(input: PublicQualityInput): string | null {
     return "Reviewed or citable work";
   }
   if ((input.responseCount ?? 0) > 0) return "Active response thread";
-  if ((input.commentCount ?? 0) >= 3) return "Strong discussion";
   if ((input.bookmarkCount ?? 0) >= 3) return "Saved by readers";
   if (getQualityScore(input) >= 35) return "Quality signals are rising";
   return null;
@@ -273,7 +264,6 @@ export function getPostQualitySummary(
   const responseCount = input.responseCount ?? 0;
   const reviewCount = input.reviewCount ?? 0;
   const completedReviewCount = input.completedReviewCount ?? 0;
-  const commentCount = input.commentCount ?? 0;
   const likeCount = input.likeCount ?? 0;
   const bookmarkCount = input.bookmarkCount ?? 0;
   const tags = input.tags ?? [];
@@ -454,10 +444,6 @@ export function getPostQualitySummary(
       {
         label: "Responses",
         value: pluralize(responseCount, "response"),
-      },
-      {
-        label: "Discussion",
-        value: pluralize(commentCount, "comment"),
       },
       {
         label: "Saves and likes",

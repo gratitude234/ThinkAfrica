@@ -886,12 +886,6 @@ function getConversationStats(conversation: DiscoverConversation) {
     } cited`;
   }
 
-  if (conversation.commentCount > 0) {
-    return `${conversation.commentCount.toLocaleString()} ${
-      conversation.commentCount === 1 ? "comment" : "comments"
-    }`;
-  }
-
   return "Join the conversation";
 }
 

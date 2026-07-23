@@ -31,7 +31,6 @@ export interface PostCardData {
   author_id?: string;
   like_count?: number;
   bookmark_count?: number;
-  comment_count?: number;
   view_count?: number | null;
   impression_count?: number | null;
   read_count?: number | null;
@@ -262,7 +261,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
     VERIFIED_COLORS[author?.verified_type ?? "student"] ?? "bg-emerald-brand";
   const badgeClass = TYPE_BADGES[post.type] ?? TYPE_BADGES.blog;
   const likeCount = typeof post.like_count === "number" ? post.like_count : null;
-  const commentCount = typeof post.comment_count === "number" ? post.comment_count : null;
+  const responseCount = typeof post.response_count === "number" ? post.response_count : null;
   const readCount = typeof post.read_count === "number" ? post.read_count : null;
   const hasCoverImage = Boolean(post.cover_image_url?.trim());
   const isEditorial = variant === "editorial" || variant === "featured";
@@ -476,7 +475,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
               </div>
               <div className="ml-auto flex shrink-0 items-center gap-2.5 text-gray-500 sm:gap-3">
                 <EngagementMetric icon={<HeartIcon />} value={likeCount} label="likes" />
-                <EngagementMetric icon={<CommentIcon />} value={commentCount} label="comments" />
+                <EngagementMetric icon={<CommentIcon />} value={responseCount} label="responses" />
                 <EngagementMetric icon={<EyeIcon />} value={readCount} label="reads" />
                 {isEditorial ? <span className="hidden text-gray-400 sm:inline-flex"><BookmarkIcon /></span> : null}
               </div>

@@ -33,16 +33,14 @@ export default async function TopicPage({ params }: PageProps) {
   if (!postsRaw) notFound();
 
   const postIds = postsRaw.map((post) => post.id);
-  const [commentCounts, bookmarkCounts, referenceCounts, responseRows] =
+  const [bookmarkCounts, referenceCounts, responseRows] =
     postIds.length > 0
       ? await Promise.all([
-          getCountsByPostId(supabase, "comments", postIds),
           getCountsByPostId(supabase, "bookmarks", postIds),
           getCountsByPostId(supabase, "post_references", postIds),
           supabase.from("posts").select("in_response_to").in("in_response_to", postIds),
         ])
       : [
-          {} as Record<string, number>,
           {} as Record<string, number>,
           {} as Record<string, number>,
           { data: [] as Array<{ in_response_to?: string | null }> },
@@ -63,7 +61,6 @@ export default async function TopicPage({ params }: PageProps) {
         (p as { published_version_id?: string | null }).published_version_id ?? null,
       referenceCount: referenceCounts[p.id] ?? 0,
       responseCount: responseCounts[p.id] ?? 0,
-      commentCount: commentCounts[p.id] ?? 0,
       bookmarkCount: bookmarkCounts[p.id] ?? 0,
       viewCount: p.view_count,
       publishedAt: p.published_at,
@@ -77,7 +74,6 @@ export default async function TopicPage({ params }: PageProps) {
     return {
     ...p,
     profiles: profile,
-    comment_count: commentCounts[p.id] ?? 0,
     bookmark_count: bookmarkCounts[p.id] ?? 0,
     reference_count: referenceCounts[p.id] ?? 0,
     response_count: responseCounts[p.id] ?? 0,
@@ -125,12 +121,9 @@ export default async function TopicPage({ params }: PageProps) {
       Boolean((post as { published_version_id?: string | null }).published_version_id)
   ).length;
   const activeConversationPosts = posts
-    .filter((post) => (post.response_count ?? 0) > 0 || (post.comment_count ?? 0) > 0)
+    .filter((post) => (post.response_count ?? 0) > 0)
     .sort(
-      (left, right) =>
-        (right.response_count ?? 0) +
-        (right.comment_count ?? 0) -
-        ((left.response_count ?? 0) + (left.comment_count ?? 0))
+      (left, right) => (right.response_count ?? 0) - (left.response_count ?? 0)
     )
     .slice(0, 3);
 
@@ -201,8 +194,6 @@ export default async function TopicPage({ params }: PageProps) {
                   cover_image_url:
                     (post as { cover_image_url?: string | null })
                       .cover_image_url ?? null,
-                  comment_count:
-                    (post as { comment_count?: number }).comment_count ?? 0,
                   bookmark_count:
                     (post as { bookmark_count?: number }).bookmark_count ?? 0,
                   reference_count:
@@ -260,7 +251,8 @@ export default async function TopicPage({ params }: PageProps) {
                       {getPostMetadataTitle(post, post.profiles)}
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
-                      {post.response_count ?? 0} responses / {post.comment_count ?? 0} comments
+                      {post.response_count ?? 0}{" "}
+                      {(post.response_count ?? 0) === 1 ? "response" : "responses"}
                     </p>
                   </Link>
                 ))}

@@ -29,7 +29,7 @@ function renderActions(userId: string | null = "user-1") {
       initialLiked={false}
       initialLikeCount={4}
       initialBookmarked={false}
-      commentCount={3}
+      responseCount={3}
     />
   );
 }

@@ -36,8 +36,7 @@ export default function ResponseStartLink({
   const chooser = useResponseChooser({ triggerRef });
 
   // A caller that already declares a specific long-form starter/intent
-  // (the argument-stance prompts in ResponsePromptPanel, and the "turn
-  // this into a response post" nudges in CommentsSection) has already
+  // (the argument-stance prompts in ResponsePromptPanel) has already
   // committed to a structured, long-form contribution -- it keeps going
   // straight to the existing Article-response flow unchanged, exactly as
   // before this chooser existed, since neither concept exists for a

@@ -249,7 +249,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   }));
 
   const featuredIds = featuredPostsNorm.map((post) => post.id);
-  const { referenceCounts, commentCounts, bookmarkCounts, responseCounts } =
+  const { referenceCounts, bookmarkCounts, responseCounts } =
     await getEngagementCounts(supabase, featuredIds);
   const qualityRankedFeaturedPosts = featuredPostsNorm
     .map((post) => {
@@ -262,7 +262,6 @@ export default async function HomePage({ searchParams }: PageProps) {
         publishedVersionId: post.published_version_id,
         referenceCount: referenceCounts[post.id] ?? 0,
         responseCount: responseCounts[post.id] ?? 0,
-        commentCount: commentCounts[post.id] ?? 0,
         bookmarkCount: bookmarkCounts[post.id] ?? 0,
         viewCount: post.view_count,
         publishedAt: post.published_at,

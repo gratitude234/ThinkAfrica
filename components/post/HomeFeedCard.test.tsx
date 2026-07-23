@@ -18,7 +18,7 @@ function post(overrides: Partial<PostCardData> = {}): PostCardData {
     created_at: "2026-07-22T10:00:00.000Z",
     published_at: "2026-07-22T10:00:00.000Z",
     like_count: 3,
-    comment_count: 2,
+    response_count: 2,
     profiles: {
       username: "amara",
       full_name: "Amara Okafor",
@@ -37,10 +37,30 @@ describe("HomeFeedCard", () => {
 
     expect(container.querySelector("h2")).toBeNull();
     expect(screen.getByText("A short thought about building better institutions.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "2 comments" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "2 responses" })).toHaveAttribute(
       "href",
-      "/post/clear-thinking#comments"
+      "/post/clear-thinking#responses"
     );
+  });
+
+  it("labels a response card with the parent it is responding to", () => {
+    render(
+      <HomeFeedCard
+        post={post({ in_response_to: "parent-1" })}
+        currentUserId="user-1"
+        surface="latest"
+        respondingTo={{ title: "The Lecture Hall Still Wins", author: "Ada Obi" }}
+      />
+    );
+
+    expect(screen.getByText("The Lecture Hall Still Wins")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.textContent ===
+          "Responding to The Lecture Hall Still Wins by Ada Obi"
+      )
+    ).toBeInTheDocument();
   });
 
   it("renders Article identity with its optional genre as secondary metadata", () => {
@@ -84,6 +104,6 @@ describe("HomeFeedCard", () => {
       "href",
       "/post/clear-thinking"
     );
-    expect(screen.queryByRole("link", { name: /comments/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /responses/ })).not.toBeInTheDocument();
   });
 });

@@ -16,6 +16,7 @@ interface Props {
   currentUserId: string | null;
   surface: "home" | "following" | "latest";
   priority?: boolean;
+  respondingTo?: { title: string; author: string } | null;
 }
 
 const CARD_SHELL =
@@ -92,12 +93,26 @@ function AuthorLine({ post }: { post: PostCardData }) {
   );
 }
 
-function ContextLine({ post, surface }: Pick<Props, "post" | "surface">) {
+function ContextLine({
+  post,
+  surface,
+  respondingTo,
+}: Pick<Props, "post" | "surface" | "respondingTo">) {
   if (post.in_response_to) {
     return (
-      <p className="mb-2 flex items-center gap-1.5 text-[11.5px] text-gray-500">
-        <span aria-hidden="true">↩</span>
-        Responding to another publication
+      <p className="mb-2 flex items-start gap-1.5 text-[11.5px] leading-[1.45] text-gray-500">
+        <span aria-hidden="true" className="mt-px">↩</span>
+        <span>
+          Responding to{" "}
+          {respondingTo ? (
+            <>
+              <span className="font-semibold text-gray-700">{respondingTo.title}</span>
+              {respondingTo.author ? <> by {respondingTo.author}</> : null}
+            </>
+          ) : (
+            "another publication"
+          )}
+        </span>
       </p>
     );
   }
@@ -110,8 +125,8 @@ function ContextLine({ post, surface }: Pick<Props, "post" | "surface">) {
 function Actions({
   post,
   currentUserId,
-  showComments = true,
-}: Pick<Props, "post" | "currentUserId"> & { showComments?: boolean }) {
+  showResponses = true,
+}: Pick<Props, "post" | "currentUserId"> & { showResponses?: boolean }) {
   return (
     <FeedEngagementActions
       postId={post.id}
@@ -120,8 +135,8 @@ function Actions({
       initialLiked={post.viewer_liked ?? false}
       initialLikeCount={post.like_count ?? 0}
       initialBookmarked={post.viewer_bookmarked ?? false}
-      commentCount={post.comment_count ?? 0}
-      showComments={showComments}
+      responseCount={post.response_count ?? 0}
+      showResponses={showResponses}
     />
   );
 }
@@ -145,13 +160,13 @@ function FullWidthCover({ post, title, priority }: { post: PostCardData; title: 
   );
 }
 
-function PostFeedCard({ post, currentUserId, surface, priority }: Props) {
+function PostFeedCard({ post, currentUserId, surface, priority, respondingTo }: Props) {
   const title = getPostDisplayTitle(post);
   const excerpt = sanitizePostExcerpt(post.excerpt) || "View post";
 
   return (
     <article className={CARD_SHELL}>
-      <ContextLine post={post} surface={surface} />
+      <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
       <AuthorLine post={post} />
       <div className="mt-3">
         {title ? (
@@ -171,7 +186,7 @@ function PostFeedCard({ post, currentUserId, surface, priority }: Props) {
   );
 }
 
-function ArticleFeedCard({ post, currentUserId, surface, priority }: Props) {
+function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled article";
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const format = getArticleFormatLabel(resolveArticleFormat(post));
@@ -179,7 +194,7 @@ function ArticleFeedCard({ post, currentUserId, surface, priority }: Props) {
 
   return (
     <article className={CARD_SHELL}>
-      <ContextLine post={post} surface={surface} />
+      <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
       <AuthorLine post={post} />
       <div className="mt-3 min-w-0">
         <p className={`mb-1.5 font-display text-[10.5px] font-bold uppercase tracking-[0.14em] ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
@@ -197,7 +212,7 @@ function ArticleFeedCard({ post, currentUserId, surface, priority }: Props) {
   );
 }
 
-function ResearchFeedCard({ post, currentUserId, surface }: Props) {
+function ResearchFeedCard({ post, currentUserId, surface, respondingTo }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled research paper";
   const abstract = sanitizePostExcerpt(post.excerpt);
   const size = documentSize(post.document_size_bytes);
@@ -210,7 +225,7 @@ function ResearchFeedCard({ post, currentUserId, surface }: Props) {
 
   return (
     <article className={`${CARD_SHELL} border-purple-100`}>
-      <ContextLine post={post} surface={surface} />
+      <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.15em] text-purple-accent">Research</span>
         {evidence ? <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{evidence}</span> : null}
@@ -235,7 +250,7 @@ function ResearchFeedCard({ post, currentUserId, surface }: Props) {
           View paper →
         </Link>
       </div>
-      <Actions post={post} currentUserId={currentUserId} showComments={false} />
+      <Actions post={post} currentUserId={currentUserId} showResponses={false} />
     </article>
   );
 }

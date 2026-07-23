@@ -212,7 +212,6 @@ export default async function DashboardPage() {
   const postIds = (postsRaw ?? []).map((p) => p.id);
 
   let referenceCounts: Record<string, number> = {};
-  let commentCounts: Record<string, number> = {};
   let bookmarkCounts: Record<string, number> = {};
   let responseCounts: Record<string, number> = {};
   let likeCounts: Record<string, number> = {};
@@ -220,13 +219,11 @@ export default async function DashboardPage() {
   if (postIds.length > 0) {
     const [
       { data: references },
-      { data: comments },
       { data: bookmarks },
       { data: responses },
       { data: likeCountRows },
     ] = await Promise.all([
       supabase.from("post_references").select("post_id").in("post_id", postIds),
-      supabase.from("comments").select("post_id").in("post_id", postIds),
       supabase.from("bookmarks").select("post_id").in("post_id", postIds),
       supabase
         .from("posts")
@@ -237,13 +234,6 @@ export default async function DashboardPage() {
     ]);
 
     referenceCounts = ((references ?? []) as Array<{ post_id: string | null }>).reduce(
-      (acc, row) => {
-        if (row.post_id) acc[row.post_id] = (acc[row.post_id] ?? 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-    commentCounts = ((comments ?? []) as Array<{ post_id: string | null }>).reduce(
       (acc, row) => {
         if (row.post_id) acc[row.post_id] = (acc[row.post_id] ?? 0) + 1;
         return acc;
@@ -557,7 +547,6 @@ export default async function DashboardPage() {
         responseCount: responseCounts[post.id] ?? 0,
         reviewCount: reviews.length,
         completedReviewCount: reviews.filter((review) => review.submitted_at).length,
-        commentCount: commentCounts[post.id] ?? 0,
         likeCount: likeCounts[post.id] ?? 0,
         bookmarkCount: bookmarkCounts[post.id] ?? 0,
       });

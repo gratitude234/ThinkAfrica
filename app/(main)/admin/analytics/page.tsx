@@ -867,7 +867,6 @@ export default async function AdminAnalyticsPage() {
   );
   const [
     { data: promisingReferences },
-    { data: promisingComments },
     { data: promisingBookmarks },
     { data: promisingResponses },
   ] =
@@ -875,10 +874,6 @@ export default async function AdminAnalyticsPage() {
       ? await Promise.all([
           supabase
             .from("post_references")
-            .select("post_id")
-            .in("post_id", promisingPostIds),
-          supabase
-            .from("comments")
             .select("post_id")
             .in("post_id", promisingPostIds),
           supabase
@@ -890,12 +885,9 @@ export default async function AdminAnalyticsPage() {
             .select("in_response_to")
             .in("in_response_to", promisingPostIds),
         ])
-      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
+      : [{ data: [] }, { data: [] }, { data: [] }];
   const promisingReferenceCounts = countByPostId(
     (promisingReferences ?? []) as Array<{ post_id?: string | null }>
-  );
-  const promisingCommentCounts = countByPostId(
-    (promisingComments ?? []) as Array<{ post_id?: string | null }>
   );
   const promisingBookmarkCounts = countByPostId(
     (promisingBookmarks ?? []) as Array<{ post_id?: string | null }>
@@ -919,7 +911,6 @@ export default async function AdminAnalyticsPage() {
         publishedVersionId: post.published_version_id,
         referenceCount: promisingReferenceCounts[post.id] ?? 0,
         responseCount: promisingResponseCounts[post.id] ?? 0,
-        commentCount: promisingCommentCounts[post.id] ?? 0,
         bookmarkCount: promisingBookmarkCounts[post.id] ?? 0,
         viewCount: post.view_count,
         publishedAt: post.published_at,
@@ -934,7 +925,6 @@ export default async function AdminAnalyticsPage() {
         reason: getFeedSurfaceReason(qualityInput) ?? "Promising engagement",
         referenceCount: promisingReferenceCounts[post.id] ?? 0,
         responseCount: promisingResponseCounts[post.id] ?? 0,
-        commentCount: promisingCommentCounts[post.id] ?? 0,
         bookmarkCount: promisingBookmarkCounts[post.id] ?? 0,
       };
     })
@@ -1563,7 +1553,7 @@ export default async function AdminAnalyticsPage() {
                     <p className="mt-1 text-xs text-gray-500">
                       {post.author?.full_name ?? post.author?.username ?? "Unknown author"} /{" "}
                       {post.referenceCount} refs / {post.responseCount} responses /{" "}
-                      {post.commentCount} comments / {post.bookmarkCount} saves
+                      {post.bookmarkCount} saves
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">

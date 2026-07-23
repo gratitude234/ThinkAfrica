@@ -84,7 +84,7 @@ export async function getActivationState(
     followCount,
     postOpenCount,
     bookmarkCount,
-    commentCount,
+    responsePostCount,
     responseStartedCount,
     submittedPostCount,
     draftCount,
@@ -121,9 +121,10 @@ export async function getActivationState(
     ),
     countRowsSafe(
       supabase
-        .from("comments")
+        .from("posts")
         .select("id")
         .eq("author_id", userId)
+        .not("in_response_to", "is", null)
         .limit(2) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
     countRowsSafe(
@@ -170,7 +171,7 @@ export async function getActivationState(
         : responseStartedCount > 0
           ? "Response started"
           : null;
-  const meaningfulEngagementCount = postOpenCount + bookmarkCount + commentCount;
+  const meaningfulEngagementCount = postOpenCount + bookmarkCount + responsePostCount;
   const hasMeaningfulEngagement = meaningfulEngagementCount >= 2;
   const hasSubmittedContribution =
     submittedPostCount > 0 || debateArgumentCount > 0;

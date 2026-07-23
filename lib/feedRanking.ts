@@ -23,7 +23,6 @@ interface RankablePost extends PostCardData {
   impression_count?: number | null;
   read_count?: number | null;
   bookmark_count?: number;
-  comment_count?: number;
   reference_count?: number;
   response_count?: number;
   quality_score?: number;
@@ -34,7 +33,6 @@ export function scorePost(post: RankablePost, ctx: RankingContext): number {
   const views = post.view_count ?? 0;
   const reads = post.read_count ?? 0;
   const likes = post.like_count ?? 0;
-  const comments = post.comment_count ?? 0;
   const bookmarks = post.bookmark_count ?? 0;
   const references = post.reference_count ?? 0;
   const responses = post.response_count ?? 0;
@@ -44,7 +42,6 @@ export function scorePost(post: RankablePost, ctx: RankingContext): number {
     views +
     3 * reads +
     5 * likes +
-    10 * comments +
     15 * bookmarks +
     18 * references +
     16 * responses +

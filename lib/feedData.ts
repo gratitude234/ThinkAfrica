@@ -131,7 +131,6 @@ async function enrichPosts(
   const [
     likeCounts,
     bookmarkCounts,
-    commentCounts,
     referenceCounts,
     responseCounts,
     profilesResult,
@@ -141,7 +140,6 @@ async function enrichPosts(
   ] = await Promise.all([
     getLikeCountsByPostId(supabase, ids),
     getCountsByPostId(supabase, "bookmarks", ids),
-    getCountsByPostId(supabase, "comments", ids),
     getCountsByPostId(supabase, "post_references", ids),
     ids.length > 0
       ? supabase.from("posts").select("in_response_to").in("in_response_to", ids)
@@ -286,7 +284,6 @@ async function enrichPosts(
       publishedVersionId: post.published_version_id as string | null,
       referenceCount: referenceCounts[id] ?? 0,
       responseCount: responseCountsByPostId[id] ?? 0,
-      commentCount: commentCounts[id] ?? 0,
       likeCount: likeCounts[id] ?? 0,
       bookmarkCount: bookmarkCounts[id] ?? 0,
       viewCount: post.view_count as number | null,
@@ -305,7 +302,6 @@ async function enrichPosts(
       co_authors: coAuthors,
       like_count: likeCounts[id] ?? 0,
       bookmark_count: bookmarkCounts[id] ?? 0,
-      comment_count: commentCounts[id] ?? 0,
       reference_count: referenceCounts[id] ?? 0,
       response_count: responseCountsByPostId[id] ?? 0,
       quality_badges: qualitySignals.badges,
@@ -315,6 +311,42 @@ async function enrichPosts(
       viewer_bookmarked: viewerBookmarkedIds.has(id),
     } as PostCardData;
   });
+}
+
+/**
+ * Fetches the published Posts/Articles/Research that respond to a given post
+ * (via `in_response_to`) and hydrates them into full feed cards — same counts,
+ * viewer state, and quality signals as the main feed. Used by the post detail
+ * page's Responses section so a response renders identically to a feed card.
+ */
+export async function fetchResponseCards(
+  supabase: {
+    from: (table: string) => any;
+  },
+  postId: string,
+  viewerId: string | null,
+  limit = 10
+): Promise<PostCardData[]> {
+  const { data: raw } = await supabase
+    .from("posts")
+    .select(POST_SELECT)
+    .eq("in_response_to", postId)
+    .eq("status", "published")
+    .order("published_at", { ascending: false })
+    .limit(limit);
+
+  const rows = (raw ?? []) as unknown[];
+  if (rows.length === 0) return [];
+
+  const rankingContext: RankingContext = {
+    userId: viewerId,
+    followedIds: new Set(),
+    userInterests: [],
+    userUniversity: null,
+    userCountry: null,
+  };
+
+  return enrichPosts(supabase, rows, rankingContext);
 }
 
 export async function fetchCitableFeed(

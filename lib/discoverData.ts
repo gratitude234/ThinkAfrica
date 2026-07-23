@@ -51,7 +51,6 @@ export interface DiscoverConversation {
   tag: string | null;
   reason: string;
   responseCount: number;
-  commentCount: number;
   referenceCount: number;
 }
 
@@ -511,7 +510,6 @@ function buildActiveConversations(posts: PostCardData[]): DiscoverConversation[]
       seen.add(post.id);
       return (
         (post.response_count ?? 0) > 0 ||
-        (post.comment_count ?? 0) > 0 ||
         (post.reference_count ?? 0) > 0 ||
         (post.quality_score ?? 0) >= 35
       );
@@ -519,12 +517,10 @@ function buildActiveConversations(posts: PostCardData[]): DiscoverConversation[]
     .sort((left, right) => {
       const leftScore =
         (left.response_count ?? 0) * 4 +
-        (left.comment_count ?? 0) * 3 +
         (left.reference_count ?? 0) * 2 +
         (left.quality_score ?? 0);
       const rightScore =
         (right.response_count ?? 0) * 4 +
-        (right.comment_count ?? 0) * 3 +
         (right.reference_count ?? 0) * 2 +
         (right.quality_score ?? 0);
       return rightScore - leftScore;
@@ -539,11 +535,8 @@ function buildActiveConversations(posts: PostCardData[]): DiscoverConversation[]
         post.surface_reason ??
         ((post.response_count ?? 0) > 0
           ? "Active response thread"
-          : (post.comment_count ?? 0) > 0
-            ? "Readers are discussing this"
-            : "Quality signals are rising"),
+          : "Quality signals are rising"),
       responseCount: post.response_count ?? 0,
-      commentCount: post.comment_count ?? 0,
       referenceCount: post.reference_count ?? 0,
     }));
 }
