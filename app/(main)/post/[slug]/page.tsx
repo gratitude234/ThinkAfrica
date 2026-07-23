@@ -1510,7 +1510,12 @@ async function PostResponsesSection({
               post={response}
               currentUserId={userId}
               surface="latest"
-              respondingTo={{ title: parentTitle, author: parentAuthor }}
+              respondingTo={{
+                title: parentTitle,
+                author: parentAuthor,
+                slug: post.slug,
+                authorUsername: author?.username ?? null,
+              }}
             />
           ))}
         </div>

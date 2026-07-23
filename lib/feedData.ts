@@ -216,6 +216,75 @@ async function enrichPosts(
           .in("id", coAuthorIds)
       : { data: [], error: null };
 
+  // Response context (Part 5): batch-fetch the parent post's title/author for
+  // any row that is itself a response, so the feed can render a real
+  // "Responding to X by Y" line instead of a generic fallback. A parent that
+  // no longer resolves (unpublished/removed) is simply omitted -- callers
+  // fail safe to the generic line rather than crash or link to nothing.
+  const responseToIds = Array.from(
+    new Set(
+      (raw as Array<{ in_response_to?: string | null }>)
+        .map((post) => post.in_response_to)
+        .filter(Boolean) as string[]
+    )
+  );
+
+  const parentPostsResult =
+    responseToIds.length > 0
+      ? await supabase
+          .from("posts")
+          .select("id, slug, title, type, content_kind, author_id")
+          .in("id", responseToIds)
+          .eq("status", "published")
+      : { data: [], error: null };
+
+  const parentPosts = (parentPostsResult.data ?? []) as Array<{
+    id: string;
+    slug: string;
+    title: string | null;
+    type: string;
+    content_kind: string | null;
+    author_id: string;
+  }>;
+
+  const parentAuthorIds = Array.from(
+    new Set(parentPosts.map((parent) => parent.author_id).filter(Boolean))
+  );
+
+  const parentAuthorProfilesResult =
+    parentAuthorIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("id, username, full_name")
+          .in("id", parentAuthorIds)
+      : { data: [], error: null };
+
+  const parentAuthorProfilesById = new Map(
+    ((parentAuthorProfilesResult.data ?? []) as Array<{
+      id: string;
+      username: string;
+      full_name: string | null;
+    }>).map((profile) => [profile.id, profile])
+  );
+
+  const parentPostsById = new Map(
+    parentPosts.map((parent) => [
+      parent.id,
+      {
+        slug: parent.slug,
+        title: parent.title,
+        type: parent.type,
+        content_kind: parent.content_kind,
+        profiles: parentAuthorProfilesById.get(parent.author_id)
+          ? {
+              username: parentAuthorProfilesById.get(parent.author_id)!.username,
+              full_name: parentAuthorProfilesById.get(parent.author_id)!.full_name,
+            }
+          : null,
+      },
+    ])
+  );
+
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
   const viewerLikedIds = new Set(
     ((viewerLikesResult.data ?? []) as Array<{ post_id: string }>).map(
@@ -295,6 +364,7 @@ async function enrichPosts(
       interestMatch,
     };
     const qualitySignals = getPublicQualitySignals(qualityInput);
+    const inResponseTo = post.in_response_to as string | null | undefined;
 
     return {
       ...(post as object),
@@ -309,6 +379,7 @@ async function enrichPosts(
       quality_score: qualitySignals.score,
       viewer_liked: viewerLikedIds.has(id),
       viewer_bookmarked: viewerBookmarkedIds.has(id),
+      response_to: inResponseTo ? (parentPostsById.get(inResponseTo) ?? null) : null,
     } as PostCardData;
   });
 }

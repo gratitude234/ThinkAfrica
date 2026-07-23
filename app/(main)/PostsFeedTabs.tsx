@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import PostFeed from "@/components/post/PostFeed";
 import FeedSkeleton from "@/components/post/FeedSkeleton";
@@ -88,48 +88,14 @@ async function fetchFeed(
   return (await response.json()) as FeedResponse;
 }
 
-function EndStateCard({ topics }: { topics: string[] }) {
+export function EndStateCard() {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-      <p className="text-base font-semibold text-gray-900">
-        You&apos;re all caught up.
-      </p>
-      <p className="mt-1 text-sm text-gray-500">
-        Explore what&apos;s happening in other topics.
-      </p>
-      <div className="mt-4 flex flex-wrap justify-center gap-2">
-        {topics.map((topic) => (
-          <Link
-            key={topic}
-            href={`/topics/${encodeURIComponent(topic)}`}
-            className="rounded-full border border-gray-200 bg-canvas px-3 py-1.5 text-sm text-gray-700 hover:border-gray-400 hover:text-ink"
-          >
-            + {topic}
-          </Link>
-        ))}
-      </div>
-      <Link
-        href="/?tab=latest"
-        className="mt-3 inline-block text-sm font-semibold text-emerald-brand hover:underline"
-      >
-        Or switch to Latest -&gt;
-      </Link>
+    <div className="flex flex-col items-center gap-2 py-8 text-center">
+      <span aria-hidden="true" className="mb-1 h-px w-8 bg-gray-200" />
+      <p className="text-[13.5px] font-medium text-gray-500">You&apos;re all caught up.</p>
+      <p className="text-[12px] text-gray-400">New posts will appear here as they&apos;re published.</p>
     </div>
   );
-}
-
-function deriveSuggestedTopics(posts: PostCardData[]) {
-  const counts = new Map<string, number>();
-  for (const post of posts) {
-    for (const tag of post.tags ?? []) {
-      counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    }
-  }
-
-  return Array.from(counts.entries())
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, 4)
-    .map(([tag]) => tag);
 }
 
 export default function PostsFeedTabs({
@@ -415,12 +381,18 @@ export default function PostsFeedTabs({
   const posts = currentFeed?.posts ?? EMPTY_POSTS;
   const hasMore = currentFeed?.hasMore ?? false;
   const emptyPageCount = currentFeed?.emptyPageCount ?? 0;
-  const suggestedTopics = useMemo(() => deriveSuggestedTopics(posts), [posts]);
   const showSkeleton = isSwitching && !currentFeed;
   const showEmpty = !initialError && !showSkeleton && posts.length === 0;
   const showFeedList = !initialError && !showSkeleton && posts.length > 0;
   const showEndState =
     showFeedList && !isLoadingMore && (!hasMore || emptyPageCount >= 3);
+  const showFeaturedLead =
+    activeTab === "home" && typeFilter === "all" && Boolean(featuredPost) && !initialError && !showSkeleton;
+  // The featured lead already shows this record above the feed -- don't
+  // render it a second time in the list immediately below it.
+  const visiblePosts = showFeaturedLead
+    ? posts.filter((candidate) => candidate.id !== featuredPost?.id)
+    : posts;
 
   const resetFilterToAll = () => updateState(activeTab, "all", timeframe);
 
@@ -497,9 +469,7 @@ export default function PostsFeedTabs({
         onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
       />
 
-      {activeTab === "home" && typeFilter === "all" && featuredPost && !initialError && !showSkeleton ? (
-        <HomeFeaturedLead post={featuredPost} />
-      ) : null}
+      {showFeaturedLead && featuredPost ? <HomeFeaturedLead post={featuredPost} /> : null}
 
       <div
         id="home-feed-panel"
@@ -515,7 +485,7 @@ export default function PostsFeedTabs({
           <FeedEmptyState title={emptyTitle} body={emptyBody} cta={emptyCta} />
         ) : (
           <PostFeed
-            posts={posts}
+            posts={visiblePosts}
             activeTab={activeTab}
             activeDebate={activeDebate}
             peopleSuggestions={peopleSuggestions}
@@ -550,11 +520,7 @@ export default function PostsFeedTabs({
         </div>
       ) : null}
 
-      {showEndState ? (
-        <div className="mt-6">
-          <EndStateCard topics={suggestedTopics} />
-        </div>
-      ) : null}
+      {showEndState ? <EndStateCard /> : null}
 
       <div ref={sentinelRef} className="h-1" />
     </div>

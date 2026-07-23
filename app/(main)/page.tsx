@@ -264,6 +264,14 @@ export default async function HomePage({ searchParams }: PageProps) {
     ) ?? null;
   const featuredPost = manualFeaturedPost ?? automaticFeaturedPost;
 
+  // A second, distinct candidate for the sidebar's "Featured today" card --
+  // never the same record as the main Editor's Pick lead. Reuses the
+  // already-fetched/ranked candidate pool (no extra query). If every
+  // candidate was already used as the lead, there's nothing distinct left
+  // to show, so the card is omitted rather than duplicating it.
+  const featuredTodayPost =
+    qualityRankedFeaturedPosts.find((post) => post.id !== featuredPost?.id) ?? null;
+
   const sidebarTopics = deriveSidebarTopics({
     userInterests,
     featuredPosts: qualityRankedFeaturedPosts,
@@ -336,6 +344,7 @@ export default async function HomePage({ searchParams }: PageProps) {
             activeDebate={homeDebate}
             recentDraft={recentDraft ?? null}
             activationState={activationState}
+            featuredToday={featuredTodayPost}
             peopleSuggestions={peopleResult.suggestions}
             currentUserId={user?.id ?? null}
             topics={sidebarTopics}

@@ -4,7 +4,8 @@ import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import FollowButton from "@/components/ui/FollowButton";
 import UserAvatar from "@/components/ui/UserAvatar";
 import type { ActivationState } from "@/lib/activation";
-import { resolveContentKind } from "@/lib/contentModel";
+import { getContentKindLabel, resolveContentKind } from "@/lib/contentModel";
+import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { formatRelativeTime, formatTimeUntil } from "@/lib/utils";
 
 interface RecentDraft {
@@ -23,10 +24,21 @@ interface SuggestedPerson {
   avatar_url: string | null;
 }
 
+export interface FeaturedTodayPost {
+  id: string;
+  title: string | null;
+  slug: string;
+  type: string;
+  content_kind?: string | null;
+  article_format?: string | null;
+  profiles: { username: string | null; full_name: string | null } | null;
+}
+
 interface Props {
   activeDebate: DebateInterludeData | null;
   recentDraft: RecentDraft | null;
   activationState: ActivationState | null;
+  featuredToday: FeaturedTodayPost | null;
   peopleSuggestions: SuggestedPerson[];
   currentUserId: string | null;
   topics: string[];
@@ -82,6 +94,26 @@ function PersonalAction({
   );
 }
 
+function FeaturedTodayCard({ post }: { post: FeaturedTodayPost }) {
+  const label = getContentKindLabel(resolveContentKind(post));
+  const title = getPostMetadataTitle(post, post.profiles);
+  const author = post.profiles?.full_name ?? post.profiles?.username ?? "Indegenius contributor";
+
+  return (
+    <SideCard>
+      <Kicker>Featured today</Kicker>
+      <Link
+        href={`/post/${post.slug}`}
+        className="group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
+      >
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">{label}</p>
+        <h3 className="font-display line-clamp-2 text-[14px] font-semibold leading-snug text-ink group-hover:text-emerald-800">{title}</h3>
+      </Link>
+      <p className="mt-1.5 truncate text-[11.5px] text-gray-500">{author}</p>
+    </SideCard>
+  );
+}
+
 function DebateCard({ debate }: { debate: DebateInterludeData }) {
   const forCount = debate.motionForCount ?? 0;
   const againstCount = debate.motionAgainstCount ?? 0;
@@ -127,10 +159,11 @@ function PeopleCard({ people, currentUserId }: { people: SuggestedPerson[]; curr
   );
 }
 
-export default function HomeSidebar({ activeDebate, recentDraft, activationState, peopleSuggestions, currentUserId, topics }: Props) {
+export default function HomeSidebar({ activeDebate, recentDraft, activationState, featuredToday, peopleSuggestions, currentUserId, topics }: Props) {
   return (
     <div className="flex flex-col gap-3.5">
       <PersonalAction recentDraft={recentDraft} activationState={activationState} />
+      {featuredToday ? <FeaturedTodayCard post={featuredToday} /> : null}
       {activeDebate ? <DebateCard debate={activeDebate} /> : null}
       <PeopleCard people={peopleSuggestions} currentUserId={currentUserId} />
       {topics.length > 0 ? (

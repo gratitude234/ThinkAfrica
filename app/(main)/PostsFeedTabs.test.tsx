@@ -7,7 +7,9 @@ import type { PostCardData } from "@/components/post/PostCard";
 const mocks = vi.hoisted(() => ({ requestAuth: vi.fn() }));
 
 vi.mock("@/components/post/PostFeed", () => ({
-  default: () => <div data-testid="feed" />,
+  default: ({ posts }: { posts: PostCardData[] }) => (
+    <div data-testid="feed">{posts.map((post) => post.id).join(",")}</div>
+  ),
 }));
 
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
@@ -128,6 +130,117 @@ describe("PostsFeedTabs", () => {
     await waitFor(() => {
       expect(window.location.search).toBe("?guest=1&type=article");
     });
+  });
+});
+
+function feedPost(id: string): PostCardData {
+  return {
+    id,
+    title: `Post ${id}`,
+    slug: `post-${id}`,
+    excerpt: "An excerpt.",
+    type: "blog",
+    content_kind: "post",
+    tags: [],
+    created_at: "2026-07-22T10:00:00.000Z",
+    published_at: "2026-07-22T10:00:00.000Z",
+    profiles: { username: id, full_name: `Author ${id}`, university: null, avatar_url: null },
+  };
+}
+
+describe("PostsFeedTabs featured-lead deduplication", () => {
+  const featuredPost = {
+    id: "featured-1",
+    title: "Editor's pick",
+    slug: "editors-pick",
+    excerpt: "An excerpt.",
+    type: "blog",
+    profiles: { username: "author", full_name: "Author", university: null, avatar_url: null },
+  };
+
+  it("does not render the featured lead's post a second time in the feed list below it", () => {
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[feedPost("featured-1"), feedPost("a"), feedPost("b")]}
+        showFollowingTab={false}
+        currentUserId={null}
+        featuredPost={featuredPost}
+      />
+    );
+
+    expect(screen.getByTestId("feed").textContent).toBe("a,b");
+  });
+
+  it("keeps the full feed list when there is no featured lead to deduplicate", () => {
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[feedPost("a"), feedPost("b")]}
+        showFollowingTab={false}
+        currentUserId={null}
+        featuredPost={null}
+      />
+    );
+
+    expect(screen.getByTestId("feed").textContent).toBe("a,b");
+  });
+});
+
+describe("PostsFeedTabs caught-up state", () => {
+  // Only needed for the "more pages remain" case below, which sets
+  // initialHasMore -- that's what makes the sentinel effect construct an
+  // IntersectionObserver, which jsdom doesn't provide natively.
+  beforeEach(() => {
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the quiet caught-up line once pagination is exhausted, without topic chips", () => {
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[feedPost("a"), feedPost("b")]}
+        initialHasMore={false}
+        showFollowingTab={false}
+        currentUserId={null}
+      />
+    );
+
+    expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
+    expect(screen.queryByText(/switch to Latest/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^\+ /})).not.toBeInTheDocument();
+  });
+
+  it("does not show the caught-up state while more pages remain", () => {
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[feedPost("a"), feedPost("b")]}
+        initialHasMore
+        showFollowingTab={false}
+        currentUserId={null}
+      />
+    );
+
+    expect(screen.queryByText("You're all caught up.")).not.toBeInTheDocument();
+  });
+
+  it("does not show the caught-up state for an initially empty feed", () => {
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[]}
+        initialHasMore={false}
+        showFollowingTab={false}
+        currentUserId={null}
+      />
+    );
+
+    expect(screen.queryByText("You're all caught up.")).not.toBeInTheDocument();
   });
 });
 
