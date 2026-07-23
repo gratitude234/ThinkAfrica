@@ -4,6 +4,7 @@ import { useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useCreateChooser } from "./useCreateChooser";
 import CreateMobileSheet from "./CreateMobileSheet";
 import CreateDesktopPopover from "./CreateDesktopPopover";
+import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 
 interface CreateTriggerProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type" | "children"> {
@@ -38,12 +39,14 @@ export default function CreateTrigger({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const chooser = useCreateChooser({ variant: presentation, triggerRef, rootRef });
+  const { requestAuth } = useGuestAuthGate();
+  const handleTrigger = userId ? chooser.toggle : () => requestAuth("create");
 
   const trigger = (
     <button
       ref={triggerRef}
       type="button"
-      onClick={chooser.toggle}
+      onClick={handleTrigger}
       className={className}
       aria-haspopup="dialog"
       aria-expanded={chooser.open}

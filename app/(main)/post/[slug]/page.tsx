@@ -1000,6 +1000,7 @@ async function PostReviewStatusPanel({
 async function MobileCredibilitySection({
   post,
   author,
+  userId,
   sanitizedContent,
   wordCount,
   parentPostId,
@@ -1008,6 +1009,7 @@ async function MobileCredibilitySection({
 }: {
   post: PostRecord;
   author: AuthorProfile | null;
+  userId: string | null;
   sanitizedContent: string;
   wordCount: number;
   parentPostId: string | null;
@@ -1026,7 +1028,7 @@ async function MobileCredibilitySection({
 
   return (
     <div className="mb-8">
-      <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} />
+      <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} userId={userId} />
     </div>
   );
 }
@@ -1164,6 +1166,7 @@ async function PostEngagementSection({
         <ResponseStartLink
           postId={post.id}
           source="article_action_bar"
+          userId={userId}
           className="inline-flex min-h-9 items-center gap-2 rounded-full px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-emerald-brand"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1489,6 +1492,7 @@ async function PostResponsesSection({
             <ResponseStartLink
               postId={post.id}
               source="responses_empty_state"
+              userId={userId}
               className="inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0a4d37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -1604,7 +1608,7 @@ async function PostSidebar({
             </div>
           </section>
         ) : null}
-        <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} />
+        <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} userId={userId} />
         <TableOfContents headings={headings} />
         {author ? (
           <section className="rounded-lg bg-gray-950 p-4 text-white">
@@ -2080,7 +2084,7 @@ async function ResearchDossierSidebar({
           </div>
         </section>
 
-        <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} />
+        <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} userId={userId} />
         <ResearchReviewTimeline post={post} secondary={secondary} />
         <TableOfContents headings={dossierHeadings} />
 
@@ -2311,7 +2315,7 @@ export default async function PostPage({ params }: PageProps) {
 
   if (isResearchPost) {
     return (
-      <PostEngagementProvider postId={post.id} userId={userId}>
+      <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
       <div className="relative">
         {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
         {isPublished ? (
@@ -2416,6 +2420,7 @@ export default async function PostPage({ params }: PageProps) {
               <MobileCredibilitySection
                 post={post}
                 author={author}
+                userId={userId}
                 sanitizedContent={sanitizedContent}
                 wordCount={wordCount}
                 parentPostId={parentPostId}
@@ -2508,7 +2513,7 @@ export default async function PostPage({ params }: PageProps) {
   }
 
   return (
-    <PostEngagementProvider postId={post.id} userId={userId}>
+    <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
     <div className="relative">
       {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
       {isPublished ? (

@@ -1,9 +1,10 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { togglePostLike } from "./likeActions";
 import { toggleBookmark } from "./bookmarkActions";
+import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
+import type { ContentKind } from "@/lib/contentModel";
 
 interface PostEngagementState {
   liked: boolean | null;
@@ -25,15 +26,17 @@ const PostEngagementContext = createContext<PostEngagementState | null>(null);
 interface PostEngagementProviderProps {
   postId: string;
   userId: string | null;
+  contentKind?: ContentKind | null;
   children: React.ReactNode;
 }
 
 export function PostEngagementProvider({
   postId,
   userId,
+  contentKind = null,
   children,
 }: PostEngagementProviderProps) {
-  const router = useRouter();
+  const { requestAuth } = useGuestAuthGate();
   const [liked, setLiked] = useState<boolean | null>(null);
   const [likeCount, setLikeCount] = useState(0);
   const [likePending, setLikePending] = useState(false);
@@ -70,7 +73,7 @@ export function PostEngagementProvider({
 
   const toggleLike = useCallback(async () => {
     if (!userId) {
-      router.push("/login");
+      requestAuth("like", { contentKind });
       return;
     }
     if (likePending) return;
@@ -101,11 +104,11 @@ export function PostEngagementProvider({
     } finally {
       setLikePending(false);
     }
-  }, [userId, router, likePending, liked, likeCount, postId]);
+  }, [userId, requestAuth, contentKind, likePending, liked, likeCount, postId]);
 
   const toggleBookmarkAction = useCallback(async () => {
     if (!userId) {
-      router.push("/login");
+      requestAuth("save", { contentKind });
       return;
     }
     if (bookmarkPending) return;
@@ -131,7 +134,7 @@ export function PostEngagementProvider({
     } finally {
       setBookmarkPending(false);
     }
-  }, [userId, router, bookmarkPending, bookmarked, postId]);
+  }, [userId, requestAuth, contentKind, bookmarkPending, bookmarked, postId]);
 
   const value = useMemo<PostEngagementState>(
     () => ({

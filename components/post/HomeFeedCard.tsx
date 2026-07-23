@@ -137,6 +137,7 @@ function Actions({
       initialBookmarked={post.viewer_bookmarked ?? false}
       responseCount={post.response_count ?? 0}
       showResponses={showResponses}
+      contentKind={resolveContentKind(post)}
     />
   );
 }

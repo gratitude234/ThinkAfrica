@@ -3,14 +3,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import PostFeed from "@/components/post/PostFeed";
+import FeedSkeleton from "@/components/post/FeedSkeleton";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { PostCardData } from "@/components/post/PostCard";
 import type { FeedContentFilter, FeedTimeframe } from "@/lib/feedData";
 import FeedFilterChips from "./FeedFilterChips";
 import HomeFeaturedLead, { type HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
+import HomeGuestNotice from "./HomeGuestNotice";
+import FeedEmptyState from "./FeedEmptyState";
+import FeedErrorState from "./FeedErrorState";
+import CreateTrigger from "./CreateTrigger";
 
 type TabKey = "home" | "following" | "latest";
 const EMPTY_POSTS: PostCardData[] = [];
+
+const CREATE_CTA_CLASS =
+  "inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
+const SECONDARY_CTA_CLASS =
+  "inline-flex min-h-11 items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
+
+const CONTENT_KIND_PLURAL: Record<Exclude<FeedContentFilter, "all">, string> = {
+  post: "Posts",
+  article: "Articles",
+  research: "Research",
+};
 
 interface FeedResponse {
   posts: PostCardData[];
@@ -116,42 +132,6 @@ function deriveSuggestedTopics(posts: PostCardData[]) {
     .map(([tag]) => tag);
 }
 
-function PostFeedSkeleton() {
-  return (
-    <div aria-hidden="true">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <article
-          key={index}
-          className="relative mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-4 sm:px-[18px] sm:py-[18px]"
-        >
-          <div className="animate-pulse">
-            <div className="min-w-0">
-              <div className="mb-3 flex items-center gap-2">
-                <div className="h-5 w-16 rounded-full bg-gray-100" />
-                <div className="h-3 w-14 rounded-full bg-gray-100" />
-                <div className="h-5 w-20 rounded-full bg-gray-100" />
-              </div>
-              <div className="space-y-2">
-                <div className="h-5 w-11/12 rounded bg-gray-100" />
-                <div className="h-5 w-3/5 rounded bg-gray-100" />
-              </div>
-              <div className="mt-3 space-y-2 max-[359px]:hidden">
-                <div className="h-3 w-full rounded bg-gray-100" />
-                <div className="h-3 w-2/3 rounded bg-gray-100" />
-              </div>
-              <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-2.5">
-                <div className="h-6 w-6 rounded-full bg-gray-100" />
-                <div className="h-3 w-40 rounded bg-gray-100" />
-              </div>
-              <div className="mt-3 aspect-[16/9] w-full rounded-[10px] bg-gray-100" />
-            </div>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
 export default function PostsFeedTabs({
   initialTab,
   initialType,
@@ -198,7 +178,12 @@ export default function PostsFeedTabs({
   }));
   const [isSwitching, setIsSwitching] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Two distinct failure modes: initialError replaces the panel with a
+  // full retry state (nothing loaded yet for this tab/filter), while
+  // paginationError leaves every already-loaded card in place and only
+  // adds a compact inline retry banner at the bottom.
+  const [initialError, setInitialError] = useState(false);
+  const [paginationError, setPaginationError] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const inFlightRef = useRef(new Map<string, Promise<FeedResponse>>());
   const activeRequestRef = useRef(0);
@@ -220,7 +205,8 @@ export default function PostsFeedTabs({
     }));
     setIsSwitching(false);
     setIsLoadingMore(false);
-    setError(null);
+    setInitialError(false);
+    setPaginationError(false);
   }, [initialHasMore, initialPosts, initialTab, initialTimeframe, initialType]);
 
   useEffect(() => {
@@ -324,14 +310,13 @@ export default function PostsFeedTabs({
     ) => {
       const key = feedCacheKey(nextTab, nextType, nextTimeframe);
       if (showSkeleton) setIsSwitching(true);
+      if (showError) setInitialError(false);
       try {
         const result = await requestFeedPage(nextTab, nextType, nextTimeframe, 1);
         writeFeedPage(key, result, 1, false);
-      } catch (fetchError) {
+      } catch {
         if (activeRequestRef.current === requestId && showError) {
-          setError(
-            fetchError instanceof Error ? fetchError.message : "Failed to load feed"
-          );
+          setInitialError(true);
         }
       } finally {
         if (activeRequestRef.current === requestId && showSkeleton) {
@@ -352,7 +337,8 @@ export default function PostsFeedTabs({
       setActiveTab(nextTab);
       setTypeFilter(nextType);
       setTimeframe(nextTimeframe);
-      setError(null);
+      setInitialError(false);
+      setPaginationError(false);
       setIsSwitching(!hasCachedFeed);
       syncUrl(nextTab, nextType, nextTimeframe);
       void reloadFeed(nextTab, nextType, nextTimeframe, {
@@ -364,6 +350,16 @@ export default function PostsFeedTabs({
     [feedCache, reloadFeed, syncUrl]
   );
 
+  const retryInitial = useCallback(() => {
+    const requestId = activeRequestRef.current + 1;
+    activeRequestRef.current = requestId;
+    void reloadFeed(activeTab, typeFilter, timeframe, {
+      requestId,
+      showError: true,
+      showSkeleton: true,
+    });
+  }, [activeTab, typeFilter, timeframe, reloadFeed]);
+
   const loadMore = useCallback(async () => {
     const key = feedCacheKey(activeTab, typeFilter, timeframe);
     const currentFeed = feedCache[key];
@@ -372,15 +368,15 @@ export default function PostsFeedTabs({
     const requestId = loadMoreRequestRef.current + 1;
     loadMoreRequestRef.current = requestId;
     setIsLoadingMore(true);
-    setError(null);
+    setPaginationError(false);
     try {
       const nextPage = currentFeed.page + 1;
       const result = await requestFeedPage(activeTab, typeFilter, timeframe, nextPage);
       writeFeedPage(key, result, nextPage, true);
-    } catch (fetchError) {
-      setError(
-        fetchError instanceof Error ? fetchError.message : "Failed to load feed"
-      );
+    } catch {
+      if (loadMoreRequestRef.current === requestId) {
+        setPaginationError(true);
+      }
     } finally {
       if (loadMoreRequestRef.current === requestId) {
         setIsLoadingMore(false);
@@ -421,11 +417,44 @@ export default function PostsFeedTabs({
   const emptyPageCount = currentFeed?.emptyPageCount ?? 0;
   const suggestedTopics = useMemo(() => deriveSuggestedTopics(posts), [posts]);
   const showSkeleton = isSwitching && !currentFeed;
+  const showEmpty = !initialError && !showSkeleton && posts.length === 0;
+  const showFeedList = !initialError && !showSkeleton && posts.length > 0;
   const showEndState =
-    !showSkeleton && !isLoadingMore && posts.length > 0 && (!hasMore || emptyPageCount >= 3);
+    showFeedList && !isLoadingMore && (!hasMore || emptyPageCount >= 3);
+
+  const resetFilterToAll = () => updateState(activeTab, "all", timeframe);
+
+  let emptyTitle = "No content yet.";
+  let emptyBody = "Be the first to share your ideas with Africa.";
+  let emptyCta = (
+    <CreateTrigger userId={currentUserId} presentation="popover" className={CREATE_CTA_CLASS}>
+      Create
+    </CreateTrigger>
+  );
+
+  if (typeFilter !== "all") {
+    const kindLabel = CONTENT_KIND_PLURAL[typeFilter];
+    emptyTitle = `No ${kindLabel} here yet.`;
+    emptyBody = "Try All to see everything in this feed.";
+    emptyCta = (
+      <button type="button" onClick={resetFilterToAll} className={SECONDARY_CTA_CLASS}>
+        View all
+      </button>
+    );
+  } else if (activeTab === "following") {
+    emptyTitle = "No posts from writers you follow yet.";
+    emptyBody = "Follow writers to build a feed around the ideas you care about.";
+    emptyCta = (
+      <Link href="/onboarding?step=follow" className={CREATE_CTA_CLASS}>
+        Explore writers
+      </Link>
+    );
+  }
 
   return (
     <div>
+      {!currentUserId ? <HomeGuestNotice /> : null}
+
       <div
         className="sticky top-[84px] z-30 -mx-4 mb-3 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto border-b border-gray-200 bg-white/95 px-4 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-full sm:px-0"
         role="tablist"
@@ -468,14 +497,8 @@ export default function PostsFeedTabs({
         onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
       />
 
-      {activeTab === "home" && typeFilter === "all" && featuredPost ? (
+      {activeTab === "home" && typeFilter === "all" && featuredPost && !initialError && !showSkeleton ? (
         <HomeFeaturedLead post={featuredPost} />
-      ) : null}
-
-      {error ? (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
       ) : null}
 
       <div
@@ -484,8 +507,12 @@ export default function PostsFeedTabs({
         aria-labelledby={`feed-tab-${activeTab}`}
         aria-busy={showSkeleton || isLoadingMore}
       >
-        {showSkeleton ? (
-          <PostFeedSkeleton />
+        {initialError ? (
+          <FeedErrorState onRetry={retryInitial} />
+        ) : showSkeleton ? (
+          <FeedSkeleton />
+        ) : showEmpty ? (
+          <FeedEmptyState title={emptyTitle} body={emptyBody} cta={emptyCta} />
         ) : (
           <PostFeed
             posts={posts}
@@ -501,6 +528,26 @@ export default function PostsFeedTabs({
 
       {isLoadingMore ? (
         <div className="py-6 text-center text-sm text-gray-400">Loading more...</div>
+      ) : null}
+
+      {paginationError ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center"
+        >
+          <p className="text-sm text-red-700">Couldn&apos;t load more.</p>
+          <button
+            type="button"
+            onClick={() => {
+              void loadMore();
+            }}
+            disabled={isLoadingMore}
+            className="text-sm font-semibold text-red-700 underline decoration-red-300 underline-offset-2 disabled:opacity-60"
+          >
+            Try again
+          </button>
+        </div>
       ) : null}
 
       {showEndState ? (
