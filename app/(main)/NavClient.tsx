@@ -82,7 +82,7 @@ export default function NavClient({
         </span>
       </div>
       <nav
-        className="h-[60px] border-b border-gray-200 bg-white/98"
+        className="h-[60px] border-b border-gray-200 bg-white"
         aria-label="Primary navigation"
       >
       <div className="mx-auto flex h-full max-w-[1240px] items-center gap-7 px-4 sm:px-6 lg:px-8">
