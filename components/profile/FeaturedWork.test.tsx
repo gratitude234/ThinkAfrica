@@ -7,6 +7,10 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/someone",
 }));
 
+vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
+  useGuestAuthGate: () => ({ requestAuth: vi.fn() }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,

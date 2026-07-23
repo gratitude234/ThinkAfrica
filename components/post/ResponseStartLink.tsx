@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import type { ReactNode } from "react";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 import { useResponseChooser } from "./useResponseChooser";
 import ResponseChooser from "./ResponseChooser";
 
@@ -17,6 +18,7 @@ export default function ResponseStartLink({
   responseIntent,
   starter,
   onTriggerClick,
+  userId,
 }: {
   postId: string;
   className?: string;
@@ -31,9 +33,21 @@ export default function ResponseStartLink({
    * tracking without re-implementing this component.
    */
   onTriggerClick?: () => void;
+  /**
+   * Pass the viewer's id from guest-reachable callers (the post detail
+   * page, the reading bar, the credibility panel) so a guest sees the
+   * contextual sign-in gate before the chooser/composer opens instead of
+   * landing there directly. Omitted entirely (not just `null`) by
+   * callers that only ever render for a signed-in user (notifications,
+   * the post-publish toast, collaboration invites), which keeps their
+   * existing direct-open behavior unchanged.
+   */
+  userId?: string | null;
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const chooser = useResponseChooser({ triggerRef });
+  const { requestAuth } = useGuestAuthGate();
+  const isGuest = userId === null;
 
   // A caller that already declares a specific long-form starter/intent
   // (the argument-stance prompts in ResponsePromptPanel) has already
@@ -50,6 +64,21 @@ export default function ResponseStartLink({
 
     if (starter) params.set("starter", starter);
     if (responseIntent) params.set("responseIntent", responseIntent);
+
+    if (isGuest) {
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            onTriggerClick?.();
+            requestAuth("respond");
+          }}
+          className={className}
+        >
+          {children}
+        </button>
+      );
+    }
 
     return (
       <Link
@@ -81,6 +110,10 @@ export default function ResponseStartLink({
         type="button"
         onClick={() => {
           onTriggerClick?.();
+          if (isGuest) {
+            requestAuth("respond");
+            return;
+          }
           chooser.toggle();
         }}
         className={className}

@@ -9,6 +9,10 @@ const STORAGE_KEY = "ta_guest_banner_dismissed";
 export default function GuestBanner() {
   const [visible, setVisible] = useState(false);
   const pathname = usePathname();
+  // Home renders its own inline HomeGuestNotice (app/(main)/HomeGuestNotice.tsx)
+  // above the feed tabs, matching the mockup -- this fixed/dismissable banner
+  // stays for every other guest-visible route so they don't regress.
+  const isHome = pathname === "/";
   const isReadingPost = pathname.startsWith("/post/");
   const segments = pathname.split("/").filter(Boolean);
   const firstSegment = segments[0];
@@ -47,12 +51,13 @@ export default function GuestBanner() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (isHome) return;
     if (localStorage.getItem(STORAGE_KEY) !== "1") {
       setVisible(true);
     }
-  }, []);
+  }, [isHome]);
 
-  if (!visible) return null;
+  if (isHome || !visible) return null;
 
   return (
     <div

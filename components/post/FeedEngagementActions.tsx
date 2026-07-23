@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { togglePostLike } from "@/app/(main)/post/[slug]/likeActions";
 import { toggleBookmark } from "@/app/(main)/post/[slug]/bookmarkActions";
+import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
+import type { ContentKind } from "@/lib/contentModel";
 
 interface Props {
   postId: string;
@@ -15,11 +16,7 @@ interface Props {
   initialBookmarked: boolean;
   responseCount: number;
   showResponses?: boolean;
-}
-
-function loginReturnPath() {
-  if (typeof window === "undefined") return "/";
-  return `${window.location.pathname}${window.location.search}`;
+  contentKind?: ContentKind | null;
 }
 
 export default function FeedEngagementActions({
@@ -31,8 +28,9 @@ export default function FeedEngagementActions({
   initialBookmarked,
   responseCount,
   showResponses = true,
+  contentKind = null,
 }: Props) {
-  const router = useRouter();
+  const { requestAuth } = useGuestAuthGate();
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(initialLikeCount);
   const [bookmarked, setBookmarked] = useState(initialBookmarked);
@@ -40,14 +38,14 @@ export default function FeedEngagementActions({
   const [bookmarkPending, setBookmarkPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const requireUser = () => {
+  const requireUser = (intent: "like" | "save") => {
     if (userId) return true;
-    router.push(`/login?redirectTo=${encodeURIComponent(loginReturnPath())}`);
+    requestAuth(intent, { contentKind });
     return false;
   };
 
   const handleLike = async () => {
-    if (!requireUser() || likePending) return;
+    if (!requireUser("like") || likePending) return;
 
     const previousLiked = liked;
     const previousCount = likeCount;
@@ -77,7 +75,7 @@ export default function FeedEngagementActions({
   };
 
   const handleBookmark = async () => {
-    if (!requireUser() || bookmarkPending) return;
+    if (!requireUser("save") || bookmarkPending) return;
 
     const previousBookmarked = bookmarked;
     const nextBookmarked = !previousBookmarked;

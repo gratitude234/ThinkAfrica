@@ -13,6 +13,10 @@ vi.mock("@/lib/activationEvents", () => ({
   trackActivationEvent: vi.fn(),
 }));
 
+vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
+  useGuestAuthGate: () => ({ requestAuth: vi.fn() }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,

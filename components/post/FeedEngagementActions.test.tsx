@@ -3,13 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import FeedEngagementActions from "./FeedEngagementActions";
 
 const mocks = vi.hoisted(() => ({
-  push: vi.fn(),
+  requestAuth: vi.fn(),
   like: vi.fn(),
   bookmark: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mocks.push }),
+vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
+  useGuestAuthGate: () => ({ requestAuth: mocks.requestAuth }),
 }));
 
 vi.mock("@/app/(main)/post/[slug]/likeActions", () => ({
@@ -30,13 +30,14 @@ function renderActions(userId: string | null = "user-1") {
       initialLikeCount={4}
       initialBookmarked={false}
       responseCount={3}
+      contentKind="post"
     />
   );
 }
 
 describe("FeedEngagementActions", () => {
   beforeEach(() => {
-    mocks.push.mockReset();
+    mocks.requestAuth.mockReset();
     mocks.like.mockReset();
     mocks.bookmark.mockReset();
     window.history.replaceState(null, "", "/?tab=home&type=article");
@@ -74,14 +75,26 @@ describe("FeedEngagementActions", () => {
     expect(mocks.bookmark).toHaveBeenCalledWith({ postId: "post-1", nextBookmarked: true });
   });
 
-  it("sends guests to login with the complete feed return path", () => {
+  it("opens the contextual sign-in gate for a guest Like instead of changing the count", () => {
     renderActions(null);
 
     fireEvent.click(screen.getByRole("button", { name: "Like this item" }));
 
-    expect(mocks.push).toHaveBeenCalledWith(
-      "/login?redirectTo=%2F%3Ftab%3Dhome%26type%3Darticle"
-    );
+    expect(mocks.requestAuth).toHaveBeenCalledWith("like", { contentKind: "post" });
     expect(mocks.like).not.toHaveBeenCalled();
+    expect(screen.getByText("4")).toBeInTheDocument();
+  });
+
+  it("opens the contextual sign-in gate for a guest Save instead of changing saved state", () => {
+    renderActions(null);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save for later" }));
+
+    expect(mocks.requestAuth).toHaveBeenCalledWith("save", { contentKind: "post" });
+    expect(mocks.bookmark).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Save for later" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
   });
 });

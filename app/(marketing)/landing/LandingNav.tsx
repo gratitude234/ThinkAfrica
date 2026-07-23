@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import BrandWordmark from "@/components/ui/BrandWordmark";
 
 export default function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
@@ -34,13 +34,9 @@ export default function LandingNav() {
       <div className="mx-auto flex h-[60px] max-w-6xl items-center gap-8 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex-shrink-0" aria-label="Indegenius home">
-          <Image
-            src="/brand/indegenius-icon-wordmark-color.svg"
-            alt="Indegenius"
-            width={139}
-            height={107}
-            priority
-            className="h-7 w-auto"
+          <BrandWordmark
+            iconClassName="hidden h-6 w-6 md:block"
+            textClassName="text-[18px] md:text-[19px]"
           />
         </Link>
 

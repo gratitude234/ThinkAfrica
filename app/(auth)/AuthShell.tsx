@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import BrandWordmark from "@/components/ui/BrandWordmark";
 
 type AuthShellProps = {
   children: React.ReactNode;
@@ -37,13 +37,10 @@ export function AuthShell({
         <aside className="hidden min-h-dvh flex-col justify-between overflow-hidden bg-[#111816] px-10 py-10 text-white lg:flex">
           <div>
             <Link href="/landing" className="inline-flex" aria-label="Indegenius home">
-              <Image
-                src="/brand/indegenius-icon-wordmark-white.svg"
-                alt="Indegenius"
-                width={139}
-                height={107}
-                priority
-                className="h-9 w-auto"
+              <BrandWordmark
+                tone="white"
+                iconClassName="h-8 w-8"
+                textClassName="text-[22px]"
               />
             </Link>
 
@@ -94,14 +91,7 @@ export function AuthShell({
           <div className="w-full max-w-[470px]">
             <div className="mb-8 lg:hidden">
               <Link href="/landing" className="inline-flex" aria-label="Indegenius home">
-                <Image
-                  src="/brand/indegenius-icon-wordmark-color.svg"
-                  alt="Indegenius"
-                  width={139}
-                  height={107}
-                  priority
-                  className="h-8 w-auto"
-                />
+                <BrandWordmark iconClassName="h-7 w-7" textClassName="text-[21px]" />
               </Link>
               <p className="mt-3 text-[13px] font-medium text-ink-muted">
                 Africa&apos;s Intellectual Network

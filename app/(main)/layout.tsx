@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import GuestBanner from "@/components/ui/GuestBanner";
+import GuestAuthGateProvider from "@/components/ui/GuestAuthGateProvider";
 import { isLiteModeServer } from "@/lib/liteMode";
 import NavigationShell from "./NavigationShell";
 import { canReview } from "@/lib/roles";
@@ -45,18 +46,20 @@ export default async function MainLayout({
 
   return (
     <div className={`min-h-screen bg-canvas${isLite ? " lite-mode" : ""}`}>
-      <NavigationShell
-        user={user}
-        profile={profileData}
-        isAdmin={isAdmin}
-        canAccessReview={canAccessReview}
-        hasActiveDebate={(activeDebateCount ?? 0) > 0}
-      />
+      <GuestAuthGateProvider>
+        <NavigationShell
+          user={user}
+          profile={profileData}
+          isAdmin={isAdmin}
+          canAccessReview={canAccessReview}
+          hasActiveDebate={(activeDebateCount ?? 0) > 0}
+        />
 
-      <main className="mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-6 md:pb-16 lg:px-8">
-        {!user ? <GuestBanner /> : null}
-        {children}
-      </main>
+        <main className="mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-6 md:pb-16 lg:px-8">
+          {!user ? <GuestBanner /> : null}
+          {children}
+        </main>
+      </GuestAuthGateProvider>
     </div>
   );
 }
