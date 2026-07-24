@@ -4,7 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PostsFeedTabs from "./PostsFeedTabs";
 import type { PostCardData } from "@/components/post/PostCard";
 
-const mocks = vi.hoisted(() => ({ requestAuth: vi.fn() }));
+const mocks = vi.hoisted(() => ({ requestAuth: vi.fn(), push: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => ({ push: mocks.push }),
+}));
 
 vi.mock("@/components/post/PostFeed", () => ({
   default: ({ posts }: { posts: PostCardData[] }) => (
@@ -284,6 +289,7 @@ describe("PostsFeedTabs -- loading state", () => {
 describe("PostsFeedTabs -- empty states", () => {
   beforeEach(() => {
     mocks.requestAuth.mockReset();
+    mocks.push.mockReset();
   });
 
   it("shows the default empty state with a Create CTA that gates a guest", () => {
@@ -298,13 +304,13 @@ describe("PostsFeedTabs -- empty states", () => {
     expect(mocks.requestAuth).toHaveBeenCalledWith("create");
   });
 
-  it("opens the real Create chooser directly for an authenticated viewer", () => {
+  it("navigates an authenticated viewer straight to the Post composer", () => {
     render(<PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
     expect(mocks.requestAuth).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "Create" })).toBeInTheDocument();
+    expect(mocks.push).toHaveBeenCalledWith("/create/post");
   });
 
   it("shows the Following-specific empty state with an Explore writers CTA", () => {

@@ -16,10 +16,9 @@ interface UseResponseChooserOptions {
 
 /**
  * Presentation-agnostic Respond-chooser state: open/close and route-change
- * cleanup, mirroring app/(main)/CreateTrigger.tsx's useCreateChooser --
- * every "Respond" entry point (ResponseStartLink, reused across the post
- * page, comments, and the credibility panel) shares this one hook instead
- * of re-implementing the open-state contract.
+ * cleanup -- every "Respond" entry point (ResponseStartLink, reused across
+ * the post page, comments, and the credibility panel) shares this one hook
+ * instead of re-implementing the open-state contract.
  */
 export function useResponseChooser({ triggerRef }: UseResponseChooserOptions) {
   const [open, setOpen] = useState(false);

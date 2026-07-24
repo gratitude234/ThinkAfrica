@@ -3,10 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BottomNav from "./BottomNav";
 
 const navigationState = vi.hoisted(() => ({ pathname: "/" }));
-const mocks = vi.hoisted(() => ({ requestAuth: vi.fn() }));
+const mocks = vi.hoisted(() => ({ requestAuth: vi.fn(), push: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => navigationState.pathname,
+  useRouter: () => ({ push: mocks.push }),
 }));
 
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({

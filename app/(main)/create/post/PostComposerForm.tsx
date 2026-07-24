@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import { countShortPostCharacters, SHORT_POST_MAX_CHARACTERS } from "@/lib/shortPostContent";
@@ -268,6 +269,24 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
 
         <p className="mt-4 text-sm leading-5 text-gray-400">
           New post — Posts are short and conversational, no title needed. They publish instantly.
+        </p>
+        {/* The Create entry points go straight to this composer (no chooser
+            interstitial), so the longer-form paths surface here instead. */}
+        <p className="mt-2 text-sm leading-5 text-gray-500">
+          Writing something longer?{" "}
+          <Link
+            href="/write?kind=article"
+            className="font-semibold text-emerald-brand hover:underline"
+          >
+            Write an article
+          </Link>
+          {" · "}
+          <Link
+            href="/submit/research"
+            className="font-semibold text-emerald-brand hover:underline"
+          >
+            Submit research
+          </Link>
         </p>
       </div>
 

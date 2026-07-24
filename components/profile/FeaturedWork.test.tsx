@@ -1,10 +1,13 @@
 import type { AnchorHTMLAttributes } from "react";
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import FeaturedWork from "./FeaturedWork";
 
+const mocks = vi.hoisted(() => ({ push: vi.fn() }));
+
 vi.mock("next/navigation", () => ({
   usePathname: () => "/someone",
+  useRouter: () => ({ push: mocks.push }),
 }));
 
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
@@ -25,18 +28,12 @@ vi.mock("next/link", () => ({
 }));
 
 describe("FeaturedWork 'Publish work' CTA (generic, empty-state, own profile)", () => {
-  it("opens the shared Create chooser instead of linking straight to /write", () => {
+  it("navigates straight to the Post composer instead of linking to /write", () => {
     render(<FeaturedWork posts={[]} isOwnProfile currentUserId="user-1" />);
 
-    const trigger = screen.getByRole("button", { name: "Publish work" });
-    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("button", { name: "Publish work" }));
 
-    const dialog = screen.getByRole("dialog", { name: "Create" });
-    const links = within(dialog).getAllByRole("link");
-    expect(links).toHaveLength(3);
-    expect(links[0]).toHaveAccessibleName(/^Post/);
-    expect(links[1]).toHaveAccessibleName(/^Article/);
-    expect(links[2]).toHaveAccessibleName(/^Research Paper/);
+    expect(mocks.push).toHaveBeenCalledWith("/create/post");
   });
 
   it("does not render a plain link straight to /write", () => {

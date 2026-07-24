@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({ requestAuth: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/landing",
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({

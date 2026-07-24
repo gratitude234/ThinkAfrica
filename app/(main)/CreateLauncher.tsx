@@ -1,9 +1,6 @@
 "use client";
 
-import { useRef } from "react";
-import { useCreateChooser } from "./useCreateChooser";
-import CreateMobileSheet from "./CreateMobileSheet";
-import CreateDesktopPopover from "./CreateDesktopPopover";
+import { useRouter } from "next/navigation";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 
 interface CreateLauncherProps {
@@ -58,27 +55,25 @@ function ComposeIcon({ className = "h-6 w-6" }: { className?: string }) {
 // controls below must flip at that identical breakpoint -- previously the
 // desktop trigger appeared from `sm` (640px) while the mobile FAB only
 // disappeared at `md` (768px), so both were visible in the 640-767px gap.
+//
+// Both controls go straight to the Post composer -- the composer itself
+// offers the longer-form Article/Research paths, so no chooser interstitial.
 export default function CreateLauncher({
   userId,
   variant = "desktop",
   isActive = false,
   isPostPage = false,
 }: CreateLauncherProps) {
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const chooser = useCreateChooser({
-    variant: variant === "mobileFab" ? "sheet" : "popover",
-    triggerRef,
-    rootRef,
-  });
+  const router = useRouter();
   const { requestAuth } = useGuestAuthGate();
-  const handleTrigger = userId ? chooser.toggle : () => requestAuth("create");
+  const handleTrigger = userId
+    ? () => router.push("/create/post")
+    : () => requestAuth("create");
 
   if (variant === "mobileFab") {
     return (
       <div className="md:hidden">
         <button
-          ref={triggerRef}
           type="button"
           onClick={handleTrigger}
           className="group fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition-[background-color,box-shadow,transform] duration-200 hover:bg-[#0E4B37] hover:shadow-[0_10px_24px_-7px_rgb(7_57_41/0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 active:scale-[0.96] motion-reduce:transition-none"
@@ -92,48 +87,25 @@ export default function CreateLauncher({
               : "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
           }}
           aria-label="Start writing"
-          aria-haspopup="dialog"
-          aria-expanded={chooser.open}
-          aria-controls={chooser.open ? chooser.panelId : undefined}
         >
           <ComposeIcon className="h-[25px] w-[25px] transition-transform duration-200 group-active:scale-95 motion-reduce:transition-none" />
         </button>
-
-        <CreateMobileSheet
-          id={chooser.panelId}
-          open={chooser.open}
-          onClose={chooser.close}
-          userId={userId}
-        />
       </div>
     );
   }
 
   return (
-    <div ref={rootRef} className="relative hidden md:inline-flex">
+    <div className="relative hidden md:inline-flex">
       <button
-        ref={triggerRef}
         type="button"
         onClick={handleTrigger}
         className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
           isActive ? "bg-ink" : "bg-emerald-brand hover:bg-[#0E4B37]"
         }`}
-        aria-haspopup="dialog"
-        aria-expanded={chooser.open}
-        aria-controls={chooser.open ? chooser.panelId : undefined}
       >
         <PlusIcon className="h-3.5 w-3.5" />
         Create
       </button>
-
-      <CreateDesktopPopover
-        id={chooser.panelId}
-        titleId={chooser.titleId}
-        subtitleId={chooser.subtitleId}
-        open={chooser.open}
-        onClose={chooser.close}
-        userId={userId}
-      />
     </div>
   );
 }

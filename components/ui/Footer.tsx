@@ -66,7 +66,7 @@ export default function Footer({ landing = false }: { landing?: boolean }) {
                 </li>
               ))}
               <li>
-                <CreateTrigger userId={null} presentation="popover" className={FOOTER_LINK_CLASS}>
+                <CreateTrigger userId={null} className={FOOTER_LINK_CLASS}>
                   Write
                 </CreateTrigger>
               </li>

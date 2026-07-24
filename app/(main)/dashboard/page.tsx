@@ -815,7 +815,6 @@ export default async function DashboardPage() {
         </div>
         <CreateTrigger
           userId={user.id}
-          presentation="popover"
           className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
         >
           + New

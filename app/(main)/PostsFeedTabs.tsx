@@ -399,7 +399,7 @@ export default function PostsFeedTabs({
   let emptyTitle = "No content yet.";
   let emptyBody = "Be the first to share your ideas with Africa.";
   let emptyCta = (
-    <CreateTrigger userId={currentUserId} presentation="popover" className={CREATE_CTA_CLASS}>
+    <CreateTrigger userId={currentUserId} className={CREATE_CTA_CLASS}>
       Create
     </CreateTrigger>
   );
