@@ -8,7 +8,7 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import FollowButton from "@/components/ui/FollowButton";
 import {
   formatDate,
-  POST_TYPE_LABELS,
+  formatRelativeTime,
   POST_POINTS,
   sanitizePostExcerpt,
   getPostMetaDescription,
@@ -38,6 +38,7 @@ import { fetchResponseCards } from "@/lib/feedData";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
 import PostConversationView from "./PostConversationView";
+import PostActionsRow from "./PostActionsRow";
 import { getCollaborationSummary } from "@/lib/collaboration";
 import { getMessageEligibility } from "@/lib/messaging";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
@@ -46,7 +47,6 @@ import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import {
   getArticleFormatLabel,
-  getContentKindLabel,
   isFormallyReviewed,
   resolveArticleFormat,
   resolveContentKind,
@@ -246,32 +246,6 @@ function ArticleJsonLd({ data }: { data: ReturnType<typeof buildArticleJsonLd> }
   );
 }
 
-function PublicationSignalPill({
-  label,
-  value,
-  tone = "gray",
-}: {
-  label: string;
-  value: string;
-  tone?: "gray" | "emerald" | "sky" | "purple";
-}) {
-  const toneClass = {
-    gray: "border-gray-200 bg-white/90 text-gray-700",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    sky: "border-sky-200 bg-sky-50 text-sky-800",
-    purple: "border-purple-200 bg-purple-50 text-purple-800",
-  };
-
-  return (
-    <div className={`min-w-[96px] rounded-xl border px-3 py-2.5 ${toneClass[tone]}`}>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
-        {label}
-      </p>
-      <p className="mt-0.5 truncate text-[12px] font-semibold">{value}</p>
-    </div>
-  );
-}
-
 function formatDocumentSize(value: number | null | undefined) {
   if (!value) return null;
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
@@ -301,115 +275,6 @@ function getVersionKindLabel(value: string | null | undefined) {
   return value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function ResearchDocumentPanel({ post }: { post: PostRecord }) {
-  if (post.type !== "research") return null;
-
-  const size = formatDocumentSize(post.document_size_bytes) ?? "Size unavailable";
-  const archiveAvailable = Boolean(post.citation_id);
-
-  return (
-    <section
-      id="manuscript"
-      className="mb-8 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.06)] sm:p-6"
-    >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-            Manuscript PDF
-          </p>
-          <h2 className="font-display mt-2 text-2xl font-semibold leading-tight text-slate-950">
-            {post.document_original_name ?? "Research manuscript"}
-          </h2>
-          <p className="mt-2 max-w-[58ch] text-sm leading-6 text-slate-600">
-            The research record is presented as an abstract plus the submitted
-            PDF manuscript. PDF access uses the protected Indegenius document
-            route and opens in a new tab.
-          </p>
-        </div>
-        <span
-          className={`inline-flex w-fit shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold ${getResearchStatusTone(
-            post.status
-          )}`}
-        >
-          {formatResearchStatus(post.status)}
-        </span>
-      </div>
-
-      {post.document_path ? (
-        <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <div className="grid gap-3 text-sm sm:grid-cols-3">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                Format
-              </p>
-              <p className="mt-1 font-semibold text-slate-900">
-                {post.document_mime_type?.includes("pdf") ? "PDF" : "Document"}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                File size
-              </p>
-              <p className="mt-1 font-semibold text-slate-900">{size}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                Archive
-              </p>
-              <p className="mt-1 font-semibold text-slate-900">
-                {archiveAvailable ? "Citation archived" : "Pending archive"}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <a
-              href={`/api/research-document/${post.id}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-            >
-              Open PDF
-            </a>
-            {post.citation_id ? (
-              <>
-                <CopyCitationIdButton citationId={post.citation_id} />
-                <Link
-                  href={`/publication/${post.citation_id}`}
-                  className="inline-flex min-h-10 items-center justify-center rounded-lg border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-50"
-                >
-                  Citation archive
-                </Link>
-              </>
-            ) : null}
-          </div>
-
-          {post.citation_id ? (
-            <p className="mt-3 text-xs leading-5 text-slate-500">
-              Citation ID:{" "}
-              <span className="font-mono font-semibold text-slate-800">
-                {post.citation_id}
-              </span>
-            </p>
-          ) : null}
-        </div>
-      ) : (
-        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-900">
-            Manuscript unavailable
-          </p>
-          <p className="mt-1 text-sm leading-6 text-amber-800">
-            This research record does not currently have a PDF attached. The
-            abstract and metadata remain visible, but the manuscript cannot be
-            opened until the document is restored or attached by the author or
-            editorial team.
-          </p>
-        </div>
-      )}
-    </section>
-  );
 }
 
 function throwPostQueryError(slug: string, stage: "metadata" | "page", error: unknown): never {
@@ -753,127 +618,86 @@ async function HeaderCoAuthors({
   );
 }
 
-async function PublicationSignalBlock({
+async function DetailAuthorRow({
   post,
   author,
+  authorName,
+  userId,
+  showCoAuthors = false,
   secondaryDataPromise,
-  variant = "hero",
+  viewerDataPromise,
 }: {
   post: PostRecord;
-  author?: AuthorProfile | null;
+  author: AuthorProfile | null;
+  authorName: string;
+  userId: string | null;
+  /** Research shows a "with Co-Author, Co-Author" line under the lead author. */
+  showCoAuthors?: boolean;
   secondaryDataPromise: Promise<SecondaryData>;
-  variant?: "hero" | "standalone";
+  viewerDataPromise: Promise<ViewerData>;
 }) {
-  if (post.status !== "published") return null;
-
-  const { references, reviews, decisions, versions } = await secondaryDataPromise;
-  const reviewed = isReviewedWork(post);
-  // An Article (generic or a legacy Essay/Policy Brief) always leads with
-  // "Article" -- the historical format, if any, is a secondary detail, not
-  // a replacement for the primary identity (see docs/content-model.md).
-  const resolvedKind = resolveContentKind(post);
-  const resolvedFormat = resolveArticleFormat(post);
-  const formatLabel = getArticleFormatLabel(resolvedFormat);
-  const typeLabel =
-    resolvedKind === "article"
-      ? formatLabel
-        ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
-        : getContentKindLabel(resolvedKind)
-      : (POST_TYPE_LABELS[post.type as PostType] ?? post.type);
-  const editorialSummary = getEditorialTrustSummary({
-    type: post.type,
-    status: post.status,
-    currentRound: post.current_round ?? 1,
-    createdAt: post.created_at,
-    publishedAt: post.published_at,
-    revisionDueAt: post.revision_due_at,
-    citationId: post.citation_id,
-    publishedVersionId: post.published_version_id,
-    referenceCount: references.length,
-    reviews,
-    decisions,
-    versionCount: versions.length,
-  });
-
-  const signalPills = (
-    <>
-      <PublicationSignalPill label="Format" value={typeLabel} />
-      <PublicationSignalPill
-        label="Review"
-        value={reviewed ? "Reviewed" : "Community"}
-        tone={reviewed ? "emerald" : "gray"}
-      />
-      <PublicationSignalPill
-        label="Citation"
-        value={post.citation_id ? "Archived" : "Not archived"}
-        tone={post.citation_id ? "sky" : "gray"}
-      />
-      <PublicationSignalPill
-        label="Sources"
-        value={references.length > 0 ? `${references.length} refs` : "No refs"}
-        tone={references.length > 0 ? "emerald" : "gray"}
-      />
-      {variant === "standalone" && author ? (
-        <PublicationSignalPill
-          label="Author"
-          value={author.verified ? "Verified" : "Profile"}
-          tone={author.verified ? "emerald" : "gray"}
-        />
-      ) : null}
-    </>
-  );
-
-  if (variant === "standalone") {
-    return (
-      <section className="mb-9">
-        <div className="grid grid-cols-2 gap-2 min-[430px]:grid-cols-4 sm:flex sm:flex-wrap">
-          {signalPills}
-        </div>
-        {editorialSummary.applies ? (
-          <div className="mt-4">
-            <EditorialTrustPanel
-              summary={editorialSummary}
-              description="Reviewed and citable work includes stronger editorial context, sources, and archived publication metadata for readers."
-              actionHref={post.citation_id ? `/publication/${post.citation_id}` : null}
-              actionSource="post_editorial_trust"
-              actionKey="citation_archive"
-              compact
-            />
-          </div>
-        ) : null}
-      </section>
-    );
-  }
-
-  if (editorialSummary.applies) {
-    return (
-      <div className="mt-5">
-        <EditorialTrustPanel
-          summary={editorialSummary}
-          description="Reviewed and citable work includes stronger editorial context, sources, and archived publication metadata for readers."
-          actionHref={post.citation_id ? `/publication/${post.citation_id}` : null}
-          actionSource="post_editorial_trust"
-          actionKey="citation_archive"
-          compact
-        />
-      </div>
-    );
-  }
+  if (!author) return null;
+  const [secondary, viewer] = await Promise.all([
+    secondaryDataPromise,
+    viewerDataPromise,
+  ]);
+  const coAuthorNames = showCoAuthors
+    ? (secondary.coAuthors
+        .filter((record) => record.user_id !== author.id)
+        .map((record) => record.profile?.full_name ?? record.profile?.username)
+        .filter(Boolean) as string[])
+    : [];
+  const isOwnPost = userId === author.id;
 
   return (
-    <section className="mt-6 rounded-xl border border-white/20 bg-white/10 p-3.5 backdrop-blur-sm sm:rounded-lg sm:p-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{signalPills}</div>
-        {post.citation_id ? (
-          <Link
-            href={`/publication/${post.citation_id}`}
-            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-white/25 bg-white/20 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/25"
-          >
-            Citation archive
-          </Link>
-        ) : null}
+    <div className="mt-5 flex items-start justify-between gap-4">
+      <div className="flex min-w-0 items-start gap-3">
+        <Link href={`/${author.username}`} className="shrink-0">
+          <UserAvatar
+            name={authorName}
+            src={author.avatar_url}
+            size={48}
+            className="overflow-hidden rounded-full"
+          />
+        </Link>
+        <div className="min-w-0">
+          <p className="text-[15px] leading-snug">
+            <Link
+              href={`/${author.username}`}
+              className="font-bold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+            >
+              {authorName}
+            </Link>
+            {author.university ? (
+              <span className="text-gray-500"> · {author.university}</span>
+            ) : null}
+          </p>
+          {coAuthorNames.length > 0 ? (
+            <p className="mt-0.5 text-[13px] leading-5 text-gray-500">
+              with {coAuthorNames.join(", ")}
+            </p>
+          ) : null}
+          <p className="mt-0.5 text-[13px] leading-5 text-gray-400">
+            {formatRelativeTime(post.published_at ?? post.created_at)}
+          </p>
+        </div>
       </div>
-    </section>
+      {isOwnPost ? null : userId ? (
+        <FollowButton
+          followerId={userId}
+          followingId={author.id}
+          initialFollowing={viewer.userFollowsAuthor}
+          variant="solid"
+        />
+      ) : (
+        <Link
+          href={`/login?redirectTo=${encodeURIComponent(`/post/${post.slug}`)}`}
+          className="shrink-0 rounded-lg bg-emerald-brand px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
+        >
+          Follow
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -956,42 +780,6 @@ async function PostReviewStatusPanel({
         actionSource="post_editorial_status"
         actionKey="editorial_review_status"
       />
-    </div>
-  );
-}
-
-async function MobileCredibilitySection({
-  post,
-  author,
-  userId,
-  sanitizedContent,
-  wordCount,
-  parentPostId,
-  isPublished,
-  secondaryDataPromise,
-}: {
-  post: PostRecord;
-  author: AuthorProfile | null;
-  userId: string | null;
-  sanitizedContent: string;
-  wordCount: number;
-  parentPostId: string | null;
-  isPublished: boolean;
-  secondaryDataPromise: Promise<SecondaryData>;
-}) {
-  const secondary = await secondaryDataPromise;
-  const summary = getFullQualitySummary({
-    post,
-    author,
-    sanitizedContent,
-    wordCount,
-    parentPostId,
-    secondary,
-  });
-
-  return (
-    <div className="mb-8">
-      <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} userId={userId} />
     </div>
   );
 }
@@ -1117,48 +905,28 @@ async function PostEngagementSection({
   ]);
 
   return (
-    <div className="article-engagement-bar mb-9 flex justify-center">
-      <div className="inline-flex max-w-full items-center gap-1 rounded-full border border-gray-200 bg-white p-1.5 shadow-[0_4px_16px_-10px_rgba(0,0,0,0.18)]">
-        <LikeButton
-          postId={post.id}
-          initialLiked={viewer.userLiked}
-          initialLikeCount={secondary.likeCount}
-          userId={userId}
-        />
-        <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
-        <ResponseStartLink
-          postId={post.id}
-          source="article_action_bar"
-          userId={userId}
-          className="inline-flex min-h-9 items-center gap-2 rounded-full px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-emerald-brand"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z" />
-          </svg>
-          Respond
-        </ResponseStartLink>
-        <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
-        <BookmarkButton
-          postId={post.id}
-          initialBookmarked={viewer.userBookmarked}
-          userId={userId}
-        />
-        <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
-        <ShareButtons
-          title={getPostMetadataTitle(post, author)}
-          slug={post.slug}
-          excerpt={sanitizedExcerpt}
-          authorName={author?.full_name ?? null}
-        />
-      </div>
+    <div className="mb-9">
+      <PostActionsRow
+        postId={post.id}
+        slug={post.slug}
+        title={getPostMetadataTitle(post, author)}
+        excerpt={sanitizedExcerpt}
+        authorName={author?.full_name ?? null}
+        userId={userId}
+        initialLiked={viewer.userLiked}
+        initialLikeCount={secondary.likeCount}
+        initialBookmarked={viewer.userBookmarked}
+      />
       {userId && author && userId !== author.id ? (
-        <ReportButton
-          targetType="post"
-          targetId={post.id}
-          targetLabel={`"${getPostMetadataTitle(post, author)}"`}
-          variant="text"
-          className="hidden"
-        />
+        <p className="mt-2 text-right">
+          <ReportButton
+            targetType="post"
+            targetId={post.id}
+            targetLabel={`"${getPostMetadataTitle(post, author)}"`}
+            variant="text"
+            className="text-xs text-gray-400 hover:text-red-600"
+          />
+        </p>
       ) : null}
     </div>
   );
@@ -1403,232 +1171,6 @@ async function PostResponsesSection({
   );
 }
 
-function ResearchMetaTile({
-  label,
-  value,
-  tone = "slate",
-}: {
-  label: string;
-  value: string;
-  tone?: "slate" | "emerald" | "sky" | "amber";
-}) {
-  const toneClass = {
-    slate: "border-slate-200 bg-white text-slate-800",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    sky: "border-sky-200 bg-sky-50 text-sky-800",
-    amber: "border-amber-200 bg-amber-50 text-amber-800",
-  };
-
-  return (
-    <div className={`rounded-lg border px-3 py-3 ${toneClass[tone]}`}>
-      <p className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-60">
-        {label}
-      </p>
-      <p className="mt-1 truncate text-[12.5px] font-semibold">{value}</p>
-    </div>
-  );
-}
-
-async function ResearchHero({
-  post,
-  author,
-  authorName,
-  sanitizedExcerpt,
-  secondaryDataPromise,
-}: {
-  post: PostRecord;
-  author: AuthorProfile | null;
-  authorName: string;
-  sanitizedExcerpt: string | null;
-  secondaryDataPromise: Promise<SecondaryData>;
-}) {
-  const { coAuthors } = await secondaryDataPromise;
-  const coAuthorNames = coAuthors
-    .filter((record) => record.user_id !== author?.id)
-    .map((record) => record.profile?.full_name ?? record.profile?.username)
-    .filter(Boolean) as string[];
-  const authorLine = [authorName, ...coAuthorNames].filter(Boolean).join(", ");
-  const statusLabel = formatResearchStatus(post.status);
-
-  return (
-    <header className="relative mx-auto max-w-[720px] overflow-hidden border-b border-gray-200 bg-white pb-8 pt-1 text-ink sm:px-2 sm:pb-10 sm:pt-3">
-      <div
-        className="absolute inset-0 opacity-0"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
-          backgroundSize: "36px 36px",
-        }}
-        aria-hidden="true"
-      />
-      <div className="relative z-10">
-        <div>
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.16em] text-purple-accent">
-              Research manuscript
-            </span>
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10.5px] font-semibold text-gray-600">
-              {statusLabel}
-            </span>
-            {post.tags?.slice(0, 4).map((tag, index) => (
-              <Link
-                key={tag}
-                href={`/topics/${encodeURIComponent(tag)}`}
-                className={`rounded-full border border-purple-100 bg-purple-tint/40 px-3 py-1 text-[10.5px] font-medium text-purple-accent transition-colors hover:border-purple-200 ${
-                  index >= 3 ? "hidden sm:inline-flex" : ""
-                }`}
-              >
-                {tag}
-              </Link>
-            ))}
-          </div>
-
-          <h1 className="font-display max-w-[700px] text-[30px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink sm:text-[40px]">
-            {post.title}
-          </h1>
-
-          <div className="mt-5 max-w-[680px] border-l-2 border-purple-accent/35 pl-4">
-            <p className="font-display text-[10px] font-bold uppercase tracking-[0.18em] text-purple-accent">
-              Abstract
-            </p>
-            <p className="mt-2 line-clamp-4 text-[16px] leading-[1.7] text-gray-600 sm:line-clamp-5 sm:text-[17px]">
-              {sanitizedExcerpt ?? "Abstract not provided for this research record."}
-            </p>
-          </div>
-
-          <div className="mt-7 grid gap-5 border-t border-gray-100 pt-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            {author ? (
-              <div className="flex items-center gap-3">
-                <Link href={`/${author.username}`} className="shrink-0">
-                  <UserAvatar
-                    name={authorName}
-                    src={author.avatar_url}
-                    size={46}
-                    className="flex-shrink-0 overflow-hidden rounded-full ring-1 ring-gray-200"
-                  />
-                </Link>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
-                    Author line
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-ink">
-                    {authorLine || authorName}
-                  </p>
-                  <p className="mt-0.5 text-[11.5px] text-gray-500">
-                    {[author.field_of_study, author.university]
-                      .filter(Boolean)
-                      .join(" / ")}
-                  </p>
-                </div>
-              </div>
-            ) : null}
-            <div className="grid gap-2 text-left text-[12px] text-gray-500 sm:grid-cols-3 lg:min-w-[360px]">
-              <div>
-                <p className="font-bold uppercase tracking-[0.14em] text-gray-400">
-                  Date
-                </p>
-                <p className="mt-1 font-semibold text-gray-700">
-                  {formatDate(post.published_at ?? post.created_at)}
-                </p>
-              </div>
-              <div>
-                <p className="font-bold uppercase tracking-[0.14em] text-gray-400">
-                  Round
-                </p>
-                <p className="mt-1 font-semibold text-gray-700">
-                  Round {post.current_round ?? 1}
-                </p>
-              </div>
-              <div>
-                <p className="font-bold uppercase tracking-[0.14em] text-gray-400">
-                  Archive
-                </p>
-                <p className="mt-1 font-semibold text-gray-700">
-                  {post.citation_id ? "Citation ready" : "Pending citation"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-async function ResearchMetadataStrip({
-  post,
-  secondaryDataPromise,
-}: {
-  post: PostRecord;
-  secondaryDataPromise: Promise<SecondaryData>;
-}) {
-  const { references, versions } = await secondaryDataPromise;
-  const latestVersion = versions.length > 0 ? versions[versions.length - 1] : null;
-  const size = formatDocumentSize(post.document_size_bytes);
-  const versionLabel = latestVersion
-    ? `${getVersionKindLabel(latestVersion.version_kind)} / Round ${
-        latestVersion.round ?? post.current_round ?? 1
-      }`
-    : `Round ${post.current_round ?? 1}`;
-
-  return (
-    <section className="mx-auto mt-4 grid max-w-[720px] grid-cols-2 gap-2 md:grid-cols-3">
-      <ResearchMetaTile
-        label="Format"
-        value={post.document_path ? "PDF manuscript" : "Abstract only"}
-        tone={post.document_path ? "slate" : "amber"}
-      />
-      <ResearchMetaTile
-        label="Review"
-        value={formatResearchStatus(post.status)}
-        tone={
-          post.status === "published"
-            ? "emerald"
-            : post.status === "pending_revision"
-              ? "amber"
-              : "sky"
-        }
-      />
-      <ResearchMetaTile
-        label="Citation"
-        value={post.citation_id ? "Archived" : "Pending"}
-        tone={post.citation_id ? "sky" : "slate"}
-      />
-      <ResearchMetaTile
-        label="PDF size"
-        value={size ?? "Unavailable"}
-        tone={post.document_path ? "slate" : "amber"}
-      />
-      <ResearchMetaTile
-        label="References"
-        value={references.length > 0 ? `${references.length} listed` : "None listed"}
-        tone={references.length > 0 ? "emerald" : "slate"}
-      />
-      <ResearchMetaTile label="Version" value={versionLabel} />
-    </section>
-  );
-}
-
-function ResearchAbstractSection({
-  sanitizedExcerpt,
-}: {
-  sanitizedExcerpt: string | null;
-}) {
-  return (
-    <section
-      id="abstract"
-      className="mb-8 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 sm:p-6"
-    >
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-        Abstract
-      </p>
-      <p className="mt-3 text-[17px] leading-[1.72] text-slate-800 sm:text-[18px]">
-        {sanitizedExcerpt ?? "No abstract was provided for this research record."}
-      </p>
-    </section>
-  );
-}
-
 function ResearchReviewTimeline({
   post,
   secondary,
@@ -1713,22 +1255,6 @@ function ResearchReviewTimeline({
         ))}
       </div>
     </section>
-  );
-}
-
-async function ResearchMobileTimeline({
-  post,
-  secondaryDataPromise,
-}: {
-  post: PostRecord;
-  secondaryDataPromise: Promise<SecondaryData>;
-}) {
-  const secondary = await secondaryDataPromise;
-
-  return (
-    <div className="mb-8 lg:hidden">
-      <ResearchReviewTimeline post={post} secondary={secondary} />
-    </div>
   );
 }
 
@@ -2116,42 +1642,47 @@ export default async function PostPage({ params }: PageProps) {
           </>
         ) : null}
 
-        <Suspense
-          fallback={
-            <header className="mx-auto h-[340px] max-w-[720px] animate-pulse rounded-xl bg-white" />
-          }
-        >
-          <ResearchHero
-            post={post}
-            author={author}
-            authorName={authorName}
-            sanitizedExcerpt={sanitizedExcerpt}
-            secondaryDataPromise={secondaryDataPromise}
-          />
-        </Suspense>
+        <header className="mx-auto max-w-[720px] bg-white pb-2 pt-1 sm:px-2 sm:pt-3">
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+          >
+            <span aria-hidden="true">‹</span> Back to feed
+          </Link>
 
-        <div
-          className="h-2"
-          aria-hidden="true"
-        />
+          <div className="mt-1 flex flex-wrap items-center gap-2.5">
+            <span className="font-display text-[11px] font-bold uppercase tracking-[0.16em] text-purple-accent">
+              Research
+            </span>
+            {post.citation_id || isReviewedWork(post) ? (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                {post.citation_id ? "Citable" : "Reviewed"}
+              </span>
+            ) : post.status !== "published" ? (
+              <span
+                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${getResearchStatusTone(post.status)}`}
+              >
+                {formatResearchStatus(post.status)}
+              </span>
+            ) : null}
+          </div>
 
-        <Suspense
-          fallback={
-            <section className="mx-auto mt-4 grid max-w-[720px] grid-cols-2 gap-2 md:grid-cols-3">
-              {[...Array(6)].map((_, index) => (
-                <div
-                  key={index}
-                  className="h-[66px] animate-pulse rounded-lg border border-slate-200 bg-white"
-                />
-              ))}
-            </section>
-          }
-        >
-          <ResearchMetadataStrip
-            post={post}
-            secondaryDataPromise={secondaryDataPromise}
-          />
-        </Suspense>
+          <h1 className="font-display mt-3 max-w-[700px] text-[30px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink sm:text-[40px]">
+            {post.title}
+          </h1>
+
+          <Suspense fallback={<div className="mt-5 h-12 animate-pulse rounded-lg bg-gray-100" />}>
+            <DetailAuthorRow
+              post={post}
+              author={author}
+              authorName={authorName}
+              userId={userId}
+              showCoAuthors
+              secondaryDataPromise={secondaryDataPromise}
+              viewerDataPromise={viewerDataPromise}
+            />
+          </Suspense>
+        </header>
 
         <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-4 pb-20 pt-8 sm:px-6 lg:grid-cols-[minmax(0,760px)_300px] lg:gap-[52px] lg:px-8">
           <main className="min-w-0">
@@ -2188,28 +1719,67 @@ export default async function PostPage({ params }: PageProps) {
               <AudioSummaryPlayer audioUrl={post.audio_summary_url} />
             ) : null}
 
-            <ResearchAbstractSection sanitizedExcerpt={sanitizedExcerpt} />
-            <ResearchDocumentPanel post={post} />
+            <section id="abstract" className="mb-4 scroll-mt-24 rounded-xl bg-purple-tint/60 p-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-purple-accent">
+                Abstract
+              </p>
+              <p className="mt-2 text-[16px] leading-[1.7] text-gray-800">
+                {sanitizedExcerpt ?? "No abstract was provided for this research record."}
+              </p>
+            </section>
 
-            <Suspense fallback={<SectionSkeleton rows={3} />}>
-              <ResearchMobileTimeline
-                post={post}
-                secondaryDataPromise={secondaryDataPromise}
-              />
-            </Suspense>
+            {post.document_path ? (
+              <section
+                id="manuscript"
+                className="mb-4 flex scroll-mt-24 items-center gap-3 rounded-xl border border-gray-200 bg-white p-3.5"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-purple-accent text-[10px] font-bold tracking-wide text-white"
+                >
+                  PDF
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ink">
+                    {post.document_original_name ?? "Research manuscript"}
+                  </span>
+                  <span className="block text-xs text-gray-500">
+                    {formatDocumentSize(post.document_size_bytes) ?? "PDF"}
+                  </span>
+                </span>
+                <a
+                  href={`/api/research-document/${post.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 rounded-lg bg-gray-100 px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:bg-gray-200"
+                >
+                  View manuscript
+                </a>
+              </section>
+            ) : (
+              <div id="manuscript" className="mb-4 scroll-mt-24 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-amber-900">Manuscript unavailable</p>
+                <p className="mt-1 text-sm leading-6 text-amber-800">
+                  This research record does not currently have a PDF attached. The
+                  abstract and metadata remain visible until the document is
+                  restored or attached by the author or editorial team.
+                </p>
+              </div>
+            )}
 
-            <Suspense fallback={<SectionSkeleton rows={2} />}>
-              <MobileCredibilitySection
-                post={post}
-                author={author}
-                userId={userId}
-                sanitizedContent={sanitizedContent}
-                wordCount={wordCount}
-                parentPostId={parentPostId}
-                isPublished={isPublished}
-                secondaryDataPromise={secondaryDataPromise}
-              />
-            </Suspense>
+            {post.tags && post.tags.length > 0 ? (
+              <div className="mb-8 flex flex-wrap gap-2">
+                {post.tags.map((tag) => (
+                  <Link
+                    key={tag}
+                    href={`/topics/${encodeURIComponent(tag)}`}
+                    className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[13px] text-gray-600 transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand"
+                  >
+                    #{tag}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
 
             <Suspense fallback={<SectionSkeleton rows={4} />}>
               <PostReferencesAndCitation
@@ -2314,62 +1884,50 @@ export default async function PostPage({ params }: PageProps) {
         </>
       ) : null}
 
-      <header className="mx-auto max-w-[720px] border-b border-gray-200 bg-white pb-7 pt-1 sm:px-2 sm:pb-9 sm:pt-3">
+      <header className="mx-auto max-w-[720px] bg-white pb-2 pt-1 sm:px-2 sm:pt-3">
         <div>
-          <div className="mb-4 flex flex-wrap items-center gap-2.5">
-            <span className={`font-display text-[10.5px] font-bold uppercase tracking-[0.16em] ${isArticlePost ? (articleFormatLabel === "Policy Brief" ? "text-purple-accent" : "text-gold-ink") : "text-emerald-brand"}`}>
-              {isArticlePost ? `Article${articleFormatLabel ? ` · ${articleFormatLabel}` : ""}` : "Post"}
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+          >
+            <span aria-hidden="true">‹</span> Back to feed
+          </Link>
+
+          <div className="mt-1 flex flex-wrap items-center gap-2.5">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                articleFormatLabel === "Policy Brief"
+                  ? "bg-purple-tint text-purple-accent"
+                  : "bg-gold-tint text-gold-ink"
+              }`}
+            >
+              Article{articleFormatLabel ? ` · ${articleFormatLabel}` : ""}
             </span>
-            {isArticlePost ? <span className="text-[11px] font-medium text-gray-400">{readTime} min read</span> : null}
+            <span className="text-[12px] font-medium text-gray-400">{readTime} min read</span>
           </div>
 
-          <Suspense fallback={null}>
-            <ParentPostLink parentPostId={parentPostId} mode="editorial" />
-          </Suspense>
+          <div className="mt-4">
+            <Suspense fallback={null}>
+              <ParentPostLink parentPostId={parentPostId} mode="editorial" />
+            </Suspense>
+          </div>
 
           {displayTitle ? (
-            <h1 className={`font-display max-w-[700px] font-semibold tracking-[-0.02em] text-ink ${isArticlePost ? "text-[30px] leading-[1.08] sm:text-[40px]" : "text-[22px] leading-[1.2] sm:text-[26px]"}`}>
+            <h1 className="font-display max-w-[700px] text-[30px] font-semibold leading-[1.08] tracking-[-0.02em] text-ink sm:text-[40px]">
               {displayTitle}
             </h1>
           ) : null}
 
-          {/* Titleless lightweight Posts render the excerpt again as-is
-              via the body below (it's a same-content preview, not a
-              distinct summary) -- showing it here too would print the
-              opening of a short post twice. Only render it as a distinct
-              hero "dek" when there's an actual title above it. */}
-          {isArticlePost && displayTitle && sanitizedExcerpt ? (
-            <p className="mt-4 max-w-[640px] text-[16px] leading-[1.65] text-gray-600 sm:text-[17px]">
-              {sanitizedExcerpt}
-            </p>
-          ) : null}
-
-          {author ? (
-            <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-5 sm:flex-nowrap">
-              <Link href={`/${author.username}`} className="shrink-0">
-                <UserAvatar
-                  name={authorName}
-                  src={author.avatar_url}
-                  size={44}
-                  className="overflow-hidden rounded-full ring-1 ring-gray-200"
-                />
-              </Link>
-              <div className="min-w-0 flex-1">
-                <Link
-                  href={`/${author.username}`}
-                  className="text-[13px] font-semibold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-                >
-                  {authorName}
-                </Link>
-                <p className="mt-0.5 text-[11px] text-gray-500">
-                  {[author.field_of_study, author.university].filter(Boolean).join(" · ")}
-                </p>
-              </div>
-              <p className="w-full text-[11px] text-gray-400 sm:ml-auto sm:w-auto sm:text-right">
-                {formatDate(post.published_at ?? post.created_at)}
-              </p>
-            </div>
-          ) : null}
+          <Suspense fallback={<div className="mt-5 h-12 animate-pulse rounded-lg bg-gray-100" />}>
+            <DetailAuthorRow
+              post={post}
+              author={author}
+              authorName={authorName}
+              userId={userId}
+              secondaryDataPromise={secondaryDataPromise}
+              viewerDataPromise={viewerDataPromise}
+            />
+          </Suspense>
 
           <Suspense fallback={null}>
             <HeaderCoAuthors
