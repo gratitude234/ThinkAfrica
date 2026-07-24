@@ -31,6 +31,9 @@
     "app/(main)/PostsFeedSection.tsx",
     "app/(main)/submit/research/page.tsx",
     "app/(main)/submit/research/ResearchSubmissionForm.tsx",
+    "app/(main)/post/[slug]/page.tsx",
+    "app/(main)/post/[slug]/PostConversationView.tsx",
+    "app/(main)/post/[slug]/PostActionsRow.tsx",
     "app/api/feed/route.ts"
   ]
 }

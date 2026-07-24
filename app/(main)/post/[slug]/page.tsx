@@ -39,6 +39,7 @@ import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import ResponseStartLink, {
   type ResponseIntent,
 } from "@/components/post/ResponseStartLink";
+import PostConversationView from "./PostConversationView";
 import { getCollaborationSummary } from "@/lib/collaboration";
 import { getMessageEligibility } from "@/lib/messaging";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
@@ -2317,6 +2318,33 @@ export default async function PostPage({ params }: PageProps) {
         authorName,
       })
     : null;
+
+  // Short, titleless Posts get a conversation view (content → actions →
+  // responses), not the publication template below — see
+  // PostConversationView.tsx.
+  if (resolvedKind === "post") {
+    return (
+      <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
+        <div className="relative">
+          {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
+          {isPublished ? <ViewTracker slug={slug} wordCount={wordCount} /> : null}
+          <Suspense fallback={<SectionSkeleton rows={6} />}>
+            <PostConversationView
+              post={post}
+              author={author}
+              userId={userId}
+              bodyHtml={sanitizedContent}
+              sanitizedExcerpt={sanitizedExcerpt}
+              authorName={authorName}
+              metadataTitle={metadataTitle}
+              secondaryDataPromise={secondaryDataPromise}
+              viewerDataPromise={viewerDataPromise}
+            />
+          </Suspense>
+        </div>
+      </PostEngagementProvider>
+    );
+  }
 
   if (isResearchPost) {
     return (

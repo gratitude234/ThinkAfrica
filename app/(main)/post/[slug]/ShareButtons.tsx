@@ -7,6 +7,8 @@ interface Props {
   slug: string;
   excerpt?: string | null;
   authorName?: string | null;
+  /** Borderless icon+label styling for inline action rows (post conversation view). */
+  flat?: boolean;
 }
 
 export default function ShareButtons({
@@ -14,6 +16,7 @@ export default function ShareButtons({
   slug,
   excerpt,
   authorName,
+  flat = false,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -82,11 +85,15 @@ export default function ShareButtons({
   };
 
   return (
-    <div ref={menuRef} className="relative w-full sm:w-auto">
+    <div ref={menuRef} className={flat ? "relative" : "relative w-full sm:w-auto"}>
       <button
         type="button"
         onClick={sharePost}
-        className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 sm:w-auto"
+        className={
+          flat
+            ? "inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-[15px] font-medium text-gray-700 transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+            : "inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 sm:w-auto"
+        }
         aria-haspopup="menu"
         aria-expanded={menuOpen}
       >
