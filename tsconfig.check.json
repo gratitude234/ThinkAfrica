@@ -29,6 +29,8 @@
     "app/(write)/write/actions.ts",
     "app/(main)/messages/[id]/actions.ts",
     "app/(main)/PostsFeedSection.tsx",
+    "app/(main)/submit/research/page.tsx",
+    "app/(main)/submit/research/ResearchSubmissionForm.tsx",
     "app/api/feed/route.ts"
   ]
 }

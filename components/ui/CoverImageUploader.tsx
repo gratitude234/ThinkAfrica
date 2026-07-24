@@ -16,6 +16,7 @@ interface CoverImageUploaderProps {
   emptyTitle?: string;
   emptyHint?: string;
   previewHeightClass?: string;
+  variant?: "dropzone" | "compact";
 }
 
 export default function CoverImageUploader({
@@ -32,6 +33,7 @@ export default function CoverImageUploader({
   emptyTitle = "Add a cover image",
   emptyHint = "JPG, PNG, or WebP, up to 5MB",
   previewHeightClass = "h-48",
+  variant = "dropzone",
 }: CoverImageUploaderProps) {
   const [preview, setPreview] = useState<string | null>(initialUrl ?? null);
   const [uploading, setUploading] = useState(false);
@@ -130,6 +132,49 @@ export default function CoverImageUploader({
   };
 
   if (preview) {
+    if (variant === "compact") {
+      return (
+        <div>
+          <div className="flex min-w-0 items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={preview}
+              alt="Attached image"
+              className="h-11 w-14 shrink-0 rounded-md object-cover"
+            />
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+              className="text-sm font-medium text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {uploading ? "Uploading..." : "Change"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                releaseBlobUrl();
+                setPreview(null);
+                onRemove();
+              }}
+              disabled={uploading}
+              className="text-sm font-medium text-red-600 underline-offset-2 hover:text-red-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Remove
+            </button>
+          </div>
+          {error ? <p className="mt-1 text-xs text-red-500">{error}</p> : null}
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPTED_IMAGE_TYPES.join(",")}
+            className="hidden"
+            onChange={handleInputChange}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="relative overflow-hidden rounded-lg">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -177,6 +222,47 @@ export default function CoverImageUploader({
             </button>
           </div>
         ) : null}
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPTED_IMAGE_TYPES.join(",")}
+          className="hidden"
+          onChange={handleInputChange}
+        />
+      </div>
+    );
+  }
+
+  if (variant === "compact") {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 transition-colors hover:border-gray-300 hover:bg-canvas hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {uploading ? (
+            "Uploading..."
+          ) : (
+            <>
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <rect x="3.5" y="4" width="17" height="16" rx="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="m5.5 17 4.25-4.25 3 3 2.25-2.25 3.5 3.5" />
+                <circle cx="15.5" cy="9" r="1.25" />
+              </svg>
+              {emptyTitle}
+            </>
+          )}
+        </button>
+        {error ? <p className="mt-1 text-xs text-red-500">{error}</p> : null}
         <input
           ref={inputRef}
           type="file"

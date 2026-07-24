@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Button from "@/components/ui/Button";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import { countShortPostCharacters, SHORT_POST_MAX_CHARACTERS } from "@/lib/shortPostContent";
 import { createPost } from "./actions";
@@ -156,32 +155,39 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+    <div className="flex min-h-[calc(100dvh-127px)] flex-col sm:min-h-[552px]">
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={() => router.back()}
-          className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-gray-500 hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+          aria-label="Close post composer"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
         >
-          Cancel
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth={1.8}
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
         </button>
-        <div className="min-w-0 flex-1 text-center">
-          <h1 className="font-display text-xl font-semibold text-gray-900">New post</h1>
-          <p className="text-[11px] text-gray-400">Saved on this device automatically</p>
-        </div>
-        <Button
+        <h1 className="min-w-0 flex-1 text-base font-normal text-gray-400">New post</h1>
+        <button
           type="button"
-          variant="primary"
           onClick={() => void handleSubmit()}
           disabled={!canSubmit}
-          loading={submitting}
+          className="inline-flex h-11 min-w-[74px] items-center justify-center rounded-full bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-white disabled:opacity-100"
         >
-          Post
-        </Button>
+          {submitting ? "Posting..." : "Post"}
+        </button>
       </div>
 
       {parentPost ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
             Responding to
           </p>
@@ -192,7 +198,7 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
       ) : null}
 
       {pendingRestore ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <span>You have an unfinished post saved on this device.</span>
           <span className="flex shrink-0 gap-2">
             <button
@@ -213,7 +219,7 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
         </div>
       ) : null}
 
-      <div>
+      <div className="flex min-h-[280px] flex-1 flex-col pt-4">
         <label htmlFor="post-body" className="sr-only">
           Post text
         </label>
@@ -227,18 +233,10 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
           rows={8}
           autoFocus
           aria-describedby="post-body-count post-body-error"
-          className={`min-h-[260px] w-full resize-y rounded-lg border bg-white px-1 py-3 text-[17px] leading-[1.7] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-4 ${
+          className={`min-h-[260px] w-full flex-1 resize-none rounded-lg border bg-white px-1 py-3 text-[18px] leading-[1.65] text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-4 ${
             isOverLimit ? "border-red-300" : "border-transparent"
           }`}
         />
-        <div className="mt-1.5 flex items-center justify-between text-xs">
-          <span
-            id="post-body-count"
-            className={isOverLimit ? "font-semibold text-red-600" : "text-gray-400"}
-          >
-            {characterCount.toLocaleString()} / {SHORT_POST_MAX_CHARACTERS.toLocaleString()}
-          </span>
-        </div>
         {isOverLimit ? (
           <p id="post-body-error" role="alert" className="mt-1 text-xs font-medium text-red-600">
             Posts can be at most {SHORT_POST_MAX_CHARACTERS.toLocaleString()} characters — trim{" "}
@@ -247,21 +245,37 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
         ) : null}
       </div>
 
-      <CoverImageUploader
-        initialUrl={imageUrl ?? undefined}
-        onUpload={(url) => setImageUrl(url)}
-        onRemove={() => setImageUrl(null)}
-        onUploadingChange={setUploading}
-        emptyTitle="Add an image (optional)"
-        previewHeightClass="h-40"
-      />
+      <div className="border-t border-gray-100 pt-4">
+        <div className="flex items-center justify-between gap-4">
+          <CoverImageUploader
+            initialUrl={imageUrl ?? undefined}
+            onUpload={(url) => setImageUrl(url)}
+            onRemove={() => setImageUrl(null)}
+            onUploadingChange={setUploading}
+            emptyTitle="Add image"
+            previewHeightClass="h-40"
+            variant="compact"
+          />
+          <span
+            id="post-body-count"
+            className={`shrink-0 text-sm ${
+              isOverLimit ? "font-semibold text-red-600" : "text-gray-400"
+            }`}
+          >
+            {characterCount.toLocaleString()}/{SHORT_POST_MAX_CHARACTERS.toLocaleString()}
+          </span>
+        </div>
+
+        <p className="mt-4 text-sm leading-5 text-gray-400">
+          New post — Posts are short and conversational, no title needed. They publish instantly.
+        </p>
+      </div>
 
       {error ? (
-        <p role="alert" className="text-sm font-medium text-red-600">
+        <p role="alert" className="mt-3 text-sm font-medium text-red-600">
           {error}
         </p>
       ) : null}
-
     </div>
   );
 }

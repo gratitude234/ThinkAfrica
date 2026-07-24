@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import ResearchSubmissionForm, {
   type ResearchDraft,
+  type SubmittingAuthor,
 } from "./ResearchSubmissionForm";
 import type { PostReferenceRecord } from "@/lib/types";
 import type { CoAuthorProfile } from "@/components/collaboration/CoAuthorPicker";
@@ -24,6 +25,19 @@ export default async function ResearchSubmitPage({ searchParams }: PageProps) {
   let draft: ResearchDraft | null = null;
   let references: PostReferenceRecord[] = [];
   let coAuthors: CoAuthorProfile[] = [];
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("username, full_name, university")
+    .eq("id", user.id)
+    .single();
+  const author: SubmittingAuthor | null = profile
+    ? {
+        username: profile.username as string,
+        fullName: (profile.full_name as string | null) ?? null,
+        university: (profile.university as string | null) ?? null,
+      }
+    : null;
 
   if (draftId) {
     const { data: post } = await supabase
@@ -90,6 +104,7 @@ export default async function ResearchSubmitPage({ searchParams }: PageProps) {
   return (
     <ResearchSubmissionForm
       userId={user.id}
+      author={author}
       initialDraft={draft}
       initialReferences={references}
       initialCoAuthors={coAuthors}
