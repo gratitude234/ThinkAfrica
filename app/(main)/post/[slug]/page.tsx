@@ -36,9 +36,7 @@ import HomeFeedCard from "@/components/post/HomeFeedCard";
 import type { PostCardData } from "@/components/post/PostCard";
 import { fetchResponseCards } from "@/lib/feedData";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
-import ResponseStartLink, {
-  type ResponseIntent,
-} from "@/components/post/ResponseStartLink";
+import ResponseStartLink from "@/components/post/ResponseStartLink";
 import PostConversationView from "./PostConversationView";
 import { getCollaborationSummary } from "@/lib/collaboration";
 import { getMessageEligibility } from "@/lib/messaging";
@@ -128,28 +126,6 @@ interface CoAuthorRecord {
   } | null;
 }
 
-const RESPONSE_PROMPTS: Array<{
-  intent: ResponseIntent;
-  label: string;
-  body: string;
-}> = [
-  {
-    intent: "extend",
-    label: "Extend this idea",
-    body: "Build on the strongest point with another angle from class, campus, or your community.",
-  },
-  {
-    intent: "challenge",
-    label: "Challenge the argument",
-    body: "Respond with a respectful counterpoint, objection, or different interpretation.",
-  },
-  {
-    intent: "evidence",
-    label: "Add evidence or an example",
-    body: "Bring in a source, statistic, case, or lived observation that sharpens the discussion.",
-  },
-];
-
 interface RelatedPost {
   id: string;
   title: string | null;
@@ -204,20 +180,6 @@ function estimateReadTime(content: string): number {
 
 function countWords(content: string): number {
   return content.replace(/<[^>]*>/g, " ").trim().split(/\s+/).filter(Boolean).length;
-}
-
-function extractHeadings(content: string): { id: string; text: string; level: number }[] {
-  const regex = /<h([23])[^>]*>(.*?)<\/h[23]>/gi;
-  const matches: RegExpExecArray[] = [];
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(content)) !== null) matches.push(match);
-
-  return matches.map((item, index) => ({
-    id: `heading-${index}`,
-    text: item[2].replace(/<[^>]*>/g, ""),
-    level: parseInt(item[1], 10),
-  }));
 }
 
 function injectHeadingIds(content: string): string {
@@ -407,7 +369,7 @@ function ResearchDocumentPanel({ post }: { post: PostRecord }) {
               href={`/api/research-document/${post.id}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
             >
               Open PDF
             </a>
@@ -1273,80 +1235,16 @@ async function PostContinueExploringSection({
 }) {
   const { relatedPosts, previousPost, nextPost } = await secondaryDataPromise;
 
+  if (relatedPosts.length === 0 && !previousPost && !nextPost) return null;
+
   return (
-    <section className="my-9 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-[0_12px_36px_-28px_rgba(0,75,58,0.55)]">
-      <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 px-5 py-6 text-white sm:px-7 sm:py-7">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-200">
-          Keep reading
-        </p>
-        <div className="mt-2 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="font-display text-2xl font-semibold leading-tight sm:text-[28px]">
-              Continue exploring Indegenius
-            </h2>
-            <p className="mt-2 max-w-lg text-sm leading-6 text-emerald-50/75">
-              Discover the latest ideas, research, and perspectives from across the community.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/"
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-emerald-950 transition-colors hover:bg-emerald-50"
-            >
-              Latest stories
-            </Link>
-            <Link
-              href="/explore"
-              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/25 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10"
-            >
-              Explore topics
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {previousPost || nextPost ? (
-        <div className="grid border-b border-gray-100 sm:grid-cols-2 sm:divide-x sm:divide-gray-100">
-          {previousPost ? (
-            <Link
-              href={`/post/${previousPost.slug}`}
-              className="group flex min-h-[104px] flex-col justify-center border-b border-gray-100 px-5 py-4 transition-colors hover:bg-emerald-50/60 sm:border-b-0 sm:px-7"
-            >
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">
-                &larr; Previous story
-              </span>
-              <span className="mt-2 line-clamp-2 text-sm font-semibold leading-snug text-gray-900 group-hover:text-emerald-800">
-                {getPostMetadataTitle(previousPost)}
-              </span>
-            </Link>
-          ) : (
-            <div className="hidden sm:block" aria-hidden="true" />
-          )}
-          {nextPost ? (
-            <Link
-              href={`/post/${nextPost.slug}`}
-              className="group flex min-h-[104px] flex-col justify-center px-5 py-4 text-right transition-colors hover:bg-emerald-50/60 sm:px-7"
-            >
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">
-                Next story &rarr;
-              </span>
-              <span className="mt-2 line-clamp-2 text-sm font-semibold leading-snug text-gray-900 group-hover:text-emerald-800">
-                {getPostMetadataTitle(nextPost)}
-              </span>
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
-
+    <section className="my-9 border-t border-gray-200 pt-6">
       {relatedPosts.length > 0 ? (
-        <div className="px-5 py-6 sm:px-7">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-              More like this
-            </h3>
-            <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <>
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+            More like this
+          </h3>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             {relatedPosts.map((item) => (
               <Link
                 key={item.id}
@@ -1376,6 +1274,31 @@ async function PostContinueExploringSection({
               </Link>
             ))}
           </div>
+        </>
+      ) : null}
+
+      {previousPost || nextPost ? (
+        <div className="mt-5 flex items-center justify-between gap-4 text-sm">
+          {previousPost ? (
+            <Link
+              href={`/post/${previousPost.slug}`}
+              className="group min-w-0 text-gray-500 transition-colors hover:text-emerald-brand"
+            >
+              <span aria-hidden="true">&larr; </span>
+              <span className="font-medium">{getPostMetadataTitle(previousPost)}</span>
+            </Link>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+          {nextPost ? (
+            <Link
+              href={`/post/${nextPost.slug}`}
+              className="group min-w-0 text-right text-gray-500 transition-colors hover:text-emerald-brand"
+            >
+              <span className="font-medium">{getPostMetadataTitle(nextPost)}</span>
+              <span aria-hidden="true"> &rarr;</span>
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -1414,51 +1337,6 @@ async function PostPublishSuccessSection({
           : null
       }
     />
-  );
-}
-
-function ResponsePromptPanel({ postId }: { postId: string }) {
-  return (
-    <section className="mb-10 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-[#E0FAF0] p-4 sm:rounded-lg sm:p-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">
-            Respond to this idea
-          </p>
-          <h2 className="font-display mt-1 text-[21px] font-semibold leading-tight text-gray-950 sm:text-[22px]">
-            Add your argument to the thread
-          </h2>
-        </div>
-        <p className="max-w-sm text-[13px] leading-6 text-emerald-900/75">
-          Choose the angle that best fits what you want to say next.
-        </p>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {RESPONSE_PROMPTS.map((prompt) => (
-          <ResponseStartLink
-            key={prompt.intent}
-            postId={postId}
-            source="article_response_prompt"
-            starter="response"
-            responseIntent={prompt.intent}
-            className="group flex min-h-[112px] flex-col justify-between rounded-xl border border-emerald-100 bg-white p-4 text-left transition-all hover:-translate-y-px hover:border-emerald-300 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:min-h-[124px] sm:rounded-lg"
-          >
-            <span>
-              <span className="block text-sm font-semibold text-gray-950 transition-colors group-hover:text-emerald-700">
-                {prompt.label}
-              </span>
-              <span className="mt-2 block text-sm leading-6 text-gray-600">
-                {prompt.body}
-              </span>
-            </span>
-            <span className="mt-4 text-xs font-semibold text-emerald-700">
-              Start response
-            </span>
-          </ResponseStartLink>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -1522,135 +1400,6 @@ async function PostResponsesSection({
         </div>
       )}
     </section>
-  );
-}
-
-async function PostSidebar({
-  post,
-  author,
-  userId,
-  headings,
-  sanitizedContent,
-  sanitizedExcerpt,
-  wordCount,
-  parentPostId,
-  isPublished,
-  secondaryDataPromise,
-  viewerDataPromise,
-}: {
-  post: PostRecord;
-  author: AuthorProfile | null;
-  userId: string | null;
-  headings: { id: string; text: string; level: number }[];
-  sanitizedContent: string;
-  sanitizedExcerpt: string | null;
-  wordCount: number;
-  parentPostId: string | null;
-  isPublished: boolean;
-  secondaryDataPromise: Promise<SecondaryData>;
-  viewerDataPromise: Promise<ViewerData>;
-}) {
-  const [secondary, viewer] = await Promise.all([
-    secondaryDataPromise,
-    viewerDataPromise,
-  ]);
-  const summary = getFullQualitySummary({
-    post,
-    author,
-    sanitizedContent,
-    wordCount,
-    parentPostId,
-    secondary,
-  });
-
-  return (
-    <aside className="hidden lg:block">
-      <div className="sticky top-24 space-y-4">
-        {isPublished ? (
-          <section className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
-              Reader actions
-            </h2>
-            <div className="space-y-2 [&_a]:w-full [&_button]:w-full">
-              <LikeButton
-                postId={post.id}
-                initialLiked={viewer.userLiked}
-                initialLikeCount={secondary.likeCount}
-                userId={userId}
-              />
-              <BookmarkButton
-                postId={post.id}
-                initialBookmarked={viewer.userBookmarked}
-                userId={userId}
-              />
-              <ShareButtons
-                title={getPostMetadataTitle(post, author)}
-                slug={post.slug}
-                excerpt={sanitizedExcerpt}
-                authorName={author?.full_name ?? null}
-              />
-              {post.citation_id ? (
-                <Link
-                  href={`/publication/${post.citation_id}`}
-                  className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-sky-200 hover:text-sky-700"
-                >
-                  Cite this
-                </Link>
-              ) : null}
-              <ResponseStartLink
-                postId={post.id}
-                source="post_sidebar"
-                className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-              >
-                Write a response
-              </ResponseStartLink>
-              {userId && author && userId !== author.id ? (
-                <ReportButton
-                  targetType="post"
-                  targetId={post.id}
-                  targetLabel={`"${getPostMetadataTitle(post, author)}"`}
-                />
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-        <CredibilityPanel postId={post.id} summary={summary} isPublished={isPublished} userId={userId} />
-        <TableOfContents headings={headings} />
-        {author ? (
-          <section className="rounded-lg bg-gray-950 p-4 text-white">
-            <h2 className="font-display text-[15px] font-semibold">
-              Follow this author
-            </h2>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-white/55">
-              Get new work by {author.full_name ?? author.username} in your feed.
-            </p>
-            <div className="mt-3">
-              {userId && userId !== author.id ? (
-                <FollowButton
-                  followerId={userId}
-                  followingId={author.id}
-                  initialFollowing={viewer.userFollowsAuthor}
-                />
-              ) : userId === author.id ? (
-                <Link
-                  href="/dashboard"
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/15"
-                >
-                  View dashboard
-                </Link>
-              ) : (
-                <Link
-                  href={`/login?redirectTo=${encodeURIComponent(`/post/${post.slug}`)}`}
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-                >
-                  Follow author
-                </Link>
-              )}
-            </div>
-          </section>
-        ) : null}
-      </div>
-    </aside>
   );
 }
 
@@ -2039,7 +1788,7 @@ async function ResearchDossierSidebar({
                 href={`/api/research-document/${post.id}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-10 items-center justify-center rounded-lg bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
               >
                 Open PDF
               </a>
@@ -2095,11 +1844,11 @@ async function ResearchDossierSidebar({
         <TableOfContents headings={dossierHeadings} />
 
         {author ? (
-          <section className="rounded-lg bg-slate-950 p-4 text-white">
-            <h2 className="font-display text-[15px] font-semibold">
+          <section className="rounded-lg border border-gray-200 bg-white p-4">
+            <h2 className="font-display text-[15px] font-semibold text-ink">
               Follow this researcher
             </h2>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-white/55">
+            <p className="mt-1 text-[11.5px] leading-relaxed text-gray-500">
               Get new research by {author.full_name ?? author.username} in your feed.
             </p>
             <div className="mt-3">
@@ -2112,7 +1861,7 @@ async function ResearchDossierSidebar({
               ) : userId === author.id ? (
                 <Link
                   href="/dashboard"
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/15"
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-canvas"
                 >
                   View dashboard
                 </Link>
@@ -2470,8 +2219,6 @@ export default async function PostPage({ params }: PageProps) {
               />
             </Suspense>
 
-            {isPublished ? <ResponsePromptPanel postId={post.id} /> : null}
-
             <Suspense fallback={<SectionSkeleton rows={2} />}>
               <PostEngagementSection
                 post={post}
@@ -2483,29 +2230,8 @@ export default async function PostPage({ params }: PageProps) {
               />
             </Suspense>
 
-            <Suspense fallback={<SectionSkeleton rows={3} />}>
-              <AuthorAndCollaborationSection
-                post={post}
-                author={author}
-                userId={userId}
-                authorName={authorName}
-                secondaryDataPromise={secondaryDataPromise}
-                viewerDataPromise={viewerDataPromise}
-              />
-            </Suspense>
-
-            {isPublished ? (
-              <>
-                <hr className="my-9 border-gray-200/80" />
-                <Suspense fallback={<SectionSkeleton rows={3} />}>
-                  <PostContinueExploringSection
-                    secondaryDataPromise={secondaryDataPromise}
-                  />
-                </Suspense>
-                <hr className="mb-8 border-gray-200/80" />
-              </>
-            ) : null}
-
+            {/* The conversation comes directly after the actions row — nothing
+                may sit between a reader finishing the paper and the responses. */}
             <Suspense fallback={<SectionSkeleton rows={3} />}>
               <PostResponsesSection
                 post={post}
@@ -2514,6 +2240,27 @@ export default async function PostPage({ params }: PageProps) {
                 secondaryDataPromise={secondaryDataPromise}
               />
             </Suspense>
+
+            <div className="mt-10">
+              <Suspense fallback={<SectionSkeleton rows={3} />}>
+                <AuthorAndCollaborationSection
+                  post={post}
+                  author={author}
+                  userId={userId}
+                  authorName={authorName}
+                  secondaryDataPromise={secondaryDataPromise}
+                  viewerDataPromise={viewerDataPromise}
+                />
+              </Suspense>
+            </div>
+
+            {isPublished ? (
+              <Suspense fallback={<SectionSkeleton rows={3} />}>
+                <PostContinueExploringSection
+                  secondaryDataPromise={secondaryDataPromise}
+                />
+              </Suspense>
+            ) : null}
           </main>
 
           <Suspense
@@ -2709,26 +2456,8 @@ export default async function PostPage({ params }: PageProps) {
             />
           </Suspense>
 
-          <Suspense fallback={<SectionSkeleton rows={3} />}>
-            <AuthorAndCollaborationSection
-              post={post}
-              author={author}
-              userId={userId}
-              authorName={authorName}
-              secondaryDataPromise={secondaryDataPromise}
-              viewerDataPromise={viewerDataPromise}
-              showCollaboration={false}
-            />
-          </Suspense>
-
-          {isPublished ? (
-            <Suspense fallback={<SectionSkeleton rows={3} />}>
-              <PostContinueExploringSection
-                secondaryDataPromise={secondaryDataPromise}
-              />
-            </Suspense>
-          ) : null}
-
+          {/* The conversation comes directly after the actions row — nothing
+              may sit between a reader finishing the piece and the responses. */}
           <Suspense fallback={<SectionSkeleton rows={3} />}>
             <PostResponsesSection
               post={post}
@@ -2737,6 +2466,28 @@ export default async function PostPage({ params }: PageProps) {
               secondaryDataPromise={secondaryDataPromise}
             />
           </Suspense>
+
+          <div className="mt-10">
+            <Suspense fallback={<SectionSkeleton rows={3} />}>
+              <AuthorAndCollaborationSection
+                post={post}
+                author={author}
+                userId={userId}
+                authorName={authorName}
+                secondaryDataPromise={secondaryDataPromise}
+                viewerDataPromise={viewerDataPromise}
+                showCollaboration={false}
+              />
+            </Suspense>
+          </div>
+
+          {isPublished ? (
+            <Suspense fallback={<SectionSkeleton rows={3} />}>
+              <PostContinueExploringSection
+                secondaryDataPromise={secondaryDataPromise}
+              />
+            </Suspense>
+          ) : null}
         </main>
       </div>
     </div>
