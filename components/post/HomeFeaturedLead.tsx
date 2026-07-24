@@ -21,6 +21,11 @@ export interface HomeFeaturedPost {
   } | null;
 }
 
+function readTime(excerpt: string | null) {
+  const words = excerpt?.trim().split(/\s+/).filter(Boolean).length ?? 0;
+  return Math.max(1, Math.ceil(words / 200));
+}
+
 export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
   const kind = resolveContentKind(post);
   const format = kind === "article" ? getArticleFormatLabel(resolveArticleFormat(post)) : null;
@@ -50,7 +55,7 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
       ) : null}
       <div className="relative px-[18px] py-5 sm:max-w-[72%] sm:px-6 sm:py-6">
         <p className="font-display text-[10.5px] font-bold uppercase tracking-[0.16em] text-emerald-200">
-          Editor&apos;s pick · {label}
+          Editor&apos;s pick · {label} · {readTime(excerpt)} min
         </p>
         <Link href={`/post/${post.slug}`} className="mt-2 block rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-brand">
           <h2 className="font-display text-[22px] font-semibold leading-[1.15] sm:text-2xl">{title}</h2>

@@ -9,7 +9,7 @@ import {
   resolveContentKind,
 } from "@/lib/contentModel";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
+import { sanitizePostExcerpt } from "@/lib/utils";
 
 interface RespondingToInfo {
   title: string;
@@ -67,7 +67,6 @@ function AuthorLine({ post, avatarSize = 36 }: { post: PostCardData; avatarSize?
   const name = profile?.full_name ?? profile?.username ?? "Indegenius member";
   const coauthorCount = post.co_authors?.length ?? 0;
   const byline = coauthorCount > 0 ? `${name} + ${coauthorCount}` : name;
-  const date = post.published_at ?? post.created_at;
   const avatarDimensions = { width: avatarSize, height: avatarSize };
   const avatar = profile?.avatar_url ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -87,25 +86,22 @@ function AuthorLine({ post, avatarSize = 36 }: { post: PostCardData; avatarSize?
       ) : (
         <span className="shrink-0">{avatar}</span>
       )}
-      <div className="min-w-0 text-[12px] leading-[1.4]">
-        <div className="flex min-w-0 items-center gap-1.5">
-          {profile?.username ? (
-            <Link href={`/${profile.username}`} className={`truncate font-semibold text-ink hover:text-emerald-700 ${FOCUS_RING}`}>
-              {byline}
-            </Link>
-          ) : (
-            <span className="truncate font-semibold text-ink">{byline}</span>
-          )}
-          {profile?.verified ? (
-            <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-[7px] font-bold text-white" title="Verified">
-              ✓
-            </span>
-          ) : null}
-        </div>
-        <p className="truncate text-ink-muted">
-          {profile?.university ? `${profile.university} · ` : ""}
-          {formatRelativeTime(date)}
-        </p>
+      <div className="flex min-w-0 items-center gap-1.5 text-[12.5px] leading-[1.4]">
+        {profile?.username ? (
+          <Link href={`/${profile.username}`} className={`truncate font-semibold text-ink hover:text-emerald-700 ${FOCUS_RING}`}>
+            {byline}
+          </Link>
+        ) : (
+          <span className="truncate font-semibold text-ink">{byline}</span>
+        )}
+        {profile?.verified ? (
+          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-[7px] font-bold text-white" title="Verified">
+            ✓
+          </span>
+        ) : null}
+        {profile?.university ? (
+          <span className="truncate text-ink-muted">· {profile.university}</span>
+        ) : null}
       </div>
     </div>
   );
@@ -252,7 +248,21 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo 
   );
 }
 
-function ResearchManuscriptRow({ post }: { post: PostCardData }) {
+function EvidenceBadge({ label }: { label: string }) {
+  return (
+    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+      {label}
+    </span>
+  );
+}
+
+function ResearchManuscriptRow({
+  post,
+  evidence,
+}: {
+  post: PostCardData;
+  evidence: string | null;
+}) {
   const size = documentSize(post.document_size_bytes);
   const hasDocument = Boolean(post.document_original_name || post.document_mime_type);
   if (!hasDocument) return null;
@@ -265,9 +275,11 @@ function ResearchManuscriptRow({ post }: { post: PostCardData }) {
       >
         PDF
       </span>
-      <span className="min-w-0 flex-1 truncate text-[11.5px] text-gray-500">
+      <span className="min-w-0 truncate text-[11.5px] text-gray-500">
         PDF manuscript{size ? ` · ${size}` : ""}
       </span>
+      {evidence ? <EvidenceBadge label={evidence} /> : null}
+      <span className="flex-1" />
       <Link
         href={`/post/${post.slug}`}
         aria-label="View paper"
@@ -287,22 +299,29 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo }: Props)
   const coauthors = (post.co_authors ?? [])
     .map((author) => author.profile?.full_name ?? author.profile?.username)
     .filter(Boolean) as string[];
-  const authors = [primaryAuthor, ...coauthors].join(", ");
+  const hasDocument = Boolean(post.document_original_name || post.document_mime_type);
 
   return (
     <article className={`${CARD_SHELL} border-purple-100`}>
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.15em] text-purple-accent">Research</span>
-        {evidence ? <span className="ml-auto rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{evidence}</span> : null}
+        {evidence && !hasDocument ? (
+          <span className="ml-auto">
+            <EvidenceBadge label={evidence} />
+          </span>
+        ) : null}
       </div>
       <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
         <h2 className="font-display text-[19px] font-semibold leading-[1.28] text-ink sm:text-[21px]">{title}</h2>
       </Link>
-      <p className="mt-2 text-[12px] font-medium leading-[1.45] text-gray-700">{authors}</p>
+      <p className="mt-2 text-[12px] font-semibold leading-[1.45] text-gray-800">{primaryAuthor}</p>
       {post.profiles?.university ? <p className="mt-0.5 text-[11.5px] text-gray-500">{post.profiles.university}</p> : null}
+      {coauthors.length > 0 ? (
+        <p className="mt-0.5 text-[11.5px] leading-[1.45] text-gray-500">with {coauthors.join(", ")}</p>
+      ) : null}
       {abstract ? <p className="mt-2.5 line-clamp-2 text-[13.5px] leading-[1.6] text-gray-600">{abstract}</p> : null}
-      <ResearchManuscriptRow post={post} />
+      <ResearchManuscriptRow post={post} evidence={evidence} />
       <Actions post={post} currentUserId={currentUserId} showResponses={false} />
     </article>
   );

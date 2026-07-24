@@ -205,6 +205,27 @@ describe("HomeFeedCard", () => {
     expect(screen.getByRole("heading", { name: "A field study of public trust" })).toBeInTheDocument();
   });
 
+  it("lists Research co-authors on a separate 'with' line under the lead author", () => {
+    render(
+      <HomeFeedCard
+        post={post({
+          title: "A field study of public trust",
+          type: "research",
+          content_kind: "research",
+          co_authors: [
+            { profile: { username: "kwame-b", full_name: "Kwame Boateng" } },
+            { profile: { username: "ama-s", full_name: null } },
+          ] as PostCardData["co_authors"],
+        })}
+        currentUserId="user-1"
+        surface="home"
+      />
+    );
+
+    expect(screen.getByText("Amara Okafor")).toBeInTheDocument();
+    expect(screen.getByText("with Kwame Boateng, ama-s")).toBeInTheDocument();
+  });
+
   it("does not fabricate a Reviewed badge for unreviewed Research", () => {
     render(
       <HomeFeedCard

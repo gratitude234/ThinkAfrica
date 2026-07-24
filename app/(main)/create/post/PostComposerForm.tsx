@@ -233,7 +233,7 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
           rows={8}
           autoFocus
           aria-describedby="post-body-count post-body-error"
-          className={`min-h-[260px] w-full flex-1 resize-none rounded-lg border bg-white px-1 py-3 text-[18px] leading-[1.65] text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-4 ${
+          className={`min-h-[260px] w-full flex-1 resize-none rounded-lg border bg-white px-1 py-3 text-[18px] leading-[1.65] text-gray-900 placeholder:text-gray-500 focus:outline-none ${
             isOverLimit ? "border-red-300" : "border-transparent"
           }`}
         />
@@ -245,7 +245,7 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
         ) : null}
       </div>
 
-      <div className="border-t border-gray-100 pt-4">
+      <div className="pt-4">
         <div className="flex items-center justify-between gap-4">
           <CoverImageUploader
             initialUrl={imageUrl ?? undefined}
@@ -262,7 +262,7 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
               isOverLimit ? "font-semibold text-red-600" : "text-gray-400"
             }`}
           >
-            {characterCount.toLocaleString()}/{SHORT_POST_MAX_CHARACTERS.toLocaleString()}
+            {characterCount}/{SHORT_POST_MAX_CHARACTERS}
           </span>
         </div>
 
