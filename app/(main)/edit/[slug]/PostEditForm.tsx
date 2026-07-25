@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import { countShortPostCharacters, SHORT_POST_MAX_CHARACTERS } from "@/lib/shortPostContent";
-import { updatePost } from "@/app/(main)/create/post/actions";
+import { updatePost } from "@/app/(write)/create/post/actions";
 
 interface PostEditFormProps {
   postId: string;

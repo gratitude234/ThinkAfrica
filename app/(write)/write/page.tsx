@@ -178,7 +178,7 @@ export default function WritePage() {
   const typeParam = searchParams.get("type");
   // "kind=article" is the preferred, stable URL for this composer (it's the
   // link the Post composer's "Write an article" path uses -- see
-  // app/(main)/create/post/PostComposerForm.tsx); legacy
+  // app/(write)/create/post/PostComposerForm.tsx); legacy
   // `type=essay`/`type=policy_brief` links keep
   // working for backward compatibility -- both just land on the same
   // Article composer, since which legacy value applies to a *new* draft is

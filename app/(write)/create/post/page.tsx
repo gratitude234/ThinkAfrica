@@ -46,8 +46,10 @@ export default async function CreatePostPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="-mx-4 -mb-32 -mt-6 flex min-h-[calc(100dvh-87px)] flex-col overflow-hidden bg-white sm:mx-auto sm:mb-0 sm:mt-0 sm:min-h-[600px] sm:max-w-[640px] sm:rounded-xl sm:border sm:border-gray-200 sm:shadow-[0_12px_32px_rgb(17_24_39/0.08)]">
-      <PostComposerForm userId={user.id} parentPost={parentPost} />
+    <div className="min-h-dvh bg-gray-100 sm:flex sm:justify-center sm:px-6 sm:py-8">
+      <div className="flex min-h-dvh w-full flex-col overflow-hidden bg-white sm:min-h-[600px] sm:max-w-[640px] sm:rounded-xl sm:border sm:border-gray-200 sm:shadow-[0_12px_32px_rgb(17_24_39/0.08)]">
+        <PostComposerForm userId={user.id} parentPost={parentPost} />
+      </div>
     </div>
   );
 }
