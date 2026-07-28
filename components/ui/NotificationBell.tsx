@@ -42,6 +42,10 @@ const TYPE_ICONS: Record<string, string> = {
   revision_requested: "RE",
   response_post: "RE",
   opportunity_inquiry: "OP",
+  debate_invitation: "D",
+  debate_invitation_response: "OK",
+  debate_phase_advanced: ">",
+  debate_cancelled: "X",
 };
 
 function notificationText(notification: Notification) {

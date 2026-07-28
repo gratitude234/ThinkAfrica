@@ -21,6 +21,7 @@ import ShareButton from "./ShareButton";
 import RecapPoller from "./RecapPoller";
 import ActivateDebateV2 from "./ActivateDebateV2";
 import DebateV2Page from "./v2/DebateV2Page";
+import DebateV15Page from "./v15/DebateV15Page";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -93,6 +94,10 @@ export default async function DebatePage({ params }: PageProps) {
   // decision, exercised directly by lib/debateV2Ui.test.ts).
   if (resolveDebateExperienceVersion(debate.format_version) === "v2") {
     return <DebateV2Page debateId={id} />;
+  }
+
+  if (debate.debate_variant === "v1_5") {
+    return <DebateV15Page debateId={id} />;
   }
 
   const { data: rawArgs } = await supabase

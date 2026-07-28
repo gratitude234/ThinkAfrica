@@ -1,29 +1,31 @@
 import { PHASE_LABELS, type DebatePhase } from "@/lib/debatePhases";
 
-export type DebateStatus = "open" | "active" | "closed";
+export type DebateStatus = "open" | "active" | "closed" | "cancelled";
 
 const STATUS_STYLES: Record<DebateStatus, string> = {
   open: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200",
   active: "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
   closed: "bg-gray-100 text-gray-600 ring-1 ring-gray-200",
+  cancelled: "bg-red-50 text-red-700 ring-1 ring-red-200",
 };
 
 export function getStatusLabel(status: DebateStatus) {
   if (status === "active") return "Live";
   if (status === "open") return "Open";
+  if (status === "cancelled") return "Cancelled";
   return "Closed";
 }
 
 export function getVoteSplit(forCount = 0, againstCount = 0) {
   const total = forCount + againstCount;
-  const forPct = total > 0 ? Math.round((forCount / total) * 100) : 50;
+  const forPct = total > 0 ? Math.round((forCount / total) * 100) : 0;
 
   return {
     total,
     forCount,
     againstCount,
     forPct,
-    againstPct: 100 - forPct,
+    againstPct: total > 0 ? 100 - forPct : 0,
   };
 }
 
@@ -81,13 +83,11 @@ export function StanceMeter({
   againstCount,
   label = "Community vote",
   compact = false,
-  againstColor = "#7C3AED",
 }: {
   forCount?: number | null;
   againstCount?: number | null;
   label?: string;
   compact?: boolean;
-  againstColor?: string;
 }) {
   const split = getVoteSplit(forCount ?? 0, againstCount ?? 0);
 
@@ -103,13 +103,17 @@ export function StanceMeter({
           style={{ width: `${split.forPct}%` }}
         />
         <span
-          className="h-full transition-[width] duration-500"
-          style={{ width: `${split.againstPct}%`, background: againstColor }}
+          className="h-full bg-purple-accent transition-[width] duration-500"
+          style={{ width: `${split.againstPct}%` }}
         />
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-xs font-semibold">
-        <span className="text-emerald-700">For {split.forPct}%</span>
-        <span style={{ color: againstColor }}>Against {split.againstPct}%</span>
+        <span className="text-emerald-700">
+          For {split.total ? `${split.forPct}%` : "0"}
+        </span>
+        <span className="text-purple-accent">
+          Against {split.total ? `${split.againstPct}%` : "0"}
+        </span>
       </div>
     </div>
   );
@@ -118,14 +122,19 @@ export function StanceMeter({
 export function PhaseStepper({
   currentPhase,
   status,
+  variant = "legacy",
 }: {
   currentPhase: DebatePhase;
   status: DebateStatus | string;
+  variant?: "legacy" | "v1_5";
 }) {
-  const phases: DebatePhase[] = ["opening", "rebuttal", "closing"];
+  const phases: DebatePhase[] =
+    variant === "v1_5"
+      ? ["recruiting", "opening", "rebuttal", "voting", "completed"]
+      : ["opening", "rebuttal", "closing"];
   const currentIndex = phases.indexOf(currentPhase);
-  const isOpen = status === "open";
-  const isClosed = status === "closed";
+  const isOpen = variant === "legacy" && status === "open";
+  const isClosed = status === "closed" || status === "cancelled";
 
   return (
     <div className="w-full">
@@ -159,7 +168,11 @@ export function PhaseStepper({
           );
         })}
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] font-medium text-gray-500">
+      <div
+        className={`mt-2 grid gap-2 text-[11px] font-medium text-gray-500 ${
+          variant === "v1_5" ? "grid-cols-5" : "grid-cols-3"
+        }`}
+      >
         {phases.map((phase) => (
           <span key={phase} className="truncate">
             {PHASE_LABELS[phase]}

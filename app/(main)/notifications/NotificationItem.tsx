@@ -48,6 +48,10 @@ const TYPE_ICONS: Record<string, string> = {
   debate_v2_final_vote: "V",
   debate_v2_direct_response: "?",
   debate_v2_evidence_requested: "E",
+  debate_invitation: "D",
+  debate_invitation_response: "OK",
+  debate_phase_advanced: ">",
+  debate_cancelled: "X",
 };
 
 function buildMessage(notification: NotificationData): string {

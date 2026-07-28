@@ -14,6 +14,7 @@
     "lib/suggestedPeople.ts",
     "lib/discoverData.ts",
     "lib/adminAccess.ts",
+    "lib/debateV15.ts",
     "components/moderation/reportReasons.ts",
     "components/moderation/reportActions.ts",
     "components/moderation/blockActions.ts",

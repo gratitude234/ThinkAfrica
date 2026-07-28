@@ -1,21 +1,21 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import {
-  formatDate,
-  formatRelativeTime,
-  formatTimeUntil,
-} from "@/lib/utils";
+import { formatDate, formatRelativeTime, formatTimeUntil } from "@/lib/utils";
 import { type DebatePhase, PHASE_LABELS } from "@/lib/debatePhases";
 import {
   DebateStatusPill,
-  LiveDot,
   PhasePill,
   StanceMeter,
   StatTile,
   type DebateStatus,
 } from "./DebatePrimitives";
-import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
+import {
+  DEFAULT_OG_IMAGE,
+  SITE_NAME,
+  absoluteUrl,
+  canonicalPath,
+} from "@/lib/site";
 
 export const revalidate = 30;
 
@@ -30,7 +30,9 @@ export const metadata: Metadata = {
       "Join structured Indegenius debates where students argue motions, vote on positions, and build stronger public ideas.",
     url: absoluteUrl("/debates"),
     siteName: SITE_NAME,
-    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
+    images: [
+      { url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 },
+    ],
     type: "website",
   },
   twitter: {
@@ -42,12 +44,30 @@ export const metadata: Metadata = {
   },
 };
 
-type DebateFilter = "live" | "open" | "closed" | "recaps";
+type DebateFilter =
+  | "active"
+  | "recruiting"
+  | "completed"
+  | "cancelled"
+  | "recaps";
 
 const TABS: Array<{ label: string; value: DebateFilter; href: string }> = [
-  { label: "Live", value: "live", href: "/debates" },
-  { label: "Open", value: "open", href: "/debates?status=open" },
-  { label: "Closed", value: "closed", href: "/debates?status=closed" },
+  { label: "Active", value: "active", href: "/debates" },
+  {
+    label: "Recruiting",
+    value: "recruiting",
+    href: "/debates?status=recruiting",
+  },
+  {
+    label: "Completed",
+    value: "completed",
+    href: "/debates?status=completed",
+  },
+  {
+    label: "Cancelled",
+    value: "cancelled",
+    href: "/debates?status=cancelled",
+  },
   { label: "Recaps", value: "recaps", href: "/debates?status=recaps" },
 ];
 
@@ -61,29 +81,70 @@ interface DebateProfile {
   university: string | null;
 }
 
+type DebateVariant = "legacy" | "v1_5";
+type RecapStatus = "none" | "pending" | "generating" | "ready" | "failed";
+
 interface DebateRow {
   id: string;
   title: string;
   description: string | null;
   status: DebateStatus;
   current_phase: DebatePhase | null;
+  debate_variant: DebateVariant | null;
   round_duration_minutes: number | null;
   tags: string[] | null;
   created_at: string;
   ends_at: string | null;
+  recruiting_deadline: string | null;
+  opening_deadline: string | null;
+  rebuttal_deadline: string | null;
+  voting_deadline: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
   motion_for_count: number | null;
   motion_against_count: number | null;
-  recap_text?: string | null;
-  recap_generated_at?: string | null;
+  recap_text: string | null;
+  recap_status: RecapStatus | null;
   debate_arguments?: { count: number }[] | { count: number } | null;
   profiles: DebateProfile | DebateProfile[] | null;
 }
 
+const EMPTY_COPY: Record<DebateFilter, { title: string; body: string }> = {
+  active: {
+    title: "No debate is active right now.",
+    body: "Recruiting debates are assembling one confirmed voice for each side.",
+  },
+  recruiting: {
+    title: "No debates are recruiting.",
+    body: "Verified members can frame a motion and personally invite both sides.",
+  },
+  completed: {
+    title: "No completed debates yet.",
+    body: "Finished debates will remain here as durable records of the reasoning and vote.",
+  },
+  cancelled: {
+    title: "No cancelled debates.",
+    body: "Debates that cannot continue are labelled honestly and kept readable here.",
+  },
+  recaps: {
+    title: "No AI-assisted recaps yet.",
+    body: "A recap appears after a completed debate has been summarised.",
+  },
+};
+
 function getFilter(status?: string): DebateFilter {
-  if (status === "open" || status === "closed" || status === "recaps") {
+  if (
+    status === "recruiting" ||
+    status === "completed" ||
+    status === "cancelled" ||
+    status === "recaps"
+  ) {
     return status;
   }
-  return "live";
+  // Preserve old links that used ?status=open and ?status=closed.
+  if (status === "open") return "recruiting";
+  if (status === "closed") return "completed";
+  return "active";
 }
 
 function getArgumentCount(value: DebateRow["debate_arguments"]) {
@@ -100,15 +161,50 @@ function getVoteSplit(debate: DebateRow) {
   const forCount = debate.motion_for_count ?? 0;
   const againstCount = debate.motion_against_count ?? 0;
   const total = forCount + againstCount;
-  const forPct = total > 0 ? Math.round((forCount / total) * 100) : 50;
-
+  const forPct = total ? Math.round((forCount / total) * 100) : 0;
   return {
     forCount,
     againstCount,
     total,
     forPct,
-    againstPct: 100 - forPct,
+    againstPct: total ? 100 - forPct : 0,
   };
+}
+
+function getPhaseDeadline(debate: DebateRow) {
+  if (debate.debate_variant !== "v1_5") return debate.ends_at;
+
+  if (debate.current_phase === "recruiting") {
+    return debate.recruiting_deadline;
+  }
+  if (debate.current_phase === "opening") return debate.opening_deadline;
+  if (debate.current_phase === "rebuttal") return debate.rebuttal_deadline;
+  if (debate.current_phase === "voting") return debate.voting_deadline;
+  return null;
+}
+
+function getTimeLabel(debate: DebateRow) {
+  if (debate.status === "cancelled") {
+    return `Cancelled ${formatDate(debate.cancelled_at ?? debate.created_at)}`;
+  }
+  if (debate.status === "closed") {
+    return `Completed ${formatDate(debate.ends_at ?? debate.created_at)}`;
+  }
+
+  const deadline = getPhaseDeadline(debate);
+  if (!deadline) {
+    return debate.status === "open"
+      ? `Opened ${formatRelativeTime(debate.created_at)}`
+      : null;
+  }
+
+  const phaseLabel = debate.current_phase
+    ? PHASE_LABELS[debate.current_phase]
+    : "Stage";
+  if (new Date(deadline).getTime() <= Date.now()) {
+    return `${phaseLabel} deadline passed`;
+  }
+  return `${phaseLabel} closes ${formatTimeUntil(deadline)}`;
 }
 
 function EmptyDebates({
@@ -118,41 +214,25 @@ function EmptyDebates({
   filter: DebateFilter;
   signedIn: boolean;
 }) {
-  const copy: Record<DebateFilter, { title: string; body: string }> = {
-    live: {
-      title: "No live debates right now.",
-      body: "Open debates are waiting for moderators to start structured rounds.",
-    },
-    open: {
-      title: "No open motions yet.",
-      body: "Verified members can frame the next question for the community.",
-    },
-    closed: {
-      title: "No closed debates yet.",
-      body: "Completed debates will appear here with final voting records.",
-    },
-    recaps: {
-      title: "No recaps available yet.",
-      body: "Once a debate closes, Indegenius generates a citable recap.",
-    },
-  };
-
+  const copy = EMPTY_COPY[filter];
   return (
-    <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
-      <p className="text-base font-semibold text-gray-900">{copy[filter].title}</p>
-      <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-gray-500">
-        {copy[filter].body}
+    <div className="rounded-xl border border-dashed border-gray-200 bg-surface px-6 py-14 text-center">
+      <p className="text-base font-semibold text-ink">{copy.title}</p>
+      <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-ink-muted">
+        {copy.body}
       </p>
       <div className="mt-5 flex flex-wrap justify-center gap-2">
-        <Link
-          href="/debates?status=open"
-          className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-canvas"
-        >
-          View open motions
-        </Link>
+        {filter !== "recruiting" ? (
+          <Link
+            href="/debates?status=recruiting"
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-ink hover:bg-canvas"
+          >
+            View recruiting debates
+          </Link>
+        ) : null}
         <Link
           href={signedIn ? "/debates/create" : "/login?redirectTo=/debates/create"}
-          className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
+          className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90"
         >
           Start a debate
         </Link>
@@ -161,186 +241,79 @@ function EmptyDebates({
   );
 }
 
-function LiveHeroCard({ debate }: { debate: DebateRow }) {
-  const split = getVoteSplit(debate);
-  const argCount = getArgumentCount(debate.debate_arguments);
-  const phase = debate.current_phase ?? "opening";
+function DebateCard({
+  debate,
+  featured = false,
+}: {
+  debate: DebateRow;
+  featured?: boolean;
+}) {
   const moderator = getProfile(debate.profiles);
+  const argumentCount = getArgumentCount(debate.debate_arguments);
+  const split = getVoteSplit(debate);
+  const phase =
+    debate.current_phase ??
+    (debate.status === "closed" ? "completed" : "opening");
+  const timeLabel = getTimeLabel(debate);
+  const deadline = getPhaseDeadline(debate);
+  const hasRecap =
+    Boolean(debate.recap_text) || debate.recap_status === "ready";
+
+  const accent =
+    debate.status === "cancelled"
+      ? "border-l-red-400"
+      : phase === "recruiting"
+        ? "border-l-gold"
+        : phase === "voting"
+          ? "border-l-purple-accent"
+          : debate.status === "closed"
+            ? "border-l-gray-300"
+            : "border-l-emerald-brand";
 
   return (
     <Link
       href={`/debates/${debate.id}`}
-      className="group block overflow-hidden rounded-2xl transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-2xl"
-      style={{ background: "#111827" }}
+      className={`group block rounded-xl border border-l-4 border-gray-200 bg-surface p-5 transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-lg ${accent} ${
+        featured ? "sm:p-6" : ""
+      }`}
     >
-      <div className="p-6 sm:p-7">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <LiveDot size={8} />
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-400">
-              Live Debate
-            </span>
-          </div>
-          {debate.ends_at ? (
-            <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.4)" }}>
-              {formatTimeUntil(debate.ends_at)}
-            </span>
-          ) : null}
-        </div>
-
-        <h2 className="font-display mb-3 text-xl font-bold leading-snug text-white sm:text-[22px]">
-          {debate.title}
-        </h2>
-        {debate.description ? (
-          <p className="mb-5 line-clamp-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.55)" }}>
-            {debate.description}
-          </p>
-        ) : null}
-
-        <div className="mb-5 grid grid-cols-2 gap-2.5">
-          <div
-            className="rounded-xl px-4 py-3 text-center"
-            style={{
-              background: "rgba(16,185,129,0.1)",
-              border: "1px solid rgba(16,185,129,0.22)",
-            }}
-          >
-            <p
-              className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em]"
-              style={{ color: "#10B981" }}
-            >
-              For
-            </p>
-            <p className="text-3xl font-bold leading-none text-white">{split.forPct}%</p>
-            <p className="mt-1 text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>
-              {split.forCount.toLocaleString()} votes
-            </p>
-          </div>
-          <div
-            className="rounded-xl px-4 py-3 text-center"
-            style={{
-              background: "rgba(124,58,237,0.1)",
-              border: "1px solid rgba(124,58,237,0.25)",
-            }}
-          >
-            <p
-              className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em]"
-              style={{ color: "#A78BFA" }}
-            >
-              Against
-            </p>
-            <p className="text-3xl font-bold leading-none text-white">{split.againstPct}%</p>
-            <p className="mt-1 text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>
-              {split.againstCount.toLocaleString()} votes
-            </p>
-          </div>
-        </div>
-
-        <div
-          className="mb-5 h-1 overflow-hidden rounded-full"
-          style={{ background: "rgba(255,255,255,0.08)" }}
-        >
-          <div
-            className="h-full bg-emerald-brand transition-[width] duration-500"
-            style={{ width: `${split.forPct}%` }}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {debate.tags && debate.tags.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {debate.tags.slice(0, 3).map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full px-2.5 py-1 text-[11px]"
-                  style={{
-                    color: "rgba(255,255,255,0.4)",
-                    background: "rgba(255,255,255,0.06)",
-                  }}
-                >
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          <span className="text-sm font-bold text-emerald-400 transition-colors group-hover:text-emerald-300">
-            Enter room →
-          </span>
-        </div>
-      </div>
-
-      <div
-        className="flex flex-wrap gap-x-4 gap-y-1 px-6 py-3 text-xs font-medium sm:px-7"
-        style={{
-          background: "rgba(255,255,255,0.04)",
-          borderTop: "1px solid rgba(255,255,255,0.07)",
-          color: "rgba(255,255,255,0.35)",
-        }}
-      >
-        <span>{argCount} {argCount === 1 ? "argument" : "arguments"}</span>
-        <span>·</span>
-        <span>{PHASE_LABELS[phase]}</span>
-        {moderator ? (
-          <>
-            <span>·</span>
-            <span>Moderated by {moderator.full_name ?? moderator.username}</span>
-          </>
-        ) : null}
-      </div>
-    </Link>
-  );
-}
-
-function DebateCard({ debate }: { debate: DebateRow }) {
-  const status = debate.status;
-  const argCount = getArgumentCount(debate.debate_arguments);
-  const moderator = getProfile(debate.profiles);
-  const split = getVoteSplit(debate);
-  const phase = debate.current_phase ?? "opening";
-  const statusAccent =
-    status === "active"
-      ? "border-l-amber-400"
-      : status === "open"
-        ? "border-l-emerald-brand"
-        : "border-l-gray-300";
-  const timeLabel =
-    status === "active"
-      ? formatTimeUntil(debate.ends_at)
-      : status === "open"
-        ? `Opened ${formatRelativeTime(debate.created_at)}`
-        : `Closed ${formatDate(debate.ends_at ?? debate.created_at)}`;
-
-  return (
-    <Link
-      href={`/debates/${debate.id}`}
-      className={`group block rounded-xl border border-l-4 border-gray-200 bg-white p-5 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)] ${statusAccent}`}
-    >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <DebateStatusPill status={status} />
+            <DebateStatusPill status={debate.status} />
             <PhasePill phase={phase} />
-            {timeLabel ? (
-              <span className="text-xs font-medium text-gray-500">{timeLabel}</span>
+            {debate.debate_variant === "v1_5" ? (
+              <span className="rounded-full bg-green-tint px-2.5 py-1 text-xs font-semibold text-emerald-brand">
+                Curated 1v1
+              </span>
             ) : null}
           </div>
 
-          <h2 className="font-display text-xl font-semibold leading-tight text-ink transition-colors group-hover:text-emerald-brand">
+          <h2
+            className={`font-display font-semibold leading-tight text-ink transition-colors group-hover:text-emerald-brand ${
+              featured ? "text-2xl" : "text-xl"
+            }`}
+          >
             {debate.title}
           </h2>
-
           {debate.description ? (
-            <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-500">
+            <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-muted">
               {debate.description}
             </p>
           ) : null}
 
-          {debate.tags && debate.tags.length > 0 ? (
+          {debate.status === "cancelled" && debate.cancellation_reason ? (
+            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              Cancelled: {debate.cancellation_reason}
+            </p>
+          ) : null}
+
+          {debate.tags?.length ? (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {debate.tags.slice(0, 5).map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full bg-canvas px-2.5 py-1 text-xs font-medium text-gray-500"
+                  className="rounded-full bg-canvas px-2.5 py-1 text-xs font-medium text-ink-muted"
                 >
                   #{tag}
                 </span>
@@ -349,95 +322,53 @@ function DebateCard({ debate }: { debate: DebateRow }) {
           ) : null}
         </div>
 
-        <div className="hidden w-full shrink-0 rounded-xl border border-gray-100 bg-canvas p-3 sm:block sm:w-[220px]">
+        <div className="w-full shrink-0 rounded-xl border border-gray-100 bg-canvas p-3 sm:w-[220px]">
           <StanceMeter
             forCount={split.forCount}
             againstCount={split.againstCount}
             compact
           />
+          {debate.debate_variant === "v1_5" &&
+          debate.status !== "closed" &&
+          debate.status !== "cancelled" ? (
+            <p
+              className="mt-3 border-t border-gray-200 pt-3 text-xs font-medium text-ink-muted"
+              title={deadline ? new Date(deadline).toLocaleString() : undefined}
+            >
+              {timeLabel}
+            </p>
+          ) : null}
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-500">
-        <span>{argCount} {argCount === 1 ? "argument" : "arguments"}</span>
-        {debate.round_duration_minutes ? (
-          <span>{debate.round_duration_minutes} min phases</span>
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-100 pt-4 text-xs text-ink-muted">
+        {timeLabel &&
+        !(
+          debate.debate_variant === "v1_5" &&
+          debate.status !== "closed" &&
+          debate.status !== "cancelled"
+        ) ? (
+          <span>{timeLabel}</span>
         ) : null}
+        <span>
+          {argumentCount} {argumentCount === 1 ? "argument" : "arguments"}
+        </span>
         {moderator ? (
           <span>
             Moderated by{" "}
-            <span className="font-medium text-gray-600">
-              {moderator.full_name ?? moderator.username}
+            <span className="font-medium text-ink">
+              {moderator.full_name ?? moderator.username ?? "Indegenius"}
             </span>
           </span>
         ) : null}
-        {debate.recap_text ? (
-          <span className="font-medium text-emerald-brand">Recap available</span>
+        {hasRecap ? (
+          <span className="font-semibold text-emerald-brand">
+            AI-assisted recap ready
+          </span>
         ) : null}
-        <span className="ml-auto hidden font-semibold text-emerald-brand transition-colors group-hover:text-emerald-700 sm:inline">
-          Enter room
+        <span className="ml-auto hidden font-semibold text-emerald-brand sm:inline">
+          Open debate →
         </span>
-      </div>
-    </Link>
-  );
-}
-
-function FeaturedDebateHero({ debate }: { debate: DebateRow }) {
-  const split = getVoteSplit(debate);
-  const argCount = getArgumentCount(debate.debate_arguments);
-  const timeLabel =
-    debate.status === "active"
-      ? formatTimeUntil(debate.ends_at)
-      : debate.status === "open"
-        ? `Opened ${formatRelativeTime(debate.created_at)}`
-        : `Closed ${formatDate(debate.ends_at ?? debate.created_at)}`;
-
-  return (
-    <Link
-      href={`/debates/${debate.id}`}
-      className="block overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)]"
-    >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-brand" />
-          {debate.status === "active" ? "Live debate" : "Open motion"}
-        </span>
-        <span className="text-xs font-medium text-gray-500">{timeLabel}</span>
-      </div>
-
-      <h2 className="font-display text-xl font-semibold leading-snug text-ink">
-        {debate.title}
-      </h2>
-      {debate.description ? (
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-500">
-          {debate.description}
-        </p>
-      ) : null}
-
-      <div className="mt-5 grid grid-cols-2 gap-2">
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center text-emerald-800">
-          <p className="text-xs font-bold">For</p>
-          <p className="mt-1 text-2xl font-bold">{split.forPct}%</p>
-        </div>
-        <div
-          className="rounded-xl px-4 py-3 text-center"
-          style={{ background: "#EDE9FE", border: "1px solid #C4B5FD", color: "#5B21B6" }}
-        >
-          <p className="text-xs font-bold">Against</p>
-          <p className="mt-1 text-2xl font-bold">{split.againstPct}%</p>
-        </div>
-      </div>
-
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
-        <div
-          className="h-full rounded-full bg-emerald-brand"
-          style={{ width: `${split.forPct}%` }}
-        />
-      </div>
-
-      <div className="mt-3 flex items-center justify-between text-xs font-medium text-gray-500">
-        <span>{split.total.toLocaleString()} votes</span>
-        <span>{argCount.toLocaleString()} {argCount === 1 ? "argument" : "arguments"}</span>
       </div>
     </Link>
   );
@@ -447,7 +378,6 @@ export default async function DebatesPage({ searchParams }: PageProps) {
   const { status } = await searchParams;
   const filter = getFilter(status);
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -467,29 +397,36 @@ export default async function DebatesPage({ searchParams }: PageProps) {
     profile?.role === "editor" ||
     profile?.role === "admin";
 
-  const [liveCount, openCount, closedCount, recapCount] = await Promise.all([
-    supabase
-      .from("debates")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "active"),
-    supabase
-      .from("debates")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "open"),
-    supabase
-      .from("debates")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "closed"),
-    supabase
-      .from("debates")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "closed")
-      .not("recap_text", "is", null),
-  ]);
+  const [activeCount, recruitingCount, completedCount, cancelledCount, recapCount] =
+    await Promise.all([
+      supabase
+        .from("debates")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active"),
+      supabase
+        .from("debates")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "open"),
+      supabase
+        .from("debates")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "closed"),
+      supabase
+        .from("debates")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "cancelled"),
+      supabase
+        .from("debates")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "closed")
+        .or("recap_text.not.is.null,recap_status.eq.ready"),
+    ]);
+
   const counts: Record<DebateFilter, number> = {
-    live: liveCount.count ?? 0,
-    open: openCount.count ?? 0,
-    closed: closedCount.count ?? 0,
+    active: activeCount.count ?? 0,
+    recruiting: recruitingCount.count ?? 0,
+    completed: completedCount.count ?? 0,
+    cancelled: cancelledCount.count ?? 0,
     recaps: recapCount.count ?? 0,
   };
 
@@ -497,92 +434,84 @@ export default async function DebatesPage({ searchParams }: PageProps) {
     .from("debates")
     .select(
       `
-      id, title, description, status, current_phase, round_duration_minutes,
-      tags, created_at, ends_at, motion_for_count, motion_against_count,
-      recap_text, recap_generated_at,
+      id, title, description, status, current_phase, debate_variant,
+      round_duration_minutes, tags, created_at, ends_at,
+      recruiting_deadline, opening_deadline, rebuttal_deadline, voting_deadline,
+      cancelled_at, cancellation_reason,
+      motion_for_count, motion_against_count, recap_text, recap_status,
       debate_arguments(count),
       profiles!debates_moderator_id_fkey(username, full_name, university)
     `
     )
     .order("created_at", { ascending: false });
 
-  if (filter === "live") {
-    query = query.eq("status", "active");
-  } else if (filter === "open") {
-    query = query.eq("status", "open");
-  } else if (filter === "closed") {
-    query = query.eq("status", "closed");
-  } else {
-    query = query.eq("status", "closed").not("recap_text", "is", null);
+  if (filter === "active") query = query.eq("status", "active");
+  if (filter === "recruiting") query = query.eq("status", "open");
+  if (filter === "completed") query = query.eq("status", "closed");
+  if (filter === "cancelled") query = query.eq("status", "cancelled");
+  if (filter === "recaps") {
+    query = query
+      .eq("status", "closed")
+      .or("recap_text.not.is.null,recap_status.eq.ready");
   }
 
   const { data: debatesRaw } = await query;
   const debates = (debatesRaw ?? []) as DebateRow[];
-  let openHeroDebate: DebateRow | null = null;
-
-  if (filter === "live" && debates.length === 0 && (counts.open ?? 0) > 0) {
-    const { data: openHeroRaw } = await supabase
-      .from("debates")
-      .select(
-        `
-        id, title, description, status, current_phase, round_duration_minutes,
-        tags, created_at, ends_at, motion_for_count, motion_against_count,
-        recap_text, recap_generated_at,
-        debate_arguments(count),
-        profiles!debates_moderator_id_fkey(username, full_name, university)
-      `
-      )
-      .eq("status", "open")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    openHeroDebate = (openHeroRaw as DebateRow | null) ?? null;
-  }
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-6 flex flex-col gap-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02] md:mb-7 md:flex-row md:items-end md:justify-between">
+      <header className="mb-7 flex flex-col gap-5 rounded-xl border border-gray-200 bg-surface p-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand">
             Debate room
           </p>
-          <h1 className="font-display mt-2 text-3xl font-bold leading-tight text-ink md:text-4xl">
-            Argue the motion.
-            <br className="hidden sm:block" /> Move the debate.
+          <h1 className="mt-2 font-display text-3xl font-bold leading-tight text-ink md:text-4xl">
+            Ideas tested in public.
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
-            Pick a side, vote on the motion, and make the strongest case while
-            moderators guide each room through opening, rebuttal, and closing.
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">
+            Follow curated 1v1 debates from recruitment through opening,
+            rebuttal, the community vote, and a durable recap.
           </p>
         </div>
-        <div className="flex flex-col items-start gap-3 md:items-end">
+        <div className="flex flex-col items-start gap-2 md:items-end">
           <Link
             href={user ? "/debates/create" : "/login?redirectTo=/debates/create"}
-            className={`inline-flex w-fit items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            className={`inline-flex rounded-lg px-4 py-2 text-sm font-semibold ${
               canCreate || !user
-                ? "bg-emerald-brand text-white hover:bg-[#0E4B37]"
-                : "border border-gray-200 bg-canvas text-gray-600 hover:border-gray-300 hover:bg-white"
+                ? "bg-emerald-brand text-white hover:opacity-90"
+                : "border border-gray-200 bg-canvas text-ink-muted hover:bg-surface"
             }`}
           >
-            {canCreate || !user ? "Start a debate" : "Verify to start one"}
+            {canCreate || !user ? "Start a curated debate" : "Verify to start one"}
           </Link>
           {!canCreate && user ? (
-            <p className="max-w-xs text-xs leading-5 text-gray-500 md:text-right">
-              Verified members, editors, and admins can moderate new motions.
+            <p className="text-xs text-ink-muted">
+              Verified members, editors, and admins can moderate.
             </p>
           ) : null}
         </div>
-      </div>
+      </header>
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Live rooms" value={counts.live} tone="amber" pulse />
-        <StatTile label="Open motions" value={counts.open} tone="emerald" />
-        <StatTile label="Closed" value={counts.closed} />
-        <StatTile label="Recaps" value={counts.recaps} />
+        <StatTile
+          label="Active stages"
+          value={counts.active}
+          tone="amber"
+          pulse={counts.active > 0}
+        />
+        <StatTile
+          label="Recruiting"
+          value={counts.recruiting}
+          tone="emerald"
+        />
+        <StatTile label="Completed" value={counts.completed} />
+        <StatTile label="Recaps ready" value={counts.recaps} />
       </div>
 
-      <div className="mb-6 overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav
+        aria-label="Debate filters"
+        className="mb-6 overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <div className="flex min-w-max gap-1">
           {TABS.map((tab) => {
             const active = filter === tab.value;
@@ -590,18 +519,19 @@ export default async function DebatesPage({ searchParams }: PageProps) {
               <Link
                 key={tab.value}
                 href={tab.href}
-                className={`mb-[-1px] inline-flex items-center gap-2 border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors ${
+                aria-current={active ? "page" : undefined}
+                className={`mb-[-1px] inline-flex items-center gap-2 border-b-2 px-3.5 py-2.5 text-sm font-medium ${
                   active
                     ? "border-emerald-brand text-ink"
-                    : "border-transparent text-gray-500 hover:text-ink"
+                    : "border-transparent text-ink-muted hover:text-ink"
                 }`}
               >
                 <span>{tab.label}</span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[11px] ${
                     active
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-white text-gray-400"
+                      ? "bg-green-tint text-emerald-brand"
+                      : "bg-surface text-ink-muted"
                   }`}
                 >
                   {counts[tab.value]}
@@ -610,21 +540,19 @@ export default async function DebatesPage({ searchParams }: PageProps) {
             );
           })}
         </div>
-      </div>
+      </nav>
 
-      {debates.length === 0 && openHeroDebate ? (
-        <FeaturedDebateHero debate={openHeroDebate} />
-      ) : debates.length === 0 ? (
+      {debates.length === 0 ? (
         <EmptyDebates filter={filter} signedIn={Boolean(user)} />
       ) : (
         <div className="space-y-3">
-          {debates.map((debate) =>
-            filter === "live" ? (
-              <LiveHeroCard key={debate.id} debate={debate} />
-            ) : (
-              <DebateCard key={debate.id} debate={debate} />
-            )
-          )}
+          {debates.map((debate, index) => (
+            <DebateCard
+              key={debate.id}
+              debate={debate}
+              featured={index === 0 && filter === "active"}
+            />
+          ))}
         </div>
       )}
     </div>

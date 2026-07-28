@@ -159,6 +159,51 @@ function notificationToAction(
         cta: "Review invite",
         actionKey: "co_author_invite",
       };
+    case "debate_invitation":
+      return {
+        ...base,
+        category: "activity",
+        priority: 55,
+        label: "Debate invitation",
+        description:
+          notification.message ??
+          `${actorName(notification)} invited you to a debate.`,
+        cta: "Review invitation",
+        actionKey: "debate_invitation",
+      };
+    case "debate_invitation_response":
+      return {
+        ...base,
+        category: "activity",
+        priority: 60,
+        label: "Debate invitation update",
+        description:
+          notification.message ?? "A debater responded to your invitation.",
+        cta: "Open debate",
+        actionKey: "debate_invitation_response",
+      };
+    case "debate_phase_advanced":
+      return {
+        ...base,
+        category: "activity",
+        priority: 60,
+        label: "Debate stage opened",
+        description:
+          notification.message ?? "A debate has moved to its next stage.",
+        cta: "Open debate",
+        actionKey: "debate_phase_advanced",
+      };
+    case "debate_cancelled":
+      return {
+        ...base,
+        category: "activity",
+        priority: 60,
+        label: "Debate cancelled",
+        description:
+          notification.message ?? "A debate you joined was cancelled.",
+        cta: "View record",
+        actionKey: "debate_cancelled",
+      };
     case "comment":
       return {
         ...base,
