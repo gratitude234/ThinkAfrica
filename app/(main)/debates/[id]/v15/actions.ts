@@ -1,6 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import {
+  deliverDebateV15Event,
+  type DebateV15DeliveryEvent,
+} from "@/lib/debateV15Delivery";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -11,6 +15,29 @@ import type {
 } from "./types";
 
 type RpcPayload = Record<string, string | number | boolean | object | null>;
+type RpcData = Record<string, unknown>;
+
+type DebateDeliveryRow = {
+  title: string;
+  moderator_id: string | null;
+  cancellation_reason: string | null;
+};
+
+type DebateDeliverySlotRow = {
+  user_id: string;
+  stance: DebateV15Stance;
+  status: "invited" | "accepted" | "declined";
+};
+
+type ProfileNameRow = {
+  username: string | null;
+  full_name: string | null;
+};
+
+type RpcExecution = {
+  result: DebateV15ActionResult;
+  data: RpcData | null;
+};
 
 function rpcMessage(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
@@ -25,35 +52,138 @@ function rpcMessage(data: unknown): string | null {
   return null;
 }
 
+function asRpcData(data: unknown): RpcData | null {
+  return data && typeof data === "object" && !Array.isArray(data)
+    ? (data as RpcData)
+    : null;
+}
+
+async function executeDebateRpc(
+  debateId: string,
+  name: string,
+  payload: RpcPayload
+): Promise<RpcExecution> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(name, payload);
+  const rpcData = asRpcData(data);
+
+  if (error) {
+    return {
+      result: { ok: false, message: error.message },
+      data: rpcData,
+    };
+  }
+
+  if (rpcData?.outcome === "stale_no_op") {
+    revalidatePath(`/debates/${debateId}`);
+    return {
+      result: {
+        ok: true,
+        message:
+          "This debate changed in another session. The latest state is now shown.",
+      },
+      data: rpcData,
+    };
+  }
+
+  const resultError = rpcMessage(data);
+  if (resultError) {
+    return {
+      result: { ok: false, message: resultError },
+      data: rpcData,
+    };
+  }
+
+  revalidatePath(`/debates/${debateId}`);
+  revalidatePath("/debates");
+  return { result: { ok: true }, data: rpcData };
+}
+
 async function runDebateRpc(
   debateId: string,
   name: string,
   payload: RpcPayload
 ): Promise<DebateV15ActionResult> {
+  const execution = await executeDebateRpc(debateId, name, payload);
+  return execution.result;
+}
+
+function rpcString(data: RpcData | null, key: string): string | null {
+  const value = data?.[key];
+  return typeof value === "string" ? value : null;
+}
+
+async function loadDebateDeliveryRow(
+  debateId: string
+): Promise<DebateDeliveryRow | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("debates")
+    .select("title, moderator_id, cancellation_reason")
+    .eq("id", debateId)
+    .maybeSingle<DebateDeliveryRow>();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function loadDebateDeliverySlots(
+  debateId: string
+): Promise<DebateDeliverySlotRow[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("debate_slots_v1_5")
+    .select("user_id, stance, status")
+    .eq("debate_id", debateId);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as DebateDeliverySlotRow[];
+}
+
+async function loadProfileName(userId: string): Promise<string> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("profiles")
+    .select("username, full_name")
+    .eq("id", userId)
+    .maybeSingle<ProfileNameRow>();
+
+  if (error) throw new Error(error.message);
+  return data?.full_name?.trim() || data?.username?.trim() || "A debater";
+}
+
+async function currentActorId(): Promise<string | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc(name, payload);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
 
-  if (error) return { ok: false, message: error.message };
-
-  if (
-    data &&
-    typeof data === "object" &&
-    (data as Record<string, unknown>).outcome === "stale_no_op"
-  ) {
-    revalidatePath(`/debates/${debateId}`);
-    return {
-      ok: true,
-      message:
-        "This debate changed in another session. The latest state is now shown.",
-    };
+async function attemptDebateDelivery(
+  context: string,
+  work: () => Promise<void>
+): Promise<void> {
+  try {
+    await work();
+  } catch (error) {
+    console.error(
+      `Debate V1.5 notification preparation failed for ${context}: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
   }
+}
 
-  const resultError = rpcMessage(data);
-  if (resultError) return { ok: false, message: resultError };
-
-  revalidatePath(`/debates/${debateId}`);
-  revalidatePath("/debates");
-  return { ok: true };
+async function deliverToRecipients(
+  recipients: string[],
+  event: (recipientId: string) => DebateV15DeliveryEvent
+): Promise<void> {
+  await Promise.all(
+    [...new Set(recipients)].map((recipientId) =>
+      deliverDebateV15Event(event(recipientId))
+    )
+  );
 }
 
 export async function inviteDebaterV15Action(
@@ -61,38 +191,161 @@ export async function inviteDebaterV15Action(
   userId: string,
   stance: DebateV15Stance
 ) {
-  return runDebateRpc(debateId, "invite_debater_v1_5", {
+  const execution = await executeDebateRpc(debateId, "invite_debater_v1_5", {
     p_debate_id: debateId,
     p_user_id: userId,
     p_stance: stance,
   });
+
+  if (!execution.result.ok || execution.data?.outcome !== "invited") {
+    return execution.result;
+  }
+
+  await attemptDebateDelivery(`invitation:${debateId}`, async () => {
+    const debate = await loadDebateDeliveryRow(debateId);
+    const recipientId = rpcString(execution.data, "user_id");
+    const authoritativeStance = rpcString(execution.data, "stance");
+    if (
+      !debate ||
+      !recipientId ||
+      (authoritativeStance !== "for" && authoritativeStance !== "against")
+    ) {
+      throw new Error("The saved invitation could not be prepared for delivery.");
+    }
+
+    await deliverDebateV15Event({
+      kind: "invitation",
+      recipientId,
+      debateId,
+      debateTitle: debate.title,
+      stance: authoritativeStance,
+    });
+  });
+
+  return {
+    ok: true,
+    message:
+      "Invitation recorded. They’ll receive an in-app alert, plus email and push where enabled.",
+  };
 }
 
 export async function respondToDebateInvitationV15Action(
   debateId: string,
   accept: boolean
 ) {
-  return runDebateRpc(debateId, "respond_to_debate_invitation_v1_5", {
-    p_debate_id: debateId,
-    p_accept: accept,
+  const execution = await executeDebateRpc(
+    debateId,
+    "respond_to_debate_invitation_v1_5",
+    {
+      p_debate_id: debateId,
+      p_accept: accept,
+    }
+  );
+
+  const outcome = execution.data?.outcome;
+  if (
+    !execution.result.ok ||
+    (outcome !== "accepted" && outcome !== "declined")
+  ) {
+    return execution.result;
+  }
+
+  await attemptDebateDelivery(`invitation-response:${debateId}`, async () => {
+    const [debate, actorId] = await Promise.all([
+      loadDebateDeliveryRow(debateId),
+      currentActorId(),
+    ]);
+    if (!debate?.moderator_id || !actorId || debate.moderator_id === actorId) {
+      return;
+    }
+    const participantName = await loadProfileName(actorId);
+    await deliverDebateV15Event({
+      kind: "invitation_response",
+      recipientId: debate.moderator_id,
+      debateId,
+      debateTitle: debate.title,
+      participantName,
+      response: outcome,
+    });
   });
+
+  return execution.result;
 }
 
 export async function revokeDebateInvitationV15Action(
   debateId: string,
   stance: DebateV15Stance
 ) {
-  return runDebateRpc(debateId, "revoke_debate_invitation_v1_5", {
-    p_debate_id: debateId,
-    p_stance: stance,
+  const execution = await executeDebateRpc(
+    debateId,
+    "revoke_debate_invitation_v1_5",
+    {
+      p_debate_id: debateId,
+      p_stance: stance,
+    }
+  );
+
+  if (!execution.result.ok || execution.data?.outcome !== "revoked") {
+    return execution.result;
+  }
+
+  await attemptDebateDelivery(`invitation-withdrawn:${debateId}`, async () => {
+    const debate = await loadDebateDeliveryRow(debateId);
+    const recipientId = rpcString(execution.data, "user_id");
+    const authoritativeStance = rpcString(execution.data, "stance");
+    if (
+      !debate ||
+      !recipientId ||
+      (authoritativeStance !== "for" && authoritativeStance !== "against")
+    ) {
+      throw new Error(
+        "The withdrawn invitation could not be prepared for delivery."
+      );
+    }
+    await deliverDebateV15Event({
+      kind: "invitation_withdrawn",
+      recipientId,
+      debateId,
+      debateTitle: debate.title,
+      stance: authoritativeStance,
+    });
   });
+
+  return execution.result;
 }
 
 export async function startDebateV15Action(debateId: string) {
-  return runDebateRpc(debateId, "start_debate_v1_5", {
+  const execution = await executeDebateRpc(debateId, "start_debate_v1_5", {
     p_debate_id: debateId,
     p_expected_phase: "recruiting",
   });
+
+  if (!execution.result.ok || execution.data?.outcome !== "started") {
+    return execution.result;
+  }
+
+  await attemptDebateDelivery(`phase-opening:${debateId}`, async () => {
+    const [debate, slots, actorId] = await Promise.all([
+      loadDebateDeliveryRow(debateId),
+      loadDebateDeliverySlots(debateId),
+      currentActorId(),
+    ]);
+    if (!debate) throw new Error("Debate not found after starting.");
+    await deliverToRecipients(
+      slots
+        .filter((slot) => slot.status === "accepted" && slot.user_id !== actorId)
+        .map((slot) => slot.user_id),
+      (recipientId) => ({
+        kind: "phase_opened",
+        recipientId,
+        debateId,
+        debateTitle: debate.title,
+        phase: "opening",
+      })
+    );
+  });
+
+  return execution.result;
 }
 
 export interface DebateV15SourceInput {
@@ -135,10 +388,45 @@ export async function advanceDebatePhaseV15Action(
   debateId: string,
   expectedPhase: "opening" | "rebuttal"
 ) {
-  return runDebateRpc(debateId, "advance_debate_phase_v1_5", {
-    p_debate_id: debateId,
-    p_expected_phase: expectedPhase,
+  const execution = await executeDebateRpc(
+    debateId,
+    "advance_debate_phase_v1_5",
+    {
+      p_debate_id: debateId,
+      p_expected_phase: expectedPhase,
+    }
+  );
+  const phase = rpcString(execution.data, "current_phase");
+  if (
+    !execution.result.ok ||
+    execution.data?.outcome !== "advanced" ||
+    (phase !== "rebuttal" && phase !== "voting")
+  ) {
+    return execution.result;
+  }
+
+  await attemptDebateDelivery(`phase-${phase}:${debateId}`, async () => {
+    const [debate, slots, actorId] = await Promise.all([
+      loadDebateDeliveryRow(debateId),
+      loadDebateDeliverySlots(debateId),
+      currentActorId(),
+    ]);
+    if (!debate) throw new Error("Debate not found after advancing.");
+    await deliverToRecipients(
+      slots
+        .filter((slot) => slot.status === "accepted" && slot.user_id !== actorId)
+        .map((slot) => slot.user_id),
+      (recipientId) => ({
+        kind: "phase_opened",
+        recipientId,
+        debateId,
+        debateTitle: debate.title,
+        phase,
+      })
+    );
   });
+
+  return execution.result;
 }
 
 export async function extendDeadlineV15Action(
@@ -159,10 +447,44 @@ export async function cancelDebateV15Action(
   debateId: string,
   reason: string
 ) {
-  return runDebateRpc(debateId, "cancel_debate_v1_5", {
+  const execution = await executeDebateRpc(debateId, "cancel_debate_v1_5", {
     p_debate_id: debateId,
     p_reason: reason,
   });
+
+  if (!execution.result.ok || execution.data?.outcome !== "cancelled") {
+    return execution.result;
+  }
+
+  await attemptDebateDelivery(`cancelled:${debateId}`, async () => {
+    const [debate, slots, actorId] = await Promise.all([
+      loadDebateDeliveryRow(debateId),
+      loadDebateDeliverySlots(debateId),
+      currentActorId(),
+    ]);
+    const cancellationReason = debate?.cancellation_reason;
+    if (!debate || !cancellationReason) {
+      throw new Error("Cancelled debate details were unavailable.");
+    }
+    await deliverToRecipients(
+      slots
+        .filter(
+          (slot) =>
+            (slot.status === "invited" || slot.status === "accepted") &&
+            slot.user_id !== actorId
+        )
+        .map((slot) => slot.user_id),
+      (recipientId) => ({
+        kind: "cancelled",
+        recipientId,
+        debateId,
+        debateTitle: debate.title,
+        reason: cancellationReason,
+      })
+    );
+  });
+
+  return execution.result;
 }
 
 async function requestRecap(debateId: string): Promise<void> {

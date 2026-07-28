@@ -81,12 +81,14 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     email_co_author_accepted: true,
     email_co_author_declined: true,
     email_opportunity_inquiry: true,
+    email_debate_updates: true,
     push_published: true,
     push_messages: true,
     push_comments: true,
     push_likes: true,
     push_follows: true,
     push_daily_brief: true,
+    push_debate_updates: true,
     ...((profile.notification_prefs as Partial<NotificationPrefs>) ?? {}),
   };
 

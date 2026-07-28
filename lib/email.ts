@@ -20,7 +20,8 @@ export type NotificationPreferenceKey =
   | "email_co_author_invite"
   | "email_co_author_accepted"
   | "email_co_author_declined"
-  | "email_opportunity_inquiry";
+  | "email_opportunity_inquiry"
+  | "email_debate_updates";
 
 export type EmailSendResult =
   | { ok: true; id: string | null }

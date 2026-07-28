@@ -29,6 +29,8 @@ Optional:
 - `ADMIN_SECRET` — Protects internal API routes
 - `RESEND_API_KEY` — Email service
 - `ANTHROPIC_API_KEY` — Claude API for audio summaries (`/api/audio-summary`)
+- `GEMINI_API_KEY` — Gemini API for debate recaps (`/api/debate-recap`)
+- `GEMINI_RECAP_MODEL` — Optional Gemini recap model override; defaults to `gemini-3.6-flash`
 - `GOOGLE_TTS_API_KEY` — Text-to-speech
 - `CRON_SECRET` — Authenticates Vercel Cron requests to `/api/cron/*` routes (Vercel sends it automatically as `Authorization: Bearer <value>` when set)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_MAILTO` — Web push (VAPID keypair + contact address for `lib/push.ts`)

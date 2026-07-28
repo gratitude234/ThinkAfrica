@@ -10,7 +10,8 @@ export type PushPreferenceKey =
   | "push_comments"
   | "push_likes"
   | "push_follows"
-  | "push_daily_brief";
+  | "push_daily_brief"
+  | "push_debate_updates";
 
 export type PushSendResult =
   | { ok: true; sent: number }

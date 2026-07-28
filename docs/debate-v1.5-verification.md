@@ -88,10 +88,12 @@ Confirm these server-side values in staging and production:
 
 ```text
 ADMIN_SECRET
-ANTHROPIC_API_KEY
+GEMINI_API_KEY
 NEXT_PUBLIC_APP_URL
 SUPABASE_SERVICE_ROLE_KEY
 ```
+
+`GEMINI_RECAP_MODEL` is optional and defaults to `gemini-3.6-flash`.
 
 Refresh the PostgREST schema cache after applying the migrations, then confirm
 all new RPC signatures are discoverable. V1.5 itself needs no cron.

@@ -40,12 +40,14 @@ const prefs: NotificationPrefs = {
   email_co_author_accepted: true,
   email_co_author_declined: true,
   email_opportunity_inquiry: true,
+  email_debate_updates: true,
   push_published: true,
   push_messages: true,
   push_comments: true,
   push_likes: true,
   push_follows: true,
   push_daily_brief: true,
+  push_debate_updates: true,
 };
 
 describe("NotificationsForm", () => {
@@ -54,8 +56,11 @@ describe("NotificationsForm", () => {
     await waitFor(() => {
       expect(screen.getByText("This browser does not support push notifications.")).toBeInTheDocument();
     });
-    for (const label of ["Submission decisions", "Direct messages", "Comments", "Likes", "New followers", "Daily brief"]) {
+    for (const label of ["Submission decisions", "Direct messages", "Comments", "Likes", "New followers", "Daily brief", "Debate updates"]) {
       expect(screen.getByRole("switch", { name: `Push: ${label}` })).toBeEnabled();
     }
+    expect(
+      screen.getByRole("switch", { name: "Email: Debate updates" })
+    ).toBeChecked();
   });
 });
