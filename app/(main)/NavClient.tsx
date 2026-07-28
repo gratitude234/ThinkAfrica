@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import BrandWordmark from "@/components/ui/BrandWordmark";
 import NavUserMenu from "./NavUserMenu";
@@ -59,6 +60,37 @@ export default function NavClient({
   onOpenSearch,
 }: NavClientProps) {
   const pathname = usePathname();
+  const navRef = useRef<HTMLDivElement>(null);
+
+  // Publish the real rendered height of the sticky nav as --app-nav-height so
+  // sticky sub-headers (debate rooms, feed tabs) can pin flush beneath it.
+  // Hardcoded offsets drifted out of sync with the nav and left sub-headers
+  // sliding underneath it; measuring removes that whole class of bug and keeps
+  // working when the announcement strip wraps at narrow widths.
+  useEffect(() => {
+    const node = navRef.current;
+    if (!node) return;
+
+    const root = document.documentElement;
+    const publishHeight = () => {
+      const height = Math.round(node.getBoundingClientRect().height);
+      if (height > 0) {
+        root.style.setProperty("--app-nav-height", `${height}px`);
+      }
+    };
+
+    publishHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", publishHeight);
+      return () => window.removeEventListener("resize", publishHeight);
+    }
+
+    const observer = new ResizeObserver(publishHeight);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   const isHomeActive = pathname === "/";
   const isExploreActive =
     pathname === "/explore" ||
@@ -75,7 +107,7 @@ export default function NavClient({
     : `/login?redirectTo=${encodeURIComponent("/messages")}`;
 
   return (
-    <div className="sticky top-0 z-50">
+    <div ref={navRef} className="sticky top-0 z-50">
       <div className="bg-emerald-brand py-1.5 text-center">
         <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold sm:text-[10.5px]">
           Africa&apos;s intellectual social network

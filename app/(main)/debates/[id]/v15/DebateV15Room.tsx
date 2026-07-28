@@ -64,6 +64,71 @@ const PHASE_COPY: Record<
   },
 };
 
+interface MutateOptions {
+  /**
+   * Confirmation copy for this specific action. When omitted the action
+   * completes silently rather than announcing a generic "Saved." — lightweight
+   * interactions (upvotes) reflect their own state in-place, while
+   * irreversible ones (submitting an argument, casting the final vote) must
+   * say exactly what happened.
+   */
+  success?: string;
+  onSuccess?: () => void;
+}
+
+type DebateV15Mutate = (
+  action: () => Promise<DebateV15ActionResult>,
+  options?: MutateOptions
+) => void;
+
+function draftStorageKey(
+  debateId: string,
+  phase: string,
+  userId: string | null
+): string {
+  return `v15-draft:${debateId}:${phase}:${userId ?? "anon"}`;
+}
+
+function readStoredDraft(
+  key: string
+): { content: string; sources: Array<{ url: string; title: string }> } | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+
+    const record = parsed as Record<string, unknown>;
+    const content = typeof record.content === "string" ? record.content : "";
+    const sources = Array.isArray(record.sources)
+      ? record.sources
+          .filter(
+            (entry): entry is { url: string; title?: string } =>
+              Boolean(entry) &&
+              typeof entry === "object" &&
+              typeof (entry as { url?: unknown }).url === "string"
+          )
+          .map((entry) => ({ url: entry.url, title: entry.title ?? "" }))
+      : [];
+
+    if (!content.trim() && !sources.length) return null;
+    return { content, sources };
+  } catch {
+    return null;
+  }
+}
+
+function formatMinutesLeft(minutes: number): string {
+  if (minutes < 1) return "less than a minute";
+  if (minutes === 1) return "1 minute";
+  if (minutes < 60) return `${minutes} minutes`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 1 && !rest) return "1 hour";
+  if (!rest) return `${hours} hours`;
+  return `${hours}h ${rest}m`;
+}
+
 function profileName(profile: DebateV15Profile | null): string {
   return profile?.fullName ?? profile?.username ?? "Unknown member";
 }
@@ -337,7 +402,9 @@ function EmptyArgument({
       <SideMark stance={stance} />
       <p className="mt-3">
         {deadlinePassed
-          ? `Deadline passed. ${stance.toUpperCase()} did not submit a ${phase}.`
+          ? `Deadline passed. ${stance.toUpperCase()} did not submit ${
+              phase === "opening" ? "an opening argument" : "a rebuttal"
+            }.`
           : `Awaiting ${stance.toUpperCase()}'s ${phase} argument.`}
       </p>
     </div>
@@ -403,19 +470,39 @@ function ArgumentComposer({
   room,
   phase,
   busy,
+  expired,
+  deadline,
+  now,
   submit,
 }: {
   room: DebateV15RoomData;
   phase: "opening" | "rebuttal";
   busy: boolean;
+  /**
+   * The submission window has closed. The composer stays mounted and keeps the
+   * debater's text — unmounting it would destroy an unsent draft the moment
+   * the clock ticks past the deadline.
+   */
+  expired: boolean;
+  deadline: string | null;
+  now: number;
   submit: (
     content: string,
-    sources: Array<{ url: string; title?: string }>
+    sources: Array<{ url: string; title?: string }>,
+    onSubmitted: () => void
   ) => void;
 }) {
+  const storageKey = draftStorageKey(
+    room.debate.id,
+    phase,
+    room.currentUserId
+  );
   const [content, setContent] = useState("");
   const [sources, setSources] = useState([{ url: "", title: "" }]);
   const [confirmed, setConfirmed] = useState(false);
+  const [restored, setRestored] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const hydrated = useRef(false);
   const maxWords = phase === "opening" ? 300 : 200;
   const count = content.trim() ? content.trim().split(/\s+/).length : 0;
   const overLimit = count > maxWords;
@@ -423,6 +510,78 @@ function ArgumentComposer({
     (source) =>
       source.url.trim() && !/^https?:\/\/\S+$/i.test(source.url.trim())
   );
+
+  // Restore any draft left behind by a refresh, a closed tab, or a phone
+  // evicting the page from memory. Read after mount so the server and client
+  // first render agree.
+  useEffect(() => {
+    const saved = readStoredDraft(storageKey);
+    if (saved) {
+      setContent(saved.content);
+      if (saved.sources.length) setSources(saved.sources);
+      setRestored(true);
+    }
+    hydrated.current = true;
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!hydrated.current) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const hasSource = sources.some((source) => source.url.trim());
+        if (!content.trim() && !hasSource) {
+          window.localStorage.removeItem(storageKey);
+          return;
+        }
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({ content, sources, savedAt: Date.now() })
+        );
+      } catch {
+        // Storage can be full or blocked (private mode). The composer still
+        // works; it just loses the safety net.
+      }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [content, sources, storageKey]);
+
+  const clearDraft = () => {
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Nothing to recover from — the submission already succeeded.
+    }
+  };
+
+  const minutesLeft =
+    deadline && !expired
+      ? Math.floor((new Date(deadline).getTime() - now) / 60_000)
+      : null;
+  const closingSoon = minutesLeft !== null && minutesLeft <= 30;
+
+  const copyDraft = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2500);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const blockedReason = expired
+    ? `The ${phase} deadline has passed, so this can no longer be submitted.`
+    : !content.trim()
+      ? "Write your argument to enable submission."
+      : overLimit
+        ? `Remove ${count - maxWords} ${
+            count - maxWords === 1 ? "word" : "words"
+          } to fit the ${maxWords}-word limit.`
+        : invalidSource
+          ? "Every source URL must begin with http:// or https://."
+          : !confirmed
+            ? "Tick the confirmation box to enable submission."
+            : null;
 
   const addSource = () => {
     if (sources.length < 5) setSources([...sources, { url: "", title: "" }]);
@@ -451,7 +610,7 @@ function ArgumentComposer({
       className="rounded-2xl border border-green-wash-border bg-surface p-5 sm:p-6"
     >
       <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-brand">
-        Your next action
+        {expired ? "Submission window closed" : "Your next action"}
       </p>
       <h3 className="mt-1 font-display text-2xl font-bold text-ink">
         Submit your {phase}
@@ -460,6 +619,51 @@ function ArgumentComposer({
         Make one focused case. Your stance is locked, and this submission
         cannot be edited after it is sent.
       </p>
+
+      {expired ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4"
+        >
+          <p className="text-sm font-semibold text-red-700">
+            The {phase} deadline passed before this was submitted.
+          </p>
+          <p className="mt-1 text-sm leading-6 text-red-700">
+            {content.trim()
+              ? `Your draft below has been kept so nothing is lost. Copy it now, and ask the moderator to extend the ${phase} deadline if you still want it on the record.`
+              : `Ask the moderator to extend the ${phase} deadline if you still want to take part.`}
+          </p>
+          {content.trim() ? (
+            <ActionButton
+              tone="danger"
+              className="mt-3"
+              onClick={copyDraft}
+            >
+              {copied ? "Draft copied" : "Copy my draft"}
+            </ActionButton>
+          ) : null}
+        </div>
+      ) : null}
+
+      {!expired && restored ? (
+        <p
+          role="status"
+          className="mt-4 rounded-xl border border-green-wash-border bg-green-tint p-3 text-sm font-semibold text-emerald-brand"
+        >
+          We restored the draft you had saved on this device.
+        </p>
+      ) : null}
+
+      {closingSoon && minutesLeft !== null ? (
+        <p
+          role="status"
+          className="mt-4 rounded-xl border border-gold bg-gold-tint p-3 text-sm font-semibold text-gold-ink"
+        >
+          {minutesLeft <= 0
+            ? "This deadline is passing right now — submit immediately."
+            : `Only ${formatMinutesLeft(minutesLeft)} left to submit your ${phase}.`}
+        </p>
+      ) : null}
 
       <label
         htmlFor="v15-argument"
@@ -471,10 +675,13 @@ function ArgumentComposer({
         id="v15-argument"
         value={content}
         onChange={(event) => setContent(event.target.value)}
+        readOnly={expired}
         rows={9}
         maxLength={5000}
         placeholder={`Write your ${phase} argument…`}
-        className="mt-2 w-full rounded-xl border border-green-wash-border bg-canvas px-4 py-3 text-sm leading-6 text-ink outline-none focus:border-emerald-brand focus:ring-2 focus:ring-green-tint"
+        className={`mt-2 w-full rounded-xl border border-green-wash-border px-4 py-3 text-sm leading-6 text-ink outline-none focus:border-emerald-brand focus:ring-2 focus:ring-green-tint ${
+          expired ? "bg-green-wash" : "bg-canvas"
+        }`}
       />
       <p
         className={`mt-1 text-right text-xs font-semibold ${
@@ -572,16 +779,32 @@ function ArgumentComposer({
               .map((source) => ({
                 url: source.url.trim(),
                 title: source.title.trim() || undefined,
-              }))
+              })),
+            () => {
+              clearDraft();
+              setContent("");
+              setSources([{ url: "", title: "" }]);
+              setConfirmed(false);
+              setRestored(false);
+            }
           )
         }
-        disabled={
-          !content.trim() || overLimit || invalidSource || !confirmed || busy
-        }
+        disabled={Boolean(blockedReason) || busy}
+        aria-describedby={blockedReason ? "v15-submit-blocked" : undefined}
         className="mt-4 w-full"
       >
         {busy ? "Submitting…" : `Submit ${phase} — final`}
       </ActionButton>
+      {blockedReason ? (
+        <p
+          id="v15-submit-blocked"
+          className={`mt-2 text-center text-xs font-semibold ${
+            expired ? "text-red-700" : "text-ink-muted"
+          }`}
+        >
+          {blockedReason}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -957,7 +1180,7 @@ function ManagerControls({
 }: {
   room: DebateV15RoomData;
   busy: boolean;
-  mutate: (action: () => Promise<DebateV15ActionResult>) => void;
+  mutate: DebateV15Mutate;
 }) {
   const [dialog, setDialog] = useState<
     "advance" | "extend" | "cancel" | null
@@ -1066,8 +1289,14 @@ function ManagerControls({
             <ActionButton
               disabled={busy}
               onClick={() => {
-                mutate(() =>
-                  advanceDebatePhaseV15Action(room.debate.id, phase)
+                mutate(
+                  () => advanceDebatePhaseV15Action(room.debate.id, phase),
+                  {
+                    success:
+                      phase === "opening"
+                        ? "Opening arguments are closed. The room is now in rebuttals."
+                        : "Rebuttals are closed. Final community voting is open.",
+                  }
                 );
                 setDialog(null);
               }}
@@ -1104,13 +1333,21 @@ function ManagerControls({
             <ActionButton
               disabled={!newDeadline || busy}
               onClick={() => {
-                mutate(() =>
-                  extendDeadlineV15Action(
-                    room.debate.id,
-                    phase as "recruiting" | "opening" | "rebuttal" | "voting",
-                    currentDeadline,
-                    new Date(newDeadline).toISOString()
-                  )
+                mutate(
+                  () =>
+                    extendDeadlineV15Action(
+                      room.debate.id,
+                      phase as
+                        | "recruiting"
+                        | "opening"
+                        | "rebuttal"
+                        | "voting",
+                      currentDeadline,
+                      new Date(newDeadline).toISOString()
+                    ),
+                  {
+                    success: `The ${phase} deadline has been extended. Everyone in the room sees the new time.`,
+                  }
                 );
                 setDialog(null);
               }}
@@ -1149,8 +1386,12 @@ function ManagerControls({
               tone="danger"
               disabled={!reason.trim() || busy}
               onClick={() => {
-                mutate(() =>
-                  cancelDebateV15Action(room.debate.id, reason.trim())
+                mutate(
+                  () => cancelDebateV15Action(room.debate.id, reason.trim()),
+                  {
+                    success:
+                      "The debate is cancelled. Everyone involved has been notified.",
+                  }
                 );
                 setDialog(null);
               }}
@@ -1171,7 +1412,7 @@ function RecruitingView({
 }: {
   room: DebateV15RoomData;
   busy: boolean;
-  mutate: (action: () => Promise<DebateV15ActionResult>) => void;
+  mutate: DebateV15Mutate;
 }) {
   const now = useClockTick(room.loadedAt);
   const forSlot = room.slots.find((slot) => slot.stance === "for");
@@ -1195,11 +1436,21 @@ function RecruitingView({
   const invite = (userId: string, stance: DebateV15Stance) =>
     mutate(() => inviteDebaterV15Action(room.debate.id, userId, stance));
   const respond = (accept: boolean) =>
-    mutate(() =>
-      respondToDebateInvitationV15Action(room.debate.id, accept)
+    mutate(
+      () => respondToDebateInvitationV15Action(room.debate.id, accept),
+      {
+        success: accept
+          ? "You're confirmed as a debater. Watch the opening deadline — you get one submission."
+          : "Invitation declined. The moderator can now invite someone else.",
+      }
     );
   const revoke = (stance: DebateV15Stance) =>
-    mutate(() => revokeDebateInvitationV15Action(room.debate.id, stance));
+    mutate(
+      () => revokeDebateInvitationV15Action(room.debate.id, stance),
+      {
+        success: `The ${stance.toUpperCase()} slot is clear. You can invite a replacement.`,
+      }
+    );
 
   return (
     <div className="space-y-5">
@@ -1261,7 +1512,12 @@ function RecruitingView({
           </ul>
           <ActionButton
             className="mt-4"
-            onClick={() => mutate(() => startDebateV15Action(room.debate.id))}
+            onClick={() =>
+              mutate(() => startDebateV15Action(room.debate.id), {
+                success:
+                  "The debate is live. Both debaters can now submit opening arguments.",
+              })
+            }
             disabled={!bothAccepted || !scheduleReady || openingClosed || busy}
           >
             Start opening arguments
@@ -1298,7 +1554,7 @@ function ActiveArgumentView({
   room: DebateV15RoomData;
   phase: "opening" | "rebuttal";
   busy: boolean;
-  mutate: (action: () => Promise<DebateV15ActionResult>) => void;
+  mutate: DebateV15Mutate;
 }) {
   const now = useClockTick(room.loadedAt);
   const deadline = deadlineForPhase(room, phase);
@@ -1316,7 +1572,10 @@ function ActiveArgumentView({
   const alreadySubmitted = phaseArguments.some(
     (argument) => argument.authorId === room.currentUserId
   );
-  const canCompose = Boolean(userSlot) && !alreadySubmitted && !passed;
+  // Deliberately not gated on `passed`. The composer stays mounted once the
+  // deadline lapses so an unsent draft survives the clock tick; it renders in
+  // a locked state instead of vanishing mid-sentence.
+  const canCompose = Boolean(userSlot) && !alreadySubmitted;
 
   return (
     <div className="space-y-5">
@@ -1385,23 +1644,27 @@ function ActiveArgumentView({
           room={room}
           phase={phase}
           busy={busy}
-          submit={(content, sources) =>
-            mutate(() =>
-              submitDebateArgumentV15Action(
-                room.debate.id,
-                content,
-                sources
-              )
+          expired={passed}
+          deadline={deadline}
+          now={now}
+          submit={(content, sources, onSubmitted) =>
+            mutate(
+              () =>
+                submitDebateArgumentV15Action(
+                  room.debate.id,
+                  content,
+                  sources
+                ),
+              {
+                success: `Your ${phase} argument is submitted and locked on the record.`,
+                onSuccess: onSubmitted,
+              }
             )
           }
         />
       ) : alreadySubmitted && userSlot ? (
         <p className="rounded-xl bg-green-tint p-4 text-sm font-semibold text-emerald-brand">
           ✓ Your {phase} is submitted. Submissions are final.
-        </p>
-      ) : passed && userSlot ? (
-        <p role="status" className="rounded-xl bg-gold-tint p-4 text-sm text-gold-ink">
-          The {phase} deadline has passed, so the submission window is closed.
         </p>
       ) : null}
 
@@ -1417,7 +1680,7 @@ function VotingView({
 }: {
   room: DebateV15RoomData;
   busy: boolean;
-  mutate: (action: () => Promise<DebateV15ActionResult>) => void;
+  mutate: DebateV15Mutate;
 }) {
   const now = useClockTick(room.loadedAt);
   const [closeOpen, setCloseOpen] = useState(false);
@@ -1471,8 +1734,14 @@ function VotingView({
               aria-pressed={room.userFinalVote === stance}
               disabled={!room.currentUserId || deadlinePassed || busy}
               onClick={() =>
-                mutate(() =>
-                  castFinalVoteV15Action(room.debate.id, stance)
+                mutate(
+                  () => castFinalVoteV15Action(room.debate.id, stance),
+                  {
+                    success:
+                      stance === "for"
+                        ? "Your final vote is recorded FOR the motion."
+                        : "Your final vote is recorded AGAINST the motion.",
+                  }
                 )
               }
               className={`rounded-xl border-2 p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-brand disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -1575,11 +1844,14 @@ function VotingView({
               tone="secondary"
               disabled={busy || reminded}
               onClick={() =>
-                mutate(async () => {
-                  const result = await remindVotersV15Action(room.debate.id);
-                  if (result.ok) setReminded(true);
-                  return result;
-                })
+                mutate(
+                  async () => {
+                    const result = await remindVotersV15Action(room.debate.id);
+                    if (result.ok) setReminded(true);
+                    return result;
+                  },
+                  { success: "Voting reminder sent to the debate's audience." }
+                )
               }
             >
               {reminded ? "Reminder sent" : "Remind voters"}
@@ -1611,7 +1883,10 @@ function VotingView({
               tone="gold"
               disabled={busy}
               onClick={() => {
-                mutate(() => completeDebateV15Action(room.debate.id));
+                mutate(() => completeDebateV15Action(room.debate.id), {
+                  success:
+                    "Voting is closed and the verdict is published. The recap is now generating.",
+                });
                 setCloseOpen(false);
               }}
             >
@@ -1653,7 +1928,7 @@ function VerdictView({
 }: {
   room: DebateV15RoomData;
   busy: boolean;
-  mutate: (action: () => Promise<DebateV15ActionResult>) => void;
+  mutate: DebateV15Mutate;
 }) {
   const { total, forPercent, againstPercent, outcome } =
     resolveDebateV15Verdict(
@@ -1805,7 +2080,9 @@ function VerdictView({
                 className="mt-3"
                 disabled={busy}
                 onClick={() =>
-                  mutate(() => retryDebateRecapV15Action(room.debate.id))
+                  mutate(() => retryDebateRecapV15Action(room.debate.id), {
+                    success: "Recap generation has been queued again.",
+                  })
                 }
               >
                 Retry recap
@@ -1928,7 +2205,7 @@ function CancelledView({
 }: {
   room: DebateV15RoomData;
   busy: boolean;
-  mutate: (action: () => Promise<DebateV15ActionResult>) => void;
+  mutate: DebateV15Mutate;
 }) {
   return (
     <div className="space-y-5">
@@ -1990,10 +2267,11 @@ export default function DebateV15Room({
     tone: "error" | "success";
     message: string;
   } | null>(null);
+  const feedbackRef = useRef<HTMLDivElement>(null);
   const activeDeadline = deadlineForPhase(room, room.debate.phase);
   const moderatorName = profileName(room.debate.moderator);
 
-  const mutate = (action: () => Promise<DebateV15ActionResult>) => {
+  const mutate: DebateV15Mutate = (action, options = {}) => {
     setFeedback(null);
     startTransition(async () => {
       const result = await action();
@@ -2004,13 +2282,28 @@ export default function DebateV15Room({
         });
         return;
       }
-      setFeedback({
-        tone: "success",
-        message: result.message ?? "Saved.",
-      });
+
+      options.onSuccess?.();
+
+      // A server-authored message (e.g. invitation delivery) always wins;
+      // otherwise use the caller's copy. With neither, the action succeeds
+      // quietly rather than announcing a meaningless "Saved."
+      const message = result.message ?? options.success ?? null;
+      setFeedback(message ? { tone: "success", message } : null);
       router.refresh();
     });
   };
+
+  // The banner sits at the top of a long room; actions are triggered from the
+  // bottom of it (composer, vote panel). Without moving the viewport, a failed
+  // submission would report itself entirely off-screen on a phone.
+  useEffect(() => {
+    if (!feedback) return;
+    const node = feedbackRef.current;
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+    node.focus({ preventScroll: true });
+  }, [feedback]);
 
   const share = async () => {
     try {
@@ -2026,7 +2319,7 @@ export default function DebateV15Room({
 
   return (
     <div className="-mx-4 min-h-screen bg-canvas sm:-mx-6 lg:-mx-8">
-      <header className="sticky top-16 z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
+      <header className="sticky top-[var(--app-nav-height)] z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="min-w-0">
             <Link
@@ -2055,14 +2348,24 @@ export default function DebateV15Room({
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {feedback ? (
           <div
+            ref={feedbackRef}
+            tabIndex={-1}
             role={feedback.tone === "error" ? "alert" : "status"}
-            className={`mb-5 rounded-xl border p-4 text-sm font-semibold ${
+            className={`mb-5 flex items-start justify-between gap-3 rounded-xl border p-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-2 ${
               feedback.tone === "error"
                 ? "border-red-200 bg-red-50 text-red-700"
                 : "border-green-wash-border bg-green-tint text-emerald-brand"
             }`}
           >
-            {feedback.message}
+            <span>{feedback.message}</span>
+            <button
+              type="button"
+              onClick={() => setFeedback(null)}
+              aria-label="Dismiss message"
+              className="shrink-0 rounded-lg px-2 py-0.5 text-base leading-none hover:bg-black/5 focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+            >
+              ×
+            </button>
           </div>
         ) : null}
 

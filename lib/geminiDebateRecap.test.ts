@@ -45,6 +45,9 @@ describe("Gemini debate recap request", () => {
     const request = fetchMock.mock.calls[0]?.[1] as { body?: string };
     const body = JSON.parse(request.body ?? "{}") as {
       generationConfig?: {
+        thinkingConfig?: {
+          thinkingLevel?: string;
+        };
         responseFormat?: {
           text?: {
             mimeType?: string;
@@ -53,8 +56,11 @@ describe("Gemini debate recap request", () => {
         };
       };
     };
+    expect(body.generationConfig?.thinkingConfig?.thinkingLevel).toBe(
+      "minimal"
+    );
     expect(body.generationConfig?.responseFormat?.text?.mimeType).toBe(
-      "application/json"
+      "APPLICATION_JSON"
     );
     expect(body.generationConfig?.responseFormat?.text?.schema?.required).toEqual(
       [

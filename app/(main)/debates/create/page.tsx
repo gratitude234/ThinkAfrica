@@ -601,7 +601,7 @@ export default function CreateDebatePage() {
           </div>
         </form>
 
-        <aside className="space-y-4 lg:sticky lg:top-[76px] lg:self-start">
+        <aside className="space-y-4 lg:sticky lg:top-[calc(var(--app-nav-height)+1rem)] lg:self-start">
           <section className="rounded-xl border border-gray-200 bg-surface p-5">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <DebateStatusPill status="open" />

@@ -227,7 +227,7 @@ export default async function DebatePage({ params }: PageProps) {
 
   return (
     <div>
-      <div className="sticky top-16 z-40 -mx-4 border-b border-gray-200 bg-white/95 px-6 py-3 backdrop-blur-xl sm:-mx-6 lg:-mx-8">
+      <div className="sticky top-[var(--app-nav-height)] z-40 -mx-4 border-b border-gray-200 bg-white/95 px-6 py-3 backdrop-blur-xl sm:-mx-6 lg:-mx-8">
         <div className="mx-auto flex max-w-5xl flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <Link

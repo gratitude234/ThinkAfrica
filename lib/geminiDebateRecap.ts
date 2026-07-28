@@ -73,12 +73,15 @@ export async function requestGeminiDebateRecap(input: {
 
   const generationConfig: Record<string, unknown> = {
     maxOutputTokens: input.structured ? 1_600 : 1_200,
+    thinkingConfig: {
+      thinkingLevel: "minimal",
+    },
   };
 
   if (input.structured) {
     generationConfig.responseFormat = {
       text: {
-        mimeType: "application/json",
+        mimeType: "APPLICATION_JSON",
         schema: STRUCTURED_RECAP_SCHEMA,
       },
     };

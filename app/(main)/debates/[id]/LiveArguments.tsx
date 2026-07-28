@@ -587,7 +587,7 @@ export default function LiveArguments({
 
         <div
           id="participate"
-          className="order-first space-y-5 lg:sticky lg:top-[84px] lg:order-none lg:self-start"
+          className="order-first space-y-5 lg:sticky lg:top-[calc(var(--app-nav-height)+1rem)] lg:order-none lg:self-start"
         >
           <MotionVotePanel
             debateId={debateId}
