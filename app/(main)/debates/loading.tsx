@@ -1,6 +1,9 @@
 export default function Loading() {
   return (
-    <div className="max-w-4xl mx-auto animate-pulse">
+    <div className="max-w-4xl mx-auto animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading debates"
+    >
       <div className="h-8 w-48 bg-gray-200 rounded mb-2" />
       <div className="h-4 w-72 bg-gray-100 rounded mb-8" />
       <div className="space-y-4">
@@ -19,6 +22,8 @@ export default function Loading() {
           </div>
         ))}
       </div>
+
+      <span className="sr-only">Loading debates…</span>
     </div>
   );
 }

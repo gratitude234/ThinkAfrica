@@ -29,7 +29,7 @@ import type { EditorHandle } from "@/components/editor/Editor";
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
   loading: () => (
-    <div className="min-h-[280px] animate-pulse py-1 lg:min-h-[380px]">
+    <div className="min-h-[280px] animate-pulse motion-reduce:animate-none py-1 lg:min-h-[380px]">
       <div className="h-5 w-full rounded bg-gray-200/50" />
       <div className="mt-3 h-5 w-3/4 rounded bg-gray-200/50" />
     </div>
@@ -804,7 +804,7 @@ export default function WritePage() {
                 aria-hidden="true"
                 className={`mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle ${
                   saveStatus === "saving"
-                    ? "animate-pulse bg-amber-400"
+                    ? "animate-pulse motion-reduce:animate-none bg-amber-400"
                     : saveStatus === "error"
                       ? "bg-red-500"
                       : saveStatus === "saved"

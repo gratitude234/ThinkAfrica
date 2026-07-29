@@ -20,18 +20,24 @@ export default async function MainLayout({
   } = await supabase.auth.getSession();
   const user = session?.user ?? null;
 
-  const { data: profileData } = user
-    ? await supabase
-        .from("profiles")
-        .select("points, username, full_name, role, avatar_url")
-        .eq("id", user.id)
-        .single()
-    : { data: null };
-
-  const { count: activeDebateCount } = await supabase
-    .from("debates")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active");
+  // This layout re-renders on every navigation inside the app shell, so its
+  // queries sit on the critical path of every click. They're independent of
+  // each other -- running them sequentially made each navigation pay both
+  // round trips back to back.
+  const [{ data: profileData }, { count: activeDebateCount }] =
+    await Promise.all([
+      user
+        ? supabase
+            .from("profiles")
+            .select("points, username, full_name, role, avatar_url")
+            .eq("id", user.id)
+            .single()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("debates")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active"),
+    ]);
 
   const isAdmin =
     !!user &&

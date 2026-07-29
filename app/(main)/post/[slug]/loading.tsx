@@ -1,6 +1,9 @@
 export default function Loading() {
   return (
-    <div className="max-w-6xl mx-auto animate-pulse">
+    <div className="max-w-6xl mx-auto animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading this post"
+    >
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-3">
           <div className="max-w-3xl space-y-4">
@@ -63,6 +66,8 @@ export default function Loading() {
           </div>
         </div>
       </div>
+
+      <span className="sr-only">Loading this post…</span>
     </div>
   );
 }

@@ -15,7 +15,7 @@ const POST_TYPE_FILTERS = [
 
 function BookmarkSkeletons() {
   return (
-    <div className="space-y-4 animate-pulse">
+    <div className="space-y-4 animate-pulse motion-reduce:animate-none">
       {[...Array(3)].map((_, index) => (
         <div
           key={index}

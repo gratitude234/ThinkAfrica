@@ -1,6 +1,9 @@
 export default function Loading() {
   return (
-    <div className="max-w-5xl mx-auto animate-pulse">
+    <div className="max-w-5xl mx-auto animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading your dashboard"
+    >
       <div className="flex items-center justify-between mb-8">
         <div className="space-y-2">
           <div className="h-7 w-32 bg-gray-200 rounded" />
@@ -36,6 +39,8 @@ export default function Loading() {
           </div>
         ))}
       </div>
+
+      <span className="sr-only">Loading your dashboard…</span>
     </div>
   );
 }

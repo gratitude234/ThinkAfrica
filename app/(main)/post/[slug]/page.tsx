@@ -537,7 +537,7 @@ async function getViewerData({
 
 function SectionSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="animate-pulse space-y-3">
+    <div className="animate-pulse motion-reduce:animate-none space-y-3">
       <div className="h-4 w-24 rounded bg-gray-200" />
       {[...Array(rows)].map((_, index) => (
         <div key={index} className="h-4 rounded bg-gray-100" />
@@ -1671,7 +1671,7 @@ export default async function PostPage({ params }: PageProps) {
             {post.title}
           </h1>
 
-          <Suspense fallback={<div className="mt-5 h-12 animate-pulse rounded-lg bg-gray-100" />}>
+          <Suspense fallback={<div className="mt-5 h-12 animate-pulse motion-reduce:animate-none rounded-lg bg-gray-100" />}>
             <DetailAuthorRow
               post={post}
               author={author}
@@ -1918,7 +1918,7 @@ export default async function PostPage({ params }: PageProps) {
             </h1>
           ) : null}
 
-          <Suspense fallback={<div className="mt-5 h-12 animate-pulse rounded-lg bg-gray-100" />}>
+          <Suspense fallback={<div className="mt-5 h-12 animate-pulse motion-reduce:animate-none rounded-lg bg-gray-100" />}>
             <DetailAuthorRow
               post={post}
               author={author}

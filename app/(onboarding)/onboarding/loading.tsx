@@ -1,7 +1,7 @@
 export default function Loading() {
   return (
     <div className="h-dvh overflow-hidden bg-canvas">
-      <div className="mx-auto flex h-full w-full max-w-lg flex-col animate-pulse">
+      <div className="mx-auto flex h-full w-full max-w-lg flex-col animate-pulse motion-reduce:animate-none">
         <div className="flex-shrink-0 px-5 pt-8">
           <div className="flex h-7 items-center justify-between">
             <span className="h-7 w-7" />

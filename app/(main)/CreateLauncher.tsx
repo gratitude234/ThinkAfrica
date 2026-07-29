@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 
@@ -21,6 +22,31 @@ function PlusIcon({ className = "h-4 w-4" }: { className?: string }) {
       aria-hidden="true"
     >
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function SpinnerIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      className={`animate-spin motion-reduce:animate-none ${className}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth={4}
+      />
+      <path
+        className="opacity-90"
+        fill="currentColor"
+        d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
+      />
     </svg>
   );
 }
@@ -66,8 +92,12 @@ export default function CreateLauncher({
 }: CreateLauncherProps) {
   const router = useRouter();
   const { requestAuth } = useGuestAuthGate();
+  // The composer is a server route (auth + optional parent-post lookup), so
+  // there's a real gap between the tap and the new screen. Track it so both
+  // controls can show they're working instead of appearing dead.
+  const [isNavigating, startNavigation] = useTransition();
   const handleTrigger = userId
-    ? () => router.push("/create/post")
+    ? () => startNavigation(() => router.push("/create/post"))
     : () => requestAuth("create");
 
   if (variant === "mobileFab") {
@@ -86,9 +116,15 @@ export default function CreateLauncher({
               ? "calc(112px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))"
               : "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
           }}
-          aria-label="Start writing"
+          aria-label={isNavigating ? "Opening the composer" : "Start writing"}
+          disabled={isNavigating}
+          aria-busy={isNavigating || undefined}
         >
-          <ComposeIcon className="h-[25px] w-[25px] transition-transform duration-200 group-active:scale-95 motion-reduce:transition-none" />
+          {isNavigating ? (
+            <SpinnerIcon className="h-[25px] w-[25px]" />
+          ) : (
+            <ComposeIcon className="h-[25px] w-[25px] transition-transform duration-200 group-active:scale-95 motion-reduce:transition-none" />
+          )}
         </button>
       </div>
     );
@@ -99,11 +135,17 @@ export default function CreateLauncher({
       <button
         type="button"
         onClick={handleTrigger}
+        disabled={isNavigating}
+        aria-busy={isNavigating || undefined}
         className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
           isActive ? "bg-ink" : "bg-emerald-brand hover:bg-[#0E4B37]"
         }`}
       >
-        <PlusIcon className="h-3.5 w-3.5" />
+        {isNavigating ? (
+          <SpinnerIcon className="h-3.5 w-3.5" />
+        ) : (
+          <PlusIcon className="h-3.5 w-3.5" />
+        )}
         Create
       </button>
     </div>

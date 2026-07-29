@@ -1,6 +1,6 @@
 "use client";
 
-import { type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useTransition, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 
@@ -25,16 +25,30 @@ export default function CreateTrigger({
   userId,
   className,
   children,
+  disabled,
   ...rest
 }: CreateTriggerProps) {
   const router = useRouter();
   const { requestAuth } = useGuestAuthGate();
+  // /create/post is a server route that authenticates and may resolve a
+  // parent post before it can render, so the click isn't instant. Without a
+  // pending state the button looks inert for that whole window and people
+  // click it again. useTransition keeps the current page interactive while
+  // marking this control busy.
+  const [isNavigating, startNavigation] = useTransition();
+
+  const handleClick = userId
+    ? () => startNavigation(() => router.push("/create/post"))
+    : () => requestAuth("create");
 
   return (
     <button
       type="button"
-      onClick={userId ? () => router.push("/create/post") : () => requestAuth("create")}
+      onClick={handleClick}
       className={className}
+      disabled={disabled || isNavigating}
+      aria-busy={isNavigating || undefined}
+      data-pending={isNavigating ? "" : undefined}
       {...rest}
     >
       {children}

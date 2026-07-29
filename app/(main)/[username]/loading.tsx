@@ -1,6 +1,9 @@
 export default function Loading() {
   return (
-    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 animate-pulse">
+    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading this profile"
+    >
       {/* Profile sidebar */}
       <div className="lg:col-span-1 space-y-4">
         <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
@@ -34,6 +37,8 @@ export default function Loading() {
           </div>
         ))}
       </div>
+
+      <span className="sr-only">Loading this profile…</span>
     </div>
   );
 }

@@ -1,6 +1,9 @@
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-3xl animate-pulse">
+    <div className="mx-auto max-w-3xl animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading your bookmarks"
+    >
       <div className="mb-6 h-7 w-32 rounded bg-gray-200" />
       <div className="mb-6 flex gap-2">
         {[...Array(3)].map((_, index) => (
@@ -33,6 +36,8 @@ export default function Loading() {
           </div>
         ))}
       </div>
+
+      <span className="sr-only">Loading your bookmarks…</span>
     </div>
   );
 }

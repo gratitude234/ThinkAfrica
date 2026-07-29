@@ -1,7 +1,7 @@
 export default function WriteCanvasSkeleton() {
   return (
     <div
-      className="mx-auto min-h-screen max-w-[1240px] animate-pulse px-5 pb-24 sm:px-8 lg:px-8 xl:px-10"
+      className="mx-auto min-h-screen max-w-[1240px] animate-pulse motion-reduce:animate-none px-5 pb-24 sm:px-8 lg:px-8 xl:px-10"
       role="status"
       aria-label="Loading the writing canvas"
     >

@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="max-w-2xl mx-auto animate-pulse">
+    <div className="max-w-2xl mx-auto animate-pulse motion-reduce:animate-none">
       <div className="h-7 w-24 bg-gray-200 rounded mb-6" />
       <div className="mb-6 flex gap-1">
         {[...Array(4)].map((_, i) => (

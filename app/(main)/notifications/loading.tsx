@@ -1,6 +1,9 @@
 export default function Loading() {
   return (
-    <div className="max-w-2xl mx-auto animate-pulse">
+    <div className="max-w-2xl mx-auto animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading notifications"
+    >
       <div className="h-7 w-32 bg-gray-200 rounded mb-6" />
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         {[...Array(6)].map((_, i) => (
@@ -13,6 +16,8 @@ export default function Loading() {
           </div>
         ))}
       </div>
+
+      <span className="sr-only">Loading notifications…</span>
     </div>
   );
 }

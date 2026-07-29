@@ -32,7 +32,7 @@ export function getVoteSplit(forCount = 0, againstCount = 0) {
 export function LiveDot({ size = 8 }: { size?: number }) {
   return (
     <span
-      className="animate-pulse"
+      className="animate-pulse motion-reduce:animate-none"
       style={{
         display: "inline-block",
         width: size,

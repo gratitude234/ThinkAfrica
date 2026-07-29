@@ -50,7 +50,7 @@ function StatusBadge({ status, closureKind }: { status: DebateV2DebateSummary["s
   if (status === "active") {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
-        <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+        <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse motion-reduce:animate-none rounded-full bg-amber-500" />
         Live
       </span>
     );

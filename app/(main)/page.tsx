@@ -119,53 +119,33 @@ export default async function HomePage({ searchParams }: PageProps) {
     redirect("/landing");
   }
 
-  let userInterests: string[] = [];
-  let userUniversity: string | null = null;
-  let userFieldOfStudy: string | null = null;
-  let welcomeFirstName: string | null = null;
-  let welcomePrimaryLabel: string | null = null;
-  let legacyPushSeed: LegacyPushPromptSeed = {
-    attemptCount: 0,
-    lastShownAt: null,
-    shownAt: null,
-  };
-
-  if (user) {
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select(
-        "interests, university, field_of_study, full_name, profile_type, push_prompt_attempt_count, push_prompt_last_shown_at, push_prompt_shown_at"
-      )
-      .eq("id", user.id)
-      .single();
-
-    userInterests = (profileData?.interests as string[] | null) ?? [];
-    userUniversity = profileData?.university ?? null;
-    userFieldOfStudy = profileData?.field_of_study ?? null;
-    welcomeFirstName = profileData?.full_name?.trim().split(/\s+/)[0] ?? null;
-    welcomePrimaryLabel = isProfileType(profileData?.profile_type)
-      ? getProfileTypeLabel(profileData.profile_type)
-      : null;
-
-    legacyPushSeed = {
-      attemptCount: profileData?.push_prompt_attempt_count ?? 0,
-      lastShownAt: profileData?.push_prompt_last_shown_at ?? null,
-      shownAt: profileData?.push_prompt_shown_at ?? null,
-    };
-  }
-
   const showWelcomeBanner = Boolean(user) && welcome === "1";
 
   const draftCutoff = new Date(
     Date.now() - 14 * 24 * 60 * 60 * 1000
   ).toISOString();
 
+  // The viewer's profile is only read after this batch resolves (interests
+  // feed the featured-post ranking below), so it belongs in the batch rather
+  // than in front of it -- fetching it first made the home page wait on a
+  // round trip before it even started loading the feed.
   const [
+    { data: profileData },
     { data: followedUsers },
     hotDebateResult,
     { data: recentDraft },
     featuredCandidates,
   ] = await Promise.all([
+    user
+      ? supabase
+          .from("profiles")
+          .select(
+            "interests, university, field_of_study, full_name, profile_type, push_prompt_attempt_count, push_prompt_last_shown_at, push_prompt_shown_at"
+          )
+          .eq("id", user.id)
+          .single()
+      : Promise.resolve({ data: null }),
+
     user
       ? supabase
           .from("follows")
@@ -189,6 +169,20 @@ export default async function HomePage({ searchParams }: PageProps) {
 
     getFeaturedPostCandidates(supabase),
   ]);
+
+  const userInterests = (profileData?.interests as string[] | null) ?? [];
+  const userUniversity = profileData?.university ?? null;
+  const userFieldOfStudy = profileData?.field_of_study ?? null;
+  const welcomeFirstName =
+    profileData?.full_name?.trim().split(/\s+/)[0] ?? null;
+  const welcomePrimaryLabel = isProfileType(profileData?.profile_type)
+    ? getProfileTypeLabel(profileData.profile_type)
+    : null;
+  const legacyPushSeed: LegacyPushPromptSeed = {
+    attemptCount: profileData?.push_prompt_attempt_count ?? 0,
+    lastShownAt: profileData?.push_prompt_last_shown_at ?? null,
+    shownAt: profileData?.push_prompt_shown_at ?? null,
+  };
 
   const { manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult } =
     featuredCandidates;

@@ -1,6 +1,6 @@
 export function PostCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white animate-pulse">
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white animate-pulse motion-reduce:animate-none">
       <div className="aspect-[16/9] w-full bg-gray-200" />
       <div className="space-y-3 p-5">
         <div className="flex items-center justify-between">
@@ -24,7 +24,7 @@ export function PostCardSkeleton() {
 
 export function ProfileCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
+    <div className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse motion-reduce:animate-none">
       <div className="flex items-start gap-4 mb-4">
         <div className="w-16 h-16 rounded-full bg-gray-200 flex-shrink-0" />
         <div className="flex-1">
@@ -49,7 +49,7 @@ export function ProfileCardSkeleton() {
 
 export function DebateCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
+    <div className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse motion-reduce:animate-none">
       <div className="flex items-center gap-2 mb-3">
         <div className="h-5 bg-gray-200 rounded-full w-16" />
         <div className="h-5 bg-gray-100 rounded-full w-20" />

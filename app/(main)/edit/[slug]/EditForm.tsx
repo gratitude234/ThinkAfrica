@@ -30,7 +30,7 @@ import { saveEditedPost } from "./actions";
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
   loading: () => (
-    <div className="min-h-[400px] animate-pulse rounded-lg border border-gray-200 bg-canvas" />
+    <div className="min-h-[400px] animate-pulse motion-reduce:animate-none rounded-lg border border-gray-200 bg-canvas" />
   ),
 });
 

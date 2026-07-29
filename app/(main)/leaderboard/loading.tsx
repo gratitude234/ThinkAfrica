@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="max-w-3xl mx-auto animate-pulse">
+    <div className="max-w-3xl mx-auto animate-pulse motion-reduce:animate-none">
       <div className="h-8 w-40 bg-gray-200 rounded mb-2" />
       <div className="h-4 w-56 bg-gray-100 rounded mb-8" />
       {/* Tab strip */}

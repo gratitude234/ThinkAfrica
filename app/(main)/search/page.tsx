@@ -119,7 +119,7 @@ function ResultSkeleton() {
       {[...Array(3)].map((_, index) => (
         <div
           key={index}
-          className="animate-pulse rounded-xl border border-gray-200 bg-white p-4"
+          className="animate-pulse motion-reduce:animate-none rounded-xl border border-gray-200 bg-white p-4"
         >
           <div className="h-5 w-20 rounded-full bg-gray-100" />
           <div className="mt-3 h-4 w-3/4 rounded bg-gray-200" />

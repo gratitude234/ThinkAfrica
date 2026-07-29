@@ -1,6 +1,9 @@
 export default function Loading() {
   return (
-    <div className="animate-pulse">
+    <div className="animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading this debate"
+    >
       <div className="border-b border-gray-200 py-4 px-6 flex items-center justify-between">
         <div className="h-6 w-64 bg-gray-200 rounded" />
         <div className="h-5 w-24 bg-gray-100 rounded-full" />
@@ -22,6 +25,8 @@ export default function Loading() {
           </div>
         ))}
       </div>
+
+      <span className="sr-only">Loading this debate…</span>
     </div>
   );
 }

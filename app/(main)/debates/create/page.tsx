@@ -351,7 +351,7 @@ export default function CreateDebatePage() {
 
   if (access.status === "checking") {
     return (
-      <div className="mx-auto max-w-5xl animate-pulse">
+      <div className="mx-auto max-w-5xl animate-pulse motion-reduce:animate-none">
         <div className="h-9 w-72 rounded bg-gray-200" />
         <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="h-[580px] rounded-xl bg-surface" />

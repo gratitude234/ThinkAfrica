@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-xl animate-pulse">
+    <div className="mx-auto max-w-xl animate-pulse motion-reduce:animate-none">
       <div className="mb-8 space-y-2">
         <div className="h-8 w-56 rounded bg-gray-200" />
         <div className="h-4 w-80 rounded bg-gray-100" />

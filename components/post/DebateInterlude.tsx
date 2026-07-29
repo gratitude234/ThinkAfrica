@@ -28,7 +28,7 @@ export default function DebateInterlude({
     <section className="-mx-4 my-3 grid gap-4 border-y border-gray-800 bg-gray-900 p-4 text-white sm:mx-0 sm:rounded-xl sm:border sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5">
       <div className="min-w-0">
         <div className="mb-2 flex items-center gap-2">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+          <span className="h-1.5 w-1.5 animate-pulse motion-reduce:animate-none rounded-full bg-emerald-400" />
           <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-emerald-300">
             {status === "open" ? "Open debate" : "Live debate"} {"\u00B7"}{" "}
             {debate.argumentCount.toLocaleString()} arguments

@@ -1,6 +1,9 @@
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-3xl animate-pulse">
+    <div className="mx-auto max-w-3xl animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading search"
+    >
       <div className="mb-6 h-7 w-24 rounded bg-gray-200" />
       <div className="mb-8 h-12 w-full rounded-2xl bg-gray-200" />
       <div className="space-y-3">
@@ -17,6 +20,8 @@ export default function Loading() {
           </div>
         ))}
       </div>
+
+      <span className="sr-only">Loading search…</span>
     </div>
   );
 }

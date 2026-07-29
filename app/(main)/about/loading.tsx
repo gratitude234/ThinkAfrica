@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-[960px] animate-pulse text-ink">
+    <div className="mx-auto max-w-[960px] animate-pulse motion-reduce:animate-none text-ink">
       <section className="border-b border-[#e5e0d8] px-2 py-14 text-center sm:py-16">
         <div className="mx-auto mb-6 h-3 w-44 rounded bg-emerald-100" />
         <div className="mx-auto h-12 max-w-[620px] rounded bg-gray-200 sm:h-16" />

@@ -931,7 +931,7 @@ function DebateRailCard({ data }: { data: DiscoverData }) {
   return (
     <section className="rounded-xl bg-gray-900 p-5 text-white">
       <div className="mb-3 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-emerald-brand animate-pulse" />
+        <span className="h-2 w-2 rounded-full bg-emerald-brand animate-pulse motion-reduce:animate-none" />
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">
           {debate.status === "active" ? "Live debate" : "Open debate"}
         </p>
@@ -976,7 +976,7 @@ function MobileDebateBanner({ data }: { data: DiscoverData }) {
       className="mb-4 flex min-w-0 items-center justify-between gap-3 rounded-[10px] bg-gray-900 px-3.5 py-3 text-white lg:hidden"
     >
       <span className="flex min-w-0 items-center gap-2">
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-brand animate-pulse" />
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-brand animate-pulse motion-reduce:animate-none" />
         <span className="min-w-0">
           <span className="block text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/50">
             {debate.status === "active" ? "Live debate" : "Open debate"}

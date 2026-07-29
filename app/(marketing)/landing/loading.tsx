@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="animate-pulse">
+    <div className="animate-pulse motion-reduce:animate-none">
       <section className="px-4 py-16">
         <div className="mx-auto grid max-w-6xl items-center gap-12 md:grid-cols-2">
           <div className="space-y-4">
