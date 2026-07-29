@@ -37,13 +37,17 @@ function Chip({
 export default function FeedFilterChips({
   type,
   onTypeChange,
+  className = "mb-3",
 }: {
   type: FeedContentFilter;
   onTypeChange: (value: FeedContentFilter) => void;
+  className?: string;
 }) {
   return (
     <div
-      className="mb-3 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // overscroll-x-contain stops a diagonal swipe over the chips from
+      // rubber-banding this strip instead of scrolling the feed behind it.
+      className={`flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
       role="group"
       aria-label="Filter feed by content type"
     >

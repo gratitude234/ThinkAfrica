@@ -372,6 +372,57 @@ describe("PostsFeedTabs -- empty states", () => {
   });
 });
 
+describe("PostsFeedTabs -- scroll position on tab switch", () => {
+  beforeEach(() => {
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ posts: [post("1")], hasMore: false }), {
+            status: 200,
+          })
+      )
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("returns a reader who is scrolled into the feed back to the top of it", async () => {
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    render(<PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />);
+
+    // jsdom reports every rect as zero, so stand in for "the feed controls
+    // have scrolled 2400px above the viewport".
+    vi.stubGlobal("scrollY", 2400);
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      top: -2400,
+    } as DOMRect);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: "Latest" }));
+    });
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
+  });
+
+  it("leaves the viewport alone when the feed controls are already in view", async () => {
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    render(<PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: "Latest" }));
+    });
+
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+});
+
 describe("PostsFeedTabs -- error and retry states", () => {
   beforeEach(() => {
     mocks.requestAuth.mockReset();
