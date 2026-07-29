@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  MAX_TOPIC_KEY_LENGTH,
+  normalizeTagValue,
+} from "@/lib/tags";
 
 interface TagInputProps {
   label?: string;
@@ -16,10 +20,6 @@ interface TagInputProps {
 
 interface TagRow {
   tags: string[] | null;
-}
-
-function normalizeTag(tag: string) {
-  return tag.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 export default function TagInput({
@@ -64,7 +64,7 @@ export default function TagInput({
         new Set(
           ((data ?? []) as TagRow[])
             .flatMap((post) => post.tags ?? [])
-            .map((tag) => normalizeTag(tag))
+            .map((tag) => normalizeTagValue(tag))
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b));
@@ -80,7 +80,7 @@ export default function TagInput({
   };
 
   const addTag = (tag: string) => {
-    const normalized = normalizeTag(tag);
+    const normalized = normalizeTagValue(tag);
 
     if (!normalized || value.includes(normalized) || value.length >= maxTags) {
       return;
@@ -95,7 +95,7 @@ export default function TagInput({
   };
 
   const suggestions = useMemo(() => {
-    const normalizedQuery = normalizeTag(query);
+    const normalizedQuery = normalizeTagValue(query);
 
     if (!normalizedQuery) {
       return [];
@@ -152,6 +152,7 @@ export default function TagInput({
               <input
                 type="text"
                 value={query}
+                maxLength={MAX_TOPIC_KEY_LENGTH}
                 onChange={(event) => {
                   setQuery(event.target.value);
                   void loadTags();

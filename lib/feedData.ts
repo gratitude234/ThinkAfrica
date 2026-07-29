@@ -6,8 +6,9 @@ import {
   getPublicQualitySignals,
 } from "@/lib/postQuality";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
 
-export type FeedTabKey = "home" | "following" | "latest";
+export type FeedTabKey = "home" | "following" | "topics" | "latest";
 export type FeedTimeframe = "all" | "week" | "month";
 export type FeedContentFilter = "all" | "post" | "article" | "research";
 
@@ -44,6 +45,7 @@ interface FeedOptions {
   userInterests: string[];
   userUniversity: string | null;
   followedIds: string[];
+  topicSubscriptionKeys?: string[];
   excludedAuthorIds?: string[];
 }
 
@@ -522,6 +524,7 @@ export async function fetchFeedPage({
   userInterests,
   userUniversity,
   followedIds,
+  topicSubscriptionKeys,
   excludedAuthorIds,
 }: FeedOptions): Promise<FeedPageResult> {
   const shouldUsePublicCache =
@@ -530,8 +533,10 @@ export async function fetchFeedPage({
     userInterests.length === 0 &&
     !userUniversity &&
     followedIds.length === 0 &&
+    (topicSubscriptionKeys?.length ?? 0) === 0 &&
     (excludedAuthorIds?.length ?? 0) === 0 &&
-    tab !== "following";
+    tab !== "following" &&
+    tab !== "topics";
 
   if (shouldUsePublicCache) {
     return fetchCachedPublicFeedPage({ tab, page, pageSize, type, timeframe });
@@ -548,6 +553,7 @@ export async function fetchFeedPage({
     userInterests,
     userUniversity,
     followedIds,
+    topicSubscriptionKeys,
     excludedAuthorIds,
   });
 }
@@ -563,6 +569,7 @@ async function fetchFeedPageUncached({
   userInterests,
   userUniversity,
   followedIds,
+  topicSubscriptionKeys,
   excludedAuthorIds,
 }: FeedOptions): Promise<FeedPageResult> {
   const reader = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -591,6 +598,43 @@ async function fetchFeedPageUncached({
     );
     const { data } = await query
       .in("author_id", visibleFollowedIds)
+      .order("published_at", { ascending: false })
+      .range(start, end);
+
+    const raw = data ?? [];
+    const rankingContext: RankingContext = {
+      userId,
+      followedIds: new Set(followedIds),
+      userInterests,
+      userUniversity,
+      userCountry: null,
+    };
+    const posts = await enrichPosts(
+      reader,
+      raw.slice(0, safePageSize),
+      rankingContext
+    );
+    return { posts, hasMore: raw.length > safePageSize };
+  }
+
+  if (tab === "topics") {
+    const subscribedTopics = topicSubscriptionKeys ?? [];
+    if (
+      !userId ||
+      !isTopicSubscriptionsEnabled() ||
+      subscribedTopics.length === 0
+    ) {
+      return { posts: [], hasMore: false };
+    }
+
+    const start = (safePage - 1) * safePageSize;
+    const end = start + safePageSize;
+    const query = applyPostFilters(
+      reader.from("posts").select(POST_SELECT),
+      { type, cutoff, excludedAuthorIds: excluded }
+    );
+    const { data } = await query
+      .overlaps("topic_keys", subscribedTopics)
       .order("published_at", { ascending: false })
       .range(start, end);
 

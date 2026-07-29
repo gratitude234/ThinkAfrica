@@ -12,6 +12,8 @@ import {
   type SuggestedPerson,
 } from "@/lib/suggestedPeople";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
+import { normalizeTagValue } from "@/lib/tags";
 
 export type DiscoverTab = "for-you" | "trending" | "citable" | "topics" | "people";
 
@@ -76,6 +78,7 @@ export interface DiscoverOpportunitySummary {
 
 export interface DiscoverData {
   userInterests: string[];
+  topicSubscriptionKeys: string[];
   userUniversity: string | null;
   followedIds: string[];
   forYouPosts: PostCardData[];
@@ -146,7 +149,7 @@ function normalizeInterests(value: string[] | null | undefined) {
 }
 
 function normalizeTag(value: string) {
-  return value.trim().toLowerCase();
+  return normalizeTagValue(value);
 }
 
 function getDebateArgumentCount(value: RawDebate["debate_arguments"]) {
@@ -163,10 +166,24 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
       fieldOfStudy: null as string | null,
       followedIds: [] as string[],
       blockedIds: [] as string[],
+      topicSubscriptionKeys: [] as string[],
     };
   }
 
-  const [{ data: profile }, { data: follows }, { data: blocks }] =
+  const topicSubscriptionsPromise = isTopicSubscriptionsEnabled()
+    ? supabase
+        .from("topic_subscriptions")
+        .select("topic_key")
+        .eq("subscriber_id", userId)
+        .limit(1000)
+    : Promise.resolve({ data: [] as Array<{ topic_key: string }> });
+
+  const [
+    { data: profile },
+    { data: follows },
+    { data: blocks },
+    { data: topicSubscriptions },
+  ] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -183,6 +200,7 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
         .select("blocked_id")
         .eq("blocker_id", userId)
         .limit(1000),
+      topicSubscriptionsPromise,
     ]);
 
   const profileRow = profile as ProfileRow | null;
@@ -195,6 +213,9 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
     fieldOfStudy: profileRow?.field_of_study ?? null,
     followedIds: followRows.map((row) => row.following_id),
     blockedIds: blockRows.map((row) => row.blocked_id),
+    topicSubscriptionKeys: (
+      (topicSubscriptions ?? []) as Array<{ topic_key: string }>
+    ).map((row) => row.topic_key),
   };
 }
 
@@ -273,10 +294,14 @@ async function getTopicCountsUncached(
   const counts = new Map<string, { tag: string; count: number }>();
 
   for (const row of ((data ?? []) as TopicRow[])) {
+    const postTopics = new Map<string, string>();
     for (const rawTag of row.tags ?? []) {
       const tag = rawTag.trim();
       if (!tag) continue;
       const key = normalizeTag(tag);
+      postTopics.set(key, postTopics.get(key) ?? tag);
+    }
+    for (const [key, tag] of postTopics) {
       const current = counts.get(key);
       counts.set(key, {
         tag: current?.tag ?? tag,
@@ -729,6 +754,7 @@ export async function getDiscoverData(
 
   return {
     userInterests: userContext.interests,
+    topicSubscriptionKeys: userContext.topicSubscriptionKeys,
     userUniversity: userContext.university,
     followedIds: userContext.followedIds,
     forYouPosts,

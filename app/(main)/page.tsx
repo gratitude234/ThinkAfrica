@@ -23,6 +23,7 @@ import {
 } from "@/lib/dailyBrief";
 import PostsFeedSection from "./PostsFeedSection";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl, canonicalPath } from "@/lib/site";
+import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
 
 export const revalidate = 60;
 
@@ -135,6 +136,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     hotDebateResult,
     { data: recentDraft },
     featuredCandidates,
+    { data: topicSubscriptions },
   ] = await Promise.all([
     user
       ? supabase
@@ -168,6 +170,14 @@ export default async function HomePage({ searchParams }: PageProps) {
       : Promise.resolve({ data: null, error: null }),
 
     getFeaturedPostCandidates(supabase),
+
+    user && isTopicSubscriptionsEnabled()
+      ? supabase
+          .from("topic_subscriptions")
+          .select("topic_key")
+          .eq("subscriber_id", user.id)
+          .limit(1000)
+      : Promise.resolve({ data: [] as Array<{ topic_key: string }> }),
   ]);
 
   const userInterests = (profileData?.interests as string[] | null) ?? [];
@@ -197,6 +207,9 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   const followedIds = (followedUsers ?? []).map(
     (row: { following_id: string }) => row.following_id
+  );
+  const topicSubscriptionKeys = (topicSubscriptions ?? []).map(
+    (row: { topic_key: string }) => row.topic_key
   );
   const followCount = followedIds.length;
 
@@ -287,9 +300,12 @@ export default async function HomePage({ searchParams }: PageProps) {
   }
 
   const showFollowingEligible = !!user;
+  const showTopicsEligible = Boolean(user) && isTopicSubscriptionsEnabled();
   const activeTab =
     tab === "following" && showFollowingEligible
       ? "following"
+      : tab === "topics" && showTopicsEligible
+        ? "topics"
       : tab === "latest"
         ? "latest"
         : "home";
@@ -323,7 +339,9 @@ export default async function HomePage({ searchParams }: PageProps) {
               userInterests={userInterests}
               userUniversity={userUniversity}
               followedIds={followedIds}
+              topicSubscriptionKeys={topicSubscriptionKeys}
               showFollowingEligible={showFollowingEligible}
+              showTopicsEligible={showTopicsEligible}
               activeDebate={homeDebate}
               peopleSuggestions={peopleResult.suggestions}
               peopleSuggestionReason={peopleResult.reason}

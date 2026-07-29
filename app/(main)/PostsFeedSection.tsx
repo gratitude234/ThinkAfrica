@@ -19,7 +19,9 @@ interface Props {
   userInterests: string[];
   userUniversity: string | null;
   followedIds: string[];
+  topicSubscriptionKeys: string[];
   showFollowingEligible: boolean;
+  showTopicsEligible: boolean;
   activeDebate: DebateInterludeData | null;
   peopleSuggestions: {
     id: string;
@@ -33,8 +35,13 @@ interface Props {
   featuredPost?: HomeFeaturedPost | null;
 }
 
-function getInitialTab(tab: string, showFollowingEligible: boolean): FeedTabKey {
+function getInitialTab(
+  tab: string,
+  showFollowingEligible: boolean,
+  showTopicsEligible: boolean
+): FeedTabKey {
   if (tab === "following" && showFollowingEligible) return "following";
+  if (tab === "topics" && showTopicsEligible) return "topics";
   if (tab === "latest") return "latest";
   return "home";
 }
@@ -56,7 +63,9 @@ export default async function PostsFeedSection({
   userInterests,
   userUniversity,
   followedIds,
+  topicSubscriptionKeys,
   showFollowingEligible,
+  showTopicsEligible,
   activeDebate,
   peopleSuggestions,
   peopleSuggestionReason,
@@ -64,7 +73,11 @@ export default async function PostsFeedSection({
   featuredPost = null,
 }: Props) {
   const supabase = await createClient();
-  const initialTab = getInitialTab(tab, showFollowingEligible);
+  const initialTab = getInitialTab(
+    tab,
+    showFollowingEligible,
+    showTopicsEligible
+  );
   const initialType = getInitialType(type);
   const initialTimeframe = getInitialTimeframe(timeframe);
   const excludedAuthorIds = await getBlockedUserIds(userId);
@@ -80,6 +93,7 @@ export default async function PostsFeedSection({
     userInterests,
     userUniversity,
     followedIds,
+    topicSubscriptionKeys,
     excludedAuthorIds,
   });
 
@@ -91,6 +105,7 @@ export default async function PostsFeedSection({
       initialPosts={initialFeed.posts}
       initialHasMore={initialFeed.hasMore}
       showFollowingTab={showFollowingEligible}
+      showTopicsTab={showTopicsEligible}
       activeDebate={activeDebate}
       peopleSuggestions={peopleSuggestions}
       peopleSuggestionReason={peopleSuggestionReason}

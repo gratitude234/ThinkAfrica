@@ -2,9 +2,20 @@
 
 import { useEffect, useRef } from "react";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { qualifiedReadThresholds } from "@/lib/publicationDelivery";
 
 const VIEW_SESSION_KEY = (slug: string) => `ta_post_view_${slug}`;
 const READ_SESSION_KEY = (slug: string) => `ta_post_read_${slug}`;
+
+function getDeliveryToken() {
+  const token = new URLSearchParams(window.location.search).get("delivery");
+  return token && /^[0-9a-f-]{36}$/i.test(token) ? token : null;
+}
+
+function sessionKey(base: (slug: string) => string, slug: string) {
+  const token = getDeliveryToken();
+  return token ? `${base(slug)}_${token}` : base(slug);
+}
 
 function getScrollDepth() {
   const documentElement = document.documentElement;
@@ -26,6 +37,7 @@ function postEngagement(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       route: `${window.location.pathname}${window.location.search}`,
+      deliveryToken: getDeliveryToken(),
       ...payload,
     }),
     keepalive: true,
@@ -44,8 +56,9 @@ export default function ViewTracker({
   const readFiredRef = useRef(false);
 
   useEffect(() => {
-    if (!sessionStorage.getItem(VIEW_SESSION_KEY(slug))) {
-      sessionStorage.setItem(VIEW_SESSION_KEY(slug), "1");
+    const viewSessionKey = sessionKey(VIEW_SESSION_KEY, slug);
+    if (!sessionStorage.getItem(viewSessionKey)) {
+      sessionStorage.setItem(viewSessionKey, "1");
       void postEngagement(slug, "view");
     }
 
@@ -53,10 +66,11 @@ export default function ViewTracker({
   }, [slug]);
 
   useEffect(() => {
-    if (sessionStorage.getItem(READ_SESSION_KEY(slug))) return;
+    const readSessionKey = sessionKey(READ_SESSION_KEY, slug);
+    if (sessionStorage.getItem(readSessionKey)) return;
 
-    const requiredSeconds = wordCount <= 600 ? 15 : 30;
-    const requiredDepth = wordCount <= 600 ? 50 : 60;
+    const { activeSeconds: requiredSeconds, scrollDepth: requiredDepth } =
+      qualifiedReadThresholds(wordCount);
 
     const maybeRecordRead = () => {
       if (readFiredRef.current) return;
@@ -69,7 +83,7 @@ export default function ViewTracker({
       }
 
       readFiredRef.current = true;
-      sessionStorage.setItem(READ_SESSION_KEY(slug), "1");
+      sessionStorage.setItem(readSessionKey, "1");
       void postEngagement(slug, "read", {
         readSeconds: activeSecondsRef.current,
         scrollDepth: maxScrollDepthRef.current,

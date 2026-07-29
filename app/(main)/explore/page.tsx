@@ -1234,7 +1234,7 @@ function TopicsSection({
         {sectionTitle(
           "Explore topics",
           userId
-            ? "Follow topics to tune your home feed and Explore recommendations."
+            ? "Subscribe to topics for a dedicated feed and in-app publication alerts."
             : "Browse what the community is writing about."
         )}
         <DiscoverTrackedLink
@@ -1248,6 +1248,7 @@ function TopicsSection({
       <DiscoverTopicsGrid
         topics={data.topics}
         initialInterests={data.userInterests}
+        initialSubscribedTopicKeys={data.topicSubscriptionKeys}
         userId={userId}
       />
     </>

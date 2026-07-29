@@ -14,7 +14,7 @@ import FeedEmptyState from "./FeedEmptyState";
 import FeedErrorState from "./FeedErrorState";
 import CreateTrigger from "./CreateTrigger";
 
-type TabKey = "home" | "following" | "latest";
+type TabKey = "home" | "following" | "topics" | "latest";
 const EMPTY_POSTS: PostCardData[] = [];
 
 const CREATE_CTA_CLASS =
@@ -105,6 +105,7 @@ export default function PostsFeedTabs({
   initialPosts,
   initialHasMore,
   showFollowingTab,
+  showTopicsTab = false,
   activeDebate,
   peopleSuggestions,
   peopleSuggestionReason,
@@ -118,6 +119,7 @@ export default function PostsFeedTabs({
   initialPosts: PostCardData[];
   initialHasMore: boolean;
   showFollowingTab: boolean;
+  showTopicsTab?: boolean;
   activeDebate: DebateInterludeData | null;
   peopleSuggestions: {
     id: string;
@@ -421,6 +423,14 @@ export default function PostsFeedTabs({
         Explore writers
       </Link>
     );
+  } else if (activeTab === "topics") {
+    emptyTitle = "No posts from your subscribed topics yet.";
+    emptyBody = "Subscribe to topics to build a feed around the subjects you care about.";
+    emptyCta = (
+      <Link href="/topics" className={CREATE_CTA_CLASS}>
+        Explore topics
+      </Link>
+    );
   }
 
   return (
@@ -432,8 +442,12 @@ export default function PostsFeedTabs({
         role="tablist"
         aria-label="Choose feed"
       >
-        {(["home", "following", "latest"] as const)
-          .filter((tab) => tab !== "following" || showFollowingTab)
+        {(["home", "following", "topics", "latest"] as const)
+          .filter(
+            (tab) =>
+              (tab !== "following" || showFollowingTab) &&
+              (tab !== "topics" || showTopicsTab)
+          )
           .map((tab) => {
             const label =
               tab === "home"
@@ -442,7 +456,9 @@ export default function PostsFeedTabs({
                   : "Discover"
                 : tab === "following"
                   ? "Following"
-                  : "Latest";
+                  : tab === "topics"
+                    ? "Topics"
+                    : "Latest";
             return (
               <button
                 key={tab}

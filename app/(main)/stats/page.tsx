@@ -1,9 +1,15 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import Badge from "@/components/ui/Badge";
 import PointsTierBadge from "@/components/ui/PointsTierBadge";
 import { formatDate, getPointTier, getNextTier } from "@/lib/utils";
+import {
+  isAuthorSubscriptionsEnabled,
+  isTopicSubscriptionsEnabled,
+} from "@/lib/featureFlags";
+import { getAuthorPublicationFunnel } from "@/lib/publicationDistribution";
 
 function StatCard({
   label,
@@ -42,12 +48,15 @@ export default async function StatsPage() {
 
   if (!profile) redirect("/onboarding");
 
-  const { data: publishedPosts } = await supabase
-    .from("posts")
-    .select("id, title, slug, type, content_kind, article_format, view_count, read_count, created_at, published_at")
-    .eq("author_id", profile.id)
-    .eq("status", "published")
-    .order("read_count", { ascending: false });
+  const [{ data: publishedPosts }, publicationFunnel] = await Promise.all([
+    supabase
+      .from("posts")
+      .select("id, title, slug, type, content_kind, article_format, view_count, read_count, created_at, published_at")
+      .eq("author_id", profile.id)
+      .eq("status", "published")
+      .order("read_count", { ascending: false }),
+    getAuthorPublicationFunnel(profile.id),
+  ]);
 
   const theirPostIds = (publishedPosts ?? []).map((p) => p.id);
   const totalReads = (publishedPosts ?? []).reduce(
@@ -96,7 +105,7 @@ export default async function StatsPage() {
       </div>
 
       {/* 4 stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className={`grid grid-cols-2 gap-4 mb-8 ${isAuthorSubscriptionsEnabled() ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
         <StatCard label="Total Reads" value={totalReads} />
         <StatCard label="Total Likes" value={totalLikes} />
         <StatCard label="Followers" value={followerCount ?? 0} />
@@ -109,7 +118,100 @@ export default async function StatsPage() {
               : "this week"
           }
         />
+        {isAuthorSubscriptionsEnabled() ? (
+          <StatCard
+            label="Active Subscribers"
+            value={publicationFunnel.activeSubscriberCount}
+            sub="explicit author subscriptions"
+          />
+        ) : null}
       </div>
+
+      {isAuthorSubscriptionsEnabled() ? (
+        <section className="mb-8 overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="border-b border-gray-100 px-6 py-4">
+            <h2 className="text-sm font-semibold text-gray-900">
+              Publication delivery funnel
+            </h2>
+            <p className="mt-1 text-xs text-gray-500">
+              Unique recipients across in-app, email, and push. Topic delivery
+              is shared across credited authors; direct-author delivery remains
+              private to the matched author.
+            </p>
+          </div>
+          {publicationFunnel.rows.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-6 py-3 font-medium">Publication</th>
+                    <th className="px-4 py-3 font-medium">Source</th>
+                    <th className="px-4 py-3 text-right font-medium">Delivered</th>
+                    <th className="px-4 py-3 text-right font-medium">Opens</th>
+                    <th className="px-4 py-3 text-right font-medium">Qualified reads</th>
+                    <th className="px-6 py-3 text-right font-medium">Conversion</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {publicationFunnel.rows.map((row) => {
+                    const segments = isTopicSubscriptionsEnabled()
+                      ? [
+                          { label: "Overall", value: row.overall },
+                          { label: "Direct author", value: row.authorSource },
+                          { label: "Topics", value: row.topicSource },
+                        ]
+                      : [{ label: "Overall", value: row.overall }];
+
+                    return (
+                      <Fragment key={row.postId}>
+                        {segments.map((segment, index) => (
+                          <tr key={`${row.postId}:${segment.label}`}>
+                            {index === 0 ? (
+                              <td
+                                rowSpan={segments.length}
+                                className="max-w-sm px-6 py-3 align-top"
+                              >
+                                <Link
+                                  href={`/post/${row.slug}`}
+                                  className="block truncate font-medium text-gray-900 hover:text-emerald-brand"
+                                >
+                                  {row.title}
+                                </Link>
+                                <span className="text-xs text-gray-400">
+                                  {row.publishedAt ? formatDate(row.publishedAt) : ""}
+                                </span>
+                              </td>
+                            ) : null}
+                            <td className="px-4 py-3 text-xs font-medium text-gray-500">
+                              {segment.label}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-700">
+                              {segment.value.deliveredRecipients.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-700">
+                              {segment.value.opens.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-700">
+                              {segment.value.qualifiedReads.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-3 text-right font-semibold text-gray-900">
+                              {segment.value.qualifiedReadConversionRate.toFixed(1)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="px-6 py-8 text-center text-sm text-gray-500">
+              Publication delivery data will appear after the feature is enabled and new work is published.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       {/* Top posts table */}
       {(publishedPosts ?? []).length > 0 ? (

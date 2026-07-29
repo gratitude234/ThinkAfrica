@@ -26,6 +26,11 @@ import {
 import { notifyResponseParentAuthor, validateResponseParent } from "@/lib/responsePost";
 import type { PostReferenceRecord } from "@/lib/types";
 import type { PostType } from "@/lib/utils";
+import { schedulePublicationDistribution } from "@/lib/publicationDistribution";
+import {
+  getTopicValuesValidationError,
+  normalizeTagValue,
+} from "@/lib/tags";
 
 type ReferenceInput = Omit<PostReferenceRecord, "post_id"> & {
   id?: string;
@@ -333,7 +338,11 @@ export async function ensureDraft(input: {
     return { error: suspensionError, draftId: null as string | null };
   }
 
-  const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  const tagError = getTopicValuesValidationError(input.tags);
+  if (tagError) {
+    return { error: tagError, draftId: null as string | null };
+  }
+  const normalizedTags = input.tags.map(normalizeTagValue).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
 
   // The server, not the browser, is what actually validates and persists
@@ -701,7 +710,11 @@ export async function publishPost(input: {
   const submitStatus =
     effectiveType === "blog" || effectiveType === "essay" ? "published" : "pending";
   const publishedAt = submitStatus === "published" ? now : null;
-  const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  const tagError = getTopicValuesValidationError(input.tags);
+  if (tagError) {
+    return { error: tagError, slug: null as string | null };
+  }
+  const normalizedTags = input.tags.map(normalizeTagValue).filter(Boolean);
   const sanitizedContent = sanitizePostHtml(input.content);
 
   // Re-validated here (not just trusted from an earlier ensureDraft() call)
@@ -885,6 +898,8 @@ export async function publishPost(input: {
   revalidatePath("/admin/review");
 
   if (submitStatus === "published") {
+    schedulePublicationDistribution(postId, "Article");
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
     void fetch(`${appUrl}/api/audio-summary`, {
       method: "POST",

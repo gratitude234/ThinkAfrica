@@ -7,8 +7,10 @@ import {
   type FeedTimeframe,
 } from "@/lib/feedData";
 import { getBlockedUserIds } from "@/lib/blocking";
+import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
 
 function getTab(param: string | null): FeedTabKey {
+  if (param === "topics" && isTopicSubscriptionsEnabled()) return "topics";
   if (param === "following" || param === "latest") return param;
   return "home";
 }
@@ -45,10 +47,22 @@ export async function GET(request: NextRequest) {
   let userInterests: string[] = [];
   let userUniversity: string | null = null;
   let followedIds: string[] = [];
+  let topicSubscriptionKeys: string[] = [];
   let excludedAuthorIds: string[] = [];
 
   if (user) {
-    const [{ data: profile }, { data: followedUsers }, blockedIds] =
+    const topicSubscriptionsPromise = isTopicSubscriptionsEnabled()
+      ? supabase
+          .from("topic_subscriptions")
+          .select("topic_key")
+          .eq("subscriber_id", user.id)
+      : Promise.resolve({ data: [] as Array<{ topic_key: string }> });
+    const [
+      { data: profile },
+      { data: followedUsers },
+      blockedIds,
+      { data: topicSubscriptions },
+    ] =
       await Promise.all([
         supabase
           .from("profiles")
@@ -60,12 +74,16 @@ export async function GET(request: NextRequest) {
           .select("following_id")
           .eq("follower_id", user.id),
         getBlockedUserIds(user.id),
+        topicSubscriptionsPromise,
       ]);
 
     userInterests = (profile?.interests as string[] | null) ?? [];
     userUniversity = profile?.university ?? null;
     followedIds = (followedUsers ?? []).map(
       (row: { following_id: string }) => row.following_id
+    );
+    topicSubscriptionKeys = (topicSubscriptions ?? []).map(
+      (row: { topic_key: string }) => row.topic_key
     );
     excludedAuthorIds = blockedIds;
   }
@@ -81,6 +99,7 @@ export async function GET(request: NextRequest) {
     userInterests,
     userUniversity,
     followedIds,
+    topicSubscriptionKeys,
     excludedAuthorIds,
   });
 

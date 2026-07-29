@@ -45,9 +45,25 @@ export const CANONICAL_TAGS = [
 export type CanonicalTag = (typeof CANONICAL_TAGS)[number];
 
 const COUNTRY_REGION_TAGS = CANONICAL_TAGS.slice(20, 37);
+export const MAX_TOPIC_KEY_LENGTH = 80;
 
 export function normalizeTagValue(tag: string) {
   return tag.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function isSubscribableTopicValue(tag: string) {
+  const normalized = normalizeTagValue(tag);
+  return normalized.length > 0 && normalized.length <= MAX_TOPIC_KEY_LENGTH;
+}
+
+export function getTopicValuesValidationError(tags: string[]) {
+  const invalid = tags.find((tag) => {
+    const normalized = normalizeTagValue(tag);
+    return normalized.length < 1 || normalized.length > MAX_TOPIC_KEY_LENGTH;
+  });
+  return invalid
+    ? `Each topic must contain between 1 and ${MAX_TOPIC_KEY_LENGTH} characters.`
+    : null;
 }
 
 export function getCanonicalTagMatch(value: string | null | undefined) {

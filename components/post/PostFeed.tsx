@@ -5,7 +5,7 @@ import DebateInterlude, { type DebateInterludeData } from "./DebateInterlude";
 import PeopleInterlude from "./PeopleInterlude";
 import TopicInterlude from "./TopicInterlude";
 
-type FeedTabKey = "home" | "following" | "latest";
+type FeedTabKey = "home" | "following" | "topics" | "latest";
 export type DiscoveryModule = "people" | "debate" | "topic";
 
 export function getDiscoveryModuleOrder({
@@ -108,6 +108,18 @@ export default function PostFeed({
               className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
             >
               Find writers to follow
+            </Link>
+          </div>
+        ) : activeTab === "topics" ? (
+          <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
+            <p className="text-sm text-gray-500">
+              You have no matching topic publications yet.
+            </p>
+            <Link
+              href="/topics"
+              className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
+            >
+              Explore topics
             </Link>
           </div>
         ) : (

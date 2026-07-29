@@ -39,6 +39,8 @@ const TYPE_ICONS: Record<string, string> = {
   review_assigned: "R",
   revision_requested: "RE",
   post_published: "P",
+  author_published: "NEW",
+  topic_published: "#",
   co_author_invite: "CO",
   co_author_accepted: "OK",
   co_author_declined: "NO",
@@ -54,7 +56,7 @@ const TYPE_ICONS: Record<string, string> = {
   debate_cancelled: "X",
 };
 
-function buildMessage(notification: NotificationData): string {
+export function buildNotificationMessage(notification: NotificationData): string {
   if (notification.message) {
     return notification.message;
   }
@@ -83,6 +85,10 @@ function buildMessage(notification: NotificationData): string {
       return `Reviewers have requested revisions on: ${postTitle}`;
     case "post_published":
       return `Your post ${postTitle} has been published.`;
+    case "author_published":
+      return `${actorName} published new work: ${postTitle}`;
+    case "topic_published":
+      return `New work was published in a topic you subscribe to: ${postTitle}`;
     case "co_author_invite":
       return `${actorName} has invited you to co-author: ${postTitle}`;
     case "co_author_accepted":
@@ -109,6 +115,8 @@ function buildLink(notification: NotificationData): string | null {
     case "review_assigned":
     case "revision_requested":
     case "post_published":
+    case "author_published":
+    case "topic_published":
     case "co_author_invite":
     case "co_author_accepted":
     case "co_author_declined":
@@ -132,7 +140,7 @@ export default function NotificationItem({
   notification: NotificationData;
 }) {
   const inboxItem = getActionInboxSummary([notification]).items[0];
-  const message = inboxItem?.description ?? buildMessage(notification);
+  const message = inboxItem?.description ?? buildNotificationMessage(notification);
   const link = buildLink(notification);
   const icon = TYPE_ICONS[notification.type] ?? "N";
   const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");

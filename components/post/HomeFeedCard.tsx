@@ -21,7 +21,7 @@ interface RespondingToInfo {
 interface Props {
   post: PostCardData;
   currentUserId: string | null;
-  surface: "home" | "following" | "latest";
+  surface: "home" | "following" | "topics" | "latest";
   priority?: boolean;
   respondingTo?: RespondingToInfo | null;
 }

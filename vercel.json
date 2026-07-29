@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/process-debate-notifications",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/debate-v15-deadlines",
+      "schedule": "0 11 * * *"
     }
   ]
 }

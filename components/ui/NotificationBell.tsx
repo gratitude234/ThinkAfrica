@@ -39,6 +39,8 @@ const TYPE_ICONS: Record<string, string> = {
   debate_reply: "!",
   post_approved: "OK",
   post_published: "P",
+  author_published: "NEW",
+  topic_published: "#",
   revision_requested: "RE",
   response_post: "RE",
   opportunity_inquiry: "OP",
@@ -48,7 +50,7 @@ const TYPE_ICONS: Record<string, string> = {
   debate_cancelled: "X",
 };
 
-function notificationText(notification: Notification) {
+export function notificationText(notification: Notification) {
   if (notification.message) return notification.message;
 
   switch (notification.type) {
@@ -64,6 +66,10 @@ function notificationText(notification: Notification) {
       return "A post needs revision";
     case "post_published":
       return "Your post has been published";
+    case "author_published":
+      return "An author you subscribe to published new work";
+    case "topic_published":
+      return "New work in a topic you subscribe to";
     case "opportunity_inquiry":
       return "New opportunity inquiry";
     default:

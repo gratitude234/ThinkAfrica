@@ -597,6 +597,10 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
               (select all that apply)
             </span>
           </label>
+          <p className="mb-2 text-xs text-gray-500">
+            These interests personalize your profile and recommendations. They
+            do not enable publication alerts.
+          </p>
           <div className="flex flex-wrap gap-2">
             {COMMON_INTERESTS.map((interest) => (
               <button

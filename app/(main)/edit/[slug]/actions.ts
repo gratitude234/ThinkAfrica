@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getTopicValuesValidationError,
+  normalizeTagValue,
+} from "@/lib/tags";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { createVersionSnapshot, requiresEditorialWorkflow } from "@/lib/reviewWorkflow";
 import { resolveArticleFormat, resolveContentKind } from "@/lib/contentModel";
@@ -167,6 +171,10 @@ export async function saveEditedPost(input: {
   if (referenceError) {
     return { error: referenceError };
   }
+  const tagError = getTopicValuesValidationError(input.tags);
+  if (tagError) {
+    return { error: tagError };
+  }
 
   if (
     post.status === "pending_revision" &&
@@ -189,7 +197,7 @@ export async function saveEditedPost(input: {
       title: input.title.trim(),
       excerpt: input.excerpt,
       content: sanitizedContent,
-      tags: input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean),
+      tags: input.tags.map(normalizeTagValue).filter(Boolean),
       type: effectiveType,
       content_kind: effectiveContentKind,
       article_format: effectiveArticleFormat,

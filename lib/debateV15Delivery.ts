@@ -11,6 +11,7 @@ import { logPushResult, sendPushNotification } from "@/lib/push";
 type DebateV15Stance = "for" | "against";
 type DebateV15Response = "accepted" | "declined";
 type DebateV15OpenedPhase = "opening" | "rebuttal" | "voting";
+type DebateV15Phase = "recruiting" | "opening" | "rebuttal" | "voting";
 
 type CommonEvent = {
   recipientId: string;
@@ -40,6 +41,24 @@ export type DebateV15DeliveryEvent =
   | (CommonEvent & {
       kind: "cancelled";
       reason: string;
+    })
+  // The three below are time-driven rather than action-driven. Every other
+  // event here fires because a person clicked something; without these,
+  // nothing in a V1.5 debate ever notices a deadline going by, and a debate
+  // whose moderator has gone quiet stalls silently for everyone in it.
+  | (CommonEvent & {
+      kind: "deadline_soon";
+      phase: DebateV15OpenedPhase;
+      hoursLeft: number;
+    })
+  | (CommonEvent & {
+      kind: "deadline_missed_moderator";
+      phase: DebateV15Phase;
+      missingSides: DebateV15Stance[];
+    })
+  | (CommonEvent & {
+      kind: "deadline_missed_participant";
+      phase: DebateV15Phase;
     });
 
 export type DebateV15DeliveryContent = {
@@ -96,6 +115,34 @@ function phaseCopy(phase: DebateV15OpenedPhase) {
         pushBody: "Community voting is now open for your debate.",
       };
   }
+}
+
+function phaseNoun(phase: DebateV15Phase) {
+  switch (phase) {
+    case "recruiting":
+      return "recruiting stage";
+    case "opening":
+      return "opening argument";
+    case "rebuttal":
+      return "rebuttal";
+    case "voting":
+      return "final vote";
+  }
+}
+
+function capitalise(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function hoursLabel(hoursLeft: number) {
+  const hours = Math.max(1, Math.round(hoursLeft));
+  // The reminder window reaches past a full day, and "about 25 hours left"
+  // reads like a countdown nobody thinks in. Past a day, say days.
+  if (hours >= 24) {
+    const days = Math.round(hours / 24);
+    return days === 1 ? "1 day" : `${days} days`;
+  }
+  return hours === 1 ? "1 hour" : `${hours} hours`;
 }
 
 function motionBlock(debateTitle: string) {
@@ -208,6 +255,72 @@ export function buildDebateV15DeliveryContent(
         push: {
           title: "Debate cancelled",
           body: excerpt(`${debateTitle} — ${reason}`),
+        },
+      };
+    }
+
+    case "deadline_soon": {
+      const stage = phaseNoun(event.phase);
+      const window = hoursLabel(event.hoursLeft);
+      return {
+        email: {
+          subject: excerpt(`${window} left to submit your ${stage}`, 160),
+          preview: `Your ${stage} is still unsubmitted with ${window} to go.`,
+          title: `${window} left to submit`,
+          intro: `You have not submitted your ${stage} yet. Once the deadline passes the room locks and the submission cannot be made.`,
+          bodyHtml: `${motionBlock(debateTitle)}<p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;"><strong style="color:#111827;">Time remaining:</strong> about ${escapeHtml(window)}</p>`,
+          bodyTextLines: [motion, `Time remaining: about ${window}`],
+          ctaLabel: `Submit your ${stage}`,
+        },
+        push: {
+          title: `${window} left to submit`,
+          body: excerpt(`Your ${stage} is still unsubmitted: ${debateTitle}`),
+        },
+      };
+    }
+
+    case "deadline_missed_moderator": {
+      const stage = phaseNoun(event.phase);
+      // Naming who is missing turns a vague "something needs attention" into
+      // a decision the moderator can actually make without opening the room.
+      const missing = event.missingSides.length
+        ? event.missingSides.map(stanceLabel).join(" and ")
+        : null;
+      const missingLine = missing
+        ? `${missing} did not submit before the deadline.`
+        : "Both sides submitted before the deadline.";
+      return {
+        email: {
+          subject: excerpt(`Your debate is waiting on you: ${debateTitle}`, 160),
+          preview: `The ${stage} deadline passed and the room cannot move without you.`,
+          title: "This debate is waiting for you",
+          intro: `The ${stage} deadline has passed. Debates only move forward when their moderator advances them, so this room is paused until you act. You can advance it, extend the deadline, or cancel it.`,
+          bodyHtml: `${motionBlock(debateTitle)}<p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;"><strong style="color:#111827;">Status:</strong> ${escapeHtml(missingLine)}</p>`,
+          bodyTextLines: [motion, `Status: ${missingLine}`],
+          ctaLabel: "Open moderator controls",
+        },
+        push: {
+          title: "A debate is waiting for you",
+          body: excerpt(`The ${stage} deadline passed: ${debateTitle}`),
+        },
+      };
+    }
+
+    case "deadline_missed_participant": {
+      const stage = phaseNoun(event.phase);
+      return {
+        email: {
+          subject: excerpt(`The ${stage} deadline has passed`, 160),
+          preview: `This debate is now waiting for its moderator, not for you.`,
+          title: `The ${stage} deadline has passed`,
+          intro: `Submissions for this stage are closed. The debate now waits for its moderator to move it forward — there is nothing further for you to do right now, and you have not missed anything you can still act on.`,
+          bodyHtml: motionBlock(debateTitle),
+          bodyTextLines: [motion],
+          ctaLabel: "View the debate",
+        },
+        push: {
+          title: `${capitalise(stage)} deadline passed`,
+          body: excerpt(`Waiting on the moderator: ${debateTitle}`),
         },
       };
     }

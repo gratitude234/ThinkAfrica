@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDailyBriefContent } from "@/lib/dailyBrief";
 import { broadcastPushNotification, getDailyBriefPushRecipients } from "@/lib/push";
+import { processPendingPublicationEvents } from "@/lib/publicationDistribution";
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -15,11 +16,29 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get("dryRun") === "1" ||
     process.env.DAILY_BRIEF_DRY_RUN === "1";
 
+  // Publication recovery is independent of the brief. It runs before every
+  // content-based return and also runs during a brief dry run.
+  let publicationRecovery:
+    | Awaited<ReturnType<typeof processPendingPublicationEvents>>
+    | { enabled: boolean; claimed: number; processed: number; failed: number; error: string };
+  try {
+    publicationRecovery = await processPendingPublicationEvents(10);
+  } catch (error) {
+    publicationRecovery = {
+      enabled: true,
+      claimed: 0,
+      processed: 0,
+      failed: 1,
+      error: error instanceof Error ? error.message : "Publication recovery failed.",
+    };
+    console.error("[publication-delivery] daily recovery failed", error);
+  }
+
   const admin = createAdminClient();
   const content = await getDailyBriefContent(admin);
 
   if (!content.featuredPost && !content.activeDebate) {
-    return NextResponse.json({ skipped: "no_content", dryRun });
+    return NextResponse.json({ skipped: "no_content", dryRun, publicationRecovery });
   }
 
   const bodyParts: string[] = [];
@@ -42,6 +61,7 @@ export async function GET(request: NextRequest) {
       recipientCount: recipientIds.length,
       title,
       body,
+      publicationRecovery,
     });
   }
 
@@ -53,5 +73,5 @@ export async function GET(request: NextRequest) {
     preferenceKey: "push_daily_brief",
   });
 
-  return NextResponse.json({ dryRun: false, ...result });
+  return NextResponse.json({ dryRun: false, publicationRecovery, ...result });
 }

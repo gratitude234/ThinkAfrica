@@ -451,6 +451,7 @@ export default function DebateV2Room({ debateId, initialRoom }: { debateId: stri
                   selectedParent={selectedParent}
                   onClearSelectedParent={() => setSelectedParent(null)}
                   onSuccess={refresh}
+                  currentUserId={currentUser.id}
                 />
               ) : (
                 <section className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-500">

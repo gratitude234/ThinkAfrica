@@ -24,6 +24,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
 import { isFormallyReviewed } from "@/lib/contentModel";
+import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
 
 interface PageProps {
   params: Promise<{ username: string }>;
@@ -461,6 +462,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     { count: reviewsCompletedCount },
     activityData,
     followStatus,
+    subscriptionStatus,
     blockStatus,
   ] = await Promise.all([
     supabase
@@ -550,6 +552,14 @@ export default async function UserProfilePage({ params }: PageProps) {
           .select("follower_id")
           .eq("follower_id", user.id)
           .eq("following_id", profile.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    isAuthorSubscriptionsEnabled() && user && user.id !== profile.id
+      ? supabase
+          .from("author_subscriptions")
+          .select("subscriber_id")
+          .eq("subscriber_id", user.id)
+          .eq("author_id", profile.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     user && user.id !== profile.id
@@ -786,6 +796,7 @@ export default async function UserProfilePage({ params }: PageProps) {
         isOwnProfile={isOwnProfile}
         currentUserId={user?.id ?? null}
         initialFollowing={!!followStatus.data}
+        initialSubscribed={!!subscriptionStatus.data}
         initialBlocked={!!blockStatus.data}
         isOpenToOpportunities={!!talentProfile?.open_to_opportunities}
         canContact={opportunityVisible && !isOwnProfile}

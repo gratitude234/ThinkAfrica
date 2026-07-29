@@ -9,6 +9,10 @@ import { createVersionSnapshot } from "@/lib/reviewWorkflow";
 import { buildSlugFromTitle } from "@/lib/postSlug";
 import { contentKindFromLegacyType } from "@/lib/contentModel";
 import type { PostReferenceRecord } from "@/lib/types";
+import {
+  getTopicValuesValidationError,
+  normalizeTagValue,
+} from "@/lib/tags";
 
 type ReferenceInput = Omit<PostReferenceRecord, "post_id"> & {
   id?: string;
@@ -113,6 +117,8 @@ function validateResearchPayload(
   if (input.tags.length === 0) {
     return "Add at least one topic so editors can route the submission.";
   }
+  const tagError = getTopicValuesValidationError(input.tags);
+  if (tagError) return tagError;
 
   if (forSubmit && !input.document.documentPath) {
     return "Upload the final research PDF before submitting for review. Word or Google Docs files should be exported as PDF first.";
@@ -161,7 +167,7 @@ function normalizeResearchDraftFields(input: ResearchUploadDraftInput) {
   const abstract =
     input.abstract.trim() ||
     "Abstract pending. Add the research question, method, findings, and contribution before submitting for review.";
-  const tags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  const tags = input.tags.map(normalizeTagValue).filter(Boolean);
 
   return {
     title,
@@ -297,7 +303,11 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
     return { error: "You must be signed in.", postId: null as string | null, slug: null as string | null };
   }
 
-  const normalizedTags = input.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  const tagError = getTopicValuesValidationError(input.tags);
+  if (tagError) {
+    return { error: tagError, postId: null, slug: null };
+  }
+  const normalizedTags = input.tags.map(normalizeTagValue).filter(Boolean);
   const content = buildResearchContent(input.abstract, input.document.originalName);
   const now = new Date().toISOString();
 
@@ -535,6 +545,15 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
 
   if (!user) {
     return { error: "You must be signed in.", postId: null as string | null, slug: null as string | null };
+  }
+
+  const tagError = getTopicValuesValidationError(input.tags);
+  if (tagError) {
+    return {
+      error: tagError,
+      postId: null as string | null,
+      slug: null as string | null,
+    };
   }
 
   const { title, abstract, tags } = normalizeResearchDraftFields(input);

@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isFormallyReviewed } from "@/lib/contentModel";
+import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
+import { normalizeTagValue } from "@/lib/tags";
 import TopicsClient from "./TopicsClient";
 
 export const revalidate = 3600;
@@ -84,17 +86,28 @@ export default async function TopicsPage() {
   ]);
 
   let initialInterests: string[] = [];
+  let initialSubscribedTopicKeys: string[] = [];
+  const subscriptionsEnabled = isTopicSubscriptionsEnabled();
   if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("interests")
-      .eq("id", user.id)
-      .single();
-
-    initialInterests = (profile?.interests as string[] | null) ?? [];
+    if (subscriptionsEnabled) {
+      const { data: subscriptions } = await supabase
+        .from("topic_subscriptions")
+        .select("topic_key")
+        .eq("subscriber_id", user.id);
+      initialSubscribedTopicKeys = (subscriptions ?? []).map(
+        (row) => row.topic_key as string
+      );
+    } else {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("interests")
+        .eq("id", user.id)
+        .single();
+      initialInterests = (profile?.interests as string[] | null) ?? [];
+    }
   }
 
-  const counts: Record<string, number> = {};
+  const counts = new Map<string, { tag: string; count: number }>();
   // Evidence-based, not name-based: a type merely qualifying for the
   // editorial workflow (e.g. a still-pending policy brief) does not count
   // as "reviewed" until a record actually completes it (see
@@ -104,15 +117,24 @@ export default async function TopicsPage() {
   ((postsRaw ?? []) as TagRow[]).forEach((post) =>
     {
       if (isFormallyReviewed(post)) citableOrReviewedCount++;
+      const postTopics = new Map<string, string>();
       (post.tags ?? []).forEach((tag) => {
-        counts[tag] = (counts[tag] ?? 0) + 1;
+        const topicKey = normalizeTagValue(tag);
+        if (topicKey) {
+          postTopics.set(topicKey, postTopics.get(topicKey) ?? tag.trim());
+        }
+      });
+      postTopics.forEach((tag, topicKey) => {
+        const current = counts.get(topicKey);
+        counts.set(topicKey, {
+          tag: current?.tag ?? tag,
+          count: (current?.count ?? 0) + 1,
+        });
       });
     }
   );
 
-  const allTags = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([tag, count]) => ({ tag, count }));
+  const allTags = [...counts.values()].sort((a, b) => b.count - a.count);
 
   const grouped: Record<string, { tag: string; count: number }[]> = {};
   const uncategorized: { tag: string; count: number }[] = [];
@@ -153,8 +175,10 @@ export default async function TopicsPage() {
         </p>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">Explore Topics</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
-          Browse {allTags.length} topics from the community and follow the ones
-          that should shape your feed.
+          Browse {allTags.length} topics from the community and{" "}
+          {subscriptionsEnabled
+            ? "subscribe for a dedicated feed and in-app publication alerts."
+            : "follow the ones that should shape your feed."}
         </p>
       </div>
 
@@ -164,9 +188,13 @@ export default async function TopicsPage() {
           <p className="mt-1 text-2xl font-bold text-gray-900">{allTags.length}</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500">Your interests</p>
+          <p className="text-xs font-medium text-gray-500">
+            {subscriptionsEnabled ? "Your subscriptions" : "Your interests"}
+          </p>
           <p className="mt-1 text-2xl font-bold text-gray-900">
-            {initialInterests.length}
+            {subscriptionsEnabled
+              ? initialSubscribedTopicKeys.length
+              : initialInterests.length}
           </p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -185,6 +213,7 @@ export default async function TopicsPage() {
         <TopicsClient
           sections={sections}
           initialInterests={initialInterests}
+          initialSubscribedTopicKeys={initialSubscribedTopicKeys}
           userId={user?.id ?? null}
         />
       )}

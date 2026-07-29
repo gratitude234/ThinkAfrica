@@ -23,6 +23,7 @@ function renderComposer(overrides: Partial<Parameters<typeof V2ArgumentComposer>
       selectedParent={null}
       onClearSelectedParent={vi.fn()}
       onSuccess={vi.fn()}
+      currentUserId="user-1"
       {...overrides}
     />
   );
@@ -31,6 +32,7 @@ function renderComposer(overrides: Partial<Parameters<typeof V2ArgumentComposer>
 describe("V2ArgumentComposer", () => {
   beforeEach(() => {
     submitDebateArgumentV2ActionMock.mockReset();
+    window.localStorage.clear();
   });
 
   it("shows a used-up allowance message instead of the form once the submission limit is reached", () => {
@@ -185,5 +187,114 @@ describe("V2ArgumentComposer", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Argument submitted.");
     expect(screen.getByLabelText("Claim")).toHaveValue("");
     expect(onSuccess).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The room polls every 15s and re-renders from fresh server state, so an
+// advancing round can change entryType/activeRoundSequence under someone who
+// is mid-sentence. These cover what happens to their unsent words.
+describe("V2ArgumentComposer draft safety", () => {
+  beforeEach(() => {
+    submitDebateArgumentV2ActionMock.mockReset();
+    window.localStorage.clear();
+  });
+
+  it("keeps a draft across an unmount instead of losing it with the component", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderComposer();
+
+    await user.type(screen.getByLabelText("Claim"), "Half-written claim");
+    await user.type(screen.getByLabelText("Argument"), "Ten minutes of work.");
+
+    // The debounced write is what has to survive, so let it land.
+    await vi.waitFor(() =>
+      expect(window.localStorage.getItem("v2-draft:debate-1:opening:1:user-1")).not.toBeNull()
+    );
+
+    unmount();
+    renderComposer();
+
+    expect(await screen.findByLabelText("Claim")).toHaveValue("Half-written claim");
+    expect(screen.getByLabelText("Argument")).toHaveValue("Ten minutes of work.");
+    expect(screen.getByRole("status")).toHaveTextContent("Restored the draft");
+  });
+
+  it("locks the composer and preserves the text when the round advances mid-write", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderComposer();
+
+    await user.type(screen.getByLabelText("Claim"), "My opening claim");
+    await user.type(screen.getByLabelText("Argument"), "My opening argument.");
+
+    rerender(
+      <V2ArgumentComposer
+        debateId="debate-1"
+        entryType="rebuttal"
+        ownStance="for"
+        activeRoundSequence={2}
+        existingCountForEntryType={0}
+        eligibleParents={[]}
+        selectedParent={null}
+        onClearSelectedParent={vi.fn()}
+        onSuccess={vi.fn()}
+        currentUserId="user-1"
+      />
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The debate moved on while you were writing.");
+    // The words themselves must still be on screen, not merely "kept safe".
+    expect(screen.getByLabelText("Your unsent opening statement")).toHaveValue(
+      "My opening argument."
+    );
+    // And there must be no way to post opening text into the rebuttal round.
+    expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument();
+  });
+
+  it("returns a clean composer for the new round once the stranded draft is discarded", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderComposer();
+
+    await user.type(screen.getByLabelText("Claim"), "My opening claim");
+    await user.type(screen.getByLabelText("Argument"), "My opening argument.");
+
+    rerender(
+      <V2ArgumentComposer
+        debateId="debate-1"
+        entryType="rebuttal"
+        ownStance="for"
+        activeRoundSequence={2}
+        existingCountForEntryType={0}
+        eligibleParents={[]}
+        selectedParent={null}
+        onClearSelectedParent={vi.fn()}
+        onSuccess={vi.fn()}
+        currentUserId="user-1"
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Discard and write my rebuttal" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Claim")).toHaveValue("");
+    expect(screen.getByLabelText("Argument")).toHaveValue("");
+  });
+
+  it("does not resurrect a submitted argument as a phantom draft", async () => {
+    submitDebateArgumentV2ActionMock.mockResolvedValue({ ok: true, data: {} });
+    const user = userEvent.setup();
+    const { unmount } = renderComposer();
+
+    await user.type(screen.getByLabelText("Claim"), "My claim");
+    await user.type(screen.getByLabelText("Argument"), "My argument content.");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    await screen.findByRole("status");
+
+    unmount();
+    renderComposer();
+
+    expect(screen.getByLabelText("Claim")).toHaveValue("");
+    expect(screen.getByLabelText("Argument")).toHaveValue("");
   });
 });

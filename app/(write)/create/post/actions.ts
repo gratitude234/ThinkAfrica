@@ -14,6 +14,7 @@ import {
 } from "@/lib/shortPostContent";
 import { buildShortPostHtml } from "@/lib/shortPostHtml";
 import { notifyResponseParentAuthor, validateResponseParent } from "@/lib/responsePost";
+import { schedulePublicationDistribution } from "@/lib/publicationDistribution";
 
 // CoverImageUploader's default bucket/path convention (components/ui/CoverImageUploader.tsx).
 const POST_IMAGE_BUCKET = "post-images";
@@ -139,6 +140,8 @@ export async function createPost(input: {
   revalidatePath("/dashboard");
   revalidatePath(`/post/${slug}`);
   revalidatePath("/");
+
+  schedulePublicationDistribution(data.id, "Short Post");
 
   if (responseParent) {
     revalidatePath(`/post/${responseParent.slug}`);

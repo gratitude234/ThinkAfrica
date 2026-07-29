@@ -51,6 +51,7 @@ import {
   resolveArticleFormat,
   resolveContentKind,
 } from "@/lib/contentModel";
+import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -169,6 +170,7 @@ interface ViewerData {
   userLiked: boolean;
   userBookmarked: boolean;
   userFollowsAuthor: boolean;
+  userSubscribedToAuthor: boolean;
   messageEligibility: { eligible: boolean; reason: string | null } | null;
 }
 
@@ -492,6 +494,7 @@ async function getViewerData({
       userLiked: false,
       userBookmarked: false,
       userFollowsAuthor: false,
+      userSubscribedToAuthor: false,
       messageEligibility: null,
     };
   }
@@ -500,6 +503,7 @@ async function getViewerData({
     { data: existingLike },
     { data: existingBookmark },
     { data: followData },
+    { data: subscriptionData },
     messageEligibility,
   ] = await Promise.all([
     supabase
@@ -522,6 +526,14 @@ async function getViewerData({
           .eq("following_id", authorId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    isAuthorSubscriptionsEnabled() && authorId
+      ? supabase
+          .from("author_subscriptions")
+          .select("subscriber_id")
+          .eq("subscriber_id", userId)
+          .eq("author_id", authorId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
     authorId
       ? getMessageEligibility(supabase, userId, authorId)
       : Promise.resolve(null),
@@ -531,6 +543,7 @@ async function getViewerData({
     userLiked: Boolean(existingLike),
     userBookmarked: Boolean(existingBookmark),
     userFollowsAuthor: Boolean(followData),
+    userSubscribedToAuthor: Boolean(subscriptionData),
     messageEligibility,
   };
 }
@@ -975,6 +988,7 @@ async function AuthorAndCollaborationSection({
         author={author}
         userId={userId}
         initialFollowing={viewer.userFollowsAuthor}
+        initialSubscribed={viewer.userSubscribedToAuthor}
         isCorrespondingAuthor={primaryAuthorRecord?.corresponding_author ?? false}
         coAuthors={coAuthors
           .filter((coAuthor) => coAuthor.profile?.username)

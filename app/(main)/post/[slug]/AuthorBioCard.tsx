@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import UserAvatar from "@/components/ui/UserAvatar";
-import { toggleFollow } from "@/components/ui/followActions";
+import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
 
 interface Author {
   id: string;
@@ -20,6 +18,7 @@ interface Props {
   author: Author;
   userId: string | null;
   initialFollowing: boolean;
+  initialSubscribed?: boolean;
   isCorrespondingAuthor?: boolean;
   coAuthors?: Array<{
     user_id: string;
@@ -35,34 +34,10 @@ export default function AuthorBioCard({
   author,
   userId,
   initialFollowing,
+  initialSubscribed = false,
   isCorrespondingAuthor = false,
   coAuthors = [],
 }: Props) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [following, setFollowing] = useState(initialFollowing);
-  const [loading, setLoading] = useState(false);
-
-  const handleFollow = async () => {
-    if (!userId) {
-      router.push("/login");
-      return;
-    }
-    setLoading(true);
-    const result = await toggleFollow({
-      followingId: author.id,
-      follow: !following,
-      pathname,
-    });
-
-    if (result.error) {
-      console.error(result.error);
-    } else {
-      setFollowing(result.following);
-    }
-    setLoading(false);
-  };
-
   const isOwnProfile = userId === author.id;
   const authorName = author.full_name ?? author.username ?? "Anonymous";
 
@@ -95,17 +70,14 @@ export default function AuthorBioCard({
             </p>
           </div>
           {!isOwnProfile ? (
-            <button
-              onClick={handleFollow}
-              disabled={loading}
-              className={`min-h-8 flex-shrink-0 rounded-full px-4 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50 ${
-                following
-                  ? "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                  : "bg-emerald-brand text-white hover:bg-[#0E4B37]"
-              }`}
-            >
-              {following ? "Following" : "Follow"}
-            </button>
+            <AuthorRelationshipControls
+              authorId={author.id}
+              currentUserId={userId}
+              initialFollowing={initialFollowing}
+              initialSubscribed={initialSubscribed}
+              compact
+              className="flex-shrink-0"
+            />
           ) : null}
         </div>
         {author.bio ? (

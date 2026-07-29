@@ -5,10 +5,13 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import type { DiscoverTopic } from "@/lib/discoverData";
+import TopicSubscribeButton from "@/components/topic/TopicSubscribeButton";
+import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
 
 interface DiscoverTopicsGridProps {
   topics: DiscoverTopic[];
   initialInterests: string[];
+  initialSubscribedTopicKeys: string[];
   userId: string | null;
 }
 
@@ -19,11 +22,14 @@ function normalizeTag(value: string) {
 export default function DiscoverTopicsGrid({
   topics,
   initialInterests,
+  initialSubscribedTopicKeys,
   userId,
 }: DiscoverTopicsGridProps) {
   const [interests, setInterests] = useState(initialInterests);
   const [savingTag, setSavingTag] = useState<string | null>(null);
   const interestKeys = new Set(interests.map(normalizeTag));
+  const subscriptionsEnabled = isTopicSubscriptionsEnabled();
+  const subscribedKeys = new Set(initialSubscribedTopicKeys);
 
   const toggleTopic = async (tag: string) => {
     if (!userId || savingTag) return;
@@ -103,7 +109,14 @@ export default function DiscoverTopicsGrid({
               </span>
             </Link>
 
-            {userId ? (
+            {subscriptionsEnabled ? (
+              <TopicSubscribeButton
+                topic={topic.tag}
+                initialSubscribed={subscribedKeys.has(normalizeTag(topic.tag))}
+                currentUserId={userId}
+                compact
+              />
+            ) : userId ? (
               <button
                 type="button"
                 onClick={() => toggleTopic(topic.tag)}

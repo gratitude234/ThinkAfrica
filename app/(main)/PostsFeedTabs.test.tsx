@@ -106,6 +106,24 @@ describe("PostsFeedTabs", () => {
     );
   });
 
+  it("shows the dedicated Topics tab only when topic subscriptions are enabled", () => {
+    render(
+      <PostsFeedTabs
+        {...common}
+        showFollowingTab
+        showTopicsTab
+        currentUserId="user-1"
+      />
+    );
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "For you",
+      "Following",
+      "Topics",
+      "Latest",
+    ]);
+  });
+
   it("labels the public ranked feed Discover and omits Following for guests", () => {
     render(
       <PostsFeedTabs
@@ -330,6 +348,26 @@ describe("PostsFeedTabs -- empty states", () => {
     expect(screen.getByRole("link", { name: "Explore writers" })).toHaveAttribute(
       "href",
       "/onboarding?step=follow"
+    );
+  });
+
+  it("shows the Topics-specific empty state with an Explore topics CTA", () => {
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialTab="topics"
+        showFollowingTab
+        showTopicsTab
+        currentUserId="user-1"
+      />
+    );
+
+    expect(
+      screen.getByText("No posts from your subscribed topics yet.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Explore topics" })).toHaveAttribute(
+      "href",
+      "/topics"
     );
   });
 

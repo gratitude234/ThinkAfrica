@@ -10,6 +10,7 @@ import {
   StatTile,
   type DebateStatus,
 } from "./DebatePrimitives";
+import { resolveLandingFilter } from "./landingFilter";
 import {
   DEFAULT_OG_IMAGE,
   SITE_NAME,
@@ -207,12 +208,63 @@ function getTimeLabel(debate: DebateRow) {
   return `${phaseLabel} closes ${formatTimeUntil(deadline)}`;
 }
 
+/**
+ * The single source of truth for "can this person start a debate".
+ *
+ * The header and the empty state each used to decide this for themselves, and
+ * disagreed: the header correctly offered unverified members a muted "Verify
+ * to start one", while the empty state showed the same person a bright green
+ * "Start a debate" that only checked whether they were signed in. Tapping it
+ * led straight to a page refusing them. Both now render this.
+ */
+function CreateDebateCta({
+  canCreate,
+  signedIn,
+  align = "start",
+}: {
+  canCreate: boolean;
+  signedIn: boolean;
+  align?: "start" | "center";
+}) {
+  // A signed-out visitor is invited in: they may well be able to create once
+  // they have an account, and the sign-in page explains the rest.
+  const inviting = canCreate || !signedIn;
+
+  return (
+    <div
+      className={`flex flex-col gap-2 ${
+        align === "center" ? "items-center" : "items-start md:items-end"
+      }`}
+    >
+      <Link
+        href={signedIn ? "/debates/create" : "/login?redirectTo=/debates/create"}
+        className={`inline-flex rounded-lg px-4 py-2 text-sm font-semibold ${
+          inviting
+            ? "bg-emerald-brand text-white hover:opacity-90"
+            : "border border-gray-200 bg-canvas text-ink-muted hover:bg-surface"
+        }`}
+      >
+        {inviting ? "Start a curated debate" : "Verify to start one"}
+      </Link>
+      {!inviting ? (
+        <p className="text-xs text-ink-muted">
+          Verified members, editors, and admins can moderate.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function EmptyDebates({
   filter,
   signedIn,
+  canCreate,
+  recruitingCount,
 }: {
   filter: DebateFilter;
   signedIn: boolean;
+  canCreate: boolean;
+  recruitingCount: number;
 }) {
   const copy = EMPTY_COPY[filter];
   return (
@@ -221,8 +273,10 @@ function EmptyDebates({
       <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-ink-muted">
         {copy.body}
       </p>
-      <div className="mt-5 flex flex-wrap justify-center gap-2">
-        {filter !== "recruiting" ? (
+      <div className="mt-5 flex flex-col items-center gap-3">
+        {/* Only offered when there is actually something behind it -- this
+            used to send people from one empty page to another. */}
+        {filter !== "recruiting" && recruitingCount > 0 ? (
           <Link
             href="/debates?status=recruiting"
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-ink hover:bg-canvas"
@@ -230,12 +284,11 @@ function EmptyDebates({
             View recruiting debates
           </Link>
         ) : null}
-        <Link
-          href={signedIn ? "/debates/create" : "/login?redirectTo=/debates/create"}
-          className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          Start a debate
-        </Link>
+        <CreateDebateCta
+          canCreate={canCreate}
+          signedIn={signedIn}
+          align="center"
+        />
       </div>
     </div>
   );
@@ -376,7 +429,10 @@ function DebateCard({
 
 export default async function DebatesPage({ searchParams }: PageProps) {
   const { status } = await searchParams;
-  const filter = getFilter(status);
+  const requestedFilter = getFilter(status);
+  // A supplied ?status= means the visitor chose a tab; landing on /debates
+  // bare does not. Only the latter is eligible for the fallback below.
+  const isExplicitFilter = typeof status === "string" && status.length > 0;
   const supabase = await createClient();
   const {
     data: { user },
@@ -430,6 +486,9 @@ export default async function DebatesPage({ searchParams }: PageProps) {
     recaps: recapCount.count ?? 0,
   };
 
+  const filter = resolveLandingFilter(requestedFilter, counts, isExplicitFilter);
+  const fellBackToOtherTab = filter !== requestedFilter;
+
   let query = supabase
     .from("debates")
     .select(
@@ -473,26 +532,13 @@ export default async function DebatesPage({ searchParams }: PageProps) {
             rebuttal, the community vote, and a durable recap.
           </p>
         </div>
-        <div className="flex flex-col items-start gap-2 md:items-end">
-          <Link
-            href={user ? "/debates/create" : "/login?redirectTo=/debates/create"}
-            className={`inline-flex rounded-lg px-4 py-2 text-sm font-semibold ${
-              canCreate || !user
-                ? "bg-emerald-brand text-white hover:opacity-90"
-                : "border border-gray-200 bg-canvas text-ink-muted hover:bg-surface"
-            }`}
-          >
-            {canCreate || !user ? "Start a curated debate" : "Verify to start one"}
-          </Link>
-          {!canCreate && user ? (
-            <p className="text-xs text-ink-muted">
-              Verified members, editors, and admins can moderate.
-            </p>
-          ) : null}
-        </div>
+        <CreateDebateCta canCreate={canCreate} signedIn={Boolean(user)} />
       </header>
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Every tile below restates a count the tab strip already carries, so
+          on a phone this was most of the first screen spent saying the same
+          thing twice. Kept from `sm` up, where the space is free. */}
+      <div className="mb-5 hidden gap-3 sm:grid sm:grid-cols-4">
         <StatTile
           label="Active stages"
           value={counts.active}
@@ -542,8 +588,20 @@ export default async function DebatesPage({ searchParams }: PageProps) {
         </div>
       </nav>
 
+      {fellBackToOtherTab ? (
+        <p className="mb-4 rounded-lg border border-gray-200 bg-surface px-4 py-2.5 text-sm text-ink-muted">
+          No debate is live right now — showing{" "}
+          {filter === "recruiting" ? "debates recruiting debaters" : "completed debates"}.
+        </p>
+      ) : null}
+
       {debates.length === 0 ? (
-        <EmptyDebates filter={filter} signedIn={Boolean(user)} />
+        <EmptyDebates
+          filter={filter}
+          signedIn={Boolean(user)}
+          canCreate={canCreate}
+          recruitingCount={counts.recruiting}
+        />
       ) : (
         <div className="space-y-3">
           {debates.map((debate, index) => (

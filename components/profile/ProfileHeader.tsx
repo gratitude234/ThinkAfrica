@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import FollowButton from "@/app/(main)/[username]/FollowButton";
+import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
 import BlockUserButton from "@/components/moderation/BlockUserButton";
 import ReportButton from "@/components/moderation/ReportButton";
 import ContactInquiryModal from "@/components/profile/ContactInquiryModal";
@@ -46,6 +46,7 @@ interface ProfileHeaderProps {
   isOwnProfile: boolean;
   currentUserId: string | null;
   initialFollowing: boolean;
+  initialSubscribed?: boolean;
   initialBlocked?: boolean;
   isOpenToOpportunities: boolean;
   canContact: boolean;
@@ -80,6 +81,7 @@ export default function ProfileHeader({
   isOwnProfile,
   currentUserId,
   initialFollowing,
+  initialSubscribed = false,
   initialBlocked = false,
   isOpenToOpportunities,
   canContact,
@@ -251,10 +253,11 @@ export default function ProfileHeader({
               </>
             ) : (
               <>
-                <FollowButton
-                  targetUserId={profile.id}
+                <AuthorRelationshipControls
+                  authorId={profile.id}
                   currentUserId={currentUserId}
                   initialFollowing={initialFollowing}
+                  initialSubscribed={initialSubscribed}
                   className="mt-0"
                 />
                 <div className="flex gap-2">

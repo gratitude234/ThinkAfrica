@@ -1,5 +1,17 @@
 import { PHASE_LABELS, type DebatePhase } from "@/lib/debatePhases";
 
+// Narrow-screen forms of PHASE_LABELS. The full names ("Opening Statements",
+// "Closing Arguments") truncate to "Openin…" once five of them share a phone's
+// width, which reads as no label at all.
+const PHASE_SHORT_LABELS: Record<DebatePhase, string> = {
+  recruiting: "Recruit",
+  opening: "Opening",
+  rebuttal: "Rebuttal",
+  closing: "Closing",
+  voting: "Vote",
+  completed: "Done",
+};
+
 export type DebateStatus = "open" | "active" | "closed" | "cancelled";
 
 const STATUS_STYLES: Record<DebateStatus, string> = {
@@ -138,7 +150,10 @@ export function PhaseStepper({
 
   return (
     <div className="w-full">
-      <div className="flex items-center gap-2">
+      {/* Purely decorative: the numbers, ticks and connector lines restate
+          what the labelled list below already says, and on their own they
+          announce as a meaningless "1 2 3". */}
+      <div aria-hidden="true" className="flex items-center gap-2">
         {phases.map((phase, index) => {
           const active = !isOpen && index <= currentIndex;
           const current = !isOpen && !isClosed && phase === currentPhase;
@@ -151,7 +166,6 @@ export function PhaseStepper({
                     ? "bg-emerald-brand text-white"
                     : "bg-gray-100 text-gray-400"
                 } ${current ? "ring-4 ring-emerald-100" : ""}`}
-                title={PHASE_LABELS[phase]}
               >
                 {index < currentIndex && !isOpen ? "✓" : index + 1}
               </span>
@@ -168,17 +182,40 @@ export function PhaseStepper({
           );
         })}
       </div>
-      <div
+      {/* An ordered list rather than a row of spans, so the steps carry their
+          own order, names and current-step marker instead of relying on
+          position under a decorative circle. */}
+      <ol
+        aria-label="Debate progress"
         className={`mt-2 grid gap-2 text-[11px] font-medium text-gray-500 ${
           variant === "v1_5" ? "grid-cols-5" : "grid-cols-3"
         }`}
       >
-        {phases.map((phase) => (
-          <span key={phase} className="truncate">
-            {PHASE_LABELS[phase]}
-          </span>
-        ))}
-      </div>
+        {phases.map((phase, index) => {
+          const done = !isOpen && index < currentIndex;
+          const current = !isOpen && !isClosed && phase === currentPhase;
+
+          return (
+            <li
+              key={phase}
+              aria-current={current ? "step" : undefined}
+              className={current ? "font-semibold text-emerald-brand" : ""}
+            >
+              <span aria-hidden="true" className="block truncate sm:hidden">
+                {PHASE_SHORT_LABELS[phase]}
+              </span>
+              <span aria-hidden="true" className="hidden truncate sm:block">
+                {PHASE_LABELS[phase]}
+              </span>
+              <span className="sr-only">
+                {`Step ${index + 1} of ${phases.length}: ${PHASE_LABELS[phase]}${
+                  done ? " (completed)" : current ? " (current step)" : ""
+                }`}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

@@ -446,7 +446,8 @@ export default function OnboardingPage() {
     identity: isAcademicProfile
       ? "This helps us verify your academic credentials."
       : "Just your country, we'll keep this quick.",
-    interests: "Pick up to 6 topics to personalize your feed.",
+    interests:
+      "Pick up to 6 interests for recommendations. Publication alerts require a separate topic subscription.",
     follow: "Get to know people shaping conversations in your fields.",
   };
 

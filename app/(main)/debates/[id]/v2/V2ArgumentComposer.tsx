@@ -32,6 +32,69 @@ function emptySource(): SourceDraft {
   return { url: "", title: "", publisher: "", published_at: "", quoted_text: "" };
 }
 
+/**
+ * Drafts are keyed by the round they were written for, not merely by debate.
+ * The room polls every 15s and re-renders from fresh server state, so an
+ * advancing round can change this composer's entryType underneath someone
+ * mid-sentence -- keying on the round keeps that person's opening statement
+ * filed under the opening round rather than bleeding into the rebuttal.
+ */
+function draftStorageKey(
+  debateId: string,
+  entryType: string,
+  roundSequence: number,
+  userId: string | null
+): string {
+  return `v2-draft:${debateId}:${entryType}:${roundSequence}:${userId ?? "anon"}`;
+}
+
+interface StoredDraft {
+  claim: string;
+  content: string;
+  parentArgumentId: string;
+  relationType: string;
+  sources: SourceDraft[];
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function readStoredDraft(key: string): StoredDraft | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+
+    const record = parsed as Record<string, unknown>;
+    const claim = asString(record.claim);
+    const content = asString(record.content);
+    if (!claim.trim() && !content.trim()) return null;
+
+    return {
+      claim,
+      content,
+      parentArgumentId: asString(record.parentArgumentId),
+      relationType: asString(record.relationType),
+      sources: Array.isArray(record.sources)
+        ? record.sources.map((entry) => {
+            const source = (entry ?? {}) as Record<string, unknown>;
+            return {
+              url: asString(source.url),
+              title: asString(source.title),
+              publisher: asString(source.publisher),
+              published_at: asString(source.published_at),
+              quoted_text: asString(source.quoted_text),
+            };
+          })
+        : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function V2ArgumentComposer({
   debateId,
   entryType,
@@ -42,11 +105,13 @@ export default function V2ArgumentComposer({
   selectedParent,
   onClearSelectedParent,
   onSuccess,
+  currentUserId,
 }: {
   debateId: string;
   entryType: ArgumentEntryTypeV2;
   ownStance: DebateStance;
   activeRoundSequence: number;
+  currentUserId: string | null;
   existingCountForEntryType: number;
   eligibleParents: DebateV2ArgumentView[];
   selectedParent: DebateV2ArgumentView | null;
@@ -63,6 +128,109 @@ export default function V2ArgumentComposer({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const [restoredDraft, setRestoredDraft] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Which round the text currently in the form was written for. Props can
+  // change under an active typist when the poll picks up an advancing round;
+  // this stays put so that shift is detectable instead of silent.
+  const [draftContext, setDraftContext] = useState({ entryType, activeRoundSequence });
+  const hasText = Boolean(claim.trim() || content.trim());
+  const hasTextRef = useRef(hasText);
+  useEffect(() => {
+    hasTextRef.current = hasText;
+  });
+
+  const stranded =
+    hasText &&
+    (draftContext.entryType !== entryType ||
+      draftContext.activeRoundSequence !== activeRoundSequence);
+
+  // An empty form has nothing to strand, so it simply follows the room.
+  useEffect(() => {
+    if (!hasTextRef.current) {
+      setDraftContext({ entryType, activeRoundSequence });
+    }
+  }, [entryType, activeRoundSequence]);
+
+  const storageKey = draftStorageKey(
+    debateId,
+    draftContext.entryType,
+    draftContext.activeRoundSequence,
+    currentUserId
+  );
+  const hydratedKeyRef = useRef<string | null>(null);
+
+  // Restore whatever was last typed for this round.
+  useEffect(() => {
+    if (hydratedKeyRef.current === storageKey) return;
+    hydratedKeyRef.current = storageKey;
+
+    const saved = readStoredDraft(storageKey);
+    if (!saved) return;
+
+    setClaim(saved.claim);
+    setContent(saved.content);
+    setParentArgumentId(saved.parentArgumentId);
+    setRelationType(saved.relationType as DebateArgumentRelationType | "");
+    setSources(saved.sources);
+    setRestoredDraft(true);
+  }, [storageKey]);
+
+  // Persist as they type. Debounced so a long argument isn't a write per
+  // keystroke, and cleared outright once the form is empty again.
+  useEffect(() => {
+    if (hydratedKeyRef.current !== storageKey) return;
+
+    const timer = window.setTimeout(() => {
+      try {
+        if (!claim.trim() && !content.trim()) {
+          window.localStorage.removeItem(storageKey);
+          return;
+        }
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({ claim, content, parentArgumentId, relationType, sources })
+        );
+      } catch {
+        // A full or unavailable localStorage must never break composing.
+      }
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [claim, content, parentArgumentId, relationType, sources, storageKey]);
+
+  function clearDraftStorage() {
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Nothing to recover from -- the draft is being discarded anyway.
+    }
+  }
+
+  function discardStrandedDraft() {
+    clearDraftStorage();
+    setClaim("");
+    setContent("");
+    setParentArgumentId("");
+    setRelationType("");
+    setSources([]);
+    setError(null);
+    setRestoredDraft(false);
+    setCopied(false);
+    setDraftContext({ entryType, activeRoundSequence });
+  }
+
+  async function copyStrandedDraft() {
+    try {
+      await navigator.clipboard.writeText(
+        claim.trim() ? `${claim.trim()}\n\n${content}` : content
+      );
+      setCopied(true);
+    } catch {
+      setError("Could not copy automatically — select the text above and copy it manually.");
+    }
+  }
 
   const isRebuttal = entryType === "rebuttal";
   const wordLimit = WORD_LIMITS_V2[entryType];
@@ -157,15 +325,66 @@ export default function V2ArgumentComposer({
       return;
     }
 
+    // The argument is on the record now; the local copy would only resurface
+    // as a phantom draft the next time this round's composer mounts.
+    clearDraftStorage();
     setClaim("");
     setContent("");
     setParentArgumentId("");
     setRelationType("");
     setSources([]);
+    setRestoredDraft(false);
     onClearSelectedParent();
     setJustSubmitted(true);
     setTimeout(() => setJustSubmitted(false), 3000);
     onSuccess();
+  }
+
+  // Deliberately ahead of every other early return: once the round has moved
+  // on, showing this person their own unsent words matters more than any
+  // other state this composer could be in.
+  if (stranded) {
+    return (
+      <section
+        role="alert"
+        className="space-y-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4"
+      >
+        <div>
+          <p className="text-sm font-semibold text-amber-900">
+            The debate moved on while you were writing.
+          </p>
+          <p className="mt-1 text-sm leading-6 text-amber-800">
+            You were writing your {draftContext.entryType} statement, but this
+            round is now the {entryType}. Your text has not been sent and has
+            not been changed — it is kept below so you can copy it before
+            starting your {entryType}.
+          </p>
+        </div>
+
+        {claim.trim() ? (
+          <p className="rounded-lg border border-amber-200 bg-white p-3 text-sm font-semibold text-gray-800">
+            {claim}
+          </p>
+        ) : null}
+        <textarea
+          readOnly
+          value={content}
+          rows={8}
+          aria-label={`Your unsent ${draftContext.entryType} statement`}
+          className="w-full rounded-lg border border-amber-200 bg-white p-3 text-sm leading-6 text-gray-800"
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" onClick={copyStrandedDraft}>
+            {copied ? "Copied" : "Copy my text"}
+          </Button>
+          <Button type="button" variant="secondary" onClick={discardStrandedDraft}>
+            Discard and write my {entryType}
+          </Button>
+        </div>
+        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      </section>
+    );
   }
 
   if (allowanceUsedUp) {
@@ -187,6 +406,15 @@ export default function V2ArgumentComposer({
           {ownStance}
         </span>
       </div>
+
+      {restoredDraft ? (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800"
+        >
+          Restored the draft you had here earlier. It has not been submitted.
+        </p>
+      ) : null}
 
       {isRebuttal ? (
         <div className="space-y-2 rounded-lg border border-gray-100 bg-canvas p-3">

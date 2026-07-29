@@ -5,7 +5,17 @@ import { getProfileCredibilitySummary } from "@/lib/profileCredibility";
 import ProfileForm from "./ProfileForm";
 import AccountForm from "./AccountForm";
 import NotificationsForm, { type NotificationPrefs } from "./NotificationsForm";
+import SubscribedAuthorsManager, {
+  type SubscribedAuthor,
+} from "./SubscribedAuthorsManager";
+import SubscribedTopicsManager, {
+  type SubscribedTopic,
+} from "./SubscribedTopicsManager";
 import PrivacyForm, { type PrivacySettings } from "./PrivacyForm";
+import {
+  isAuthorSubscriptionsEnabled,
+  isTopicSubscriptionsEnabled,
+} from "@/lib/featureFlags";
 
 const VALID_TABS = ["profile", "account", "notifications", "privacy"] as const;
 type SettingsTab = (typeof VALID_TABS)[number];
@@ -44,6 +54,48 @@ export default async function SettingsPage({ searchParams }: PageProps) {
 
   if (!profile) redirect("/login");
 
+  let subscribedAuthors: SubscribedAuthor[] = [];
+  if (tab === "notifications" && isAuthorSubscriptionsEnabled()) {
+    const { data } = await supabase
+      .from("author_subscriptions")
+      .select(
+        "author_id, author:profiles!author_subscriptions_author_id_fkey(id, username, full_name, avatar_url)"
+      )
+      .eq("subscriber_id", user.id)
+      .order("created_at", { ascending: false });
+
+    subscribedAuthors = (data ?? []).flatMap((row) => {
+      const raw = row.author as
+        | { id: string; username: string; full_name: string | null; avatar_url: string | null }
+        | Array<{ id: string; username: string; full_name: string | null; avatar_url: string | null }>
+        | null;
+      const author = Array.isArray(raw) ? raw[0] : raw;
+      return author
+        ? [
+            {
+              id: author.id,
+              username: author.username,
+              fullName: author.full_name,
+              avatarUrl: author.avatar_url,
+            },
+          ]
+        : [];
+    });
+  }
+
+  let subscribedTopics: SubscribedTopic[] = [];
+  if (tab === "notifications" && isTopicSubscriptionsEnabled()) {
+    const { data } = await supabase
+      .from("topic_subscriptions")
+      .select("topic_key, display_label")
+      .eq("subscriber_id", user.id)
+      .order("created_at", { ascending: false });
+    subscribedTopics = (data ?? []).map((row) => ({
+      topicKey: row.topic_key as string,
+      displayLabel: row.display_label as string,
+    }));
+  }
+
   const credibilitySummary = getProfileCredibilitySummary({
     profile: {
       full_name: profile.full_name,
@@ -81,6 +133,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     email_co_author_accepted: true,
     email_co_author_declined: true,
     email_opportunity_inquiry: true,
+    email_author_publications: true,
     email_debate_updates: true,
     push_published: true,
     push_messages: true,
@@ -88,6 +141,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     push_likes: true,
     push_follows: true,
     push_daily_brief: true,
+    push_author_publications: true,
     push_debate_updates: true,
     ...((profile.notification_prefs as Partial<NotificationPrefs>) ?? {}),
   };
@@ -185,10 +239,18 @@ export default async function SettingsPage({ searchParams }: PageProps) {
         )}
         {tab === "account" && <AccountForm email={user.email!} />}
         {tab === "notifications" && (
-          <NotificationsForm
-            profileId={profile.id}
-            notificationPrefs={notifPrefs}
-          />
+          <>
+            {isAuthorSubscriptionsEnabled() ? (
+              <SubscribedAuthorsManager initialAuthors={subscribedAuthors} />
+            ) : null}
+            {isTopicSubscriptionsEnabled() ? (
+              <SubscribedTopicsManager initialTopics={subscribedTopics} />
+            ) : null}
+            <NotificationsForm
+              profileId={profile.id}
+              notificationPrefs={notifPrefs}
+            />
+          </>
         )}
         {tab === "privacy" && (
           <PrivacyForm profileId={profile.id} privacySettings={privacySettings} />

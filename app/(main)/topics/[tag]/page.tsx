@@ -8,6 +8,9 @@ import {
   getPublicQualitySignals,
 } from "@/lib/postQuality";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
+import TopicSubscribeButton from "@/components/topic/TopicSubscribeButton";
+import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
+import { normalizeTagValue } from "@/lib/tags";
 
 interface PageProps {
   params: Promise<{ tag: string }>;
@@ -16,19 +19,42 @@ interface PageProps {
 export default async function TopicPage({ params }: PageProps) {
   const { tag } = await params;
   const decodedTag = decodeURIComponent(tag);
+  const topicKey = normalizeTagValue(decodedTag);
   const supabase = await createClient();
+  const subscriptionsEnabled = isTopicSubscriptionsEnabled();
 
-  // Fetch posts with this tag
-  const { data: postsRaw } = await supabase
+  let postsQuery = supabase
     .from("posts")
     .select(`
       id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id,
       profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
       post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
     `)
-    .eq("status", "published")
-    .contains("tags", [decodedTag])
-    .order("view_count", { ascending: false });
+    .eq("status", "published");
+  postsQuery = subscriptionsEnabled
+    ? postsQuery.contains("topic_keys", [topicKey])
+    : postsQuery.contains("tags", [decodedTag]);
+
+  const [
+    { data: postsRaw },
+    {
+      data: { user },
+    },
+  ] = await Promise.all([
+    postsQuery.order("view_count", { ascending: false }),
+    supabase.auth.getUser(),
+  ]);
+
+  let initialSubscribed = false;
+  if (subscriptionsEnabled && user) {
+    const { data: subscription } = await supabase
+      .from("topic_subscriptions")
+      .select("topic_key")
+      .eq("subscriber_id", user.id)
+      .eq("topic_key", topicKey)
+      .maybeSingle();
+    initialSubscribed = Boolean(subscription);
+  }
 
   if (!postsRaw) notFound();
 
@@ -140,12 +166,20 @@ export default async function TopicPage({ params }: PageProps) {
               {sourceBackedCount} source-backed / {citableCount} citable
             </p>
           </div>
-          <Link
-            href={`/write?kind=article&starter=1&tag=${encodeURIComponent(decodedTag)}`}
-            className="w-fit rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-[#0E4B37]"
-          >
-            Write about #{decodedTag}
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <TopicSubscribeButton
+              topic={decodedTag}
+              initialSubscribed={initialSubscribed}
+              currentUserId={user?.id ?? null}
+              showConfirmation
+            />
+            <Link
+              href={`/write?kind=article&starter=1&tag=${encodeURIComponent(decodedTag)}`}
+              className="w-fit rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-[#0E4B37]"
+            >
+              Write about #{decodedTag}
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -163,7 +197,7 @@ export default async function TopicPage({ params }: PageProps) {
             posts.map((post) => (
               <PostCardImpression
                 key={post.id}
-                currentUserId={null}
+                currentUserId={user?.id ?? null}
                 surface="topic"
                 post={{
                   id: post.id,

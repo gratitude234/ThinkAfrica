@@ -14,6 +14,7 @@ import {
   requiresEditorialWorkflow,
 } from "@/lib/reviewWorkflow";
 import type { EditorDecision } from "@/lib/types";
+import { schedulePublicationDistribution } from "@/lib/publicationDistribution";
 
 async function requireEditorAccess() {
   try {
@@ -295,6 +296,8 @@ export async function submitEditorialDecision(input: {
           return { error: error.message };
         }
       }
+
+      schedulePublicationDistribution(input.postId, "Research");
 
       const { data: authorProfile } = await supabase
         .from("profiles")

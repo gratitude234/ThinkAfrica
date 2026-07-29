@@ -1,16 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import { shouldUseRealtime } from "@/lib/realtime";
 import {
   type DebatePhase,
   PHASE_DESCRIPTIONS,
   PHASE_LABELS,
 } from "@/lib/debatePhases";
 import { PhaseStepper, StanceMeter } from "../DebatePrimitives";
-import Toast from "@/components/ui/Toast";
 import UpvoteButton from "./UpvoteButton";
 import ArgumentForm from "./ArgumentForm";
 import MotionVotePanel from "./MotionVotePanel";
@@ -91,20 +88,6 @@ function phaseForRound(roundNumber: number): DebatePhase {
   if (roundNumber === 2) return "rebuttal";
   if (roundNumber === 3) return "closing";
   return "opening";
-}
-
-function upsertArgument(argumentsList: Argument[], argument: Argument) {
-  if (argumentsList.some((item) => item.id === argument.id)) {
-    return argumentsList;
-  }
-
-  return [...argumentsList, argument];
-}
-
-function updateVoteCount(argumentsList: Argument[], id: string, upvotes: number) {
-  return argumentsList.map((argument) =>
-    argument.id === id ? { ...argument, upvotes } : argument
-  );
 }
 
 function EmptyColumn({ message }: { message: string }) {
@@ -235,133 +218,26 @@ export default function LiveArguments({
   currentPhase,
   isModeratorOfDebate,
 }: LiveArgumentsProps) {
-  const [forArguments, setForArguments] = useState<Argument[]>(initialForArguments);
-  const [againstArguments, setAgainstArguments] = useState<Argument[]>(
-    initialAgainstArguments
-  );
-  const [votedIds] = useState<Set<string>>(new Set(userVotedIds));
-  const [localDebateStatus, setLocalDebateStatus] = useState(debateStatus);
-  const [localCurrentPhase, setLocalCurrentPhase] =
-    useState<DebatePhase>(currentPhase);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Rendered straight from props rather than mirrored into state. This
+  // component once held local copies so a realtime subscription could patch
+  // them in place, but that subscription could never fire -- migration
+  // 20260521000001_disable_realtime_for_launch_stability.sql removed
+  // debate_arguments from the supabase_realtime publication, and
+  // shouldUseRealtime() gated it behind an env flag on top of that. Legacy
+  // rooms are no longer used for new debates, so the dead subscription was
+  // removed rather than replaced with the polling loop the V1.5 room uses.
+  //
+  // Mirroring props into useState was also quietly wrong on its own: the
+  // initial value is captured once, so a server refresh delivering new props
+  // would never have reached the screen.
+  const votedIds = new Set(userVotedIds);
   const [visibleStance, setVisibleStance] = useState<"for" | "against">(
     userParticipant?.stance ?? "for"
   );
   const [phaseFilter, setPhaseFilter] = useState<DebatePhase | "all">("all");
 
-  useEffect(() => {
-    setLocalDebateStatus(debateStatus);
-  }, [debateStatus]);
-
-  useEffect(() => {
-    setLocalCurrentPhase(currentPhase);
-  }, [currentPhase]);
-
-  useEffect(() => {
-    if (!shouldUseRealtime()) {
-      return;
-    }
-
-    const supabase = createClient();
-
-    const channel = supabase
-      .channel(`debate-args:${debateId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "debate_arguments",
-          filter: `debate_id=eq.${debateId}`,
-        },
-        async (payload) => {
-          const { data } = await supabase
-            .from("debate_arguments")
-            .select(
-              "*, profiles!debate_arguments_author_id_fkey(username, full_name, university, avatar_url)"
-            )
-            .eq("id", payload.new.id)
-            .single();
-
-          if (!data) return;
-
-          const argument = {
-            ...data,
-            profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles,
-          } as Argument;
-
-          if (resolveStance(argument) === "for") {
-            setForArguments((prev) => upsertArgument(prev, argument));
-          } else {
-            setAgainstArguments((prev) => upsertArgument(prev, argument));
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "debate_arguments",
-          filter: `debate_id=eq.${debateId}`,
-        },
-        (payload) => {
-          const newId = payload.new.id as string;
-          const newUpvotes = payload.new.upvotes as number;
-
-          setForArguments((prev) => updateVoteCount(prev, newId, newUpvotes));
-          setAgainstArguments((prev) => updateVoteCount(prev, newId, newUpvotes));
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "debates",
-          filter: `id=eq.${debateId}`,
-        },
-        (payload) => {
-          const nextStatus =
-            typeof payload.new.status === "string" ? payload.new.status : null;
-          const nextPhase =
-            payload.new.current_phase === "opening" ||
-            payload.new.current_phase === "rebuttal" ||
-            payload.new.current_phase === "closing"
-              ? payload.new.current_phase
-              : null;
-
-          if (nextStatus) {
-            setLocalDebateStatus((previousStatus) => {
-              if (nextStatus !== previousStatus) {
-                if (previousStatus === "open" && nextStatus === "active") {
-                  setToastMessage("Debate is live. Submit your opening argument.");
-                }
-                if (previousStatus === "active" && nextStatus === "closed") {
-                  setToastMessage(
-                    "This debate has closed. Read the final verdict and recap."
-                  );
-                }
-              }
-
-              return nextStatus;
-            });
-          }
-
-          if (nextPhase) {
-            setLocalCurrentPhase(nextPhase);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [debateId]);
-
-  const sortedForArguments = sortByUpvotes(forArguments);
-  const sortedAgainstArguments = sortByUpvotes(againstArguments);
+  const sortedForArguments = sortByUpvotes(initialForArguments);
+  const sortedAgainstArguments = sortByUpvotes(initialAgainstArguments);
   const filteredForArguments = phaseFilter === "all"
     ? sortedForArguments
     : sortedForArguments.filter((arg) => phaseForRound(arg.round_number) === phaseFilter);
@@ -379,9 +255,9 @@ export default function LiveArguments({
   const motionTotal = motionForCount + motionAgainstCount;
   const motionForPct = motionTotal > 0 ? Math.round((motionForCount / motionTotal) * 100) : 50;
   const motionAgainstPct = 100 - motionForPct;
-  const isClosed = localDebateStatus === "closed";
-  const isOpen = localDebateStatus === "open";
-  const canSubmitArguments = localDebateStatus === "active";
+  const isClosed = debateStatus === "closed";
+  const isOpen = debateStatus === "open";
+  const canSubmitArguments = debateStatus === "active";
 
   return (
     <div>
@@ -396,20 +272,20 @@ export default function LiveArguments({
                 ? "Open for participants"
                 : isClosed
                   ? "Debate closed"
-                  : PHASE_LABELS[localCurrentPhase]}
+                  : PHASE_LABELS[currentPhase]}
             </p>
             <p className="mt-1 text-xs leading-5 text-gray-500">
               {isOpen
                 ? "Choose a side and vote on the motion before the moderator starts rounds."
                 : isClosed
                   ? "Voting and argument submission are closed. Read the strongest arguments below."
-                  : PHASE_DESCRIPTIONS[localCurrentPhase]}
+                  : PHASE_DESCRIPTIONS[currentPhase]}
             </p>
           </div>
 
           <PhaseStepper
-            currentPhase={localCurrentPhase}
-            status={localDebateStatus}
+            currentPhase={currentPhase}
+            status={debateStatus}
           />
         </div>
       </div>
@@ -418,8 +294,8 @@ export default function LiveArguments({
         <div className="mb-5">
           <PhaseControls
             debateId={debateId}
-            currentPhase={localCurrentPhase}
-            debateStatus={localDebateStatus}
+            currentPhase={currentPhase}
+            debateStatus={debateStatus}
           />
         </div>
       ) : null}
@@ -608,14 +484,14 @@ export default function LiveArguments({
                 ? "Choose a side before start"
                 : isClosed
                   ? "No new arguments"
-                  : `Write for ${PHASE_LABELS[localCurrentPhase]}`}
+                  : `Write for ${PHASE_LABELS[currentPhase]}`}
             </h3>
             <p className="mt-1 text-xs leading-5 text-gray-500">
               {isOpen
                 ? "Vote now and lock your side. Argument submission opens when the moderator starts rounds."
                 : isClosed
                   ? "The room is archived. Vote totals and strongest arguments remain visible."
-                  : PHASE_DESCRIPTIONS[localCurrentPhase]}
+                  : PHASE_DESCRIPTIONS[currentPhase]}
             </p>
 
             <div className="mt-4">
@@ -635,7 +511,7 @@ export default function LiveArguments({
                   disabled={false}
                   submissionDisabled={!canSubmitArguments}
                   userParticipant={userParticipant}
-                  currentPhase={localCurrentPhase}
+                  currentPhase={currentPhase}
                 />
               ) : (
                 <div className="rounded-xl border border-gray-200 bg-canvas p-4 text-sm text-gray-500">
@@ -648,9 +524,6 @@ export default function LiveArguments({
           </section>
         </div>
       </div>
-      {toastMessage ? (
-        <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
-      ) : null}
     </div>
   );
 }
