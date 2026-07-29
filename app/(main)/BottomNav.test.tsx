@@ -103,9 +103,50 @@ describe("BottomNav account label and safe areas", () => {
     expect(nav.className).toMatch(/\bfixed\b/);
     expect(nav).toHaveStyle({ paddingBottom: "env(safe-area-inset-bottom)" });
 
-    for (const label of ["Home", "Explore", "Messages", "Me"]) {
+    for (const label of ["Home", "Explore", "Debates", "Messages", "Me"]) {
       const link = screen.getByText(label).closest("a");
       expect(link?.className).toMatch(/h-full/);
     }
+  });
+});
+
+describe("BottomNav debates destination", () => {
+  beforeEach(() => {
+    navigationState.pathname = "/";
+    mocks.requestAuth.mockReset();
+  });
+
+  afterEach(() => cleanup());
+
+  it("gives mobile users a route into debates", () => {
+    render(<BottomNav username="writer" userId="user-1" hasActiveDebate={false} />);
+
+    expect(screen.getByText("Debates").closest("a")).toHaveAttribute(
+      "href",
+      "/debates"
+    );
+  });
+
+  it("announces a live debate only while one is running", () => {
+    const { rerender } = render(
+      <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
+    );
+    expect(screen.queryByText("A debate is live now")).not.toBeInTheDocument();
+
+    rerender(
+      <BottomNav username="writer" userId="user-1" hasActiveDebate />
+    );
+    expect(screen.getByText("A debate is live now")).toBeInTheDocument();
+  });
+
+  it("marks the debates tab as the current page inside a debate room", () => {
+    navigationState.pathname = "/debates/some-debate-id";
+
+    render(<BottomNav username="writer" userId="user-1" hasActiveDebate />);
+
+    expect(screen.getByText("Debates").closest("a")).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
   });
 });

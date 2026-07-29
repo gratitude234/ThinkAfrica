@@ -17,8 +17,10 @@ function navLinkClass(isCurrent: boolean) {
   }`;
 }
 
+// px-2 rather than px-3: five destinations have to share a 320px-wide bar,
+// and the wider pill pushed "Messages" into wrapping on the narrowest phones.
 function navPillClass(isCurrent: boolean) {
-  return `flex flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1 transition-colors duration-150 ${
+  return `flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 transition-colors duration-150 ${
     isCurrent ? "bg-emerald-50" : ""
   }`;
 }
@@ -26,6 +28,7 @@ function navPillClass(isCurrent: boolean) {
 export default function BottomNav({
   username,
   userId,
+  hasActiveDebate,
 }: BottomNavProps) {
   const pathname = usePathname();
   const isPostPage = pathname.startsWith("/post/");
@@ -95,7 +98,7 @@ export default function BottomNav({
                   d="M3 10.75L12 3l9 7.75V21H14.75v-5.5h-5.5V21H3V10.75z"
                 />
               </svg>
-              <span className="text-[11px] font-medium">Home</span>
+              <span className="whitespace-nowrap text-[11px] font-medium">Home</span>
             </span>
           </Link>
 
@@ -118,7 +121,45 @@ export default function BottomNav({
                   d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
                 />
               </svg>
-              <span className="text-[11px] font-medium">Explore</span>
+              <span className="whitespace-nowrap text-[11px] font-medium">Explore</span>
+            </span>
+          </Link>
+
+          <Link
+            href="/debates"
+            className={navLinkClass(isActive("/debates"))}
+            aria-current={isActive("/debates") ? "page" : undefined}
+          >
+            <span className={navPillClass(isActive("/debates"))}>
+              <div className="relative">
+                {/* Balance scale rather than a speech bubble: Messages sits
+                    next to this and already owns the bubble. */}
+                <svg
+                  className="h-[22px] w-[22px]"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4v16m-7-3h14M5 7l-2 6h4L5 7zm14 0l-2 6h4l-2-6zM7 5h10"
+                  />
+                </svg>
+                {hasActiveDebate ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-brand ring-2 ring-white"
+                  />
+                ) : null}
+              </div>
+              <span className="whitespace-nowrap text-[11px] font-medium">
+                Debates
+              </span>
+              {hasActiveDebate ? (
+                <span className="sr-only">A debate is live now</span>
+              ) : null}
             </span>
           </Link>
 
@@ -146,7 +187,7 @@ export default function BottomNav({
                   <MessagesUnreadBadge userId={userId} className="-right-1.5 -top-1.5" />
                 ) : null}
               </div>
-              <span className="text-[11px] font-medium">Messages</span>
+              <span className="whitespace-nowrap text-[11px] font-medium">Messages</span>
             </span>
           </Link>
 
@@ -169,7 +210,7 @@ export default function BottomNav({
                   d="M20 21a8 8 0 10-16 0m12-11a4 4 0 11-8 0 4 4 0 018 0z"
                 />
               </svg>
-              <span className="text-[11px] font-medium">{profileLabel}</span>
+              <span className="whitespace-nowrap text-[11px] font-medium">{profileLabel}</span>
             </span>
           </Link>
         </div>

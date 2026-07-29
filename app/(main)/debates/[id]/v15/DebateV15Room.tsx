@@ -35,15 +35,28 @@ import type {
   DebateV15Source,
   DebateV15Stance,
 } from "./types";
+import { loadDebateV15RoomSignal } from "./loadRoomSignal";
+import {
+  debateV15SignalFromRoom,
+  debateV15SignalsDiffer,
+  type DebateV15RoomSignal,
+} from "./roomSignal";
 import RecapPoller from "../RecapPoller";
 import { resolveDebateV15Verdict } from "@/lib/debateV15";
 
-const PHASES: Array<{ key: DebateV15Phase; label: string }> = [
-  { key: "recruiting", label: "Recruiting" },
-  { key: "opening", label: "Opening" },
-  { key: "rebuttal", label: "Rebuttal" },
-  { key: "voting", label: "Final vote" },
-  { key: "completed", label: "Verdict" },
+const POLL_INTERVAL_MS = 15_000;
+
+const PHASES: Array<{
+  key: DebateV15Phase;
+  label: string;
+  /** Narrow-screen form: five full labels do not fit across a phone. */
+  short: string;
+}> = [
+  { key: "recruiting", label: "Recruiting", short: "Recruit" },
+  { key: "opening", label: "Opening", short: "Open" },
+  { key: "rebuttal", label: "Rebuttal", short: "Rebut" },
+  { key: "voting", label: "Final vote", short: "Vote" },
+  { key: "completed", label: "Verdict", short: "Verdict" },
 ];
 
 const PHASE_COPY: Record<
@@ -74,6 +87,11 @@ interface MutateOptions {
    */
   success?: string;
   onSuccess?: () => void;
+  /**
+   * Identifies the specific control that started this request, so only that
+   * control shows a pending state. Everything else in the room stays usable.
+   */
+  key?: string;
 }
 
 type DebateV15Mutate = (
@@ -162,6 +180,152 @@ function useClockTick(initialNow: number): number {
     return () => window.clearInterval(interval);
   }, []);
   return now;
+}
+
+/**
+ * Keeps the room in step with everyone else in it. A debate is a shared,
+ * deadline-driven space: the moderator advances the phase, the opponent
+ * posts, a deadline gets extended. Without this the room only changed when
+ * the viewer themselves acted, so a debater could sit on a stale "opening"
+ * screen well after rebuttals had started.
+ *
+ * Polling rather than a realtime subscription is deliberate -- see
+ * loadRoomSignal.ts. Ticks never overlap, pause while the tab is hidden,
+ * and stop entirely once the debate can no longer change.
+ */
+function useRoomLiveSync(
+  room: DebateV15RoomData,
+  isTerminal: boolean,
+  onChange: () => void
+) {
+  const debateId = room.debate.id;
+  // Seeded from the server-rendered room so the very first tick can already
+  // detect anything that changed since this page was rendered.
+  const lastSignalRef = useRef<DebateV15RoomSignal | null>(
+    debateV15SignalFromRoom(room)
+  );
+  // Held in a ref so a new callback identity on each render doesn't tear
+  // down and restart the polling interval.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+
+  useEffect(() => {
+    if (isTerminal) return;
+
+    let cancelled = false;
+    let inFlight = false;
+
+    const poll = async () => {
+      if (inFlight || cancelled || document.hidden) return;
+      inFlight = true;
+      try {
+        const signal = await loadDebateV15RoomSignal(debateId);
+        if (!signal || cancelled) return;
+
+        const previous = lastSignalRef.current;
+        lastSignalRef.current = signal;
+
+        if (previous && debateV15SignalsDiffer(previous, signal)) {
+          onChangeRef.current();
+        }
+      } catch {
+        // A failed tick keeps the previous baseline so the next comparison
+        // is still made against known-good state rather than a gap.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const interval = window.setInterval(poll, POLL_INTERVAL_MS);
+    // A tab returning to the foreground has missed every paused tick, so
+    // catch up immediately instead of waiting out the next interval.
+    const onVisible = () => {
+      if (!document.hidden) void poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [debateId, isTerminal]);
+}
+
+function formatCountdown(msLeft: number): string {
+  const total = Math.floor(msLeft / 1000);
+  const days = Math.floor(total / 86_400);
+  const hours = Math.floor((total % 86_400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  if (days > 0) return `${days}d ${hours}h ${pad(minutes)}m`;
+  if (hours > 0) return `${hours}h ${pad(minutes)}m ${pad(seconds)}s`;
+  return `${pad(minutes)}:${pad(seconds)}`;
+}
+
+/**
+ * Live countdown to the active deadline. The room previously showed only an
+ * absolute timestamp, leaving "how long have I actually got?" as mental
+ * arithmetic across timezones -- the debates list already ran a countdown,
+ * so the room was the weaker of the two.
+ *
+ * Renders nothing until mounted: the remaining time differs between the
+ * server render and the client's first paint by definition, so there is no
+ * markup to match.
+ */
+function DeadlineCountdown({
+  value,
+  className = "",
+}: {
+  value: string;
+  className?: string;
+}) {
+  const [msLeft, setMsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    const target = new Date(value).getTime();
+    if (Number.isNaN(target)) return;
+
+    const update = () => setMsLeft(target - Date.now());
+    update();
+    const interval = window.setInterval(update, 1000);
+    return () => window.clearInterval(interval);
+  }, [value]);
+
+  if (msLeft === null) return null;
+
+  const passed = msLeft <= 0;
+  const urgent = !passed && msLeft <= 10 * 60 * 1000;
+  const soon = !passed && !urgent && msLeft <= 60 * 60 * 1000;
+  const tone = passed
+    ? "text-red-700"
+    : urgent
+      ? "text-red-700"
+      : soon
+        ? "text-gold-ink"
+        : "text-ink-muted";
+
+  return (
+    <span
+      // Announcing every tick would make a screen reader unusable; the
+      // surrounding panels state the deadline in full.
+      role="timer"
+      aria-live="off"
+      className={`inline-flex items-center gap-1.5 font-semibold tabular-nums ${tone} ${className}`}
+    >
+      {urgent ? (
+        <span
+          aria-hidden="true"
+          className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-600 motion-reduce:animate-none"
+        />
+      ) : null}
+      {passed ? "Deadline passed" : `${formatCountdown(msLeft)} left`}
+    </span>
+  );
 }
 
 function LocalDeadline({
@@ -300,11 +464,32 @@ function PhaseProgress({ phase }: { phase: DebateV15Phase }) {
                   : "text-ink-muted"
             }`}
           >
-            <span className="block text-[10px] font-bold uppercase tracking-wide">
+            {/* The visible marks are decorative duplicates of the sr-only
+                step description below, which always carries the full label
+                regardless of breakpoint -- a screen reader should never be
+                left announcing a bare "3". */}
+            <span
+              aria-hidden="true"
+              className="block text-[10px] font-bold uppercase tracking-wide"
+            >
               {isDone ? "✓" : index + 1}
             </span>
-            <span className="mt-0.5 hidden text-xs font-semibold sm:block">
+            <span
+              aria-hidden="true"
+              className="mt-0.5 block text-[11px] font-semibold leading-tight sm:hidden"
+            >
+              {item.short}
+            </span>
+            <span
+              aria-hidden="true"
+              className="mt-0.5 hidden text-xs font-semibold sm:block"
+            >
               {item.label}
+            </span>
+            <span className="sr-only">
+              {`Step ${index + 1} of ${PHASES.length}: ${item.label}${
+                isDone ? " (completed)" : isCurrent ? " (current step)" : ""
+              }`}
             </span>
           </li>
         );
@@ -416,14 +601,14 @@ function ArgumentColumns({
   argumentsForPhase,
   deadlinePassed,
   room,
-  busy,
+  pending,
   onUpvote,
 }: {
   phase: "opening" | "rebuttal";
   argumentsForPhase: DebateV15Argument[];
   deadlinePassed: boolean;
   room: DebateV15RoomData;
-  busy: boolean;
+  pending: string | null;
   onUpvote: (id: string) => void;
 }) {
   return (
@@ -449,7 +634,7 @@ function ArgumentColumns({
                   Boolean(room.currentUserId) &&
                   room.debate.status === "active"
                 }
-                busy={busy}
+                busy={pending === `upvote:${argument.id}`}
                 onUpvote={onUpvote}
               />
             ) : (
@@ -891,7 +1076,7 @@ function SideSlot({
   room,
   stance,
   slot,
-  busy,
+  pending,
   invite,
   respond,
   revoke,
@@ -900,7 +1085,7 @@ function SideSlot({
   room: DebateV15RoomData;
   stance: DebateV15Stance;
   slot: DebateV15Slot | undefined;
-  busy: boolean;
+  pending: string | null;
   invite: (userId: string, stance: DebateV15Stance) => void;
   respond: (accept: boolean) => void;
   revoke: (stance: DebateV15Stance) => void;
@@ -947,7 +1132,7 @@ function SideSlot({
               {showSearch && !recruitingClosed ? (
                 <InviteSearch
                   stance={stance}
-                  busy={busy}
+                  busy={pending === `invite:${stance}`}
                   invite={invite}
                 />
               ) : null}
@@ -976,7 +1161,7 @@ function SideSlot({
             {room.isManager ? (
               <button
                 type="button"
-                disabled={busy || recruitingClosed}
+                disabled={pending === `revoke:${stance}` || recruitingClosed}
                 onClick={() =>
                   slot.status === "accepted"
                     ? setConfirmRemoval(true)
@@ -1001,16 +1186,18 @@ function SideSlot({
               <div className="mt-3 flex gap-2">
                 <ActionButton
                   onClick={() => respond(true)}
-                  disabled={busy || recruitingClosed}
+                  disabled={pending === "respond:accept" || recruitingClosed}
                 >
-                  Accept invitation
+                  {pending === "respond:accept"
+                    ? "Accepting…"
+                    : "Accept invitation"}
                 </ActionButton>
                 <ActionButton
                   tone="secondary"
                   onClick={() => respond(false)}
-                  disabled={busy || recruitingClosed}
+                  disabled={pending === "respond:decline" || recruitingClosed}
                 >
-                  Decline
+                  {pending === "respond:decline" ? "Declining…" : "Decline"}
                 </ActionButton>
               </div>
             </div>
@@ -1036,7 +1223,7 @@ function SideSlot({
             </ActionButton>
             <ActionButton
               tone="danger"
-              disabled={busy}
+              disabled={pending === `revoke:${stance}`}
               onClick={() => {
                 revoke(stance);
                 setConfirmRemoval(false);
@@ -1175,11 +1362,11 @@ function Modal({
 
 function ManagerControls({
   room,
-  busy,
+  pending,
   mutate,
 }: {
   room: DebateV15RoomData;
-  busy: boolean;
+  pending: string | null;
   mutate: DebateV15Mutate;
 }) {
   const [dialog, setDialog] = useState<
@@ -1218,10 +1405,7 @@ function ManagerControls({
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {phase === "opening" || phase === "rebuttal" ? (
-            <ActionButton
-              onClick={() => setDialog("advance")}
-              disabled={busy}
-            >
+            <ActionButton onClick={() => setDialog("advance")}>
               {phase === "opening"
                 ? "Advance to rebuttals"
                 : "Open final voting"}
@@ -1231,17 +1415,12 @@ function ManagerControls({
             <ActionButton
               tone="secondary"
               onClick={() => setDialog("extend")}
-              disabled={busy}
             >
               Extend {phase} deadline
             </ActionButton>
           ) : null}
           {phase !== "completed" ? (
-            <ActionButton
-              tone="danger"
-              onClick={() => setDialog("cancel")}
-              disabled={busy}
-            >
+            <ActionButton tone="danger" onClick={() => setDialog("cancel")}>
               Cancel debate
             </ActionButton>
           ) : null}
@@ -1287,11 +1466,12 @@ function ManagerControls({
               Keep {phase} open
             </ActionButton>
             <ActionButton
-              disabled={busy}
+              disabled={pending === "advance"}
               onClick={() => {
                 mutate(
                   () => advanceDebatePhaseV15Action(room.debate.id, phase),
                   {
+                    key: "advance",
                     success:
                       phase === "opening"
                         ? "Opening arguments are closed. The room is now in rebuttals."
@@ -1331,7 +1511,7 @@ function ManagerControls({
               Keep current time
             </ActionButton>
             <ActionButton
-              disabled={!newDeadline || busy}
+              disabled={!newDeadline || pending === "extend"}
               onClick={() => {
                 mutate(
                   () =>
@@ -1346,6 +1526,7 @@ function ManagerControls({
                       new Date(newDeadline).toISOString()
                     ),
                   {
+                    key: "extend",
                     success: `The ${phase} deadline has been extended. Everyone in the room sees the new time.`,
                   }
                 );
@@ -1384,11 +1565,12 @@ function ManagerControls({
             </ActionButton>
             <ActionButton
               tone="danger"
-              disabled={!reason.trim() || busy}
+              disabled={!reason.trim() || pending === "cancel"}
               onClick={() => {
                 mutate(
                   () => cancelDebateV15Action(room.debate.id, reason.trim()),
                   {
+                    key: "cancel",
                     success:
                       "The debate is cancelled. Everyone involved has been notified.",
                   }
@@ -1407,11 +1589,11 @@ function ManagerControls({
 
 function RecruitingView({
   room,
-  busy,
+  pending,
   mutate,
 }: {
   room: DebateV15RoomData;
-  busy: boolean;
+  pending: string | null;
   mutate: DebateV15Mutate;
 }) {
   const now = useClockTick(room.loadedAt);
@@ -1434,11 +1616,14 @@ function RecruitingView({
       new Date(room.debate.openingDeadline).getTime() < now
   );
   const invite = (userId: string, stance: DebateV15Stance) =>
-    mutate(() => inviteDebaterV15Action(room.debate.id, userId, stance));
+    mutate(() => inviteDebaterV15Action(room.debate.id, userId, stance), {
+      key: `invite:${stance}`,
+    });
   const respond = (accept: boolean) =>
     mutate(
       () => respondToDebateInvitationV15Action(room.debate.id, accept),
       {
+        key: accept ? "respond:accept" : "respond:decline",
         success: accept
           ? "You're confirmed as a debater. Watch the opening deadline — you get one submission."
           : "Invitation declined. The moderator can now invite someone else.",
@@ -1448,6 +1633,7 @@ function RecruitingView({
     mutate(
       () => revokeDebateInvitationV15Action(room.debate.id, stance),
       {
+        key: `revoke:${stance}`,
         success: `The ${stance.toUpperCase()} slot is clear. You can invite a replacement.`,
       }
     );
@@ -1478,7 +1664,7 @@ function RecruitingView({
             room={room}
             stance="for"
             slot={forSlot}
-            busy={busy}
+            pending={pending}
             invite={invite}
             respond={respond}
             revoke={revoke}
@@ -1488,7 +1674,7 @@ function RecruitingView({
             room={room}
             stance="against"
             slot={againstSlot}
-            busy={busy}
+            pending={pending}
             invite={invite}
             respond={respond}
             revoke={revoke}
@@ -1514,13 +1700,19 @@ function RecruitingView({
             className="mt-4"
             onClick={() =>
               mutate(() => startDebateV15Action(room.debate.id), {
+                key: "start",
                 success:
                   "The debate is live. Both debaters can now submit opening arguments.",
               })
             }
-            disabled={!bothAccepted || !scheduleReady || openingClosed || busy}
+            disabled={
+              !bothAccepted ||
+              !scheduleReady ||
+              openingClosed ||
+              pending === "start"
+            }
           >
-            Start opening arguments
+            {pending === "start" ? "Starting…" : "Start opening arguments"}
           </ActionButton>
           {!bothAccepted ? (
             <p className="mt-2 text-xs text-gold-ink">
@@ -1540,7 +1732,7 @@ function RecruitingView({
         </p>
       )}
 
-      <ManagerControls room={room} busy={busy} mutate={mutate} />
+      <ManagerControls room={room} pending={pending} mutate={mutate} />
     </div>
   );
 }
@@ -1548,12 +1740,12 @@ function RecruitingView({
 function ActiveArgumentView({
   room,
   phase,
-  busy,
+  pending,
   mutate,
 }: {
   room: DebateV15RoomData;
   phase: "opening" | "rebuttal";
-  busy: boolean;
+  pending: string | null;
   mutate: DebateV15Mutate;
 }) {
   const now = useClockTick(room.loadedAt);
@@ -1597,6 +1789,12 @@ function ActiveArgumentView({
               {passed ? "Deadline passed" : "Submission deadline"}
             </span>
             <LocalDeadline value={deadline} compact />
+            {deadline && !passed ? (
+              <DeadlineCountdown
+                value={deadline}
+                className="mt-1 block text-xs !text-white"
+              />
+            ) : null}
           </div>
         </div>
       </section>
@@ -1612,10 +1810,11 @@ function ActiveArgumentView({
               argumentsForPhase={openings}
               deadlinePassed
               room={room}
-              busy={busy}
+              pending={pending}
               onUpvote={(id) =>
-                mutate(() =>
-                  toggleArgumentUpvoteV15Action(room.debate.id, id)
+                mutate(
+                  () => toggleArgumentUpvoteV15Action(room.debate.id, id),
+                  { key: `upvote:${id}` }
                 )
               }
             />
@@ -1632,9 +1831,11 @@ function ActiveArgumentView({
           argumentsForPhase={phaseArguments}
           deadlinePassed={passed}
           room={room}
-          busy={busy}
+          pending={pending}
           onUpvote={(id) =>
-            mutate(() => toggleArgumentUpvoteV15Action(room.debate.id, id))
+            mutate(() => toggleArgumentUpvoteV15Action(room.debate.id, id), {
+              key: `upvote:${id}`,
+            })
           }
         />
       </section>
@@ -1643,7 +1844,7 @@ function ActiveArgumentView({
         <ArgumentComposer
           room={room}
           phase={phase}
-          busy={busy}
+          busy={pending === "submit-argument"}
           expired={passed}
           deadline={deadline}
           now={now}
@@ -1656,6 +1857,7 @@ function ActiveArgumentView({
                   sources
                 ),
               {
+                key: "submit-argument",
                 success: `Your ${phase} argument is submitted and locked on the record.`,
                 onSuccess: onSubmitted,
               }
@@ -1668,18 +1870,18 @@ function ActiveArgumentView({
         </p>
       ) : null}
 
-      <ManagerControls room={room} busy={busy} mutate={mutate} />
+      <ManagerControls room={room} pending={pending} mutate={mutate} />
     </div>
   );
 }
 
 function VotingView({
   room,
-  busy,
+  pending,
   mutate,
 }: {
   room: DebateV15RoomData;
-  busy: boolean;
+  pending: string | null;
   mutate: DebateV15Mutate;
 }) {
   const now = useClockTick(room.loadedAt);
@@ -1714,6 +1916,12 @@ function VotingView({
               Voting deadline
             </span>
             <LocalDeadline value={room.debate.votingDeadline} compact />
+            {room.debate.votingDeadline && !deadlinePassed ? (
+              <DeadlineCountdown
+                value={room.debate.votingDeadline}
+                className="mt-1 block text-xs !text-white"
+              />
+            ) : null}
           </div>
         </div>
       </section>
@@ -1732,11 +1940,16 @@ function VotingView({
               key={stance}
               type="button"
               aria-pressed={room.userFinalVote === stance}
-              disabled={!room.currentUserId || deadlinePassed || busy}
+              disabled={
+                !room.currentUserId ||
+                deadlinePassed ||
+                pending === `final-vote:${stance}`
+              }
               onClick={() =>
                 mutate(
                   () => castFinalVoteV15Action(room.debate.id, stance),
                   {
+                    key: `final-vote:${stance}`,
                     success:
                       stance === "for"
                         ? "Your final vote is recorded FOR the motion."
@@ -1822,10 +2035,11 @@ function VotingView({
                 )}
                 deadlinePassed
                 room={room}
-                busy={busy}
+                pending={pending}
                 onUpvote={(id) =>
-                  mutate(() =>
-                    toggleArgumentUpvoteV15Action(room.debate.id, id)
+                  mutate(
+                    () => toggleArgumentUpvoteV15Action(room.debate.id, id),
+                    { key: `upvote:${id}` }
                   )
                 }
               />
@@ -1842,7 +2056,7 @@ function VotingView({
           <div className="mt-3 flex flex-wrap gap-2">
             <ActionButton
               tone="secondary"
-              disabled={busy || reminded}
+              disabled={pending === "remind-voters" || reminded}
               onClick={() =>
                 mutate(
                   async () => {
@@ -1850,15 +2064,21 @@ function VotingView({
                     if (result.ok) setReminded(true);
                     return result;
                   },
-                  { success: "Voting reminder sent to the debate's audience." }
+                  {
+                    key: "remind-voters",
+                    success: "Voting reminder sent to the debate's audience.",
+                  }
                 )
               }
             >
-              {reminded ? "Reminder sent" : "Remind voters"}
+              {pending === "remind-voters"
+                ? "Sending…"
+                : reminded
+                  ? "Reminder sent"
+                  : "Remind voters"}
             </ActionButton>
             <ActionButton
               tone="gold"
-              disabled={busy}
               onClick={() => setCloseOpen(true)}
             >
               Close debate
@@ -1867,7 +2087,7 @@ function VotingView({
         </section>
       ) : null}
 
-      <ManagerControls room={room} busy={busy} mutate={mutate} />
+      <ManagerControls room={room} pending={pending} mutate={mutate} />
 
       {closeOpen ? (
         <Modal title="Close voting and publish verdict?" close={() => setCloseOpen(false)}>
@@ -1881,9 +2101,10 @@ function VotingView({
             </ActionButton>
             <ActionButton
               tone="gold"
-              disabled={busy}
+              disabled={pending === "complete"}
               onClick={() => {
                 mutate(() => completeDebateV15Action(room.debate.id), {
+                  key: "complete",
                   success:
                     "Voting is closed and the verdict is published. The recap is now generating.",
                 });
@@ -1923,11 +2144,11 @@ function SourceList({ sources }: { sources: DebateV15Source[] }) {
 
 function VerdictView({
   room,
-  busy,
+  pending,
   mutate,
 }: {
   room: DebateV15RoomData;
-  busy: boolean;
+  pending: string | null;
   mutate: DebateV15Mutate;
 }) {
   const { total, forPercent, againstPercent, outcome } =
@@ -2078,14 +2299,15 @@ function VerdictView({
               <ActionButton
                 tone="danger"
                 className="mt-3"
-                disabled={busy}
+                disabled={pending === "retry-recap"}
                 onClick={() =>
                   mutate(() => retryDebateRecapV15Action(room.debate.id), {
+                    key: "retry-recap",
                     success: "Recap generation has been queued again.",
                   })
                 }
               >
-                Retry recap
+                {pending === "retry-recap" ? "Queueing…" : "Retry recap"}
               </ActionButton>
             ) : null}
           </div>
@@ -2200,11 +2422,11 @@ function RecapBlock({
 
 function CancelledView({
   room,
-  busy,
+  pending,
   mutate,
 }: {
   room: DebateV15RoomData;
-  busy: boolean;
+  pending: string | null;
   mutate: DebateV15Mutate;
 }) {
   return (
@@ -2237,10 +2459,11 @@ function CancelledView({
                 argument={argument}
                 upvoted={room.userUpvotedArgumentIds.includes(argument.id)}
                 canUpvote={false}
-                busy={busy}
+                busy={pending === `upvote:${argument.id}`}
                 onUpvote={(id) =>
-                  mutate(() =>
-                    toggleArgumentUpvoteV15Action(room.debate.id, id)
+                  mutate(
+                    () => toggleArgumentUpvoteV15Action(room.debate.id, id),
+                    { key: `upvote:${id}` }
                   )
                 }
               />
@@ -2262,37 +2485,57 @@ export default function DebateV15Room({
   room: DebateV15RoomData;
 }) {
   const router = useRouter();
-  const [busy, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  // Which action is in flight, not merely whether one is. A single boolean
+  // disabled every control in the room on any request, so upvoting an
+  // argument greyed out the composer and the moderator's phase controls.
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const pending = isPending ? pendingKey : null;
   const [feedback, setFeedback] = useState<{
     tone: "error" | "success";
     message: string;
   } | null>(null);
+  const [liveUpdatedAt, setLiveUpdatedAt] = useState<number | null>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
   const activeDeadline = deadlineForPhase(room, room.debate.phase);
   const moderatorName = profileName(room.debate.moderator);
 
   const mutate: DebateV15Mutate = (action, options = {}) => {
     setFeedback(null);
+    setPendingKey(options.key ?? "action");
     startTransition(async () => {
-      const result = await action();
-      if (!result.ok) {
-        setFeedback({
-          tone: "error",
-          message: result.message ?? "That action could not be completed.",
-        });
-        return;
+      try {
+        const result = await action();
+        if (!result.ok) {
+          setFeedback({
+            tone: "error",
+            message: result.message ?? "That action could not be completed.",
+          });
+          return;
+        }
+
+        options.onSuccess?.();
+
+        // A server-authored message (e.g. invitation delivery) always wins;
+        // otherwise use the caller's copy. With neither, the action succeeds
+        // quietly rather than announcing a meaningless "Saved."
+        const message = result.message ?? options.success ?? null;
+        setFeedback(message ? { tone: "success", message } : null);
+        router.refresh();
+      } finally {
+        setPendingKey(null);
       }
-
-      options.onSuccess?.();
-
-      // A server-authored message (e.g. invitation delivery) always wins;
-      // otherwise use the caller's copy. With neither, the action succeeds
-      // quietly rather than announcing a meaningless "Saved."
-      const message = result.message ?? options.success ?? null;
-      setFeedback(message ? { tone: "success", message } : null);
-      router.refresh();
     });
   };
+
+  useRoomLiveSync(
+    room,
+    room.debate.status === "cancelled" || room.debate.phase === "completed",
+    () => {
+      setLiveUpdatedAt(Date.now());
+      router.refresh();
+    }
+  );
 
   // The banner sits at the top of a long room; actions are triggered from the
   // bottom of it (composer, vote panel). Without moving the viewport, a failed
@@ -2304,6 +2547,14 @@ export default function DebateV15Room({
     node.scrollIntoView({ behavior: "smooth", block: "center" });
     node.focus({ preventScroll: true });
   }, [feedback]);
+
+  // The live-sync notice is an acknowledgement, not a state the room stays
+  // in -- the refreshed content is the real message.
+  useEffect(() => {
+    if (!liveUpdatedAt) return;
+    const timer = window.setTimeout(() => setLiveUpdatedAt(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [liveUpdatedAt]);
 
   const share = async () => {
     try {
@@ -2332,10 +2583,16 @@ export default function DebateV15Room({
               {room.debate.title}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {activeDeadline && room.debate.status !== "cancelled" ? (
-              <span className="hidden text-xs font-semibold text-ink-muted sm:block">
-                <LocalDeadline value={activeDeadline} compact />
+              <span className="flex flex-col items-end text-xs leading-tight">
+                {/* The countdown is the part a debater actually acts on, so
+                    it stays visible on phones; the absolute timestamp is
+                    supporting detail and drops away on narrow screens. */}
+                <DeadlineCountdown value={activeDeadline} />
+                <span className="hidden text-ink-faint sm:block">
+                  <LocalDeadline value={activeDeadline} compact />
+                </span>
               </span>
             ) : null}
             <ActionButton tone="secondary" onClick={share}>
@@ -2346,6 +2603,19 @@ export default function DebateV15Room({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        {liveUpdatedAt ? (
+          <p
+            role="status"
+            className="mb-4 inline-flex items-center gap-2 rounded-full bg-green-tint px-3 py-1.5 text-xs font-semibold text-emerald-brand"
+          >
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 rounded-full bg-emerald-brand"
+            />
+            This room just updated.
+          </p>
+        ) : null}
+
         {feedback ? (
           <div
             ref={feedbackRef}
@@ -2422,21 +2692,21 @@ export default function DebateV15Room({
         ) : null}
 
         {room.debate.status === "cancelled" ? (
-          <CancelledView room={room} busy={busy} mutate={mutate} />
+          <CancelledView room={room} pending={pending} mutate={mutate} />
         ) : room.debate.phase === "recruiting" ? (
-          <RecruitingView room={room} busy={busy} mutate={mutate} />
+          <RecruitingView room={room} pending={pending} mutate={mutate} />
         ) : room.debate.phase === "opening" ||
           room.debate.phase === "rebuttal" ? (
           <ActiveArgumentView
             room={room}
             phase={room.debate.phase}
-            busy={busy}
+            pending={pending}
             mutate={mutate}
           />
         ) : room.debate.phase === "voting" ? (
-          <VotingView room={room} busy={busy} mutate={mutate} />
+          <VotingView room={room} pending={pending} mutate={mutate} />
         ) : (
-          <VerdictView room={room} busy={busy} mutate={mutate} />
+          <VerdictView room={room} pending={pending} mutate={mutate} />
         )}
       </main>
     </div>
