@@ -153,6 +153,7 @@ export default function PostsFeedTabs({
   const [initialError, setInitialError] = useState(false);
   const [paginationError, setPaginationError] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const feedTopRef = useRef<HTMLDivElement | null>(null);
   const inFlightRef = useRef(new Map<string, Promise<FeedResponse>>());
   const activeRequestRef = useRef(0);
   const loadMoreRequestRef = useRef(0);
@@ -295,6 +296,29 @@ export default function PostsFeedTabs({
     [requestFeedPage, writeFeedPage]
   );
 
+  // Switching tabs swaps the entire list underneath a scroll position that was
+  // meaningful for the old one. Landing five screens deep in a different (often
+  // shorter) feed is what makes the tabs feel stuck. Snap back to the top of
+  // the feed -- but only when the reader is already below it, so switching
+  // tabs from the top of the page never yanks the viewport.
+  const scrollFeedToTop = useCallback(() => {
+    const anchor = feedTopRef.current;
+    if (!anchor || typeof window === "undefined") return;
+
+    const navHeight =
+      Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--app-nav-height")
+      ) || 0;
+    const target = Math.max(
+      window.scrollY + anchor.getBoundingClientRect().top - navHeight,
+      0
+    );
+    if (window.scrollY <= target) return;
+    // Instant, not smooth: a tab switch should already be at the top by the
+    // time the new cards paint, not animating past the old ones.
+    window.scrollTo({ top: target, behavior: "auto" });
+  }, []);
+
   const updateState = useCallback(
     (nextTab: TabKey, nextType: FeedContentFilter, nextTimeframe: FeedTimeframe) => {
       const nextKey = feedCacheKey(nextTab, nextType, nextTimeframe);
@@ -308,6 +332,7 @@ export default function PostsFeedTabs({
       setInitialError(false);
       setPaginationError(false);
       setIsSwitching(!hasCachedFeed);
+      scrollFeedToTop();
       syncUrl(nextTab, nextType, nextTimeframe);
       void reloadFeed(nextTab, nextType, nextTimeframe, {
         requestId,
@@ -315,7 +340,7 @@ export default function PostsFeedTabs({
         showSkeleton: !hasCachedFeed,
       });
     },
-    [feedCache, reloadFeed, syncUrl]
+    [feedCache, reloadFeed, scrollFeedToTop, syncUrl]
   );
 
   const retryInitial = useCallback(() => {
@@ -437,6 +462,7 @@ export default function PostsFeedTabs({
     <div>
       {!currentUserId ? <HomeGuestNotice /> : null}
 
+<<<<<<< HEAD
       <div
         className="sticky top-[84px] z-30 -mx-4 mb-3 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto border-b border-gray-200 bg-white/95 px-4 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-full sm:px-0"
         role="tablist"
@@ -479,11 +505,62 @@ export default function PostsFeedTabs({
             );
           })}
       </div>
+=======
+      {/* Honest (non-sticky) marker for where the feed controls sit in the
+          document -- the sticky wrapper's own rect lies once it is pinned. */}
+      <div ref={feedTopRef} aria-hidden="true" />
+>>>>>>> d2fffc5a6c8da0b64b596c3f8c68b9addd824cf6
 
-      <FeedFilterChips
-        type={typeFilter}
-        onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
-      />
+      {/* Tabs and filter chips pin together as one block. Splitting them let
+          the chips slide up under the tabs, which read as the header breaking
+          apart mid-scroll. Opaque (not bg-white/95) so cards passing beneath
+          don't ghost through the control strip. */}
+      <div
+        className="sticky top-[var(--app-nav-height)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] bg-white px-4 pb-1 sm:mx-0 sm:w-full sm:px-0"
+      >
+        <div
+          className="flex gap-1 overflow-x-auto overscroll-x-contain border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          role="tablist"
+          aria-label="Choose feed"
+        >
+          {(["home", "following", "latest"] as const)
+            .filter((tab) => tab !== "following" || showFollowingTab)
+            .map((tab) => {
+              const label =
+                tab === "home"
+                  ? currentUserId
+                    ? "For you"
+                    : "Discover"
+                  : tab === "following"
+                    ? "Following"
+                    : "Latest";
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  id={`feed-tab-${tab}`}
+                  aria-controls="home-feed-panel"
+                  aria-selected={activeTab === tab}
+                  onClick={() => updateState(tab, typeFilter, timeframe)}
+                  className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${
+                    activeTab === tab
+                      ? "border-emerald-brand text-ink"
+                      : "border-transparent text-gray-500 hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+        </div>
+
+        <FeedFilterChips
+          type={typeFilter}
+          onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
+          className="mt-2"
+        />
+      </div>
 
       {showFeaturedLead && featuredPost ? <HomeFeaturedLead post={featuredPost} /> : null}
 
