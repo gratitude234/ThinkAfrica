@@ -26,15 +26,25 @@ export default function FollowButton({
   const pathname = usePathname();
 
   const handleToggle = async () => {
+    const optimisticNext = !following;
+    const previousFollowing = following;
+
+    // Flip the UI immediately rather than waiting on the round trip — the
+    // follow/unfollow itself is the only part of the server action that
+    // needs to gate this button, and it's rare enough to fail that
+    // optimistic-then-revert reads better than "..." on every click.
+    setFollowing(optimisticNext);
     setLoading(true);
+
     const result = await toggleFollow({
       followingId,
-      follow: !following,
+      follow: optimisticNext,
       pathname,
     });
 
     if (result.error) {
       console.error(result.error);
+      setFollowing(previousFollowing);
       setLoading(false);
       return;
     }
@@ -71,7 +81,7 @@ export default function FollowButton({
             }`
       }
     >
-      {loading ? "..." : following ? "Following" : "Follow"}
+      {following ? "Following" : "Follow"}
     </button>
   );
 }

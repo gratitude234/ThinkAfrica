@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
@@ -71,39 +72,50 @@ export async function toggleFollow(input: ToggleFollowInput): Promise<{
 
   if (followError) return { error: followError.message, following: false };
 
-  const { data: actorProfile } = await supabase
+  if (input.pathname) revalidatePath(input.pathname);
+
+  // Notifying the followed user (profile lookup, notifications insert, push
+  // send) has no bearing on whether the follow itself succeeded, so it runs
+  // after the response is sent instead of adding its round trips to the
+  // click-to-"Following" latency the user is waiting on.
+  after(() => notifyFollowed(user.id, input.followingId));
+
+  return { error: null, following: true };
+}
+
+async function notifyFollowed(followerId: string, followingId: string) {
+  const admin = createAdminClient();
+
+  const { data: actorProfile } = await admin
     .from("profiles")
     .select("username, full_name")
-    .eq("id", user.id)
+    .eq("id", followerId)
     .maybeSingle<ProfileSummary>();
 
   const actorName = displayName(actorProfile);
   const ctaPath = actorProfile?.username ? `/${actorProfile.username}` : "/notifications";
 
-  const admin = createAdminClient();
   const { error: notificationError } = await admin.from("notifications").insert({
-    user_id: input.followingId,
+    user_id: followingId,
     type: "follow",
     message: `${actorName} started following you on Indegenius.`,
     link: ctaPath,
-    actor_id: user.id,
+    actor_id: followerId,
     read: false,
   });
 
   if (notificationError) {
     console.error(`Failed to create follow notification: ${notificationError.message}`);
-  } else {
-    const pushResult = await sendPushNotification({
-      recipientId: input.followingId,
-      title: "You have a new follower",
-      body: `${actorName} started following you on Indegenius.`,
-      path: ctaPath,
-      preferenceKey: "push_follows",
-      cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
-    });
-    logPushResult(`follow:${user.id}:${input.followingId}`, pushResult);
+    return;
   }
 
-  if (input.pathname) revalidatePath(input.pathname);
-  return { error: null, following: true };
+  const pushResult = await sendPushNotification({
+    recipientId: followingId,
+    title: "You have a new follower",
+    body: `${actorName} started following you on Indegenius.`,
+    path: ctaPath,
+    preferenceKey: "push_follows",
+    cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
+  });
+  logPushResult(`follow:${followerId}:${followingId}`, pushResult);
 }
