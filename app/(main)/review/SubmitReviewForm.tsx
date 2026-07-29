@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitReview } from "./actions";
 
@@ -46,6 +46,12 @@ export default function SubmitReviewForm({ postId }: { postId: string }) {
   const [additionalNotes, setAdditionalNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Leaving the portal is a navigation, not part of the mutation, so it needs
+  // its own pending flag: setLoading(false) fires the moment the review is
+  // saved, which previously left the button reading "Submit review" again
+  // while the router was still working -- inviting a second submission.
+  const [isLeaving, startLeaving] = useTransition();
+  const isBusy = loading || isLeaving;
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -59,8 +65,10 @@ export default function SubmitReviewForm({ postId }: { postId: string }) {
       return;
     }
 
-    router.push("/review");
-    router.refresh();
+    startLeaving(() => {
+      router.push("/review");
+      router.refresh();
+    });
   };
 
   return (
@@ -142,10 +150,15 @@ export default function SubmitReviewForm({ postId }: { postId: string }) {
       <button
         type="button"
         onClick={handleSubmit}
-        disabled={loading}
+        disabled={isBusy}
+        aria-busy={isBusy || undefined}
         className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
-        {loading ? "Submitting..." : "Submit review"}
+        {isLeaving
+          ? "Opening your queue..."
+          : loading
+            ? "Submitting..."
+            : "Submit review"}
       </button>
     </div>
   );

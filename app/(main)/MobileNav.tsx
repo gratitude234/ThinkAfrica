@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -52,12 +52,23 @@ export default function MobileNav({
     ? pathname === profileHref || pathname.startsWith(`${profileHref}/`)
     : pathname === "/settings" || pathname.startsWith("/settings/");
 
+  // Signing out is a network call followed by a navigation, and neither used
+  // to show anything -- the sheet just sat there looking unresponsive.
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isLeaving, startLeaving] = useTransition();
+  const signOutBusy = isSigningOut || isLeaving;
+
   const handleSignOut = async () => {
+    if (signOutBusy) return;
+    setIsSigningOut(true);
     const supabase = createClient();
     await supabase.auth.signOut();
+    setIsSigningOut(false);
     setOpen(false);
-    router.push("/login");
-    router.refresh();
+    startLeaving(() => {
+      router.push("/login");
+      router.refresh();
+    });
   };
 
   useEffect(() => {
@@ -152,9 +163,11 @@ export default function MobileNav({
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="block w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                disabled={signOutBusy}
+                aria-busy={signOutBusy || undefined}
+                className="block w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
               >
-                Sign out
+                {signOutBusy ? "Signing out…" : "Sign out"}
               </button>
             </div>
           </div>

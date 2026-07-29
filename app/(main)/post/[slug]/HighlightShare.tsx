@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 interface HighlightShareProps {
@@ -18,6 +18,9 @@ interface TooltipState {
 export default function HighlightShare({ containerId, postSlug, postId }: HighlightShareProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [copied, setCopied] = useState(false);
+  // The composer is a heavy client bundle, so the tooltip lingers after the
+  // tap while it loads. Reflect that instead of leaving the action inert.
+  const [isOpeningComposer, startOpeningComposer] = useTransition();
   const tooltipRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -82,7 +85,9 @@ export default function HighlightShare({ containerId, postSlug, postId }: Highli
 
   const handleReply = () => {
     sessionStorage.setItem("write_response_quote", tooltip.text);
-    router.push(`/write?response_to=${postSlug}&inResponseTo=${postId}`);
+    startOpeningComposer(() => {
+      router.push(`/write?response_to=${postSlug}&inResponseTo=${postId}`);
+    });
   };
 
   return (
@@ -99,12 +104,14 @@ export default function HighlightShare({ containerId, postSlug, postId }: Highli
         <button
           type="button"
           onClick={handleReply}
-          className="flex items-center gap-1.5 font-medium transition-colors hover:text-emerald-300"
+          disabled={isOpeningComposer}
+          aria-busy={isOpeningComposer || undefined}
+          className="flex items-center gap-1.5 font-medium transition-colors hover:text-emerald-300 disabled:opacity-60"
         >
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4" />
           </svg>
-          Reply to this
+          {isOpeningComposer ? "Opening…" : "Reply to this"}
         </button>
         <span className="text-gray-600">·</span>
         <button

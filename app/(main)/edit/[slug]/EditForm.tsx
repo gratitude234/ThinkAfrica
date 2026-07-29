@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+  useTransition,
+} from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -157,6 +164,10 @@ export default function EditForm({
   const [authorNote, setAuthorNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Returning to the dashboard is its own wait, separate from the save.
+  // Both the save handler and the "Leave" confirmation navigate, and neither
+  // used to show anything while the dashboard loaded.
+  const [isLeaving, startLeaving] = useTransition();
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<EditorHandle>(null);
   const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
@@ -223,7 +234,9 @@ export default function EditForm({
         if (updateError) {
           setError(updateError);
         } else {
-          router.push("/dashboard");
+          startLeaving(() => {
+            router.push("/dashboard");
+          });
         }
         setLoading(false);
       }
@@ -641,7 +654,7 @@ export default function EditForm({
             <Button variant="secondary" type="button" onClick={() => setShowCancelConfirm(true)}>
               Cancel
             </Button>
-            <Button type="submit" loading={loading} size="lg">
+            <Button type="submit" loading={loading || isLeaving} size="lg">
               {post.status === "pending_revision" ? "Submit revision" : "Save changes"}
             </Button>
           </div>
@@ -735,10 +748,12 @@ export default function EditForm({
               </button>
               <button
                 type="button"
-                onClick={() => router.push("/dashboard")}
-                className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+                onClick={() => startLeaving(() => router.push("/dashboard"))}
+                disabled={isLeaving}
+                aria-busy={isLeaving || undefined}
+                className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
               >
-                Leave
+                {isLeaving ? "Leaving…" : "Leave"}
               </button>
             </div>
           </div>

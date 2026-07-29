@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import FollowButton from "@/components/ui/FollowButton";
@@ -95,6 +95,10 @@ export default function OnboardingPage() {
 
   const [loading, setLoading] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  // Finishing setup saves the profile and then loads the home feed. The save
+  // clears `loading` as soon as it returns, so the button used to read
+  // "Finish setup" again while the feed was still being fetched.
+  const [isEnteringApp, startEnteringApp] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("persona");
@@ -397,11 +401,15 @@ export default function OnboardingPage() {
       setShowPushPrompt(true);
       return;
     }
-    router.push("/");
+    startEnteringApp(() => {
+      router.push("/");
+    });
   };
 
   const finishOnboarding = useCallback(() => {
-    router.push("/?welcome=1");
+    startEnteringApp(() => {
+      router.push("/?welcome=1");
+    });
   }, [router]);
 
   const goBack = () => {
@@ -730,10 +738,17 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={ctaHandlers[step]}
-            disabled={loading || !canContinue}
+            disabled={loading || isEnteringApp || !canContinue}
+            aria-busy={loading || isEnteringApp || undefined}
             className="flex h-12 w-full items-center justify-center rounded-xl bg-emerald-brand text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {loading ? "Saving..." : step === "follow" ? "Finish setup" : "Continue"}
+            {isEnteringApp
+              ? "Setting up your feed..."
+              : loading
+                ? "Saving..."
+                : step === "follow"
+                  ? "Finish setup"
+                  : "Continue"}
           </button>
         </div>
       </div>

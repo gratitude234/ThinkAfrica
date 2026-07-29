@@ -1,7 +1,14 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { type ReactNode, useState, useCallback, useEffect, useRef } from "react";
+import {
+  type ReactNode,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useTransition,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
@@ -249,6 +256,10 @@ export default function WritePage() {
   const [showLinkPopover, setShowLinkPopover] = useState(false);
   const [linkPopoverUrl, setLinkPopoverUrl] = useState("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Leaving the canvas loads the home feed, which is server-rendered. Track
+  // it so the exit controls can show they're working instead of sitting
+  // inert while the feed is fetched.
+  const [isLeaving, startLeaving] = useTransition();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const responseStarterAppliedRef = useRef(false);
   const topicStarterAppliedRef = useRef(false);
@@ -756,7 +767,9 @@ export default function WritePage() {
       setShowCancelConfirm(true);
       return;
     }
-    router.push("/");
+    startLeaving(() => {
+      router.push("/");
+    });
   };
   const uploadResearchLink = (
     <Link
@@ -1245,7 +1258,8 @@ export default function WritePage() {
                 variant="danger"
                 type="button"
                 className="flex-1"
-                onClick={() => router.push("/")}
+                loading={isLeaving}
+                onClick={() => startLeaving(() => router.push("/"))}
               >
                 Leave
               </Button>

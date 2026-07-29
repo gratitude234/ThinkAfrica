@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -100,6 +100,9 @@ export default function MessageThread({
   otherUserId,
 }: MessageThreadProps) {
   const router = useRouter();
+  // The inbox is server-rendered, so the back arrow has a real wait behind
+  // it. Track it so repeated taps don't stack up navigations.
+  const [isReturningToInbox, startReturningToInbox] = useTransition();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -347,8 +350,10 @@ export default function MessageThread({
       <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
         <button
           type="button"
-          onClick={() => router.push("/messages")}
-          className="mr-1 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          onClick={() => startReturningToInbox(() => router.push("/messages"))}
+          disabled={isReturningToInbox}
+          aria-busy={isReturningToInbox || undefined}
+          className="mr-1 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
           aria-label="Back to inbox"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

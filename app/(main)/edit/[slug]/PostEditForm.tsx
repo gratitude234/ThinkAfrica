@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
@@ -26,11 +26,15 @@ export default function PostEditForm({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cancelling navigates back to the post, which is a full server render --
+  // without a pending state the button looked inert for that whole window.
+  const [isCancelling, startCancelling] = useTransition();
 
   const characterCount = countShortPostCharacters(body);
   const isEmpty = characterCount === 0;
   const isOverLimit = characterCount > SHORT_POST_MAX_CHARACTERS;
-  const canSave = !isEmpty && !isOverLimit && !saving && !uploading;
+  const canSave =
+    !isEmpty && !isOverLimit && !saving && !uploading && !isCancelling;
 
   const handleSave = useCallback(async () => {
     if (!canSave || saving) return;
@@ -104,7 +108,13 @@ export default function PostEditForm({
       ) : null}
 
       <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
-        <Button type="button" variant="secondary" onClick={() => router.push(`/post/${slug}`)}>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => startCancelling(() => router.push(`/post/${slug}`))}
+          loading={isCancelling}
+          disabled={saving}
+        >
           Cancel
         </Button>
         <Button

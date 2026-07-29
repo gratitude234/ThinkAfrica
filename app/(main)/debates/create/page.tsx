@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -211,6 +211,10 @@ export default function CreateDebatePage() {
   const [timezone, setTimezone] = useState("your local timezone");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Opening the new debate room is a separate wait from creating it. The
+  // finally block below clears `loading` as soon as the RPC returns, so
+  // without this the button went idle while the room was still loading.
+  const [isOpeningRoom, startOpeningRoom] = useTransition();
 
   const parsedTags = useMemo(() => parseTags(tags), [tags]);
   const scheduleError = getScheduleError(schedule);
@@ -340,8 +344,10 @@ export default function CreateDebatePage() {
         return;
       }
 
-      router.push(`/debates/${debateId}`);
-      router.refresh();
+      startOpeningRoom(() => {
+        router.push(`/debates/${debateId}`);
+        router.refresh();
+      });
     } catch {
       setError("The debate could not be created. Please try again.");
     } finally {
@@ -592,8 +598,12 @@ export default function CreateDebatePage() {
           ) : null}
 
           <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-5">
-            <Button type="submit" loading={loading} disabled={!canSubmit}>
-              Create and recruit debaters
+            <Button
+              type="submit"
+              loading={loading || isOpeningRoom}
+              disabled={!canSubmit}
+            >
+              {isOpeningRoom ? "Opening the room…" : "Create and recruit debaters"}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.back()}>
               Cancel

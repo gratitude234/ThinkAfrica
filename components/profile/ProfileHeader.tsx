@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import FollowButton from "@/app/(main)/[username]/FollowButton";
 import BlockUserButton from "@/components/moderation/BlockUserButton";
@@ -362,6 +362,13 @@ function MessageButton({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Resolving the conversation and opening the thread are two separate
+  // waits. `loading` only covers the first: it used to be cleared in a
+  // finally block that ran the instant the conversation id came back, so the
+  // button flipped from "Opening..." back to "Message" while the thread was
+  // still loading and looked like the click had failed.
+  const [isOpeningThread, startOpeningThread] = useTransition();
+  const isBusy = loading || isOpeningThread;
 
   const handleMessage = async () => {
     setLoading(true);
@@ -376,7 +383,9 @@ function MessageButton({
       );
 
       if (conversationId) {
-        router.push(`/messages/${conversationId}`);
+        startOpeningThread(() => {
+          router.push(`/messages/${conversationId}`);
+        });
       } else {
         setError("Unable to start conversation.");
       }
@@ -399,10 +408,11 @@ function MessageButton({
       <button
         type="button"
         onClick={handleMessage}
-        disabled={loading}
+        disabled={isBusy}
+        aria-busy={isBusy || undefined}
         className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:text-gray-900 disabled:opacity-50"
       >
-        {loading ? "Opening..." : "Message"}
+        {isBusy ? "Opening..." : "Message"}
       </button>
       {error ? (
         <p className="mt-1 text-center text-[10px] text-red-500">{error}</p>

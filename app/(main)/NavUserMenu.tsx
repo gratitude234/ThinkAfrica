@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -79,11 +79,22 @@ export default function NavUserMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // Signing out is a network call followed by a navigation, and neither used
+  // to show anything -- the menu just sat there looking unresponsive.
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isLeaving, startLeaving] = useTransition();
+  const signOutBusy = isSigningOut || isLeaving;
+
   const handleSignOut = async () => {
+    if (signOutBusy) return;
+    setIsSigningOut(true);
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    setIsSigningOut(false);
+    startLeaving(() => {
+      router.push("/login");
+      router.refresh();
+    });
   };
 
   if (!user) {
@@ -267,7 +278,9 @@ export default function NavUserMenu({
           <div className="border-t border-gray-100" />
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+            disabled={signOutBusy}
+            aria-busy={signOutBusy || undefined}
+            className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60"
           >
             <svg
               className="w-4 h-4"
@@ -282,7 +295,7 @@ export default function NavUserMenu({
                 d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
               />
             </svg>
-            Sign out
+            {signOutBusy ? "Signing out…" : "Sign out"}
           </button>
         </div>
       )}
