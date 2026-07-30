@@ -60,6 +60,8 @@ const ALLOWED_EVENTS = new Set<ActivationEventName>([
   "push_nudge_action",
   "push_permission_resolved",
   "push_device_operation",
+  "ai_topic_suggestion_selected",
+  "topic_selection_skipped",
 ]);
 
 const ANONYMOUS_VIEW_EVENTS = new Set<ActivationEventName>([

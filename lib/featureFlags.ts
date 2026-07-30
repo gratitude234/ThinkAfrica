@@ -33,3 +33,12 @@ export function isTopicSubscriptionsEnabled(): boolean {
     process.env.NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED === "1"
   );
 }
+
+/**
+ * AI topic suggestions can ship before Topic Subscriptions. The flag also
+ * gates reads/writes of the additive research_keywords column so application
+ * code can be deployed before its pending migration is promoted.
+ */
+export function isAiTopicSuggestionsEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_AI_TOPIC_SUGGESTIONS_ENABLED === "1";
+}

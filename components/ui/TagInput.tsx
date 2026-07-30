@@ -201,10 +201,12 @@ export default function TagInput({
       </div>
 
       {value.length >= maxTags ? (
-        <p className="mt-2 text-xs text-gray-400">Max 5 tags reached</p>
+        <p className="mt-2 text-xs text-gray-400">
+          Max {maxTags} topics reached
+        </p>
       ) : (
         <p className="mt-2 text-xs text-gray-400">
-          {value.length} / {maxTags} tags selected
+          {value.length} / {maxTags} topics selected
         </p>
       )}
     </div>

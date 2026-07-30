@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
 import { sendPasswordChangedEmail } from "@/app/(auth)/accountEmailActions";
+import { useSignOut } from "@/lib/useSignOut";
 
 const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
@@ -22,6 +23,7 @@ export default function AccountForm({ email }: { email: string }) {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [toast, setToast] = useState<string | null>(null);
+  const { signOut, isSigningOut, error: signOutError } = useSignOut();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,6 +144,31 @@ export default function AccountForm({ email }: { email: string }) {
           </Button>
         </div>
       </form>
+
+      <section className="mt-8 border-t border-gray-100 pt-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Session</h2>
+            <p className="mt-1 text-sm leading-6 text-gray-500">
+              Sign out of Indegenius on this device.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="danger"
+            loading={isSigningOut}
+            onClick={() => void signOut()}
+            className="min-h-11 sm:min-w-28"
+          >
+            {isSigningOut ? "Signing out…" : "Sign out"}
+          </Button>
+        </div>
+        {signOutError ? (
+          <p className="mt-3 text-sm text-red-600" role="alert">
+            {signOutError}
+          </p>
+        ) : null}
+      </section>
 
       {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
     </>

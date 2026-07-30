@@ -14,3 +14,8 @@ timestamp. Do not promote it until the author-subscription candidate has been
 applied and verified in staging. It intentionally backfills canonical topic
 keys, but never profile interests, subscriptions, publication events, or
 deliveries.
+
+`ai_topic_suggestions_v1.sql` is independent of subscription delivery and may
+be promoted before Topic Subscriptions once the Debate migration ledger is
+resolved. It adds only separated Research keywords and a private daily Gemini
+quota; it never rewrites published Research tags or stores draft content.

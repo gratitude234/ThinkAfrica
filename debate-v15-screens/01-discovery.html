@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#073929">
+  <title>Debates · Indegenius</title>
+  <link rel="stylesheet" href="../debate-v15-assets/system.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to debates</a>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <a class="brand" href="01-discovery.html" aria-label="Indegenius home">
+        <img src="../public/brand/indegenius-icon-wordmark-color.svg" alt="Indegenius">
+      </a>
+      <nav class="primary-nav" aria-label="Primary">
+        <a href="#">Home</a>
+        <a href="#">Explore</a>
+        <a href="01-discovery.html" aria-current="page">Debates</a>
+        <a href="#">Opportunities</a>
+      </nav>
+      <div class="header-actions">
+        <a class="button button--primary" href="#">Write</a>
+        <span class="avatar" aria-label="Signed in as Amina">AO</span>
+        <button class="icon-button mobile-menu-button" aria-label="Open navigation">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="page-shell">
+    <section style="display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.48fr);gap:32px;align-items:end" class="discovery-hero">
+      <div>
+        <p class="eyebrow">Curated 1v1 debates</p>
+        <h1 class="display page-title" style="margin-top:12px">Ideas deserve a fair hearing.</h1>
+        <p class="lede">Follow evidence-led debates from invitation to verdict. Two debaters, four final arguments, one community vote.</p>
+      </div>
+      <div class="surface panel surface--tint" aria-label="How V1.5 works">
+        <p class="panel__label">The format at a glance</p>
+        <ol class="timeline" style="margin-top:16px">
+          <li class="is-current"><strong>Two people are invited</strong>One argues for; one argues against.</li>
+          <li><strong>Opening, then rebuttal</strong>Each contribution is final and sourced.</li>
+          <li><strong>The community decides</strong>Argument upvotes signal quality; final votes decide.</li>
+        </ol>
+      </div>
+    </section>
+
+    <div class="listing-toolbar">
+      <label class="search-wrap">
+        <span class="skip-link">Search debates</span>
+        <input id="debate-search" class="input" type="search" placeholder="Search motions, topics, or moderators">
+      </label>
+      <a class="button button--primary" href="02-recruiting-lobby.html">Start a debate</a>
+    </div>
+
+    <div class="filter-tabs" aria-label="Filter debates">
+      <button class="filter-tab" data-filter="all" aria-pressed="true">All</button>
+      <button class="filter-tab" data-filter="live" aria-pressed="false">Live now</button>
+      <button class="filter-tab" data-filter="recruiting" aria-pressed="false">Recruiting</button>
+      <button class="filter-tab" data-filter="completed" aria-pressed="false">Completed</button>
+      <button class="filter-tab" data-filter="recap" aria-pressed="false">Recaps ready</button>
+    </div>
+
+    <section class="debate-list" aria-live="polite" style="margin-top:16px">
+      <a class="surface debate-listing" href="03-opening-room.html" data-card data-state="live" data-search="ai tools african universities students learning assessment policy">
+        <div>
+          <div class="motion-hero__meta">
+            <span class="pill">Opening · live</span>
+            <span class="pill pill--neutral">Education</span>
+          </div>
+          <h2>African universities should require students to disclose the use of generative AI in assessed work.</h2>
+          <p>Opening arguments are being submitted. Read both sides as the record develops.</p>
+        </div>
+        <div class="debate-listing__aside">
+          <strong data-deadline="233">3h 53m left</strong>
+          <span>Opening deadline</span>
+        </div>
+      </a>
+
+      <a class="surface debate-listing" href="02-recruiting-lobby.html" data-card data-state="recruiting" data-search="african union open research public funding access science policy moderator">
+        <div>
+          <div class="motion-hero__meta">
+            <span class="pill pill--gold">Recruiting</span>
+            <span class="pill pill--neutral">Research policy</span>
+          </div>
+          <h2>Publicly funded African research should be open access from the day of publication.</h2>
+          <p>FOR is confirmed. The invited AGAINST debater has not yet responded.</p>
+        </div>
+        <div class="debate-listing__aside">
+          <strong>1 of 2 sides ready</strong>
+          <span>Recruiting closes Friday</span>
+        </div>
+      </a>
+
+      <a class="surface debate-listing" href="06-verdict-recap.html" data-card data-state="completed recap" data-search="regional trade university curricula africa education policy recap">
+        <div>
+          <div class="motion-hero__meta">
+            <span class="pill pill--purple">Verdict published</span>
+            <span class="pill pill--neutral">Higher education</span>
+          </div>
+          <h2>Regional trade policy should be a required part of every African university curriculum.</h2>
+          <p>The community verdict and AI-assisted synthesis are ready to read.</p>
+        </div>
+        <div class="debate-listing__aside">
+          <strong>58% FOR</strong>
+          <span>AI-assisted recap ready</span>
+        </div>
+      </a>
+    </section>
+
+    <p id="empty-state" class="surface panel" hidden>No debates match that search and filter.</p>
+  </main>
+
+  <div class="toast" role="status" data-toast></div>
+  <script src="../debate-v15-assets/common.js"></script>
+  <script>
+    const search = document.querySelector("#debate-search");
+    const tabs = [...document.querySelectorAll("[data-filter]")];
+    const cards = [...document.querySelectorAll("[data-card]")];
+    const empty = document.querySelector("#empty-state");
+    let filter = "all";
+
+    function refreshList() {
+      const query = search.value.trim().toLowerCase();
+      let visible = 0;
+      cards.forEach((card) => {
+        const matchesFilter = filter === "all" || card.dataset.state.includes(filter);
+        const matchesQuery = !query || card.dataset.search.includes(query) || card.textContent.toLowerCase().includes(query);
+        card.hidden = !(matchesFilter && matchesQuery);
+        if (!card.hidden) visible += 1;
+      });
+      empty.hidden = visible !== 0;
+    }
+
+    tabs.forEach((tab) => tab.addEventListener("click", () => {
+      filter = tab.dataset.filter;
+      tabs.forEach((item) => item.setAttribute("aria-pressed", String(item === tab)));
+      refreshList();
+    }));
+    search.addEventListener("input", refreshList);
+  </script>
+  <style>
+    @media (max-width: 760px) {
+      .discovery-hero { grid-template-columns: 1fr !important; align-items: start !important; }
+    }
+  </style>
+</body>
+</html>

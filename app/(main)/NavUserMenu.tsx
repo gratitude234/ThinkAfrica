@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useTransition } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
+import { getUsableProfileUsername } from "@/lib/profileUsername";
+import { useSignOut } from "@/lib/useSignOut";
 import Button from "@/components/ui/Button";
 
 interface NavUserMenuProps {
@@ -62,12 +62,13 @@ export default function NavUserMenu({
   isAdmin,
   canAccessReview,
 }: NavUserMenuProps) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const tier = getTier(points);
   const displayName =
     profile?.full_name ?? user?.email?.split("@")[0] ?? "Account";
+  const profileUsername = getUsableProfileUsername(profile?.username ?? null);
+  const profileHref = profileUsername ? `/${profileUsername}` : "/settings";
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -79,22 +80,15 @@ export default function NavUserMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Signing out is a network call followed by a navigation, and neither used
-  // to show anything -- the menu just sat there looking unresponsive.
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isLeaving, startLeaving] = useTransition();
-  const signOutBusy = isSigningOut || isLeaving;
+  const {
+    signOut,
+    isSigningOut: signOutBusy,
+    error: signOutError,
+  } = useSignOut();
 
   const handleSignOut = async () => {
-    if (signOutBusy) return;
-    setIsSigningOut(true);
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setIsSigningOut(false);
-    startLeaving(() => {
-      router.push("/login");
-      router.refresh();
-    });
+    const signedOut = await signOut();
+    if (signedOut) setOpen(false);
   };
 
   if (!user) {
@@ -145,7 +139,7 @@ export default function NavUserMenu({
           </div>
           {profile && (
             <Link
-              href="/me"
+              href={profileHref}
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
             >
@@ -297,6 +291,11 @@ export default function NavUserMenu({
             </svg>
             {signOutBusy ? "Signing out…" : "Sign out"}
           </button>
+          {signOutError ? (
+            <p className="px-4 pb-3 text-xs leading-5 text-red-600" role="alert">
+              {signOutError}
+            </p>
+          ) : null}
         </div>
       )}
     </div>

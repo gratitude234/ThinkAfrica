@@ -1,26 +1,31 @@
-/**
- * /me resolves the signed-in user's username server-side (auth + profile
- * lookup) before redirecting to /[username]. That's two round trips with
- * nothing painted, so show the profile header shape rather than a blank
- * screen — it lines up with the profile page this redirects into.
- */
 export default function Loading() {
   return (
     <div
-      className="mx-auto max-w-4xl animate-pulse motion-reduce:animate-none"
+      className="mx-auto max-w-3xl space-y-6 animate-pulse motion-reduce:animate-none"
       role="status"
-      aria-label="Opening your profile"
+      aria-label="Opening your account"
     >
-      <div className="flex items-start gap-4">
-        <div className="h-20 w-20 shrink-0 rounded-full bg-gray-200" />
-        <div className="flex-1 space-y-2.5 pt-2">
-          <div className="h-6 w-48 rounded bg-gray-200" />
-          <div className="h-3.5 w-32 rounded bg-gray-100" />
-          <div className="h-3.5 w-64 max-w-full rounded bg-gray-100" />
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+        <div className="h-14 bg-gray-100" />
+        <div className="flex items-end gap-3 px-5 pb-5">
+          <div className="-mt-7 h-[72px] w-[72px] shrink-0 rounded-full border-4 border-white bg-gray-200" />
+          <div className="flex-1 space-y-2 pb-1">
+            <div className="h-6 w-44 rounded bg-gray-200" />
+            <div className="h-3.5 w-28 rounded bg-gray-100" />
+          </div>
         </div>
       </div>
 
-      <span className="sr-only">Opening your profile…</span>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {[...Array(3)].map((_, index) => (
+          <div
+            key={index}
+            className="h-[92px] rounded-xl border border-gray-200 bg-white"
+          />
+        ))}
+      </div>
+
+      <span className="sr-only">Opening your account…</span>
     </div>
   );
 }

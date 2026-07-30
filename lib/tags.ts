@@ -46,6 +46,9 @@ export type CanonicalTag = (typeof CANONICAL_TAGS)[number];
 
 const COUNTRY_REGION_TAGS = CANONICAL_TAGS.slice(20, 37);
 export const MAX_TOPIC_KEY_LENGTH = 80;
+export const MAX_SHORT_POST_TOPICS = 3;
+export const MAX_LONG_FORM_TOPICS = 5;
+export const MAX_RESEARCH_KEYWORDS = 10;
 
 export function normalizeTagValue(tag: string) {
   return tag.trim().toLowerCase().replace(/\s+/g, " ");
@@ -81,6 +84,61 @@ export function getCanonicalTagMatch(value: string | null | undefined) {
       );
     }) ?? null
   );
+}
+
+export function getExactCanonicalTag(value: string | null | undefined) {
+  if (!value) return null;
+  const normalizedValue = normalizeTagValue(value);
+  return (
+    CANONICAL_TAGS.find(
+      (tag) => normalizeTagValue(tag) === normalizedValue
+    ) ?? null
+  );
+}
+
+export function normalizeAndDedupeTopicValues(values: string[], limit: number) {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const value of values) {
+    const key = normalizeTagValue(value);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(key);
+    if (normalized.length >= limit) break;
+  }
+
+  return normalized;
+}
+
+export function normalizeResearchKeywords(values: string[]) {
+  return normalizeAndDedupeTopicValues(values, MAX_RESEARCH_KEYWORDS);
+}
+
+/**
+ * Existing editable Research drafts stored topics and keywords together in
+ * posts.tags. Only exact canonical values can be identified safely as topics;
+ * every other non-reserved value is treated as a legacy keyword on first save.
+ */
+export function splitLegacyResearchTags(values: string[]) {
+  const topics: string[] = [];
+  const keywords: string[] = [];
+
+  for (const value of values) {
+    const normalized = normalizeTagValue(value);
+    if (!normalized || normalized === "research") continue;
+    const canonical = getExactCanonicalTag(normalized);
+    if (canonical) {
+      topics.push(normalizeTagValue(canonical));
+    } else {
+      keywords.push(normalized);
+    }
+  }
+
+  return {
+    topics: normalizeAndDedupeTopicValues(topics, MAX_LONG_FORM_TOPICS),
+    keywords: normalizeResearchKeywords(keywords),
+  };
 }
 
 export function getSuggestedTags({

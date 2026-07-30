@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#073929">
+  <title>Recruiting lobby · Indegenius Debate</title>
+  <link rel="stylesheet" href="../debate-v15-assets/system.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to debate</a>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <a class="brand" href="01-discovery.html"><img src="../public/brand/indegenius-icon-wordmark-color.svg" alt="Indegenius"></a>
+      <nav class="primary-nav" aria-label="Primary">
+        <a href="#">Home</a><a href="#">Explore</a><a href="01-discovery.html" aria-current="page">Debates</a><a href="#">Opportunities</a>
+      </nav>
+      <div class="header-actions">
+        <button class="button button--secondary" data-copy-link>Share</button>
+        <span class="avatar">MA</span>
+        <button class="icon-button mobile-menu-button" aria-label="Open navigation">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="page-shell">
+    <div class="breadcrumbs"><a href="01-discovery.html">Debates</a><span>/</span><span>Recruiting lobby</span></div>
+    <section class="motion-hero">
+      <div class="motion-hero__content">
+        <div class="motion-hero__meta"><span class="pill">Curated 1v1</span><span class="pill pill--gold">Recruiting</span></div>
+        <h1 class="motion-title">Publicly funded African research should be open access from the day of publication.</h1>
+        <p class="motion-context">The debate asks whether immediate public access should be a condition of public funding, even where publishers, learned societies, or local journals depend on subscription revenue.</p>
+        <div class="tag-row"><span class="tag">#OpenScience</span><span class="tag">#ResearchPolicy</span><span class="tag">#HigherEducation</span></div>
+        <div class="metadata-row"><span>Moderated by Malik Adebayo</span><span>Local time shown · WAT secondary</span><span>0 of 4 arguments submitted</span></div>
+      </div>
+    </section>
+
+    <nav class="progress-rail" aria-label="Debate progress">
+      <div class="progress-step is-current" aria-current="step"><strong>1</strong><span>Recruiting</span></div>
+      <div class="progress-step"><strong>2</strong><span>Opening</span></div>
+      <div class="progress-step"><strong>3</strong><span>Rebuttal</span></div>
+      <div class="progress-step"><strong>4</strong><span>Final vote</span></div>
+      <div class="progress-step"><strong>5</strong><span>Verdict</span></div>
+    </nav>
+
+    <div class="workspace">
+      <div class="stack">
+        <section class="surface panel task-panel">
+          <div class="panel__header">
+            <div>
+              <p class="panel__label">Your next action · moderator</p>
+              <h2>Confirm the AGAINST side.</h2>
+              <p>Both invited debaters must accept before you can open the first round.</p>
+            </div>
+            <div class="deadline"><small>Recruiting closes</small><strong>Fri, 31 Jul · 18:00</strong><span style="font-size:11px">18:00 WAT</span></div>
+          </div>
+          <div class="split-actions">
+            <button id="invite-toggle" class="button button--primary" aria-expanded="false" aria-controls="invite-panel">Invite AGAINST debater</button>
+            <button class="button button--secondary" id="extend">Extend deadline</button>
+          </div>
+          <div id="invite-panel" class="surface panel surface--tint" hidden style="margin-top:16px">
+            <div class="field">
+              <label for="member-search">Find a verified member</label>
+              <input id="member-search" class="input" type="search" placeholder="Search by name, university, or username">
+            </div>
+            <div id="member-result" class="profile-row" hidden style="margin-top:14px">
+              <span class="profile-row__avatar profile-row__avatar--purple">KN</span>
+              <span style="min-width:0;flex:1"><span class="profile-row__name">Kemi Nwosu</span><span class="profile-row__meta" style="display:block">University of Lagos · @keminwosu</span></span>
+              <button id="send-invite" class="button button--primary">Send invite</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="surface panel">
+          <div class="panel__header">
+            <div><p class="panel__label">Participant setup</p><h2 class="display card-title">One voice on each side</h2></div>
+            <span class="pill pill--neutral" id="readiness-pill">1 of 2 confirmed</span>
+          </div>
+          <div class="two-sides">
+            <article class="side-card">
+              <span class="side-mark"><span class="side-mark__symbol">+</span>For the motion</span>
+              <div class="profile-row" style="margin-top:18px">
+                <span class="profile-row__avatar">AO</span>
+                <span><span class="profile-row__name">Amina Okafor</span><span class="profile-row__meta" style="display:block">University of Ibadan</span></span>
+              </div>
+              <p class="side-card__state">Confirmed</p>
+              <p class="side-card__copy">Committed to one opening argument and one rebuttal.</p>
+            </article>
+            <article class="side-card side-card--against">
+              <span class="side-mark side-mark--against"><span class="side-mark__symbol">−</span>Against the motion</span>
+              <div id="against-empty">
+                <p class="side-card__state">Not yet invited</p>
+                <p class="side-card__copy">Choose one verified member who can test the motion’s trade-offs.</p>
+              </div>
+              <div id="against-invited" hidden>
+                <div class="profile-row" style="margin-top:18px">
+                  <span class="profile-row__avatar profile-row__avatar--purple">KN</span>
+                  <span><span class="profile-row__name">Kemi Nwosu</span><span class="profile-row__meta" style="display:block">University of Lagos</span></span>
+                </div>
+                <p class="side-card__state">Awaiting response</p>
+                <p class="side-card__copy">Kemi has been invited. You can replace the invite if they decline.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <aside class="workspace__aside stack">
+        <section class="surface panel">
+          <p class="panel__label">Start readiness</p>
+          <ul class="readiness" style="margin-top:16px">
+            <li><span class="check">✓</span><span><strong>FOR confirmed</strong><br>Amina accepted the commitment.</span></li>
+            <li id="against-check"><span class="check check--pending">2</span><span><strong>AGAINST needed</strong><br>Invite and receive acceptance.</span></li>
+            <li><span class="check">✓</span><span><strong>Deadlines set</strong><br>All four windows are sequential.</span></li>
+          </ul>
+          <button class="button button--primary button--full" disabled style="margin-top:20px">Start opening arguments</button>
+          <p class="field__hint" style="margin-bottom:0">Blocked until both sides accept.</p>
+        </section>
+        <section class="surface panel timeline-panel">
+          <p class="panel__label">Scheduled path</p>
+          <ol class="timeline" style="margin-top:16px">
+            <li class="is-current"><strong>Recruiting</strong>Closes Fri, 31 Jul · 18:00</li>
+            <li><strong>Opening arguments</strong>Due Sun, 2 Aug · 18:00</li>
+            <li><strong>Rebuttals</strong>Due Tue, 4 Aug · 18:00</li>
+            <li><strong>Final community vote</strong>Closes Thu, 6 Aug · 18:00</li>
+          </ol>
+        </section>
+        <button class="button button--quiet">Cancel debate</button>
+      </aside>
+    </div>
+  </main>
+
+  <div class="toast" role="status" data-toast></div>
+  <script src="../debate-v15-assets/common.js"></script>
+  <script>
+    const toggle = document.querySelector("#invite-toggle");
+    const panel = document.querySelector("#invite-panel");
+    const search = document.querySelector("#member-search");
+    const result = document.querySelector("#member-result");
+    toggle.addEventListener("click", () => {
+      const open = toggle.getAttribute("aria-expanded") === "true";
+      toggle.setAttribute("aria-expanded", String(!open));
+      panel.hidden = open;
+      if (!open) search.focus();
+    });
+    search.addEventListener("input", () => {
+      result.hidden = search.value.trim().length < 2;
+    });
+    document.querySelector("#send-invite").addEventListener("click", () => {
+      document.querySelector("#against-empty").hidden = true;
+      document.querySelector("#against-invited").hidden = false;
+      document.querySelector("#readiness-pill").textContent = "Invite sent · response pending";
+      panel.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+      showDebateToast("Invitation sent to Kemi Nwosu.");
+    });
+    document.querySelector("#extend").addEventListener("click", () => showDebateToast("Deadline extension controls would open here."));
+  </script>
+</body>
+</html>

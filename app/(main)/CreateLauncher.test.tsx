@@ -62,7 +62,7 @@ describe("CreateLauncher -- direct-to-composer", () => {
   // jsdom has no real layout/media-query engine, so this can't be proven by
   // resizing a viewport -- it asserts on the Tailwind breakpoint utilities
   // that *are* the visibility contract, the same way the rest of NavClient's
-  // responsive chrome (search bar, desktop nav links, MobileNav, BottomNav)
+  // responsive chrome (search bar, desktop nav links, BottomNav)
   // switches at `md`. Both Create controls must flip at that identical
   // token, or there is a window (previously 640-767px, `sm` vs `md`) where
   // both are visible at once.

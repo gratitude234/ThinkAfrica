@@ -6,10 +6,10 @@ import { useEffect, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import BrandWordmark from "@/components/ui/BrandWordmark";
 import NavUserMenu from "./NavUserMenu";
-import MobileNav from "./MobileNav";
 import CreateLauncher from "./CreateLauncher";
 import NotificationBell from "@/components/ui/NotificationBell";
 import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
+import { shouldShowMobilePrimaryNav } from "./mobileNavigation";
 
 interface NavClientProps {
   user: User | null;
@@ -102,6 +102,7 @@ export default function NavClient({
   const isOpportunitiesActive =
     pathname === "/opportunities" || pathname.startsWith("/opportunities/");
   const isWriteActive = pathname.startsWith("/write");
+  const showMobilePrimaryNav = shouldShowMobilePrimaryNav(pathname);
   const messagesHref = user
     ? "/messages"
     : `/login?redirectTo=${encodeURIComponent("/messages")}`;
@@ -183,7 +184,9 @@ export default function NavClient({
           <div className="ml-auto flex items-center gap-2.5">
             <Link
               href={messagesHref}
-              className="relative flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+              className={`relative h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+                showMobilePrimaryNav ? "hidden md:flex" : "flex"
+              }`}
               aria-label="Open messages"
             >
               <MessageIcon />
@@ -206,12 +209,6 @@ export default function NavClient({
                 canAccessReview={canAccessReview}
               />
             </div>
-            <MobileNav
-              user={user}
-              profile={profile}
-              isAdmin={isAdmin}
-              canAccessReview={canAccessReview}
-            />
           </div>
       </div>
       </nav>

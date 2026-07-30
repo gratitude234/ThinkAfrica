@@ -54,7 +54,12 @@ export type ActivationEventName =
   | "push_nudge_shown"
   | "push_nudge_action"
   | "push_permission_resolved"
-  | "push_device_operation";
+  | "push_device_operation"
+  | "ai_topic_suggestion_requested"
+  | "ai_topic_suggestion_succeeded"
+  | "ai_topic_suggestion_failed"
+  | "ai_topic_suggestion_selected"
+  | "topic_selection_skipped";
 
 interface ActivationEventPayload {
   event: ActivationEventName;

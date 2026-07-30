@@ -76,8 +76,8 @@ function ComposeIcon({ className = "h-6 w-6" }: { className?: string }) {
 }
 
 // NavClient's own desktop nav (links, search) switches to its desktop layout
-// at `md`; the mobile FAB/hamburger switch back to their mobile layout at
-// the same `md` token (see MobileNav.tsx, BottomNav.tsx). The two Create
+// at `md`; the mobile FAB switches back to its mobile layout at the same
+// `md` token (see BottomNav.tsx). The two Create
 // controls below must flip at that identical breakpoint -- previously the
 // desktop trigger appeared from `sm` (640px) while the mobile FAB only
 // disappeared at `md` (768px), so both were visible in the 640-767px gap.

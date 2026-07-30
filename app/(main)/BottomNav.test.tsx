@@ -108,6 +108,26 @@ describe("BottomNav account label and safe areas", () => {
       expect(link?.className).toMatch(/h-full/);
     }
   });
+
+  it("keeps Me selected throughout the signed-in account area", () => {
+    for (const pathname of [
+      "/me",
+      "/writer",
+      "/dashboard",
+      "/bookmarks",
+      "/settings",
+    ]) {
+      navigationState.pathname = pathname;
+      const { unmount } = render(
+        <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
+      );
+      expect(screen.getByText("Me").closest("a")).toHaveAttribute(
+        "aria-current",
+        "page"
+      );
+      unmount();
+    }
+  });
 });
 
 describe("BottomNav debates destination", () => {

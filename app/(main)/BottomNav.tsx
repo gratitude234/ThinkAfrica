@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CreateLauncher from "./CreateLauncher";
 import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
+import { shouldShowMobilePrimaryNav } from "./mobileNavigation";
 
 interface BottomNavProps {
   username: string | null;
@@ -32,17 +33,8 @@ export default function BottomNav({
 }: BottomNavProps) {
   const pathname = usePathname();
   const isPostPage = pathname.startsWith("/post/");
-  const isMessagesThread = /^\/messages\/.+/.test(pathname);
-  const isEditPage = pathname.startsWith("/edit/");
-  const isCreatePage = pathname.startsWith("/create/");
-  const isResearchSubmitPage = pathname.startsWith("/submit/research");
-  if (
-    pathname.startsWith("/write") ||
-    isCreatePage ||
-    isEditPage ||
-    isResearchSubmitPage ||
-    isMessagesThread
-  ) {
+  const showPrimaryNav = shouldShowMobilePrimaryNav(pathname);
+  if (!showPrimaryNav && !isPostPage) {
     return null;
   }
 
@@ -56,12 +48,18 @@ export default function BottomNav({
   const profileHref = userId ? "/me" : "/signup";
   const resolvedProfileHref = username ? `/${username}` : "/settings";
   const profileActive = userId
-    ? username
-      ? pathname === profileHref ||
-        pathname.startsWith(`${profileHref}/`) ||
-        pathname === resolvedProfileHref ||
-        pathname.startsWith(`${resolvedProfileHref}/`)
-      : pathname === "/settings" || pathname.startsWith("/settings/")
+    ? pathname === profileHref ||
+      pathname.startsWith(`${profileHref}/`) ||
+      pathname === "/dashboard" ||
+      pathname.startsWith("/dashboard/") ||
+      pathname === "/bookmarks" ||
+      pathname.startsWith("/bookmarks/") ||
+      pathname === "/settings" ||
+      pathname.startsWith("/settings/") ||
+      (username
+        ? pathname === resolvedProfileHref ||
+          pathname.startsWith(`${resolvedProfileHref}/`)
+        : false)
     : pathname === "/signup";
   const profileLabel = userId ? "Me" : "Join";
 
@@ -69,7 +67,7 @@ export default function BottomNav({
     <>
       <CreateLauncher userId={userId} variant="mobileFab" isPostPage={isPostPage} />
 
-      {!isPostPage ? (
+      {showPrimaryNav ? (
         <nav
           className="fixed left-0 right-0 z-50 border-t border-gray-100 bg-white shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] md:hidden"
           style={{
