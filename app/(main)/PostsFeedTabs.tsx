@@ -462,54 +462,9 @@ export default function PostsFeedTabs({
     <div>
       {!currentUserId ? <HomeGuestNotice /> : null}
 
-<<<<<<< HEAD
-      <div
-        className="sticky top-[84px] z-30 -mx-4 mb-3 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto border-b border-gray-200 bg-white/95 px-4 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-full sm:px-0"
-        role="tablist"
-        aria-label="Choose feed"
-      >
-        {(["home", "following", "topics", "latest"] as const)
-          .filter(
-            (tab) =>
-              (tab !== "following" || showFollowingTab) &&
-              (tab !== "topics" || showTopicsTab)
-          )
-          .map((tab) => {
-            const label =
-              tab === "home"
-                ? currentUserId
-                  ? "For you"
-                  : "Discover"
-                : tab === "following"
-                  ? "Following"
-                  : tab === "topics"
-                    ? "Topics"
-                    : "Latest";
-            return (
-              <button
-                key={tab}
-                type="button"
-                role="tab"
-                id={`feed-tab-${tab}`}
-                aria-controls="home-feed-panel"
-                aria-selected={activeTab === tab}
-                onClick={() => updateState(tab, typeFilter, timeframe)}
-                className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${
-                  activeTab === tab
-                    ? "border-emerald-brand text-ink"
-                    : "border-transparent text-gray-500 hover:text-ink"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-      </div>
-=======
       {/* Honest (non-sticky) marker for where the feed controls sit in the
           document -- the sticky wrapper's own rect lies once it is pinned. */}
       <div ref={feedTopRef} aria-hidden="true" />
->>>>>>> d2fffc5a6c8da0b64b596c3f8c68b9addd824cf6
 
       {/* Tabs and filter chips pin together as one block. Splitting them let
           the chips slide up under the tabs, which read as the header breaking
@@ -523,8 +478,12 @@ export default function PostsFeedTabs({
           role="tablist"
           aria-label="Choose feed"
         >
-          {(["home", "following", "latest"] as const)
-            .filter((tab) => tab !== "following" || showFollowingTab)
+          {(["home", "following", "topics", "latest"] as const)
+            .filter(
+              (tab) =>
+                (tab !== "following" || showFollowingTab) &&
+                (tab !== "topics" || showTopicsTab)
+            )
             .map((tab) => {
               const label =
                 tab === "home"
@@ -533,7 +492,9 @@ export default function PostsFeedTabs({
                     : "Discover"
                   : tab === "following"
                     ? "Following"
-                    : "Latest";
+                    : tab === "topics"
+                      ? "Topics"
+                      : "Latest";
               return (
                 <button
                   key={tab}

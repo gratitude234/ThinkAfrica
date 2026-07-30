@@ -36,13 +36,24 @@ describe("author subscription SQL release candidate", () => {
     expect(sql).toContain("renew_publication_delivery_lease");
   });
 
-  it("restates the full notification type list so author_published survives future rewrites", () => {
-    expect(sql).toContain("'author_published'");
+  it("restates the full notification type list so new types survive future rewrites", () => {
     // The probed live list must be spelled out, not inherited from the database,
     // because the next migration to touch this constraint will be copied from a
     // file. Spot-check the oldest and newest deployed types.
     expect(sql).toContain("'like', 'comment', 'follow'");
     expect(sql).toContain("'debate_phase_advanced', 'debate_cancelled'");
+    expect(sql).toContain(
+      "'author_published', 'author_subscribed', 'topic_published'"
+    );
+  });
+
+  it("reports whether a subscription row was actually created", () => {
+    // create or replace cannot widen a function's return type.
+    expect(sql).toContain(
+      "drop function if exists public.set_author_relationship(uuid, boolean, boolean)"
+    );
+    expect(sql).toContain("subscription_created boolean");
+    expect(sql).toContain("v_subscription_created := v_row_count > 0");
   });
 
   it("refuses to drop a notification type that drifted into the live database", () => {

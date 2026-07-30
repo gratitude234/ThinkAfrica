@@ -57,3 +57,29 @@ describe("author publication notifications", () => {
     );
   });
 });
+
+describe("author subscriber notifications", () => {
+  const subscriberNotification = {
+    ...publicationNotification,
+    id: "subscription-id",
+    type: "author_subscribed",
+    message: null as string | null,
+    link: null as string | null,
+    post_id: null,
+    post_title: null,
+    post_slug: null,
+  };
+
+  it("says subscribed rather than followed", () => {
+    expect(buildNotificationMessage(subscriberNotification)).toBe(
+      "Ama Mensah subscribed to your work"
+    );
+  });
+
+  it("links to the subscriber's profile", () => {
+    render(<NotificationItem notification={subscriberNotification} />);
+    expect(
+      screen.getByRole("link", { name: /subscribed to your work/i })
+    ).toHaveAttribute("href", "/ama");
+  });
+});

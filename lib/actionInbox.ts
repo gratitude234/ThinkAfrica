@@ -228,6 +228,20 @@ function notificationToAction(
         cta: "View profile",
         actionKey: "follow",
       };
+    // Ranked ahead of a follow: subscribing is the strongest signal a reader
+    // can give, and it opts them into every future publication.
+    case "author_subscribed":
+      return {
+        ...base,
+        category: "activity",
+        priority: 75,
+        label: "New subscriber",
+        description:
+          notification.message ??
+          `${actorName(notification)} subscribed to your work.`,
+        cta: "View profile",
+        actionKey: "author_subscribed",
+      };
     case "like":
       return {
         ...base,

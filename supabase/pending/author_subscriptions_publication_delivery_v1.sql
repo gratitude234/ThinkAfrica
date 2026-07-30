@@ -34,6 +34,10 @@ revoke all on public.author_subscriptions from public, anon, authenticated;
 grant select on public.author_subscriptions to authenticated;
 grant all on public.author_subscriptions to service_role;
 
+-- The return type gains subscription_created, and create or replace cannot
+-- change a function's return type. Drop first so this file stays re-runnable.
+drop function if exists public.set_author_relationship(uuid, boolean, boolean);
+
 create or replace function public.set_author_relationship(
   p_author_id uuid,
   p_following boolean default null,
@@ -42,7 +46,8 @@ create or replace function public.set_author_relationship(
 returns table (
   following boolean,
   subscribed boolean,
-  follow_created boolean
+  follow_created boolean,
+  subscription_created boolean
 )
 language plpgsql
 security definer
@@ -51,6 +56,7 @@ as $$
 declare
   v_subscriber_id uuid := auth.uid();
   v_follow_created boolean := false;
+  v_subscription_created boolean := false;
   v_row_count integer := 0;
 begin
   if v_subscriber_id is null then
@@ -95,6 +101,11 @@ begin
       insert into public.author_subscriptions (subscriber_id, author_id)
       values (v_subscriber_id, p_author_id)
       on conflict (subscriber_id, author_id) do nothing;
+      -- Safe to reuse v_row_count: v_follow_created was captured above. Callers
+      -- notify the author only on a real transition, so re-subscribing after an
+      -- unsubscribe cannot produce a duplicate notification.
+      get diagnostics v_row_count = row_count;
+      v_subscription_created := v_row_count > 0;
     elsif p_subscribed is false then
       -- Unsubscribe deliberately leaves Follow intact.
       delete from public.author_subscriptions
@@ -112,7 +123,8 @@ begin
       select 1 from public.author_subscriptions
       where subscriber_id = v_subscriber_id and author_id = p_author_id
     ),
-    v_follow_created;
+    v_follow_created,
+    v_subscription_created;
 end;
 $$;
 
@@ -397,7 +409,11 @@ declare
     'debate_v2_direct_response', 'debate_v2_evidence_requested',
     'debate_invitation', 'debate_invitation_response',
     'debate_phase_advanced', 'debate_cancelled',
-    'author_published'
+    -- Added by this file. topic_published is already rendered by
+    -- app/(main)/notifications/NotificationItem.tsx but has never been allowed
+    -- by the database; provisioning it here keeps Topic Subscriptions V1 from
+    -- needing a third pass over this constraint.
+    'author_published', 'author_subscribed', 'topic_published'
   ];
   v_definition text;
   v_dropped text;

@@ -28,6 +28,7 @@ interface NotificationData {
 
 const TYPE_ICONS: Record<string, string> = {
   follow: "+",
+  author_subscribed: "SUB",
   like: "<3",
   comment: "...",
   debate_reply: "!",
@@ -72,6 +73,8 @@ export function buildNotificationMessage(notification: NotificationData): string
       return `${actorName} commented on "${postTitle}"`;
     case "follow":
       return `${actorName} started following you`;
+    case "author_subscribed":
+      return `${actorName} subscribed to your work`;
     case "debate_reply":
     case "debate_argument":
       return `${actorName} added a debate argument`;
@@ -123,6 +126,7 @@ function buildLink(notification: NotificationData): string | null {
     case "response_post":
       return notification.post_slug ? `/post/${notification.post_slug}` : null;
     case "follow":
+    case "author_subscribed":
       return notification.actor_username ? `/${notification.actor_username}` : null;
     case "debate_reply":
     case "debate_argument":

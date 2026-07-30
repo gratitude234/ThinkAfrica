@@ -23,6 +23,7 @@ type RelationshipRpcRow = {
   following: boolean;
   subscribed: boolean;
   follow_created: boolean;
+  subscription_created: boolean;
 };
 
 function displayName(profile: ProfileSummary | null) {
@@ -199,7 +200,14 @@ export async function setAuthorSubscription(input: {
 
   safeRevalidate(input.pathname);
   revalidatePath("/settings");
-  if (data.follow_created) {
+  // Subscribing always creates the underlying Follow, so both flags can be true
+  // for a single click. Send only the stronger notification: the author should
+  // hear "subscribed", never "started following" plus a duplicate. Both flags
+  // are false when nothing actually changed, so re-subscribing after an
+  // unsubscribe stays silent.
+  if (data.subscription_created) {
+    after(() => notifyAuthorSubscribed(user.id, input.authorId));
+  } else if (data.follow_created) {
     after(() => notifyFollowed(user.id, input.authorId));
   }
 
@@ -211,39 +219,79 @@ export async function setAuthorSubscription(input: {
   };
 }
 
-async function notifyFollowed(followerId: string, followingId: string) {
+/**
+ * Shared shape for the two relationship notifications. Both are triggered by
+ * the same click, addressed to the same author, and link back to the reader's
+ * profile, so only the wording and the log key differ.
+ */
+async function notifyRelationship(input: {
+  actorId: string;
+  recipientId: string;
+  type: "follow" | "author_subscribed";
+  message: (actorName: string) => string;
+  pushTitle: string;
+  logKey: string;
+}) {
   const admin = createAdminClient();
 
   const { data: actorProfile } = await admin
     .from("profiles")
     .select("username, full_name")
-    .eq("id", followerId)
+    .eq("id", input.actorId)
     .maybeSingle<ProfileSummary>();
 
   const actorName = displayName(actorProfile);
   const ctaPath = actorProfile?.username ? `/${actorProfile.username}` : "/notifications";
+  const message = input.message(actorName);
 
   const { error: notificationError } = await admin.from("notifications").insert({
-    user_id: followingId,
-    type: "follow",
-    message: `${actorName} started following you on Indegenius.`,
+    user_id: input.recipientId,
+    type: input.type,
+    message,
     link: ctaPath,
-    actor_id: followerId,
+    actor_id: input.actorId,
     read: false,
   });
 
   if (notificationError) {
-    console.error(`Failed to create follow notification: ${notificationError.message}`);
+    console.error(
+      `Failed to create ${input.type} notification: ${notificationError.message}`
+    );
     return;
   }
 
   const pushResult = await sendPushNotification({
-    recipientId: followingId,
-    title: "You have a new follower",
-    body: `${actorName} started following you on Indegenius.`,
+    recipientId: input.recipientId,
+    title: input.pushTitle,
+    body: message,
     path: ctaPath,
     preferenceKey: "push_follows",
     cooldownMs: ENGAGEMENT_PUSH_COOLDOWN_MS,
   });
-  logPushResult(`follow:${followerId}:${followingId}`, pushResult);
+  logPushResult(input.logKey, pushResult);
+}
+
+async function notifyFollowed(followerId: string, followingId: string) {
+  await notifyRelationship({
+    actorId: followerId,
+    recipientId: followingId,
+    type: "follow",
+    message: (actorName) => `${actorName} started following you on Indegenius.`,
+    pushTitle: "You have a new follower",
+    logKey: `follow:${followerId}:${followingId}`,
+  });
+}
+
+// Subscribers reuse push_follows rather than introducing a preference of their
+// own: it is the same "someone connected with your work" event, and it keeps the
+// notification settings page unchanged.
+async function notifyAuthorSubscribed(subscriberId: string, authorId: string) {
+  await notifyRelationship({
+    actorId: subscriberId,
+    recipientId: authorId,
+    type: "author_subscribed",
+    message: (actorName) => `${actorName} subscribed to your work on Indegenius.`,
+    pushTitle: "You have a new subscriber",
+    logKey: `author_subscribed:${subscriberId}:${authorId}`,
+  });
 }

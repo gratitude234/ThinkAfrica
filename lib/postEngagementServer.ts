@@ -35,6 +35,7 @@ const DELIVERY_TOKEN_PATTERN =
 type AttributedDelivery = {
   id: string;
   channel: "in_app" | "email" | "push";
+  source: "author_subscription" | "topic_subscription";
   postId: string;
   wordCount: number;
 };
@@ -54,7 +55,7 @@ async function validateAttributedDelivery(
 
   const { data: delivery } = await admin
     .from("publication_deliveries")
-    .select("id, event_id, channel, status")
+    .select("id, event_id, channel, status, matched_author_ids")
     .eq("tracking_token", token)
     .eq("status", "sent")
     .maybeSingle<{
@@ -62,6 +63,7 @@ async function validateAttributedDelivery(
       event_id: string;
       channel: "in_app" | "email" | "push";
       status: string;
+      matched_author_ids: string[];
     }>();
   if (!delivery) return null;
 
@@ -87,7 +89,16 @@ async function validateAttributedDelivery(
     .split(/\s+/)
     .filter(Boolean).length;
 
-  return { id: delivery.id, channel: delivery.channel, postId: post.id, wordCount };
+  return {
+    id: delivery.id,
+    channel: delivery.channel,
+    source:
+      delivery.matched_author_ids.length > 0
+        ? "author_subscription"
+        : "topic_subscription",
+    postId: post.id,
+    wordCount,
+  };
 }
 
 function qualifiesAttributedRead(
@@ -142,7 +153,7 @@ export async function handlePostEngagement(
         ? {
             ...clientMetadata,
             distribution: {
-              source: "author_subscription",
+              source: attributedDelivery.source,
               deliveryId: attributedDelivery.id,
               channel: attributedDelivery.channel,
             },

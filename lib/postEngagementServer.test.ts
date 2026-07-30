@@ -64,6 +64,7 @@ describe("post engagement publication attribution", () => {
       event_id: "event-id",
       channel: "email",
       status: "sent",
+      matched_author_ids: ["author-id"],
     });
     const event = selectOne({ post_id: "post-id" });
     const post = selectOne({
@@ -138,5 +139,69 @@ describe("post engagement publication attribution", () => {
     });
     expect(updatedFilters).toContainEqual(["id", "delivery-id"]);
     expect(updatedFilters).toContainEqual(["qualified_read_at", null]);
+  });
+
+  it("attributes a topic-only delivery to the topic subscription source", async () => {
+    const delivery = selectOne({
+      id: "topic-delivery-id",
+      event_id: "event-id",
+      channel: "in_app",
+      status: "sent",
+      matched_author_ids: [],
+    });
+    const event = selectOne({ post_id: "post-id" });
+    const post = selectOne({
+      id: "post-id",
+      slug: "work",
+      status: "published",
+      content: "A short publication.",
+    });
+    const updateBuilder = {
+      eq: vi.fn(),
+      is: vi.fn().mockResolvedValue({ error: null }),
+    };
+    updateBuilder.eq.mockReturnValue(updateBuilder);
+
+    let deliveryCalls = 0;
+    const admin = {
+      rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
+      from: vi.fn((table: string) => {
+        if (table === "publication_deliveries") {
+          deliveryCalls += 1;
+          if (deliveryCalls === 1) return delivery;
+          return { update: vi.fn(() => updateBuilder) };
+        }
+        if (table === "publication_events") return event;
+        if (table === "posts") return post;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+    mockedAdminClient.mockReturnValue(admin as never);
+
+    const response = await handlePostEngagement(
+      new NextRequest("http://localhost/api/posts/work/view", {
+        method: "POST",
+        body: JSON.stringify({
+          deliveryToken: "123e4567-e89b-42d3-a456-426614174000",
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+      Promise.resolve({ slug: "work" }),
+      "view"
+    );
+
+    expect(response.status).toBe(200);
+    expect(admin.rpc).toHaveBeenCalledWith(
+      "record_post_engagement",
+      expect.objectContaining({
+        engagement_metadata: {
+          distribution: {
+            source: "topic_subscription",
+            deliveryId: "topic-delivery-id",
+            channel: "in_app",
+          },
+        },
+      })
+    );
   });
 });

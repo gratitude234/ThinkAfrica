@@ -20,7 +20,7 @@ export async function GET(
     const admin = createAdminClient();
     const { data: delivery, error } = await admin
       .from("publication_deliveries")
-      .select("id, event_id, channel, status")
+      .select("id, event_id, channel, status, matched_author_ids")
       .eq("tracking_token", token)
       .eq("status", "sent")
       .maybeSingle<{
@@ -28,6 +28,7 @@ export async function GET(
         event_id: string;
         channel: "in_app" | "email" | "push";
         status: string;
+        matched_author_ids: string[];
       }>();
     if (error || !delivery) return NextResponse.redirect(fallback, 307);
 
@@ -53,7 +54,12 @@ export async function GET(
       .is("opened_at", null);
 
     const destination = new URL(`/post/${encodeURIComponent(post.slug)}`, request.url);
-    destination.searchParams.set("src", "author_subscription");
+    destination.searchParams.set(
+      "src",
+      delivery.matched_author_ids.length > 0
+        ? "author_subscription"
+        : "topic_subscription"
+    );
     destination.searchParams.set("channel", delivery.channel);
     destination.searchParams.set("delivery", token);
     return NextResponse.redirect(destination, 307);
@@ -62,4 +68,3 @@ export async function GET(
     return NextResponse.redirect(fallback, 307);
   }
 }
-
