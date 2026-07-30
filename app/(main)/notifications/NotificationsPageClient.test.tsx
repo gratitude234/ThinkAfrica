@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import NotificationsPageClient from "./NotificationsPageClient";
-import type { NotificationData } from "./notificationData";
+import type { NotificationData } from "@/lib/notificationData";
 
 vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
 vi.mock("./actions", () => ({ respondToCoAuthorInvite: vi.fn() }));
@@ -18,8 +18,8 @@ const mutations = vi.hoisted(() => ({
 
 vi.mock("@/lib/notificationMutations", () => mutations);
 
-vi.mock("./notificationData", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./notificationData")>()),
+vi.mock("@/lib/notificationData", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/notificationData")>()),
   fetchNotificationRows: vi.fn().mockResolvedValue({ rows: [], error: null }),
 }));
 

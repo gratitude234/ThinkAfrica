@@ -19,7 +19,7 @@ import {
   fetchNotificationRows,
   sectionsFromNotifications,
   type NotificationData,
-} from "./notificationData";
+} from "@/lib/notificationData";
 
 interface NotificationsPageClientProps {
   userId: string;

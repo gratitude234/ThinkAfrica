@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
+import {
+  notificationHref,
+  notificationIcon,
+  notificationMessage,
+} from "@/lib/notificationCatalog";
 import { formatRelativeTime } from "@/lib/utils";
 import { respondToCoAuthorInvite } from "./actions";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
@@ -38,116 +43,14 @@ interface NotificationItemProps {
   onDismiss?: (notificationId: string) => void;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  follow: "+",
-  author_subscribed: "SUB",
-  like: "<3",
-  comment: "...",
-  debate_reply: "!",
-  debate_argument: "!",
-  fellowship: "$",
-  badge: "*",
-  post_approved: "OK",
-  post_rejected: "X",
-  review_assigned: "R",
-  revision_requested: "RE",
-  post_published: "P",
-  author_published: "NEW",
-  topic_published: "#",
-  co_author_invite: "CO",
-  co_author_accepted: "OK",
-  co_author_declined: "NO",
-  response_post: "RE",
-  opportunity_inquiry: "OP",
-  debate_v2_round_change: "!",
-  debate_v2_final_vote: "V",
-  debate_v2_direct_response: "?",
-  debate_v2_evidence_requested: "E",
-  debate_invitation: "D",
-  debate_invitation_response: "OK",
-  debate_phase_advanced: ">",
-  debate_cancelled: "X",
-};
-
+/**
+ * Retained as a named export because it is the unit under test for fallback copy.
+ * The copy itself now lives in lib/notificationCatalog.ts, alongside every other
+ * per-type presentation detail, instead of in a switch that had drifted out of
+ * step with both the action inbox and the bell dropdown.
+ */
 export function buildNotificationMessage(notification: NotificationData): string {
-  if (notification.message) {
-    return notification.message;
-  }
-
-  const actorName =
-    notification.actor?.full_name ?? notification.actor?.username ?? "Someone";
-  const postTitle = notification.post_title ?? "your post";
-
-  switch (notification.type) {
-    case "like":
-      return `${actorName} liked your post "${postTitle}"`;
-    case "comment":
-      return `${actorName} commented on "${postTitle}"`;
-    case "follow":
-      return `${actorName} started following you`;
-    case "author_subscribed":
-      return `${actorName} subscribed to your work`;
-    case "debate_reply":
-    case "debate_argument":
-      return `${actorName} added a debate argument`;
-    case "fellowship":
-      return "You have a fellowship update";
-    case "badge":
-      return "You earned a new badge";
-    case "review_assigned":
-      return `You've been assigned to review: ${postTitle}`;
-    case "revision_requested":
-      return `Reviewers have requested revisions on: ${postTitle}`;
-    case "post_published":
-      return `Your post ${postTitle} has been published.`;
-    case "author_published":
-      return `${actorName} published new work: ${postTitle}`;
-    case "topic_published":
-      return `New work was published in a topic you subscribe to: ${postTitle}`;
-    case "co_author_invite":
-      return `${actorName} has invited you to co-author: ${postTitle}`;
-    case "co_author_accepted":
-      return `${actorName} accepted your co-author invitation on: ${postTitle}`;
-    case "co_author_declined":
-      return `${actorName} declined your co-author invitation on: ${postTitle}`;
-    case "response_post":
-      return `${actorName} wrote a response to "${postTitle}"`;
-    case "opportunity_inquiry":
-      return "New opportunity inquiry";
-    default:
-      return "New notification";
-  }
-}
-
-function buildLink(notification: NotificationData): string | null {
-  if (notification.link) {
-    return notification.link;
-  }
-
-  switch (notification.type) {
-    case "like":
-    case "comment":
-    case "review_assigned":
-    case "revision_requested":
-    case "post_published":
-    case "author_published":
-    case "topic_published":
-    case "co_author_invite":
-    case "co_author_accepted":
-    case "co_author_declined":
-    case "response_post":
-      return notification.post_slug ? `/post/${notification.post_slug}` : null;
-    case "follow":
-    case "author_subscribed":
-      return notification.actor_username ? `/${notification.actor_username}` : null;
-    case "debate_reply":
-    case "debate_argument":
-      return "/debates";
-    case "opportunity_inquiry":
-      return "/dashboard#opportunity-interest";
-    default:
-      return null;
-  }
+  return notificationMessage(notification);
 }
 
 export default function NotificationItem({
@@ -157,8 +60,8 @@ export default function NotificationItem({
 }: NotificationItemProps) {
   const inboxItem = getActionInboxSummary([notification]).items[0];
   const message = inboxItem?.description ?? buildNotificationMessage(notification);
-  const link = buildLink(notification);
-  const icon = TYPE_ICONS[notification.type] ?? "N";
+  const link = notificationHref(notification);
+  const icon = notificationIcon(notification.type);
   const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");
   const isRead = notification.read;
 

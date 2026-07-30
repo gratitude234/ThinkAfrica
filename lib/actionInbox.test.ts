@@ -105,3 +105,63 @@ describe("primaryActionable", () => {
     expect(summary.primaryActionable).toBeNull();
   });
 });
+
+describe("type coverage regressions", () => {
+  it("labels a publication delivery instead of calling it 'New notification'", () => {
+    // The reported bug: this rendered as "NEW NOTIFICATION — Yusuph Sebasi
+    // published a new Article: ..." because actionInbox had no author_published case.
+    const summary = getActionInboxSummary([
+      notification("author_published", {
+        message: "Yusuph Sebasi published a new Article: The Burden Of Sickle Cell Disease",
+      }),
+    ]);
+
+    expect(summary.items[0]).toMatchObject({
+      label: "New from an author you follow",
+      cta: "Read now",
+      category: "activity",
+    });
+  });
+
+  it("promotes a suspension over every other unread item", () => {
+    const summary = getActionInboxSummary([
+      notification("like"),
+      notification("revision_requested"),
+      notification("account_suspended"),
+      notification("follow"),
+    ]);
+
+    expect(summary.primaryAction?.type).toBe("account_suspended");
+    expect(summary.primaryActionable?.type).toBe("account_suspended");
+    expect(summary.primaryActionable?.label).toBe("Account suspended");
+  });
+
+  it.each([
+    ["moderation_post_removed", "Post removed"],
+    ["moderation_comment_hidden", "Comment hidden"],
+    ["review_started", "Submission under review"],
+    ["review_reminder", "Review overdue"],
+    ["co_author_accepted", "Co-author invite accepted"],
+    ["topic_published", "New in a topic you follow"],
+    ["debate_v2_round_change", "New debate round"],
+    ["debate_v2_final_vote", "Final vote open"],
+    ["debate_v2_direct_response", "Direct response"],
+    ["debate_v2_evidence_requested", "Evidence requested"],
+  ])("gives %s its own label", (type, label) => {
+    expect(getActionInboxSummary([notification(type)]).items[0].label).toBe(label);
+  });
+
+  it("splits the editorial status types that used to share one label", () => {
+    const summary = getActionInboxSummary([
+      notification("post_published"),
+      notification("post_rejected"),
+    ]);
+    const labels = summary.items.map((item) => item.label);
+
+    expect(labels).toContain("Published");
+    expect(labels).toContain("Not accepted");
+    expect(labels).not.toContain("Application or review update");
+    // The shared analytics key is deliberately preserved across the split.
+    expect(summary.items.every((item) => item.actionKey === "status_update")).toBe(true);
+  });
+});

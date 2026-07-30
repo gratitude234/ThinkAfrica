@@ -24,6 +24,8 @@ const publicationNotification = {
   actor_username: "ama",
 };
 
+// Fallback copy is now standardised as full sentences by lib/notificationCatalog.ts,
+// which is why these expectations gained terminal punctuation.
 describe("author publication notifications", () => {
   it("uses author-specific fallback copy", () => {
     expect(
@@ -31,7 +33,7 @@ describe("author publication notifications", () => {
         ...publicationNotification,
         message: null,
       })
-    ).toBe("Ama Mensah published new work: Designing Lagos");
+    ).toBe("Ama Mensah published new work: Designing Lagos.");
   });
 
   it("uses topic-specific fallback copy", () => {
@@ -42,7 +44,7 @@ describe("author publication notifications", () => {
         message: null,
       })
     ).toBe(
-      "New work was published in a topic you subscribe to: Designing Lagos"
+      "New work was published in a topic you subscribe to: Designing Lagos."
     );
   });
 
@@ -73,7 +75,7 @@ describe("author subscriber notifications", () => {
 
   it("says subscribed rather than followed", () => {
     expect(buildNotificationMessage(subscriberNotification)).toBe(
-      "Ama Mensah subscribed to your work"
+      "Ama Mensah subscribed to your work."
     );
   });
 

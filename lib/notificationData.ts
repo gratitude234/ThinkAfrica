@@ -74,9 +74,15 @@ export interface NotificationRowsResult {
   error: string | null;
 }
 
+/**
+ * The one notification read query. The bell dropdown previously ran its own
+ * `select("*")` without the actor/post joins, which is why its fallback copy could
+ * only say "Someone started following you" while the page said who.
+ */
 export async function fetchNotificationRows(
   supabase: NotificationsQueryClient,
-  userId: string
+  userId: string,
+  limit = 50
 ): Promise<NotificationRowsResult> {
   // Dismissed notifications are soft-deleted, not removed, so they have to be
   // filtered out here rather than relying on the row being gone.
@@ -86,7 +92,7 @@ export async function fetchNotificationRows(
     .eq("user_id", userId)
     .is("dismissed_at", null)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(limit);
 
   const rows = ((raw ?? []) as Array<Record<string, unknown>>).map((notification) => {
     const rawActor = notification.actor as
