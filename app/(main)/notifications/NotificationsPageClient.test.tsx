@@ -268,8 +268,23 @@ describe("filter chips", () => {
     // `revision` is in the hero, so the Review chip must not claim it.
     expect(screen.getByRole("button", { name: "Review" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Needs attention (2)" })
+      screen.getByRole("button", { name: "Unread (2)" })
     ).toBeInTheDocument();
+  });
+
+  it("counts every chip by the same rule", async () => {
+    // "Needs attention" used to count unread only while the category chips counted
+    // read and unread alike, so the same items were advertised twice by two rules.
+    render(
+      <NotificationsPageClient
+        userId="u1"
+        notifications={[follow, publication, notification({ id: "read-1", read: true })]}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "All (3)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unread (2)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Activity (3)" })).toBeInTheDocument();
   });
 
   it("marks the active chip for assistive technology", async () => {
@@ -277,9 +292,10 @@ describe("filter chips", () => {
       <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
     );
 
-    expect(
-      screen.getByRole("button", { name: /Needs attention/ })
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
 
     await userEvent.click(screen.getByRole("button", { name: /Activity/ }));
 
@@ -287,5 +303,75 @@ describe("filter chips", () => {
       "aria-pressed",
       "true"
     );
+    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+});
+
+describe("the caught-up dead end", () => {
+  it("opens on everything rather than on unread", () => {
+    // Defaulting to unread meant a fully-read inbox opened on an empty state while
+    // its notifications sat in the database, unreachable by any filter.
+    render(
+      <NotificationsPageClient
+        userId="u1"
+        notifications={[notification({ id: "read-1", read: true, message: "An old one" })]}
+      />
+    );
+
+    expect(screen.getByText("An old one")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing in this view.")).not.toBeInTheDocument();
+  });
+
+  it("still shows the inbox after marking everything read", async () => {
+    render(
+      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("All caught up")).toBeInTheDocument();
+    });
+    // The rows are still on screen -- they are read, not gone.
+    expect(screen.getByText(/started following your work/)).toBeInTheDocument();
+    expect(screen.getByText(/published a new Article/)).toBeInTheDocument();
+  });
+
+  it("offers a way out of an empty filter", async () => {
+    render(
+      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Responses/ }));
+    expect(screen.getByText("Nothing in this view.")).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Show all notifications" })
+    );
+
+    expect(screen.getByText(/started following your work/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+  });
+
+  it("says caught up rather than empty when only unread is filtered out", async () => {
+    render(
+      <NotificationsPageClient
+        userId="u1"
+        notifications={[notification({ id: "read-1", read: true })]}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Unread/ }));
+
+    expect(screen.getByText("You are all caught up.")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Your inbox still has 1 notification\./)
+    ).toBeInTheDocument();
   });
 });

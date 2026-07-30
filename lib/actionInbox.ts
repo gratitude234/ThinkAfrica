@@ -7,12 +7,16 @@ import {
 } from "./notificationCatalog";
 
 /**
- * "needs_attention" is not a descriptor category -- no notification type is ever
- * classified as it. The inbox uses it as a *state* filter meaning "unread", and it
- * is kept in this union only because existing callers type their filter keys
- * against it.
+ * Categories are exactly the descriptor categories -- nothing more.
+ *
+ * This used to carry an extra "needs_attention" member that no notification type
+ * was ever assigned, because the inbox needed a key for its unread filter. A
+ * category that cannot match anything is a trap: every consumer had to remember to
+ * special-case it, and the inbox's chip row silently mixed one state filter in with
+ * four real categories while presenting them identically. Read/unread is a state,
+ * so the inbox now models it as one.
  */
-export type ActionInboxCategory = NotificationCategory | "needs_attention";
+export type ActionInboxCategory = NotificationCategory;
 
 export interface ActionInboxNotificationInput {
   id: string;

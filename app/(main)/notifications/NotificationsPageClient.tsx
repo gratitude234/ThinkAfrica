@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Toast from "@/components/ui/Toast";
-import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
+import {
+  getActionInboxSummary,
+  type ActionInboxCategory,
+  type ActionInboxItem,
+} from "@/lib/actionInbox";
 import {
   dismissNotification,
   markAllNotificationsRead,
@@ -26,15 +30,31 @@ interface NotificationsPageClientProps {
   notifications: NotificationData[];
 }
 
-type FilterKey = "needs_attention" | "responses" | "review" | "opportunities" | "activity";
+/**
+ * "all" and "unread" are states; the rest are categories. They are separate kinds
+ * of thing, which is why the old single "needs_attention" key -- a state pretending
+ * to be a category -- had to be special-cased everywhere it was touched.
+ */
+type FilterKey = "all" | "unread" | ActionInboxCategory;
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: "needs_attention", label: "Needs attention" },
+  { key: "all", label: "All" },
+  { key: "unread", label: "Unread" },
   { key: "responses", label: "Responses" },
   { key: "review", label: "Review" },
   { key: "opportunities", label: "Opportunities" },
   { key: "activity", label: "Activity" },
 ];
+
+/**
+ * The inbox opens on everything, not on unread.
+ *
+ * It used to default to unread-only, so marking everything read collapsed the page
+ * to "Nothing in this view" while fifty notifications sat in the database with no
+ * filter that could reach them -- the tidier your inbox, the emptier the page
+ * looked. Unread is still one tap away, it is just no longer the only way in.
+ */
+const DEFAULT_FILTER: FilterKey = "all";
 
 interface UndoState {
   message: string;
@@ -73,7 +93,7 @@ export default function NotificationsPageClient({
   // derived from it, so marking one row read cannot leave the header count, the
   // hero and the list disagreeing with each other.
   const [notifications, setNotifications] = useState(initialNotifications);
-  const [activeFilter, setActiveFilter] = useState<FilterKey>("needs_attention");
+  const [activeFilter, setActiveFilter] = useState<FilterKey>(DEFAULT_FILTER);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [toast, setToast] = useState<
     { message: string; undo?: UndoState } | null
@@ -159,27 +179,35 @@ export default function NotificationsPageClient({
     () =>
       sectionsFromNotifications(
         listNotifications.filter((item) => {
-          if (activeFilter === "needs_attention") return !item.read;
+          if (activeFilter === "all") return true;
+          if (activeFilter === "unread") return !item.read;
           return categoryByNotificationId.get(item.id) === activeFilter;
         })
       ),
     [listNotifications, activeFilter, categoryByNotificationId]
   );
 
-  // Counted over the same set the list renders, so a chip can never advertise
-  // items that clicking it will not show.
+  /**
+   * Every count answers the same question: how many rows will I see if I tap this?
+   *
+   * They previously did not. "Needs attention" counted unread only while the four
+   * category chips counted read and unread alike, so the same three notifications
+   * were advertised as "Needs attention (3)" and "Activity (3)" by two different
+   * rules. Counting over exactly the set the list renders makes them comparable.
+   */
   const filterCounts = useMemo(() => {
     const counts: Record<FilterKey, number> = {
-      needs_attention: 0,
+      all: listNotifications.length,
+      unread: 0,
       responses: 0,
       review: 0,
       opportunities: 0,
       activity: 0,
     };
     for (const item of listNotifications) {
-      if (!item.read) counts.needs_attention += 1;
+      if (!item.read) counts.unread += 1;
       const category = categoryByNotificationId.get(item.id);
-      if (category && category !== "needs_attention") counts[category] += 1;
+      if (category) counts[category] += 1;
     }
     return counts;
   }, [listNotifications, categoryByNotificationId]);
@@ -474,12 +502,27 @@ export default function NotificationsPageClient({
             </div>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center">
-              <p className="font-medium text-gray-700">Nothing in this view.</p>
-              <p className="mt-1 text-sm text-gray-500">
-                {activeFilter === "needs_attention"
-                  ? "You are caught up. Switch filters to revisit what has already been read."
-                  : "Try another filter to see the rest of your inbox."}
+              <p className="font-medium text-gray-700">
+                {activeFilter === "unread"
+                  ? "You are all caught up."
+                  : "Nothing in this view."}
               </p>
+              <p className="mt-1 text-sm text-gray-500">
+                {activeFilter === "unread"
+                  ? `Everything here has been read. Your inbox still has ${notifications.length} notification${
+                      notifications.length === 1 ? "" : "s"
+                    }.`
+                  : "This filter has nothing in it right now."}
+              </p>
+              {/* An empty filter used to be a dead end -- it said "try another
+                  filter" without offering one. */}
+              <button
+                type="button"
+                onClick={() => setActiveFilter("all")}
+                className="mt-4 cursor-pointer rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-canvas"
+              >
+                Show all notifications
+              </button>
             </div>
           )}
         </>
