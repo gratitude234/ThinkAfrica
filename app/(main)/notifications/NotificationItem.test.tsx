@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import NotificationItem, { buildNotificationMessage } from "./NotificationItem";
 
@@ -23,6 +24,8 @@ const publicationNotification = {
   actor_username: "ama",
 };
 
+// Fallback copy is now standardised as full sentences by lib/notificationCatalog.ts,
+// which is why these expectations gained terminal punctuation.
 describe("author publication notifications", () => {
   it("uses author-specific fallback copy", () => {
     expect(
@@ -30,7 +33,7 @@ describe("author publication notifications", () => {
         ...publicationNotification,
         message: null,
       })
-    ).toBe("Ama Mensah published new work: Designing Lagos");
+    ).toBe("Ama Mensah published new work: Designing Lagos.");
   });
 
   it("uses topic-specific fallback copy", () => {
@@ -41,7 +44,7 @@ describe("author publication notifications", () => {
         message: null,
       })
     ).toBe(
-      "New work was published in a topic you subscribe to: Designing Lagos"
+      "New work was published in a topic you subscribe to: Designing Lagos."
     );
   });
 
@@ -72,7 +75,7 @@ describe("author subscriber notifications", () => {
 
   it("says subscribed rather than followed", () => {
     expect(buildNotificationMessage(subscriberNotification)).toBe(
-      "Ama Mensah subscribed to your work"
+      "Ama Mensah subscribed to your work."
     );
   });
 
@@ -81,5 +84,68 @@ describe("author subscriber notifications", () => {
     expect(
       screen.getByRole("link", { name: /subscribed to your work/i })
     ).toHaveAttribute("href", "/ama");
+  });
+});
+
+describe("read state and dismissal", () => {
+  const followNotification = {
+    ...publicationNotification,
+    id: "follow-id",
+    type: "follow",
+    message: null as string | null,
+    link: null as string | null,
+  };
+
+  it("reports the open to the parent instead of tracking read state locally", async () => {
+    const onOpen = vi.fn();
+    render(
+      <NotificationItem notification={followNotification} onOpen={onOpen} />
+    );
+
+    await userEvent.click(screen.getByRole("link", { name: /following/i }));
+
+    expect(onOpen).toHaveBeenCalledWith("follow-id");
+  });
+
+  it("reflects the read flag from props", () => {
+    const { rerender } = render(
+      <NotificationItem notification={followNotification} />
+    );
+    expect(screen.getByText("Unread")).toBeInTheDocument();
+
+    rerender(
+      <NotificationItem
+        notification={{ ...followNotification, read: true }}
+      />
+    );
+    expect(screen.queryByText("Unread")).not.toBeInTheDocument();
+  });
+
+  it("offers a dismiss control outside the link when the parent can handle it", async () => {
+    const onDismiss = vi.fn();
+    render(
+      <NotificationItem notification={followNotification} onDismiss={onDismiss} />
+    );
+
+    const dismiss = screen.getByRole("button", { name: /^Dismiss notification:/i });
+    // A <button> nested inside an <a> is invalid markup and unreachable by
+    // keyboard, so the control must be a sibling of the link.
+    expect(dismiss.closest("a")).toBeNull();
+
+    await userEvent.click(dismiss);
+    expect(onDismiss).toHaveBeenCalledWith("follow-id");
+  });
+
+  it("omits the dismiss control when no handler is supplied", () => {
+    render(<NotificationItem notification={followNotification} />);
+    expect(
+      screen.queryByRole("button", { name: /^Dismiss notification:/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("exposes a machine-readable timestamp", () => {
+    render(<NotificationItem notification={followNotification} />);
+    const time = document.querySelector("time");
+    expect(time).toHaveAttribute("dateTime", followNotification.created_at);
   });
 });

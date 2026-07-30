@@ -4,17 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
+import {
+  markAllNotificationsRead,
+  markNotificationsRead,
+} from "@/lib/notificationMutations";
+import { notificationHref, notificationMessage } from "@/lib/notificationCatalog";
+import NotificationAvatar from "@/components/notifications/NotificationAvatar";
+import {
+  fetchNotificationRows,
+  type NotificationData,
+} from "@/lib/notificationData";
 import { shouldUseRealtime } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
-
-interface Notification {
-  id: string;
-  type: string;
-  message: string | null;
-  read: boolean;
-  link: string | null;
-  created_at: string;
-}
 
 function timeAgo(dateString: string): string {
   const seconds = Math.floor(
@@ -32,53 +33,18 @@ function timeAgo(dateString: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  like: "<3",
-  comment: "...",
-  follow: "+",
-  debate_reply: "!",
-  post_approved: "OK",
-  post_published: "P",
-  author_published: "NEW",
-  topic_published: "#",
-  revision_requested: "RE",
-  response_post: "RE",
-  opportunity_inquiry: "OP",
-  debate_invitation: "D",
-  debate_invitation_response: "OK",
-  debate_phase_advanced: ">",
-  debate_cancelled: "X",
-};
-
-export function notificationText(notification: Notification) {
-  if (notification.message) return notification.message;
-
-  switch (notification.type) {
-    case "follow":
-      return "Someone started following you";
-    case "like":
-      return "Someone liked your post";
-    case "comment":
-      return "Someone commented on your post";
-    case "response_post":
-      return "Someone wrote a response to your post";
-    case "revision_requested":
-      return "A post needs revision";
-    case "post_published":
-      return "Your post has been published";
-    case "author_published":
-      return "An author you subscribe to published new work";
-    case "topic_published":
-      return "New work in a topic you subscribe to";
-    case "opportunity_inquiry":
-      return "New opportunity inquiry";
-    default:
-      return "New notification";
-  }
+/**
+ * Retained as a named export for the existing callers/tests. The dropdown's own
+ * copy switch is gone: it covered only ten types and, because its query never
+ * joined `profiles`, its fallbacks could not name the actor -- every follow read
+ * "Someone started following you" while the same row on /notifications named them.
+ */
+export function notificationText(notification: NotificationData) {
+  return notificationMessage(notification);
 }
 
 export default function NotificationBell({ userId }: { userId: string }) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
@@ -89,17 +55,24 @@ export default function NotificationBell({ userId }: { userId: string }) {
     [notifications]
   );
 
-  const fetchNotifications = useCallback(async () => {
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(10);
+  // Only a notification that asks something of the reader earns the hero slot; a
+  // new follower used to be promoted here purely for being the newest unread row.
+  const heroItem = actionSummary.primaryActionable;
 
-    if (data) {
-      setNotifications(data as Notification[]);
-    }
+  // ...and whatever the hero renders is dropped from the list below it, so a
+  // 320px-wide dropdown stops showing the same notification twice.
+  const listNotifications = useMemo(
+    () =>
+      notifications.filter(
+        (notification) => notification.id !== heroItem?.notificationId
+      ),
+    [notifications, heroItem]
+  );
+
+  const fetchNotifications = useCallback(async () => {
+    const { rows, error } = await fetchNotificationRows(supabase, userId, 10);
+    if (error) return;
+    setNotifications(rows);
   }, [supabase, userId]);
 
   useEffect(() => {
@@ -148,11 +121,12 @@ export default function NotificationBell({ userId }: { userId: string }) {
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
-        (payload) => {
-          setNotifications((prev) => [
-            payload.new as Notification,
-            ...prev.slice(0, 9),
-          ]);
+        () => {
+          // Refetch rather than splicing in `payload.new`: a Realtime row carries
+          // only the `notifications` columns, with none of the joined actor/post
+          // fields the copy and link fallbacks are built from, so the spliced row
+          // would render as "Someone ..." with no destination.
+          void fetchNotifications();
         }
       )
       .subscribe();
@@ -160,7 +134,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [supabase, userId]);
+  }, [supabase, userId, fetchNotifications]);
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -177,18 +151,63 @@ export default function NotificationBell({ userId }: { userId: string }) {
   }, []);
 
   async function markAllRead() {
-    await supabase
-      .from("notifications")
-      .update({ read: true })
-      .eq("user_id", userId)
-      .eq("read", false);
+    const previouslyUnread = notifications
+      .filter((notification) => !notification.read)
+      .map((notification) => notification.id);
 
     setNotifications((prev) =>
       prev.map((notification) => ({ ...notification, read: true }))
     );
+
+    const { error } = await markAllNotificationsRead(supabase, userId);
+
+    // Previously this ignored the result entirely and cleared the badge even when
+    // the write failed, leaving the UI asserting something the server disagreed with.
+    if (error) {
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          previouslyUnread.includes(notification.id)
+            ? { ...notification, read: false }
+            : notification
+        )
+      );
+    }
   }
 
-  function trackOpen(notification: Notification) {
+  /**
+   * Opening a notification marks it read. Without this the badge only ever cleared
+   * via "Mark all as read", so a notification the reader had already acted on kept
+   * counting against them.
+   */
+  function markOneRead(notificationId: string) {
+    const target = notifications.find(
+      (notification) => notification.id === notificationId
+    );
+    if (!target || target.read) return;
+
+    setNotifications((prev) =>
+      prev.map((notification) =>
+        notification.id === notificationId
+          ? { ...notification, read: true }
+          : notification
+      )
+    );
+
+    void markNotificationsRead(supabase, userId, [notificationId]).then(
+      ({ error }) => {
+        if (!error) return;
+        setNotifications((prev) =>
+          prev.map((notification) =>
+            notification.id === notificationId
+              ? { ...notification, read: false }
+              : notification
+          )
+        );
+      }
+    );
+  }
+
+  function trackOpen(notification: NotificationData) {
     trackActivationEvent({
       event: "notification_opened",
       metadata: {
@@ -279,12 +298,13 @@ export default function NotificationBell({ userId }: { userId: string }) {
               </div>
             ) : (
               <>
-                {actionSummary.primaryAction ? (
+                {heroItem ? (
                   <div className="px-3 py-3">
                     <Link
-                      href={actionSummary.primaryAction.href}
+                      href={heroItem.href}
                       onClick={() => {
-                        trackAction(actionSummary.primaryAction as ActionInboxItem);
+                        trackAction(heroItem);
+                        markOneRead(heroItem.notificationId);
                         setOpen(false);
                       }}
                       className="block rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 transition-colors hover:bg-emerald-100/60"
@@ -293,23 +313,31 @@ export default function NotificationBell({ userId }: { userId: string }) {
                         Needs attention
                       </p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">
-                        {actionSummary.primaryAction.label}
+                        {heroItem.label}
                       </p>
                       <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-600">
-                        {actionSummary.primaryAction.description}
+                        {heroItem.description}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        {timeAgo(heroItem.createdAt)}
                       </p>
                       <p className="mt-2 text-xs font-semibold text-emerald-700">
-                        {actionSummary.primaryAction.cta}
+                        {heroItem.cta}
                       </p>
                     </Link>
                   </div>
                 ) : null}
-                {notifications.map((notification) => {
+                {listNotifications.map((notification) => {
+                // Resolved through the catalog, so a follow or like created without
+                // an explicit `link` is still reachable here. This used to read
+                // `notification.link` directly, which left those rows dead.
+                const href = notificationHref(notification);
                 const inner = (
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600">
-                      {TYPE_ICONS[notification.type] ?? "N"}
-                    </span>
+                    <NotificationAvatar
+                      type={notification.type}
+                      avatarUrl={notification.actor?.avatar_url}
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm leading-snug text-gray-700">
                         {notificationText(notification)}
@@ -331,11 +359,12 @@ export default function NotificationBell({ userId }: { userId: string }) {
                       !notification.read ? "bg-emerald-50" : "hover:bg-canvas"
                     }`}
                   >
-                    {notification.link ? (
+                    {href ? (
                       <Link
-                        href={notification.link}
+                        href={href}
                         onClick={() => {
                           trackOpen(notification);
+                          markOneRead(notification.id);
                           setOpen(false);
                         }}
                       >

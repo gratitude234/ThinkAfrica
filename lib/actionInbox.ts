@@ -1,9 +1,18 @@
-export type ActionInboxCategory =
-  | "needs_attention"
-  | "responses"
-  | "review"
-  | "opportunities"
-  | "activity";
+import {
+  describeNotificationType,
+  isActionableType,
+  notificationHref,
+  notificationMessage,
+  type NotificationCategory,
+} from "./notificationCatalog";
+
+/**
+ * "needs_attention" is not a descriptor category -- no notification type is ever
+ * classified as it. The inbox uses it as a *state* filter meaning "unread", and it
+ * is kept in this union only because existing callers type their filter keys
+ * against it.
+ */
+export type ActionInboxCategory = NotificationCategory | "needs_attention";
 
 export interface ActionInboxNotificationInput {
   id: string;
@@ -35,6 +44,17 @@ export interface ActionInboxItem {
   cta: string;
   actionKey: string;
   postId: string | null;
+  /**
+   * Whether this notification asks the reader to *do* something (revise a draft,
+   * answer an invitation, respond to an inquiry) as opposed to merely telling them
+   * something happened (a like, a follow, a new publication).
+   *
+   * Only actionable items are eligible to be promoted into a "Needs attention"
+   * hero. Without this distinction the hero was simply the newest unread row, so a
+   * single new follower rendered as a full-width NEEDS ATTENTION banner with a
+   * primary CTA -- over-claiming urgency and training people to ignore the banner.
+   */
+  actionable: boolean;
 }
 
 export interface ActionInboxGroup {
@@ -45,6 +65,12 @@ export interface ActionInboxGroup {
 
 export interface ActionInboxSummary {
   primaryAction: ActionInboxItem | null;
+  /**
+   * The highest-priority unread item that actually asks for a response. This is
+   * what a "Needs attention" hero should render; `primaryAction` is just the top
+   * unread row of any kind and stays available for callers that want that.
+   */
+  primaryActionable: ActionInboxItem | null;
   items: ActionInboxItem[];
   groups: ActionInboxGroup[];
   unreadActionCount: number;
@@ -53,218 +79,35 @@ export interface ActionInboxSummary {
 
 const STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
-function actorName(notification: ActionInboxNotificationInput) {
-  return (
-    notification.actor?.full_name?.trim() ||
-    notification.actor?.username?.trim() ||
-    "Someone"
-  );
-}
+export { isActionableType };
 
-function postTitle(notification: ActionInboxNotificationInput) {
-  return notification.post_title?.trim() || "your work";
-}
-
-function defaultHref(notification: ActionInboxNotificationInput) {
-  if (notification.link) return notification.link;
-  if (notification.post_slug) return `/post/${notification.post_slug}`;
-  if (notification.actor_username) return `/${notification.actor_username}`;
-  return "/notifications";
-}
-
+/**
+ * Labels, categories, priorities, CTAs and fallback copy all come from
+ * lib/notificationCatalog.ts, which is the one place any notification type is
+ * described. This function only adapts a stored row to the inbox's shape.
+ */
 function notificationToAction(
   notification: ActionInboxNotificationInput
 ): ActionInboxItem {
-  const base = {
+  const descriptor = describeNotificationType(notification.type);
+
+  return {
     notificationId: notification.id,
     type: notification.type,
     read: notification.read,
     createdAt: notification.created_at,
-    href: defaultHref(notification),
     postId: notification.post_id ?? null,
+    category: descriptor.category,
+    priority: descriptor.priority,
+    label: descriptor.label,
+    cta: descriptor.cta,
+    actionKey: descriptor.actionKey,
+    actionable: descriptor.actionable,
+    description: notificationMessage(notification),
+    // Every inbox item needs somewhere to go, so an unlinkable notification falls
+    // back to the inbox itself rather than rendering a broken CTA.
+    href: notificationHref(notification) ?? "/notifications",
   };
-
-  switch (notification.type) {
-    case "revision_requested":
-      return {
-        ...base,
-        category: "review",
-        priority: 10,
-        label: "Revision requested",
-        description:
-          notification.message ??
-          `Reviewer feedback is ready for ${postTitle(notification)}.`,
-        cta: "Revise submission",
-        actionKey: "revision_requested",
-      };
-    case "response_post":
-      return {
-        ...base,
-        category: "responses",
-        priority: 20,
-        label: "Response to your work",
-        description:
-          notification.message ??
-          `${actorName(notification)} wrote a response to ${postTitle(notification)}.`,
-        cta: "Read response",
-        actionKey: "response_received",
-      };
-    case "opportunity_inquiry":
-      return {
-        ...base,
-        category: "opportunities",
-        priority: 30,
-        label: "Opportunity inquiry",
-        description:
-          notification.message ??
-          "A partner sent structured opportunity interest for your profile.",
-        href: notification.link ?? "/dashboard#opportunity-interest",
-        cta: "Review inquiry",
-        actionKey: "opportunity_inquiry",
-      };
-    case "review_assigned":
-      return {
-        ...base,
-        category: "review",
-        priority: 40,
-        label: "Review assigned",
-        description:
-          notification.message ??
-          `You have been assigned to review ${postTitle(notification)}.`,
-        cta: "Open review",
-        actionKey: "review_assigned",
-      };
-    case "post_published":
-    case "post_approved":
-    case "post_rejected":
-    case "fellowship":
-      return {
-        ...base,
-        category: "review",
-        priority: 50,
-        label: "Application or review update",
-        description: notification.message ?? "You have a status update to review.",
-        cta: "Open update",
-        actionKey: "status_update",
-      };
-    case "co_author_invite":
-      return {
-        ...base,
-        category: "activity",
-        priority: 60,
-        label: "Co-author invite",
-        description:
-          notification.message ??
-          `${actorName(notification)} invited you to co-author ${postTitle(notification)}.`,
-        cta: "Review invite",
-        actionKey: "co_author_invite",
-      };
-    case "debate_invitation":
-      return {
-        ...base,
-        category: "activity",
-        priority: 55,
-        label: "Debate invitation",
-        description:
-          notification.message ??
-          `${actorName(notification)} invited you to a debate.`,
-        cta: "Review invitation",
-        actionKey: "debate_invitation",
-      };
-    case "debate_invitation_response":
-      return {
-        ...base,
-        category: "activity",
-        priority: 60,
-        label: "Debate invitation update",
-        description:
-          notification.message ?? "A debater responded to your invitation.",
-        cta: "Open debate",
-        actionKey: "debate_invitation_response",
-      };
-    case "debate_phase_advanced":
-      return {
-        ...base,
-        category: "activity",
-        priority: 60,
-        label: "Debate stage opened",
-        description:
-          notification.message ?? "A debate has moved to its next stage.",
-        cta: "Open debate",
-        actionKey: "debate_phase_advanced",
-      };
-    case "debate_cancelled":
-      return {
-        ...base,
-        category: "activity",
-        priority: 60,
-        label: "Debate cancelled",
-        description:
-          notification.message ?? "A debate you joined was cancelled.",
-        cta: "View record",
-        actionKey: "debate_cancelled",
-      };
-    case "comment":
-      return {
-        ...base,
-        category: "activity",
-        priority: 70,
-        label: "New comment",
-        description:
-          notification.message ??
-          `${actorName(notification)} commented on ${postTitle(notification)}.`,
-        cta: "Open comment",
-        actionKey: "comment",
-      };
-    case "follow":
-      return {
-        ...base,
-        category: "activity",
-        priority: 80,
-        label: "New follower",
-        description:
-          notification.message ??
-          `${actorName(notification)} started following your work.`,
-        cta: "View profile",
-        actionKey: "follow",
-      };
-    // Ranked ahead of a follow: subscribing is the strongest signal a reader
-    // can give, and it opts them into every future publication.
-    case "author_subscribed":
-      return {
-        ...base,
-        category: "activity",
-        priority: 75,
-        label: "New subscriber",
-        description:
-          notification.message ??
-          `${actorName(notification)} subscribed to your work.`,
-        cta: "View profile",
-        actionKey: "author_subscribed",
-      };
-    case "like":
-      return {
-        ...base,
-        category: "activity",
-        priority: 90,
-        label: "New like",
-        description:
-          notification.message ??
-          `${actorName(notification)} liked ${postTitle(notification)}.`,
-        cta: "View post",
-        actionKey: "like",
-      };
-    default:
-      return {
-        ...base,
-        category: "activity",
-        priority: 100,
-        label: "New notification",
-        description: notification.message ?? "You have a new update.",
-        cta: "Open",
-        actionKey: "notification",
-      };
-  }
 }
 
 export function getActionInboxSummary(
@@ -288,6 +131,7 @@ export function getActionInboxSummary(
 
   return {
     primaryAction: unreadItems[0] ?? null,
+    primaryActionable: unreadItems.find((item) => item.actionable) ?? null,
     items,
     groups: groupOrder
       .map((group) => ({
