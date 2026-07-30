@@ -69,6 +69,15 @@ type NotificationsQueryClient = {
   from: (table: string) => any;
 };
 
+/**
+ * PostgREST renders this as `type=not.in.(like,follow)`. Notification types are
+ * `[a-z0-9_]+` throughout the catalog, so no value here needs quoting or escaping.
+ */
+function applyMutedTypes(query: any, mutedTypes: string[]) {
+  if (mutedTypes.length === 0) return query;
+  return query.not("type", "in", `(${mutedTypes.join(",")})`);
+}
+
 export interface NotificationRowsResult {
   rows: NotificationData[];
   error: string | null;
@@ -82,15 +91,22 @@ export interface NotificationRowsResult {
 export async function fetchNotificationRows(
   supabase: NotificationsQueryClient,
   userId: string,
-  limit = 50
+  limit = 50,
+  mutedTypes: string[] = []
 ): Promise<NotificationRowsResult> {
   // Dismissed notifications are soft-deleted, not removed, so they have to be
   // filtered out here rather than relying on the row being gone.
-  const { data: raw, error } = await supabase
+  let query = supabase
     .from("notifications")
     .select(NOTIFICATIONS_SELECT)
     .eq("user_id", userId)
-    .is("dismissed_at", null)
+    .is("dismissed_at", null);
+
+  // Muting filters here rather than at insert time so one rule covers both
+  // surfaces, and so turning a group back on restores its history.
+  query = applyMutedTypes(query, mutedTypes);
+
+  const { data: raw, error } = await query
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -122,4 +138,44 @@ export async function fetchNotificationRows(
   });
 
   return { rows, error: error?.message ?? null };
+}
+
+export interface UnreadCountResult {
+  count: number | null;
+  error: string | null;
+}
+
+/**
+ * The true number of unread notifications.
+ *
+ * The bell used to derive its badge from the ten rows it had fetched, so the count
+ * was capped at ten and — worse — simply wrong: someone with forty unread items
+ * saw "3" whenever only three of the newest ten happened to be unread. This is a
+ * `head` count, so it costs a round trip but transfers no rows.
+ *
+ * `count` is null when the query fails, so a caller can tell "no unread" apart from
+ * "we do not know" and leave the previous badge alone rather than clearing it.
+ */
+export async function fetchUnreadCount(
+  supabase: NotificationsQueryClient,
+  userId: string,
+  mutedTypes: string[] = []
+): Promise<UnreadCountResult> {
+  let query = supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("read", false)
+    .is("dismissed_at", null);
+
+  // Must match fetchNotificationRows exactly, or the badge counts notifications
+  // the inbox will not show.
+  query = applyMutedTypes(query, mutedTypes);
+
+  const { count, error } = await query;
+
+  return {
+    count: typeof count === "number" ? count : null,
+    error: error?.message ?? null,
+  };
 }

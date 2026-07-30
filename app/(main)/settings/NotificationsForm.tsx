@@ -23,8 +23,12 @@ import {
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
 import { sendCurrentDeviceTestPush } from "./pushActions";
+import {
+  IN_APP_PREF_GROUPS,
+  type InAppNotificationPrefs,
+} from "@/lib/notificationPreferences";
 
-export interface NotificationPrefs {
+interface BaseNotificationPrefs {
   email_comments: boolean;
   email_follows: boolean;
   email_likes: boolean;
@@ -52,6 +56,13 @@ export interface NotificationPrefs {
   push_author_publications: boolean;
   push_debate_updates: boolean;
 }
+
+/**
+ * In-app preferences share the profile's notification_prefs blob with email and
+ * push, so they need no schema change -- but they are the only channel a reader
+ * could not previously control at all.
+ */
+export type NotificationPrefs = BaseNotificationPrefs & InAppNotificationPrefs;
 
 const EMAIL_ROWS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
   { key: "email_comments", label: "New comments", description: "When someone comments on your post" },
@@ -243,7 +254,7 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
 
   function renderToggleRow(
     { key, label, description }: { key: keyof NotificationPrefs; label: string; description: string },
-    channel: "Email" | "Push"
+    channel: "Email" | "Push" | "In-app"
   ) {
     const value = prefs[key];
     return (
@@ -269,6 +280,23 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
   return (
     <>
       <div className="max-w-2xl space-y-6">
+        <div>
+          <h2 className="mb-1 text-base font-semibold text-gray-900">In the app</h2>
+          <p className="mb-4 text-xs text-gray-500">
+            What shows up in your notifications inbox and the bell. Anything that
+            needs a response from you — review requests, invitations, editorial and
+            account decisions — always comes through and is not listed here.
+          </p>
+          <div className="space-y-3">
+            {IN_APP_PREF_GROUPS.map((group) =>
+              renderToggleRow(
+                { key: group.key, label: group.label, description: group.description },
+                "In-app"
+              )
+            )}
+          </div>
+        </div>
+
         <div>
           <h2 className="mb-4 text-base font-semibold text-gray-900">Email</h2>
           <div className="space-y-3">{EMAIL_ROWS.map((row) => renderToggleRow(row, "Email"))}</div>

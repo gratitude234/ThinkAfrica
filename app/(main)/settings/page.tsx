@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { IN_APP_PREF_DEFAULTS } from "@/lib/notificationPreferences";
 import { getProfileCredibilitySummary } from "@/lib/profileCredibility";
 import ProfileForm from "./ProfileForm";
 import AccountForm from "./AccountForm";
@@ -143,6 +144,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     push_daily_brief: true,
     push_author_publications: true,
     push_debate_updates: true,
+    ...IN_APP_PREF_DEFAULTS,
     ...((profile.notification_prefs as Partial<NotificationPrefs>) ?? {}),
   };
 
