@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
@@ -12,44 +12,25 @@ import { notificationHref, notificationMessage } from "@/lib/notificationCatalog
 import NotificationAvatar from "@/components/notifications/NotificationAvatar";
 import {
   fetchNotificationRows,
+  fetchUnreadCount,
   type NotificationData,
 } from "@/lib/notificationData";
 import { shouldUseRealtime } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
+import { formatRelativeTime } from "@/lib/utils";
 
-function timeAgo(dateString: string): string {
-  const seconds = Math.floor(
-    (Date.now() - new Date(dateString).getTime()) / 1000
-  );
-
-  if (seconds < 60) return "just now";
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
-/**
- * Retained as a named export for the existing callers/tests. The dropdown's own
- * copy switch is gone: it covered only ten types and, because its query never
- * joined `profiles`, its fallbacks could not name the actor -- every follow read
- * "Someone started following you" while the same row on /notifications named them.
- */
-export function notificationText(notification: NotificationData) {
-  return notificationMessage(notification);
-}
+const POLL_MS = 30_000;
 
 export default function NotificationBell({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
   const supabase = useMemo(() => createClient(), []);
 
-  const unreadCount = notifications.filter((notification) => !notification.read).length;
   const actionSummary = useMemo(
     () => getActionInboxSummary(notifications),
     [notifications]
@@ -60,7 +41,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
   const heroItem = actionSummary.primaryActionable;
 
   // ...and whatever the hero renders is dropped from the list below it, so a
-  // 320px-wide dropdown stops showing the same notification twice.
+  // narrow dropdown stops showing the same notification twice.
   const listNotifications = useMemo(
     () =>
       notifications.filter(
@@ -70,9 +51,15 @@ export default function NotificationBell({ userId }: { userId: string }) {
   );
 
   const fetchNotifications = useCallback(async () => {
-    const { rows, error } = await fetchNotificationRows(supabase, userId, 10);
-    if (error) return;
-    setNotifications(rows);
+    // The badge count is queried separately rather than derived from these rows:
+    // this list is capped at ten, and the unread total is not.
+    const [rowsResult, countResult] = await Promise.all([
+      fetchNotificationRows(supabase, userId, 10),
+      fetchUnreadCount(supabase, userId),
+    ]);
+
+    if (!rowsResult.error) setNotifications(rowsResult.rows);
+    if (countResult.count !== null) setUnreadCount(countResult.count);
   }, [supabase, userId]);
 
   useEffect(() => {
@@ -84,27 +71,34 @@ export default function NotificationBell({ userId }: { userId: string }) {
   // (see 20260521000001_disable_realtime_for_launch_stability.sql), so gating this on
   // that flag would silently stop delivery if Realtime is ever enabled for other
   // tables (e.g. messages) without also being re-enabled for this one.
+  //
+  // It is gated on visibility, though: a backgrounded tab polled every 30s forever,
+  // and on /notifications that ran alongside the page's own poller.
   useEffect(() => {
     const poll = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       void fetchNotifications();
-    }, 30_000);
+    }, POLL_MS);
 
     return () => clearInterval(poll);
   }, [fetchNotifications]);
 
-  // Refetch on open/focus since Realtime for `notifications` is disabled at the
-  // Postgres publication level regardless of the shouldUseRealtime() flag.
+  // Catch up immediately on returning to the tab, since polling paused while hidden.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") void fetchNotifications();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [fetchNotifications]);
+
   useEffect(() => {
     if (open) void fetchNotifications();
   }, [open, fetchNotifications]);
-
-  useEffect(() => {
-    function onFocus() {
-      void fetchNotifications();
-    }
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [fetchNotifications]);
 
   useEffect(() => {
     if (!shouldUseRealtime()) {
@@ -136,28 +130,60 @@ export default function NotificationBell({ userId }: { userId: string }) {
     };
   }, [supabase, userId, fetchNotifications]);
 
+  const close = useCallback((returnFocus = false) => {
+    setOpen(false);
+    if (returnFocus) triggerRef.current?.focus();
+  }, []);
+
+  // pointerdown rather than mousedown: mousedown never fires for a touch tap that
+  // does not resolve to a click, so tapping outside the panel on a phone did not
+  // reliably dismiss it.
   useEffect(() => {
-    function handleClick(event: MouseEvent) {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
       ) {
-        setOpen(false);
+        close();
       }
     }
 
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open, close]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        close(true);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, close]);
+
+  // Move focus into the panel on open so keyboard and screen-reader users land in
+  // the notifications rather than continuing through the nav behind them.
+  useEffect(() => {
+    if (open) panelRef.current?.focus();
+  }, [open]);
 
   async function markAllRead() {
     const previouslyUnread = notifications
       .filter((notification) => !notification.read)
       .map((notification) => notification.id);
+    const previousCount = unreadCount;
 
     setNotifications((prev) =>
       prev.map((notification) => ({ ...notification, read: true }))
     );
+    setUnreadCount(0);
 
     const { error } = await markAllNotificationsRead(supabase, userId);
 
@@ -171,6 +197,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
             : notification
         )
       );
+      setUnreadCount(previousCount);
     }
   }
 
@@ -192,6 +219,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
           : notification
       )
     );
+    setUnreadCount((count) => Math.max(0, count - 1));
 
     void markNotificationsRead(supabase, userId, [notificationId]).then(
       ({ error }) => {
@@ -203,6 +231,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
               : notification
           )
         );
+        setUnreadCount((count) => count + 1);
       }
     );
   }
@@ -242,18 +271,27 @@ export default function NotificationBell({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative" ref={containerRef}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className="relative flex h-[34px] w-[34px] items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-canvas hover:text-ink"
-        aria-label="Notifications"
+        aria-label={
+          unreadCount > 0
+            ? `Notifications, ${unreadCount} unread`
+            : "Notifications"
+        }
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
       >
         <svg
           className="h-[18px] w-[18px]"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -263,133 +301,193 @@ export default function NotificationBell({ userId }: { userId: string }) {
           />
         </svg>
         {unreadCount > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
-            {unreadCount > 9 ? "9+" : unreadCount}
+          <span
+            aria-hidden="true"
+            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white"
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         ) : null}
       </button>
 
+      {/* The badge is aria-hidden decoration; this is what actually announces. */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {unreadCount > 0 ? `${unreadCount} unread notifications` : ""}
+      </span>
+
       {open ? (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-gray-200 bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-            <span className="text-sm font-semibold text-gray-900">Notifications</span>
-            {unreadCount > 0 ? (
-              <button
-                type="button"
-                onClick={markAllRead}
-                className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
-              >
-                Mark all as read
-              </button>
-            ) : null}
-          </div>
+        <>
+          {/* Dims the page behind the mobile sheet and gives a large dismiss target. */}
+          <div
+            aria-hidden="true"
+            onClick={() => close()}
+            className="fixed inset-0 z-40 bg-black/20 sm:hidden"
+          />
 
-          <div className="max-h-80 divide-y divide-gray-50 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">
-                <p>No notifications yet</p>
-                <Link
-                  href="/?tab=latest"
-                  onClick={() => setOpen(false)}
-                  className="mt-3 inline-flex text-xs font-medium text-emerald-600 hover:text-emerald-700"
-                >
-                  Read latest posts
-                </Link>
-              </div>
-            ) : (
-              <>
-                {heroItem ? (
-                  <div className="px-3 py-3">
-                    <Link
-                      href={heroItem.href}
-                      onClick={() => {
-                        trackAction(heroItem);
-                        markOneRead(heroItem.notificationId);
-                        setOpen(false);
-                      }}
-                      className="block rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 transition-colors hover:bg-emerald-100/60"
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                        Needs attention
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">
-                        {heroItem.label}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-600">
-                        {heroItem.description}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-400">
-                        {timeAgo(heroItem.createdAt)}
-                      </p>
-                      <p className="mt-2 text-xs font-semibold text-emerald-700">
-                        {heroItem.cta}
-                      </p>
-                    </Link>
-                  </div>
-                ) : null}
-                {listNotifications.map((notification) => {
-                // Resolved through the catalog, so a follow or like created without
-                // an explicit `link` is still reachable here. This used to read
-                // `notification.link` directly, which left those rows dead.
-                const href = notificationHref(notification);
-                const inner = (
-                  <div className="flex items-start gap-3">
-                    <NotificationAvatar
-                      type={notification.type}
-                      avatarUrl={notification.actor?.avatar_url}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm leading-snug text-gray-700">
-                        {notificationText(notification)}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-400">
-                        {timeAgo(notification.created_at)}
-                      </p>
-                    </div>
-                    {!notification.read ? (
-                      <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-emerald-500" />
-                    ) : null}
-                  </div>
-                );
-
-                return (
-                  <div
-                    key={notification.id}
-                    className={`px-4 py-3 transition-colors ${
-                      !notification.read ? "bg-emerald-50" : "hover:bg-canvas"
-                    }`}
+          <div
+            id={panelId}
+            ref={panelRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-label="Notifications"
+            className="fixed inset-x-3 top-[calc(var(--app-nav-height,60px)+0.5rem)] z-50 rounded-xl border border-gray-200 bg-white shadow-lg outline-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80"
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+              <span className="text-sm font-semibold text-gray-900">
+                Notifications
+              </span>
+              <div className="flex items-center gap-3">
+                {unreadCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={markAllRead}
+                    className="cursor-pointer text-xs font-medium text-emerald-600 hover:text-emerald-700"
                   >
-                    {href ? (
-                      <Link
-                        href={href}
-                        onClick={() => {
-                          trackOpen(notification);
-                          markOneRead(notification.id);
-                          setOpen(false);
-                        }}
-                      >
-                        {inner}
-                      </Link>
-                    ) : (
-                      inner
-                    )}
-                  </div>
-                );
-                })}
-              </>
-            )}
-          </div>
+                    Mark all as read
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => close(true)}
+                  aria-label="Close notifications"
+                  className="cursor-pointer rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:hidden"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
 
-          <div className="border-t border-gray-100 px-4 py-2.5">
-            <Link
-              href="/notifications"
-              onClick={() => setOpen(false)}
-              className="block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700"
-            >
-              View all notifications -&gt;
-            </Link>
+            <div className="max-h-[65vh] divide-y divide-gray-50 overflow-y-auto overscroll-contain sm:max-h-80">
+              {notifications.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm text-gray-400">
+                  <p>No notifications yet</p>
+                  <Link
+                    href="/?tab=latest"
+                    onClick={() => close()}
+                    className="mt-3 inline-flex text-xs font-medium text-emerald-600 hover:text-emerald-700"
+                  >
+                    Read latest posts
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {heroItem ? (
+                    <div className="px-3 py-3">
+                      <Link
+                        href={heroItem.href}
+                        onClick={() => {
+                          trackAction(heroItem);
+                          markOneRead(heroItem.notificationId);
+                          close();
+                        }}
+                        className="block rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 transition-colors hover:bg-emerald-100/60"
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                          Needs attention
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900">
+                          {heroItem.label}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-600">
+                          {heroItem.description}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-400">
+                          <time dateTime={heroItem.createdAt}>
+                            {formatRelativeTime(heroItem.createdAt)}
+                          </time>
+                        </p>
+                        <p className="mt-2 text-xs font-semibold text-emerald-700">
+                          {heroItem.cta}
+                        </p>
+                      </Link>
+                    </div>
+                  ) : null}
+                  {listNotifications.map((notification) => {
+                    // Resolved through the catalog, so a follow or like created
+                    // without an explicit `link` is still reachable here. This used
+                    // to read `notification.link` directly, leaving those rows dead.
+                    const href = notificationHref(notification);
+                    const inner = (
+                      <div className="flex items-start gap-3">
+                        <NotificationAvatar
+                          type={notification.type}
+                          avatarUrl={notification.actor?.avatar_url}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm leading-snug text-gray-700">
+                            {notificationMessage(notification)}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-400">
+                            <time
+                              dateTime={notification.created_at}
+                              title={new Date(
+                                notification.created_at
+                              ).toLocaleString()}
+                            >
+                              {formatRelativeTime(notification.created_at)}
+                            </time>
+                          </p>
+                        </div>
+                        {!notification.read ? (
+                          <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-emerald-500">
+                            <span className="sr-only">Unread</span>
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+
+                    return (
+                      <div
+                        key={notification.id}
+                        className={`px-4 py-3 transition-colors ${
+                          !notification.read ? "bg-emerald-50" : "hover:bg-canvas"
+                        }`}
+                      >
+                        {href ? (
+                          <Link
+                            href={href}
+                            onClick={() => {
+                              trackOpen(notification);
+                              markOneRead(notification.id);
+                              close();
+                            }}
+                          >
+                            {inner}
+                          </Link>
+                        ) : (
+                          inner
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+
+            <div className="border-t border-gray-100 px-4 py-2.5">
+              <Link
+                href="/notifications"
+                onClick={() => close()}
+                className="block text-center text-xs font-medium text-emerald-600 hover:text-emerald-700"
+              >
+                View all notifications &rarr;
+              </Link>
+            </div>
           </div>
-        </div>
+        </>
       ) : null}
     </div>
   );

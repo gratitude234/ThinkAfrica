@@ -96,15 +96,29 @@ export default function NotificationsPageClient({
     setNotifications(rows);
   }, [supabase, userId]);
 
-  // Unconditional polling — this page has no realtime subscription of its own, and
-  // `notifications` stays out of the Realtime publication regardless of the
-  // shouldUseRealtime() flag (see NotificationBell.tsx for the same reasoning).
+  // Polling — this page has no realtime subscription of its own, and `notifications`
+  // stays out of the Realtime publication regardless of the shouldUseRealtime() flag
+  // (see NotificationBell.tsx for the same reasoning).
+  //
+  // Gated on visibility so a backgrounded tab stops issuing requests, and because
+  // the bell polls too: on this page that was two independent 30s pollers running
+  // forever whether or not anyone was looking.
   useEffect(() => {
     const poll = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       void refresh();
     }, 30_000);
 
     return () => clearInterval(poll);
+  }, [refresh]);
+
+  // Catch up on returning to the tab, since polling paused while it was hidden.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") void refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [refresh]);
 
   const runWrite = useCallback(async <T,>(write: () => Promise<T>): Promise<T> => {

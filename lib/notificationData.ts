@@ -123,3 +123,36 @@ export async function fetchNotificationRows(
 
   return { rows, error: error?.message ?? null };
 }
+
+export interface UnreadCountResult {
+  count: number | null;
+  error: string | null;
+}
+
+/**
+ * The true number of unread notifications.
+ *
+ * The bell used to derive its badge from the ten rows it had fetched, so the count
+ * was capped at ten and — worse — simply wrong: someone with forty unread items
+ * saw "3" whenever only three of the newest ten happened to be unread. This is a
+ * `head` count, so it costs a round trip but transfers no rows.
+ *
+ * `count` is null when the query fails, so a caller can tell "no unread" apart from
+ * "we do not know" and leave the previous badge alone rather than clearing it.
+ */
+export async function fetchUnreadCount(
+  supabase: NotificationsQueryClient,
+  userId: string
+): Promise<UnreadCountResult> {
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("read", false)
+    .is("dismissed_at", null);
+
+  return {
+    count: typeof count === "number" ? count : null,
+    error: error?.message ?? null,
+  };
+}
