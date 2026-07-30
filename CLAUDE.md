@@ -49,7 +49,6 @@ app/
 ├── (auth)/          # Login, signup, forgot/reset-password — standalone AuthShell layout
 ├── (main)/          # Full app shell with NavigationShell
 │   ├── page.tsx     # Home feed (tabs: home/following/latest)
-│   ├── write/       # Post creation (blog, essay, research, policy_brief)
 │   ├── submit/research/  # Research-specific submission form
 │   ├── post/[slug]/ # Post detail, comments, reviews
 │   ├── edit/[slug]/ # Edit published posts
@@ -66,9 +65,13 @@ app/
 │   ├── bookmarks/   # Saved posts
 │   ├── leaderboard/ # Points/contribution ranking
 │   ├── opportunities/  # Fellowships/scholarships
-│   ├── onboarding/  # New user flow
 │   └── notifications/  # Activity notifications
-└── (marketing)/     # Landing page, public info pages
+├── (write)/         # Composer — NOT under (main)
+│   ├── write/       # Post creation (blog, essay, research, policy_brief)
+│   └── create/post/ # Short-form composer
+├── (onboarding)/    # New user flow — NOT under (main)
+├── (marketing)/     # Landing page, public info pages
+└── r/[...]          # Tracked redirect links (e.g. /r/p/[token] publication delivery)
 ```
 
 API routes (`app/api/`):
@@ -83,6 +86,10 @@ API routes (`app/api/`):
 | `POST /api/debate-recap` | Generate debate summary |
 | `POST /api/activation` | Track activation/onboarding events |
 | `GET /api/og` | Open Graph image generation |
+| `POST /api/posts/[slug]/{view,read,impression}` | Post engagement tracking |
+| `GET /api/topic-suggestions` | AI topic classification |
+| `GET /api/universities` | University lookup |
+| `GET /api/cron/*` | Vercel Cron jobs — authenticated with `CRON_SECRET`. Includes `daily-brief`, `review-reminders`, `process-debate-notifications`, `debate-v15-deadlines`, `advance-debate-rounds` |
 
 ### Data Layer
 
@@ -151,6 +158,26 @@ The `Editor.tsx` component exposes an `EditorHandle` ref (`toggleBold`, `toggleI
 
 ### Database
 
-Key tables: `profiles`, `posts`, `post_versions`, `post_authors` (co-authors), `post_references`, `post_likes`, `post_comments`, `post_reviews`, `post_editor_decisions`, `debates`, `debate_rounds`, `debate_arguments`, `follows`, `messages`, `notifications`, `badges`, `user_badges`, `opportunities`, `opportunity_applications`, `ambassador_applications`, `editor_assignments`.
+Key tables — **verified against `supabase/`; do not guess a name from the feature it serves**, several are not what you would expect:
+
+| Concept | Table |
+|---------|-------|
+| Users | `profiles` |
+| Posts | `posts`, `post_versions`, `post_authors` (co-authors), `post_references` |
+| Likes | `likes` — **not** `post_likes` |
+| Comments | `comments` — **not** `post_comments`. Note: nothing in the app writes to this table; only the moderation tooling reads and hides rows. There is no comment composer, and the trigger that used to create `comment` notifications was dropped in `20260715000001`. |
+| Editorial review | `post_reviews`, `post_editor_decisions`, `submission_tracks` |
+| Debates | `debates`, `debate_rounds`, `debate_arguments`, `debate_participants`, `debate_votes`, `debate_subscriptions`, `debate_notification_events` |
+| Social graph | `follows`, `author_subscriptions`, `topic_subscriptions`, `user_blocks` |
+| Messaging | `conversations`, `conversation_participants`, `messages` |
+| Notifications | `notifications`, `push_subscriptions`, `publication_deliveries` |
+| Badges | `badges`, `user_badges` |
+| Fellowships | `fellowships`, `fellowship_applications`, `saved_opportunities` — there is no `opportunities` table |
+| Ambassadors | `campus_ambassadors` — **not** `ambassador_applications` |
+| Moderation | `reports`, `admin_audit_events` |
+
+There is no `editor_assignments` table; reviewer assignment lives in `post_reviews`.
+
+For the full list, `grep -rhoiE "create table (if not exists )?public\.[a-z_]+" supabase/` is authoritative.
 
 Schema: `supabase/schema.sql` (base) + `supabase/schema_phase2-5.sql` (incremental). Timestamped migrations in `supabase/migrations/`. Apply via Supabase dashboard or CLI — no local migration runner configured.
