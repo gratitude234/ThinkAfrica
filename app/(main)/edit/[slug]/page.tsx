@@ -71,6 +71,7 @@ export default async function EditPage({ params }: PageProps) {
         slug={post.slug}
         initialBody={shortPostHtmlToText(post.content ?? "")}
         initialImageUrl={post.cover_image_url ?? null}
+        initialTopics={(post.tags as string[] | null) ?? []}
       />
     );
   }

@@ -4,7 +4,9 @@ import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import PublishingTopicSelector from "@/components/topic/PublishingTopicSelector";
 import { countShortPostCharacters, SHORT_POST_MAX_CHARACTERS } from "@/lib/shortPostContent";
+import { MAX_SHORT_POST_TOPICS } from "@/lib/tags";
 import { updatePost } from "@/app/(write)/create/post/actions";
 
 interface PostEditFormProps {
@@ -12,6 +14,7 @@ interface PostEditFormProps {
   slug: string;
   initialBody: string;
   initialImageUrl: string | null;
+  initialTopics: string[];
 }
 
 export default function PostEditForm({
@@ -19,10 +22,12 @@ export default function PostEditForm({
   slug,
   initialBody,
   initialImageUrl,
+  initialTopics,
 }: PostEditFormProps) {
   const router = useRouter();
   const [body, setBody] = useState(initialBody);
   const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl);
+  const [topics, setTopics] = useState(initialTopics);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +47,7 @@ export default function PostEditForm({
     setSaving(true);
     setError(null);
 
-    const result = await updatePost({ postId, body, imageUrl });
+    const result = await updatePost({ postId, body, imageUrl, topics });
 
     if (result.error || !result.slug) {
       setError(result.error ?? "Failed to save. Please try again.");
@@ -51,7 +56,7 @@ export default function PostEditForm({
     }
 
     router.push(`/post/${result.slug}`);
-  }, [body, canSave, imageUrl, postId, router, saving]);
+  }, [body, canSave, imageUrl, postId, router, saving, topics]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 px-4 py-8 sm:px-6">
@@ -99,6 +104,15 @@ export default function PostEditForm({
         onUploadingChange={setUploading}
         emptyTitle="Add an image (optional)"
         previewHeightClass="h-40"
+      />
+
+      <PublishingTopicSelector
+        contentKind="post"
+        content={body}
+        value={topics}
+        maxTopics={MAX_SHORT_POST_TOPICS}
+        onChange={setTopics}
+        disabled={saving}
       />
 
       {error ? (

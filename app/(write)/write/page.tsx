@@ -1290,7 +1290,6 @@ export default function WritePage() {
             title={title}
             content={content}
             wordCount={wordCount}
-            userId={currentUserId}
             initialTags={tags}
             initialCoverImageUrl={coverImageUrl}
             initialExcerpt={excerpt}

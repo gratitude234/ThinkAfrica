@@ -22,6 +22,7 @@ const TOPIC_RESPONSE_SCHEMA = {
   properties: {
     topics: {
       type: "array",
+      maxItems: 5,
       items: {
         type: "string",
         enum: [...CANONICAL_TAGS],
@@ -71,7 +72,10 @@ export function parseGeminiTopicSuggestions(
   const seen = new Set<string>();
   for (const topic of topics as string[]) {
     const canonical = getExactCanonicalTag(topic);
-    if (!canonical || seen.has(canonical)) continue;
+    if (!canonical) {
+      throw new Error("Gemini returned a topic outside the catalogue.");
+    }
+    if (seen.has(canonical)) continue;
     seen.add(canonical);
     result.push(canonical);
     if (result.length >= topicSuggestionLimit(contentKind)) break;

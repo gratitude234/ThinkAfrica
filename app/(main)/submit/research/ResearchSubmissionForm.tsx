@@ -3,8 +3,14 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
+import PublishingTopicSelector from "@/components/topic/PublishingTopicSelector";
 import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import {
+  MAX_LONG_FORM_TOPICS,
+  MAX_RESEARCH_KEYWORDS,
+  MAX_TOPIC_KEY_LENGTH,
+} from "@/lib/tags";
 import type { CoAuthorProfile } from "@/components/collaboration/CoAuthorPicker";
 import type { PostReferenceRecord } from "@/lib/types";
 import {
@@ -18,7 +24,8 @@ export interface ResearchDraft {
   id: string;
   title: string;
   abstract: string;
-  tags: string[];
+  topics: string[];
+  keywords: string[];
   status: string;
   currentRound: number;
   document: ResearchDocumentInput;
@@ -39,17 +46,6 @@ interface ResearchSubmissionFormProps {
 }
 
 type SubmissionStep = 1 | 2 | 3 | 4;
-
-const TOPIC_OPTIONS = [
-  "Politics",
-  "Education",
-  "Health",
-  "Technology",
-  "Culture",
-  "Economics",
-  "Climate",
-  "Gender",
-] as const;
 
 const MAX_PDF_MB = 20;
 
@@ -147,18 +143,9 @@ export default function ResearchSubmissionForm({
   const [draftId, setDraftId] = useState(initialDraft?.id ?? null);
   const [title, setTitle] = useState(initialDraft?.title ?? "");
   const [abstract, setAbstract] = useState(initialDraft?.abstract ?? "");
-  const initialTags = initialDraft?.tags ?? [];
-  const [topics, setTopics] = useState<string[]>(
-    TOPIC_OPTIONS.filter((topic) => initialTags.includes(topic.toLowerCase()))
-  );
+  const [topics, setTopics] = useState<string[]>(initialDraft?.topics ?? []);
   const [keywords, setKeywords] = useState(
-    initialTags
-      .filter(
-        (tag) =>
-          tag !== "research" &&
-          !TOPIC_OPTIONS.some((topic) => topic.toLowerCase() === tag)
-      )
-      .join(", ")
+    (initialDraft?.keywords ?? []).join(", ")
   );
   const [document, setDocument] = useState<ResearchDocumentInput>(
     initialDraft?.document ?? emptyDocument
@@ -175,6 +162,8 @@ export default function ResearchSubmissionForm({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmNoTopics, setConfirmNoTopics] = useState(false);
+  const [continuedWithoutTopics, setContinuedWithoutTopics] = useState(false);
   const [currentStep, setCurrentStep] = useState<SubmissionStep>(() => {
     if (
       initialDraft &&
@@ -201,13 +190,15 @@ export default function ResearchSubmissionForm({
     .split(",")
     .map((keyword) => keyword.trim())
     .filter(Boolean);
-  const tags = [
-    ...topics.map((topic) => topic.toLowerCase()),
-    ...keywordList.map((keyword) => keyword.toLowerCase()),
-  ];
   const pdfUploaded = Boolean(document.documentPath);
   const metadataReady =
-    title.trim().length > 0 && abstract.trim().length > 0 && tags.length > 0;
+    title.trim().length > 0 &&
+    abstract.trim().length > 0 &&
+    keywordList.length > 0 &&
+    keywordList.length <= MAX_RESEARCH_KEYWORDS &&
+    keywordList.every(
+      (keyword) => keyword.length <= MAX_TOPIC_KEY_LENGTH
+    );
   const authorName = author?.fullName?.trim() || author?.username || "You";
 
   useEffect(() => {
@@ -271,7 +262,8 @@ export default function ResearchSubmissionForm({
     draftId,
     title,
     abstract,
-    tags,
+    topics,
+    keywords: keywordList,
     document,
     references: buildReferences(),
     coAuthors: coAuthors.map((coAuthor, index) => ({
@@ -295,11 +287,20 @@ export default function ResearchSubmissionForm({
       setError(
         currentStep === 1
           ? "Upload the PDF manuscript to continue."
-          : "Add a title, an abstract, and at least one topic or keyword to continue."
+          : `Add a title, an abstract, and 1-${MAX_RESEARCH_KEYWORDS} keywords to continue.`
       );
       return;
     }
+    if (
+      currentStep === 2 &&
+      topics.length === 0 &&
+      !continuedWithoutTopics
+    ) {
+      setConfirmNoTopics(true);
+      return;
+    }
     setError(null);
+    setConfirmNoTopics(false);
     setCurrentStep((step) => Math.min(4, step + 1) as SubmissionStep);
   };
 
@@ -313,7 +314,8 @@ export default function ResearchSubmissionForm({
       draftId,
       title,
       abstract,
-      tags,
+      topics,
+      keywords: keywordList,
     });
 
     if (draftResult.error || !draftResult.postId) {
@@ -393,7 +395,8 @@ export default function ResearchSubmissionForm({
     setCoAuthorResults([]);
   };
 
-  const summaryTopics = topics.length > 0 ? topics : keywordList.slice(0, 4);
+  const summaryTopics = topics;
+  const summaryKeywords = keywordList.slice(0, MAX_RESEARCH_KEYWORDS);
 
   return (
     <div className="mx-auto w-full max-w-md pb-16 sm:max-w-lg">
@@ -540,7 +543,7 @@ export default function ResearchSubmissionForm({
             </div>
             <div>
               <label className="text-[15px] font-bold text-ink" htmlFor="research-keywords">
-                Keywords
+                Keywords <span className="text-red-600">*</span>
               </label>
               <input
                 id="research-keywords"
@@ -550,37 +553,59 @@ export default function ResearchSubmissionForm({
                 className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[15px] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand disabled:bg-gray-50 disabled:text-gray-400"
                 placeholder="e.g. groundwater, mining, environmental policy"
               />
-              <p className="mt-2 text-sm text-gray-500">Separate keywords with commas.</p>
+              <p className="mt-2 text-sm text-gray-500">
+                Required. Separate up to {MAX_RESEARCH_KEYWORDS} keywords with commas.
+              </p>
             </div>
             <div>
-              <p className="text-[15px] font-bold text-ink">Topics</p>
-              <div className="mt-2.5 flex flex-wrap gap-2.5">
-                {TOPIC_OPTIONS.map((topic) => {
-                  const selected = topics.includes(topic);
-                  return (
+              <PublishingTopicSelector
+                contentKind="research"
+                title={title}
+                abstract={abstract}
+                keywords={keywordList}
+                value={topics}
+                maxTopics={MAX_LONG_FORM_TOPICS}
+                disabled={!isEditable}
+                onChange={(nextTopics) => {
+                  setTopics(nextTopics);
+                  setConfirmNoTopics(false);
+                  setContinuedWithoutTopics(false);
+                }}
+              />
+              {confirmNoTopics && topics.length === 0 ? (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm font-semibold text-amber-950">
+                    Continue without topics?
+                  </p>
+                  <p className="mt-1 text-sm leading-5 text-amber-900/80">
+                    Topics help editors and interested readers discover this Research.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <button
-                      key={topic}
                       type="button"
-                      disabled={!isEditable}
-                      aria-pressed={selected}
-                      onClick={() =>
-                        setTopics((current) =>
-                          current.includes(topic)
-                            ? current.filter((item) => item !== topic)
-                            : [...current, topic]
-                        )
-                      }
-                      className={`rounded-full border px-4 py-1.5 text-[15px] transition-colors disabled:pointer-events-none disabled:opacity-60 ${
-                        selected
-                          ? "border-emerald-brand bg-emerald-brand text-white"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-emerald-brand/40"
-                      }`}
+                      onClick={() => setConfirmNoTopics(false)}
+                      className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900"
                     >
-                      {topic}
+                      Add topics
                     </button>
-                  );
-                })}
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContinuedWithoutTopics(true);
+                        setConfirmNoTopics(false);
+                        trackActivationEvent({
+                          event: "topic_selection_skipped",
+                          metadata: { contentKind: "research" },
+                        });
+                        setCurrentStep(3);
+                      }}
+                      className="rounded-lg bg-amber-800 px-3 py-2 text-xs font-semibold text-white"
+                    >
+                      Continue without topics
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </section>
@@ -720,17 +745,26 @@ export default function ResearchSubmissionForm({
                 .join(" · ")}
             </p>
             {summaryTopics.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {summaryTopics.map((topic) => (
-                  <span
-                    key={topic}
-                    className="rounded-full border border-gray-200 bg-white px-3.5 py-1 text-sm text-gray-700"
-                  >
-                    {topic}
-                  </span>
-                ))}
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-gray-500">Topics</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {summaryTopics.map((topic) => (
+                    <span
+                      key={topic}
+                      className="rounded-full border border-gray-200 bg-white px-3.5 py-1 text-sm text-gray-700"
+                    >
+                      {topic}
+                    </span>
+                  ))}
+                </div>
               </div>
             ) : null}
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-gray-500">Keywords</p>
+              <p className="mt-1 text-sm text-gray-700">
+                {summaryKeywords.join(", ") || "None added"}
+              </p>
+            </div>
           </div>
         </section>
       ) : null}

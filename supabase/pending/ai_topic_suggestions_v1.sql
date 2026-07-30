@@ -3,11 +3,21 @@
 -- deployment ledger has been reconciled.
 
 alter table public.posts
-  add column if not exists research_keywords text[] not null default '{}'::text[];
+  add column if not exists research_keywords text[];
+
+alter table public.posts
+  drop constraint if exists posts_research_keywords_limit_check;
+alter table public.posts
+  add constraint posts_research_keywords_limit_check
+  check (
+    research_keywords is null
+    or cardinality(research_keywords) <= 10
+  );
 
 -- Existing Research tags are deliberately not rewritten. Published records
--- cannot be split safely; editable legacy drafts are separated on first save
--- by application code after this migration is enabled.
+-- cannot be split safely. NULL identifies an untouched legacy row; editable
+-- legacy drafts are separated on first save and then write an array (including
+-- an empty array) so later loads no longer need to guess.
 
 create table if not exists public.ai_topic_suggestion_quotas (
   user_id uuid not null references public.profiles(id) on delete cascade,

@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import PublishingTopicSelector from "@/components/topic/PublishingTopicSelector";
 import { countShortPostCharacters, SHORT_POST_MAX_CHARACTERS } from "@/lib/shortPostContent";
+import { MAX_SHORT_POST_TOPICS } from "@/lib/tags";
 import { createPost } from "./actions";
 
 interface PostComposerFormProps {
@@ -15,6 +17,7 @@ interface PostComposerFormProps {
 interface DraftBackup {
   body: string;
   imageUrl: string | null;
+  topics: string[];
 }
 
 const SAVE_DELAY_MS = 500;
@@ -39,7 +42,15 @@ function readDraftBackup(userId: string): DraftBackup | null {
         typeof (parsed as { imageUrl?: unknown }).imageUrl === "string")
     ) {
       const candidate = parsed as { body: string; imageUrl: string | null };
-      return { body: candidate.body, imageUrl: candidate.imageUrl ?? null };
+      return {
+        body: candidate.body,
+        imageUrl: candidate.imageUrl ?? null,
+        topics: Array.isArray((parsed as { topics?: unknown }).topics)
+          ? ((parsed as { topics: unknown[] }).topics.filter(
+              (topic): topic is string => typeof topic === "string"
+            ))
+          : [],
+      };
     }
     return null;
   } catch {
@@ -68,6 +79,8 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
   const router = useRouter();
   const [body, setBody] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [topics, setTopics] = useState<string[]>([]);
+  const [showTopics, setShowTopics] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,19 +110,21 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
       if (body.trim().length === 0) {
         clearDraftBackup(userId);
       } else {
-        writeDraftBackup(userId, { body, imageUrl });
+        writeDraftBackup(userId, { body, imageUrl, topics });
       }
     }, SAVE_DELAY_MS);
 
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [body, imageUrl, submitting, userId, pendingRestore]);
+  }, [body, imageUrl, pendingRestore, submitting, topics, userId]);
 
   const restoreBackup = useCallback(() => {
     if (!pendingRestore) return;
     setBody(pendingRestore.body);
     setImageUrl(pendingRestore.imageUrl);
+    setTopics(pendingRestore.topics);
+    setShowTopics(pendingRestore.topics.length > 0);
     setPendingRestore(null);
     textareaRef.current?.focus();
   }, [pendingRestore]);
@@ -130,7 +145,12 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
     setSubmitting(true);
     setError(null);
 
-    const result = await createPost({ body, imageUrl, inResponseTo: parentPost?.id ?? null });
+    const result = await createPost({
+      body,
+      imageUrl,
+      inResponseTo: parentPost?.id ?? null,
+      topics,
+    });
 
     if (result.error || !result.slug) {
       setError(result.error ?? "Failed to publish. Please try again.");
@@ -143,7 +163,7 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
     // every publish records two rows.
     clearDraftBackup(userId);
     router.push(`/post/${result.slug}`);
-  }, [body, canSubmit, imageUrl, parentPost, router, submitting, userId]);
+  }, [body, canSubmit, imageUrl, parentPost, router, submitting, topics, userId]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -244,6 +264,43 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
               Quick takes can be at most {SHORT_POST_MAX_CHARACTERS.toLocaleString()} characters —
               trim {(characterCount - SHORT_POST_MAX_CHARACTERS).toLocaleString()} more.
             </p>
+          ) : null}
+        </div>
+
+        <div className="border-t border-black/[0.06] px-5 py-3 sm:px-6">
+          <button
+            type="button"
+            onClick={() => setShowTopics((current) => !current)}
+            aria-expanded={showTopics}
+            className="flex min-h-10 w-full items-center justify-between gap-3 text-left"
+          >
+            <span>
+              <span className="block text-sm font-semibold text-gray-800">
+                Add topics (optional)
+              </span>
+              <span className="block text-xs text-gray-500">
+                Help interested readers find this post.
+              </span>
+            </span>
+            <span className="shrink-0 text-xs font-medium text-emerald-brand">
+              {topics.length > 0
+                ? `${topics.length}/${MAX_SHORT_POST_TOPICS}`
+                : showTopics
+                  ? "Hide"
+                  : "Add"}
+            </span>
+          </button>
+          {showTopics ? (
+            <div className="mt-3">
+              <PublishingTopicSelector
+                contentKind="post"
+                content={body}
+                value={topics}
+                maxTopics={MAX_SHORT_POST_TOPICS}
+                onChange={setTopics}
+                disabled={submitting}
+              />
+            </div>
           ) : null}
         </div>
 

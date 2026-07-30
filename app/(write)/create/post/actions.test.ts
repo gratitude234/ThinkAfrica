@@ -37,6 +37,7 @@ function baseInput(overrides: Partial<Parameters<typeof createPost>[0]> = {}) {
     body: "A perfectly normal quick thought.",
     imageUrl: null,
     inResponseTo: null,
+    topics: [],
     ...overrides,
   };
 }
@@ -71,6 +72,37 @@ describe("createPost", () => {
     expect(insertedWith.type).toBe("blog");
     expect(insertedWith.content_kind).toBe("post");
     expect(insertedWith.in_response_to).toBeNull();
+    expect(insertedWith.tags).toEqual([]);
+  });
+
+  it("normalizes and stores up to three optional topics", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults({ data: { id: "new-post-id" }, error: null }),
+    });
+
+    const result = await createPost(
+      baseInput({ topics: [" Technology ", "technology", "Education Policy"] })
+    );
+
+    expect(result.error).toBeNull();
+    expect(
+      fakeSupabase.current!.builders.posts[0].insertedWith
+    ).toEqual(
+      expect.objectContaining({
+        tags: ["technology", "education policy"],
+      })
+    );
+  });
+
+  it("rejects more than three Short Post topics server-side", async () => {
+    fakeSupabase.current = makeFakeSupabase({});
+
+    const result = await createPost(
+      baseInput({ topics: ["one", "two", "three", "four"] })
+    );
+
+    expect(result.error).toMatch(/at most 3 topics/i);
+    expect(result.slug).toBeNull();
   });
 
   it("rejects an empty body server-side even if the client's own character count somehow let it through", async () => {

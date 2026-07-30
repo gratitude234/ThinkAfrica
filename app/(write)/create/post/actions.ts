@@ -15,6 +15,11 @@ import {
 import { buildShortPostHtml } from "@/lib/shortPostHtml";
 import { notifyResponseParentAuthor, validateResponseParent } from "@/lib/responsePost";
 import { schedulePublicationDistribution } from "@/lib/publicationDistribution";
+import {
+  getTopicValuesValidationError,
+  MAX_SHORT_POST_TOPICS,
+  normalizeAndDedupeTopicValues,
+} from "@/lib/tags";
 
 // CoverImageUploader's default bucket/path convention (components/ui/CoverImageUploader.tsx).
 const POST_IMAGE_BUCKET = "post-images";
@@ -60,6 +65,7 @@ export async function createPost(input: {
   body: string;
   imageUrl?: string | null;
   inResponseTo?: string | null;
+  topics: string[];
 }) {
   const supabase = await createClient();
   const {
@@ -87,6 +93,21 @@ export async function createPost(input: {
       slug: null as string | null,
     };
   }
+
+  if (input.topics.length > MAX_SHORT_POST_TOPICS) {
+    return {
+      error: `Posts can have at most ${MAX_SHORT_POST_TOPICS} topics.`,
+      slug: null as string | null,
+    };
+  }
+  const topicError = getTopicValuesValidationError(input.topics);
+  if (topicError) {
+    return { error: topicError, slug: null as string | null };
+  }
+  const topics = normalizeAndDedupeTopicValues(
+    input.topics,
+    MAX_SHORT_POST_TOPICS
+  );
 
   // A "Quick response" Post never trusts the client's claimed parent --
   // the composer's own display of "Responding to X" is resolved
@@ -128,6 +149,7 @@ export async function createPost(input: {
       published_at: now,
       current_round: 1,
       cover_image_url: imageUrl,
+      tags: topics,
       in_response_to: responseParent?.id ?? null,
     })
     .select("id")
@@ -169,6 +191,16 @@ export async function createPost(input: {
     source: "server_action",
     route: "/create/post",
   });
+  if (topics.length === 0) {
+    await recordActivationEvent({
+      supabase,
+      event: "topic_selection_skipped",
+      userId: user.id,
+      metadata: { postId: data.id, contentKind: "post" },
+      source: "server_action",
+      route: "/create/post",
+    });
+  }
 
   return { error: null, slug };
 }
@@ -180,7 +212,12 @@ export async function createPost(input: {
  * published_at, type, or content_kind, so the permalink and publication
  * state stay exactly as they were.
  */
-export async function updatePost(input: { postId: string; body: string; imageUrl?: string | null }) {
+export async function updatePost(input: {
+  postId: string;
+  body: string;
+  imageUrl?: string | null;
+  topics: string[];
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -224,6 +261,21 @@ export async function updatePost(input: { postId: string; body: string; imageUrl
     };
   }
 
+  if (input.topics.length > MAX_SHORT_POST_TOPICS) {
+    return {
+      error: `Posts can have at most ${MAX_SHORT_POST_TOPICS} topics.`,
+      slug: null as string | null,
+    };
+  }
+  const topicError = getTopicValuesValidationError(input.topics);
+  if (topicError) {
+    return { error: topicError, slug: null as string | null };
+  }
+  const topics = normalizeAndDedupeTopicValues(
+    input.topics,
+    MAX_SHORT_POST_TOPICS
+  );
+
   const normalizedBody = normalizeShortPostText(input.body);
   const sanitizedContent = buildShortPostHtml(input.body);
   const excerpt = deriveShortPostExcerpt(normalizedBody);
@@ -236,6 +288,7 @@ export async function updatePost(input: { postId: string; body: string; imageUrl
       content: sanitizedContent,
       excerpt,
       cover_image_url: imageUrl,
+      tags: topics,
     })
     .eq("id", input.postId)
     .eq("author_id", user.id);

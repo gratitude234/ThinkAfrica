@@ -11,8 +11,12 @@ import { contentKindFromLegacyType } from "@/lib/contentModel";
 import type { PostReferenceRecord } from "@/lib/types";
 import {
   getTopicValuesValidationError,
-  normalizeTagValue,
+  MAX_LONG_FORM_TOPICS,
+  MAX_RESEARCH_KEYWORDS,
+  normalizeAndDedupeTopicValues,
+  normalizeResearchKeywords,
 } from "@/lib/tags";
+import { isAiTopicSuggestionsEnabled } from "@/lib/featureFlags";
 
 type ReferenceInput = Omit<PostReferenceRecord, "post_id"> & {
   id?: string;
@@ -35,7 +39,8 @@ interface ResearchPayload {
   draftId: string | null;
   title: string;
   abstract: string;
-  tags: string[];
+  topics: string[];
+  keywords: string[];
   document: ResearchDocumentInput;
   references: ReferenceInput[];
   coAuthors: CoAuthorInput[];
@@ -46,7 +51,8 @@ interface ResearchUploadDraftInput {
   draftId: string | null;
   title: string;
   abstract: string;
-  tags: string[];
+  topics: string[];
+  keywords: string[];
 }
 
 const RESEARCH_SETUP_ERROR =
@@ -114,11 +120,19 @@ function validateResearchPayload(
   if (!input.abstract.trim()) {
     return "Add an abstract that summarizes the question, method, findings, and contribution.";
   }
-  if (input.tags.length === 0) {
-    return "Add at least one topic so editors can route the submission.";
+  if (input.topics.length > MAX_LONG_FORM_TOPICS) {
+    return `Research can have at most ${MAX_LONG_FORM_TOPICS} topics.`;
   }
-  const tagError = getTopicValuesValidationError(input.tags);
+  const tagError = getTopicValuesValidationError(input.topics);
   if (tagError) return tagError;
+  if (input.keywords.length > MAX_RESEARCH_KEYWORDS) {
+    return `Research can have at most ${MAX_RESEARCH_KEYWORDS} keywords.`;
+  }
+  const keywordError = getTopicValuesValidationError(input.keywords);
+  if (keywordError) return keywordError;
+  if (forSubmit && normalizeResearchKeywords(input.keywords).length === 0) {
+    return "Add at least one research keyword before submitting.";
+  }
 
   if (forSubmit && !input.document.documentPath) {
     return "Upload the final research PDF before submitting for review. Word or Google Docs files should be exported as PDF first.";
@@ -167,12 +181,24 @@ function normalizeResearchDraftFields(input: ResearchUploadDraftInput) {
   const abstract =
     input.abstract.trim() ||
     "Abstract pending. Add the research question, method, findings, and contribution before submitting for review.";
-  const tags = input.tags.map(normalizeTagValue).filter(Boolean);
+  const topics = normalizeAndDedupeTopicValues(
+    input.topics,
+    MAX_LONG_FORM_TOPICS
+  );
+  const keywords = normalizeResearchKeywords(input.keywords);
+  const separateKeywords = isAiTopicSuggestionsEnabled();
 
   return {
     title,
     abstract,
-    tags: tags.length > 0 ? tags : ["research"],
+    tags: separateKeywords
+      ? topics
+      : normalizeAndDedupeTopicValues(
+          [...topics, ...keywords, ...(topics.length || keywords.length ? [] : ["research"])],
+          MAX_LONG_FORM_TOPICS + MAX_RESEARCH_KEYWORDS
+        ),
+    keywords,
+    separateKeywords,
   };
 }
 
@@ -303,11 +329,43 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
     return { error: "You must be signed in.", postId: null as string | null, slug: null as string | null };
   }
 
-  const tagError = getTopicValuesValidationError(input.tags);
+  if (input.topics.length > MAX_LONG_FORM_TOPICS) {
+    return {
+      error: `Research can have at most ${MAX_LONG_FORM_TOPICS} topics.`,
+      postId: null,
+      slug: null,
+    };
+  }
+  const tagError = getTopicValuesValidationError(input.topics);
   if (tagError) {
     return { error: tagError, postId: null, slug: null };
   }
-  const normalizedTags = input.tags.map(normalizeTagValue).filter(Boolean);
+  if (input.keywords.length > MAX_RESEARCH_KEYWORDS) {
+    return {
+      error: `Research can have at most ${MAX_RESEARCH_KEYWORDS} keywords.`,
+      postId: null,
+      slug: null,
+    };
+  }
+  const keywordError = getTopicValuesValidationError(input.keywords);
+  if (keywordError) {
+    return { error: keywordError, postId: null, slug: null };
+  }
+  const normalizedTopics = normalizeAndDedupeTopicValues(
+    input.topics,
+    MAX_LONG_FORM_TOPICS
+  );
+  const normalizedKeywords = normalizeResearchKeywords(input.keywords);
+  const separateKeywords = isAiTopicSuggestionsEnabled();
+  const normalizedTags = separateKeywords
+    ? normalizedTopics
+    : normalizeAndDedupeTopicValues(
+        [...normalizedTopics, ...normalizedKeywords],
+        MAX_LONG_FORM_TOPICS + MAX_RESEARCH_KEYWORDS
+      );
+  const researchKeywordPatch = separateKeywords
+    ? { research_keywords: normalizedKeywords }
+    : {};
   const content = buildResearchContent(input.abstract, input.document.originalName);
   const now = new Date().toISOString();
 
@@ -386,6 +444,7 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
         excerpt: input.abstract.trim(),
         content,
         tags: normalizedTags,
+        ...researchKeywordPatch,
         type: "research",
         content_kind: contentKindFromLegacyType("research"),
         article_format: null,
@@ -431,6 +490,7 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
         excerpt: input.abstract.trim(),
         content,
         tags: normalizedTags,
+        ...researchKeywordPatch,
         type: "research",
         content_kind: contentKindFromLegacyType("research"),
         article_format: null,
@@ -547,7 +607,21 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
     return { error: "You must be signed in.", postId: null as string | null, slug: null as string | null };
   }
 
-  const tagError = getTopicValuesValidationError(input.tags);
+  if (input.topics.length > MAX_LONG_FORM_TOPICS) {
+    return {
+      error: `Research can have at most ${MAX_LONG_FORM_TOPICS} topics.`,
+      postId: null as string | null,
+      slug: null as string | null,
+    };
+  }
+  if (input.keywords.length > MAX_RESEARCH_KEYWORDS) {
+    return {
+      error: `Research can have at most ${MAX_RESEARCH_KEYWORDS} keywords.`,
+      postId: null as string | null,
+      slug: null as string | null,
+    };
+  }
+  const tagError = getTopicValuesValidationError(input.topics);
   if (tagError) {
     return {
       error: tagError,
@@ -555,8 +629,20 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
       slug: null as string | null,
     };
   }
+  const keywordError = getTopicValuesValidationError(input.keywords);
+  if (keywordError) {
+    return {
+      error: keywordError,
+      postId: null as string | null,
+      slug: null as string | null,
+    };
+  }
 
-  const { title, abstract, tags } = normalizeResearchDraftFields(input);
+  const { title, abstract, tags, keywords, separateKeywords } =
+    normalizeResearchDraftFields(input);
+  const researchKeywordPatch = separateKeywords
+    ? { research_keywords: keywords }
+    : {};
   const content = buildResearchContent(abstract, null);
   const now = Date.now().toString(36);
 
@@ -587,6 +673,7 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
         excerpt: abstract,
         content,
         tags,
+        ...researchKeywordPatch,
       })
       .eq("id", existingPost.id)
       .eq("author_id", user.id);
@@ -616,6 +703,7 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
       excerpt: abstract,
       content,
       tags,
+      ...researchKeywordPatch,
       type: "research",
       content_kind: contentKindFromLegacyType("research"),
       article_format: null,

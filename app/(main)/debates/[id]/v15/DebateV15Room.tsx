@@ -41,6 +41,10 @@ import {
   debateV15SignalsDiffer,
   type DebateV15RoomSignal,
 } from "./roomSignal";
+import {
+  resolveDebateV15Guidance,
+  type DebateV15Role,
+} from "./roomGuidance";
 import RecapPoller from "../RecapPoller";
 import { resolveDebateV15Verdict } from "@/lib/debateV15";
 
@@ -252,6 +256,82 @@ function useRoomLiveSync(
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [debateId, isTerminal]);
+}
+
+function resolveViewerRole(room: DebateV15RoomData): DebateV15Role {
+  if (room.isManager) return "moderator";
+  if (!room.currentUserId) return "guest";
+
+  const ownSlot = room.slots.find(
+    (slot) => slot.userId === room.currentUserId
+  );
+  if (ownSlot?.status === "accepted") return "debater";
+  if (ownSlot?.status === "invited") return "invitee";
+  return "reader";
+}
+
+/**
+ * The room's answer to "what is mine to do?", shown before any of the stage
+ * detail. Colour follows the tone so the two states a viewer most needs to
+ * tell apart -- "you are holding this up" and "a deadline went by" -- are
+ * distinguishable at a glance, with the wording carrying the meaning for
+ * anyone who cannot use colour.
+ */
+function RoomGuidanceCallout({ room, now }: { room: DebateV15RoomData; now: number }) {
+  const phase = room.debate.phase;
+  if (room.debate.status === "cancelled") return null;
+
+  const deadline = deadlineForPhase(room, phase);
+  const deadlinePassed = Boolean(
+    deadline && new Date(deadline).getTime() < now
+  );
+  const acceptedSlots = room.slots.filter((slot) => slot.status === "accepted");
+  const phaseArguments =
+    phase === "opening" || phase === "rebuttal"
+      ? room.arguments.filter((argument) => argument.phase === phase)
+      : [];
+
+  const guidance = resolveDebateV15Guidance({
+    role: resolveViewerRole(room),
+    phase,
+    deadlinePassed,
+    bothDebatersAccepted: acceptedSlots.length === 2,
+    viewerHasSubmitted: phaseArguments.some(
+      (argument) => argument.authorId === room.currentUserId
+    ),
+    missingSides: (["for", "against"] as const).filter(
+      (stance) =>
+        !phaseArguments.some((argument) => argument.stance === stance)
+    ),
+    viewerHasVoted: Boolean(room.userFinalVote),
+  });
+
+  const tone =
+    guidance.tone === "action"
+      ? "border-emerald-brand bg-green-tint"
+      : guidance.tone === "warning"
+        ? "border-gold bg-gold-tint"
+        : "border-green-wash-border bg-surface";
+  const headingTone =
+    guidance.tone === "action"
+      ? "text-emerald-brand"
+      : guidance.tone === "warning"
+        ? "text-gold-ink"
+        : "text-ink";
+
+  return (
+    <section
+      // Announced, not alerting: it re-resolves on every poll tick, and an
+      // assertive role would interrupt a screen reader mid-argument.
+      role="status"
+      className={`mb-6 rounded-2xl border border-l-4 p-5 ${tone}`}
+    >
+      <p className={`text-base font-bold ${headingTone}`}>{guidance.heading}</p>
+      <p className="mt-1.5 max-w-3xl text-sm leading-6 text-ink-muted">
+        {guidance.body}
+      </p>
+    </section>
+  );
 }
 
 function formatCountdown(msLeft: number): string {
@@ -2496,6 +2576,7 @@ export default function DebateV15Room({
     message: string;
   } | null>(null);
   const [liveUpdatedAt, setLiveUpdatedAt] = useState<number | null>(null);
+  const now = useClockTick(room.loadedAt);
   const feedbackRef = useRef<HTMLDivElement>(null);
   const activeDeadline = deadlineForPhase(room, room.debate.phase);
   const moderatorName = profileName(room.debate.moderator);
@@ -2690,6 +2771,8 @@ export default function DebateV15Room({
             <PhaseProgress phase={room.debate.phase} />
           </div>
         ) : null}
+
+        <RoomGuidanceCallout room={room} now={now} />
 
         {room.debate.status === "cancelled" ? (
           <CancelledView room={room} pending={pending} mutate={mutate} />

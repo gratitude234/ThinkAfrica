@@ -111,17 +111,24 @@ describe("getPostQualitySummary content-kind awareness", () => {
     }
   });
 
-  it("still requires topics for an essay/policy_brief/research", () => {
-    const summary = getPostQualitySummary({
-      type: "essay",
-      status: "draft",
-      title: "An essay",
-      tags: [],
-    });
+  it("encourages but does not require topics for long-form work", () => {
+    for (const type of ["essay", "policy_brief", "research"]) {
+      const summary = getPostQualitySummary({
+        type,
+        status: "draft",
+        title: "A long-form publication",
+        tags: [],
+      });
 
-    const tagsItem = checklistItem(summary, "tags");
-    expect(tagsItem.done).toBe(false);
-    expect(tagsItem.blocking).toBe(true);
+      const tagsItem = checklistItem(summary, "tags");
+      expect(tagsItem.done).toBe(false);
+      expect(tagsItem.blocking).toBe(false);
+      expect(
+        summary.checklist
+          .filter((item) => item.blocking)
+          .map((item) => item.key)
+      ).not.toContain("tags");
+    }
   });
 
   it("keeps a legacy titled Blog's existing label instead of relabeling it 'Post'", () => {

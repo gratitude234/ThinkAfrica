@@ -31,6 +31,8 @@ Optional:
 - `ANTHROPIC_API_KEY` — Claude API for audio summaries (`/api/audio-summary`)
 - `GEMINI_API_KEY` — Gemini API for debate recaps (`/api/debate-recap`)
 - `GEMINI_RECAP_MODEL` — Optional Gemini recap model override; defaults to `gemini-3.6-flash`
+- `GEMINI_TOPIC_MODEL` — Optional Gemini topic-classification model override; defaults to `gemini-3.6-flash`
+- `NEXT_PUBLIC_AI_TOPIC_SUGGESTIONS_ENABLED` — Set to `1` only after the AI topic pending migration is applied and verified
 - `GOOGLE_TTS_API_KEY` — Text-to-speech
 - `CRON_SECRET` — Authenticates Vercel Cron requests to `/api/cron/*` routes (Vercel sends it automatically as `Authorization: Bearer <value>` when set)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_MAILTO` — Web push (VAPID keypair + contact address for `lib/push.ts`)
@@ -143,8 +145,8 @@ The `Editor.tsx` component exposes an `EditorHandle` ref (`toggleBold`, `toggleI
 
 - Server Components fetch data directly with the server Supabase client; mark interactive leaves with `"use client"`.
 - Loading states use `loading.tsx` skeleton files (Suspense boundaries).
-- Custom brand colors in `tailwind.config.ts`: `brand-emerald` (#10B981), `brand-gold` (#F59E0B), `brand-purple` (#7C3AED). Use these instead of raw Tailwind color classes.
-- Fonts: Inter (body) and Playfair Display (headlines) — applied in the root layout.
+- Custom brand colors in `tailwind.config.ts` — deep and low-chroma, not the bright Tailwind defaults: `emerald-brand` (#073929), `gold` (#CE932B), `gold-ink` (#8A5D1E), `purple-accent` (#391A60), with `green-tint`/`gold-tint`/`purple-tint` and `green-wash`/`green-wash-border` as their surfaces. Neutrals are `canvas` (#FAF8F5), `surface`, `ink`, `ink-muted`. Use these rather than raw Tailwind color classes, and read the config rather than this list when exact values matter.
+- Fonts: Inter (body, `font-sans`) and Bodoni Moda (headlines, `font-display`) — both loaded in the root layout via `next/font/google`.
 - Nav visibility for feature-flagged sections (debates, fellowships, ambassadors, talent) is controlled exclusively via `lib/featureFlags.ts`.
 
 ### Database

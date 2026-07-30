@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ArticleFormat } from "@/lib/contentModel";
 import PublishDrawer from "./PublishDrawer";
+import { publishPost } from "./actions";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -49,7 +50,6 @@ function renderDrawer(overrides: Partial<React.ComponentProps<typeof PublishDraw
     title: overrides.title ?? "A real title",
     content: overrides.content ?? "<p>Enough words to pass validation here easily.</p>",
     wordCount: overrides.wordCount ?? 60,
-    userId: overrides.userId ?? "user-1",
     initialPostType: overrides.initialPostType ?? "essay",
     initialArticleFormat: overrides.initialArticleFormat ?? null,
     onMetadataChange,
@@ -106,7 +106,6 @@ describe("PublishDrawer genre picker", () => {
         title="A real title"
         content="<p>Enough words to pass validation here easily.</p>"
         wordCount={60}
-        userId="user-1"
         initialPostType="essay"
         initialArticleFormat={"policy_brief" as ArticleFormat}
         coverUploading={false}
@@ -121,5 +120,26 @@ describe("PublishDrawer genre picker", () => {
     renderDrawer({ initialPostType: "policy_brief" });
 
     expect(screen.queryByText("Genre (optional)")).not.toBeInTheDocument();
+  });
+
+  it("requires one explicit confirmation but still allows publishing an Article without topics", async () => {
+    const user = userEvent.setup();
+    const mockedPublishPost = vi.mocked(publishPost);
+    mockedPublishPost.mockClear();
+    renderDrawer({
+      initialTags: [],
+      wordCount: 100,
+      content: `<p>${Array.from({ length: 100 }, () => "word").join(" ")}</p>`,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Publish Article" }));
+
+    expect(mockedPublishPost).not.toHaveBeenCalled();
+    expect(screen.getByText("Publish without topics?")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Publish without topics" })
+    );
+    expect(mockedPublishPost).toHaveBeenCalledOnce();
   });
 });

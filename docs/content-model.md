@@ -13,7 +13,7 @@ content kinds:
    top-level creation choices, and never proof of review, credibility, or
    citation by themselves.
 3. **Research** — formal research-paper record: title, abstract, PDF,
-   authors, topics, references. Goes through the existing editorial review
+   authors, optional topics, required keywords, references. Goes through the existing editorial review
    workflow. Becomes citable only after acceptance, and only through
    actual workflow evidence (`citation_id`/`published_version_id`) — never
    because of its kind or genre alone.

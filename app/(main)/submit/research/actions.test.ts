@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeFakeSupabase, queueResults } from "@/lib/testUtils/supabaseMock";
 
 const fakeSupabase = { current: null as ReturnType<typeof makeFakeSupabase> | null };
@@ -27,12 +27,17 @@ import { saveResearchDraft, submitResearchPaper } from "./actions";
 
 const document = { documentPath: "path/to.pdf", originalName: "paper.pdf", mimeType: "application/pdf", sizeBytes: 1024 };
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 function basePayload(overrides: Partial<Parameters<typeof submitResearchPaper>[0]> = {}) {
   return {
     draftId: "post-1",
     title: "A research title",
     abstract: "An abstract long enough to pass validation.",
-    tags: ["policy"],
+    topics: ["policy"],
+    keywords: ["governance"],
     document,
     references: [
       {
@@ -62,6 +67,47 @@ function standardRoutes() {
 }
 
 describe("submitResearchPaper", () => {
+  it("keeps topics optional but requires at least one Research keyword", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults({
+        data: { id: "post-1", author_id: "user-1", slug: "a-paper", status: "draft", current_round: 1, type: "research" },
+        error: null,
+      }),
+    });
+
+    const result = await submitResearchPaper(
+      basePayload({ topics: [], keywords: [] })
+    );
+
+    expect(result.error).toMatch(/at least one research keyword/i);
+  });
+
+  it("stores topics and keywords separately when the feature is enabled", async () => {
+    vi.stubEnv("NEXT_PUBLIC_AI_TOPIC_SUGGESTIONS_ENABLED", "1");
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults(
+        {
+          data: { id: "post-1", author_id: "user-1", slug: "a-paper", status: "draft", current_round: 1, type: "research" },
+          error: null,
+        },
+        { data: [{ id: "post-1" }], error: null }
+      ),
+      ...standardRoutes(),
+    });
+
+    const result = await submitResearchPaper(
+      basePayload({ topics: [], keywords: [" Groundwater ", "groundwater"] })
+    );
+
+    expect(result.error).toBeNull();
+    expect(fakeSupabase.current!.builders.posts[1].updatedWith).toEqual(
+      expect.objectContaining({
+        tags: [],
+        research_keywords: ["groundwater"],
+      })
+    );
+  });
+
   it("refuses to resubmit a withdrawn research paper", async () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults({

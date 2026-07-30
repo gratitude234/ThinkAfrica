@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
-import TagInput from "@/components/ui/TagInput";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
+import PublishingTopicSelector from "@/components/topic/PublishingTopicSelector";
 import type { PostReferenceRecord } from "@/lib/types";
 import {
   generateExcerpt,
@@ -13,7 +12,7 @@ import {
   POST_TYPE_LABELS,
   type PostType,
 } from "@/lib/utils";
-import { getSuggestedTags, normalizeTagValue } from "@/lib/tags";
+import { MAX_LONG_FORM_TOPICS } from "@/lib/tags";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostQualitySummary, isLowQualityTitle } from "@/lib/postQuality";
 import {
@@ -29,7 +28,6 @@ interface PublishDrawerProps {
   title: string;
   content: string;
   wordCount: number;
-  userId: string;
   initialTags?: string[];
   initialCoverImageUrl?: string;
   initialExcerpt?: string;
@@ -46,25 +44,6 @@ interface PublishDrawerProps {
   onCoverUploadingChange: (uploading: boolean) => void;
 }
 
-const SUGGESTED_TOPICS = [
-  "Governance",
-  "Economics",
-  "Education Policy",
-  "Climate & Environment",
-  "Public Health",
-  "Press Freedom",
-  "Technology",
-  "Youth & Employment",
-];
-
-interface ProfileRow {
-  field_of_study: string | null;
-}
-
-interface TagRow {
-  tags: string[] | null;
-}
-
 export default function PublishDrawer({
   open,
   onClose,
@@ -72,7 +51,6 @@ export default function PublishDrawer({
   title,
   content,
   wordCount,
-  userId,
   initialTags = [],
   initialCoverImageUrl = "",
   initialExcerpt = "",
@@ -113,8 +91,8 @@ export default function PublishDrawer({
   const [tags, setTags] = useState<string[]>(initialTags);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [platformTags, setPlatformTags] = useState<string[]>([]);
+  const [confirmPublishWithoutTopics, setConfirmPublishWithoutTopics] =
+    useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -127,57 +105,9 @@ export default function PublishDrawer({
     setArticleFormat(initialArticleFormat);
     setTags(initialTags);
     setError(null);
+    setConfirmPublishWithoutTopics(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  useEffect(() => {
-    if (!open || !userId) return;
-
-    const supabase = createClient();
-
-    Promise.all([
-      supabase.from("profiles").select("field_of_study").eq("id", userId).single(),
-      supabase.from("posts").select("tags").eq("status", "published").limit(500),
-    ]).then(([profileResult, tagsResult]) => {
-      setProfile((profileResult.data as ProfileRow | null) ?? null);
-
-      const counts = new Map<string, number>();
-      ((tagsResult.data ?? []) as TagRow[]).forEach((row) => {
-        (row.tags ?? []).forEach((tag) => {
-          const normalized = normalizeTagValue(tag);
-          counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
-        });
-      });
-
-      const ranked = Array.from(counts.entries())
-        .sort((left, right) => right[1] - left[1])
-        .map(([tag]) => tag)
-        .slice(0, 10);
-
-      setPlatformTags(ranked);
-    });
-  }, [open, userId]);
-
-  const suggestedTags = useMemo(
-    () =>
-      getSuggestedTags({
-        content,
-        fieldOfStudy: profile?.field_of_study,
-        platformTags,
-      }),
-    [content, platformTags, profile?.field_of_study]
-  );
-
-  const topicSuggestions = useMemo(() => {
-    const seen = new Set<string>();
-
-    return [...SUGGESTED_TOPICS, ...suggestedTags].filter((tag) => {
-      const normalized = normalizeTagValue(tag);
-      if (!normalized || seen.has(normalized)) return false;
-      seen.add(normalized);
-      return true;
-    }).slice(0, 8);
-  }, [suggestedTags]);
 
   const qualitySummary = useMemo(
     () =>
@@ -219,17 +149,8 @@ export default function PublishDrawer({
 
   const handleTagChange = (nextTags: string[]) => {
     setTags(nextTags);
+    setConfirmPublishWithoutTopics(false);
     onMetadataChange?.({ tags: nextTags });
-  };
-
-  const toggleSuggestedTag = (tag: string) => {
-    const normalized = normalizeTagValue(tag);
-    if (tags.includes(normalized)) {
-      handleTagChange(tags.filter((value) => value !== normalized));
-      return;
-    }
-    if (tags.length >= 5) return;
-    handleTagChange([...tags, normalized]);
   };
 
   const handleArticleFormatChange = (nextFormat: ArticleFormat | null) => {
@@ -237,7 +158,7 @@ export default function PublishDrawer({
     onMetadataChange?.({ articleFormat: nextFormat });
   };
 
-  const handlePublish = async () => {
+  const handlePublish = async (allowNoTopics = false) => {
     if (!title.trim()) {
       setError("Please enter a title.");
       return;
@@ -253,17 +174,24 @@ export default function PublishDrawer({
       return;
     }
 
+    if (tags.length === 0 && !allowNoTopics) {
+      setConfirmPublishWithoutTopics(true);
+      document
+        .getElementById("article-topic-selector")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     setPublishing(true);
     setError(null);
 
     const finalExcerpt = initialExcerpt.trim() || generateExcerpt(content, 220);
-    const normalizedTags = tags.map((tag) => normalizeTagValue(tag)).filter(Boolean);
     const { error: publishError, slug: publishedPostSlug } = await publishPost({
       draftId,
       title: title.trim(),
       excerpt: finalExcerpt,
       content,
-      tags: normalizedTags,
+      tags,
       postType,
       articleFormat: postType === "essay" ? articleFormat : undefined,
       coverImageUrl: initialCoverImageUrl,
@@ -287,6 +215,12 @@ export default function PublishDrawer({
           .length,
       },
     });
+    if (tags.length === 0) {
+      trackActivationEvent({
+        event: "topic_selection_skipped",
+        metadata: { contentKind: "article" },
+      });
+    }
 
     router.push(
       `/post/${publishedPostSlug}?justPublished=1&live=${isInstantPublish ? "1" : "0"}`
@@ -341,42 +275,15 @@ export default function PublishDrawer({
         <div className="mb-[18px] h-px bg-gray-100" />
 
         <section className="mb-5">
-          <div className="mb-2.5 flex items-baseline justify-between">
-            <p className="text-[13px] font-semibold text-ink">Topics</p>
-            <span className="text-xs text-gray-400">{tags.length}/5</span>
-          </div>
-
-          <div className="mb-3 flex flex-wrap gap-2">
-            {topicSuggestions.map((tag) => {
-              const normalized = normalizeTagValue(tag);
-              const selected = tags.includes(normalized);
-              const disabled = !selected && tags.length >= 5;
-
-              return (
-                <button
-                  key={normalized}
-                  type="button"
-                  onClick={() => toggleSuggestedTag(tag)}
-                  disabled={disabled}
-                  aria-pressed={selected}
-                  className={`rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-                    selected
-                      ? "border-emerald-brand bg-green-tint text-emerald-brand"
-                      : "border-gray-200 bg-white text-gray-700 hover:border-emerald-brand hover:text-emerald-brand disabled:cursor-not-allowed disabled:opacity-45"
-                  }`}
-                >
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
-
-          <TagInput
+          <PublishingTopicSelector
+            id="article-topic-selector"
+            contentKind="article"
+            title={title}
+            content={content}
             value={tags}
-            maxTags={5}
-            showLabel={false}
-            placeholder={tags.length >= 5 ? "Topic limit reached" : "Add a topic"}
+            maxTopics={MAX_LONG_FORM_TOPICS}
             onChange={handleTagChange}
+            disabled={publishing}
           />
         </section>
 
@@ -455,13 +362,45 @@ export default function PublishDrawer({
             </div>
           ) : null}
 
+          {confirmPublishWithoutTopics && tags.length === 0 ? (
+            <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-3">
+              <p className="text-sm font-semibold text-amber-900">
+                Publish without topics?
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-amber-800">
+                Topics help this Article reach readers who follow these subjects.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmPublishWithoutTopics(false);
+                    document
+                      .getElementById("article-topic-selector")
+                      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }}
+                  className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900"
+                >
+                  Add topics
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handlePublish(true)}
+                  className="rounded-lg bg-amber-800 px-3 py-2 text-xs font-semibold text-white"
+                >
+                  Publish without topics
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <Button
             type="button"
             size="lg"
             className="w-full"
             loading={publishing}
             disabled={!qualitySummary.readyForSubmission || coverUploading}
-            onClick={handlePublish}
+            onClick={() => void handlePublish()}
           >
             {publishLabel}
           </Button>

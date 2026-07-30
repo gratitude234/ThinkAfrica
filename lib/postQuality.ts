@@ -300,10 +300,12 @@ export function getPostQualitySummary(
     {
       key: "tags",
       label: "Topics selected",
-      // Topics are optional for Posts (see docs/content-model.md).
+      // Topics improve discovery but are optional for every publication
+      // kind. Long-form publishing surfaces a separate, explicit no-topic
+      // confirmation instead of making this quality signal blocking.
       done: isNewLightweightPost || tags.length > 0,
-      blocking: !isNewLightweightPost,
-      helper: "Add at least one topic so the right students can find it.",
+      blocking: false,
+      helper: "Add topics so interested readers can find this publication.",
     },
     {
       key: "word_count",

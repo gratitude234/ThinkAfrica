@@ -116,11 +116,10 @@ export async function POST(request: Request) {
       resetAt: quota.reset_at,
     };
     return NextResponse.json(response);
-  } catch (error) {
-    console.error(
-      "[topic-suggestions] Gemini request failed",
-      error instanceof Error ? error.message : "Unknown provider error"
-    );
+  } catch {
+    // Provider errors are intentionally not logged verbatim: a remote error
+    // must never echo draft text, response content, or credentials into logs.
+    console.error("[topic-suggestions] Gemini request failed");
     await recordActivationEvent({
       supabase,
       event: "ai_topic_suggestion_failed",

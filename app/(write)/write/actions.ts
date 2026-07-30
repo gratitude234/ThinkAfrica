@@ -29,7 +29,8 @@ import type { PostType } from "@/lib/utils";
 import { schedulePublicationDistribution } from "@/lib/publicationDistribution";
 import {
   getTopicValuesValidationError,
-  normalizeTagValue,
+  MAX_LONG_FORM_TOPICS,
+  normalizeAndDedupeTopicValues,
 } from "@/lib/tags";
 
 type ReferenceInput = Omit<PostReferenceRecord, "post_id"> & {
@@ -338,11 +339,20 @@ export async function ensureDraft(input: {
     return { error: suspensionError, draftId: null as string | null };
   }
 
+  if (input.tags.length > MAX_LONG_FORM_TOPICS) {
+    return {
+      error: `Articles can have at most ${MAX_LONG_FORM_TOPICS} topics.`,
+      draftId: null as string | null,
+    };
+  }
   const tagError = getTopicValuesValidationError(input.tags);
   if (tagError) {
     return { error: tagError, draftId: null as string | null };
   }
-  const normalizedTags = input.tags.map(normalizeTagValue).filter(Boolean);
+  const normalizedTags = normalizeAndDedupeTopicValues(
+    input.tags,
+    MAX_LONG_FORM_TOPICS
+  );
   const sanitizedContent = sanitizePostHtml(input.content);
 
   // The server, not the browser, is what actually validates and persists
@@ -710,11 +720,20 @@ export async function publishPost(input: {
   const submitStatus =
     effectiveType === "blog" || effectiveType === "essay" ? "published" : "pending";
   const publishedAt = submitStatus === "published" ? now : null;
+  if (input.tags.length > MAX_LONG_FORM_TOPICS) {
+    return {
+      error: `Articles can have at most ${MAX_LONG_FORM_TOPICS} topics.`,
+      slug: null as string | null,
+    };
+  }
   const tagError = getTopicValuesValidationError(input.tags);
   if (tagError) {
     return { error: tagError, slug: null as string | null };
   }
-  const normalizedTags = input.tags.map(normalizeTagValue).filter(Boolean);
+  const normalizedTags = normalizeAndDedupeTopicValues(
+    input.tags,
+    MAX_LONG_FORM_TOPICS
+  );
   const sanitizedContent = sanitizePostHtml(input.content);
 
   // Re-validated here (not just trusted from an earlier ensureDraft() call)

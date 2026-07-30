@@ -6,6 +6,8 @@ import ResearchSubmissionForm, {
 } from "./ResearchSubmissionForm";
 import type { PostReferenceRecord } from "@/lib/types";
 import type { CoAuthorProfile } from "@/components/collaboration/CoAuthorPicker";
+import { isAiTopicSuggestionsEnabled } from "@/lib/featureFlags";
+import { splitLegacyResearchTags } from "@/lib/tags";
 
 interface PageProps {
   searchParams: Promise<{ draft?: string }>;
@@ -40,22 +42,51 @@ export default async function ResearchSubmitPage({ searchParams }: PageProps) {
     : null;
 
   if (draftId) {
-    const { data: post } = await supabase
+    const separateResearchKeywords = isAiTopicSuggestionsEnabled();
+    const { data: postData } = await supabase
       .from("posts")
       .select(
-        "id, title, excerpt, tags, status, current_round, document_path, document_original_name, document_mime_type, document_size_bytes"
+        separateResearchKeywords
+          ? "id, title, excerpt, tags, research_keywords, status, current_round, document_path, document_original_name, document_mime_type, document_size_bytes"
+          : "id, title, excerpt, tags, status, current_round, document_path, document_original_name, document_mime_type, document_size_bytes"
       )
       .eq("id", draftId)
       .eq("author_id", user.id)
       .eq("type", "research")
       .single();
+    const post = postData as unknown as {
+      id: string;
+      title: string;
+      excerpt: string | null;
+      tags: string[] | null;
+      research_keywords?: string[] | null;
+      status: string;
+      current_round: number | null;
+      document_path?: string | null;
+      document_original_name?: string | null;
+      document_mime_type?: string | null;
+      document_size_bytes?: number | null;
+    } | null;
 
     if (post) {
+      const legacyFields = splitLegacyResearchTags(
+        (post.tags as string[] | null) ?? []
+      );
+      const storedKeywords = (
+        post as { research_keywords?: string[] | null }
+      ).research_keywords;
+      const hasSeparatedKeywords =
+        separateResearchKeywords && Array.isArray(storedKeywords);
       draft = {
         id: post.id,
         title: post.title,
         abstract: post.excerpt ?? "",
-        tags: (post.tags as string[] | null) ?? [],
+        topics: hasSeparatedKeywords
+          ? ((post.tags as string[] | null) ?? [])
+          : legacyFields.topics,
+        keywords: hasSeparatedKeywords
+          ? (storedKeywords ?? [])
+          : legacyFields.keywords,
         status: post.status,
         currentRound: post.current_round ?? 1,
         document: {
