@@ -4,11 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
-import {
-  notificationHref,
-  notificationIcon,
-  notificationMessage,
-} from "@/lib/notificationCatalog";
+import { notificationHref, notificationMessage } from "@/lib/notificationCatalog";
+import NotificationAvatar from "@/components/notifications/NotificationAvatar";
 import { formatRelativeTime } from "@/lib/utils";
 import { respondToCoAuthorInvite } from "./actions";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
@@ -61,7 +58,6 @@ export default function NotificationItem({
   const inboxItem = getActionInboxSummary([notification]).items[0];
   const message = inboxItem?.description ?? buildNotificationMessage(notification);
   const link = notificationHref(notification);
-  const icon = notificationIcon(notification.type);
   const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");
   const isRead = notification.read;
 
@@ -119,20 +115,11 @@ export default function NotificationItem({
     onOpen?.(notification.id);
   };
 
-  const avatar = notification.actor?.avatar_url ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={notification.actor.avatar_url}
-      alt={notification.actor.full_name ?? notification.actor.username}
-      className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+  const avatar = (
+    <NotificationAvatar
+      type={notification.type}
+      avatarUrl={notification.actor?.avatar_url}
     />
-  ) : (
-    <div
-      aria-hidden="true"
-      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600"
-    >
-      {icon}
-    </div>
   );
 
   const body = (

@@ -8,11 +8,8 @@ import {
   markAllNotificationsRead,
   markNotificationsRead,
 } from "@/lib/notificationMutations";
-import {
-  notificationHref,
-  notificationIcon,
-  notificationMessage,
-} from "@/lib/notificationCatalog";
+import { notificationHref, notificationMessage } from "@/lib/notificationCatalog";
+import NotificationAvatar from "@/components/notifications/NotificationAvatar";
 import {
   fetchNotificationRows,
   type NotificationData,
@@ -337,12 +334,10 @@ export default function NotificationBell({ userId }: { userId: string }) {
                 const href = notificationHref(notification);
                 const inner = (
                   <div className="flex items-start gap-3">
-                    <span
-                      aria-hidden="true"
-                      className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600"
-                    >
-                      {notificationIcon(notification.type)}
-                    </span>
+                    <NotificationAvatar
+                      type={notification.type}
+                      avatarUrl={notification.actor?.avatar_url}
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm leading-snug text-gray-700">
                         {notificationText(notification)}

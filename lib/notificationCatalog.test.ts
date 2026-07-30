@@ -6,7 +6,15 @@ import {
   notificationHref,
   notificationIcon,
   notificationMessage,
+  type NotificationIconName,
 } from "./notificationCatalog";
+
+const ICON_NAMES: NotificationIconName[] = [
+  "arrow-right", "badge-check", "ban", "bell", "briefcase", "chat",
+  "check-circle", "clipboard", "clock", "document", "hashtag", "heart",
+  "pencil", "question", "reply", "scale", "shield-alert", "star", "trophy",
+  "user-plus", "users", "x-circle",
+];
 
 /**
  * Every notification type this codebase actually writes, traced from the
@@ -71,18 +79,17 @@ describe("catalog coverage", () => {
     expect(generic).toEqual([]);
   });
 
-  it("gives every descriptor a distinct, non-empty label and CTA", () => {
+  it("gives every descriptor a non-empty label and CTA", () => {
     for (const [type, descriptor] of Object.entries(NOTIFICATION_DESCRIPTORS)) {
       expect(descriptor.label, type).not.toBe("");
       expect(descriptor.cta, type).not.toBe("");
-      expect(descriptor.icon, type).not.toBe("");
     }
   });
 
   it("falls back gracefully for a type it has never seen", () => {
     const descriptor = describeNotificationType("something_invented_later");
     expect(descriptor).toBe(FALLBACK_DESCRIPTOR);
-    expect(notificationIcon("something_invented_later")).toBe("N");
+    expect(notificationIcon("something_invented_later")).toBe("bell");
   });
 });
 
@@ -194,5 +201,46 @@ describe("notificationHref", () => {
     expect(notificationHref({ type: "like" })).toBeNull();
     expect(notificationHref({ type: "follow" })).toBeNull();
     expect(notificationHref({ type: "something_invented_later" })).toBeNull();
+  });
+});
+
+describe("icons and tones", () => {
+  it("assigns every descriptor an icon the artwork table can render", () => {
+    // The union is the contract between this module and NotificationAvatar; a name
+    // with no path would render an empty circle.
+    for (const [type, descriptor] of Object.entries(NOTIFICATION_DESCRIPTORS)) {
+      expect(ICON_NAMES, type).toContain(descriptor.icon);
+    }
+  });
+
+  it("reserves the critical tone for trust-and-safety and rejections", () => {
+    const critical = Object.entries(NOTIFICATION_DESCRIPTORS)
+      .filter(([, descriptor]) => descriptor.tone === "critical")
+      .map(([type]) => type)
+      .sort();
+
+    expect(critical).toEqual([
+      "account_suspended",
+      "co_author_declined",
+      "debate_cancelled",
+      "moderation_comment_hidden",
+      "moderation_post_removed",
+      "post_rejected",
+    ]);
+  });
+
+  it("does not tint routine activity", () => {
+    // A like and a suspension cannot both be coloured or neither reads as urgent.
+    for (const type of ["like", "follow", "comment", "author_published"]) {
+      expect(describeNotificationType(type).tone, type).toBe("neutral");
+    }
+  });
+
+  it("no longer uses ASCII placeholder glyphs", () => {
+    // "<3", "NEW", "+", "OK" -- rendered as unstyled-looking text in a grey circle
+    // and announced literally by screen readers.
+    for (const [type, descriptor] of Object.entries(NOTIFICATION_DESCRIPTORS)) {
+      expect(descriptor.icon, type).toMatch(/^[a-z][a-z-]*$/);
+    }
   });
 });

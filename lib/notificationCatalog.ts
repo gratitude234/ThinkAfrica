@@ -20,6 +20,47 @@ export type NotificationCategory =
   | "opportunities"
   | "activity";
 
+/**
+ * Semantic icon names. These replaced ASCII placeholder glyphs ("<3", "NEW", "+",
+ * "OK") that rendered as a grey circle with letters in it -- read as broken or
+ * unstyled UI, collided across types (three different types shared "OK", two
+ * shared "RE"), and were announced literally by screen readers, so a like was
+ * "less than three".
+ *
+ * The name is deliberately abstract: this module stays React-free, and
+ * components/notifications/NotificationAvatar.tsx owns the actual artwork.
+ */
+export type NotificationIconName =
+  | "arrow-right"
+  | "badge-check"
+  | "ban"
+  | "bell"
+  | "briefcase"
+  | "chat"
+  | "check-circle"
+  | "clipboard"
+  | "clock"
+  | "document"
+  | "hashtag"
+  | "heart"
+  | "pencil"
+  | "question"
+  | "reply"
+  | "scale"
+  | "shield-alert"
+  | "star"
+  | "trophy"
+  | "user-plus"
+  | "users"
+  | "x-circle";
+
+/**
+ * Colour intent for the icon. Kept scarce on purpose: if a like and a suspension
+ * are both tinted, neither tint means anything. Only trust-and-safety and
+ * rejections are `critical`; only work that is overdue or blocked is `attention`.
+ */
+export type NotificationTone = "critical" | "attention" | "positive" | "neutral";
+
 export interface NotificationSubject {
   type: string;
   message?: string | null;
@@ -54,10 +95,11 @@ export interface NotificationDescriptor {
    */
   actionable: boolean;
   /**
-   * Placeholder glyph shown when the actor has no avatar. Still ASCII; replacing
-   * these with real icons is a separate change, but there is now one table to swap.
+   * Type icon. Shown as a badge over the actor's avatar, or standalone when there
+   * is no avatar to badge.
    */
-  icon: string;
+  icon: NotificationIconName;
+  tone: NotificationTone;
   /** Fallback copy, used only when the stored `message` is null. */
   describe: (context: NotificationContext) => string;
   /** Fallback destination, used only when the stored `link` is null. */
@@ -82,7 +124,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Read the guidelines",
     actionKey: "account_suspended",
     actionable: true,
-    icon: "!!",
+    icon: "ban",
+    tone: "critical",
     describe: () =>
       "Your account has been suspended. Open the editorial standards for details.",
     hrefFor: toGuidelines,
@@ -94,7 +137,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Read the guidelines",
     actionKey: "moderation_post_removed",
     actionable: true,
-    icon: "!!",
+    icon: "shield-alert",
+    tone: "critical",
     describe: (context) =>
       `${context.postTitle} was removed for breaking the community guidelines.`,
     hrefFor: toGuidelines,
@@ -106,7 +150,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Read the guidelines",
     actionKey: "moderation_comment_hidden",
     actionable: true,
-    icon: "!!",
+    icon: "shield-alert",
+    tone: "critical",
     describe: () =>
       "One of your comments was hidden for breaking the community guidelines.",
     hrefFor: toGuidelines,
@@ -120,7 +165,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Revise submission",
     actionKey: "revision_requested",
     actionable: true,
-    icon: "RV",
+    icon: "pencil",
+    tone: "attention",
     describe: (context) => `Reviewer feedback is ready for ${context.postTitle}.`,
     hrefFor: toPost,
   },
@@ -131,7 +177,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Finish review",
     actionKey: "review_reminder",
     actionable: true,
-    icon: "R!",
+    icon: "clock",
+    tone: "attention",
     describe: (context) =>
       `Your review of ${context.postTitle} is still outstanding.`,
     hrefFor: toPost,
@@ -143,7 +190,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open review",
     actionKey: "review_assigned",
     actionable: true,
-    icon: "R",
+    icon: "clipboard",
+    tone: "neutral",
     describe: (context) =>
       `You have been assigned to review ${context.postTitle}.`,
     hrefFor: toPost,
@@ -155,7 +203,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open submission",
     actionKey: "review_started",
     actionable: false,
-    icon: "R",
+    icon: "clipboard",
+    tone: "neutral",
     describe: (context) => `${context.postTitle} is now under review.`,
     hrefFor: toPost,
   },
@@ -167,7 +216,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     // Kept from the previous shared branch so existing analytics keep resolving.
     actionKey: "status_update",
     actionable: true,
-    icon: "P",
+    icon: "badge-check",
+    tone: "positive",
     describe: (context) => `${context.postTitle} has been published.`,
     hrefFor: toPost,
   },
@@ -178,7 +228,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open post",
     actionKey: "status_update",
     actionable: true,
-    icon: "OK",
+    icon: "badge-check",
+    tone: "positive",
     describe: (context) => `${context.postTitle} was approved.`,
     hrefFor: toPost,
   },
@@ -189,7 +240,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open dashboard",
     actionKey: "status_update",
     actionable: true,
-    icon: "X",
+    icon: "x-circle",
+    tone: "critical",
     describe: (context) =>
       `${context.postTitle} was not accepted for publication.`,
     hrefFor: () => "/dashboard",
@@ -201,7 +253,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open update",
     actionKey: "status_update",
     actionable: true,
-    icon: "$",
+    icon: "briefcase",
+    tone: "neutral",
     describe: () => "You have a fellowship update.",
   },
 
@@ -213,7 +266,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Read response",
     actionKey: "response_received",
     actionable: true,
-    icon: "RE",
+    icon: "reply",
+    tone: "neutral",
     describe: (context) =>
       `${context.actorName} wrote a response to ${context.postTitle}.`,
     hrefFor: toPost,
@@ -225,7 +279,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open comment",
     actionKey: "comment",
     actionable: false,
-    icon: "...",
+    icon: "chat",
+    tone: "neutral",
     describe: (context) =>
       `${context.actorName} commented on ${context.postTitle}.`,
     hrefFor: toPost,
@@ -239,7 +294,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Review inquiry",
     actionKey: "opportunity_inquiry",
     actionable: true,
-    icon: "OP",
+    icon: "briefcase",
+    tone: "neutral",
     describe: () =>
       "A partner sent structured opportunity interest for your profile.",
     hrefFor: () => "/dashboard#opportunity-interest",
@@ -253,7 +309,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Review invite",
     actionKey: "co_author_invite",
     actionable: true,
-    icon: "CO",
+    icon: "users",
+    tone: "neutral",
     describe: (context) =>
       `${context.actorName} invited you to co-author ${context.postTitle}.`,
     hrefFor: toPost,
@@ -265,7 +322,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open post",
     actionKey: "co_author_accepted",
     actionable: false,
-    icon: "CO",
+    icon: "users",
+    tone: "positive",
     describe: (context) =>
       `${context.actorName} accepted your co-author invitation on ${context.postTitle}.`,
     hrefFor: toPost,
@@ -277,7 +335,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open post",
     actionKey: "co_author_declined",
     actionable: false,
-    icon: "CO",
+    icon: "users",
+    tone: "critical",
     describe: (context) =>
       `${context.actorName} declined your co-author invitation on ${context.postTitle}.`,
     hrefFor: toPost,
@@ -291,7 +350,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Review invitation",
     actionKey: "debate_invitation",
     actionable: true,
-    icon: "D",
+    icon: "scale",
+    tone: "neutral",
     describe: (context) => `${context.actorName} invited you to a debate.`,
     hrefFor: toDebates,
   },
@@ -302,7 +362,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open debate",
     actionKey: "debate_phase_advanced",
     actionable: true,
-    icon: ">",
+    icon: "arrow-right",
+    tone: "neutral",
     describe: () => "A debate has moved to its next stage.",
     hrefFor: toDebates,
   },
@@ -313,7 +374,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open debate",
     actionKey: "debate_v2_round_change",
     actionable: true,
-    icon: ">",
+    icon: "arrow-right",
+    tone: "neutral",
     describe: () => "A new debate round is open.",
     hrefFor: toDebates,
   },
@@ -324,7 +386,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open debate",
     actionKey: "debate_v2_direct_response",
     actionable: true,
-    icon: "?",
+    icon: "question",
+    tone: "neutral",
     describe: () => "You received a direct response in a debate.",
     hrefFor: toDebates,
   },
@@ -335,7 +398,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open debate",
     actionKey: "debate_v2_evidence_requested",
     actionable: true,
-    icon: "E",
+    icon: "question",
+    tone: "attention",
     describe: () => "Evidence was requested for one of your debate claims.",
     hrefFor: toDebates,
   },
@@ -346,7 +410,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open debate",
     actionKey: "debate_v2_final_vote",
     actionable: true,
-    icon: "V",
+    icon: "check-circle",
+    tone: "neutral",
     describe: () => "Final voting is open in a debate.",
     hrefFor: toDebates,
   },
@@ -357,7 +422,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open debate",
     actionKey: "debate_invitation_response",
     actionable: false,
-    icon: "D",
+    icon: "scale",
+    tone: "positive",
     describe: () => "A debater responded to your invitation.",
     hrefFor: toDebates,
   },
@@ -368,7 +434,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "View record",
     actionKey: "debate_cancelled",
     actionable: false,
-    icon: "X",
+    icon: "x-circle",
+    tone: "critical",
     describe: () => "A debate you joined was cancelled.",
     hrefFor: toDebates,
   },
@@ -379,7 +446,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open debate",
     actionKey: "debate_reply",
     actionable: false,
-    icon: "D",
+    icon: "scale",
+    tone: "neutral",
     describe: (context) => `${context.actorName} added a debate argument.`,
     hrefFor: toDebates,
   },
@@ -390,7 +458,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Open debate",
     actionKey: "debate_argument",
     actionable: false,
-    icon: "D",
+    icon: "scale",
+    tone: "neutral",
     describe: (context) => `${context.actorName} added a debate argument.`,
     hrefFor: toDebates,
   },
@@ -403,7 +472,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Read now",
     actionKey: "author_published",
     actionable: false,
-    icon: "NEW",
+    icon: "document",
+    tone: "neutral",
     describe: (context) =>
       `${context.actorName} published new work: ${context.postTitle}.`,
     hrefFor: toPost,
@@ -415,7 +485,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "Read now",
     actionKey: "topic_published",
     actionable: false,
-    icon: "#",
+    icon: "hashtag",
+    tone: "neutral",
     describe: (context) =>
       `New work was published in a topic you subscribe to: ${context.postTitle}.`,
     hrefFor: toPost,
@@ -431,7 +502,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "View profile",
     actionKey: "author_subscribed",
     actionable: false,
-    icon: "SUB",
+    icon: "star",
+    tone: "positive",
     describe: (context) => `${context.actorName} subscribed to your work.`,
     hrefFor: toProfile,
   },
@@ -442,7 +514,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "View profile",
     actionKey: "follow",
     actionable: false,
-    icon: "+",
+    icon: "user-plus",
+    tone: "neutral",
     describe: (context) => `${context.actorName} started following your work.`,
     hrefFor: toProfile,
   },
@@ -453,7 +526,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "View profile",
     actionKey: "badge",
     actionable: false,
-    icon: "*",
+    icon: "trophy",
+    tone: "positive",
     describe: () => "You earned a new badge.",
     hrefFor: toProfile,
   },
@@ -464,7 +538,8 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     cta: "View post",
     actionKey: "like",
     actionable: false,
-    icon: "<3",
+    icon: "heart",
+    tone: "neutral",
     describe: (context) => `${context.actorName} liked ${context.postTitle}.`,
     hrefFor: toPost,
   },
@@ -477,7 +552,8 @@ export const FALLBACK_DESCRIPTOR: NotificationDescriptor = {
   cta: "Open",
   actionKey: "notification",
   actionable: false,
-  icon: "N",
+  icon: "bell",
+  tone: "neutral",
   describe: () => "You have a new update.",
 };
 
