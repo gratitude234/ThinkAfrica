@@ -24,6 +24,7 @@
     "lib/actionInbox.ts",
     "lib/notificationCatalog.ts",
     "components/notifications/NotificationAvatar.tsx",
+    "components/notifications/ActionInboxPanel.tsx",
     "components/moderation/reportReasons.ts",
     "components/moderation/reportActions.ts",
     "components/moderation/blockActions.ts",
