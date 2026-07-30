@@ -15,6 +15,7 @@ import {
   fetchUnreadCount,
   type NotificationData,
 } from "@/lib/notificationData";
+import { mutedNotificationTypes } from "@/lib/notificationPreferences";
 import { shouldUseRealtime } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/utils";
@@ -24,6 +25,9 @@ const POLL_MS = 30_000;
 export default function NotificationBell({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  // null until the reader's in-app preferences have loaded. Fetching before then
+  // would flash notifications they have muted, then remove them a moment later.
+  const [mutedTypes, setMutedTypes] = useState<string[] | null>(null);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -50,17 +54,40 @@ export default function NotificationBell({ userId }: { userId: string }) {
     [notifications, heroItem]
   );
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void supabase
+      .from("profiles")
+      .select("notification_prefs")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(({ data }: { data: { notification_prefs?: unknown } | null }) => {
+        if (cancelled) return;
+        // On failure fall back to muting nothing: an unreadable preference should
+        // under-filter rather than silently hide a reader's notifications.
+        setMutedTypes(mutedNotificationTypes(data?.notification_prefs));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, userId]);
+
   const fetchNotifications = useCallback(async () => {
+    if (mutedTypes === null) return;
+
     // The badge count is queried separately rather than derived from these rows:
-    // this list is capped at ten, and the unread total is not.
+    // this list is capped at ten, and the unread total is not. Both apply the same
+    // mute list, or the badge counts notifications the dropdown will not show.
     const [rowsResult, countResult] = await Promise.all([
-      fetchNotificationRows(supabase, userId, 10),
-      fetchUnreadCount(supabase, userId),
+      fetchNotificationRows(supabase, userId, 10, mutedTypes),
+      fetchUnreadCount(supabase, userId, mutedTypes),
     ]);
 
     if (!rowsResult.error) setNotifications(rowsResult.rows);
     if (countResult.count !== null) setUnreadCount(countResult.count);
-  }, [supabase, userId]);
+  }, [supabase, userId, mutedTypes]);
 
   useEffect(() => {
     void fetchNotifications();

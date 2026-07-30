@@ -28,6 +28,8 @@ import {
 interface NotificationsPageClientProps {
   userId: string;
   notifications: NotificationData[];
+  /** Types this reader has muted in Settings. Applied to the poller's refetch too. */
+  mutedTypes: string[];
 }
 
 /**
@@ -88,6 +90,7 @@ function trackAction(item: ActionInboxItem, source: string) {
 export default function NotificationsPageClient({
   userId,
   notifications: initialNotifications,
+  mutedTypes,
 }: NotificationsPageClientProps) {
   // One flat, authoritative list. Date sections and the action summary are both
   // derived from it, so marking one row read cannot leave the header count, the
@@ -108,13 +111,18 @@ export default function NotificationsPageClient({
 
   const refresh = useCallback(async () => {
     if (pendingWrites.current > 0) return;
-    const { rows, error } = await fetchNotificationRows(supabase, userId);
+    const { rows, error } = await fetchNotificationRows(
+      supabase,
+      userId,
+      50,
+      mutedTypes
+    );
     // Leave the currently-displayed notifications alone on a transient fetch
     // failure rather than wiping them out with an empty result.
     if (error) return;
     if (pendingWrites.current > 0) return;
     setNotifications(rows);
-  }, [supabase, userId]);
+  }, [supabase, userId, mutedTypes]);
 
   // Polling — this page has no realtime subscription of its own, and `notifications`
   // stays out of the Realtime publication regardless of the shouldUseRealtime() flag
@@ -367,16 +375,26 @@ export default function NotificationsPageClient({
                 : "All caught up"}
             </p>
           </div>
-          {unreadCount > 0 ? (
-            <button
-              type="button"
-              onClick={() => void handleMarkAllRead()}
-              disabled={markingAllRead}
-              className="cursor-pointer text-xs font-medium text-emerald-600 transition-colors hover:text-emerald-700 disabled:opacity-60"
+          <div className="flex shrink-0 items-center gap-3">
+            {unreadCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => void handleMarkAllRead()}
+                disabled={markingAllRead}
+                className="cursor-pointer text-xs font-medium text-emerald-600 transition-colors hover:text-emerald-700 disabled:opacity-60"
+              >
+                {markingAllRead ? "Marking..." : "Mark all read"}
+              </button>
+            ) : null}
+            {/* Neither this page nor the bell used to link anywhere you could
+                turn notifications down. */}
+            <Link
+              href="/settings?tab=notifications"
+              className="text-xs font-medium text-gray-500 transition-colors hover:text-gray-700"
             >
-              {markingAllRead ? "Marking..." : "Mark all read"}
-            </button>
-          ) : null}
+              Settings
+            </Link>
+          </div>
         </div>
       </div>
 

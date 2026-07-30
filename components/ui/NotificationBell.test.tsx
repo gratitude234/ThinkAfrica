@@ -5,8 +5,26 @@ import NotificationBell from "./NotificationBell";
 import type { NotificationData } from "@/lib/notificationData";
 
 vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
-vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 vi.mock("@/lib/realtime", () => ({ shouldUseRealtime: () => false }));
+
+// The bell reads the profile's notification_prefs once on mount to learn which
+// types the reader has muted, so the stub has to serve that chain.
+const storedPrefs = vi.hoisted(() => ({ value: null as unknown }));
+const supabaseStub = vi.hoisted(() => ({
+  from: () => ({
+    select: () => ({
+      eq: () => ({
+        maybeSingle: () =>
+          Promise.resolve({
+            data: { notification_prefs: storedPrefs.value },
+            error: null,
+          }),
+      }),
+    }),
+  }),
+}));
+
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => supabaseStub }));
 
 const data = vi.hoisted(() => ({
   fetchNotificationRows: vi.fn(),
@@ -59,6 +77,7 @@ function setup({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  storedPrefs.value = null;
   mutations.markNotificationsRead.mockResolvedValue({ error: null });
   mutations.markAllNotificationsRead.mockResolvedValue({
     error: null,
@@ -109,9 +128,7 @@ describe("unread badge", () => {
     );
 
     await waitFor(() => {
-      expect(mutations.markNotificationsRead).toHaveBeenCalledWith({}, "u1", [
-        "follow-1",
-      ]);
+      expect(mutations.markNotificationsRead).toHaveBeenCalledWith(supabaseStub, "u1", ["follow-1"]);
     });
     expect(
       screen.getByRole("button", { name: "Notifications, 4 unread" })
@@ -264,5 +281,48 @@ describe("polling", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("muted notification types", () => {
+  it("waits for preferences before its first fetch", async () => {
+    // Fetching first would flash notifications the reader has muted and then
+    // remove them a moment later.
+    storedPrefs.value = { inapp_likes: false };
+    setup();
+
+    await waitFor(() => expect(data.fetchNotificationRows).toHaveBeenCalled());
+
+    expect(data.fetchNotificationRows).toHaveBeenCalledWith(
+      supabaseStub,
+      "u1",
+      10,
+      ["like"]
+    );
+  });
+
+  it("applies the same mute list to the badge count", async () => {
+    storedPrefs.value = { inapp_follows: false };
+    setup();
+
+    await waitFor(() => expect(data.fetchUnreadCount).toHaveBeenCalled());
+
+    expect(data.fetchUnreadCount).toHaveBeenCalledWith(supabaseStub, "u1", [
+      "follow",
+      "author_subscribed",
+    ]);
+  });
+
+  it("mutes nothing for a reader with no stored preferences", async () => {
+    setup();
+
+    await waitFor(() => expect(data.fetchNotificationRows).toHaveBeenCalled());
+
+    expect(data.fetchNotificationRows).toHaveBeenCalledWith(
+      supabaseStub,
+      "u1",
+      10,
+      []
+    );
   });
 });

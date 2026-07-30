@@ -72,7 +72,7 @@ describe("needs-attention hero", () => {
     // The reported bug: a single new follower rendered as a full-width
     // "NEEDS ATTENTION / New follower" hero with a primary CTA.
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
@@ -82,6 +82,7 @@ describe("needs-attention hero", () => {
     render(
       <NotificationsPageClient
         userId="u1"
+        mutedTypes={[]}
         notifications={[revision, follow, publication]}
       />
     );
@@ -97,6 +98,7 @@ describe("needs-attention hero", () => {
     render(
       <NotificationsPageClient
         userId="u1"
+        mutedTypes={[]}
         notifications={[revision, follow, publication]}
       />
     );
@@ -106,7 +108,7 @@ describe("needs-attention hero", () => {
   });
 
   it("does not contradict the hero with an all-caught-up panel", () => {
-    render(<NotificationsPageClient userId="u1" notifications={[revision]} />);
+    render(<NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[revision]} />);
 
     expect(screen.getByText("Needs attention")).toBeInTheDocument();
     expect(screen.queryByText("No notifications yet")).not.toBeInTheDocument();
@@ -117,7 +119,7 @@ describe("needs-attention hero", () => {
 describe("marking a single notification read", () => {
   it("persists the read and updates the unread count", async () => {
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     expect(screen.getByText("2 new notifications")).toBeInTheDocument();
@@ -137,7 +139,7 @@ describe("marking a single notification read", () => {
     mutations.markNotificationsRead.mockResolvedValue({ error: "denied" });
 
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     await userEvent.click(screen.getByRole("link", { name: /published a new Article/ }));
@@ -151,7 +153,7 @@ describe("marking a single notification read", () => {
 describe("dismissing a notification", () => {
   it("removes the row and offers an undo", async () => {
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     await userEvent.click(
@@ -177,7 +179,7 @@ describe("dismissing a notification", () => {
     mutations.dismissNotification.mockResolvedValue({ error: "offline" });
 
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     await userEvent.click(
@@ -194,7 +196,7 @@ describe("dismissing a notification", () => {
 describe("mark all read", () => {
   it("offers an undo scoped to the rows the database actually changed", async () => {
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
@@ -223,7 +225,7 @@ describe("mark all read", () => {
     });
 
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
@@ -244,7 +246,7 @@ describe("mark all read", () => {
     });
 
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
@@ -261,6 +263,7 @@ describe("filter chips", () => {
     render(
       <NotificationsPageClient
         userId="u1"
+        mutedTypes={[]}
         notifications={[revision, follow, publication]}
       />
     );
@@ -278,6 +281,7 @@ describe("filter chips", () => {
     render(
       <NotificationsPageClient
         userId="u1"
+        mutedTypes={[]}
         notifications={[follow, publication, notification({ id: "read-1", read: true })]}
       />
     );
@@ -289,7 +293,7 @@ describe("filter chips", () => {
 
   it("marks the active chip for assistive technology", async () => {
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
@@ -317,6 +321,7 @@ describe("the caught-up dead end", () => {
     render(
       <NotificationsPageClient
         userId="u1"
+        mutedTypes={[]}
         notifications={[notification({ id: "read-1", read: true, message: "An old one" })]}
       />
     );
@@ -327,7 +332,7 @@ describe("the caught-up dead end", () => {
 
   it("still shows the inbox after marking everything read", async () => {
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
@@ -342,7 +347,7 @@ describe("the caught-up dead end", () => {
 
   it("offers a way out of an empty filter", async () => {
     render(
-      <NotificationsPageClient userId="u1" notifications={[follow, publication]} />
+      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Responses/ }));
@@ -363,6 +368,7 @@ describe("the caught-up dead end", () => {
     render(
       <NotificationsPageClient
         userId="u1"
+        mutedTypes={[]}
         notifications={[notification({ id: "read-1", read: true })]}
       />
     );

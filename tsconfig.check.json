@@ -23,6 +23,7 @@
     "lib/debateV15.ts",
     "lib/actionInbox.ts",
     "lib/notificationCatalog.ts",
+    "lib/notificationPreferences.ts",
     "components/notifications/NotificationAvatar.tsx",
     "components/notifications/ActionInboxPanel.tsx",
     "components/moderation/reportReasons.ts",
