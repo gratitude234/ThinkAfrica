@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
+import {
+  markAllNotificationsRead,
+  markNotificationsRead,
+} from "@/lib/notificationMutations";
 import { shouldUseRealtime } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 
@@ -89,11 +93,28 @@ export default function NotificationBell({ userId }: { userId: string }) {
     [notifications]
   );
 
+  // Only a notification that asks something of the reader earns the hero slot; a
+  // new follower used to be promoted here purely for being the newest unread row.
+  const heroItem = actionSummary.primaryActionable;
+
+  // ...and whatever the hero renders is dropped from the list below it, so a
+  // 320px-wide dropdown stops showing the same notification twice.
+  const listNotifications = useMemo(
+    () =>
+      notifications.filter(
+        (notification) => notification.id !== heroItem?.notificationId
+      ),
+    [notifications, heroItem]
+  );
+
   const fetchNotifications = useCallback(async () => {
     const { data } = await supabase
       .from("notifications")
-      .select("*")
+      .select("id, type, message, read, link, created_at")
       .eq("user_id", userId)
+      // Dismissed notifications are soft-deleted, so they have to be excluded
+      // explicitly or they keep appearing here after being cleared on /notifications.
+      .is("dismissed_at", null)
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -177,14 +198,59 @@ export default function NotificationBell({ userId }: { userId: string }) {
   }, []);
 
   async function markAllRead() {
-    await supabase
-      .from("notifications")
-      .update({ read: true })
-      .eq("user_id", userId)
-      .eq("read", false);
+    const previouslyUnread = notifications
+      .filter((notification) => !notification.read)
+      .map((notification) => notification.id);
 
     setNotifications((prev) =>
       prev.map((notification) => ({ ...notification, read: true }))
+    );
+
+    const { error } = await markAllNotificationsRead(supabase, userId);
+
+    // Previously this ignored the result entirely and cleared the badge even when
+    // the write failed, leaving the UI asserting something the server disagreed with.
+    if (error) {
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          previouslyUnread.includes(notification.id)
+            ? { ...notification, read: false }
+            : notification
+        )
+      );
+    }
+  }
+
+  /**
+   * Opening a notification marks it read. Without this the badge only ever cleared
+   * via "Mark all as read", so a notification the reader had already acted on kept
+   * counting against them.
+   */
+  function markOneRead(notificationId: string) {
+    const target = notifications.find(
+      (notification) => notification.id === notificationId
+    );
+    if (!target || target.read) return;
+
+    setNotifications((prev) =>
+      prev.map((notification) =>
+        notification.id === notificationId
+          ? { ...notification, read: true }
+          : notification
+      )
+    );
+
+    void markNotificationsRead(supabase, userId, [notificationId]).then(
+      ({ error }) => {
+        if (!error) return;
+        setNotifications((prev) =>
+          prev.map((notification) =>
+            notification.id === notificationId
+              ? { ...notification, read: false }
+              : notification
+          )
+        );
+      }
     );
   }
 
@@ -279,12 +345,13 @@ export default function NotificationBell({ userId }: { userId: string }) {
               </div>
             ) : (
               <>
-                {actionSummary.primaryAction ? (
+                {heroItem ? (
                   <div className="px-3 py-3">
                     <Link
-                      href={actionSummary.primaryAction.href}
+                      href={heroItem.href}
                       onClick={() => {
-                        trackAction(actionSummary.primaryAction as ActionInboxItem);
+                        trackAction(heroItem);
+                        markOneRead(heroItem.notificationId);
                         setOpen(false);
                       }}
                       className="block rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 transition-colors hover:bg-emerald-100/60"
@@ -293,18 +360,21 @@ export default function NotificationBell({ userId }: { userId: string }) {
                         Needs attention
                       </p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">
-                        {actionSummary.primaryAction.label}
+                        {heroItem.label}
                       </p>
                       <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-600">
-                        {actionSummary.primaryAction.description}
+                        {heroItem.description}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        {timeAgo(heroItem.createdAt)}
                       </p>
                       <p className="mt-2 text-xs font-semibold text-emerald-700">
-                        {actionSummary.primaryAction.cta}
+                        {heroItem.cta}
                       </p>
                     </Link>
                   </div>
                 ) : null}
-                {notifications.map((notification) => {
+                {listNotifications.map((notification) => {
                 const inner = (
                   <div className="flex items-start gap-3">
                     <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600">
@@ -336,6 +406,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
                         href={notification.link}
                         onClick={() => {
                           trackOpen(notification);
+                          markOneRead(notification.id);
                           setOpen(false);
                         }}
                       >

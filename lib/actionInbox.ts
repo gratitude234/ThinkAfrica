@@ -35,6 +35,17 @@ export interface ActionInboxItem {
   cta: string;
   actionKey: string;
   postId: string | null;
+  /**
+   * Whether this notification asks the reader to *do* something (revise a draft,
+   * answer an invitation, respond to an inquiry) as opposed to merely telling them
+   * something happened (a like, a follow, a new publication).
+   *
+   * Only actionable items are eligible to be promoted into a "Needs attention"
+   * hero. Without this distinction the hero was simply the newest unread row, so a
+   * single new follower rendered as a full-width NEEDS ATTENTION banner with a
+   * primary CTA -- over-claiming urgency and training people to ignore the banner.
+   */
+  actionable: boolean;
 }
 
 export interface ActionInboxGroup {
@@ -45,10 +56,39 @@ export interface ActionInboxGroup {
 
 export interface ActionInboxSummary {
   primaryAction: ActionInboxItem | null;
+  /**
+   * The highest-priority unread item that actually asks for a response. This is
+   * what a "Needs attention" hero should render; `primaryAction` is just the top
+   * unread row of any kind and stays available for callers that want that.
+   */
+  primaryActionable: ActionInboxItem | null;
   items: ActionInboxItem[];
   groups: ActionInboxGroup[];
   unreadActionCount: number;
   staleUnreadCount: number;
+}
+
+/**
+ * Types that require something of the reader. Deliberately type-based rather than
+ * category-based: `co_author_invite` and `debate_invitation` are filed under
+ * "activity" but are among the most actionable things in the inbox.
+ */
+const ACTIONABLE_TYPES = new Set([
+  "revision_requested",
+  "response_post",
+  "opportunity_inquiry",
+  "review_assigned",
+  "post_published",
+  "post_approved",
+  "post_rejected",
+  "fellowship",
+  "co_author_invite",
+  "debate_invitation",
+  "debate_phase_advanced",
+]);
+
+export function isActionableType(type: string): boolean {
+  return ACTIONABLE_TYPES.has(type);
 }
 
 const STALE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -75,6 +115,13 @@ function defaultHref(notification: ActionInboxNotificationInput) {
 function notificationToAction(
   notification: ActionInboxNotificationInput
 ): ActionInboxItem {
+  const described = describeNotification(notification);
+  return { ...described, actionable: isActionableType(described.type) };
+}
+
+function describeNotification(
+  notification: ActionInboxNotificationInput
+): Omit<ActionInboxItem, "actionable"> {
   const base = {
     notificationId: notification.id,
     type: notification.type,
@@ -288,6 +335,7 @@ export function getActionInboxSummary(
 
   return {
     primaryAction: unreadItems[0] ?? null,
+    primaryActionable: unreadItems.find((item) => item.actionable) ?? null,
     items,
     groups: groupOrder
       .map((group) => ({

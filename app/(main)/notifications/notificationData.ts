@@ -60,7 +60,7 @@ export function sectionsFromNotifications(
 }
 
 const NOTIFICATIONS_SELECT = `
-  id, type, read, created_at, actor_id, post_id, message, link,
+  id, type, read, created_at, actor_id, post_id, message, link, dismissed_at,
   actor:profiles!notifications_actor_id_fkey(full_name, username, avatar_url),
   post:posts!notifications_post_id_fkey(title, slug)
 `;
@@ -78,10 +78,13 @@ export async function fetchNotificationRows(
   supabase: NotificationsQueryClient,
   userId: string
 ): Promise<NotificationRowsResult> {
+  // Dismissed notifications are soft-deleted, not removed, so they have to be
+  // filtered out here rather than relying on the row being gone.
   const { data: raw, error } = await supabase
     .from("notifications")
     .select(NOTIFICATIONS_SELECT)
     .eq("user_id", userId)
+    .is("dismissed_at", null)
     .order("created_at", { ascending: false })
     .limit(50);
 
