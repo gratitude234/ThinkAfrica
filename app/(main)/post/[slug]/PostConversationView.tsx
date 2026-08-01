@@ -4,7 +4,7 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
 import ReportButton from "@/components/moderation/ReportButton";
 import HomeFeedCard from "@/components/post/HomeFeedCard";
-import PostCover from "@/components/post/PostCover";
+import PostImage from "@/components/post/PostImage";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
 import type { PostCardData } from "@/components/post/PostCard";
 import PublishedToast from "./PublishedToast";
@@ -198,15 +198,14 @@ export default async function PostConversationView({
           dangerouslySetInnerHTML={{ __html: bodyHtml }}
         />
         {post.cover_image_url ? (
-          <PostCover
+          <PostImage
             src={post.cover_image_url}
             alt="Image attached to this post"
             type={post.type}
             sizes="(max-width: 680px) calc(100vw - 32px), 640px"
             priority
-            fit="natural"
-            className="mt-5 w-full overflow-hidden rounded-xl bg-gray-100"
-            imageClassName="object-cover"
+            wrapperClassName="mt-5"
+            className="w-full overflow-hidden rounded-xl bg-gray-100"
           />
         ) : null}
       </div>
