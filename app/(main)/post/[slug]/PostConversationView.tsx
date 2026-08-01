@@ -204,8 +204,9 @@ export default async function PostConversationView({
             type={post.type}
             sizes="(max-width: 680px) calc(100vw - 32px), 640px"
             priority
+            fit="natural"
             className="mt-5 w-full overflow-hidden rounded-xl bg-gray-100"
-            imageClassName="w-full object-cover"
+            imageClassName="object-cover"
           />
         ) : null}
       </div>
