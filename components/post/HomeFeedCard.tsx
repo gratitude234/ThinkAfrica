@@ -201,7 +201,8 @@ function FullWidthCover({ post, title, priority }: { post: PostCardData; title: 
         article_format={post.article_format}
         sizes="(max-width: 640px) calc(100vw - 56px), 680px"
         priority={priority}
-        className="aspect-[16/9] w-full rounded-[10px] bg-gray-100"
+        fit="natural"
+        className="w-full rounded-[10px] bg-gray-100"
         imageClassName="object-cover"
       />
     </Link>
