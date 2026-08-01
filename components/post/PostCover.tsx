@@ -60,9 +60,7 @@ const NATURAL_MAX_RATIO = 16 / 9;
 // Height reserved before the image reports its intrinsic size.
 const NATURAL_DEFAULT_RATIO = 16 / 9;
 
-function measureNaturalFit(width: number, height: number): NaturalFit | null {
-  if (!width || !height) return null;
-  const raw = width / height;
+function clampNaturalFit(raw: number): NaturalFit {
   const ratio = Math.min(NATURAL_MAX_RATIO, Math.max(NATURAL_MIN_RATIO, raw));
   return { ratio, cropped: Math.abs(ratio - raw) > 0.001 };
 }
@@ -109,18 +107,35 @@ export default function PostCover({
   onNaturalFit,
 }: PostCoverProps) {
   const [failed, setFailed] = useState(false);
-  const [naturalFit, setNaturalFit] = useState<NaturalFit | null>(null);
+  // Deliberately a primitive, not the {ratio, cropped} object: the ref below
+  // re-runs on renders it does not control, and storing an object there would
+  // hand setState a fresh identity every time, re-rendering forever. A number
+  // measured twice is `Object.is`-equal, so React bails out instead.
+  const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
   const postType = normalizeType(type);
+  // Stable across renders so next/image's internal ref (which lists `onError`
+  // in its deps and merges it with ours) keeps its identity -- an inline
+  // handler here makes React detach and re-attach `measureRef` every render.
+  const handleError = useCallback(() => setFailed(true), []);
   // Measured off the element rather than next/image's `onLoad`, which fires
   // asynchronously behind a decode() promise. A cached image can also be
   // complete before the ref runs, so check for that too.
   const measureRef = useCallback((node: HTMLImageElement | null) => {
     if (!node) return;
-    const measure = () => setNaturalFit(measureNaturalFit(node.naturalWidth, node.naturalHeight));
+    const measure = () => {
+      const { naturalWidth, naturalHeight } = node;
+      if (!naturalWidth || !naturalHeight) return;
+      setNaturalRatio(naturalWidth / naturalHeight);
+    };
     if (node.complete) measure();
     node.addEventListener("load", measure);
     return () => node.removeEventListener("load", measure);
   }, []);
+
+  const naturalFit = useMemo(
+    () => (naturalRatio === null ? null : clampNaturalFit(naturalRatio)),
+    [naturalRatio]
+  );
 
   useEffect(() => {
     if (naturalFit) onNaturalFit?.(naturalFit);
@@ -183,7 +198,7 @@ export default function PostCover({
         loading={priority ? "eager" : undefined}
         unoptimized={imageUnoptimized}
         className={resolvedImageClassName}
-        onError={() => setFailed(true)}
+        onError={handleError}
       />
     </div>
   );
