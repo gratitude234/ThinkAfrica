@@ -134,6 +134,19 @@ describe("HomeFeedCard", () => {
     expect(screen.getByText(/Responding to another publication/)).toBeInTheDocument();
   });
 
+  it("drops the responding-to line where the parent is already the context", () => {
+    render(
+      <HomeFeedCard
+        post={post({ in_response_to: "parent-1", response_to: null })}
+        currentUserId="user-1"
+        surface="latest"
+        hideRespondingTo
+      />
+    );
+
+    expect(screen.queryByText(/Responding to/)).toBeNull();
+  });
+
   it("renders Article identity with its optional genre as secondary metadata", () => {
     render(
       <HomeFeedCard

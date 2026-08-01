@@ -24,6 +24,9 @@ interface Props {
   surface: "home" | "following" | "subscriptions" | "topics" | "latest";
   priority?: boolean;
   respondingTo?: RespondingToInfo | null;
+  /** Set where the parent is already the surrounding context — under the very
+   *  post being responded to, "Responding to <this post>" is just noise. */
+  hideRespondingTo?: boolean;
 }
 
 function deriveRespondingTo(responseTo: PostCardData["response_to"]): RespondingToInfo | null {
@@ -111,8 +114,9 @@ function ContextLine({
   post,
   surface,
   respondingTo,
-}: Pick<Props, "post" | "surface" | "respondingTo">) {
-  if (post.in_response_to) {
+  hideRespondingTo,
+}: Pick<Props, "post" | "surface" | "respondingTo" | "hideRespondingTo">) {
+  if (post.in_response_to && !hideRespondingTo) {
     const parent = respondingTo ?? deriveRespondingTo(post.response_to);
     return (
       <p className="mb-2 flex items-start gap-1.5 text-[11.5px] leading-[1.45] text-gray-500">
@@ -206,13 +210,13 @@ function FullWidthCover({ post, title, priority }: { post: PostCardData; title: 
   );
 }
 
-function PostFeedCard({ post, currentUserId, surface, priority, respondingTo }: Props) {
+function PostFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo }: Props) {
   const title = getPostDisplayTitle(post);
   const excerpt = sanitizePostExcerpt(post.excerpt) || "View post";
 
   return (
     <article className={CARD_SHELL}>
-      <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
+      <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
       <AuthorLine post={post} avatarSize={32} />
       <div className="mt-3">
         {title ? (
@@ -232,7 +236,7 @@ function PostFeedCard({ post, currentUserId, surface, priority, respondingTo }: 
   );
 }
 
-function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo }: Props) {
+function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled article";
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const format = getArticleFormatLabel(resolveArticleFormat(post));
@@ -240,7 +244,7 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo 
 
   return (
     <article className={CARD_SHELL}>
-      <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
+      <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
       <AuthorLine post={post} avatarSize={28} />
       <div className="mt-3 min-w-0">
         <p className={`mb-1.5 font-display text-[10.5px] font-bold uppercase tracking-[0.14em] ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
@@ -301,7 +305,7 @@ function ResearchManuscriptRow({
   );
 }
 
-function ResearchFeedCard({ post, currentUserId, surface, respondingTo }: Props) {
+function ResearchFeedCard({ post, currentUserId, surface, respondingTo, hideRespondingTo }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled research paper";
   const abstract = sanitizePostExcerpt(post.excerpt);
   const evidence = post.citation_id ? "Citable" : isFormallyReviewed(post) ? "Reviewed" : null;
@@ -313,7 +317,7 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo }: Props)
 
   return (
     <article className={`${CARD_SHELL} border-purple-100`}>
-      <ContextLine post={post} surface={surface} respondingTo={respondingTo} />
+      <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.15em] text-purple-accent">Research</span>
         {evidence && !hasDocument ? (

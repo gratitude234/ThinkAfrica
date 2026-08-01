@@ -3,12 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import UserAvatar from "@/components/ui/UserAvatar";
 import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
 import ReportButton from "@/components/moderation/ReportButton";
+import BackLink from "@/components/ui/BackLink";
 import HomeFeedCard from "@/components/post/HomeFeedCard";
 import PostImage from "@/components/post/PostImage";
-import ResponseStartLink from "@/components/post/ResponseStartLink";
 import type { PostCardData } from "@/components/post/PostCard";
 import PublishedToast from "./PublishedToast";
 import PostActionsRow from "./PostActionsRow";
+import InlineResponseComposer from "./InlineResponseComposer";
 import { getPostDisplayTitle } from "@/lib/postDisplay";
 import { formatRelativeTime, POST_POINTS, type PostType } from "@/lib/utils";
 
@@ -23,11 +24,13 @@ interface ConversationAuthor {
 interface ConversationPost {
   id: string;
   slug: string;
+  title: string | null;
   type: string;
   status: string;
   created_at: string;
   published_at: string | null;
   cover_image_url: string | null;
+  tags: string[] | null;
   in_response_to: string | null;
 }
 
@@ -105,6 +108,8 @@ export default async function PostConversationView({
   const isPublished = post.status === "published";
   const isOwnPost = Boolean(userId && author && userId === author.id);
   const relatedPost = secondary.relatedPosts[0] ?? null;
+  const displayTitle = getPostDisplayTitle(post);
+  const topics = post.tags ?? [];
 
   return (
     <div className="mx-auto max-w-[640px] pb-20">
@@ -126,18 +131,9 @@ export default async function PostConversationView({
         }
       />
 
-      <Link
-        href="/"
-        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-      >
-        <span aria-hidden="true">‹</span> Back to feed
-      </Link>
-
-      <div className="mt-2">
-        <span className="rounded-full bg-green-tint px-3 py-1 text-xs font-semibold text-emerald-brand">
-          Post
-        </span>
-      </div>
+      <BackLink className="inline-flex min-h-11 items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">
+        <span aria-hidden="true">‹</span> Back
+      </BackLink>
 
       {post.status === "draft" ? (
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
@@ -193,6 +189,14 @@ export default async function PostConversationView({
         {post.in_response_to ? (
           <ParentContextLine parentPostId={post.in_response_to} />
         ) : null}
+        {/* Titleless Posts render no heading at all rather than a fabricated
+            one -- but a Post that does carry a title showed it in the feed and
+            nowhere here, which also left the page with no h1. */}
+        {displayTitle ? (
+          <h1 className="mb-3 font-display text-[26px] font-semibold leading-[1.25] text-ink sm:text-[30px]">
+            {displayTitle}
+          </h1>
+        ) : null}
         <div
           className="text-[19px] leading-[1.62] text-gray-900 [&_a]:text-emerald-brand [&_a]:underline [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
           dangerouslySetInnerHTML={{ __html: bodyHtml }}
@@ -221,6 +225,7 @@ export default async function PostConversationView({
           initialLiked={viewer.userLiked}
           initialLikeCount={secondary.likeCount}
           initialBookmarked={viewer.userBookmarked}
+          responseCount={secondary.responseCount}
         />
         {userId && author && !isOwnPost ? (
           <p className="mt-2 text-right">
@@ -235,29 +240,33 @@ export default async function PostConversationView({
         ) : null}
       </div>
 
+      {topics.length > 0 ? (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {topics.map((topic) => (
+            <Link
+              key={topic}
+              href={`/topics/${encodeURIComponent(topic)}`}
+              className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[13px] text-gray-600 transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+            >
+              #{topic}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
       <section id="responses" className="mt-10 scroll-mt-24">
-        <h2 className="font-display text-[26px] font-semibold text-ink">
+        <h2 className="font-display text-[19px] font-semibold text-ink">
           Responses · {secondary.responseCount}
         </h2>
 
+        {isPublished ? (
+          <InlineResponseComposer parentPostId={post.id} userId={userId} />
+        ) : null}
+
         {secondary.responseCards.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-gray-200 bg-white px-6 py-8 text-center">
-            <p className="text-[15px] text-gray-500">
-              No responses yet. Be the first to weigh in.
-            </p>
-            {isPublished ? (
-              <div className="mt-5 flex justify-center">
-                <ResponseStartLink
-                  postId={post.id}
-                  source="responses_empty_state"
-                  userId={userId}
-                  className="inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-6 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-                >
-                  Respond
-                </ResponseStartLink>
-              </div>
-            ) : null}
-          </div>
+          <p className="mt-4 text-[15px] text-gray-500">
+            No responses yet. Be the first to weigh in.
+          </p>
         ) : (
           <div className="mt-4">
             {secondary.responseCards.map((response) => (
@@ -266,12 +275,7 @@ export default async function PostConversationView({
                 post={response}
                 currentUserId={userId}
                 surface="latest"
-                respondingTo={{
-                  title: metadataTitle,
-                  author: authorName,
-                  slug: post.slug,
-                  authorUsername: author?.username ?? null,
-                }}
+                hideRespondingTo
               />
             ))}
           </div>

@@ -15,6 +15,8 @@ interface PostActionsRowProps {
   initialLiked: boolean;
   initialLikeCount: number;
   initialBookmarked: boolean;
+  /** Shown alongside the Respond action, mirroring the like count. */
+  responseCount?: number;
   /** Rendered at the trailing edge of the bar — keeps secondary actions such as
    *  Report grouped with the row instead of orphaned on a line of their own. */
   reportSlot?: React.ReactNode;
@@ -33,6 +35,7 @@ export default function PostActionsRow({
   initialLiked,
   initialLikeCount,
   initialBookmarked,
+  responseCount = 0,
   reportSlot = null,
 }: PostActionsRowProps) {
   const {
@@ -119,6 +122,9 @@ export default function PostActionsRow({
             />
           </svg>
           Respond
+          {responseCount > 0 ? (
+            <span className="text-gray-500">{responseCount}</span>
+          ) : null}
         </ResponseStartLink>
 
         <button
