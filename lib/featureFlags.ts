@@ -30,6 +30,7 @@ export function isAuthorSubscriptionsEnabled(): boolean {
 export function isAuthorSubscriptionsUxV2Enabled(): boolean {
   return (
     isAuthorSubscriptionsEnabled() &&
+    process.env.NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED === "1" &&
     process.env.NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED === "1"
   );
 }

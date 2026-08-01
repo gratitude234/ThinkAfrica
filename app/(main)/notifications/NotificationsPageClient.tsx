@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Toast from "@/components/ui/Toast";
@@ -9,37 +9,74 @@ import {
   type ActionInboxCategory,
   type ActionInboxItem,
 } from "@/lib/actionInbox";
+import {
+  dismissNotification,
+  markAllNotificationsRead,
+  restoreUnread,
+  undismissNotification,
+} from "@/lib/notificationMutations";
+import { markNotificationRead } from "@/lib/notificationRead";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { formatRelativeTime } from "@/lib/utils";
 import NotificationItem from "./NotificationItem";
 import {
   fetchNotificationRows,
   sectionsFromNotifications,
-  type NotificationSection,
-} from "./notificationData";
-import { markNotificationRead } from "@/lib/notificationRead";
+  type NotificationData,
+} from "@/lib/notificationData";
+import { isAuthorSubscriptionsUxV2Enabled } from "@/lib/featureFlags";
 
 interface NotificationsPageClientProps {
   userId: string;
-  initialUnreadCount: number;
-  sections: NotificationSection[];
+  notifications: NotificationData[];
+  /** Types this reader has muted in Settings. Applied to the poller's refetch too. */
+  mutedTypes: string[];
 }
 
+/**
+ * "all" and "unread" are states; the rest are categories. They are separate kinds
+ * of thing, which is why the old single "needs_attention" key -- a state pretending
+ * to be a category -- had to be special-cased everywhere it was touched.
+ */
 type FilterKey =
+  | "all"
+  | "unread"
   | "needs_attention"
-  | "responses"
-  | "review"
-  | "opportunities"
-  | "subscriptions"
-  | "activity";
+  | ActionInboxCategory;
 
-const FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: "needs_attention", label: "Needs attention" },
+const BASE_FILTERS: Array<{ key: FilterKey; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "unread", label: "Unread" },
   { key: "responses", label: "Responses" },
   { key: "review", label: "Review" },
   { key: "opportunities", label: "Opportunities" },
-  { key: "subscriptions", label: "Subscriptions" },
   { key: "activity", label: "Activity" },
 ];
+
+const V2_FILTERS: Array<{ key: FilterKey; label: string }> = [
+  { key: "needs_attention", label: "Needs attention" },
+  { key: "subscriptions", label: "Subscriptions" },
+  ...BASE_FILTERS,
+];
+
+function initialFilter(
+  notifications: NotificationData[],
+  subscriptionUxEnabled: boolean
+): FilterKey {
+  if (!subscriptionUxEnabled) return "all";
+  const summary = getActionInboxSummary(notifications);
+  if (summary.unreadActionCount > 0) return "needs_attention";
+  if (summary.items.some((item) => item.category === "subscriptions")) {
+    return "subscriptions";
+  }
+  return "activity";
+}
+
+interface UndoState {
+  message: string;
+  actionLabel: string;
+  run: () => Promise<void>;
+}
 
 function trackAction(item: ActionInboxItem, source: string) {
   trackActivationEvent({
@@ -64,169 +101,292 @@ function trackAction(item: ActionInboxItem, source: string) {
   });
 }
 
-function ActionCard({
-  item,
-  source,
-  primary = false,
-  onOpen,
-}: {
-  item: ActionInboxItem;
-  source: string;
-  primary?: boolean;
-  onOpen?: (item: ActionInboxItem) => void;
-}) {
-  return (
-    <Link
-      href={item.href}
-      onClick={() => {
-        onOpen?.(item);
-        trackAction(item, source);
-      }}
-      className={`block rounded-xl border transition-colors ${
-        primary
-          ? "border-emerald-200 bg-emerald-50 p-4 hover:bg-emerald-100/60"
-          : "border-gray-200 bg-white p-3 hover:bg-canvas"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900">{item.label}</p>
-          <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-gray-600">
-            {item.description}
-          </p>
-        </div>
-        {!item.read ? (
-          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-        ) : null}
-      </div>
-      <p className="mt-3 text-xs font-semibold text-emerald-700">{item.cta}</p>
-    </Link>
-  );
-}
-
 export default function NotificationsPageClient({
   userId,
-  initialUnreadCount,
-  sections,
+  notifications: initialNotifications,
+  mutedTypes,
 }: NotificationsPageClientProps) {
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
-  const [localSections, setLocalSections] = useState(sections);
-  const [activeFilter, setActiveFilter] = useState<FilterKey>(() => {
-    const initial = getActionInboxSummary(
-      sections.flatMap((section) => section.items)
-    );
-    if (initial.unreadActionCount > 0) return "needs_attention";
-    if (
-      initial.items.some(
-        (item) => item.category === "subscriptions"
-      )
-    ) {
-      return "subscriptions";
-    }
-    return "activity";
-  });
+  // One flat, authoritative list. Date sections and the action summary are both
+  // derived from it, so marking one row read cannot leave the header count, the
+  // hero and the list disagreeing with each other.
+  const [notifications, setNotifications] = useState(initialNotifications);
+  const subscriptionUxEnabled = isAuthorSubscriptionsUxV2Enabled();
+  const filters = subscriptionUxEnabled ? V2_FILTERS : BASE_FILTERS;
+  const [activeFilter, setActiveFilter] = useState<FilterKey>(() =>
+    initialFilter(initialNotifications, subscriptionUxEnabled)
+  );
   const [markingAllRead, setMarkingAllRead] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<
+    { message: string; undo?: UndoState } | null
+  >(null);
+
+  // Suppress the poller while a mutation is in flight, otherwise a refetch that
+  // started before the write lands can overwrite the optimistic update with stale
+  // server rows and make the row visibly "un-read" itself.
+  const pendingWrites = useRef(0);
+
+  const supabase = useMemo(() => createClient(), []);
 
   const refresh = useCallback(async () => {
-    const supabase = createClient();
-    const { rows, error } = await fetchNotificationRows(supabase, userId);
+    if (pendingWrites.current > 0) return;
+    const { rows, error } = await fetchNotificationRows(
+      supabase,
+      userId,
+      50,
+      mutedTypes
+    );
     // Leave the currently-displayed notifications alone on a transient fetch
     // failure rather than wiping them out with an empty result.
     if (error) return;
-    setLocalSections(sectionsFromNotifications(rows));
-    setUnreadCount(rows.filter((notification) => !notification.read).length);
-  }, [userId]);
+    if (pendingWrites.current > 0) return;
+    setNotifications(rows);
+  }, [supabase, userId, mutedTypes]);
 
-  // Unconditional polling — this page has no realtime subscription of its own, and
-  // `notifications` stays out of the Realtime publication regardless of the
-  // shouldUseRealtime() flag (see NotificationBell.tsx for the same reasoning).
+  // Polling — this page has no realtime subscription of its own, and `notifications`
+  // stays out of the Realtime publication regardless of the shouldUseRealtime() flag
+  // (see NotificationBell.tsx for the same reasoning).
+  //
+  // Gated on visibility so a backgrounded tab stops issuing requests, and because
+  // the bell polls too: on this page that was two independent 30s pollers running
+  // forever whether or not anyone was looking.
   useEffect(() => {
     const poll = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       void refresh();
     }, 30_000);
 
     return () => clearInterval(poll);
   }, [refresh]);
 
-  const notifications = localSections.flatMap((section) => section.items);
+  // Catch up on returning to the tab, since polling paused while it was hidden.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") void refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refresh]);
+
+  const runWrite = useCallback(async <T,>(write: () => Promise<T>): Promise<T> => {
+    pendingWrites.current += 1;
+    try {
+      return await write();
+    } finally {
+      pendingWrites.current -= 1;
+    }
+  }, []);
+
+  const unreadCount = notifications.filter((item) => !item.read).length;
   const summary = useMemo(
     () => getActionInboxSummary(notifications),
     [notifications]
   );
-  const itemByNotificationId = new Map(
-    summary.items.map((item) => [item.notificationId, item])
+
+  /**
+   * Only a notification that actually asks something of the reader is promoted
+   * into the hero. Previously this was just the newest unread row, so a single new
+   * follower rendered as a full-width "NEEDS ATTENTION" banner.
+   */
+  const heroItem = summary.primaryActionable;
+
+  const categoryByNotificationId = useMemo(
+    () => new Map(summary.items.map((item) => [item.notificationId, item.category])),
+    [summary]
   );
-  const visibleSections = localSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => {
-        const inboxItem = itemByNotificationId.get(item.id);
-        if (activeFilter === "needs_attention") {
-          return !item.read && inboxItem?.requiresAction === true;
-        }
-        return inboxItem?.category === activeFilter;
-      }),
-    }))
-    .filter((section) => section.items.length > 0);
-  const secondaryActions = summary.items
-    .filter(
-      (item) =>
-        !item.read &&
-        item.requiresAction &&
-        item.notificationId !== summary.primaryAction?.notificationId
-    )
-    .slice(0, 3);
 
-  const markOneRead = (notificationId: string) => {
-    const wasUnread = notifications.some(
-      (notification) =>
-        notification.id === notificationId && !notification.read
-    );
-    if (!wasUnread) return;
-    setUnreadCount((current) => Math.max(0, current - 1));
-    setLocalSections((current) =>
-      current.map((section) => ({
-        ...section,
-        items: section.items.map((item) =>
+  // The hero already renders this notification in full above the list; rendering
+  // it again below is what made the page look like a duplicate of itself.
+  const listNotifications = useMemo(
+    () => notifications.filter((item) => item.id !== heroItem?.notificationId),
+    [notifications, heroItem]
+  );
+
+  const visibleSections = useMemo(
+    () =>
+      sectionsFromNotifications(
+        listNotifications.filter((item) => {
+          if (activeFilter === "all") return true;
+          if (activeFilter === "unread") return !item.read;
+          if (activeFilter === "needs_attention") {
+            const inboxItem = summary.items.find(
+              (candidate) => candidate.notificationId === item.id
+            );
+            return !item.read && inboxItem?.requiresAction === true;
+          }
+          return categoryByNotificationId.get(item.id) === activeFilter;
+        })
+      ),
+    [listNotifications, activeFilter, categoryByNotificationId, summary.items]
+  );
+
+  /**
+   * Every count answers the same question: how many rows will I see if I tap this?
+   *
+   * They previously did not. "Needs attention" counted unread only while the four
+   * category chips counted read and unread alike, so the same three notifications
+   * were advertised as "Needs attention (3)" and "Activity (3)" by two different
+   * rules. Counting over exactly the set the list renders makes them comparable.
+   */
+  const filterCounts = useMemo(() => {
+    const counts: Record<FilterKey, number> = {
+      all: listNotifications.length,
+      unread: 0,
+      needs_attention: summary.unreadActionCount,
+      responses: 0,
+      review: 0,
+      opportunities: 0,
+      subscriptions: 0,
+      activity: 0,
+    };
+    for (const item of listNotifications) {
+      if (!item.read) counts.unread += 1;
+      const category = categoryByNotificationId.get(item.id);
+      if (category) counts[category] += 1;
+    }
+    return counts;
+  }, [listNotifications, categoryByNotificationId, summary.unreadActionCount]);
+
+  const handleOpen = useCallback(
+    (notificationId: string) => {
+      const target = notifications.find((item) => item.id === notificationId);
+      if (!target || target.read) return;
+
+      setNotifications((current) =>
+        current.map((item) =>
           item.id === notificationId ? { ...item, read: true } : item
-        ),
-      }))
-    );
-    void markNotificationRead(notificationId).catch(() => {
-      setToastMessage("Could not mark that notification as read.");
-      void refresh();
-    });
-  };
+        )
+      );
 
-  const handleMarkAllRead = async () => {
+      void runWrite(async () => {
+        try {
+          await markNotificationRead(notificationId);
+        } catch {
+          // Put it back rather than showing a cleared badge that the server
+          // does not agree with.
+          setNotifications((current) =>
+            current.map((item) =>
+              item.id === notificationId ? { ...item, read: false } : item
+            )
+          );
+        }
+      });
+    },
+    [notifications, runWrite]
+  );
+
+  const handleDismiss = useCallback(
+    (notificationId: string) => {
+      const target = notifications.find((item) => item.id === notificationId);
+      if (!target) return;
+
+      setNotifications((current) =>
+        current.filter((item) => item.id !== notificationId)
+      );
+
+      void runWrite(async () => {
+        const { error } = await dismissNotification(
+          supabase,
+          userId,
+          notificationId
+        );
+
+        if (error) {
+          setNotifications((current) =>
+            [...current, target].sort(
+              (left, right) =>
+                new Date(right.created_at).getTime() -
+                new Date(left.created_at).getTime()
+            )
+          );
+          setToast({ message: `Could not dismiss notification: ${error}` });
+          return;
+        }
+
+        setToast({
+          message: "Notification dismissed",
+          undo: {
+            message: "Notification dismissed",
+            actionLabel: "Undo",
+            run: async () => {
+              const result = await runWrite(() =>
+                undismissNotification(supabase, userId, notificationId)
+              );
+              if (result.error) {
+                setToast({ message: `Could not undo: ${result.error}` });
+                return;
+              }
+              await refresh();
+            },
+          },
+        });
+      });
+    },
+    [notifications, refresh, runWrite, supabase, userId]
+  );
+
+  const handleMarkAllRead = useCallback(async () => {
     setMarkingAllRead(true);
+    const previouslyUnread = notifications
+      .filter((item) => !item.read)
+      .map((item) => item.id);
+
+    setNotifications((current) => current.map((item) => ({ ...item, read: true })));
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true })
-        .eq("user_id", userId)
-        .eq("read", false);
+      const { error, affectedIds } = await runWrite(() =>
+        markAllNotificationsRead(supabase, userId)
+      );
 
       if (error) {
-        setToastMessage(`Failed to mark notifications as read: ${error.message}`);
-      } else {
-        setUnreadCount(0);
-        setLocalSections((current) =>
-          current.map((section) => ({
-            ...section,
-            items: section.items.map((item) => ({ ...item, read: true })),
-          }))
+        setNotifications((current) =>
+          current.map((item) =>
+            previouslyUnread.includes(item.id) ? { ...item, read: false } : item
+          )
         );
+        setToast({ message: `Failed to mark notifications as read: ${error}` });
+        return;
       }
+
+      // Prefer the ids the database actually changed; fall back to what we saw as
+      // unread if the update returned no representation.
+      const undoableIds = affectedIds.length > 0 ? affectedIds : previouslyUnread;
+      if (undoableIds.length === 0) return;
+
+      setToast({
+        message: `Marked ${undoableIds.length} notification${
+          undoableIds.length === 1 ? "" : "s"
+        } read`,
+        undo: {
+          message: "Marked read",
+          actionLabel: "Undo",
+          run: async () => {
+            const result = await runWrite(() =>
+              restoreUnread(supabase, userId, undoableIds)
+            );
+            if (result.error) {
+              setToast({
+                message: result.conflict
+                  ? "Could not undo — some of those notifications have newer activity."
+                  : `Could not undo: ${result.error}`,
+              });
+              await refresh();
+              return;
+            }
+            await refresh();
+          },
+        },
+      });
     } catch {
-      setToastMessage("Failed to mark notifications as read.");
+      setNotifications((current) =>
+        current.map((item) =>
+          previouslyUnread.includes(item.id) ? { ...item, read: false } : item
+        )
+      );
+      setToast({ message: "Failed to mark notifications as read." });
     } finally {
       setMarkingAllRead(false);
     }
-  };
+  }, [notifications, refresh, runWrite, supabase, userId]);
 
   return (
     <>
@@ -235,66 +395,80 @@ export default function NotificationsPageClient({
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Action inbox</h1>
             <p className="mt-2 text-sm font-semibold text-gray-900">
-              {unreadCount > 0 ? `${unreadCount} new notifications` : "All caught up"}
+              {unreadCount > 0
+                ? `${unreadCount} new notification${unreadCount === 1 ? "" : "s"}`
+                : "All caught up"}
             </p>
           </div>
-          {unreadCount > 0 ? (
-            <button
-              type="button"
-              onClick={handleMarkAllRead}
-              disabled={markingAllRead}
-              className="cursor-pointer text-xs font-medium text-emerald-600 transition-colors hover:text-emerald-700 disabled:opacity-60"
+          <div className="flex shrink-0 items-center gap-3">
+            {unreadCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => void handleMarkAllRead()}
+                disabled={markingAllRead}
+                className="cursor-pointer text-xs font-medium text-emerald-600 transition-colors hover:text-emerald-700 disabled:opacity-60"
+              >
+                {markingAllRead ? "Marking..." : "Mark all read"}
+              </button>
+            ) : null}
+            {/* Neither this page nor the bell used to link anywhere you could
+                turn notifications down. */}
+            <Link
+              href="/settings?tab=notifications"
+              className="text-xs font-medium text-gray-500 transition-colors hover:text-gray-700"
             >
-              {markingAllRead ? "Marking..." : "Mark all read"}
-            </button>
-          ) : null}
+              Settings
+            </Link>
+          </div>
         </div>
       </div>
 
-      {summary.primaryAction ? (
-        <section className="mb-6 rounded-xl border border-emerald-200 bg-white p-4">
+      {heroItem ? (
+        <section className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
                 Needs attention
               </p>
               <h2 className="mt-1 text-lg font-semibold text-gray-950">
-                {summary.primaryAction.label}
+                {heroItem.label}
               </h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
-                {summary.primaryAction.description}
+                {heroItem.description}
               </p>
+              <p className="mt-2 text-xs text-gray-500">
+                <time
+                  dateTime={heroItem.createdAt}
+                  title={new Date(heroItem.createdAt).toLocaleString()}
+                >
+                  {formatRelativeTime(heroItem.createdAt)}
+                </time>
+              </p>
+              {summary.staleUnreadCount > 0 ? (
+                <p className="mt-2 text-xs font-medium text-amber-700">
+                  {summary.staleUnreadCount} unread item
+                  {summary.staleUnreadCount === 1 ? "" : "s"} older than 7 days
+                </p>
+              ) : null}
             </div>
             <Link
-              href={summary.primaryAction.href}
+              href={heroItem.href}
               onClick={() => {
-                markOneRead(summary.primaryAction!.notificationId);
-                trackAction(
-                  summary.primaryAction as ActionInboxItem,
-                  "notifications_inbox"
-                );
+                trackAction(heroItem, "notifications_inbox");
+                handleOpen(heroItem.notificationId);
               }}
               className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
             >
-              {summary.primaryAction.cta}
+              {heroItem.cta}
             </Link>
           </div>
-          {secondaryActions.length > 0 ? (
-            <div className="mt-4 grid gap-2 md:grid-cols-3">
-              {secondaryActions.map((item) => (
-                <ActionCard
-                  key={item.notificationId}
-                  item={item}
-                  source="notifications_inbox_secondary"
-                  onOpen={(action) => markOneRead(action.notificationId)}
-                />
-              ))}
-            </div>
-          ) : null}
         </section>
       ) : null}
 
-      {notifications.length === 0 ? (
+      {listNotifications.length === 0 ? (
+        // When the hero is the entire inbox, it already says everything there is
+        // to say — an "all caught up" panel underneath it would contradict it.
+        heroItem ? null : (
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-20 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
             All caught up
@@ -324,28 +498,26 @@ export default function NotificationsPageClient({
             </Link>
           </div>
         </div>
+        )
       ) : (
         <>
           <div className="mb-3 flex flex-wrap gap-2">
-            {FILTERS.map((filter) => {
-              const count =
-                filter.key === "needs_attention"
-                  ? summary.unreadActionCount
-                  : summary.items.filter(
-                      (item) => item.category === (filter.key as ActionInboxCategory)
-                    ).length;
+            {filters.map((filter) => {
+              const count = filterCounts[filter.key];
+              const isActive = activeFilter === filter.key;
               return (
                 <button
                   key={filter.key}
                   type="button"
+                  aria-pressed={isActive}
                   onClick={() => setActiveFilter(filter.key)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    activeFilter === filter.key
+                  className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    isActive
                       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                       : "border-gray-200 bg-white text-gray-500 hover:bg-canvas"
                   }`}
                 >
-                  {filter.label} {count > 0 ? `(${count})` : ""}
+                  {count > 0 ? `${filter.label} (${count})` : filter.label}
                 </button>
               );
             })}
@@ -364,7 +536,8 @@ export default function NotificationsPageClient({
                     <NotificationItem
                       key={notification.id}
                       notification={notification}
-                      onOpened={() => markOneRead(notification.id)}
+                      onOpen={handleOpen}
+                      onDismiss={handleDismiss}
                     />
                   ))}
                 </div>
@@ -372,17 +545,39 @@ export default function NotificationsPageClient({
             </div>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center">
-              <p className="font-medium text-gray-700">Nothing in this view.</p>
-              <p className="mt-1 text-sm text-gray-500">
-                Try another filter or mark everything read when you are caught up.
+              <p className="font-medium text-gray-700">
+                {activeFilter === "unread"
+                  ? "You are all caught up."
+                  : "Nothing in this view."}
               </p>
+              <p className="mt-1 text-sm text-gray-500">
+                {activeFilter === "unread"
+                  ? `Everything here has been read. Your inbox still has ${notifications.length} notification${
+                      notifications.length === 1 ? "" : "s"
+                    }.`
+                  : "This filter has nothing in it right now."}
+              </p>
+              {/* An empty filter used to be a dead end -- it said "try another
+                  filter" without offering one. */}
+              <button
+                type="button"
+                onClick={() => setActiveFilter("all")}
+                className="mt-4 cursor-pointer rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-canvas"
+              >
+                Show all notifications
+              </button>
             </div>
           )}
         </>
       )}
 
-      {toastMessage ? (
-        <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
+      {toast ? (
+        <Toast
+          message={toast.message}
+          actionLabel={toast.undo?.actionLabel}
+          onAction={toast.undo ? () => void toast.undo?.run() : undefined}
+          onDone={() => setToast(null)}
+        />
       ) : null}
     </>
   );

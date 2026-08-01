@@ -30,6 +30,10 @@ export type AuthorRelationshipVariant =
 export type SubscriptionFeedSource = "all" | "authors" | "topics";
 
 export type NotificationPreferenceKey =
+  | "inapp_likes"
+  | "inapp_follows"
+  | "inapp_debates"
+  | "inapp_collaboration"
   | "email_comments"
   | "email_follows"
   | "email_likes"

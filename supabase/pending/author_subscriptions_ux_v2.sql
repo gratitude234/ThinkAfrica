@@ -237,8 +237,11 @@ grant execute on function public.set_author_relationship_v2(
   uuid, boolean, boolean, text, uuid
 ) to authenticated;
 
--- Preserve the deployed V1 signature for rollback compatibility while routing
--- it through the same invariant and event-reason handling as V2.
+-- Preserve the deployed V1 three-column result signature for rollback
+-- compatibility while routing it through the same invariant and event-reason
+-- handling as V2. PostgreSQL cannot change an existing function's OUT
+-- parameters with CREATE OR REPLACE, so the fourth V2-only transition field
+-- must not be exposed from this legacy signature.
 create or replace function public.set_author_relationship(
   p_author_id uuid,
   p_following boolean default null,
@@ -247,21 +250,20 @@ create or replace function public.set_author_relationship(
 returns table (
   following boolean,
   subscribed boolean,
-  follow_created boolean,
-  subscription_created boolean
+  follow_created boolean
 )
 language sql
 security definer
 set search_path = public
 as $$
-  select *
+  select result.following, result.subscribed, result.follow_created
   from public.set_author_relationship_v2(
     p_author_id,
     p_following,
     p_subscribed,
     'unknown',
     null
-  );
+  ) result;
 $$;
 
 revoke all on function public.set_author_relationship(uuid, boolean, boolean)
@@ -305,6 +307,8 @@ begin
     raise exception 'Authentication required';
   end if;
   if p_key not in (
+    'inapp_likes', 'inapp_follows', 'inapp_debates',
+    'inapp_collaboration',
     'email_comments', 'email_follows', 'email_likes', 'email_responses',
     'email_messages', 'email_published', 'email_digest',
     'email_account_security', 'email_profile_reminders',

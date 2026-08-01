@@ -41,13 +41,28 @@ export default function ActionInboxPanel({
   source,
   compact = false,
 }: ActionInboxPanelProps) {
-  if (!summary.primaryAction) return null;
+  /**
+   * Everything in this panel sits under a "Needs attention" heading, so everything
+   * in it has to actually need attention.
+   *
+   * It used to headline `primaryAction` -- the newest unread row of any kind -- and
+   * fill its secondary cards with any unread item, so a single new follower could
+   * render here as "Needs attention: New follower" with a primary CTA, and a row of
+   * likes could sit underneath it. /notifications and the bell moved to
+   * `primaryActionable` earlier; this was the last surface still over-claiming.
+   *
+   * The panel now hides itself when nothing is actionable, which is the honest
+   * outcome for a section with that name.
+   */
+  const primaryAction = summary.primaryActionable;
+  if (!primaryAction) return null;
 
   const secondaryItems = summary.items
     .filter(
       (item) =>
         !item.read &&
-        item.notificationId !== summary.primaryAction?.notificationId
+        item.requiresAction &&
+        item.notificationId !== primaryAction.notificationId
     )
     .slice(0, 3);
 
@@ -63,10 +78,10 @@ export default function ActionInboxPanel({
             Needs attention
           </p>
           <h2 className="mt-1 text-lg font-semibold text-gray-950">
-            {summary.primaryAction.label}
+            {primaryAction.label}
           </h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-emerald-900/75">
-            {summary.primaryAction.description}
+            {primaryAction.description}
           </p>
           {summary.staleUnreadCount > 0 ? (
             <p className="mt-2 text-xs font-medium text-amber-700">
@@ -76,11 +91,11 @@ export default function ActionInboxPanel({
           ) : null}
         </div>
         <Link
-          href={summary.primaryAction.href}
-          onClick={() => trackAction(summary.primaryAction as ActionInboxItem, source)}
+          href={primaryAction.href}
+          onClick={() => trackAction(primaryAction, source)}
           className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
         >
-          {summary.primaryAction.cta}
+          {primaryAction.cta}
         </Link>
       </div>
 

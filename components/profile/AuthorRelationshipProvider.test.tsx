@@ -72,6 +72,7 @@ describe("AuthorRelationshipProvider", () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED", "1");
+    vi.stubEnv("NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED", "1");
     vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED", "1");
   });
 

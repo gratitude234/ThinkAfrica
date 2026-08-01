@@ -15,6 +15,14 @@ describe("author subscriptions UX V2 migration candidate", () => {
       "create or replace function public.set_author_relationship("
     );
     expect(sql).not.toContain("drop function if exists public.set_author_relationship(");
+    const legacyWrapper = sql.slice(
+      sql.indexOf("create or replace function public.set_author_relationship("),
+      sql.indexOf(
+        "revoke all on function public.set_author_relationship(uuid, boolean, boolean)"
+      )
+    );
+    expect(legacyWrapper).toContain("follow_created boolean");
+    expect(legacyWrapper).not.toContain("subscription_created boolean");
   });
 
   it("stores private aggregate events without subscriber identity", () => {
@@ -36,6 +44,8 @@ describe("author subscriptions UX V2 migration candidate", () => {
     expect(sql).toContain("the source publication does not credit this author");
     expect(sql).toContain("unsupported notification preference");
     expect(sql).toContain("jsonb_set");
+    expect(sql).toContain("'inapp_likes'");
+    expect(sql).toContain("'inapp_collaboration'");
   });
 
   it("provides caller-only manager and stable feed RPCs", () => {

@@ -23,11 +23,15 @@ import {
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
 import { sendCurrentDeviceTestPush } from "./pushActions";
+import {
+  IN_APP_PREF_GROUPS,
+  type InAppNotificationPrefs,
+} from "@/lib/notificationPreferences";
 import { isAuthorSubscriptionsUxV2Enabled } from "@/lib/featureFlags";
 import type { NotificationPreferenceKey } from "@/lib/publicationDelivery";
 export type { NotificationPreferenceKey } from "@/lib/publicationDelivery";
 
-export interface NotificationPrefs {
+interface BaseNotificationPrefs {
   email_comments: boolean;
   email_follows: boolean;
   email_likes: boolean;
@@ -55,6 +59,13 @@ export interface NotificationPrefs {
   push_author_publications: boolean;
   push_debate_updates: boolean;
 }
+
+/**
+ * In-app preferences share the profile's notification_prefs blob with email and
+ * push, so they need no schema change -- but they are the only channel a reader
+ * could not previously control at all.
+ */
+export type NotificationPrefs = BaseNotificationPrefs & InAppNotificationPrefs;
 
 const EMAIL_ROWS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
   { key: "email_comments", label: "New comments", description: "When someone comments on your post" },
@@ -283,10 +294,11 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
 
   function renderToggleRow(
     { key, label, description }: { key: keyof NotificationPrefs; label: string; description: string },
-    channel: "Email" | "Push"
+    channel: "Email" | "Push" | "In-app"
   ) {
     const value = prefs[key];
-    const status = switchStatus[key];
+    const preferenceKey = key as NotificationPreferenceKey;
+    const status = switchStatus[preferenceKey];
     return (
       <div key={key} className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
         <div className="min-w-0 pr-3">
@@ -314,7 +326,7 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
           aria-label={`${channel}: ${label}`}
           aria-checked={value}
           aria-busy={status === "saving" || undefined}
-          onClick={() => void updatePreference(key, !value)}
+          onClick={() => void updatePreference(preferenceKey, !value)}
           className="relative inline-flex h-11 w-12 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
           <span
@@ -379,11 +391,27 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
         ) : null}
 
         <div>
+          <h2 className="mb-1 text-base font-semibold text-gray-900">In the app</h2>
+          <p className="mb-4 text-xs text-gray-500">
+            What shows up in your notifications inbox and the bell. Anything that
+            needs a response from you — review requests, invitations, editorial and
+            account decisions — always comes through and is not listed here.
+          </p>
+          <div className="space-y-3">
+            {IN_APP_PREF_GROUPS.map((group) =>
+              renderToggleRow(
+                { key: group.key, label: group.label, description: group.description },
+                "In-app"
+              )
+            )}
+          </div>
+        </div>
+
+        <div>
           <h2 className="mb-4 text-base font-semibold text-gray-900">Email</h2>
           <div className="space-y-3">
             {EMAIL_ROWS.filter(
-              (row) =>
-                !autoSave || row.key !== "email_author_publications"
+              (row) => !autoSave || row.key !== "email_author_publications"
             ).map((row) => renderToggleRow(row, "Email"))}
           </div>
         </div>
@@ -431,8 +459,7 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
           {pushError ? <p className="mb-3 text-sm text-red-600" role="alert">{pushError}</p> : null}
           <div className="space-y-3">
             {PUSH_ROWS.filter(
-              (row) =>
-                !autoSave || row.key !== "push_author_publications"
+              (row) => !autoSave || row.key !== "push_author_publications"
             ).map((row) => renderToggleRow(row, "Push"))}
           </div>
         </div>
