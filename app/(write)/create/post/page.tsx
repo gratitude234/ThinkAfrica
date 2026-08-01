@@ -46,8 +46,8 @@ export default async function CreatePostPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="min-h-dvh bg-gray-100 sm:flex sm:justify-center sm:px-6 sm:py-8">
-      <div className="flex min-h-dvh w-full flex-col overflow-hidden bg-white sm:min-h-[600px] sm:max-w-[640px] sm:rounded-xl sm:border sm:border-gray-200 sm:shadow-[0_12px_32px_rgb(17_24_39/0.08)]">
+    <div className="min-h-dvh bg-gray-100 md:flex md:justify-center md:px-6 md:pb-8 md:pt-[clamp(3rem,8vh,6rem)]">
+      <div className="flex min-h-dvh w-full flex-col overflow-hidden bg-white md:min-h-0 md:max-w-[720px] md:rounded-2xl md:border md:border-gray-200 md:shadow-[0_12px_32px_rgb(17_24_39/0.08)]">
         <PostComposerForm userId={user.id} parentPost={parentPost} />
       </div>
     </div>

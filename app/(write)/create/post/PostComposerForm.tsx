@@ -176,8 +176,8 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
   );
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
+    <div className="flex flex-1 flex-col md:flex-none">
+      <div className="flex items-center gap-3 px-4 py-3 sm:px-5 md:px-6">
         <button
           type="button"
           onClick={() => router.back()}
@@ -240,8 +240,8 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
         </div>
       ) : null}
 
-      <div className="flex flex-1 flex-col bg-canvas">
-        <div className="flex min-h-[280px] flex-1 flex-col px-5 pt-5 sm:px-6">
+      <div className="flex flex-1 flex-col bg-canvas md:flex-none">
+        <div className="flex min-h-[280px] flex-1 flex-col px-5 pt-5 sm:px-6 md:min-h-0 md:flex-none md:px-8 md:py-6">
           <label htmlFor="post-body" className="sr-only">
             Quick take text
           </label>
@@ -255,7 +255,7 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
             rows={8}
             autoFocus
             aria-describedby="post-body-count post-body-error"
-            className={`min-h-[240px] w-full flex-1 resize-none rounded-lg border bg-transparent text-[22px] leading-[1.5] text-gray-900 placeholder:text-gray-400 focus:outline-none sm:text-2xl ${
+            className={`min-h-[240px] w-full flex-1 resize-none rounded-lg border bg-transparent text-[22px] leading-[1.5] text-gray-900 placeholder:text-gray-400 focus:outline-none sm:text-2xl md:h-[clamp(220px,30vh,300px)] md:min-h-0 md:flex-none md:text-[22px] ${
               isOverLimit ? "border-red-300" : "border-transparent"
             }`}
           />
@@ -267,31 +267,90 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
           ) : null}
         </div>
 
-        <div className="border-t border-black/[0.06] px-5 py-3 sm:px-6">
-          <button
-            type="button"
-            onClick={() => setShowTopics((current) => !current)}
-            aria-expanded={showTopics}
-            className="flex min-h-10 w-full items-center justify-between gap-3 text-left"
+        <div className="border-t border-black/[0.06]">
+          <div
+            data-testid="post-composer-toolbar"
+            className="flex flex-col md:min-h-16 md:flex-row md:flex-wrap md:items-center md:gap-3 md:px-8 md:py-2.5"
           >
-            <span>
-              <span className="block text-sm font-semibold text-gray-800">
-                Add topics (optional)
+            <button
+              type="button"
+              onClick={() => setShowTopics((current) => !current)}
+              aria-expanded={showTopics}
+              aria-controls="post-topics-panel"
+              className="flex min-h-16 w-full items-center justify-between gap-3 px-5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-6 md:min-h-11 md:w-auto md:justify-start md:rounded-lg md:border md:border-gray-200 md:bg-white md:px-4 md:py-0 md:text-gray-600 md:transition-colors md:hover:border-gray-300 md:hover:bg-white md:hover:text-gray-900 md:focus-visible:ring-offset-2"
+            >
+              <span className="md:hidden">
+                <span className="block text-sm font-semibold text-gray-800">
+                  Add topics (optional)
+                </span>
+                <span className="block text-xs text-gray-500">
+                  Help interested readers find this post.
+                </span>
               </span>
-              <span className="block text-xs text-gray-500">
-                Help interested readers find this post.
+              <span className="hidden items-center gap-2 text-sm font-medium md:inline-flex">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.75}
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path d="M20.59 13.41 11 3.83V3H4v7h.83l9.58 9.59a2 2 0 0 0 2.82 0l3.36-3.36a2 2 0 0 0 0-2.82Z" />
+                  <path d="M7.5 6.5h.01" />
+                </svg>
+                Topics
+                {topics.length > 0 ? (
+                  <span className="rounded-full bg-green-tint px-1.5 py-0.5 text-[11px] font-semibold text-emerald-brand">
+                    {topics.length}
+                  </span>
+                ) : null}
               </span>
-            </span>
-            <span className="shrink-0 text-xs font-medium text-emerald-brand">
-              {topics.length > 0
-                ? `${topics.length}/${MAX_SHORT_POST_TOPICS}`
-                : showTopics
-                  ? "Hide"
-                  : "Add"}
-            </span>
-          </button>
+              <span className="shrink-0 text-xs font-medium text-emerald-brand md:hidden">
+                {topics.length > 0
+                  ? `${topics.length}/${MAX_SHORT_POST_TOPICS}`
+                  : showTopics
+                    ? "Hide"
+                    : "Add"}
+              </span>
+            </button>
+
+            <div className="flex items-center justify-between gap-4 border-t border-black/[0.06] px-5 py-3 sm:px-6 md:contents">
+              <CoverImageUploader
+                initialUrl={imageUrl ?? undefined}
+                onUpload={(url) => setImageUrl(url)}
+                onRemove={() => setImageUrl(null)}
+                onUploadingChange={setUploading}
+                emptyTitle="Add image"
+                previewHeightClass="h-40"
+                variant="compact"
+              />
+              <div className="ml-auto flex shrink-0 items-center gap-2.5">
+                <span aria-hidden="true" className="hidden text-xs text-gray-400 md:inline">
+                  Ctrl/⌘ + Enter
+                </span>
+                <span aria-hidden="true" className="hidden text-gray-300 md:inline">
+                  ·
+                </span>
+                <span
+                  id="post-body-count"
+                  className={`shrink-0 text-sm ${
+                    isOverLimit ? "font-semibold text-red-600" : "text-gray-400"
+                  }`}
+                >
+                  {characterCount}/{SHORT_POST_MAX_CHARACTERS}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {showTopics ? (
-            <div className="mt-3">
+            <div
+              id="post-topics-panel"
+              className="border-t border-black/[0.06] px-5 py-4 sm:px-6 md:px-8"
+            >
               <PublishingTopicSelector
                 contentKind="post"
                 content={body}
@@ -303,39 +362,25 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
             </div>
           ) : null}
         </div>
-
-        <div className="flex items-center justify-between gap-4 border-t border-black/[0.06] px-5 py-3 sm:px-6">
-          <CoverImageUploader
-            initialUrl={imageUrl ?? undefined}
-            onUpload={(url) => setImageUrl(url)}
-            onRemove={() => setImageUrl(null)}
-            onUploadingChange={setUploading}
-            emptyTitle="Add image"
-            previewHeightClass="h-40"
-            variant="compact"
-          />
-          <span
-            id="post-body-count"
-            className={`shrink-0 text-sm ${
-              isOverLimit ? "font-semibold text-red-600" : "text-gray-400"
-            }`}
-          >
-            {characterCount}/{SHORT_POST_MAX_CHARACTERS}
-          </span>
-        </div>
       </div>
 
-      <div className="px-5 py-5 sm:px-6">
+      <div
+        data-testid="post-composer-footer"
+        className="px-5 py-5 sm:px-6 md:flex md:items-center md:justify-between md:gap-6 md:border-t md:border-black/[0.06] md:px-8 md:py-4"
+      >
         <p className="text-sm leading-6 text-gray-600">
-          Quick takes are short and conversational, no title needed — they publish instantly.
-          Writing something longer?
+          <span className="md:hidden">
+            Quick takes are short and conversational, no title needed — they publish instantly.
+            Writing something longer?
+          </span>
+          <span className="hidden whitespace-nowrap md:inline">Need more room?</span>
         </p>
         {/* The Create entry points go straight to this composer (no chooser
             interstitial), so the longer-form paths surface here instead. */}
-        <div className="mt-3 flex flex-wrap items-center gap-2.5">
+        <div className="mt-3 flex flex-wrap items-center gap-2.5 md:mt-0 md:flex-nowrap md:gap-1">
           <Link
             href="/write?kind=article"
-            className="inline-flex items-center gap-2 rounded-full bg-gold-tint px-4 py-2 text-sm font-semibold text-gold-ink transition-colors hover:bg-[#F1E4C8]"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-gold-tint px-4 py-2 text-sm font-semibold text-gold-ink transition-colors hover:bg-[#F1E4C8] md:rounded-lg md:bg-transparent md:px-2.5 md:hover:bg-gold-tint"
           >
             <svg
               className="h-4 w-4"
@@ -355,7 +400,7 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
           </Link>
           <Link
             href="/submit/research"
-            className="inline-flex items-center gap-2 rounded-full bg-purple-tint px-4 py-2 text-sm font-semibold text-purple-accent transition-colors hover:bg-[#E2DAEC]"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-purple-tint px-4 py-2 text-sm font-semibold text-purple-accent transition-colors hover:bg-[#E2DAEC] md:rounded-lg md:bg-transparent md:px-2.5 md:hover:bg-purple-tint"
           >
             <svg
               className="h-4 w-4"
