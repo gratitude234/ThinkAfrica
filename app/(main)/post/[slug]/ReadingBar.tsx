@@ -33,6 +33,7 @@ export default function ReadingBar({
     bookmarked,
     likeError,
     bookmarkError,
+    inlineActionsVisible,
     syncLiked,
     syncLikeCount,
     syncBookmarked,
@@ -78,14 +79,18 @@ export default function ReadingBar({
     }
   };
 
-  if (!visible && !toastMessage) return null;
+  // The inline actions row owns these actions whenever it is on screen; the
+  // floating bar only stands in for it once it has scrolled out of view.
+  const showBar = visible && !inlineActionsVisible;
+
+  if (!showBar && !toastMessage) return null;
 
   return (
     <>
       {toastMessage ? (
         <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
       ) : null}
-      {!visible ? null : (
+      {!showBar ? null : (
         <>
       {/* ── Mobile / tablet: horizontal pill at bottom ── */}
       <div
@@ -144,16 +149,20 @@ export default function ReadingBar({
       </div>
 
       {/* ── Desktop: slim vertical rail, sitting in the left margin beside the article ── */}
-      {/* Layout is max-w-[1200px] two-column (article + 272px sidebar).                */}
-      {/* Article left edge ≈ 50vw - 572px. Rail right = article left - 24px.           */}
-      {/* Rail width ≈ 52px → left = 50vw - 648px. Only show at xl (1280px+) where     */}
-      {/* there is room to the left of the layout without overlapping the sidebar.       */}
+      {/* How far left of centre the rail sits depends on the article layout, so each   */}
+      {/* branch of the post page declares it via --reading-rail-offset. The default    */}
+      {/* (640px) is the research layout's max-w-[1200px] two-column geometry; the      */}
+      {/* editorial branch overrides it to 424px = half its 680px column + a 28px       */}
+      {/* gutter + the rail's own 56px width.                                           */}
+      {/* left:50% rather than 50vw — vw includes the scrollbar width and would sit the */}
+      {/* rail a few px off true centre.                                                */}
       <div
         className="hidden xl:block"
         style={{
           position: "fixed",
-          top: "40%",
-          left: "calc(50vw - 640px)",
+          top: "50%",
+          left: "50%",
+          marginLeft: "calc(-1 * var(--reading-rail-offset, 640px))",
           transform: "translateY(-50%)",
           zIndex: 40,
         }}

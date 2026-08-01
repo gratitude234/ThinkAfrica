@@ -696,27 +696,18 @@ async function DetailAuthorRow({
           </p>
         </div>
       </div>
-      {isOwnPost ? null : userId ? (
+      {/* Follow only, up here. Subscribing is the bigger commitment, so it is
+          offered once — in the author card at the end, after the read. */}
+      {isOwnPost ? null : (
         <AuthorRelationshipControls
           authorId={author.id}
           authorName={authorName}
           currentUserId={userId}
-          initialFollowing={viewer.userFollowsAuthor}
-          initialSubscribed={viewer.userSubscribedToAuthor}
+          initialFollowing={userId ? viewer.userFollowsAuthor : false}
+          initialSubscribed={userId ? viewer.userSubscribedToAuthor : false}
           source="post_header"
           postId={post.id}
-          variant="icon"
-        />
-      ) : (
-        <AuthorRelationshipControls
-          authorId={author.id}
-          authorName={authorName}
-          currentUserId={null}
-          initialFollowing={false}
-          initialSubscribed={false}
-          source="post_header"
-          postId={post.id}
-          variant="icon"
+          variant="follow_only"
         />
       )}
     </div>
@@ -927,30 +918,27 @@ async function PostEngagementSection({
   ]);
 
   return (
-    <div className="mb-9">
-      <PostActionsRow
-        postId={post.id}
-        slug={post.slug}
-        title={getPostMetadataTitle(post, author)}
-        excerpt={sanitizedExcerpt}
-        authorName={author?.full_name ?? null}
-        userId={userId}
-        initialLiked={viewer.userLiked}
-        initialLikeCount={secondary.likeCount}
-        initialBookmarked={viewer.userBookmarked}
-      />
-      {userId && author && userId !== author.id ? (
-        <p className="mt-2 text-right">
+    <PostActionsRow
+      postId={post.id}
+      slug={post.slug}
+      title={getPostMetadataTitle(post, author)}
+      excerpt={sanitizedExcerpt}
+      authorName={author?.full_name ?? null}
+      userId={userId}
+      initialLiked={viewer.userLiked}
+      initialLikeCount={secondary.likeCount}
+      initialBookmarked={viewer.userBookmarked}
+      reportSlot={
+        userId && author && userId !== author.id ? (
           <ReportButton
             targetType="post"
             targetId={post.id}
             targetLabel={`"${getPostMetadataTitle(post, author)}"`}
             variant="text"
-            className="text-xs text-gray-400 hover:text-red-600"
           />
-        </p>
-      ) : null}
-    </div>
+        ) : null
+      }
+    />
   );
 }
 
@@ -1030,7 +1018,7 @@ async function PostContinueExploringSection({
   if (relatedPosts.length === 0 && !previousPost && !nextPost) return null;
 
   return (
-    <section className="my-9 border-t border-gray-200 pt-6">
+    <section className="mt-14 border-t border-gray-200 pt-6">
       {relatedPosts.length > 0 ? (
         <>
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
@@ -1070,28 +1058,37 @@ async function PostContinueExploringSection({
       ) : null}
 
       {previousPost || nextPost ? (
-        <div className="mt-5 flex items-center justify-between gap-4 text-sm">
+        <nav
+          aria-label="Adjacent posts"
+          className="mt-8 grid gap-4 border-t border-gray-200 pt-5 sm:grid-cols-2"
+        >
           {previousPost ? (
             <Link
               href={`/post/${previousPost.slug}`}
-              className="group min-w-0 text-gray-500 transition-colors hover:text-emerald-brand"
+              className="group min-w-0 transition-colors hover:text-emerald-brand"
             >
-              <span aria-hidden="true">&larr; </span>
-              <span className="font-medium">{getPostMetadataTitle(previousPost)}</span>
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+                <span aria-hidden="true">&larr;</span> Previous
+              </span>
+              <span className="mt-1 line-clamp-2 text-sm font-medium text-gray-600 transition-colors group-hover:text-emerald-brand">
+                {getPostMetadataTitle(previousPost)}
+              </span>
             </Link>
-          ) : (
-            <span aria-hidden="true" />
-          )}
+          ) : null}
           {nextPost ? (
             <Link
               href={`/post/${nextPost.slug}`}
-              className="group min-w-0 text-right text-gray-500 transition-colors hover:text-emerald-brand"
+              className="group min-w-0 transition-colors hover:text-emerald-brand sm:col-start-2 sm:text-right"
             >
-              <span className="font-medium">{getPostMetadataTitle(nextPost)}</span>
-              <span aria-hidden="true"> &rarr;</span>
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+                Next <span aria-hidden="true">&rarr;</span>
+              </span>
+              <span className="mt-1 line-clamp-2 text-sm font-medium text-gray-600 transition-colors group-hover:text-emerald-brand">
+                {getPostMetadataTitle(nextPost)}
+              </span>
             </Link>
           ) : null}
-        </div>
+        </nav>
       ) : null}
     </section>
   );
@@ -1924,7 +1921,11 @@ export default async function PostPage({ params }: PageProps) {
       postId={post.id}
     >
       <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
-      <div className="relative">
+      {/* Half the 680px column + a 28px gutter + the 56px rail — see ReadingBar. */}
+      <div
+        className="relative"
+        style={{ "--reading-rail-offset": "424px" } as React.CSSProperties}
+      >
       {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
       {isPublished ? (
         <>
@@ -1944,7 +1945,7 @@ export default async function PostPage({ params }: PageProps) {
         </>
       ) : null}
 
-      <header className="mx-auto max-w-[720px] bg-white pb-2 pt-1 sm:px-2 sm:pt-3">
+      <header className="mx-auto max-w-[680px] pb-2 pt-1 sm:pt-3">
         <div>
           <Link
             href="/"
@@ -1966,14 +1967,16 @@ export default async function PostPage({ params }: PageProps) {
             <span className="text-[12px] font-medium text-gray-400">{readTime} min read</span>
           </div>
 
-          <div className="mt-4">
-            <Suspense fallback={null}>
-              <ParentPostLink parentPostId={parentPostId} mode="editorial" />
-            </Suspense>
-          </div>
+          {parentPostId ? (
+            <div className="mt-4">
+              <Suspense fallback={null}>
+                <ParentPostLink parentPostId={parentPostId} mode="editorial" />
+              </Suspense>
+            </div>
+          ) : null}
 
           {displayTitle ? (
-            <h1 className="font-display max-w-[700px] text-[30px] font-semibold leading-[1.08] tracking-[-0.02em] text-ink sm:text-[40px]">
+            <h1 className="font-display mt-4 text-[30px] font-semibold leading-[1.08] tracking-[-0.02em] text-ink sm:text-[40px]">
               {displayTitle}
             </h1>
           ) : null}
@@ -2000,14 +2003,14 @@ export default async function PostPage({ params }: PageProps) {
       </header>
 
       {post.cover_image_url ? (
-        <div className="mx-auto mt-6 max-w-[720px]">
+        <div className="mx-auto mt-6 max-w-[680px]">
           <PostCover
             src={post.cover_image_url}
             alt={post.title}
             type={post.type}
             content_kind={post.content_kind}
             article_format={post.article_format}
-            sizes="(max-width: 760px) calc(100vw - 32px), 720px"
+            sizes="(max-width: 720px) calc(100vw - 32px), 680px"
             priority
             className="aspect-[16/9] w-full rounded-[10px] border border-gray-200 bg-gray-100"
             imageClassName="object-cover"
@@ -2046,7 +2049,7 @@ export default async function PostPage({ params }: PageProps) {
             <AudioSummaryPlayer audioUrl={post.audio_summary_url} />
           ) : null}
 
-          <div className="article-journal-body article-redesign-body relative mb-12 sm:mb-16">
+          <div className="article-journal-body article-redesign-body relative mb-10 sm:mb-12">
             <HighlightShare containerId="post-article-prose" postSlug={post.slug} postId={post.id} />
             <div
               id="post-article-prose"
@@ -2085,7 +2088,7 @@ export default async function PostPage({ params }: PageProps) {
             />
           </Suspense>
 
-          <div className="mt-10">
+          <div className="mt-14">
             <Suspense fallback={<SectionSkeleton rows={3} />}>
               <AuthorAndCollaborationSection
                 post={post}

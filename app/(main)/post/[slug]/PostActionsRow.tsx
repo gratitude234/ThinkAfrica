@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePostEngagement } from "./PostEngagementContext";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
 import ShareButtons from "./ShareButtons";
@@ -15,6 +15,9 @@ interface PostActionsRowProps {
   initialLiked: boolean;
   initialLikeCount: number;
   initialBookmarked: boolean;
+  /** Rendered at the trailing edge of the bar — keeps secondary actions such as
+   *  Report grouped with the row instead of orphaned on a line of their own. */
+  reportSlot?: React.ReactNode;
 }
 
 const ACTION_CLASS =
@@ -30,6 +33,7 @@ export default function PostActionsRow({
   initialLiked,
   initialLikeCount,
   initialBookmarked,
+  reportSlot = null,
 }: PostActionsRowProps) {
   const {
     liked,
@@ -43,7 +47,9 @@ export default function PostActionsRow({
     syncBookmarked,
     toggleLike,
     toggleBookmark,
+    setInlineActionsVisible,
   } = usePostEngagement();
+  const rowRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     syncLiked(initialLiked);
@@ -52,9 +58,27 @@ export default function PostActionsRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The floating ReadingBar is the alternate for this row, never its twin — it
+  // stays hidden for as long as these controls are on screen.
+  useEffect(() => {
+    const node = rowRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setInlineActionsVisible(entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+      setInlineActionsVisible(false);
+    };
+  }, [setInlineActionsVisible]);
+
   return (
-    <div className="border-y border-gray-200 py-1.5">
-      <div className="flex items-center justify-between gap-1 sm:justify-start sm:gap-8">
+    <div ref={rowRef} className="border-y border-gray-200 py-1.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:gap-x-8">
         <button
           type="button"
           onClick={toggleLike}
@@ -122,6 +146,8 @@ export default function PostActionsRow({
         </button>
 
         <ShareButtons title={title} slug={slug} excerpt={excerpt} authorName={authorName} flat />
+
+        {reportSlot ? <div className="ml-auto pr-2">{reportSlot}</div> : null}
       </div>
       {likeError ? <p className="pb-2 text-xs text-red-500">{likeError}</p> : null}
     </div>

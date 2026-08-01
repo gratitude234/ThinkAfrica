@@ -14,6 +14,10 @@ interface PostEngagementState {
   bookmarked: boolean | null;
   bookmarkPending: boolean;
   bookmarkError: string | null;
+  /** True while the inline PostActionsRow is on screen. The floating ReadingBar
+   *  suppresses itself when it is, so the same actions never appear twice. */
+  inlineActionsVisible: boolean;
+  setInlineActionsVisible: (value: boolean) => void;
   syncLiked: (value: boolean) => void;
   syncLikeCount: (value: number) => void;
   syncBookmarked: (value: boolean) => void;
@@ -45,6 +49,10 @@ export function PostEngagementProvider({
   const [bookmarked, setBookmarked] = useState<boolean | null>(null);
   const [bookmarkPending, setBookmarkPending] = useState(false);
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
+
+  // Defaults to false so posts that never render an inline actions row (drafts,
+  // posts under review) keep the floating bar behaving exactly as before.
+  const [inlineActionsVisible, setInlineActionsVisible] = useState(false);
 
   // Multiple Suspense-streamed leaves report the same server-fetched viewer
   // state on mount; only the first report should set it, so a later report
@@ -145,6 +153,8 @@ export function PostEngagementProvider({
       bookmarked,
       bookmarkPending,
       bookmarkError,
+      inlineActionsVisible,
+      setInlineActionsVisible,
       syncLiked,
       syncLikeCount,
       syncBookmarked,
@@ -159,6 +169,7 @@ export function PostEngagementProvider({
       bookmarked,
       bookmarkPending,
       bookmarkError,
+      inlineActionsVisible,
       syncLiked,
       syncLikeCount,
       syncBookmarked,
