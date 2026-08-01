@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { POST_TYPE_LABELS, type PostType } from "@/lib/utils";
 import {
   getArticleFormatLabel,
@@ -34,6 +34,15 @@ interface PostCoverProps {
   sizes?: string;
   priority?: boolean;
   unoptimized?: boolean;
+  // Fires once the image reports its intrinsic size in `fit="natural"` mode.
+  // `cropped` means the ratio hit a clamp, so part of the image is out of
+  // view -- callers use it to offer a way to see the whole thing.
+  onNaturalFit?: (fit: NaturalFit) => void;
+}
+
+export interface NaturalFit {
+  ratio: number;
+  cropped: boolean;
 }
 
 const FALLBACK_STYLES: Record<string, string> = {
@@ -51,9 +60,11 @@ const NATURAL_MAX_RATIO = 16 / 9;
 // Height reserved before the image reports its intrinsic size.
 const NATURAL_DEFAULT_RATIO = 16 / 9;
 
-function clampNaturalRatio(width: number, height: number) {
+function measureNaturalFit(width: number, height: number): NaturalFit | null {
   if (!width || !height) return null;
-  return Math.min(NATURAL_MAX_RATIO, Math.max(NATURAL_MIN_RATIO, width / height));
+  const raw = width / height;
+  const ratio = Math.min(NATURAL_MAX_RATIO, Math.max(NATURAL_MIN_RATIO, raw));
+  return { ratio, cropped: Math.abs(ratio - raw) > 0.001 };
 }
 
 function normalizeType(type: string | null | undefined): PostType {
@@ -95,21 +106,25 @@ export default function PostCover({
   sizes = "100vw",
   priority = false,
   unoptimized,
+  onNaturalFit,
 }: PostCoverProps) {
   const [failed, setFailed] = useState(false);
-  const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
+  const [naturalFit, setNaturalFit] = useState<NaturalFit | null>(null);
   const postType = normalizeType(type);
   // Measured off the element rather than next/image's `onLoad`, which fires
   // asynchronously behind a decode() promise. A cached image can also be
   // complete before the ref runs, so check for that too.
   const measureRef = useCallback((node: HTMLImageElement | null) => {
     if (!node) return;
-    const measure = () =>
-      setNaturalRatio(clampNaturalRatio(node.naturalWidth, node.naturalHeight));
+    const measure = () => setNaturalFit(measureNaturalFit(node.naturalWidth, node.naturalHeight));
     if (node.complete) measure();
     node.addEventListener("load", measure);
     return () => node.removeEventListener("load", measure);
   }, []);
+
+  useEffect(() => {
+    if (naturalFit) onNaturalFit?.(naturalFit);
+  }, [naturalFit, onNaturalFit]);
   // Mirrors Badge.tsx's label logic exactly: an Article (generic or a
   // legacy Essay/Policy Brief) always leads with "Article", with the
   // format (if any) as a secondary suffix.
@@ -135,7 +150,7 @@ export default function PostCover({
   // utility, so the same style also backs the no-image fallback box.
   const naturalStyle =
     fit === "natural"
-      ? { aspectRatio: String(naturalRatio ?? NATURAL_DEFAULT_RATIO) }
+      ? { aspectRatio: String(naturalFit?.ratio ?? NATURAL_DEFAULT_RATIO) }
       : undefined;
 
   if (!src || failed) {

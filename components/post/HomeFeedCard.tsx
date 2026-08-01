@@ -1,6 +1,6 @@
 import Link from "next/link";
 import FeedEngagementActions from "./FeedEngagementActions";
-import PostCover from "./PostCover";
+import PostImage from "./PostImage";
 import type { PostCardData } from "./PostCard";
 import {
   getArticleFormatLabel,
@@ -192,20 +192,17 @@ function Actions({
 function FullWidthCover({ post, title, priority }: { post: PostCardData; title: string; priority?: boolean }) {
   if (!post.cover_image_url?.trim()) return null;
   return (
-    <Link href={`/post/${post.slug}`} className={`mt-3 block rounded-[10px] ${FOCUS_RING}`}>
-      <PostCover
-        src={post.cover_image_url}
-        alt={title}
-        type={post.type}
-        content_kind={post.content_kind}
-        article_format={post.article_format}
-        sizes="(max-width: 640px) calc(100vw - 56px), 680px"
-        priority={priority}
-        fit="natural"
-        className="w-full rounded-[10px] bg-gray-100"
-        imageClassName="object-cover"
-      />
-    </Link>
+    <PostImage
+      src={post.cover_image_url}
+      alt={title}
+      type={post.type}
+      content_kind={post.content_kind}
+      article_format={post.article_format}
+      sizes="(max-width: 640px) calc(100vw - 56px), 680px"
+      priority={priority}
+      wrapperClassName="mt-3"
+      className="w-full rounded-[10px] bg-gray-100"
+    />
   );
 }
 
