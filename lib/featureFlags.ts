@@ -24,6 +24,17 @@ export function isAuthorSubscriptionsEnabled(): boolean {
 }
 
 /**
+ * UX V2 is independently reversible while retaining the live V1 relationship
+ * and publication-delivery infrastructure.
+ */
+export function isAuthorSubscriptionsUxV2Enabled(): boolean {
+  return (
+    isAuthorSubscriptionsEnabled() &&
+    process.env.NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED === "1"
+  );
+}
+
+/**
  * Topic subscriptions extend the durable author-publication delivery
  * infrastructure, so the topic flag can never enable them independently.
  */

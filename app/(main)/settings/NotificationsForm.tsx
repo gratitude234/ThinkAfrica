@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import {
@@ -23,6 +23,9 @@ import {
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
 import { sendCurrentDeviceTestPush } from "./pushActions";
+import { isAuthorSubscriptionsUxV2Enabled } from "@/lib/featureFlags";
+import type { NotificationPreferenceKey } from "@/lib/publicationDelivery";
+export type { NotificationPreferenceKey } from "@/lib/publicationDelivery";
 
 export interface NotificationPrefs {
   email_comments: boolean;
@@ -102,11 +105,18 @@ const TEST_ERROR_MESSAGES = {
 export default function NotificationsForm({ profileId, notificationPrefs }: Props) {
   const [prefs, setPrefs] = useState<NotificationPrefs>(notificationPrefs);
   const [saving, setSaving] = useState(false);
+  const [switchStatus, setSwitchStatus] = useState<
+    Partial<Record<NotificationPreferenceKey, "saving" | "saved" | "error">>
+  >({});
+  const switchRequestRef = useRef<
+    Partial<Record<NotificationPreferenceKey, number>>
+  >({});
   const [toast, setToast] = useState<string | null>(null);
   const [pushState, setPushState] = useState<PushState>("checking");
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
   const [endpoint, setEndpoint] = useState<string | null>(null);
+  const autoSave = isAuthorSubscriptionsUxV2Enabled();
 
   const refreshDeviceState = useCallback(async () => {
     setPushState("checking");
@@ -160,6 +170,36 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
       .eq("id", profileId);
     setSaving(false);
     setToast(error ? error.message : "Preferences saved.");
+  };
+
+  const updatePreference = async (
+    key: NotificationPreferenceKey,
+    nextValue: boolean
+  ) => {
+    if (!autoSave) {
+      setPrefs((current) => ({ ...current, [key]: nextValue }));
+      return;
+    }
+
+    const previousValue = prefs[key];
+    const requestId = (switchRequestRef.current[key] ?? 0) + 1;
+    switchRequestRef.current[key] = requestId;
+    setPrefs((current) => ({ ...current, [key]: nextValue }));
+    setSwitchStatus((current) => ({ ...current, [key]: "saving" }));
+
+    const supabase = createClient();
+    const { error } = await supabase.rpc("set_notification_preference", {
+      p_key: key,
+      p_enabled: nextValue,
+    });
+    if (switchRequestRef.current[key] !== requestId) return;
+
+    if (error) {
+      setPrefs((current) => ({ ...current, [key]: previousValue }));
+      setSwitchStatus((current) => ({ ...current, [key]: "error" }));
+      return;
+    }
+    setSwitchStatus((current) => ({ ...current, [key]: "saved" }));
   };
 
   const subscribe = async (requestPermission: boolean) => {
@@ -246,21 +286,45 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
     channel: "Email" | "Push"
   ) {
     const value = prefs[key];
+    const status = switchStatus[key];
     return (
       <div key={key} className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
-        <div>
+        <div className="min-w-0 pr-3">
           <p className="text-sm font-medium text-gray-800">{label}</p>
           <p className="mt-0.5 text-xs text-gray-500">{description}</p>
+          {autoSave && status ? (
+            <p
+              className={`mt-1 text-xs ${
+                status === "error" ? "text-red-600" : "text-gray-500"
+              }`}
+              role={status === "error" ? "alert" : "status"}
+              aria-live="polite"
+            >
+              {status === "saving"
+                ? "Saving…"
+                : status === "saved"
+                  ? "Saved"
+                  : "Could not save. Restored."}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
           role="switch"
           aria-label={`${channel}: ${label}`}
           aria-checked={value}
-          onClick={() => setPrefs((current) => ({ ...current, [key]: !current[key] }))}
-          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${value ? "bg-emerald-500" : "bg-gray-200"}`}
+          aria-busy={status === "saving" || undefined}
+          onClick={() => void updatePreference(key, !value)}
+          className="relative inline-flex h-11 w-12 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
-          <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${value ? "translate-x-5" : "translate-x-0"}`} />
+          <span
+            className={`relative inline-flex h-6 w-11 rounded-full transition-colors ${
+              value ? "bg-emerald-500" : "bg-gray-200"
+            }`}
+            aria-hidden="true"
+          >
+            <span className={`inline-block h-5 w-5 translate-y-0.5 transform rounded-full bg-white shadow transition-transform motion-reduce:transition-none ${value ? "translate-x-5" : "translate-x-0.5"}`} />
+          </span>
         </button>
       </div>
     );
@@ -269,9 +333,59 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
   return (
     <>
       <div className="max-w-2xl space-y-6">
+        {autoSave ? (
+          <section
+            id="publication-subscriptions"
+            className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+              Publication subscriptions
+            </p>
+            <h2 className="mt-1 text-base font-semibold text-gray-900">
+              How new work reaches you
+            </h2>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-xl border border-emerald-100 bg-white px-4 py-3">
+                <p className="text-sm font-medium text-gray-800">In-app</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Always on for Posts, Articles, and Research from your
+                  subscriptions.
+                </p>
+              </div>
+              {renderToggleRow(
+                {
+                  key: "email_author_publications",
+                  label: "Email",
+                  description: "Articles and Research from subscribed writers",
+                },
+                "Email"
+              )}
+              {renderToggleRow(
+                {
+                  key: "push_author_publications",
+                  label: "Push",
+                  description: `Articles and Research · ${
+                    pushState === "active"
+                      ? "enabled on this device"
+                      : pushState === "unsupported"
+                        ? "unsupported on this device"
+                        : "this device is not enabled"
+                  }`,
+                },
+                "Push"
+              )}
+            </div>
+          </section>
+        ) : null}
+
         <div>
           <h2 className="mb-4 text-base font-semibold text-gray-900">Email</h2>
-          <div className="space-y-3">{EMAIL_ROWS.map((row) => renderToggleRow(row, "Email"))}</div>
+          <div className="space-y-3">
+            {EMAIL_ROWS.filter(
+              (row) =>
+                !autoSave || row.key !== "email_author_publications"
+            ).map((row) => renderToggleRow(row, "Email"))}
+          </div>
         </div>
 
         <div>
@@ -315,12 +429,19 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
           </div>
 
           {pushError ? <p className="mb-3 text-sm text-red-600" role="alert">{pushError}</p> : null}
-          <div className="space-y-3">{PUSH_ROWS.map((row) => renderToggleRow(row, "Push"))}</div>
+          <div className="space-y-3">
+            {PUSH_ROWS.filter(
+              (row) =>
+                !autoSave || row.key !== "push_author_publications"
+            ).map((row) => renderToggleRow(row, "Push"))}
+          </div>
         </div>
 
-        <div className="flex justify-end pt-2">
-          <Button loading={saving} onClick={handleSave}>Save preferences</Button>
-        </div>
+        {!autoSave ? (
+          <div className="flex justify-end pt-2">
+            <Button loading={saving} onClick={handleSave}>Save preferences</Button>
+          </div>
+        ) : null}
       </div>
       {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
     </>

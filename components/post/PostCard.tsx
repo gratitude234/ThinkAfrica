@@ -15,6 +15,7 @@ import {
   resolveArticleFormat,
   resolveContentKind,
 } from "@/lib/contentModel";
+import type { SubscriptionMatchReason } from "@/lib/publicationDelivery";
 
 export interface PostCardData {
   id: string;
@@ -52,6 +53,11 @@ export interface PostCardData {
     tone: "emerald" | "sky" | "purple" | "amber" | "gray";
   }>;
   surface_reason?: string | null;
+  subscription_match?: {
+    authorIds: string[];
+    topicKeys: string[];
+    reasons: SubscriptionMatchReason[];
+  };
   co_authors?: Array<{
     user_id: string;
     profile?: {

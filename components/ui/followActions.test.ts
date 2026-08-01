@@ -99,6 +99,7 @@ describe("author relationship actions", () => {
       following: true,
       subscribed: true,
       followCreated: true,
+      subscriptionCreated: true,
     });
   });
 

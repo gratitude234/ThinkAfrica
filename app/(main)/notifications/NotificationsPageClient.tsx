@@ -16,6 +16,7 @@ import {
   sectionsFromNotifications,
   type NotificationSection,
 } from "./notificationData";
+import { markNotificationRead } from "@/lib/notificationRead";
 
 interface NotificationsPageClientProps {
   userId: string;
@@ -23,13 +24,20 @@ interface NotificationsPageClientProps {
   sections: NotificationSection[];
 }
 
-type FilterKey = "needs_attention" | "responses" | "review" | "opportunities" | "activity";
+type FilterKey =
+  | "needs_attention"
+  | "responses"
+  | "review"
+  | "opportunities"
+  | "subscriptions"
+  | "activity";
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "needs_attention", label: "Needs attention" },
   { key: "responses", label: "Responses" },
   { key: "review", label: "Review" },
   { key: "opportunities", label: "Opportunities" },
+  { key: "subscriptions", label: "Subscriptions" },
   { key: "activity", label: "Activity" },
 ];
 
@@ -60,15 +68,20 @@ function ActionCard({
   item,
   source,
   primary = false,
+  onOpen,
 }: {
   item: ActionInboxItem;
   source: string;
   primary?: boolean;
+  onOpen?: (item: ActionInboxItem) => void;
 }) {
   return (
     <Link
       href={item.href}
-      onClick={() => trackAction(item, source)}
+      onClick={() => {
+        onOpen?.(item);
+        trackAction(item, source);
+      }}
       className={`block rounded-xl border transition-colors ${
         primary
           ? "border-emerald-200 bg-emerald-50 p-4 hover:bg-emerald-100/60"
@@ -98,7 +111,20 @@ export default function NotificationsPageClient({
 }: NotificationsPageClientProps) {
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [localSections, setLocalSections] = useState(sections);
-  const [activeFilter, setActiveFilter] = useState<FilterKey>("needs_attention");
+  const [activeFilter, setActiveFilter] = useState<FilterKey>(() => {
+    const initial = getActionInboxSummary(
+      sections.flatMap((section) => section.items)
+    );
+    if (initial.unreadActionCount > 0) return "needs_attention";
+    if (
+      initial.items.some(
+        (item) => item.category === "subscriptions"
+      )
+    ) {
+      return "subscriptions";
+    }
+    return "activity";
+  });
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -128,22 +154,50 @@ export default function NotificationsPageClient({
     () => getActionInboxSummary(notifications),
     [notifications]
   );
-  const categoryByNotificationId = new Map(
-    summary.items.map((item) => [item.notificationId, item.category])
+  const itemByNotificationId = new Map(
+    summary.items.map((item) => [item.notificationId, item])
   );
   const visibleSections = localSections
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
-        const category = categoryByNotificationId.get(item.id);
-        if (activeFilter === "needs_attention") return !item.read;
-        return category === activeFilter;
+        const inboxItem = itemByNotificationId.get(item.id);
+        if (activeFilter === "needs_attention") {
+          return !item.read && inboxItem?.requiresAction === true;
+        }
+        return inboxItem?.category === activeFilter;
       }),
     }))
     .filter((section) => section.items.length > 0);
   const secondaryActions = summary.items
-    .filter((item) => !item.read && item.notificationId !== summary.primaryAction?.notificationId)
+    .filter(
+      (item) =>
+        !item.read &&
+        item.requiresAction &&
+        item.notificationId !== summary.primaryAction?.notificationId
+    )
     .slice(0, 3);
+
+  const markOneRead = (notificationId: string) => {
+    const wasUnread = notifications.some(
+      (notification) =>
+        notification.id === notificationId && !notification.read
+    );
+    if (!wasUnread) return;
+    setUnreadCount((current) => Math.max(0, current - 1));
+    setLocalSections((current) =>
+      current.map((section) => ({
+        ...section,
+        items: section.items.map((item) =>
+          item.id === notificationId ? { ...item, read: true } : item
+        ),
+      }))
+    );
+    void markNotificationRead(notificationId).catch(() => {
+      setToastMessage("Could not mark that notification as read.");
+      void refresh();
+    });
+  };
 
   const handleMarkAllRead = async () => {
     setMarkingAllRead(true);
@@ -213,9 +267,13 @@ export default function NotificationsPageClient({
             </div>
             <Link
               href={summary.primaryAction.href}
-              onClick={() =>
-                trackAction(summary.primaryAction as ActionInboxItem, "notifications_inbox")
-              }
+              onClick={() => {
+                markOneRead(summary.primaryAction!.notificationId);
+                trackAction(
+                  summary.primaryAction as ActionInboxItem,
+                  "notifications_inbox"
+                );
+              }}
               className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
             >
               {summary.primaryAction.cta}
@@ -228,6 +286,7 @@ export default function NotificationsPageClient({
                   key={item.notificationId}
                   item={item}
                   source="notifications_inbox_secondary"
+                  onOpen={(action) => markOneRead(action.notificationId)}
                 />
               ))}
             </div>
@@ -302,7 +361,11 @@ export default function NotificationsPageClient({
                     </p>
                   </div>
                   {section.items.map((notification) => (
-                    <NotificationItem key={notification.id} notification={notification} />
+                    <NotificationItem
+                      key={notification.id}
+                      notification={notification}
+                      onOpened={() => markOneRead(notification.id)}
+                    />
                   ))}
                 </div>
               ))}

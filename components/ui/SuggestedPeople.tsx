@@ -61,6 +61,8 @@ export default async function SuggestedPeople({
             <FollowButton
               followerId={currentUserId}
               followingId={person.id}
+              authorName={person.full_name ?? person.username}
+              source="explore"
             />
           </div>
         ))}

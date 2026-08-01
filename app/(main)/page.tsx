@@ -23,7 +23,11 @@ import {
 } from "@/lib/dailyBrief";
 import PostsFeedSection from "./PostsFeedSection";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl, canonicalPath } from "@/lib/site";
-import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
+import {
+  isAuthorSubscriptionsUxV2Enabled,
+  isTopicSubscriptionsEnabled,
+} from "@/lib/featureFlags";
+import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
 
 export const revalidate = 60;
 
@@ -56,6 +60,7 @@ interface PageProps {
     tab?: string;
     type?: string;
     timeframe?: string;
+    source?: string;
     welcome?: string;
   }>;
 }
@@ -109,7 +114,7 @@ function deriveSidebarTopics({
 }
 
 export default async function HomePage({ searchParams }: PageProps) {
-  const { guest, tab, type, timeframe, welcome } = await searchParams;
+  const { guest, tab, type, timeframe, source, welcome } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -137,6 +142,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     { data: recentDraft },
     featuredCandidates,
     { data: topicSubscriptions },
+    { data: authorSubscriptions },
   ] = await Promise.all([
     user
       ? supabase
@@ -178,6 +184,13 @@ export default async function HomePage({ searchParams }: PageProps) {
           .eq("subscriber_id", user.id)
           .limit(1000)
       : Promise.resolve({ data: [] as Array<{ topic_key: string }> }),
+    user && isAuthorSubscriptionsUxV2Enabled()
+      ? supabase
+          .from("author_subscriptions")
+          .select("author_id")
+          .eq("subscriber_id", user.id)
+          .limit(1000)
+      : Promise.resolve({ data: [] as Array<{ author_id: string }> }),
   ]);
 
   const userInterests = (profileData?.interests as string[] | null) ?? [];
@@ -210,6 +223,9 @@ export default async function HomePage({ searchParams }: PageProps) {
   );
   const topicSubscriptionKeys = (topicSubscriptions ?? []).map(
     (row: { topic_key: string }) => row.topic_key
+  );
+  const authorSubscriptionIds = (authorSubscriptions ?? []).map(
+    (row: { author_id: string }) => row.author_id
   );
   const followCount = followedIds.length;
 
@@ -300,10 +316,20 @@ export default async function HomePage({ searchParams }: PageProps) {
   }
 
   const showFollowingEligible = !!user;
-  const showTopicsEligible = Boolean(user) && isTopicSubscriptionsEnabled();
+  const showSubscriptionsEligible =
+    Boolean(user) && isAuthorSubscriptionsUxV2Enabled();
+  const showTopicsEligible =
+    Boolean(user) &&
+    isTopicSubscriptionsEnabled() &&
+    !showSubscriptionsEligible;
+  const subscriptionSource: SubscriptionFeedSource =
+    source === "authors" || source === "topics" ? source : "all";
   const activeTab =
     tab === "following" && showFollowingEligible
       ? "following"
+      : (tab === "subscriptions" || tab === "topics") &&
+          showSubscriptionsEligible
+        ? "subscriptions"
       : tab === "topics" && showTopicsEligible
         ? "topics"
       : tab === "latest"
@@ -328,7 +354,11 @@ export default async function HomePage({ searchParams }: PageProps) {
         />
       ) : null}
 
-      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,700px)_minmax(280px,304px)] lg:justify-center lg:gap-8 xl:gap-10">
+      {/* Below xl there is no rail, so the feed keeps its capped, centered
+          layout. At xl the rail already consumes the left edge, so the feed
+          goes fluid and fills the column instead of centering inside it --
+          the old justify-center was throwing away ~130px on wide screens. */}
+      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,700px)_minmax(280px,304px)] lg:justify-center lg:gap-8 xl:grid-cols-[minmax(0,1fr)_304px] xl:justify-normal xl:gap-10">
         <div className="min-w-0">
           <Suspense fallback={<FeedSkeleton />}>
             <PostsFeedSection
@@ -339,9 +369,16 @@ export default async function HomePage({ searchParams }: PageProps) {
               userInterests={userInterests}
               userUniversity={userUniversity}
               followedIds={followedIds}
+              authorSubscriptionIds={authorSubscriptionIds}
               topicSubscriptionKeys={topicSubscriptionKeys}
+              subscriptionSource={
+                tab === "topics" && showSubscriptionsEligible
+                  ? "topics"
+                  : subscriptionSource
+              }
               showFollowingEligible={showFollowingEligible}
               showTopicsEligible={showTopicsEligible}
+              showSubscriptionsEligible={showSubscriptionsEligible}
               activeDebate={homeDebate}
               peopleSuggestions={peopleResult.suggestions}
               peopleSuggestionReason={peopleResult.reason}
@@ -351,7 +388,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           </Suspense>
         </div>
 
-        <aside className="hidden self-start lg:sticky lg:top-[76px] lg:block">
+        <aside className="hidden self-start lg:sticky lg:top-[calc(var(--app-nav-height)+1rem)] lg:block">
           <HomeSidebar
             activeDebate={homeDebate}
             recentDraft={recentDraft ?? null}

@@ -4,6 +4,85 @@ export interface AuthorRelationshipState {
   following: boolean;
   subscribed: boolean;
   followCreated: boolean;
+  subscriptionCreated: boolean;
+}
+
+export type AuthorRelationshipSurface =
+  | "unknown"
+  | "profile"
+  | "post_header"
+  | "author_card"
+  | "research_sidebar"
+  | "explore"
+  | "home_suggestion"
+  | "onboarding"
+  | "subscriptions_manager"
+  | "subscriptions_manager_undo"
+  | "follow_nudge"
+  | "qualified_read_nudge";
+
+export type AuthorRelationshipVariant =
+  | "full"
+  | "compact"
+  | "icon"
+  | "follow_only";
+
+export type SubscriptionFeedSource = "all" | "authors" | "topics";
+
+export type NotificationPreferenceKey =
+  | "email_comments"
+  | "email_follows"
+  | "email_likes"
+  | "email_responses"
+  | "email_messages"
+  | "email_published"
+  | "email_digest"
+  | "email_account_security"
+  | "email_profile_reminders"
+  | "email_review_assigned"
+  | "email_review_started"
+  | "email_review_reminder"
+  | "email_co_author_invite"
+  | "email_co_author_accepted"
+  | "email_co_author_declined"
+  | "email_opportunity_inquiry"
+  | "email_author_publications"
+  | "email_debate_updates"
+  | "push_published"
+  | "push_messages"
+  | "push_comments"
+  | "push_likes"
+  | "push_follows"
+  | "push_daily_brief"
+  | "push_author_publications"
+  | "push_debate_updates";
+
+export interface SubscriptionMatchReason {
+  kind: "author" | "topic";
+  key: string;
+  label: string;
+}
+
+export interface AuthorSubscriberGrowth {
+  activeSubscribers: number;
+  gained7d: number;
+  lost7d: number;
+  net7d: number;
+  gained30d: number;
+  lost30d: number;
+  net30d: number;
+  trackingSince: string | null;
+  daily: Array<{
+    date: string;
+    gained: number;
+    lost: number;
+    net: number;
+  }>;
+}
+
+export interface AuthorSubscriptionAcquisitionRow {
+  postId: string;
+  subscribersGained: number;
 }
 
 export interface TopicSubscriptionState {

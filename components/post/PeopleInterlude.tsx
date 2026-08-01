@@ -67,7 +67,12 @@ export default function PeopleInterlude({
               ) : null}
             </div>
             {currentUserId ? (
-              <FollowButton followerId={currentUserId} followingId={person.id} />
+              <FollowButton
+                followerId={currentUserId}
+                followingId={person.id}
+                authorName={person.full_name ?? person.username}
+                source="home_suggestion"
+              />
             ) : (
               <Link
                 href={`/${person.username}`}

@@ -7,6 +7,7 @@ import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
 import { formatRelativeTime } from "@/lib/utils";
 import { respondToCoAuthorInvite } from "./actions";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
+import { markNotificationRead } from "@/lib/notificationRead";
 
 interface NotificationData {
   id: string;
@@ -23,6 +24,7 @@ interface NotificationData {
   } | null;
   post_title: string | null;
   post_slug: string | null;
+  post_content_kind?: string | null;
   actor_username: string | null;
 }
 
@@ -140,8 +142,10 @@ function buildLink(notification: NotificationData): string | null {
 
 export default function NotificationItem({
   notification,
+  onOpened,
 }: {
   notification: NotificationData;
+  onOpened?: () => void;
 }) {
   const inboxItem = getActionInboxSummary([notification]).items[0];
   const message = inboxItem?.description ?? buildNotificationMessage(notification);
@@ -150,7 +154,20 @@ export default function NotificationItem({
   const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");
   const [localRead, setLocalRead] = useState(notification.read);
 
+  const markOpened = () => {
+    if (localRead) return;
+    setLocalRead(true);
+    if (onOpened) {
+      onOpened();
+      return;
+    }
+    void markNotificationRead(notification.id).catch(() => {
+      setLocalRead(false);
+    });
+  };
+
   const trackNotificationAction = (source: string, item?: ActionInboxItem) => {
+    markOpened();
     trackActivationEvent({
       event: "notification_opened",
       metadata: {
@@ -215,7 +232,11 @@ export default function NotificationItem({
       <div className="min-w-0 flex-1">
         {inboxItem ? (
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            {inboxItem.label}
+            {(notification.type === "author_published" ||
+              notification.type === "topic_published") &&
+            notification.post_content_kind
+              ? `${notification.post_content_kind} · ${inboxItem.label}`
+              : inboxItem.label}
           </p>
         ) : null}
         <p className="mt-0.5 text-sm leading-snug text-gray-700">{message}</p>
@@ -288,6 +309,7 @@ export default function NotificationItem({
             <Link
               href={link}
               onClick={() => {
+                markOpened();
                 trackActivationEvent({
                   event: "next_action_clicked",
                   metadata: {

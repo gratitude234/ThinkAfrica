@@ -4,14 +4,22 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
-import type { AuthorRelationshipState } from "@/lib/publicationDelivery";
+import {
+  isAuthorSubscriptionsEnabled,
+  isAuthorSubscriptionsUxV2Enabled,
+} from "@/lib/featureFlags";
+import type {
+  AuthorRelationshipState,
+  AuthorRelationshipSurface,
+} from "@/lib/publicationDelivery";
 import { ENGAGEMENT_PUSH_COOLDOWN_MS, logPushResult, sendPushNotification } from "@/lib/push";
 
 type ToggleFollowInput = {
   followingId: string;
   follow: boolean;
   pathname?: string | null;
+  surface?: AuthorRelationshipSurface;
+  postId?: string | null;
 };
 
 type ProfileSummary = {
@@ -25,6 +33,36 @@ type RelationshipRpcRow = {
   follow_created: boolean;
   subscription_created: boolean;
 };
+
+function relationshipRpc(input: {
+  authorId: string;
+  following: boolean | null;
+  subscribed: boolean | null;
+  surface?: AuthorRelationshipSurface;
+  postId?: string | null;
+}) {
+  if (isAuthorSubscriptionsUxV2Enabled()) {
+    return {
+      name: "set_author_relationship_v2",
+      args: {
+        p_author_id: input.authorId,
+        p_following: input.following,
+        p_subscribed: input.subscribed,
+        p_source: input.surface ?? "unknown",
+        p_source_post_id: input.postId ?? null,
+      },
+    };
+  }
+
+  return {
+    name: "set_author_relationship",
+    args: {
+      p_author_id: input.authorId,
+      p_following: input.following,
+      p_subscribed: input.subscribed,
+    },
+  };
+}
 
 function displayName(profile: ProfileSummary | null) {
   return profile?.full_name?.trim() || profile?.username?.trim() || "An Indegenius reader";
@@ -68,12 +106,15 @@ export async function toggleFollow(input: ToggleFollowInput): Promise<{
   }
 
   if (isAuthorSubscriptionsEnabled()) {
+    const rpc = relationshipRpc({
+      authorId: input.followingId,
+      following: input.follow,
+      subscribed: null,
+      surface: input.surface,
+      postId: input.postId,
+    });
     const { data, error } = await supabase
-      .rpc("set_author_relationship", {
-        p_author_id: input.followingId,
-        p_following: input.follow,
-        p_subscribed: null,
-      })
+      .rpc(rpc.name, rpc.args)
       .single<RelationshipRpcRow>();
 
     if (error || !data) {
@@ -150,6 +191,8 @@ export async function setAuthorSubscription(input: {
   authorId: string;
   subscribed: boolean;
   pathname?: string | null;
+  surface?: AuthorRelationshipSurface;
+  postId?: string | null;
 }): Promise<{ error: string | null } & AuthorRelationshipState> {
   if (!isAuthorSubscriptionsEnabled()) {
     return {
@@ -157,6 +200,7 @@ export async function setAuthorSubscription(input: {
       following: false,
       subscribed: false,
       followCreated: false,
+      subscriptionCreated: false,
     };
   }
 
@@ -170,6 +214,7 @@ export async function setAuthorSubscription(input: {
       following: false,
       subscribed: false,
       followCreated: false,
+      subscriptionCreated: false,
     };
   }
   if (user.id === input.authorId) {
@@ -178,15 +223,19 @@ export async function setAuthorSubscription(input: {
       following: false,
       subscribed: false,
       followCreated: false,
+      subscriptionCreated: false,
     };
   }
 
+  const rpc = relationshipRpc({
+    authorId: input.authorId,
+    following: input.subscribed ? true : null,
+    subscribed: input.subscribed,
+    surface: input.surface,
+    postId: input.postId,
+  });
   const { data, error } = await supabase
-    .rpc("set_author_relationship", {
-      p_author_id: input.authorId,
-      p_following: input.subscribed ? true : null,
-      p_subscribed: input.subscribed,
-    })
+    .rpc(rpc.name, rpc.args)
     .single<RelationshipRpcRow>();
 
   if (error || !data) {
@@ -195,17 +244,22 @@ export async function setAuthorSubscription(input: {
       following: input.subscribed,
       subscribed: !input.subscribed,
       followCreated: false,
+      subscriptionCreated: false,
     };
   }
 
   safeRevalidate(input.pathname);
   revalidatePath("/settings");
+  revalidatePath("/subscriptions");
   // Subscribing always creates the underlying Follow, so both flags can be true
   // for a single click. Send only the stronger notification: the author should
   // hear "subscribed", never "started following" plus a duplicate. Both flags
   // are false when nothing actually changed, so re-subscribing after an
   // unsubscribe stays silent.
-  if (data.subscription_created) {
+  if (
+    data.subscription_created &&
+    input.surface !== "subscriptions_manager_undo"
+  ) {
     after(() => notifyAuthorSubscribed(user.id, input.authorId));
   } else if (data.follow_created) {
     after(() => notifyFollowed(user.id, input.authorId));
@@ -216,6 +270,7 @@ export async function setAuthorSubscription(input: {
     following: data.following,
     subscribed: data.subscribed,
     followCreated: data.follow_created,
+    subscriptionCreated: data.subscription_created,
   };
 }
 

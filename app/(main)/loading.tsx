@@ -1,44 +1,42 @@
+import FeedSkeleton from "@/components/post/FeedSkeleton";
+
+function SideCardSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="h-2.5 w-24 rounded bg-gray-200" />
+      <div className="mt-3 space-y-2">
+        {Array.from({ length: rows }, (_, index) => (
+          <div key={index} className="h-3 w-full rounded bg-gray-100" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Segment-level loading UI for (main). It mirrors the feed + sidebar geometry of
+ * app/(main)/page.tsx, which is the shape most routes in this group fall back
+ * to, and reuses FeedSkeleton so the placeholder cards match the real ones
+ * instead of drifting from them.
+ */
 export default function Loading() {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-pulse motion-reduce:animate-none"
+    <div
+      className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,700px)_minmax(280px,304px)] lg:justify-center lg:gap-8 xl:grid-cols-[minmax(0,1fr)_304px] xl:justify-normal xl:gap-10"
       role="status"
       aria-label="Loading your feed"
     >
-      {/* Feed column */}
-      <div className="lg:col-span-2 space-y-4">
-        <div className="h-8 w-56 bg-gray-200 rounded-lg mb-2" />
-        <div className="h-4 w-72 bg-gray-100 rounded mb-6" />
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="h-5 w-16 bg-gray-200 rounded-full" />
-              <div className="h-4 w-24 bg-gray-100 rounded" />
-            </div>
-            <div className="h-5 w-4/5 bg-gray-200 rounded" />
-            <div className="h-4 w-full bg-gray-100 rounded" />
-            <div className="h-4 w-3/4 bg-gray-100 rounded" />
-            <div className="flex items-center gap-3 pt-1">
-              <div className="h-7 w-7 rounded-full bg-gray-200" />
-              <div className="h-3 w-32 bg-gray-100 rounded" />
-            </div>
-          </div>
-        ))}
+      <div className="min-w-0">
+        <FeedSkeleton />
       </div>
 
-      {/* Sidebar column */}
-      <div className="hidden lg:block space-y-6">
-        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-          <div className="h-4 w-28 bg-gray-200 rounded" />
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-3 w-full bg-gray-100 rounded" />
-          ))}
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-          <div className="h-4 w-28 bg-gray-200 rounded" />
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-3 w-full bg-gray-100 rounded" />
-          ))}
-        </div>
+      <div
+        aria-hidden="true"
+        className="hidden animate-pulse flex-col gap-3.5 motion-reduce:animate-none lg:flex"
+      >
+        <SideCardSkeleton rows={2} />
+        <SideCardSkeleton rows={3} />
+        <SideCardSkeleton rows={3} />
       </div>
 
       <span className="sr-only">Loading your feed…</span>

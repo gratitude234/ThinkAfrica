@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import UserAvatar from "@/components/ui/UserAvatar";
-import FollowButton from "@/components/ui/FollowButton";
+import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
 import ReportButton from "@/components/moderation/ReportButton";
 import HomeFeedCard from "@/components/post/HomeFeedCard";
 import PostCover from "@/components/post/PostCover";
@@ -42,6 +42,7 @@ interface ConversationViewer {
   userLiked: boolean;
   userBookmarked: boolean;
   userFollowsAuthor: boolean;
+  userSubscribedToAuthor: boolean;
 }
 
 interface PostConversationViewProps {
@@ -173,20 +174,17 @@ export default async function PostConversationView({
               </p>
             </div>
           </div>
-          {isOwnPost ? null : userId ? (
-            <FollowButton
-              followerId={userId}
-              followingId={author.id}
+          {isOwnPost ? null : (
+            <AuthorRelationshipControls
+              authorId={author.id}
+              authorName={authorName}
+              currentUserId={userId}
               initialFollowing={viewer.userFollowsAuthor}
-              variant="solid"
+              initialSubscribed={viewer.userSubscribedToAuthor}
+              variant="icon"
+              source="post_header"
+              postId={post.id}
             />
-          ) : (
-            <Link
-              href={`/login?redirectTo=${encodeURIComponent(`/post/${post.slug}`)}`}
-              className="shrink-0 rounded-lg bg-emerald-brand px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-            >
-              Follow
-            </Link>
           )}
         </div>
       ) : null}

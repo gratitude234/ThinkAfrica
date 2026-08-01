@@ -5,6 +5,10 @@ export type ActivationEventName =
   | "onboarding_step_completed"
   | "interest_selected"
   | "writer_followed"
+  | "author_subscription_created"
+  | "author_subscription_removed"
+  | "author_subscription_nudge_shown"
+  | "author_subscription_nudge_action"
   | "post_opened"
   | "search_performed"
   | "discover_viewed"
@@ -83,6 +87,7 @@ const VIEW_EVENTS = new Set<ActivationEventName>([
   "response_thread_opened",
   "weekly_digest_previewed",
   "quality_check_viewed",
+  "author_subscription_nudge_shown",
 ]);
 
 function hashActivationKey(value: string) {

@@ -5,7 +5,8 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, canonicalPath, absoluteUrl } from "@/lib/site";
 import UserAvatar from "@/components/ui/UserAvatar";
-import FollowButton from "@/components/ui/FollowButton";
+import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
+import AuthorRelationshipProvider from "@/components/profile/AuthorRelationshipProvider";
 import {
   formatDate,
   formatRelativeTime,
@@ -696,19 +697,27 @@ async function DetailAuthorRow({
         </div>
       </div>
       {isOwnPost ? null : userId ? (
-        <FollowButton
-          followerId={userId}
-          followingId={author.id}
+        <AuthorRelationshipControls
+          authorId={author.id}
+          authorName={authorName}
+          currentUserId={userId}
           initialFollowing={viewer.userFollowsAuthor}
-          variant="solid"
+          initialSubscribed={viewer.userSubscribedToAuthor}
+          source="post_header"
+          postId={post.id}
+          variant="icon"
         />
       ) : (
-        <Link
-          href={`/login?redirectTo=${encodeURIComponent(`/post/${post.slug}`)}`}
-          className="shrink-0 rounded-lg bg-emerald-brand px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-        >
-          Follow
-        </Link>
+        <AuthorRelationshipControls
+          authorId={author.id}
+          authorName={authorName}
+          currentUserId={null}
+          initialFollowing={false}
+          initialSubscribed={false}
+          source="post_header"
+          postId={post.id}
+          variant="icon"
+        />
       )}
     </div>
   );
@@ -986,6 +995,7 @@ async function AuthorAndCollaborationSection({
     <>
       <AuthorBioCard
         author={author}
+        postId={post.id}
         userId={userId}
         initialFollowing={viewer.userFollowsAuthor}
         initialSubscribed={viewer.userSubscribedToAuthor}
@@ -1386,17 +1396,23 @@ async function ResearchDossierSidebar({
         {author ? (
           <section className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="font-display text-[15px] font-semibold text-ink">
-              Follow this researcher
+              Get every new publication
             </h2>
             <p className="mt-1 text-[11.5px] leading-relaxed text-gray-500">
-              Get new research by {author.full_name ?? author.username} in your feed.
+              Follow {author.full_name ?? author.username} for the feed, or
+              subscribe for every new publication.
             </p>
             <div className="mt-3">
               {userId && userId !== author.id ? (
-                <FollowButton
-                  followerId={userId}
-                  followingId={author.id}
+                <AuthorRelationshipControls
+                  authorId={author.id}
+                  authorName={author.full_name ?? author.username}
+                  currentUserId={userId}
                   initialFollowing={viewer.userFollowsAuthor}
+                  initialSubscribed={viewer.userSubscribedToAuthor}
+                  source="research_sidebar"
+                  postId={post.id}
+                  compact
                 />
               ) : userId === author.id ? (
                 <Link
@@ -1406,12 +1422,15 @@ async function ResearchDossierSidebar({
                   View dashboard
                 </Link>
               ) : (
-                <Link
-                  href={`/login?redirectTo=${encodeURIComponent(`/post/${post.slug}`)}`}
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-                >
-                  Follow researcher
-                </Link>
+                <AuthorRelationshipControls
+                  authorId={author.id}
+                  authorName={author.full_name ?? author.username}
+                  currentUserId={null}
+                  initialFollowing={false}
+                  source="research_sidebar"
+                  postId={post.id}
+                  compact
+                />
               )}
             </div>
           </section>
@@ -1590,6 +1609,7 @@ export default async function PostPage({ params }: PageProps) {
     authorId: author?.id ?? null,
     supabase,
   });
+  const relationshipViewer = await viewerDataPromise;
   const resolvedKind = resolveContentKind(post);
   const isResearchPost = resolvedKind === "research";
   const isArticlePost = resolvedKind === "article";
@@ -1613,32 +1633,49 @@ export default async function PostPage({ params }: PageProps) {
   // PostConversationView.tsx.
   if (resolvedKind === "post") {
     return (
-      <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
-        <div className="relative">
-          {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
-          {isPublished ? <ViewTracker slug={slug} wordCount={wordCount} /> : null}
-          <Suspense fallback={<SectionSkeleton rows={6} />}>
-            <PostConversationView
-              post={post}
-              author={author}
-              userId={userId}
-              bodyHtml={sanitizedContent}
-              sanitizedExcerpt={sanitizedExcerpt}
-              authorName={authorName}
-              metadataTitle={metadataTitle}
-              secondaryDataPromise={secondaryDataPromise}
-              viewerDataPromise={viewerDataPromise}
-            />
-          </Suspense>
-        </div>
-      </PostEngagementProvider>
+      <AuthorRelationshipProvider
+        authorId={author?.id ?? post.author_id}
+        authorName={authorName}
+        currentUserId={userId}
+        initialFollowing={relationshipViewer.userFollowsAuthor}
+        initialSubscribed={relationshipViewer.userSubscribedToAuthor}
+        postId={post.id}
+      >
+        <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
+          <div className="relative">
+            {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
+            {isPublished ? <ViewTracker slug={slug} wordCount={wordCount} /> : null}
+            <Suspense fallback={<SectionSkeleton rows={6} />}>
+              <PostConversationView
+                post={post}
+                author={author}
+                userId={userId}
+                bodyHtml={sanitizedContent}
+                sanitizedExcerpt={sanitizedExcerpt}
+                authorName={authorName}
+                metadataTitle={metadataTitle}
+                secondaryDataPromise={secondaryDataPromise}
+                viewerDataPromise={viewerDataPromise}
+              />
+            </Suspense>
+          </div>
+        </PostEngagementProvider>
+      </AuthorRelationshipProvider>
     );
   }
 
   if (isResearchPost) {
     return (
-      <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
-      <div className="relative">
+      <AuthorRelationshipProvider
+        authorId={author?.id ?? post.author_id}
+        authorName={authorName}
+        currentUserId={userId}
+        initialFollowing={relationshipViewer.userFollowsAuthor}
+        initialSubscribed={relationshipViewer.userSubscribedToAuthor}
+        postId={post.id}
+      >
+        <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
+        <div className="relative">
         {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
         {isPublished ? (
           <>
@@ -1871,14 +1908,23 @@ export default async function PostPage({ params }: PageProps) {
             />
           </Suspense>
         </div>
-      </div>
-      </PostEngagementProvider>
+        </div>
+        </PostEngagementProvider>
+      </AuthorRelationshipProvider>
     );
   }
 
   return (
-    <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
-    <div className="relative">
+    <AuthorRelationshipProvider
+      authorId={author?.id ?? post.author_id}
+      authorName={authorName}
+      currentUserId={userId}
+      initialFollowing={relationshipViewer.userFollowsAuthor}
+      initialSubscribed={relationshipViewer.userSubscribedToAuthor}
+      postId={post.id}
+    >
+      <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
+      <div className="relative">
       {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
       {isPublished ? (
         <>
@@ -2062,7 +2108,8 @@ export default async function PostPage({ params }: PageProps) {
           ) : null}
         </main>
       </div>
-    </div>
+      </div>
       </PostEngagementProvider>
+    </AuthorRelationshipProvider>
   );
 }

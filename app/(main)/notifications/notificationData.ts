@@ -14,6 +14,7 @@ export interface NotificationData {
   actor_username: string | null;
   post_title: string | null;
   post_slug: string | null;
+  post_content_kind: string | null;
 }
 
 export interface NotificationSection {
@@ -62,7 +63,7 @@ export function sectionsFromNotifications(
 const NOTIFICATIONS_SELECT = `
   id, type, read, created_at, actor_id, post_id, message, link,
   actor:profiles!notifications_actor_id_fkey(full_name, username, avatar_url),
-  post:posts!notifications_post_id_fkey(title, slug)
+  post:posts!notifications_post_id_fkey(title, slug, content_kind)
 `;
 
 type NotificationsQueryClient = {
@@ -91,8 +92,8 @@ export async function fetchNotificationRows(
       | NotificationData["actor"][]
       | null;
     const rawPost = notification.post as
-      | { title: string; slug: string }
-      | { title: string; slug: string }[]
+      | { title: string; slug: string; content_kind: string | null }
+      | { title: string; slug: string; content_kind: string | null }[]
       | null;
     const actor = Array.isArray(rawActor) ? rawActor[0] ?? null : rawActor;
     const post = Array.isArray(rawPost) ? rawPost[0] ?? null : rawPost;
@@ -109,6 +110,7 @@ export async function fetchNotificationRows(
       actor_username: actor?.username ?? null,
       post_title: post?.title ?? null,
       post_slug: post?.slug ?? null,
+      post_content_kind: post?.content_kind ?? null,
     };
   });
 

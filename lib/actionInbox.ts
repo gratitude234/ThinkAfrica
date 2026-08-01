@@ -3,6 +3,7 @@ export type ActionInboxCategory =
   | "responses"
   | "review"
   | "opportunities"
+  | "subscriptions"
   | "activity";
 
 export interface ActionInboxNotificationInput {
@@ -26,6 +27,7 @@ export interface ActionInboxItem {
   notificationId: string;
   type: string;
   category: ActionInboxCategory;
+  requiresAction: boolean;
   priority: number;
   read: boolean;
   createdAt: string;
@@ -82,12 +84,14 @@ function notificationToAction(
     createdAt: notification.created_at,
     href: defaultHref(notification),
     postId: notification.post_id ?? null,
+    requiresAction: false,
   };
 
   switch (notification.type) {
     case "revision_requested":
       return {
         ...base,
+        requiresAction: true,
         category: "review",
         priority: 10,
         label: "Revision requested",
@@ -112,6 +116,7 @@ function notificationToAction(
     case "opportunity_inquiry":
       return {
         ...base,
+        requiresAction: true,
         category: "opportunities",
         priority: 30,
         label: "Opportunity inquiry",
@@ -125,6 +130,7 @@ function notificationToAction(
     case "review_assigned":
       return {
         ...base,
+        requiresAction: true,
         category: "review",
         priority: 40,
         label: "Review assigned",
@@ -150,6 +156,7 @@ function notificationToAction(
     case "co_author_invite":
       return {
         ...base,
+        requiresAction: true,
         category: "activity",
         priority: 60,
         label: "Co-author invite",
@@ -162,6 +169,7 @@ function notificationToAction(
     case "debate_invitation":
       return {
         ...base,
+        requiresAction: true,
         category: "activity",
         priority: 55,
         label: "Debate invitation",
@@ -174,6 +182,7 @@ function notificationToAction(
     case "debate_invitation_response":
       return {
         ...base,
+        requiresAction: true,
         category: "activity",
         priority: 60,
         label: "Debate invitation update",
@@ -185,6 +194,7 @@ function notificationToAction(
     case "debate_phase_advanced":
       return {
         ...base,
+        requiresAction: true,
         category: "activity",
         priority: 60,
         label: "Debate stage opened",
@@ -196,6 +206,7 @@ function notificationToAction(
     case "debate_cancelled":
       return {
         ...base,
+        requiresAction: true,
         category: "activity",
         priority: 60,
         label: "Debate cancelled",
@@ -242,6 +253,30 @@ function notificationToAction(
         cta: "View profile",
         actionKey: "author_subscribed",
       };
+    case "author_published":
+      return {
+        ...base,
+        category: "subscriptions",
+        priority: 85,
+        label: "New publication",
+        description:
+          notification.message ??
+          `${actorName(notification)} published ${postTitle(notification)}.`,
+        cta: "Read publication",
+        actionKey: "author_publication",
+      };
+    case "topic_published":
+      return {
+        ...base,
+        category: "subscriptions",
+        priority: 86,
+        label: "New in a subscribed topic",
+        description:
+          notification.message ??
+          `A new publication is ready: ${postTitle(notification)}.`,
+        cta: "Read publication",
+        actionKey: "topic_publication",
+      };
     case "like":
       return {
         ...base,
@@ -279,15 +314,17 @@ export function getActionInboxSummary(
       return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
     });
   const unreadItems = items.filter((item) => !item.read);
+  const unreadActions = unreadItems.filter((item) => item.requiresAction);
   const groupOrder: Array<{ key: ActionInboxCategory; label: string }> = [
     { key: "responses", label: "Responses" },
     { key: "review", label: "Review and status" },
     { key: "opportunities", label: "Opportunities" },
+    { key: "subscriptions", label: "Subscriptions" },
     { key: "activity", label: "Activity" },
   ];
 
   return {
-    primaryAction: unreadItems[0] ?? null,
+    primaryAction: unreadActions[0] ?? null,
     items,
     groups: groupOrder
       .map((group) => ({
@@ -295,8 +332,8 @@ export function getActionInboxSummary(
         items: items.filter((item) => item.category === group.key),
       }))
       .filter((group) => group.items.length > 0),
-    unreadActionCount: unreadItems.length,
-    staleUnreadCount: unreadItems.filter((item) => {
+    unreadActionCount: unreadActions.length,
+    staleUnreadCount: unreadActions.filter((item) => {
       const created = new Date(item.createdAt).getTime();
       return !Number.isNaN(created) && now - created > STALE_MS;
     }).length,

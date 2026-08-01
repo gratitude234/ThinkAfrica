@@ -28,11 +28,12 @@
     --ta-border: #E5E7EB;
     --ta-border-soft: #F3F4F6;
     --mobile-visual-viewport-bottom: 0px;
-    /* Height of the sticky site nav (announcement strip + nav bar). Measured
-       at runtime by NavClient and written back to :root, so sticky sub-headers
-       can pin directly beneath it instead of hardcoding a pixel guess. This
-       value is only the pre-hydration fallback. */
-    --app-nav-height: 84px;
+    /* Height of the sticky site nav. The announcement strip scrolls away and is
+       no longer part of it, so this is just the nav bar. Measured at runtime by
+       NavClient and written back to :root, so sticky sub-headers can pin
+       directly beneath it instead of hardcoding a pixel guess. This value is
+       only the pre-hydration fallback. */
+    --app-nav-height: 60px;
   }
 
   html {

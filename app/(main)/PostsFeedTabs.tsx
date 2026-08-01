@@ -7,6 +7,7 @@ import FeedSkeleton from "@/components/post/FeedSkeleton";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { PostCardData } from "@/components/post/PostCard";
 import type { FeedContentFilter, FeedTimeframe } from "@/lib/feedData";
+import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
 import FeedFilterChips from "./FeedFilterChips";
 import HomeFeaturedLead, { type HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
 import HomeGuestNotice from "./HomeGuestNotice";
@@ -14,7 +15,7 @@ import FeedEmptyState from "./FeedEmptyState";
 import FeedErrorState from "./FeedErrorState";
 import CreateTrigger from "./CreateTrigger";
 
-type TabKey = "home" | "following" | "topics" | "latest";
+type TabKey = "home" | "following" | "subscriptions" | "topics" | "latest";
 const EMPTY_POSTS: PostCardData[] = [];
 
 const CREATE_CTA_CLASS =
@@ -41,12 +42,18 @@ interface FeedCacheEntry extends FeedResponse {
 function feedCacheKey(
   tab: TabKey,
   type: FeedContentFilter,
-  timeframe: FeedTimeframe
+  timeframe: FeedTimeframe,
+  source: SubscriptionFeedSource
 ) {
-  return `${tab}:${type}:${timeframe}`;
+  return `${tab}:${type}:${timeframe}:${tab === "subscriptions" ? source : "all"}`;
 }
 
-function buildFeedUrl(tab: TabKey, type: FeedContentFilter, timeframe: FeedTimeframe) {
+function buildFeedUrl(
+  tab: TabKey,
+  type: FeedContentFilter,
+  timeframe: FeedTimeframe,
+  source: SubscriptionFeedSource
+) {
   const params = new URLSearchParams(window.location.search);
   params.set("tab", tab);
   if (type === "all") {
@@ -59,6 +66,11 @@ function buildFeedUrl(tab: TabKey, type: FeedContentFilter, timeframe: FeedTimef
   } else {
     params.set("timeframe", timeframe);
   }
+  if (tab === "subscriptions" && source !== "all") {
+    params.set("source", source);
+  } else {
+    params.delete("source");
+  }
 
   const query = params.toString();
   return query ? `/?${query}` : "/";
@@ -68,7 +80,8 @@ async function fetchFeed(
   tab: TabKey,
   type: FeedContentFilter,
   timeframe: FeedTimeframe,
-  page: number
+  page: number,
+  source: SubscriptionFeedSource
 ): Promise<FeedResponse> {
   const params = new URLSearchParams();
   params.set("tab", tab);
@@ -76,6 +89,7 @@ async function fetchFeed(
   params.set("pageSize", "12");
   if (type !== "all") params.set("type", type);
   if (timeframe !== "all") params.set("timeframe", timeframe);
+  if (tab === "subscriptions") params.set("source", source);
 
   const response = await fetch(`/api/feed?${params.toString()}`, {
     cache: "no-store",
@@ -104,8 +118,10 @@ export default function PostsFeedTabs({
   initialTimeframe,
   initialPosts,
   initialHasMore,
+  initialSubscriptionSource = "all",
   showFollowingTab,
   showTopicsTab = false,
+  showSubscriptionsTab = false,
   activeDebate,
   peopleSuggestions,
   peopleSuggestionReason,
@@ -118,8 +134,10 @@ export default function PostsFeedTabs({
   initialTimeframe: FeedTimeframe;
   initialPosts: PostCardData[];
   initialHasMore: boolean;
+  initialSubscriptionSource?: SubscriptionFeedSource;
   showFollowingTab: boolean;
   showTopicsTab?: boolean;
+  showSubscriptionsTab?: boolean;
   activeDebate: DebateInterludeData | null;
   peopleSuggestions: {
     id: string;
@@ -136,8 +154,15 @@ export default function PostsFeedTabs({
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [typeFilter, setTypeFilter] = useState<FeedContentFilter>(initialType);
   const [timeframe, setTimeframe] = useState<FeedTimeframe>(initialTimeframe);
+  const [subscriptionSource, setSubscriptionSource] =
+    useState<SubscriptionFeedSource>(initialSubscriptionSource);
   const [feedCache, setFeedCache] = useState<Record<string, FeedCacheEntry>>(() => ({
-    [feedCacheKey(initialTab, initialType, initialTimeframe)]: {
+    [feedCacheKey(
+      initialTab,
+      initialType,
+      initialTimeframe,
+      initialSubscriptionSource
+    )]: {
       posts: initialPosts,
       hasMore: initialHasMore,
       page: 1,
@@ -152,6 +177,7 @@ export default function PostsFeedTabs({
   // adds a compact inline retry banner at the bottom.
   const [initialError, setInitialError] = useState(false);
   const [paginationError, setPaginationError] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const feedTopRef = useRef<HTMLDivElement | null>(null);
   const inFlightRef = useRef(new Map<string, Promise<FeedResponse>>());
@@ -159,10 +185,16 @@ export default function PostsFeedTabs({
   const loadMoreRequestRef = useRef(0);
 
   useEffect(() => {
-    const nextKey = feedCacheKey(initialTab, initialType, initialTimeframe);
+    const nextKey = feedCacheKey(
+      initialTab,
+      initialType,
+      initialTimeframe,
+      initialSubscriptionSource
+    );
     setActiveTab(initialTab);
     setTypeFilter(initialType);
     setTimeframe(initialTimeframe);
+    setSubscriptionSource(initialSubscriptionSource);
     setFeedCache((current) => ({
       ...current,
       [nextKey]: {
@@ -176,7 +208,14 @@ export default function PostsFeedTabs({
     setIsLoadingMore(false);
     setInitialError(false);
     setPaginationError(false);
-  }, [initialHasMore, initialPosts, initialTab, initialTimeframe, initialType]);
+  }, [
+    initialHasMore,
+    initialPosts,
+    initialSubscriptionSource,
+    initialTab,
+    initialTimeframe,
+    initialType,
+  ]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -198,12 +237,13 @@ export default function PostsFeedTabs({
     (
       nextTab: TabKey,
       nextType: FeedContentFilter,
-      nextTimeframe: FeedTimeframe
+      nextTimeframe: FeedTimeframe,
+      nextSource: SubscriptionFeedSource
     ) => {
       window.history.replaceState(
         null,
         "",
-        buildFeedUrl(nextTab, nextType, nextTimeframe)
+        buildFeedUrl(nextTab, nextType, nextTimeframe, nextSource)
       );
     },
     []
@@ -214,18 +254,28 @@ export default function PostsFeedTabs({
       nextTab: TabKey,
       nextType: FeedContentFilter,
       nextTimeframe: FeedTimeframe,
-      nextPage: number
+      nextPage: number,
+      nextSource: SubscriptionFeedSource
     ) => {
-      const key = feedCacheKey(nextTab, nextType, nextTimeframe);
+      const key = feedCacheKey(
+        nextTab,
+        nextType,
+        nextTimeframe,
+        nextSource
+      );
       const requestKey = `${key}:${nextPage}`;
       const existing = inFlightRef.current.get(requestKey);
       if (existing) return existing;
 
-      const request = fetchFeed(nextTab, nextType, nextTimeframe, nextPage).finally(
-        () => {
+      const request = fetchFeed(
+        nextTab,
+        nextType,
+        nextTimeframe,
+        nextPage,
+        nextSource
+      ).finally(() => {
           inFlightRef.current.delete(requestKey);
-        }
-      );
+        });
       inFlightRef.current.set(requestKey, request);
       return request;
     },
@@ -267,6 +317,7 @@ export default function PostsFeedTabs({
       nextTab: TabKey,
       nextType: FeedContentFilter,
       nextTimeframe: FeedTimeframe,
+      nextSource: SubscriptionFeedSource,
       {
         requestId,
         showError,
@@ -277,11 +328,22 @@ export default function PostsFeedTabs({
         showSkeleton: boolean;
       }
     ) => {
-      const key = feedCacheKey(nextTab, nextType, nextTimeframe);
+      const key = feedCacheKey(
+        nextTab,
+        nextType,
+        nextTimeframe,
+        nextSource
+      );
       if (showSkeleton) setIsSwitching(true);
       if (showError) setInitialError(false);
       try {
-        const result = await requestFeedPage(nextTab, nextType, nextTimeframe, 1);
+        const result = await requestFeedPage(
+          nextTab,
+          nextType,
+          nextTimeframe,
+          1,
+          nextSource
+        );
         writeFeedPage(key, result, 1, false);
       } catch {
         if (activeRequestRef.current === requestId && showError) {
@@ -320,8 +382,18 @@ export default function PostsFeedTabs({
   }, []);
 
   const updateState = useCallback(
-    (nextTab: TabKey, nextType: FeedContentFilter, nextTimeframe: FeedTimeframe) => {
-      const nextKey = feedCacheKey(nextTab, nextType, nextTimeframe);
+    (
+      nextTab: TabKey,
+      nextType: FeedContentFilter,
+      nextTimeframe: FeedTimeframe,
+      nextSource: SubscriptionFeedSource = subscriptionSource
+    ) => {
+      const nextKey = feedCacheKey(
+        nextTab,
+        nextType,
+        nextTimeframe,
+        nextSource
+      );
       const hasCachedFeed = Boolean(feedCache[nextKey]);
       const requestId = activeRequestRef.current + 1;
       activeRequestRef.current = requestId;
@@ -329,32 +401,38 @@ export default function PostsFeedTabs({
       setActiveTab(nextTab);
       setTypeFilter(nextType);
       setTimeframe(nextTimeframe);
+      setSubscriptionSource(nextSource);
       setInitialError(false);
       setPaginationError(false);
       setIsSwitching(!hasCachedFeed);
       scrollFeedToTop();
-      syncUrl(nextTab, nextType, nextTimeframe);
-      void reloadFeed(nextTab, nextType, nextTimeframe, {
+      syncUrl(nextTab, nextType, nextTimeframe, nextSource);
+      void reloadFeed(nextTab, nextType, nextTimeframe, nextSource, {
         requestId,
         showError: !hasCachedFeed,
         showSkeleton: !hasCachedFeed,
       });
     },
-    [feedCache, reloadFeed, scrollFeedToTop, syncUrl]
+    [feedCache, reloadFeed, scrollFeedToTop, subscriptionSource, syncUrl]
   );
 
   const retryInitial = useCallback(() => {
     const requestId = activeRequestRef.current + 1;
     activeRequestRef.current = requestId;
-    void reloadFeed(activeTab, typeFilter, timeframe, {
+    void reloadFeed(activeTab, typeFilter, timeframe, subscriptionSource, {
       requestId,
       showError: true,
       showSkeleton: true,
     });
-  }, [activeTab, typeFilter, timeframe, reloadFeed]);
+  }, [activeTab, typeFilter, timeframe, subscriptionSource, reloadFeed]);
 
   const loadMore = useCallback(async () => {
-    const key = feedCacheKey(activeTab, typeFilter, timeframe);
+    const key = feedCacheKey(
+      activeTab,
+      typeFilter,
+      timeframe,
+      subscriptionSource
+    );
     const currentFeed = feedCache[key];
     if (isSwitching || isLoadingMore || !currentFeed?.hasMore) return;
 
@@ -364,7 +442,13 @@ export default function PostsFeedTabs({
     setPaginationError(false);
     try {
       const nextPage = currentFeed.page + 1;
-      const result = await requestFeedPage(activeTab, typeFilter, timeframe, nextPage);
+      const result = await requestFeedPage(
+        activeTab,
+        typeFilter,
+        timeframe,
+        nextPage,
+        subscriptionSource
+      );
       writeFeedPage(key, result, nextPage, true);
     } catch {
       if (loadMoreRequestRef.current === requestId) {
@@ -381,13 +465,17 @@ export default function PostsFeedTabs({
     isLoadingMore,
     isSwitching,
     requestFeedPage,
+    subscriptionSource,
     timeframe,
     typeFilter,
     writeFeedPage,
   ]);
 
   useEffect(() => {
-    const currentFeed = feedCache[feedCacheKey(activeTab, typeFilter, timeframe)];
+    const currentFeed =
+      feedCache[
+        feedCacheKey(activeTab, typeFilter, timeframe, subscriptionSource)
+      ];
     if (!sentinelRef.current || !currentFeed?.hasMore || isSwitching) return;
 
     const observer = new IntersectionObserver(
@@ -401,9 +489,50 @@ export default function PostsFeedTabs({
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [activeTab, feedCache, isSwitching, loadMore, timeframe, typeFilter]);
+  }, [
+    activeTab,
+    feedCache,
+    isSwitching,
+    loadMore,
+    subscriptionSource,
+    timeframe,
+    typeFilter,
+  ]);
 
-  const activeKey = feedCacheKey(activeTab, typeFilter, timeframe);
+  // Track whether the control strip is currently pinned, so its bottom edge
+  // only appears while cards are actually passing beneath it -- a permanent
+  // shadow reads as a bar floating over nothing when the page is at rest.
+  //
+  // feedTopRef is the non-sticky marker just above the strip, so it leaves the
+  // viewport at exactly the moment the strip pins. Watching it costs one
+  // IntersectionObserver instead of a layout read on every scroll event.
+  useEffect(() => {
+    const anchor = feedTopRef.current;
+    if (!anchor || typeof IntersectionObserver === "undefined") return;
+
+    const navHeight =
+      Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--app-nav-height")
+      ) || 0;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry) setIsPinned(!entry.isIntersecting);
+      },
+      { rootMargin: `-${navHeight}px 0px 0px 0px`, threshold: 0 }
+    );
+
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, []);
+
+  const activeKey = feedCacheKey(
+    activeTab,
+    typeFilter,
+    timeframe,
+    subscriptionSource
+  );
   const currentFeed = feedCache[activeKey];
   const posts = currentFeed?.posts ?? EMPTY_POSTS;
   const hasMore = currentFeed?.hasMore ?? false;
@@ -450,10 +579,20 @@ export default function PostsFeedTabs({
     );
   } else if (activeTab === "topics") {
     emptyTitle = "No posts from your subscribed topics yet.";
-    emptyBody = "Subscribe to topics to build a feed around the subjects you care about.";
+    emptyBody =
+      "Subscribe to topics to build a feed around the subjects you care about.";
     emptyCta = (
       <Link href="/topics" className={CREATE_CTA_CLASS}>
         Explore topics
+      </Link>
+    );
+  } else if (activeTab === "subscriptions") {
+    emptyTitle = "No publications from your subscriptions yet.";
+    emptyBody =
+      "Subscribe to writers or topics to build a feed around the ideas you care about.";
+    emptyCta = (
+      <Link href="/subscriptions" className={CREATE_CTA_CLASS}>
+        Manage subscriptions
       </Link>
     );
   }
@@ -469,20 +608,36 @@ export default function PostsFeedTabs({
       {/* Tabs and filter chips pin together as one block. Splitting them let
           the chips slide up under the tabs, which read as the header breaking
           apart mid-scroll. Opaque (not bg-white/95) so cards passing beneath
-          don't ghost through the control strip. */}
+          don't ghost through the control strip.
+
+          The bottom edge only appears once pinned: without it a card sliding
+          under the strip looked sliced rather than layered. The border is
+          always in the box (transparent at rest) so gaining it costs no 1px
+          reflow. */}
       <div
-        className="sticky top-[var(--app-nav-height)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] bg-white px-4 pb-1 sm:mx-0 sm:w-full sm:px-0"
+        className={`sticky top-[var(--app-nav-height)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] border-b bg-white px-4 pb-1 transition-shadow duration-200 motion-reduce:transition-none sm:mx-0 sm:w-full sm:px-0 ${
+          isPinned
+            ? "border-gray-200 shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
+            : "border-transparent"
+        }`}
       >
         <div
           className="flex gap-1 overflow-x-auto overscroll-x-contain border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
           aria-label="Choose feed"
         >
-          {(["home", "following", "topics", "latest"] as const)
+          {([
+            "home",
+            "following",
+            "subscriptions",
+            "topics",
+            "latest",
+          ] as const)
             .filter(
               (tab) =>
                 (tab !== "following" || showFollowingTab) &&
-                (tab !== "topics" || showTopicsTab)
+                (tab !== "topics" || showTopicsTab) &&
+                (tab !== "subscriptions" || showSubscriptionsTab)
             )
             .map((tab) => {
               const label =
@@ -492,6 +647,8 @@ export default function PostsFeedTabs({
                     : "Discover"
                   : tab === "following"
                     ? "Following"
+                    : tab === "subscriptions"
+                      ? "Subscriptions"
                     : tab === "topics"
                       ? "Topics"
                       : "Latest";
@@ -515,6 +672,31 @@ export default function PostsFeedTabs({
               );
             })}
         </div>
+
+        {activeTab === "subscriptions" ? (
+          <div
+            className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            aria-label="Filter subscriptions"
+          >
+            {(["all", "authors", "topics"] as const).map((source) => (
+              <button
+                key={source}
+                type="button"
+                aria-pressed={subscriptionSource === source}
+                onClick={() =>
+                  updateState(activeTab, typeFilter, timeframe, source)
+                }
+                className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+                  subscriptionSource === source
+                    ? "border-emerald-brand bg-emerald-brand text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:text-emerald-800"
+                }`}
+              >
+                {source}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <FeedFilterChips
           type={typeFilter}

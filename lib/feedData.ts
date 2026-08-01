@@ -6,9 +6,21 @@ import {
   getPublicQualitySignals,
 } from "@/lib/postQuality";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
+import {
+  isAuthorSubscriptionsUxV2Enabled,
+  isTopicSubscriptionsEnabled,
+} from "@/lib/featureFlags";
+import type {
+  SubscriptionFeedSource,
+  SubscriptionMatchReason,
+} from "@/lib/publicationDelivery";
 
-export type FeedTabKey = "home" | "following" | "topics" | "latest";
+export type FeedTabKey =
+  | "home"
+  | "following"
+  | "subscriptions"
+  | "topics"
+  | "latest";
 export type FeedTimeframe = "all" | "week" | "month";
 export type FeedContentFilter = "all" | "post" | "article" | "research";
 
@@ -45,7 +57,9 @@ interface FeedOptions {
   userInterests: string[];
   userUniversity: string | null;
   followedIds: string[];
+  authorSubscriptionIds?: string[];
   topicSubscriptionKeys?: string[];
+  subscriptionSource?: SubscriptionFeedSource;
   excludedAuthorIds?: string[];
 }
 
@@ -55,7 +69,7 @@ type PublicFeedCacheInput = Pick<
 >;
 
 const POST_SELECT =
-  "id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
+  "id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, topic_keys, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
 
 function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   if (timeframe === "week") {
@@ -524,7 +538,9 @@ export async function fetchFeedPage({
   userInterests,
   userUniversity,
   followedIds,
+  authorSubscriptionIds,
   topicSubscriptionKeys,
+  subscriptionSource,
   excludedAuthorIds,
 }: FeedOptions): Promise<FeedPageResult> {
   const shouldUsePublicCache =
@@ -533,10 +549,12 @@ export async function fetchFeedPage({
     userInterests.length === 0 &&
     !userUniversity &&
     followedIds.length === 0 &&
+    (authorSubscriptionIds?.length ?? 0) === 0 &&
     (topicSubscriptionKeys?.length ?? 0) === 0 &&
     (excludedAuthorIds?.length ?? 0) === 0 &&
     tab !== "following" &&
-    tab !== "topics";
+    tab !== "topics" &&
+    tab !== "subscriptions";
 
   if (shouldUsePublicCache) {
     return fetchCachedPublicFeedPage({ tab, page, pageSize, type, timeframe });
@@ -553,7 +571,9 @@ export async function fetchFeedPage({
     userInterests,
     userUniversity,
     followedIds,
+    authorSubscriptionIds,
     topicSubscriptionKeys,
+    subscriptionSource,
     excludedAuthorIds,
   });
 }
@@ -569,7 +589,9 @@ async function fetchFeedPageUncached({
   userInterests,
   userUniversity,
   followedIds,
+  authorSubscriptionIds,
   topicSubscriptionKeys,
+  subscriptionSource = "all",
   excludedAuthorIds,
 }: FeedOptions): Promise<FeedPageResult> {
   const reader = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -617,28 +639,143 @@ async function fetchFeedPageUncached({
     return { posts, hasMore: raw.length > safePageSize };
   }
 
-  if (tab === "topics") {
+  if (tab === "topics" || tab === "subscriptions") {
+    const source = tab === "topics" ? "topics" : subscriptionSource;
     const subscribedTopics = topicSubscriptionKeys ?? [];
+    const subscribedAuthors = (authorSubscriptionIds ?? []).filter(
+      (id) => id !== userId && !excluded.includes(id)
+    );
+    const includeAuthors = source !== "topics" && subscribedAuthors.length > 0;
+    const includeTopics =
+      source !== "authors" &&
+      isTopicSubscriptionsEnabled() &&
+      subscribedTopics.length > 0;
     if (
       !userId ||
-      !isTopicSubscriptionsEnabled() ||
-      subscribedTopics.length === 0
+      (tab === "subscriptions" && !isAuthorSubscriptionsUxV2Enabled()) ||
+      (!includeAuthors && !includeTopics)
     ) {
       return { posts: [], hasMore: false };
     }
 
     const start = (safePage - 1) * safePageSize;
     const end = start + safePageSize;
-    const query = applyPostFilters(
-      reader.from("posts").select(POST_SELECT),
-      { type, cutoff, excludedAuthorIds: excluded }
-    );
-    const { data } = await query
-      .overlaps("topic_keys", subscribedTopics)
-      .order("published_at", { ascending: false })
-      .range(start, end);
+    const candidateLimit = end + safePageSize + 1;
+    const excludedWithSelf = Array.from(new Set([...excluded, userId]));
+    const rowsById = new Map<string, Record<string, unknown>>();
+    const matchedAuthorsByPost = new Map<string, Set<string>>();
+    const matchedTopicsByPost = new Map<string, string[]>();
 
-    const raw = data ?? [];
+    if (includeTopics) {
+      const query = applyPostFilters(
+        reader.from("posts").select(POST_SELECT),
+        { type, cutoff, excludedAuthorIds: excludedWithSelf }
+      );
+      const { data } = await query
+        .overlaps("topic_keys", subscribedTopics)
+        .order("published_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(candidateLimit);
+      for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+        const id = row.id as string;
+        rowsById.set(id, row);
+        matchedTopicsByPost.set(
+          id,
+          ((row.topic_keys as string[] | null) ?? []).filter((key) =>
+            subscribedTopics.includes(key)
+          )
+        );
+      }
+    }
+
+    if (includeAuthors) {
+      const primaryQuery = applyPostFilters(
+        reader.from("posts").select(POST_SELECT),
+        { type, cutoff, excludedAuthorIds: excludedWithSelf }
+      );
+      const [{ data: primaryRows }, { data: creditedRows }] = await Promise.all([
+        primaryQuery
+          .in("author_id", subscribedAuthors)
+          .order("published_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(candidateLimit),
+        reader
+          .from("post_authors")
+          .select("post_id, user_id")
+          .in("user_id", subscribedAuthors)
+          .not("accepted_at", "is", null)
+          .limit(candidateLimit * 2),
+      ]);
+
+      for (const row of (primaryRows ?? []) as Array<Record<string, unknown>>) {
+        const id = row.id as string;
+        rowsById.set(id, row);
+        matchedAuthorsByPost.set(id, new Set([row.author_id as string]));
+      }
+
+      const coauthorIds = Array.from(
+        new Set(
+          ((creditedRows ?? []) as Array<{ post_id: string }>).map(
+            (row) => row.post_id
+          )
+        )
+      );
+      if (coauthorIds.length > 0) {
+        const coauthorQuery = applyPostFilters(
+          reader.from("posts").select(POST_SELECT),
+          { type, cutoff, excludedAuthorIds: excludedWithSelf }
+        );
+        const { data: coauthoredRows } = await coauthorQuery
+          .in("id", coauthorIds)
+          .order("published_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(candidateLimit);
+        for (const row of (coauthoredRows ?? []) as Array<
+          Record<string, unknown>
+        >) {
+          rowsById.set(row.id as string, row);
+        }
+        for (const row of (creditedRows ?? []) as Array<{
+          post_id: string;
+          user_id: string;
+        }>) {
+          if (!rowsById.has(row.post_id)) continue;
+          const matches =
+            matchedAuthorsByPost.get(row.post_id) ?? new Set<string>();
+          matches.add(row.user_id);
+          matchedAuthorsByPost.set(row.post_id, matches);
+        }
+      }
+    }
+    const candidateIds = Array.from(rowsById.keys());
+    if (candidateIds.length > 0) {
+      const { data: viewerCredits } = await reader
+        .from("post_authors")
+        .select("post_id")
+        .eq("user_id", userId)
+        .not("accepted_at", "is", null)
+        .in("post_id", candidateIds);
+      for (const row of (viewerCredits ?? []) as Array<{ post_id: string }>) {
+        rowsById.delete(row.post_id);
+        matchedAuthorsByPost.delete(row.post_id);
+        matchedTopicsByPost.delete(row.post_id);
+      }
+    }
+
+    const orderedRows = Array.from(rowsById.values()).sort((left, right) => {
+      const leftDate =
+        (left.published_at as string | null) ??
+        (left.created_at as string | null) ??
+        "";
+      const rightDate =
+        (right.published_at as string | null) ??
+        (right.created_at as string | null) ??
+        "";
+      return (
+        rightDate.localeCompare(leftDate) ||
+        String(right.id).localeCompare(String(left.id))
+      );
+    });
     const rankingContext: RankingContext = {
       userId,
       followedIds: new Set(followedIds),
@@ -648,10 +785,40 @@ async function fetchFeedPageUncached({
     };
     const posts = await enrichPosts(
       reader,
-      raw.slice(0, safePageSize),
+      orderedRows.slice(start, end),
       rankingContext
     );
-    return { posts, hasMore: raw.length > safePageSize };
+    for (const post of posts) {
+      const authorIds = Array.from(matchedAuthorsByPost.get(post.id) ?? []);
+      const topicKeys = matchedTopicsByPost.get(post.id) ?? [];
+      const reasons: SubscriptionMatchReason[] = [];
+      for (const authorId of authorIds) {
+        const matchedProfile =
+          post.author_id === authorId
+            ? post.profiles
+            : post.co_authors?.find(
+                (coauthor) => coauthor.user_id === authorId
+              )?.profile;
+        reasons.push({
+          kind: "author",
+          key: authorId,
+          label:
+            matchedProfile?.full_name ??
+            matchedProfile?.username ??
+            "this author",
+        });
+      }
+      for (const key of topicKeys) {
+        const tag =
+          (post.tags ?? []).find(
+            (candidate) =>
+              candidate.trim().toLowerCase().replace(/\s+/g, " ") === key
+          ) ?? key;
+        reasons.push({ kind: "topic", key, label: tag });
+      }
+      post.subscription_match = { authorIds, topicKeys, reasons };
+    }
+    return { posts, hasMore: orderedRows.length > end };
   }
 
   if (tab === "latest") {

@@ -2,19 +2,31 @@
 
 import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
+import {
+  isAuthorSubscriptionsEnabled,
+  isAuthorSubscriptionsUxV2Enabled,
+} from "@/lib/featureFlags";
 import { setAuthorSubscription, toggleFollow } from "@/components/ui/followActions";
+import AuthorRelationshipControlsV2 from "./AuthorRelationshipControlsV2";
+import type {
+  AuthorRelationshipSurface,
+  AuthorRelationshipVariant,
+} from "@/lib/publicationDelivery";
 
 interface Props {
   authorId: string;
+  authorName?: string;
   currentUserId: string | null;
   initialFollowing: boolean;
   initialSubscribed?: boolean;
   compact?: boolean;
+  variant?: AuthorRelationshipVariant;
+  source?: AuthorRelationshipSurface;
+  postId?: string | null;
   className?: string;
 }
 
-export default function AuthorRelationshipControls({
+function LegacyAuthorRelationshipControls({
   authorId,
   currentUserId,
   initialFollowing,
@@ -160,5 +172,13 @@ export default function AuthorRelationshipControls({
         </p>
       ) : null}
     </div>
+  );
+}
+
+export default function AuthorRelationshipControls(props: Props) {
+  return isAuthorSubscriptionsUxV2Enabled() ? (
+    <AuthorRelationshipControlsV2 {...props} />
+  ) : (
+    <LegacyAuthorRelationshipControls {...props} />
   );
 }

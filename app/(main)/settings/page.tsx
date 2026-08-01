@@ -14,6 +14,7 @@ import SubscribedTopicsManager, {
 import PrivacyForm, { type PrivacySettings } from "./PrivacyForm";
 import {
   isAuthorSubscriptionsEnabled,
+  isAuthorSubscriptionsUxV2Enabled,
   isTopicSubscriptionsEnabled,
 } from "@/lib/featureFlags";
 
@@ -240,12 +241,38 @@ export default async function SettingsPage({ searchParams }: PageProps) {
         {tab === "account" && <AccountForm email={user.email!} />}
         {tab === "notifications" && (
           <>
-            {isAuthorSubscriptionsEnabled() ? (
-              <SubscribedAuthorsManager initialAuthors={subscribedAuthors} />
-            ) : null}
-            {isTopicSubscriptionsEnabled() ? (
-              <SubscribedTopicsManager initialTopics={subscribedTopics} />
-            ) : null}
+            {isAuthorSubscriptionsUxV2Enabled() ? (
+              <section className="mb-6 border-b border-gray-100 pb-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                  Publication subscriptions
+                </p>
+                <h2 className="mt-1 text-base font-semibold text-gray-900">
+                  {subscribedAuthors.length} writer
+                  {subscribedAuthors.length === 1 ? "" : "s"} ·{" "}
+                  {subscribedTopics.length} topic
+                  {subscribedTopics.length === 1 ? "" : "s"}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-gray-500">
+                  In-app delivery is always on. Manage who and what you
+                  subscribe to on one dedicated page.
+                </p>
+                <Link
+                  href="/subscriptions"
+                  className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-gray-200 px-4 text-sm font-semibold text-gray-700 hover:border-emerald-300 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                >
+                  Manage subscriptions
+                </Link>
+              </section>
+            ) : (
+              <>
+                {isAuthorSubscriptionsEnabled() ? (
+                  <SubscribedAuthorsManager initialAuthors={subscribedAuthors} />
+                ) : null}
+                {isTopicSubscriptionsEnabled() ? (
+                  <SubscribedTopicsManager initialTopics={subscribedTopics} />
+                ) : null}
+              </>
+            )}
             <NotificationsForm
               profileId={profile.id}
               notificationPrefs={notifPrefs}

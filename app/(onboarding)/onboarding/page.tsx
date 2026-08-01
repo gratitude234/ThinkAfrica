@@ -717,7 +717,16 @@ export default function OnboardingPage() {
                         ) : null}
                       </div>
                       {userId ? (
-                        <FollowButton followerId={userId} followingId={profile.id} />
+                        <FollowButton
+                          followerId={userId}
+                          followingId={profile.id}
+                          authorName={
+                            profile.full_name ??
+                            profile.username ??
+                            "this author"
+                          }
+                          source="onboarding"
+                        />
                       ) : null}
                     </div>
                   ))}

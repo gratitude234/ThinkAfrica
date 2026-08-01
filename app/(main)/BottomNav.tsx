@@ -4,7 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CreateLauncher from "./CreateLauncher";
 import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
-import { shouldShowMobilePrimaryNav } from "./mobileNavigation";
+import { shouldShowMobilePrimaryNav } from "./navRoutes";
+import {
+  DebatesIcon,
+  ExploreIcon,
+  HomeIcon,
+  MessagesIcon,
+  NAV_MATCH_PREFIXES,
+  ProfileIcon,
+  isAccountNavActive,
+  isNavItemActive,
+} from "./navItems";
 
 interface BottomNavProps {
   username: string | null;
@@ -38,29 +48,12 @@ export default function BottomNav({
     return null;
   }
 
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
-  const isExploreActive =
-    pathname === "/explore" ||
-    pathname.startsWith("/explore/") ||
-    pathname === "/discover" ||
-    pathname.startsWith("/discover/");
+  const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
+  const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
+  const isDebatesActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates);
+  const isMessagesActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.messages);
   const profileHref = userId ? "/me" : "/signup";
-  const resolvedProfileHref = username ? `/${username}` : "/settings";
-  const profileActive = userId
-    ? pathname === profileHref ||
-      pathname.startsWith(`${profileHref}/`) ||
-      pathname === "/dashboard" ||
-      pathname.startsWith("/dashboard/") ||
-      pathname === "/bookmarks" ||
-      pathname.startsWith("/bookmarks/") ||
-      pathname === "/settings" ||
-      pathname.startsWith("/settings/") ||
-      (username
-        ? pathname === resolvedProfileHref ||
-          pathname.startsWith(`${resolvedProfileHref}/`)
-        : false)
-    : pathname === "/signup";
+  const profileActive = isAccountNavActive(pathname, { userId, username });
   const profileLabel = userId ? "Me" : "Join";
 
   return (
@@ -79,23 +72,11 @@ export default function BottomNav({
         <div className="flex h-[60px] items-center justify-around px-2">
           <Link
             href="/"
-            className={navLinkClass(isActive("/"))}
-            aria-current={isActive("/") ? "page" : undefined}
+            className={navLinkClass(isHomeActive)}
+            aria-current={isHomeActive ? "page" : undefined}
           >
-            <span className={navPillClass(isActive("/"))}>
-              <svg
-                className="h-[22px] w-[22px]"
-                fill={isActive("/") ? "currentColor" : "none"}
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 10.75L12 3l9 7.75V21H14.75v-5.5h-5.5V21H3V10.75z"
-                />
-              </svg>
+            <span className={navPillClass(isHomeActive)}>
+              <HomeIcon className="h-[22px] w-[22px]" filled={isHomeActive} />
               <span className="whitespace-nowrap text-[11px] font-medium">Home</span>
             </span>
           </Link>
@@ -106,45 +87,19 @@ export default function BottomNav({
             aria-current={isExploreActive ? "page" : undefined}
           >
             <span className={navPillClass(isExploreActive)}>
-              <svg
-                className="h-[22px] w-[22px]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
-                />
-              </svg>
+              <ExploreIcon className="h-[22px] w-[22px]" />
               <span className="whitespace-nowrap text-[11px] font-medium">Explore</span>
             </span>
           </Link>
 
           <Link
             href="/debates"
-            className={navLinkClass(isActive("/debates"))}
-            aria-current={isActive("/debates") ? "page" : undefined}
+            className={navLinkClass(isDebatesActive)}
+            aria-current={isDebatesActive ? "page" : undefined}
           >
-            <span className={navPillClass(isActive("/debates"))}>
+            <span className={navPillClass(isDebatesActive)}>
               <div className="relative">
-                {/* Balance scale rather than a speech bubble: Messages sits
-                    next to this and already owns the bubble. */}
-                <svg
-                  className="h-[22px] w-[22px]"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 4v16m-7-3h14M5 7l-2 6h4L5 7zm14 0l-2 6h4l-2-6zM7 5h10"
-                  />
-                </svg>
+                <DebatesIcon className="h-[22px] w-[22px]" />
                 {hasActiveDebate ? (
                   <span
                     aria-hidden="true"
@@ -163,24 +118,15 @@ export default function BottomNav({
 
           <Link
             href="/messages"
-            className={navLinkClass(isActive("/messages"))}
-            aria-current={isActive("/messages") ? "page" : undefined}
+            className={navLinkClass(isMessagesActive)}
+            aria-current={isMessagesActive ? "page" : undefined}
           >
-            <span className={navPillClass(isActive("/messages"))}>
+            <span className={navPillClass(isMessagesActive)}>
               <div className="relative">
-                <svg
+                <MessagesIcon
                   className="h-[22px] w-[22px]"
-                  fill={isActive("/messages") ? "currentColor" : "none"}
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z"
-                  />
-                </svg>
+                  filled={isMessagesActive}
+                />
                 {userId ? (
                   <MessagesUnreadBadge userId={userId} className="-right-1.5 -top-1.5" />
                 ) : null}
@@ -195,19 +141,7 @@ export default function BottomNav({
             aria-current={profileActive ? "page" : undefined}
           >
             <span className={navPillClass(profileActive)}>
-              <svg
-                className="h-[22px] w-[22px]"
-                fill={profileActive ? "currentColor" : "none"}
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M20 21a8 8 0 10-16 0m12-11a4 4 0 11-8 0 4 4 0 018 0z"
-                />
-              </svg>
+              <ProfileIcon className="h-[22px] w-[22px]" filled={profileActive} />
               <span className="whitespace-nowrap text-[11px] font-medium">{profileLabel}</span>
             </span>
           </Link>

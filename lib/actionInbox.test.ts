@@ -34,3 +34,26 @@ describe("Debate V1.5 action inbox notifications", () => {
     });
   });
 });
+
+describe("publication subscription notifications", () => {
+  it("keeps unread publications out of Needs attention", () => {
+    const summary = getActionInboxSummary([
+      {
+        id: "publication-alert",
+        type: "author_published",
+        read: false,
+        created_at: new Date().toISOString(),
+        message: "Ama published a new article",
+        link: "/r/p/token",
+      },
+    ]);
+
+    expect(summary.primaryAction).toBeNull();
+    expect(summary.unreadActionCount).toBe(0);
+    expect(summary.items[0]).toMatchObject({
+      category: "subscriptions",
+      requiresAction: false,
+      href: "/r/p/token",
+    });
+  });
+});

@@ -9,7 +9,9 @@ import NavUserMenu from "./NavUserMenu";
 import CreateLauncher from "./CreateLauncher";
 import NotificationBell from "@/components/ui/NotificationBell";
 import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
-import { shouldShowMobilePrimaryNav } from "./mobileNavigation";
+import { shouldShowMobilePrimaryNav } from "./navRoutes";
+import { NAV_MATCH_PREFIXES, isNavItemActive } from "./navItems";
+import { useHasScrolled } from "@/lib/useHasScrolled";
 
 interface NavClientProps {
   user: User | null;
@@ -61,6 +63,9 @@ export default function NavClient({
 }: NavClientProps) {
   const pathname = usePathname();
   const navRef = useRef<HTMLDivElement>(null);
+  // Once content is moving beneath the pinned nav, a flat bar reads as painted
+  // on rather than floating above the page.
+  const hasScrolled = useHasScrolled();
 
   // Publish the real rendered height of the sticky nav as --app-nav-height so
   // sticky sub-headers (debate rooms, feed tabs) can pin flush beneath it.
@@ -91,16 +96,13 @@ export default function NavClient({
     return () => observer.disconnect();
   }, []);
 
-  const isHomeActive = pathname === "/";
-  const isExploreActive =
-    pathname === "/explore" ||
-    pathname.startsWith("/explore/") ||
-    pathname === "/discover" ||
-    pathname.startsWith("/discover/");
-  const isDebatesActive =
-    pathname === "/debates" || pathname.startsWith("/debates/");
-  const isOpportunitiesActive =
-    pathname === "/opportunities" || pathname.startsWith("/opportunities/");
+  const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
+  const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
+  const isDebatesActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates);
+  const isOpportunitiesActive = isNavItemActive(
+    pathname,
+    NAV_MATCH_PREFIXES.opportunities
+  );
   const isWriteActive = pathname.startsWith("/write");
   const showMobilePrimaryNav = shouldShowMobilePrimaryNav(pathname);
   const messagesHref = user
@@ -108,14 +110,20 @@ export default function NavClient({
     : `/login?redirectTo=${encodeURIComponent("/messages")}`;
 
   return (
-    <div ref={navRef} className="sticky top-0 z-50">
+    <>
+      {/* Outside the sticky wrapper: the positioning statement greets you at the
+          top of the page, but it never changes, so pinning it cost 36px of
+          vertical space on every screen and every scroll. */}
       <div className="bg-emerald-brand py-1.5 text-center">
         <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold sm:text-[10.5px]">
           Africa&apos;s intellectual social network
         </span>
       </div>
+      <div ref={navRef} className="sticky top-0 z-50">
       <nav
-        className="h-[60px] border-b border-gray-200 bg-white"
+        className={`h-[60px] border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
+          hasScrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
+        }`}
         aria-label="Primary navigation"
       >
       <div className="mx-auto flex h-full max-w-[1240px] items-center gap-7 px-4 sm:px-6 lg:px-8">
@@ -127,7 +135,9 @@ export default function NavClient({
           </Link>
 
           <div className="hidden min-w-0 flex-1 items-center gap-7 md:flex">
-            <div className="flex items-center gap-1">
+            {/* At xl the side rail owns these destinations, so the top bar drops
+                them and hands the space to search. */}
+            <div className="flex items-center gap-1 xl:hidden">
               <Link
                 href="/"
                 className={navItemClass(isHomeActive)}
@@ -161,7 +171,10 @@ export default function NavClient({
             <button
               type="button"
               onClick={onOpenSearch}
-              className="ml-auto hidden min-h-11 w-full max-w-[340px] items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3.5 py-2 text-[13px] text-ink-muted transition-colors hover:border-gray-300 hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 lg:flex"
+              // xl:ml-0 cancels the ml-auto that pushes search right of the nav
+              // links; without it, dropping the links at xl would strand the
+              // field on the right with a hole after the wordmark.
+              className="ml-auto hidden min-h-11 w-full max-w-[340px] items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3.5 py-2 text-[13px] text-ink-muted transition-colors hover:border-gray-300 hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 lg:flex xl:ml-0 xl:max-w-[520px]"
               aria-label="Open search"
             >
               <svg
@@ -212,6 +225,7 @@ export default function NavClient({
           </div>
       </div>
       </nav>
-    </div>
+      </div>
+    </>
   );
 }

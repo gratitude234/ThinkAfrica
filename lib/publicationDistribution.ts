@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml, sendUserEmail, type EmailSendResult } from "@/lib/email";
 import {
   isAuthorSubscriptionsEnabled,
+  isAuthorSubscriptionsUxV2Enabled,
   isTopicSubscriptionsEnabled,
 } from "@/lib/featureFlags";
 import {
@@ -17,6 +18,8 @@ import {
   summarizePublicationFunnel,
   topicPublicationNotificationCopy,
   type AuthorSubscriptionRecord,
+  type AuthorSubscriberGrowth,
+  type AuthorSubscriptionAcquisitionRow,
   type FunnelDeliveryRecord,
   type PublicationDeliveryChannel,
   type PublicationFunnelRow,
@@ -710,4 +713,125 @@ export async function getAuthorPublicationFunnel(authorId: string): Promise<{
     );
 
   return { activeSubscriberCount: activeSubscriberCount ?? 0, rows };
+}
+
+export async function getAuthorSubscriberGrowth(authorId: string): Promise<{
+  growth: AuthorSubscriberGrowth;
+  acquisition: AuthorSubscriptionAcquisitionRow[];
+}> {
+  const empty: AuthorSubscriberGrowth = {
+    activeSubscribers: 0,
+    gained7d: 0,
+    lost7d: 0,
+    net7d: 0,
+    gained30d: 0,
+    lost30d: 0,
+    net30d: 0,
+    trackingSince: null,
+    daily: [],
+  };
+  if (!isAuthorSubscriptionsUxV2Enabled()) {
+    return { growth: empty, acquisition: [] };
+  }
+
+  const admin = createAdminClient();
+  const now = new Date();
+  const thirtyDaysAgo = new Date(
+    now.getTime() - 29 * 24 * 60 * 60 * 1000
+  );
+  thirtyDaysAgo.setUTCHours(0, 0, 0, 0);
+  const sevenDaysAgo = new Date(
+    now.getTime() - 7 * 24 * 60 * 60 * 1000
+  ).toISOString();
+  const [{ count }, eventsResult, firstEventResult] = await Promise.all([
+    admin
+      .from("author_subscriptions")
+      .select("*", { count: "exact", head: true })
+      .eq("author_id", authorId),
+    admin
+      .from("author_subscription_events")
+      .select("event_type, source_post_id, created_at")
+      .eq("author_id", authorId)
+      .gte("created_at", thirtyDaysAgo.toISOString())
+      .order("created_at", { ascending: true }),
+    admin
+      .from("author_subscription_events")
+      .select("created_at")
+      .eq("author_id", authorId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (eventsResult.error || firstEventResult.error) {
+    return {
+      growth: { ...empty, activeSubscribers: count ?? 0 },
+      acquisition: [],
+    };
+  }
+
+  const events = (eventsResult.data ?? []) as Array<{
+    event_type: "subscribed" | "unsubscribed";
+    source_post_id: string | null;
+    created_at: string;
+  }>;
+  const daily = new Map<
+    string,
+    { date: string; gained: number; lost: number; net: number }
+  >();
+  for (let offset = 0; offset < 30; offset += 1) {
+    const date = new Date(thirtyDaysAgo.getTime() + offset * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    daily.set(date, { date, gained: 0, lost: 0, net: 0 });
+  }
+
+  const acquisitionMap = new Map<string, number>();
+  for (const event of events) {
+    const date = event.created_at.slice(0, 10);
+    const bucket = daily.get(date);
+    if (bucket) {
+      if (event.event_type === "subscribed") bucket.gained += 1;
+      else bucket.lost += 1;
+      bucket.net = bucket.gained - bucket.lost;
+    }
+    if (event.event_type === "subscribed" && event.source_post_id) {
+      acquisitionMap.set(
+        event.source_post_id,
+        (acquisitionMap.get(event.source_post_id) ?? 0) + 1
+      );
+    }
+  }
+
+  const gained30d = events.filter(
+    (event) => event.event_type === "subscribed"
+  ).length;
+  const lost30d = events.length - gained30d;
+  const recent = events.filter((event) => event.created_at >= sevenDaysAgo);
+  const gained7d = recent.filter(
+    (event) => event.event_type === "subscribed"
+  ).length;
+  const lost7d = recent.length - gained7d;
+
+  return {
+    growth: {
+      activeSubscribers: count ?? 0,
+      gained7d,
+      lost7d,
+      net7d: gained7d - lost7d,
+      gained30d,
+      lost30d,
+      net30d: gained30d - lost30d,
+      trackingSince:
+        (firstEventResult.data?.created_at as string | undefined) ?? null,
+      daily: [...daily.values()].filter(
+        (row) =>
+          !firstEventResult.data?.created_at ||
+          row.date >= String(firstEventResult.data.created_at).slice(0, 10)
+      ),
+    },
+    acquisition: [...acquisitionMap.entries()].map(
+      ([postId, subscribersGained]) => ({ postId, subscribersGained })
+    ),
+  };
 }

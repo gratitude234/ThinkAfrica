@@ -255,9 +255,11 @@ export default function ProfileHeader({
               <>
                 <AuthorRelationshipControls
                   authorId={profile.id}
+                  authorName={displayName}
                   currentUserId={currentUserId}
                   initialFollowing={initialFollowing}
                   initialSubscribed={initialSubscribed}
+                  source="profile"
                   className="mt-0"
                 />
                 <div className="flex gap-2">

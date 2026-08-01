@@ -1,23 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import BrandWordmark from "@/components/ui/BrandWordmark";
+import { useHasScrolled } from "@/lib/useHasScrolled";
 
 export default function LandingNav() {
-  const [scrolled, setScrolled] = useState(false);
+  const scrolled = useHasScrolled();
   const navLinks = [
     { label: "Explore", href: "/explore" },
     { label: "Debates", href: "/debates" },
     { label: "Opportunities", href: "/opportunities" },
     { label: "About", href: "/about" },
   ];
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   return (
     <div className="sticky top-0 z-50">
@@ -27,7 +21,7 @@ export default function LandingNav() {
         </span>
       </div>
       <nav
-        className={`border-b border-gray-200 bg-white transition-shadow duration-300 ${
+        className={`border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
           scrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
         }`}
       >

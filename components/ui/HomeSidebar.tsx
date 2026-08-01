@@ -151,7 +151,14 @@ function PeopleCard({ people, currentUserId }: { people: SuggestedPerson[]; curr
               <Link href={`/${person.username}`} className="block truncate text-[12.5px] font-semibold text-ink hover:text-emerald-700">{person.full_name ?? person.username}</Link>
               {person.university ? <p className="truncate text-[10.5px] text-gray-500">{person.university}</p> : null}
             </div>
-            {currentUserId ? <FollowButton followerId={currentUserId} followingId={person.id} /> : <Link href={`/${person.username}`} className="text-[11px] font-semibold text-emerald-700">View</Link>}
+            {currentUserId ? (
+              <FollowButton
+                followerId={currentUserId}
+                followingId={person.id}
+                authorName={person.full_name ?? person.username}
+                source="home_suggestion"
+              />
+            ) : <Link href={`/${person.username}`} className="text-[11px] font-semibold text-emerald-700">View</Link>}
           </div>
         ))}
       </div>

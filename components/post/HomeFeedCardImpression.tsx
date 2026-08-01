@@ -13,7 +13,7 @@ export default function HomeFeedCardImpression({
 }: {
   post: PostCardData;
   currentUserId: string | null;
-  surface: "home" | "following" | "topics" | "latest";
+  surface: "home" | "following" | "subscriptions" | "topics" | "latest";
   priority?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);

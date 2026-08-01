@@ -6,6 +6,7 @@ import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
 import { shouldUseRealtime } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
+import { markNotificationRead } from "@/lib/notificationRead";
 
 interface Notification {
   id: string;
@@ -14,6 +15,15 @@ interface Notification {
   read: boolean;
   link: string | null;
   created_at: string;
+  post_id?: string | null;
+  post_title?: string | null;
+  post_slug?: string | null;
+  post_content_kind?: string | null;
+  actor?: {
+    full_name: string | null;
+    username: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 function timeAgo(dateString: string): string {
@@ -92,13 +102,40 @@ export default function NotificationBell({ userId }: { userId: string }) {
   const fetchNotifications = useCallback(async () => {
     const { data } = await supabase
       .from("notifications")
-      .select("*")
+      .select(
+        "id, type, message, read, link, created_at, post_id, actor:profiles!notifications_actor_id_fkey(full_name, username, avatar_url), post:posts!notifications_post_id_fkey(title, slug, content_kind)"
+      )
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(10);
 
     if (data) {
-      setNotifications(data as Notification[]);
+      setNotifications(
+        (data as Array<Record<string, unknown>>).map((row) => {
+          const rawActor = row.actor as Notification["actor"] | Notification["actor"][];
+          const rawPost = row.post as
+            | { title: string | null; slug: string; content_kind: string | null }
+            | Array<{ title: string | null; slug: string; content_kind: string | null }>
+            | null;
+          const actor = Array.isArray(rawActor) ? rawActor[0] ?? null : rawActor;
+          const post = Array.isArray(rawPost) ? rawPost[0] ?? null : rawPost;
+          return {
+            id: row.id as string,
+            type: row.type as string,
+            message: (row.message as string | null) ?? null,
+            read: Boolean(row.read),
+            link:
+              (row.link as string | null) ??
+              (post?.slug ? `/post/${post.slug}` : null),
+            created_at: row.created_at as string,
+            post_id: (row.post_id as string | null) ?? null,
+            post_title: post?.title ?? null,
+            post_slug: post?.slug ?? null,
+            post_content_kind: post?.content_kind ?? null,
+            actor,
+          };
+        })
+      );
     }
   }, [supabase, userId]);
 
@@ -199,7 +236,24 @@ export default function NotificationBell({ userId }: { userId: string }) {
     });
   }
 
+  function openNotification(notification: Notification) {
+    trackOpen(notification);
+    if (notification.read) return;
+    setNotifications((current) =>
+      current.map((item) =>
+        item.id === notification.id ? { ...item, read: true } : item
+      )
+    );
+    void markNotificationRead(notification.id).catch(() => {
+      void fetchNotifications();
+    });
+  }
+
   function trackAction(item: ActionInboxItem) {
+    const notification = notifications.find(
+      (candidate) => candidate.id === item.notificationId
+    );
+    if (notification) openNotification(notification);
     trackActivationEvent({
       event: "next_action_clicked",
       metadata: {
@@ -211,15 +265,6 @@ export default function NotificationBell({ userId }: { userId: string }) {
         postId: item.postId,
       },
     });
-    trackActivationEvent({
-      event: "notification_opened",
-      metadata: {
-        notificationId: item.notificationId,
-        type: item.type,
-        source: "notification_bell",
-        postId: item.postId,
-      },
-    });
   }
 
   return (
@@ -227,7 +272,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="relative flex h-[34px] w-[34px] items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-canvas hover:text-ink"
+        className="relative flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         aria-label="Notifications"
       >
         <svg
@@ -251,7 +296,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-gray-200 bg-white shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-gray-200 bg-white shadow-lg">
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
             <span className="text-sm font-semibold text-gray-900">Notifications</span>
             {unreadCount > 0 ? (
@@ -307,10 +352,26 @@ export default function NotificationBell({ userId }: { userId: string }) {
                 {notifications.map((notification) => {
                 const inner = (
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600">
-                      {TYPE_ICONS[notification.type] ?? "N"}
-                    </span>
+                    {notification.actor?.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={notification.actor.avatar_url}
+                        alt=""
+                        className="mt-0.5 h-8 w-8 flex-shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600">
+                        {TYPE_ICONS[notification.type] ?? "N"}
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
+                      {(notification.type === "author_published" ||
+                        notification.type === "topic_published") &&
+                      notification.post_content_kind ? (
+                        <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                          {notification.post_content_kind}
+                        </p>
+                      ) : null}
                       <p className="text-sm leading-snug text-gray-700">
                         {notificationText(notification)}
                       </p>
@@ -335,7 +396,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
                       <Link
                         href={notification.link}
                         onClick={() => {
-                          trackOpen(notification);
+                          openNotification(notification);
                           setOpen(false);
                         }}
                       >

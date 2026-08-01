@@ -12,7 +12,10 @@ import {
   type SuggestedPerson,
 } from "@/lib/suggestedPeople";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
+import {
+  isAuthorSubscriptionsUxV2Enabled,
+  isTopicSubscriptionsEnabled,
+} from "@/lib/featureFlags";
 import { normalizeTagValue } from "@/lib/tags";
 
 export type DiscoverTab = "for-you" | "trending" | "citable" | "topics" | "people";
@@ -27,6 +30,7 @@ export interface DiscoverPerson extends SuggestedPerson {
   points: number | null;
   field_of_study: string | null;
   followed: boolean;
+  subscribed: boolean;
 }
 
 export interface DiscoverDebate {
@@ -167,6 +171,7 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
       followedIds: [] as string[],
       blockedIds: [] as string[],
       topicSubscriptionKeys: [] as string[],
+      authorSubscriptionIds: [] as string[],
     };
   }
 
@@ -177,12 +182,20 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
         .eq("subscriber_id", userId)
         .limit(1000)
     : Promise.resolve({ data: [] as Array<{ topic_key: string }> });
+  const authorSubscriptionsPromise = isAuthorSubscriptionsUxV2Enabled()
+    ? supabase
+        .from("author_subscriptions")
+        .select("author_id")
+        .eq("subscriber_id", userId)
+        .limit(1000)
+    : Promise.resolve({ data: [] as Array<{ author_id: string }> });
 
   const [
     { data: profile },
     { data: follows },
     { data: blocks },
     { data: topicSubscriptions },
+    { data: authorSubscriptions },
   ] =
     await Promise.all([
       supabase
@@ -201,6 +214,7 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
         .eq("blocker_id", userId)
         .limit(1000),
       topicSubscriptionsPromise,
+      authorSubscriptionsPromise,
     ]);
 
   const profileRow = profile as ProfileRow | null;
@@ -216,6 +230,9 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
     topicSubscriptionKeys: (
       (topicSubscriptions ?? []) as Array<{ topic_key: string }>
     ).map((row) => row.topic_key),
+    authorSubscriptionIds: (
+      (authorSubscriptions ?? []) as Array<{ author_id: string }>
+    ).map((row) => row.author_id),
   };
 }
 
@@ -326,14 +343,17 @@ async function getPeople(
     userUniversity,
     fieldOfStudy,
     followedIds,
+    authorSubscriptionIds,
   }: {
     userId: string | null;
     userUniversity: string | null;
     fieldOfStudy: string | null;
     followedIds: string[];
+    authorSubscriptionIds: string[];
   }
 ): Promise<{ people: DiscoverPerson[]; reason: string }> {
   const followed = new Set(followedIds);
+  const subscribed = new Set(authorSubscriptionIds);
 
   if (userId) {
     const result = await getSuggestedPeople(supabase, {
@@ -350,6 +370,7 @@ async function getPeople(
         points: null,
         field_of_study: null,
         followed: false,
+        subscribed: false,
       })),
     };
   }
@@ -370,6 +391,7 @@ async function getPeople(
         points: person.points,
         field_of_study: person.field_of_study,
         followed: followed.has(person.id),
+        subscribed: subscribed.has(person.id),
       })),
     };
   }
@@ -393,6 +415,7 @@ async function getPeople(
         points: person.points,
         field_of_study: person.field_of_study,
         followed: followed.has(person.id),
+        subscribed: subscribed.has(person.id),
       })),
   };
 }
@@ -726,6 +749,7 @@ export async function getDiscoverData(
       userUniversity: userContext.university,
       fieldOfStudy: userContext.fieldOfStudy,
       followedIds: userContext.followedIds,
+      authorSubscriptionIds: userContext.authorSubscriptionIds,
     }),
     getDebateHighlights(supabase),
     getFellowships(supabase),

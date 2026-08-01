@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getBlockedUserIds } from "@/lib/blocking";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
+import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
 
 interface Props {
   tab: string;
@@ -19,9 +20,12 @@ interface Props {
   userInterests: string[];
   userUniversity: string | null;
   followedIds: string[];
+  authorSubscriptionIds: string[];
   topicSubscriptionKeys: string[];
+  subscriptionSource: SubscriptionFeedSource;
   showFollowingEligible: boolean;
   showTopicsEligible: boolean;
+  showSubscriptionsEligible: boolean;
   activeDebate: DebateInterludeData | null;
   peopleSuggestions: {
     id: string;
@@ -38,9 +42,13 @@ interface Props {
 function getInitialTab(
   tab: string,
   showFollowingEligible: boolean,
-  showTopicsEligible: boolean
+  showTopicsEligible: boolean,
+  showSubscriptionsEligible: boolean
 ): FeedTabKey {
   if (tab === "following" && showFollowingEligible) return "following";
+  if (tab === "subscriptions" && showSubscriptionsEligible) {
+    return "subscriptions";
+  }
   if (tab === "topics" && showTopicsEligible) return "topics";
   if (tab === "latest") return "latest";
   return "home";
@@ -63,9 +71,12 @@ export default async function PostsFeedSection({
   userInterests,
   userUniversity,
   followedIds,
+  authorSubscriptionIds,
   topicSubscriptionKeys,
+  subscriptionSource,
   showFollowingEligible,
   showTopicsEligible,
+  showSubscriptionsEligible,
   activeDebate,
   peopleSuggestions,
   peopleSuggestionReason,
@@ -76,7 +87,8 @@ export default async function PostsFeedSection({
   const initialTab = getInitialTab(
     tab,
     showFollowingEligible,
-    showTopicsEligible
+    showTopicsEligible,
+    showSubscriptionsEligible
   );
   const initialType = getInitialType(type);
   const initialTimeframe = getInitialTimeframe(timeframe);
@@ -93,7 +105,9 @@ export default async function PostsFeedSection({
     userInterests,
     userUniversity,
     followedIds,
+    authorSubscriptionIds,
     topicSubscriptionKeys,
+    subscriptionSource,
     excludedAuthorIds,
   });
 
@@ -106,6 +120,8 @@ export default async function PostsFeedSection({
       initialHasMore={initialFeed.hasMore}
       showFollowingTab={showFollowingEligible}
       showTopicsTab={showTopicsEligible}
+      showSubscriptionsTab={showSubscriptionsEligible}
+      initialSubscriptionSource={subscriptionSource}
       activeDebate={activeDebate}
       peopleSuggestions={peopleSuggestions}
       peopleSuggestionReason={peopleSuggestionReason}

@@ -7,9 +7,14 @@ import PointsTierBadge from "@/components/ui/PointsTierBadge";
 import { formatDate, getPointTier, getNextTier } from "@/lib/utils";
 import {
   isAuthorSubscriptionsEnabled,
+  isAuthorSubscriptionsUxV2Enabled,
   isTopicSubscriptionsEnabled,
 } from "@/lib/featureFlags";
-import { getAuthorPublicationFunnel } from "@/lib/publicationDistribution";
+import {
+  getAuthorPublicationFunnel,
+  getAuthorSubscriberGrowth,
+} from "@/lib/publicationDistribution";
+import type { PublicationFunnelSegment } from "@/lib/publicationDelivery";
 
 function StatCard({
   label,
@@ -31,6 +36,37 @@ function StatCard({
   );
 }
 
+function PublicationFunnelVisual({
+  segment,
+}: {
+  segment: PublicationFunnelSegment;
+}) {
+  const openWidth =
+    segment.deliveredRecipients > 0
+      ? Math.max(4, (segment.opens / segment.deliveredRecipients) * 100)
+      : 0;
+  const readWidth =
+    segment.deliveredRecipients > 0
+      ? Math.max(4, (segment.qualifiedReads / segment.deliveredRecipients) * 100)
+      : 0;
+  return (
+    <div className="mt-3 w-full max-w-xs space-y-1" aria-label="Delivery funnel">
+      <div className="h-1.5 w-full rounded-full bg-emerald-200" />
+      <div
+        className="h-1.5 rounded-full bg-emerald-500"
+        style={{ width: `${openWidth}%` }}
+      />
+      <div
+        className="h-1.5 rounded-full bg-purple-500"
+        style={{ width: `${readWidth}%` }}
+      />
+      <p className="text-[10px] text-gray-400">
+        Delivered → opened → qualified read
+      </p>
+    </div>
+  );
+}
+
 export default async function StatsPage() {
   const supabase = await createClient();
   const {
@@ -48,7 +84,8 @@ export default async function StatsPage() {
 
   if (!profile) redirect("/onboarding");
 
-  const [{ data: publishedPosts }, publicationFunnel] = await Promise.all([
+  const [{ data: publishedPosts }, publicationFunnel, subscriptionGrowth] =
+    await Promise.all([
     supabase
       .from("posts")
       .select("id, title, slug, type, content_kind, article_format, view_count, read_count, created_at, published_at")
@@ -56,6 +93,7 @@ export default async function StatsPage() {
       .eq("status", "published")
       .order("read_count", { ascending: false }),
     getAuthorPublicationFunnel(profile.id),
+    getAuthorSubscriberGrowth(profile.id),
   ]);
 
   const theirPostIds = (publishedPosts ?? []).map((p) => p.id);
@@ -94,6 +132,19 @@ export default async function StatsPage() {
         )
       )
     : 100;
+  const acquisitionByPost = new Map(
+    subscriptionGrowth.acquisition.map((row) => [
+      row.postId,
+      row.subscribersGained,
+    ])
+  );
+  const bestConversion = publicationFunnel.rows
+    .filter((row) => row.overall.deliveredRecipients >= 5)
+    .sort(
+      (left, right) =>
+        right.overall.qualifiedReadConversionRate -
+        left.overall.qualifiedReadConversionRate
+    )[0];
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -121,11 +172,87 @@ export default async function StatsPage() {
         {isAuthorSubscriptionsEnabled() ? (
           <StatCard
             label="Active Subscribers"
-            value={publicationFunnel.activeSubscriberCount}
+            value={
+              isAuthorSubscriptionsUxV2Enabled()
+                ? subscriptionGrowth.growth.activeSubscribers
+                : publicationFunnel.activeSubscriberCount
+            }
             sub="explicit author subscriptions"
           />
         ) : null}
       </div>
+
+      {isAuthorSubscriptionsUxV2Enabled() ? (
+        <section className="mb-8 rounded-xl border border-gray-200 bg-white p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">
+                Subscriber growth
+              </h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Privacy-safe totals only. Tracking began{" "}
+                {subscriptionGrowth.growth.trackingSince
+                  ? formatDate(subscriptionGrowth.growth.trackingSince)
+                  : "when UX V2 was enabled"}
+                .
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <p className="text-[11px] text-gray-500">7 days</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  +{subscriptionGrowth.growth.gained7d} / -
+                  {subscriptionGrowth.growth.lost7d} · Net{" "}
+                  {subscriptionGrowth.growth.net7d >= 0 ? "+" : ""}
+                  {subscriptionGrowth.growth.net7d}
+                </p>
+              </div>
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <p className="text-[11px] text-gray-500">30 days</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  +{subscriptionGrowth.growth.gained30d} / -
+                  {subscriptionGrowth.growth.lost30d} · Net{" "}
+                  {subscriptionGrowth.growth.net30d >= 0 ? "+" : ""}
+                  {subscriptionGrowth.growth.net30d}
+                </p>
+              </div>
+            </div>
+          </div>
+          {subscriptionGrowth.growth.daily.length > 0 ? (
+            <div
+              className="mt-5 flex h-28 items-end gap-1"
+              aria-label="30-day subscriber growth chart"
+            >
+              {subscriptionGrowth.growth.daily.map((day) => {
+                const magnitude = Math.max(day.gained, day.lost, 1);
+                return (
+                  <div
+                    key={day.date}
+                    className="flex min-w-0 flex-1 flex-col justify-end gap-px"
+                    title={`${day.date}: +${day.gained}, -${day.lost}`}
+                  >
+                    <span
+                      className="w-full rounded-t bg-emerald-400"
+                      style={{ height: `${Math.max(2, day.gained * 8)}px` }}
+                    />
+                    <span
+                      className="w-full rounded-b bg-red-300"
+                      style={{
+                        height: `${Math.max(day.lost ? 2 : 0, day.lost * 8)}px`,
+                        opacity: magnitude ? 1 : 0,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-5 rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-500">
+              Growth will appear after the first tracked subscription change.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       {isAuthorSubscriptionsEnabled() ? (
         <section className="mb-8 overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -138,6 +265,18 @@ export default async function StatsPage() {
               is shared across credited authors; direct-author delivery remains
               private to the matched author.
             </p>
+            <p className="mt-2 text-xs text-gray-500">
+              Delivered means at least one channel completed; opened means a
+              tracked publication link was opened; qualified reads meet the
+              active-time and scroll-depth threshold.
+            </p>
+            {bestConversion ? (
+              <p className="mt-2 text-xs font-semibold text-emerald-700">
+                Best qualified-read conversion (minimum 5 delivered):{" "}
+                {bestConversion.title} ·{" "}
+                {bestConversion.overall.qualifiedReadConversionRate.toFixed(1)}%
+              </p>
+            ) : null}
           </div>
           {publicationFunnel.rows.length > 0 ? (
             <div className="overflow-x-auto">
@@ -180,6 +319,20 @@ export default async function StatsPage() {
                                 <span className="text-xs text-gray-400">
                                   {row.publishedAt ? formatDate(row.publishedAt) : ""}
                                 </span>
+                                {isAuthorSubscriptionsUxV2Enabled() ? (
+                                  <>
+                                    <PublicationFunnelVisual segment={row.overall} />
+                                    {(acquisitionByPost.get(row.postId) ?? 0) > 0 ? (
+                                      <span className="mt-1 block text-xs font-semibold text-emerald-700">
+                                        +{acquisitionByPost.get(row.postId)} subscriber
+                                        {acquisitionByPost.get(row.postId) === 1
+                                          ? ""
+                                          : "s"}{" "}
+                                        attributed
+                                      </span>
+                                    ) : null}
+                                  </>
+                                ) : null}
                               </td>
                             ) : null}
                             <td className="px-4 py-3 text-xs font-medium text-gray-500">

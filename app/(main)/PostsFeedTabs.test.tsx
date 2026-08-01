@@ -36,8 +36,13 @@ vi.mock("next/link", () => ({
 
 class MockIntersectionObserver {
   callback: IntersectionObserverCallback;
-  constructor(callback: IntersectionObserverCallback) {
+  options?: IntersectionObserverInit;
+  constructor(
+    callback: IntersectionObserverCallback,
+    options?: IntersectionObserverInit
+  ) {
     this.callback = callback;
+    this.options = options;
     observerInstances.push(this);
   }
   observe = vi.fn();
@@ -45,6 +50,34 @@ class MockIntersectionObserver {
   unobserve = vi.fn();
 }
 let observerInstances: MockIntersectionObserver[] = [];
+
+// The component runs two observers: infinite scroll (rootMargin "400px 0px")
+// and the pinned-state watcher on the feed-top marker (a negative top margin
+// matching the nav height). Select by rootMargin rather than by position --
+// picking "the last one" silently swapped which observer a test drove when the
+// second was added.
+//
+// Take the *newest* match: the infinite-scroll effect re-runs on tab/filter
+// changes and registers a fresh observer each time, so the earliest match is
+// usually a disconnected one that will never fire.
+function observerMatching(label: string, predicate: (rootMargin: string) => boolean) {
+  const matches = observerInstances.filter((instance) =>
+    predicate(instance.options?.rootMargin ?? "")
+  );
+  const observer = matches[matches.length - 1];
+  if (!observer) {
+    throw new Error(
+      `No ${label} IntersectionObserver. Saw rootMargins: ` +
+        `${observerInstances.map((i) => i.options?.rootMargin).join(", ") || "none"}`
+    );
+  }
+  return observer;
+}
+
+const infiniteScrollObserver = () =>
+  observerMatching("infinite-scroll", (m) => m.startsWith("400px"));
+const pinnedStateObserver = () =>
+  observerMatching("pinned-state", (m) => m.startsWith("-"));
 
 function post(id: string): PostCardData {
   return {
@@ -523,7 +556,7 @@ describe("PostsFeedTabs -- error and retry states", () => {
     );
 
     expect(screen.getByTestId("feed")).toBeInTheDocument();
-    const observer = observerInstances[observerInstances.length - 1];
+    const observer = infiniteScrollObserver();
 
     await act(async () => {
       observer.callback(
@@ -548,5 +581,72 @@ describe("PostsFeedTabs -- error and retry states", () => {
     // targeted the failed next page, not a full reload from page 1.
     const secondCallUrl = fetchMock.mock.calls[1][0] as string;
     expect(new URL(secondCallUrl, "http://localhost").searchParams.get("page")).toBe("2");
+  });
+});
+
+// jsdom has no layout engine and never actually pins a sticky element, so the
+// pinned state is driven through the observer directly and asserted on classes.
+describe("PostsFeedTabs -- pinned control strip", () => {
+  beforeEach(() => {
+    mocks.requestAuth.mockReset();
+    observerInstances = [];
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stickyStrip(container: HTMLElement) {
+    const strip = container.querySelector<HTMLElement>(".sticky");
+    if (!strip) throw new Error("sticky control strip not found");
+    return strip;
+  }
+
+  function setPinned(isPinned: boolean) {
+    const observer = pinnedStateObserver();
+    act(() => {
+      observer.callback(
+        [{ isIntersecting: !isPinned } as IntersectionObserverEntry],
+        observer as unknown as IntersectionObserver
+      );
+    });
+  }
+
+  it("shows no bottom edge while the page is at rest", () => {
+    const { container } = render(
+      <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
+    );
+
+    const strip = stickyStrip(container);
+    expect(strip).toHaveClass("border-transparent");
+    expect(strip.className).not.toMatch(/shadow-/);
+  });
+
+  it("gains a hairline and shadow once pinned, and drops them again at the top", () => {
+    const { container } = render(
+      <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
+    );
+
+    setPinned(true);
+    const strip = stickyStrip(container);
+    expect(strip).toHaveClass("border-gray-200");
+    expect(strip.className).toMatch(/shadow-/);
+    expect(strip).not.toHaveClass("border-transparent");
+
+    setPinned(false);
+    expect(stickyStrip(container)).toHaveClass("border-transparent");
+    expect(stickyStrip(container).className).not.toMatch(/shadow-/);
+  });
+
+  // The border sits in the box at both states so pinning cannot reflow content.
+  it("keeps the border in the box in both states", () => {
+    const { container } = render(
+      <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
+    );
+
+    expect(stickyStrip(container)).toHaveClass("border-b");
+    setPinned(true);
+    expect(stickyStrip(container)).toHaveClass("border-b");
   });
 });

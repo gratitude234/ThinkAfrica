@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useOptionalAuthorRelationship } from "@/components/profile/AuthorRelationshipProvider";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { qualifiedReadThresholds } from "@/lib/publicationDelivery";
 
@@ -51,6 +52,7 @@ export default function ViewTracker({
   slug: string;
   wordCount: number;
 }) {
+  const relationship = useOptionalAuthorRelationship();
   const activeSecondsRef = useRef(0);
   const maxScrollDepthRef = useRef(0);
   const readFiredRef = useRef(false);
@@ -88,6 +90,7 @@ export default function ViewTracker({
         readSeconds: activeSecondsRef.current,
         scrollDepth: maxScrollDepthRef.current,
       });
+      relationship?.offerQualifiedReadNudge();
     };
 
     const onScroll = () => {
@@ -112,7 +115,7 @@ export default function ViewTracker({
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [slug, wordCount]);
+  }, [relationship, slug, wordCount]);
 
   return null;
 }

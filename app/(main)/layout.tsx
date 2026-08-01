@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
-import GuestBanner from "@/components/ui/GuestBanner";
 import { isLiteModeServer } from "@/lib/liteMode";
+import AppShell from "./AppShell";
 import NavigationShell from "./NavigationShell";
 import { canReview } from "@/lib/roles";
 import { canAccessAdminHubForRole } from "@/lib/adminAccess";
@@ -59,10 +59,14 @@ export default async function MainLayout({
         hasActiveDebate={(activeDebateCount ?? 0) > 0}
       />
 
-      <main className="mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-6 md:pb-16 lg:px-8">
-        {!user ? <GuestBanner /> : null}
+      <AppShell
+        showGuestBanner={!user}
+        userId={user?.id ?? null}
+        username={profileData?.username ?? null}
+        hasActiveDebate={(activeDebateCount ?? 0) > 0}
+      >
         {children}
-      </main>
+      </AppShell>
     </div>
   );
 }

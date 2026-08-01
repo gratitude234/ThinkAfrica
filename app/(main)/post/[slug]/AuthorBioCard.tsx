@@ -16,6 +16,7 @@ interface Author {
 
 interface Props {
   author: Author;
+  postId?: string;
   userId: string | null;
   initialFollowing: boolean;
   initialSubscribed?: boolean;
@@ -32,6 +33,7 @@ interface Props {
 
 export default function AuthorBioCard({
   author,
+  postId,
   userId,
   initialFollowing,
   initialSubscribed = false,
@@ -72,9 +74,12 @@ export default function AuthorBioCard({
           {!isOwnProfile ? (
             <AuthorRelationshipControls
               authorId={author.id}
+              authorName={authorName}
               currentUserId={userId}
               initialFollowing={initialFollowing}
               initialSubscribed={initialSubscribed}
+              source="author_card"
+              postId={postId}
               compact
               className="flex-shrink-0"
             />

@@ -21,7 +21,7 @@ interface RespondingToInfo {
 interface Props {
   post: PostCardData;
   currentUserId: string | null;
-  surface: "home" | "following" | "topics" | "latest";
+  surface: "home" | "following" | "subscriptions" | "topics" | "latest";
   priority?: boolean;
   respondingTo?: RespondingToInfo | null;
 }
@@ -153,6 +153,18 @@ function ContextLine({
   }
   if (surface === "home" && post.surface_reason) {
     return <p className="mb-2 text-[11.5px] text-gray-500">{post.surface_reason}</p>;
+  }
+  if (surface === "subscriptions") {
+    const reason = post.subscription_match?.reasons[0];
+    if (reason) {
+      return (
+        <p className="mb-2 text-[11.5px] font-medium text-emerald-800">
+          {reason.kind === "author"
+            ? `Because you subscribe to ${reason.label}`
+            : `From #${reason.label}`}
+        </p>
+      );
+    }
   }
   return null;
 }

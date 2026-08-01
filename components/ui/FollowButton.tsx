@@ -4,11 +4,17 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { toggleFollow } from "@/components/ui/followActions";
+import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
+import { isAuthorSubscriptionsUxV2Enabled } from "@/lib/featureFlags";
+import type { AuthorRelationshipSurface } from "@/lib/publicationDelivery";
 
 interface Props {
   followerId: string;
   followingId: string;
   initialFollowing?: boolean;
+  initialSubscribed?: boolean;
+  authorName?: string;
+  source?: AuthorRelationshipSurface;
   onChange?: (following: boolean) => void;
   /** "chip" is the compact pill used in lists; "solid" is the prominent brand button used next to the author on the post page. */
   variant?: "chip" | "solid";
@@ -18,12 +24,29 @@ export default function FollowButton({
   followerId,
   followingId,
   initialFollowing = false,
+  initialSubscribed = false,
+  authorName = "this author",
+  source = "explore",
   onChange,
   variant = "chip",
 }: Props) {
   const [following, setFollowing] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
   const pathname = usePathname();
+
+  if (isAuthorSubscriptionsUxV2Enabled()) {
+    return (
+      <AuthorRelationshipControls
+        authorId={followingId}
+        authorName={authorName}
+        currentUserId={followerId}
+        initialFollowing={initialFollowing}
+        initialSubscribed={initialSubscribed}
+        variant="follow_only"
+        source={source}
+      />
+    );
+  }
 
   const handleToggle = async () => {
     const optimisticNext = !following;

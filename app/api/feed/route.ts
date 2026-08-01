@@ -7,12 +7,24 @@ import {
   type FeedTimeframe,
 } from "@/lib/feedData";
 import { getBlockedUserIds } from "@/lib/blocking";
-import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
+import {
+  isAuthorSubscriptionsUxV2Enabled,
+  isTopicSubscriptionsEnabled,
+} from "@/lib/featureFlags";
+import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
 
 function getTab(param: string | null): FeedTabKey {
   if (param === "topics" && isTopicSubscriptionsEnabled()) return "topics";
+  if (param === "subscriptions" && isAuthorSubscriptionsUxV2Enabled()) {
+    return "subscriptions";
+  }
   if (param === "following" || param === "latest") return param;
   return "home";
+}
+
+function getSource(param: string | null): SubscriptionFeedSource {
+  if (param === "authors" || param === "topics") return param;
+  return "all";
 }
 
 function getTimeframe(param: string | null): FeedTimeframe {
@@ -39,6 +51,7 @@ export async function GET(request: NextRequest) {
   const tab = getTab(params.get("tab"));
   const timeframe = getTimeframe(params.get("timeframe"));
   const type = getType(params.get("type"));
+  const subscriptionSource = getSource(params.get("source"));
 
   const {
     data: { user },
@@ -47,6 +60,7 @@ export async function GET(request: NextRequest) {
   let userInterests: string[] = [];
   let userUniversity: string | null = null;
   let followedIds: string[] = [];
+  let authorSubscriptionIds: string[] = [];
   let topicSubscriptionKeys: string[] = [];
   let excludedAuthorIds: string[] = [];
 
@@ -57,11 +71,18 @@ export async function GET(request: NextRequest) {
           .select("topic_key")
           .eq("subscriber_id", user.id)
       : Promise.resolve({ data: [] as Array<{ topic_key: string }> });
+    const authorSubscriptionsPromise = isAuthorSubscriptionsUxV2Enabled()
+      ? supabase
+          .from("author_subscriptions")
+          .select("author_id")
+          .eq("subscriber_id", user.id)
+      : Promise.resolve({ data: [] as Array<{ author_id: string }> });
     const [
       { data: profile },
       { data: followedUsers },
       blockedIds,
       { data: topicSubscriptions },
+      { data: authorSubscriptions },
     ] =
       await Promise.all([
         supabase
@@ -75,6 +96,7 @@ export async function GET(request: NextRequest) {
           .eq("follower_id", user.id),
         getBlockedUserIds(user.id),
         topicSubscriptionsPromise,
+        authorSubscriptionsPromise,
       ]);
 
     userInterests = (profile?.interests as string[] | null) ?? [];
@@ -84,6 +106,9 @@ export async function GET(request: NextRequest) {
     );
     topicSubscriptionKeys = (topicSubscriptions ?? []).map(
       (row: { topic_key: string }) => row.topic_key
+    );
+    authorSubscriptionIds = (authorSubscriptions ?? []).map(
+      (row: { author_id: string }) => row.author_id
     );
     excludedAuthorIds = blockedIds;
   }
@@ -99,7 +124,9 @@ export async function GET(request: NextRequest) {
     userInterests,
     userUniversity,
     followedIds,
+    authorSubscriptionIds,
     topicSubscriptionKeys,
+    subscriptionSource,
     excludedAuthorIds,
   });
 
