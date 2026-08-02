@@ -97,6 +97,30 @@ export const POST_POINTS: Record<PostType, number> = {
   research: 50,
 };
 
+/**
+ * A response is worth less than the thing it answers, whatever form it takes.
+ * Originating a piece is the harder act, and once comments exist there is a
+ * lightweight way to reply that costs nothing -- so a Response should be worth
+ * having without paying the same as an original post.
+ *
+ * Mirrored in award_points_on_publish() (see the comments-and-responses
+ * migration); change both or stored and displayed points will disagree.
+ */
+export const RESPONSE_POINTS = 3;
+
+/**
+ * Points earned by publishing a post. Prefer this over indexing POST_POINTS
+ * directly -- a post that answers another one scores as a response regardless
+ * of its type.
+ */
+export function pointsForPost(post: {
+  type?: string | null;
+  in_response_to?: string | null;
+}): number {
+  if (post.in_response_to) return RESPONSE_POINTS;
+  return POST_POINTS[(post.type as PostType) ?? "blog"] ?? 10;
+}
+
 export const MIN_WORD_COUNTS: Record<PostType, number> = {
   blog: 50,
   essay: 500,

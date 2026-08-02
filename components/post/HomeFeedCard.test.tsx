@@ -134,6 +134,22 @@ describe("HomeFeedCard", () => {
     expect(screen.getByText(/Responding to another publication/)).toBeInTheDocument();
   });
 
+  it("shows when it was published only where the surface asks for it", () => {
+    const published = { published_at: "2026-07-22T10:00:00.000Z" };
+    const { unmount } = render(
+      <HomeFeedCard post={post(published)} currentUserId="user-1" surface="home" />
+    );
+    // The feed implies recency through its ordering, so no date there.
+    // \b matters: the fixture's "University of Lagos" contains "ago".
+    expect(screen.queryByText(/\bago\b|just now/)).toBeNull();
+    unmount();
+
+    render(
+      <HomeFeedCard post={post(published)} currentUserId="user-1" surface="latest" showTimestamp />
+    );
+    expect(screen.getByText(/\bago\b|just now/)).toBeInTheDocument();
+  });
+
   it("drops the responding-to line where the parent is already the context", () => {
     render(
       <HomeFeedCard

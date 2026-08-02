@@ -79,6 +79,52 @@ describe("validateResponseParent", () => {
     const postsBuilder = supabase.builders.posts[0];
     expect(postsBuilder.eq).toHaveBeenCalledWith("status", "published");
   });
+
+  it("allows responding to a response — one level of chain is fine", async () => {
+    const supabase = makeFakeSupabase({
+      posts: queueResults(
+        // The parent is a response to an original post...
+        { data: { id: "parent-1", author_id: "a", slug: "s", title: "t", type: "blog", in_response_to: "root-1" }, error: null },
+        // ...and that root is not itself a response.
+        { data: { in_response_to: null }, error: null }
+      ),
+    });
+
+    const result = await validateResponseParent(supabase as never, "parent-1", null);
+
+    expect(result.error).toBeNull();
+    expect(result.parent).not.toBeNull();
+  });
+
+  it("refuses to extend a chain that is already two responses deep", async () => {
+    const supabase = makeFakeSupabase({
+      posts: queueResults(
+        { data: { id: "parent-1", author_id: "a", slug: "s", title: "t", type: "blog", in_response_to: "mid-1" }, error: null },
+        // The grandparent is itself a response, so this would be depth three.
+        { data: { in_response_to: "root-1" }, error: null }
+      ),
+    });
+
+    const result = await validateResponseParent(supabase as never, "parent-1", null);
+
+    expect(result.parent).toBeNull();
+    expect(result.error).toContain("comment");
+  });
+
+  it("does not spend a second query when the parent is an original post", async () => {
+    const supabase = fakeSupabaseWithParent({
+      id: "parent-1",
+      author_id: "a",
+      slug: "s",
+      title: "t",
+      type: "blog",
+      in_response_to: null,
+    });
+
+    await validateResponseParent(supabase as never, "parent-1", null);
+
+    expect(supabase.builders.posts).toHaveLength(1);
+  });
 });
 
 describe("notifyResponseParentAuthor", () => {

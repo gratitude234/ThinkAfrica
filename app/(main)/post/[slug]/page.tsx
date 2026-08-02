@@ -10,7 +10,7 @@ import AuthorRelationshipProvider from "@/components/profile/AuthorRelationshipP
 import {
   formatDate,
   formatRelativeTime,
-  POST_POINTS,
+  pointsForPost,
   sanitizePostExcerpt,
   getPostMetaDescription,
   type PostType,
@@ -34,7 +34,7 @@ import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
 import ReportButton from "@/components/moderation/ReportButton";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
 import type { PostCardData } from "@/components/post/PostCard";
-import { fetchResponseCards } from "@/lib/feedData";
+import { RESPONSE_PAGE_SIZE, fetchResponsePage } from "@/lib/feedData";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
 import PostConversationView from "./PostConversationView";
@@ -56,6 +56,17 @@ import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
+/** `?responses=N` shows N pages of responses. Server-rendered rather than
+ *  fetched client-side because a response renders as a HomeFeedCard, which is a
+ *  Server Component -- and it makes the expanded thread linkable. */
+function parseResponsePages(raw: string | string[] | undefined): number {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const parsed = Number.parseInt(value ?? "1", 10);
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.min(Math.max(parsed, 1), 20);
 }
 
 interface AuthorProfile {
@@ -151,6 +162,7 @@ interface SecondaryData {
   references: ReferenceRecord[];
   coAuthors: CoAuthorRecord[];
   responseCards: PostCardData[];
+  responsesHasMore: boolean;
   reviews: Array<{
     assigned_at: string | null;
     submitted_at: string | null;
@@ -329,7 +341,8 @@ async function getSecondaryData(
   tags: string[],
   isPublished: boolean,
   publishedAt: string | null,
-  viewerId: string | null
+  viewerId: string | null,
+  responsePages = 1
 ): Promise<SecondaryData> {
   const supabase = await createClient();
 
@@ -337,7 +350,7 @@ async function getSecondaryData(
     { count: likeCount },
     { data: referencesRaw },
     { data: coAuthorsRaw },
-    responseCards,
+    responsePage,
     { data: reviewsRaw },
     { data: decisionsRaw },
     { data: versionsRaw },
@@ -364,7 +377,7 @@ async function getSecondaryData(
       .eq("post_id", postId)
       .not("accepted_at", "is", null)
       .order("display_order", { ascending: true }),
-    fetchResponseCards(supabase, postId, viewerId),
+    fetchResponsePage(supabase, postId, viewerId, RESPONSE_PAGE_SIZE * responsePages),
     supabase
       .from("post_reviews")
       .select("assigned_at, submitted_at, recommendation, round")
@@ -452,7 +465,8 @@ async function getSecondaryData(
   return {
     references: (referencesRaw ?? []) as ReferenceRecord[],
     coAuthors,
-    responseCards,
+    responseCards: responsePage.cards,
+    responsesHasMore: responsePage.hasMore,
     reviews: (reviewsRaw ?? []) as Array<{
       assigned_at: string | null;
       submitted_at: string | null;
@@ -1132,13 +1146,15 @@ async function PostPublishSuccessSection({
 async function PostResponsesSection({
   post,
   userId,
+  responsePages,
   secondaryDataPromise,
 }: {
   post: PostRecord;
   userId: string | null;
+  responsePages: number;
   secondaryDataPromise: Promise<SecondaryData>;
 }) {
-  const { responseCards, responseCount } = await secondaryDataPromise;
+  const { responseCards, responseCount, responsesHasMore } = await secondaryDataPromise;
 
   return (
     <DiscussionSection
@@ -1147,6 +1163,8 @@ async function PostResponsesSection({
       userProfileId={userId}
       responseCount={responseCount}
       responseCards={responseCards}
+      responsesHasMore={responsesHasMore}
+      nextResponsePage={responsePages + 1}
       isPublished={post.status === "published"}
     />
   );
@@ -1467,8 +1485,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function PostPage({ params }: PageProps) {
+export default async function PostPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
+  const responsePages = parseResponsePages((await searchParams)?.responses);
   const supabase = await createClient();
 
   const {
@@ -1558,7 +1577,8 @@ export default async function PostPage({ params }: PageProps) {
     post.tags ?? [],
     isPublished,
     post.published_at,
-    userId
+    userId,
+    responsePages
   );
   const viewerDataPromise = getViewerData({
     postId: post.id,
@@ -1611,6 +1631,7 @@ export default async function PostPage({ params }: PageProps) {
                 sanitizedExcerpt={sanitizedExcerpt}
                 authorName={authorName}
                 metadataTitle={metadataTitle}
+                responsePages={responsePages}
                 secondaryDataPromise={secondaryDataPromise}
                 viewerDataPromise={viewerDataPromise}
               />
@@ -1698,7 +1719,7 @@ export default async function PostPage({ params }: PageProps) {
               <PostPublishSuccessSection
                 post={post}
                 author={author}
-                points={POST_POINTS[(post.type as PostType) ?? "blog"] ?? 10}
+                points={pointsForPost(post)}
                 secondaryDataPromise={secondaryDataPromise}
               />
             </Suspense>
@@ -1814,6 +1835,7 @@ export default async function PostPage({ params }: PageProps) {
               <PostResponsesSection
                 post={post}
                 userId={userId}
+                responsePages={responsePages}
                 secondaryDataPromise={secondaryDataPromise}
               />
             </Suspense>
@@ -1983,7 +2005,7 @@ export default async function PostPage({ params }: PageProps) {
             <PostPublishSuccessSection
               post={post}
               author={author}
-              points={POST_POINTS[(post.type as PostType) ?? "blog"] ?? 10}
+              points={pointsForPost(post)}
               secondaryDataPromise={secondaryDataPromise}
             />
           </Suspense>
@@ -2042,6 +2064,7 @@ export default async function PostPage({ params }: PageProps) {
             <PostResponsesSection
               post={post}
               userId={userId}
+              responsePages={responsePages}
               secondaryDataPromise={secondaryDataPromise}
             />
           </Suspense>
