@@ -13,6 +13,7 @@ import { type PostCardData } from "@/components/post/PostCard";
 import { resolveArticleFormat, resolveContentKind } from "@/lib/contentModel";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import UserAvatar from "@/components/ui/UserAvatar";
+import StickySubnav from "@/components/ui/StickySubnav";
 import FollowButton from "@/components/ui/FollowButton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import DiscoverTrackedLink from "../discover/DiscoverTrackedLink";
@@ -380,7 +381,7 @@ function DiscoverTabs({
   activeGenre: ExploreGenreFilter;
 }) {
   return (
-    <div className="sticky top-[var(--app-nav-offset)] z-30 -mx-4 mb-5 max-w-[calc(100%+2rem)] overflow-x-auto border-b border-gray-200 bg-canvas/95 px-4 pt-1 backdrop-blur transition-[top] duration-200 ease-out [scrollbar-width:none] motion-reduce:transition-none sm:-mx-6 sm:mb-6 sm:max-w-[calc(100%+3rem)] sm:px-6 lg:mx-0 lg:max-w-full lg:px-0 [&::-webkit-scrollbar]:hidden">
+    <StickySubnav className="z-30 -mx-4 mb-5 max-w-[calc(100%+2rem)] overflow-x-auto border-b border-gray-200 bg-canvas/95 px-4 pt-1 backdrop-blur [scrollbar-width:none] sm:-mx-6 sm:mb-6 sm:max-w-[calc(100%+3rem)] sm:px-6 lg:mx-0 lg:max-w-full lg:px-0 [&::-webkit-scrollbar]:hidden">
       <div className="flex min-w-max gap-0.5 pr-2 sm:gap-1">
         {TABS.map((tab) => {
           const active = activeTab === tab.value;
@@ -415,7 +416,7 @@ function DiscoverTabs({
           );
         })}
       </div>
-    </div>
+    </StickySubnav>
   );
 }
 

@@ -118,6 +118,18 @@ describe("DebateV15Room", () => {
     window.localStorage.clear();
   });
 
+  // The room header retreats off the top with the nav rather than staying
+  // pinned at 0 once the nav is gone -- following a long exchange on a phone
+  // should get the whole screen, and the title bar is one scroll-up away.
+  // (The measurement behind that offset is covered in lib/useStickySubnav.test.)
+  it("retreats the room header with the nav", () => {
+    const { container } = render(<DebateV15Room room={makeRoom()} />);
+
+    expect(container.querySelector("header.sticky")).toHaveClass(
+      "top-[var(--app-subnav-offset)]"
+    );
+  });
+
   it("keeps an unsent draft on screen when the submission deadline passes", () => {
     vi.useFakeTimers();
     vi.setSystemTime(BASE_NOW);

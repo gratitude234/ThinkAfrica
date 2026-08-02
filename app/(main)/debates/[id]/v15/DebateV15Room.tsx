@@ -47,6 +47,7 @@ import {
 } from "./roomGuidance";
 import RecapPoller from "../RecapPoller";
 import { resolveDebateV15Verdict } from "@/lib/debateV15";
+import { useStickySubnav } from "@/lib/useStickySubnav";
 
 const POLL_INTERVAL_MS = 15_000;
 
@@ -2578,6 +2579,10 @@ export default function DebateV15Room({
   const [liveUpdatedAt, setLiveUpdatedAt] = useState<number | null>(null);
   const now = useClockTick(room.loadedAt);
   const feedbackRef = useRef<HTMLDivElement>(null);
+  // Lets the room header retreat off the top with the nav instead of staying
+  // glued there once the nav is gone.
+  const headerRef = useRef<HTMLElement>(null);
+  useStickySubnav(headerRef);
   const activeDeadline = deadlineForPhase(room, room.debate.phase);
   const moderatorName = profileName(room.debate.moderator);
 
@@ -2651,7 +2656,10 @@ export default function DebateV15Room({
 
   return (
     <div className="-mx-4 min-h-screen bg-canvas sm:-mx-6 lg:-mx-8">
-      <header className="sticky top-[var(--app-nav-offset)] z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur transition-[top] duration-200 ease-out motion-reduce:transition-none sm:px-6 lg:px-8">
+      <header
+        ref={headerRef}
+        className="sticky top-[var(--app-subnav-offset)] z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur transition-[top] duration-200 ease-out motion-reduce:transition-none sm:px-6 lg:px-8"
+      >
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="min-w-0">
             <Link

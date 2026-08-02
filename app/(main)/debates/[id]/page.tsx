@@ -18,6 +18,7 @@ import LiveArguments from "./LiveArguments";
 import DebateRecap from "./DebateRecap";
 import DebateCountdown from "./DebateCountdown";
 import ShareButton from "./ShareButton";
+import StickySubnav from "@/components/ui/StickySubnav";
 import RecapPoller from "./RecapPoller";
 import ActivateDebateV2 from "./ActivateDebateV2";
 import DebateV2Page from "./v2/DebateV2Page";
@@ -227,7 +228,7 @@ export default async function DebatePage({ params }: PageProps) {
 
   return (
     <div>
-      <div className="sticky top-[var(--app-nav-offset)] z-40 -mx-4 border-b border-gray-200 bg-white/95 px-6 py-3 backdrop-blur-xl transition-[top] duration-200 ease-out motion-reduce:transition-none sm:-mx-6 lg:-mx-8">
+      <StickySubnav className="z-40 -mx-4 border-b border-gray-200 bg-white/95 px-6 py-3 backdrop-blur-xl sm:-mx-6 lg:-mx-8">
         <div className="mx-auto flex max-w-5xl flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <Link
@@ -254,7 +255,7 @@ export default async function DebatePage({ params }: PageProps) {
             <ShareButton />
           </div>
         </div>
-      </div>
+      </StickySubnav>
 
       <div className="mx-auto max-w-5xl py-8">
         <section
