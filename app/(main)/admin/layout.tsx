@@ -41,7 +41,7 @@ export default async function AdminLayout({
 
   return (
     <div className="mx-auto grid max-w-7xl gap-6 px-4 pb-16 lg:grid-cols-[260px_minmax(0,1fr)] lg:px-6">
-      <aside className="lg:sticky lg:top-[calc(var(--app-nav-height)+1rem)] lg:self-start">
+      <aside className="transition-[top] duration-200 ease-out motion-reduce:transition-none lg:sticky lg:top-[calc(var(--app-nav-offset)+1rem)] lg:self-start">
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-brand">
             Admin

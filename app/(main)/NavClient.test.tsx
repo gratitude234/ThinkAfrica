@@ -1,10 +1,44 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import NavClient from "./NavClient";
 
-afterEach(() => {
-  window.scrollY = 0;
+// The auto-hide hook coalesces scroll events into a rAF, so frames are driven
+// by hand here -- otherwise its callbacks land on a real timer after the test
+// that scheduled them has finished.
+let frames: Array<FrameRequestCallback | null> = [];
+
+beforeEach(() => {
+  frames = [];
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
+    frames.push(cb)
+  );
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+    frames[id - 1] = null;
+  });
 });
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.scrollY = 0;
+  // --app-nav-offset lives on <html>, which outlives the render.
+  document.documentElement.removeAttribute("style");
+});
+
+function scrollTo(y: number) {
+  act(() => {
+    window.scrollY = y;
+    window.dispatchEvent(new Event("scroll"));
+  });
+  act(() => {
+    const queued = frames;
+    frames = [];
+    queued.forEach((cb) => cb?.(0));
+  });
+}
+
+function navOffset() {
+  return document.documentElement.style.getPropertyValue("--app-nav-offset");
+}
 
 const navigationState = vi.hoisted(() => ({ pathname: "/" }));
 
@@ -135,5 +169,69 @@ describe("NavClient desktop nav handoff", () => {
     const strip = screen.getByText("Africa's intellectual social network");
     expect(strip.closest(".sticky")).toBeNull();
     expect(container.querySelector(".sticky")).not.toBeNull();
+  });
+});
+
+describe("NavClient auto-hide", () => {
+  beforeEach(() => {
+    navigationState.pathname = "/";
+  });
+
+  function renderNav() {
+    return render(
+      <NavClient
+        user={null}
+        profile={null}
+        isAdmin={false}
+        canAccessReview={false}
+        onOpenSearch={vi.fn()}
+      />
+    );
+  }
+
+  // jsdom has no layout engine, so the movement itself is asserted through the
+  // one variable that drives it: the bar pins at (offset - height) and every
+  // sub-header at offset, so a published 0px is the whole stack retreating.
+  it("publishes a zero offset once the reader scrolls down", () => {
+    renderNav();
+    expect(navOffset()).toBe("");
+
+    scrollTo(400);
+    expect(navOffset()).toBe("0px");
+  });
+
+  it("clears the offset again as soon as the reader scrolls up", () => {
+    renderNav();
+
+    scrollTo(400);
+    expect(navOffset()).toBe("0px");
+
+    scrollTo(340);
+    expect(navOffset()).toBe("");
+  });
+
+  it("never retreats within the reveal floor", () => {
+    renderNav();
+
+    scrollTo(80);
+    expect(navOffset()).toBe("");
+  });
+
+  it("holds the bar in place while focus is inside it", () => {
+    renderNav();
+
+    fireEvent.focus(screen.getByRole("link", { name: "Open messages" }));
+    scrollTo(400);
+    expect(navOffset()).toBe("");
+  });
+
+  it("stops publishing the offset once unmounted", () => {
+    const { unmount } = renderNav();
+
+    scrollTo(400);
+    expect(navOffset()).toBe("0px");
+
+    unmount();
+    expect(navOffset()).toBe("");
   });
 });

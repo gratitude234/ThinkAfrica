@@ -111,12 +111,13 @@ describe("SideRail", () => {
     expect(rail).toHaveClass("hidden", "xl:block");
   });
 
-  // Every sticky aside in the app pins at nav height + 1rem. The rail sits in
-  // the same viewport as the home sidebar, so a different offset is visible as
-  // two columns starting out of line.
+  // Every sticky aside in the app pins at the nav's live offset + 1rem. The
+  // rail sits in the same viewport as the home sidebar and the feed's tab
+  // strip, so a different offset -- or the measured height, which does not move
+  // when the nav retreats -- is visible as columns starting out of line.
   it("pins at the shared sticky offset", () => {
     const { container } = renderRail();
     const rail = container.querySelector("aside");
-    expect(rail).toHaveClass("xl:top-[calc(var(--app-nav-height)+1rem)]");
+    expect(rail).toHaveClass("xl:top-[calc(var(--app-nav-offset)+1rem)]");
   });
 });

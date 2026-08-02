@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import BrandWordmark from "@/components/ui/BrandWordmark";
 import NavUserMenu from "./NavUserMenu";
@@ -12,6 +12,7 @@ import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import { shouldShowMobilePrimaryNav } from "./navRoutes";
 import { NAV_MATCH_PREFIXES, isNavItemActive } from "./navItems";
 import { useHasScrolled } from "@/lib/useHasScrolled";
+import { useNavAutoHide } from "@/lib/useNavAutoHide";
 
 interface NavClientProps {
   user: User | null;
@@ -67,6 +68,52 @@ export default function NavClient({
   // on rather than floating above the page.
   const hasScrolled = useHasScrolled();
 
+  // Focus landing anywhere inside the bar -- keyboard tabbing, or the
+  // notification panel, which renders in this subtree -- pins it open. A nav
+  // that slides away from the control you just reached for is a trap, not an
+  // affordance.
+  const [isNavFocused, setIsNavFocused] = useState(false);
+  const isNavHidden = useNavAutoHide({
+    disabled: isNavFocused,
+    revealKey: pathname,
+  });
+
+  const navHeightRef = useRef(0);
+  const isNavHiddenRef = useRef(false);
+
+  // How much of the nav is currently occupying the top of the viewport. The bar
+  // itself pins at (offset - height) and everything beneath it pins at offset,
+  // so one number moves the whole stack and no sub-header can drift out of
+  // register with the bar's bottom edge mid-animation.
+  //
+  // Published as a literal length rather than left to resolve through the
+  // var() chain in globals.css because PostsFeedTabs reads it back with
+  // getComputedStyle, and whether an unregistered custom property computes to a
+  // substituted value or a raw token stream is engine territory.
+  const publishOffset = useCallback(() => {
+    const root = document.documentElement;
+    if (isNavHiddenRef.current) {
+      root.style.setProperty("--app-nav-offset", "0px");
+    } else if (navHeightRef.current > 0) {
+      root.style.setProperty("--app-nav-offset", `${navHeightRef.current}px`);
+    } else {
+      root.style.removeProperty("--app-nav-offset");
+    }
+  }, []);
+
+  useEffect(() => {
+    isNavHiddenRef.current = isNavHidden;
+    publishOffset();
+  }, [isNavHidden, publishOffset]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    return () => {
+      root.style.removeProperty("--app-nav-offset");
+      root.style.removeProperty("--app-nav-height");
+    };
+  }, []);
+
   // Publish the real rendered height of the sticky nav as --app-nav-height so
   // sticky sub-headers (debate rooms, feed tabs) can pin flush beneath it.
   // Hardcoded offsets drifted out of sync with the nav and left sub-headers
@@ -80,8 +127,12 @@ export default function NavClient({
     const publishHeight = () => {
       const height = Math.round(node.getBoundingClientRect().height);
       if (height > 0) {
+        navHeightRef.current = height;
         root.style.setProperty("--app-nav-height", `${height}px`);
       }
+      // The offset is derived from the height, so a re-measure has to restate
+      // it -- otherwise a nav that grows keeps publishing its old offset.
+      publishOffset();
     };
 
     publishHeight();
@@ -94,7 +145,7 @@ export default function NavClient({
     const observer = new ResizeObserver(publishHeight);
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [publishOffset]);
 
   const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
   const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
@@ -119,7 +170,17 @@ export default function NavClient({
           Africa&apos;s intellectual social network
         </span>
       </div>
-      <div ref={navRef} className="sticky top-0 z-50">
+      {/* Retreats off the top on a downward scroll and comes back the moment
+          the reader scrolls up, so reading gets the full screen without putting
+          search and notifications a page-scroll away. top rather than transform
+          on purpose: a transform here would make this a containing block for
+          the fixed notification panel and Create sheet rendered inside it. */}
+      <div
+        ref={navRef}
+        onFocus={() => setIsNavFocused(true)}
+        onBlur={() => setIsNavFocused(false)}
+        className="sticky top-[calc(var(--app-nav-offset)-var(--app-nav-height))] z-50 transition-[top] duration-200 ease-out motion-reduce:transition-none"
+      >
       <nav
         className={`h-[60px] border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
           hasScrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""

@@ -352,7 +352,11 @@ export default function NotificationBell({ userId }: { userId: string }) {
             tabIndex={-1}
             role="dialog"
             aria-label="Notifications"
-            className="fixed inset-x-3 top-[calc(var(--app-nav-height,60px)+0.5rem)] z-50 rounded-xl border border-gray-200 bg-white shadow-lg outline-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80"
+            // Tracks the nav's live offset so the mobile sheet stays glued to
+            // the bar the way the sm: variant does by being its DOM child --
+            // otherwise a nav that retreats while this is open would strand it
+            // hanging off nothing.
+            className="fixed inset-x-3 top-[calc(var(--app-nav-offset,60px)+0.5rem)] z-50 rounded-xl border border-gray-200 bg-white shadow-lg outline-none transition-[top] duration-200 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80"
           >
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
               <span className="text-sm font-semibold text-gray-900">

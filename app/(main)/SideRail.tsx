@@ -88,8 +88,13 @@ export default function SideRail({
       // Sticky under the top nav and independently scrollable, so a short
       // viewport can still reach the Create button. The +1rem offset is shared
       // with every other sticky aside in the app (home sidebar, explore, admin,
-      // the debate surfaces) so columns in the same viewport pin in line.
-      className="hidden xl:sticky xl:top-[calc(var(--app-nav-height)+1rem)] xl:block xl:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain"
+      // the debate surfaces) so columns in the same viewport pin in line -- and
+      // it tracks --app-nav-offset rather than the measured height so the rail
+      // rises with the nav when it retreats, instead of the feed's tab strip
+      // sliding up while this column stays behind. max-h stays on the measured
+      // height: it is a ceiling, not a size, and animating it would resize a
+      // scrolling column mid-scroll for no visible gain.
+      className="hidden transition-[top] duration-200 ease-out motion-reduce:transition-none xl:sticky xl:top-[calc(var(--app-nav-offset)+1rem)] xl:block xl:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain"
     >
       <nav aria-label="Sections" className="flex flex-col gap-0.5">
         <RailLink

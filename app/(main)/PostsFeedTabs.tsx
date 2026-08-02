@@ -367,12 +367,16 @@ export default function PostsFeedTabs({
     const anchor = feedTopRef.current;
     if (!anchor || typeof window === "undefined") return;
 
-    const navHeight =
+    // The live offset, not the measured height: with the nav retreated the
+    // strip pins at 0, so subtracting a full nav height would land the marker
+    // 60px down, leave the strip unpinned, and open a void at the top of the
+    // column that the reveal only fills in progressively.
+    const navOffset =
       Number.parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--app-nav-height")
+        getComputedStyle(document.documentElement).getPropertyValue("--app-nav-offset")
       ) || 0;
     const target = Math.max(
-      window.scrollY + anchor.getBoundingClientRect().top - navHeight,
+      window.scrollY + anchor.getBoundingClientRect().top - navOffset,
       0
     );
     if (window.scrollY <= target) return;
@@ -510,6 +514,11 @@ export default function PostsFeedTabs({
     const anchor = feedTopRef.current;
     if (!anchor || typeof IntersectionObserver === "undefined") return;
 
+    // Deliberately the measured height, frozen at mount, rather than the live
+    // --app-nav-offset: this gates the strip's shadow, not its position, and
+    // rebuilding the observer on every hide/reveal would fire a fresh initial
+    // callback each time and flicker it. With the nav retreated the shadow
+    // turns on a little early, which is past the point anyone is looking.
     const navHeight =
       Number.parseFloat(
         getComputedStyle(document.documentElement).getPropertyValue("--app-nav-height")
@@ -615,7 +624,7 @@ export default function PostsFeedTabs({
           always in the box (transparent at rest) so gaining it costs no 1px
           reflow. */}
       <div
-        className={`sticky top-[var(--app-nav-height)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] border-b bg-white px-4 pb-1 transition-shadow duration-200 motion-reduce:transition-none sm:mx-0 sm:w-full sm:px-0 ${
+        className={`sticky top-[var(--app-nav-offset)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] border-b bg-white px-4 pb-1 transition-[top,box-shadow] duration-200 ease-out motion-reduce:transition-none sm:mx-0 sm:w-full sm:px-0 ${
           isPinned
             ? "border-gray-200 shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
             : "border-transparent"

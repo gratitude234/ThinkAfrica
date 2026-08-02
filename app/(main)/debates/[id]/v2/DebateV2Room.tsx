@@ -265,7 +265,7 @@ export default function DebateV2Room({ debateId, initialRoom }: { debateId: stri
 
   return (
     <div>
-      <div className="sticky top-[var(--app-nav-height)] z-30 -mx-4 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="sticky top-[var(--app-nav-offset)] z-30 -mx-4 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur-xl transition-[top] duration-200 ease-out motion-reduce:transition-none sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <Link href="/debates" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-brand hover:underline">
@@ -396,7 +396,7 @@ export default function DebateV2Room({ debateId, initialRoom }: { debateId: stri
             )}
           </div>
 
-          <aside className="space-y-5 lg:sticky lg:top-[calc(var(--app-nav-height)+1rem)] lg:self-start">
+          <aside className="space-y-5 transition-[top] duration-200 ease-out motion-reduce:transition-none lg:sticky lg:top-[calc(var(--app-nav-offset)+1rem)] lg:self-start">
             <V2SubscriptionControl
               debateId={debateId}
               isAuthenticated={currentUser.isAuthenticated}

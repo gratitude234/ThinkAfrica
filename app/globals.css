@@ -34,6 +34,18 @@
        directly beneath it instead of hardcoding a pixel guess. This value is
        only the pre-hydration fallback. */
     --app-nav-height: 60px;
+    /* How much of the nav is currently occupying the top of the viewport: its
+       full height while revealed, 0px once it has retreated on a downward
+       scroll. Everything that pins beneath the nav reads this instead of
+       --app-nav-height, so the bar and its sub-headers move off one number and
+       cannot drift apart mid-animation. Overridden inline on <html> by
+       NavClient; --app-nav-height stays the measured height, and is what the
+       nav's own offset is subtracted from.
+
+       This default is load-bearing rather than cosmetic: with no definition at
+       all, top: var(--app-nav-offset) is invalid at computed-value time and
+       falls back to top: auto, which stops the sub-headers being sticky. */
+    --app-nav-offset: var(--app-nav-height);
   }
 
   html {

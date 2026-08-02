@@ -2651,7 +2651,7 @@ export default function DebateV15Room({
 
   return (
     <div className="-mx-4 min-h-screen bg-canvas sm:-mx-6 lg:-mx-8">
-      <header className="sticky top-[var(--app-nav-height)] z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
+      <header className="sticky top-[var(--app-nav-offset)] z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur transition-[top] duration-200 ease-out motion-reduce:transition-none sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="min-w-0">
             <Link

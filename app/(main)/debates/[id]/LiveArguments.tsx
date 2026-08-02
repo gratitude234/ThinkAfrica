@@ -463,7 +463,7 @@ export default function LiveArguments({
 
         <div
           id="participate"
-          className="order-first space-y-5 lg:sticky lg:top-[calc(var(--app-nav-height)+1rem)] lg:order-none lg:self-start"
+          className="order-first space-y-5 transition-[top] duration-200 ease-out motion-reduce:transition-none lg:sticky lg:top-[calc(var(--app-nav-offset)+1rem)] lg:order-none lg:self-start"
         >
           <MotionVotePanel
             debateId={debateId}
