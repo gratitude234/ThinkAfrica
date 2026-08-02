@@ -46,6 +46,25 @@
        all, top: var(--app-nav-offset) is invalid at computed-value time and
        falls back to top: auto, which stops the sub-headers being sticky. */
     --app-nav-offset: var(--app-nav-height);
+    /* Height of the page's own sticky sub-header -- the feed's tab + filter
+       strip, and anything else that pins directly beneath the nav and wants to
+       travel with it. Published at runtime by whichever component owns that
+       strip (see lib/useStickySubnav.ts); 0px on pages without one. */
+    --app-subnav-height: 0px;
+    /* Where that sub-header pins. Directly beneath the nav while the nav is
+       revealed, and fully off the top of the viewport once the nav has
+       retreated -- so a downward scroll clears the entire chrome instead of
+       leaving a control bar glued to the top eating a third of the screen.
+       Everything the reader is actually reading gets the whole viewport. */
+    --app-subnav-offset: var(--app-nav-offset);
+  }
+
+  /* Set by NavClient whenever the nav is retreated. Kept as a CSS branch rather
+     than another JS-published length so the sub-header needs no channel back to
+     the nav: it publishes its height, the nav publishes the state, and the
+     stack resolves in CSS. */
+  html[data-nav-hidden="true"] {
+    --app-subnav-offset: calc(-1 * var(--app-subnav-height));
   }
 
   html {

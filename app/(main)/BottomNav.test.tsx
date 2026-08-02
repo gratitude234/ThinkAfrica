@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BottomNav from "./BottomNav";
 
@@ -168,5 +168,81 @@ describe("BottomNav debates destination", () => {
       "aria-current",
       "page"
     );
+  });
+});
+
+// The bar clears the screen on the way down and comes back on the way up, in
+// step with the top nav. jsdom has no layout engine, so the movement is
+// asserted on the transform class that drives it.
+describe("BottomNav auto-hide", () => {
+  let frames: Array<FrameRequestCallback | null> = [];
+
+  beforeEach(() => {
+    navigationState.pathname = "/";
+    mocks.requestAuth.mockReset();
+    frames = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
+      frames.push(cb)
+    );
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+      frames[id - 1] = null;
+    });
+    // The bar only renders below md, and the hook is scoped to match.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    window.scrollY = 0;
+  });
+
+  function scrollTo(y: number) {
+    act(() => {
+      window.scrollY = y;
+      window.dispatchEvent(new Event("scroll"));
+    });
+    act(() => {
+      const queued = frames;
+      frames = [];
+      queued.forEach((cb) => cb?.(0));
+    });
+  }
+
+  function bar() {
+    return screen.getByRole("navigation", { name: "Primary navigation" });
+  }
+
+  it("drops the bar off the bottom on a downward scroll and brings it back on an upward one", () => {
+    render(<BottomNav username="writer" userId="user-1" hasActiveDebate={false} />);
+    expect(bar()).toHaveClass("translate-y-0");
+
+    scrollTo(400);
+    expect(bar()).toHaveClass("translate-y-full");
+
+    scrollTo(340);
+    expect(bar()).toHaveClass("translate-y-0");
+  });
+
+  it("stays put near the top of the page, where hiding buys no reading space", () => {
+    render(<BottomNav username="writer" userId="user-1" hasActiveDebate={false} />);
+
+    scrollTo(80);
+    expect(bar()).toHaveClass("translate-y-0");
+  });
+
+  // A destination that slides out from under the focus ring reaching for it is
+  // a trap, so focus anywhere in the bar pins it open.
+  it("holds the bar in place while focus is inside it", () => {
+    render(<BottomNav username="writer" userId="user-1" hasActiveDebate={false} />);
+
+    fireEvent.focus(screen.getByText("Home").closest("a") as HTMLElement);
+    scrollTo(400);
+    expect(bar()).toHaveClass("translate-y-0");
   });
 });

@@ -649,4 +649,41 @@ describe("PostsFeedTabs -- pinned control strip", () => {
     setPinned(true);
     expect(stickyStrip(container)).toHaveClass("border-b");
   });
+
+  // The strip pins beneath the nav while the nav is there and clears the top of
+  // the viewport once it isn't -- a downward scroll hands the whole screen to
+  // the posts. --app-nav-offset would have pinned it at 0 instead, which is the
+  // bar-glued-to-the-top behaviour this replaced.
+  it("pins at the retreating sub-header offset, not the nav's bottom edge", () => {
+    const { container } = render(
+      <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
+    );
+
+    expect(stickyStrip(container)).toHaveClass("top-[var(--app-subnav-offset)]");
+  });
+
+  // jsdom reports a zero rect for everything, so the measurement is stubbed --
+  // what matters is that the strip's own height is what reaches :root.
+  it("publishes its height so the retreat clears the whole strip", () => {
+    const root = document.documentElement;
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ height: 132 } as DOMRect);
+
+    try {
+      const { unmount } = render(
+        <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
+      );
+
+      expect(root.style.getPropertyValue("--app-subnav-height")).toBe("132px");
+
+      // A height left behind would make the next page's nav travel further
+      // than its own height and open a gap above the content.
+      unmount();
+      expect(root.style.getPropertyValue("--app-subnav-height")).toBe("");
+    } finally {
+      rect.mockRestore();
+      root.removeAttribute("style");
+    }
+  });
 });

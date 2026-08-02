@@ -22,6 +22,7 @@ afterEach(() => {
   window.scrollY = 0;
   // --app-nav-offset lives on <html>, which outlives the render.
   document.documentElement.removeAttribute("style");
+  document.documentElement.removeAttribute("data-nav-hidden");
 });
 
 function scrollTo(y: number) {
@@ -38,6 +39,10 @@ function scrollTo(y: number) {
 
 function navOffset() {
   return document.documentElement.style.getPropertyValue("--app-nav-offset");
+}
+
+function isNavHidden() {
+  return document.documentElement.dataset.navHidden;
 }
 
 const navigationState = vi.hoisted(() => ({ pathname: "/" }));
@@ -233,5 +238,41 @@ describe("NavClient auto-hide", () => {
 
     unmount();
     expect(navOffset()).toBe("");
+  });
+
+  // The offset alone cannot carry a sub-header off the top of the viewport --
+  // 0px is the bottom edge of a nav that is no longer there, which is exactly
+  // where the feed's tab strip used to strand itself. The flag is what lets CSS
+  // pull that strip up by its own height instead.
+  it("flags the retreat on <html> so sub-headers can retreat with it", () => {
+    renderNav();
+    expect(isNavHidden()).toBeUndefined();
+
+    scrollTo(400);
+    expect(isNavHidden()).toBe("true");
+
+    scrollTo(340);
+    expect(isNavHidden()).toBeUndefined();
+  });
+
+  it("clears the retreat flag once unmounted", () => {
+    const { unmount } = renderNav();
+
+    scrollTo(400);
+    expect(isNavHidden()).toBe("true");
+
+    unmount();
+    expect(isNavHidden()).toBeUndefined();
+  });
+
+  // The bar's own travel is measured from the sub-header offset, not the nav
+  // offset, so a pinned sub-header makes it travel further and the two edges
+  // stay welded together for the length of the animation.
+  it("pins against the sub-header offset so the chrome moves as one block", () => {
+    const { container } = renderNav();
+
+    expect(container.querySelector(".sticky")).toHaveClass(
+      "top-[calc(var(--app-subnav-offset)-var(--app-nav-height))]"
+    );
   });
 });

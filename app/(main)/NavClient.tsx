@@ -92,6 +92,15 @@ export default function NavClient({
   // substituted value or a raw token stream is engine territory.
   const publishOffset = useCallback(() => {
     const root = document.documentElement;
+    // The state, not a length: the page's own sticky sub-header publishes its
+    // height, CSS combines the two. That keeps the nav from having to know what
+    // (if anything) is pinned beneath it on the current route.
+    if (isNavHiddenRef.current) {
+      root.dataset.navHidden = "true";
+    } else {
+      delete root.dataset.navHidden;
+    }
+
     if (isNavHiddenRef.current) {
       root.style.setProperty("--app-nav-offset", "0px");
     } else if (navHeightRef.current > 0) {
@@ -111,6 +120,7 @@ export default function NavClient({
     return () => {
       root.style.removeProperty("--app-nav-offset");
       root.style.removeProperty("--app-nav-height");
+      delete root.dataset.navHidden;
     };
   }, []);
 
@@ -174,12 +184,19 @@ export default function NavClient({
           the reader scrolls up, so reading gets the full screen without putting
           search and notifications a page-scroll away. top rather than transform
           on purpose: a transform here would make this a containing block for
-          the fixed notification panel and Create sheet rendered inside it. */}
+          the fixed notification panel and Create sheet rendered inside it.
+
+          Anchored to --app-subnav-offset rather than --app-nav-offset so the
+          bar travels the height of the *whole* chrome when a sub-header is
+          pinned beneath it (the feed's tabs + filter chips). Both resolve to
+          the same number on pages without one; where there is one, this is what
+          keeps the two edges welded together for the length of the animation
+          instead of the nav crawling off while the tabs race ahead of it. */}
       <div
         ref={navRef}
         onFocus={() => setIsNavFocused(true)}
         onBlur={() => setIsNavFocused(false)}
-        className="sticky top-[calc(var(--app-nav-offset)-var(--app-nav-height))] z-50 transition-[top] duration-200 ease-out motion-reduce:transition-none"
+        className="sticky top-[calc(var(--app-subnav-offset)-var(--app-nav-height))] z-50 transition-[top] duration-200 ease-out motion-reduce:transition-none"
       >
       <nav
         className={`h-[60px] border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
