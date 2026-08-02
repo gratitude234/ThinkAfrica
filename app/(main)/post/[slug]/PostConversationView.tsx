@@ -4,12 +4,11 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
 import ReportButton from "@/components/moderation/ReportButton";
 import BackLink from "@/components/ui/BackLink";
-import HomeFeedCard from "@/components/post/HomeFeedCard";
 import PostImage from "@/components/post/PostImage";
 import type { PostCardData } from "@/components/post/PostCard";
 import PublishedToast from "./PublishedToast";
 import PostActionsRow from "./PostActionsRow";
-import InlineResponseComposer from "./InlineResponseComposer";
+import DiscussionSection from "./DiscussionSection";
 import { getPostDisplayTitle } from "@/lib/postDisplay";
 import { formatRelativeTime, POST_POINTS, type PostType } from "@/lib/utils";
 
@@ -254,33 +253,14 @@ export default async function PostConversationView({
         </div>
       ) : null}
 
-      <section id="responses" className="mt-10 scroll-mt-24">
-        <h2 className="font-display text-[19px] font-semibold text-ink">
-          Responses · {secondary.responseCount}
-        </h2>
-
-        {isPublished ? (
-          <InlineResponseComposer parentPostId={post.id} userId={userId} />
-        ) : null}
-
-        {secondary.responseCards.length === 0 ? (
-          <p className="mt-4 text-[15px] text-gray-500">
-            No responses yet. Be the first to weigh in.
-          </p>
-        ) : (
-          <div className="mt-4">
-            {secondary.responseCards.map((response) => (
-              <HomeFeedCard
-                key={response.id}
-                post={response}
-                currentUserId={userId}
-                surface="latest"
-                hideRespondingTo
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      <DiscussionSection
+        postId={post.id}
+        userId={userId}
+        userProfileId={userId}
+        responseCount={secondary.responseCount}
+        responseCards={secondary.responseCards}
+        isPublished={isPublished}
+      />
     </div>
   );
 }

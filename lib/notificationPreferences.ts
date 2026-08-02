@@ -25,6 +25,7 @@ import { describeNotificationType } from "./notificationCatalog";
  */
 export interface InAppNotificationPrefs {
   inapp_likes: boolean;
+  inapp_comments: boolean;
   inapp_follows: boolean;
   inapp_debates: boolean;
   inapp_collaboration: boolean;
@@ -43,6 +44,12 @@ export const IN_APP_PREF_GROUPS: InAppPrefGroup[] = [
     label: "Likes",
     description: "When someone likes your work",
     types: ["like"],
+  },
+  {
+    key: "inapp_comments",
+    label: "Comments and replies",
+    description: "When someone comments on your work or replies to your comment",
+    types: ["comment"],
   },
   {
     key: "inapp_follows",
@@ -73,6 +80,7 @@ export const IN_APP_PREF_GROUPS: InAppPrefGroup[] = [
 
 export const IN_APP_PREF_DEFAULTS: InAppNotificationPrefs = {
   inapp_likes: true,
+  inapp_comments: true,
   inapp_follows: true,
   inapp_debates: true,
   inapp_collaboration: true,

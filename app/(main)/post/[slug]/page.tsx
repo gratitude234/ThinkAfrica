@@ -33,12 +33,12 @@ import PostCover from "@/components/post/PostCover";
 import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
 import ReportButton from "@/components/moderation/ReportButton";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
-import HomeFeedCard from "@/components/post/HomeFeedCard";
 import type { PostCardData } from "@/components/post/PostCard";
 import { fetchResponseCards } from "@/lib/feedData";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
 import PostConversationView from "./PostConversationView";
+import DiscussionSection from "./DiscussionSection";
 import PostActionsRow from "./PostActionsRow";
 import { getCollaborationSummary } from "@/lib/collaboration";
 import { getMessageEligibility } from "@/lib/messaging";
@@ -1131,64 +1131,24 @@ async function PostPublishSuccessSection({
 
 async function PostResponsesSection({
   post,
-  author,
   userId,
   secondaryDataPromise,
 }: {
   post: PostRecord;
-  author: AuthorProfile | null;
   userId: string | null;
   secondaryDataPromise: Promise<SecondaryData>;
 }) {
   const { responseCards, responseCount } = await secondaryDataPromise;
-  const parentTitle = getPostMetadataTitle(post, author);
-  const parentAuthor =
-    author?.full_name ?? author?.username ?? "the author";
 
   return (
-    <section id="responses" className="mt-10 scroll-mt-24">
-      <h2 className="font-display mb-4 text-[20px] font-semibold text-ink">
-        Responses{responseCount > 0 ? ` · ${responseCount}` : ""}
-      </h2>
-
-      {responseCards.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center sm:rounded-lg">
-          <p className="text-[15px] text-gray-600">
-            No responses yet. Be the first to weigh in.
-          </p>
-          <div className="mt-4 flex justify-center">
-            <ResponseStartLink
-              postId={post.id}
-              source="responses_empty_state"
-              userId={userId}
-              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0a4d37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z" />
-              </svg>
-              Respond
-            </ResponseStartLink>
-          </div>
-        </div>
-      ) : (
-        <div>
-          {responseCards.map((response) => (
-            <HomeFeedCard
-              key={response.id}
-              post={response}
-              currentUserId={userId}
-              surface="latest"
-              respondingTo={{
-                title: parentTitle,
-                author: parentAuthor,
-                slug: post.slug,
-                authorUsername: author?.username ?? null,
-              }}
-            />
-          ))}
-        </div>
-      )}
-    </section>
+    <DiscussionSection
+      postId={post.id}
+      userId={userId}
+      userProfileId={userId}
+      responseCount={responseCount}
+      responseCards={responseCards}
+      isPublished={post.status === "published"}
+    />
   );
 }
 
@@ -1853,7 +1813,6 @@ export default async function PostPage({ params }: PageProps) {
             <Suspense fallback={<SectionSkeleton rows={3} />}>
               <PostResponsesSection
                 post={post}
-                author={author}
                 userId={userId}
                 secondaryDataPromise={secondaryDataPromise}
               />
@@ -2082,7 +2041,6 @@ export default async function PostPage({ params }: PageProps) {
           <Suspense fallback={<SectionSkeleton rows={3} />}>
             <PostResponsesSection
               post={post}
-              author={author}
               userId={userId}
               secondaryDataPromise={secondaryDataPromise}
             />
