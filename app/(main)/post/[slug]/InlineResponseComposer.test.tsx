@@ -1,14 +1,19 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { COMMENT_PROMOTION_THRESHOLD } from "@/lib/commentContent";
 import InlineResponseComposer from "./InlineResponseComposer";
 
 const refresh = vi.fn();
 const createPost = vi.fn();
+const submitComment = vi.fn();
 const requestAuth = vi.fn();
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("@/app/(write)/create/post/actions", () => ({
   createPost: (input: unknown) => createPost(input),
+}));
+vi.mock("./commentActions", () => ({
+  submitComment: (input: unknown) => submitComment(input),
 }));
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
   useGuestAuthGate: () => ({ requestAuth }),
@@ -17,71 +22,103 @@ vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
 beforeEach(() => {
   refresh.mockClear();
   createPost.mockReset().mockResolvedValue({ error: null, slug: "post-abc" });
+  submitComment.mockReset().mockResolvedValue({ error: null, comment: { id: "c1" } });
   requestAuth.mockClear();
 });
 
-function typeResponse(text: string) {
-  fireEvent.change(screen.getByLabelText("Write a response"), { target: { value: text } });
+function typeReply(text: string) {
+  fireEvent.change(screen.getByLabelText("Write a comment"), { target: { value: text } });
 }
 
 describe("InlineResponseComposer", () => {
-  it("gates guests to sign-in rather than showing a composer they can't submit", () => {
+  it("gates guests to sign-in rather than showing a box they can't submit", () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId={null} />);
 
-    expect(screen.queryByLabelText("Write a response")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Sign in to respond" }));
+    expect(screen.queryByLabelText("Write a comment")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in to reply" }));
     expect(requestAuth).toHaveBeenCalledWith("respond", { contentKind: "post" });
   });
 
-  it("won't submit an empty response", () => {
+  it("won't submit an empty reply", () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
-    expect(screen.getByRole("button", { name: "Respond" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Comment" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Publish as a Response" })).toBeDisabled();
   });
 
-  it("posts the response against the parent and refreshes the thread", async () => {
+  it("posts a comment by default, not a published Response", async () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
 
-    typeResponse("Sharp point about scope.");
-    fireEvent.click(screen.getByRole("button", { name: "Respond" }));
+    typeReply("Sharp point about scope.");
+    fireEvent.click(screen.getByRole("button", { name: "Comment" }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
-    expect(createPost).toHaveBeenCalledWith({
-      body: "Sharp point about scope.",
-      topics: [],
-      inResponseTo: "parent-1",
+    expect(submitComment).toHaveBeenCalledWith({
+      postId: "parent-1",
+      content: "Sharp point about scope.",
     });
-    expect(screen.getByLabelText("Write a response")).toHaveValue("");
+    expect(createPost).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Write a comment")).toHaveValue("");
+  });
+
+  it("publishes a Response only when that is explicitly chosen", async () => {
+    render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
+
+    typeReply("A developed counter-argument.");
+    fireEvent.click(screen.getByRole("button", { name: "Publish as a Response" }));
+
+    await waitFor(() =>
+      expect(createPost).toHaveBeenCalledWith({
+        body: "A developed counter-argument.",
+        topics: [],
+        inResponseTo: "parent-1",
+      })
+    );
+    expect(submitComment).not.toHaveBeenCalled();
+  });
+
+  it("suggests promotion past the threshold without switching on its own", async () => {
+    render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
+
+    typeReply("a".repeat(COMMENT_PROMOTION_THRESHOLD - 1));
+    expect(screen.queryByText(/stand on its own/)).toBeNull();
+
+    typeReply("a".repeat(COMMENT_PROMOTION_THRESHOLD));
+    expect(screen.getByText(/stand on its own/)).toBeInTheDocument();
+
+    // The default action is still a comment.
+    fireEvent.click(screen.getByRole("button", { name: "Comment" }));
+    await waitFor(() => expect(submitComment).toHaveBeenCalledTimes(1));
+    expect(createPost).not.toHaveBeenCalled();
   });
 
   it("submits on Cmd/Ctrl+Enter", async () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
 
-    typeResponse("Ship it.");
-    fireEvent.keyDown(screen.getByLabelText("Write a response"), {
-      key: "Enter",
-      metaKey: true,
-    });
+    typeReply("Ship it.");
+    fireEvent.keyDown(screen.getByLabelText("Write a comment"), { key: "Enter", metaKey: true });
 
-    await waitFor(() => expect(createPost).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(submitComment).toHaveBeenCalledTimes(1));
   });
 
-  it("keeps the draft and shows the error when publishing fails", async () => {
-    createPost.mockResolvedValue({ error: "You must be signed in.", slug: null });
+  it("keeps the draft and shows the error when posting fails", async () => {
+    submitComment.mockResolvedValue({ error: "You must be signed in." });
     render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
 
-    typeResponse("Draft worth keeping.");
-    fireEvent.click(screen.getByRole("button", { name: "Respond" }));
+    typeReply("Draft worth keeping.");
+    fireEvent.click(screen.getByRole("button", { name: "Comment" }));
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("You must be signed in."));
-    expect(screen.getByLabelText("Write a response")).toHaveValue("Draft worth keeping.");
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("You must be signed in.")
+    );
+    expect(screen.getByLabelText("Write a comment")).toHaveValue("Draft worth keeping.");
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("offers the long-form editor as the secondary path", () => {
+  it("offers the long-form editor as the third path", () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
 
-    expect(
-      screen.getByRole("link", { name: "Write a long-form response" }).getAttribute("href")
-    ).toBe("/write?inResponseTo=parent-1&kind=article");
+    expect(screen.getByRole("link", { name: "Long-form" }).getAttribute("href")).toBe(
+      "/write?inResponseTo=parent-1&kind=article"
+    );
   });
 });

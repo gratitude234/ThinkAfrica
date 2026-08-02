@@ -143,7 +143,10 @@ create table if not exists public.comments (
   parent_id uuid references public.comments(id) on delete cascade,
   content text not null,
   upvotes integer not null default 0,
-  created_at timestamptz not null default now()
+  hidden_at timestamptz,
+  hidden_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz
 );
 
 create table if not exists public.comment_votes (
@@ -652,13 +655,13 @@ select pg_temp.create_policy_if_missing('public', 'posts', 'Authors can delete t
 
 -- ---- comments ----
 select pg_temp.create_policy_if_missing('public', 'comments', 'Comments on published posts are viewable by everyone',
-  $$create policy "Comments on published posts are viewable by everyone" on public.comments for select using (true)$$);
+  $$create policy "Comments on published posts are viewable by everyone" on public.comments for select using (hidden_at is null or auth.uid() = author_id or public.is_admin())$$);
 
 select pg_temp.create_policy_if_missing('public', 'comments', 'Authenticated users can insert comments',
-  $$create policy "Authenticated users can insert comments" on public.comments for insert with check (auth.role() = 'authenticated' and auth.uid() = author_id)$$);
+  $$create policy "Authenticated users can insert comments" on public.comments for insert with check (auth.role() = 'authenticated' and auth.uid() = author_id and not public.is_suspended())$$);
 
 select pg_temp.create_policy_if_missing('public', 'comments', 'Authors can update their own comments',
-  $$create policy "Authors can update their own comments" on public.comments for update using (auth.uid() = author_id)$$);
+  $$create policy "Authors can update their own comments" on public.comments for update using (auth.uid() = author_id) with check (auth.uid() = author_id)$$);
 
 select pg_temp.create_policy_if_missing('public', 'comments', 'Authors can delete their own comments',
   $$create policy "Authors can delete their own comments" on public.comments for delete using (auth.uid() = author_id)$$);
@@ -667,7 +670,7 @@ select pg_temp.create_policy_if_missing('public', 'comment_votes', 'Comment vote
   $$create policy "Comment votes are viewable by everyone" on public.comment_votes for select using (true)$$);
 
 select pg_temp.create_policy_if_missing('public', 'comment_votes', 'Authenticated users can vote on comments',
-  $$create policy "Authenticated users can vote on comments" on public.comment_votes for insert with check (auth.role() = 'authenticated' and auth.uid() = user_id)$$);
+  $$create policy "Authenticated users can vote on comments" on public.comment_votes for insert with check (auth.role() = 'authenticated' and auth.uid() = user_id and not public.is_suspended())$$);
 
 select pg_temp.create_policy_if_missing('public', 'comment_votes', 'Users can remove their own comment votes',
   $$create policy "Users can remove their own comment votes" on public.comment_votes for delete using (auth.uid() = user_id)$$);
