@@ -35,6 +35,7 @@ import ReportButton from "@/components/moderation/ReportButton";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
 import type { PostCardData } from "@/components/post/PostCard";
 import { RESPONSE_PAGE_SIZE, fetchResponsePage } from "@/lib/feedData";
+import { countComments } from "@/lib/commentThread";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
 import PostConversationView from "./PostConversationView";
@@ -163,6 +164,7 @@ interface SecondaryData {
   coAuthors: CoAuthorRecord[];
   responseCards: PostCardData[];
   responsesHasMore: boolean;
+  commentCount: number;
   reviews: Array<{
     assigned_at: string | null;
     submitted_at: string | null;
@@ -355,6 +357,7 @@ async function getSecondaryData(
     { data: decisionsRaw },
     { data: versionsRaw },
     { count: responseCount },
+    commentCount,
     { count: bookmarkCount },
     relatedResult,
     previousPostResult,
@@ -398,6 +401,7 @@ async function getSecondaryData(
       .select("*", { count: "exact", head: true })
       .eq("in_response_to", postId)
       .eq("status", "published"),
+    countComments(supabase, postId),
     supabase
       .from("bookmarks")
       .select("*", { count: "exact", head: true })
@@ -467,6 +471,7 @@ async function getSecondaryData(
     coAuthors,
     responseCards: responsePage.cards,
     responsesHasMore: responsePage.hasMore,
+    commentCount,
     reviews: (reviewsRaw ?? []) as Array<{
       assigned_at: string | null;
       submitted_at: string | null;
@@ -585,12 +590,26 @@ async function ParentPostLink({
   const supabase = await createClient();
   const { data: parentPost, error } = await supabase
     .from("posts")
-    .select("id, title, slug")
+    .select(
+      "id, title, slug, content_kind, type, profiles!posts_author_id_fkey (full_name, username)"
+    )
     .eq("id", parentPostId)
     .eq("status", "published")
     .maybeSingle();
 
   if (error || !parentPost) return null;
+
+  // A titleless Post has no title to show, but it does have an author -- so
+  // name it "Post by Ada Obi" rather than the anonymous "this post".
+  const rawParentProfile = (parentPost as unknown as {
+    profiles?:
+      | { full_name: string | null; username: string | null }
+      | Array<{ full_name: string | null; username: string | null }>
+      | null;
+  }).profiles;
+  const parentProfile = Array.isArray(rawParentProfile)
+    ? (rawParentProfile[0] ?? null)
+    : (rawParentProfile ?? null);
 
   return (
     <Link
@@ -603,9 +622,9 @@ async function ParentPostLink({
     >
       <span aria-hidden="true">{"\u21A9"}</span>
       <span>
-        In response to:{" "}
+        Responding to{" "}
         <span className={`font-medium ${mode === "editorial" ? "text-ink" : "text-white/80"}`}>
-          {getPostDisplayTitle(parentPost as ParentPostRef) ?? "this post"}
+          {getPostMetadataTitle(parentPost as ParentPostRef, parentProfile)}
         </span>
       </span>
     </Link>
@@ -942,6 +961,8 @@ async function PostEngagementSection({
       initialLiked={viewer.userLiked}
       initialLikeCount={secondary.likeCount}
       initialBookmarked={viewer.userBookmarked}
+      responseCount={secondary.responseCount}
+      commentCount={secondary.commentCount}
       reportSlot={
         userId && author && userId !== author.id ? (
           <ReportButton

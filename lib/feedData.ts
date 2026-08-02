@@ -148,6 +148,7 @@ async function enrichPosts(
     likeCounts,
     bookmarkCounts,
     referenceCounts,
+    commentCounts,
     responseCounts,
     profilesResult,
     postAuthorsResult,
@@ -157,6 +158,11 @@ async function enrichPosts(
     getLikeCountsByPostId(supabase, ids),
     getCountsByPostId(supabase, "bookmarks", ids),
     getCountsByPostId(supabase, "post_references", ids),
+    // Read with the caller's client, never the admin one: the RLS SELECT policy
+    // on comments is what hides moderated rows, so a service-role count leaks
+    // them. An author legitimately sees their own hidden comment, so this
+    // number is per-viewer by design.
+    getCountsByPostId(supabase, "comments", ids),
     ids.length > 0
       ? supabase.from("posts").select("in_response_to").in("in_response_to", ids)
       : Promise.resolve({ data: [], error: null }),
@@ -390,6 +396,10 @@ async function enrichPosts(
       bookmark_count: bookmarkCounts[id] ?? 0,
       reference_count: referenceCounts[id] ?? 0,
       response_count: responseCountsByPostId[id] ?? 0,
+      // Deliberately separate from response_count, which lib/postQuality.ts and
+      // lib/feedRanking.ts score and badge from -- folding comments into it
+      // would quietly change feed order.
+      comment_count: commentCounts[id] ?? 0,
       quality_badges: qualitySignals.badges,
       surface_reason: getFeedSurfaceReason(qualityInput),
       quality_score: qualitySignals.score,

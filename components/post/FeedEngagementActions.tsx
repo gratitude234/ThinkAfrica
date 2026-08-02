@@ -15,7 +15,10 @@ interface Props {
   initialLikeCount: number;
   initialBookmarked: boolean;
   responseCount: number;
-  showResponses?: boolean;
+  commentCount?: number;
+  /** The discussion metric: comments plus responses. Off only where there is
+   *  deliberately no discussion affordance. */
+  showDiscussion?: boolean;
   contentKind?: ContentKind | null;
 }
 
@@ -27,7 +30,8 @@ export default function FeedEngagementActions({
   initialLikeCount,
   initialBookmarked,
   responseCount,
-  showResponses = true,
+  commentCount = 0,
+  showDiscussion = true,
   contentKind = null,
 }: Props) {
   const { requestAuth } = useGuestAuthGate();
@@ -122,16 +126,19 @@ export default function FeedEngagementActions({
           <span>{likeCount}</span>
         </button>
 
-        {showResponses ? (
+        {showDiscussion ? (
+          // #comments, not #responses: the responses section only renders when
+          // responses exist, so a card showing "0" used to link to an anchor
+          // that wasn't on the page. The comment thread is always there.
           <Link
-            href={`/post/${slug}#responses`}
-            aria-label={`${responseCount} ${responseCount === 1 ? "response" : "responses"}`}
+            href={`/post/${slug}#comments`}
+            aria-label={`${commentCount + responseCount} in this discussion`}
             className={`${actionClass} hover:bg-gray-50 hover:text-emerald-700`}
           >
             <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            <span>{responseCount}</span>
+            <span>{commentCount + responseCount}</span>
           </Link>
         ) : null}
 

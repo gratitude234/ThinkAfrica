@@ -40,9 +40,9 @@ describe("HomeFeedCard", () => {
 
     expect(container.querySelector("h2")).toBeNull();
     expect(screen.getByText("A short thought about building better institutions.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "2 responses" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "2 in this discussion" })).toHaveAttribute(
       "href",
-      "/post/clear-thinking#responses"
+      "/post/clear-thinking#comments"
     );
   });
 
@@ -96,6 +96,34 @@ describe("HomeFeedCard", () => {
       "/post/the-lecture-hall-still-wins"
     );
     expect(screen.getByRole("link", { name: "Ada Obi" })).toHaveAttribute("href", "/ada-obi");
+  });
+
+  it("names a titleless parent once, not once in the title and again as the author", () => {
+    render(
+      <HomeFeedCard
+        post={post({
+          in_response_to: "parent-2",
+          response_to: {
+            slug: "quiet-thought",
+            title: null,
+            content_kind: "post",
+            type: "blog",
+            profiles: { username: "isacc", full_name: "Isacc Newton" },
+          },
+        })}
+        currentUserId="user-1"
+        surface="latest"
+      />
+    );
+
+    // The metadata fallback is already "Post by Isacc Newton"; appending the
+    // author again produced "Post by Isacc Newton by Isacc Newton".
+    expect(
+      screen.getByText(
+        (_, element) => element?.textContent === "Responding to Post by Isacc Newton"
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Isacc Newton by Isacc Newton/)).toBeNull();
   });
 
   it("falls back to a safe metadata title for a response to a titleless parent Post", () => {
@@ -163,6 +191,39 @@ describe("HomeFeedCard", () => {
     expect(screen.queryByText(/Responding to/)).toBeNull();
   });
 
+  it("counts comments and responses together, and links to the comment thread", () => {
+    render(
+      <HomeFeedCard
+        post={post({ response_count: 2, comment_count: 3 })}
+        currentUserId="user-1"
+        surface="home"
+      />
+    );
+
+    const link = screen.getByRole("link", { name: "5 in this discussion" });
+    // #responses only exists when responses do; #comments is always rendered.
+    expect(link).toHaveAttribute("href", "/post/clear-thinking#comments");
+    expect(link).toHaveTextContent("5");
+  });
+
+  it("gives Research a discussion count too, now that it has a comment thread", () => {
+    render(
+      <HomeFeedCard
+        post={post({
+          title: "A field study of public trust",
+          type: "research",
+          content_kind: "research",
+          response_count: 0,
+          comment_count: 4,
+        })}
+        currentUserId="user-1"
+        surface="home"
+      />
+    );
+
+    expect(screen.getByRole("link", { name: "4 in this discussion" })).toBeInTheDocument();
+  });
+
   it("renders Article identity with its optional genre as secondary metadata", () => {
     render(
       <HomeFeedCard
@@ -208,7 +269,9 @@ describe("HomeFeedCard", () => {
       "href",
       "/post/clear-thinking"
     );
-    expect(screen.queryByRole("link", { name: /responses/ })).not.toBeInTheDocument();
+    // Research used to suppress the discussion metric entirely; it has a
+    // comment thread now, so it carries the same count as everything else.
+    expect(screen.getByRole("link", { name: "2 in this discussion" })).toBeInTheDocument();
     // The dashboard-like tinted/bordered PDF sub-card is gone -- the
     // manuscript row is a plain, borderless metadata line.
     expect(container.querySelector('[class*="bg-purple-tint"]')).toBeNull();

@@ -98,3 +98,27 @@ describe("fetchResponsePage", () => {
     expect(page.hasMore).toBe(false);
   });
 });
+
+describe("enrichPosts comment counts", () => {
+  it("carries a comment count alongside, not instead of, the response count", async () => {
+    const supabase = makeFakeSupabase({
+      posts: queueResults({
+        data: [{ id: "post-1", author_id: "author-1", tags: [] }],
+        error: null,
+      }),
+      // getCountsByPostId tallies rows by post_id.
+      comments: queueResults({
+        data: [{ post_id: "post-1" }, { post_id: "post-1" }, { post_id: "post-1" }],
+        error: null,
+      }),
+    });
+
+    const page = await fetchResponsePage(supabase as never, "parent-1", null, 10);
+    const card = page.cards[0] as { comment_count?: number; response_count?: number };
+
+    expect(card.comment_count).toBe(3);
+    // response_count feeds postQuality/feedRanking; folding comments into it
+    // would silently change feed order.
+    expect(card.response_count).toBe(0);
+  });
+});

@@ -17,7 +17,7 @@ import ProfileGate from "@/components/ui/ProfileGate";
 import type { PostReferenceRecord } from "@/lib/types";
 import { type PostType } from "@/lib/utils";
 import type { ArticleFormat } from "@/lib/contentModel";
-import { getPostMetadataTitle } from "@/lib/postDisplay";
+import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import { useDraftManager, readDraftBackupRaw } from "./DraftManager";
 import PublishDrawer from "./PublishDrawer";
 import CoverImageDialog from "./CoverImageDialog";
@@ -243,6 +243,9 @@ export default function WritePage() {
     responseToIdParam
   );
   const [inResponseToTitle, setInResponseToTitle] = useState<string | null>(null);
+  /** False when the title above is the derived "Post by {author}" stand-in, in
+   *  which case the separate "by @{author}" line would name them twice. */
+  const [parentHasOwnTitle, setParentHasOwnTitle] = useState(true);
   const [inResponseToAuthor, setInResponseToAuthor] = useState<string | null>(null);
   const [responseQuote, setResponseQuote] = useState<string | null>(null);
   const [references, setReferences] = useState<PostReferenceRecord[]>([]);
@@ -332,6 +335,7 @@ export default function WritePage() {
             : (parentPost.profiles as { username: string } | null);
           setInResponseToId(parentPost.id);
           setInResponseToTitle(getPostMetadataTitle(parentPost, authorProfile));
+          setParentHasOwnTitle(getPostDisplayTitle(parentPost) !== null);
           setInResponseToAuthor(authorProfile?.username ?? null);
           return;
         }
@@ -356,6 +360,7 @@ export default function WritePage() {
             : (parentPost.profiles as { username: string } | null);
           setInResponseToId(parentPost.id);
           setInResponseToTitle(getPostMetadataTitle(parentPost, authorProfile));
+          setParentHasOwnTitle(getPostDisplayTitle(parentPost) !== null);
           setInResponseToAuthor(authorProfile?.username ?? null);
           return;
         }
@@ -379,6 +384,7 @@ export default function WritePage() {
             : (parentPost.profiles as { username: string } | null);
           setInResponseToId(parentPost.id);
           setInResponseToTitle(getPostMetadataTitle(parentPost, authorProfile));
+          setParentHasOwnTitle(getPostDisplayTitle(parentPost) !== null);
           setInResponseToAuthor(authorProfile?.username ?? null);
           return;
         }
@@ -1000,7 +1006,7 @@ export default function WritePage() {
                 </p>
                 <p className="mt-0.5 truncate text-sm font-medium text-gray-900">
                   {inResponseToTitle}
-                  {inResponseToAuthor ? (
+                  {inResponseToAuthor && parentHasOwnTitle ? (
                     <span className="ml-1 font-normal text-gray-500">
                       by @{inResponseToAuthor}
                     </span>

@@ -16,6 +16,14 @@ interface RespondingToInfo {
   author: string;
   slug?: string | null;
   authorUsername?: string | null;
+  /**
+   * Whether `title` is the parent's own title rather than the derived
+   * "Post by {author}" stand-in. Only a real title takes a trailing " by
+   * {author}" clause -- the stand-in already names the author, and appending it
+   * again reads "Responding to Post by Ada Obi by Ada Obi". Undefined means a
+   * caller passed a title explicitly, which is always treated as a real one.
+   */
+  hasOwnTitle?: boolean;
 }
 
 interface Props {
@@ -36,6 +44,7 @@ function deriveRespondingTo(responseTo: PostCardData["response_to"]): Responding
   if (!responseTo) return null;
   return {
     title: getPostMetadataTitle(responseTo, responseTo.profiles),
+    hasOwnTitle: getPostDisplayTitle(responseTo) !== null,
     author: responseTo.profiles?.full_name ?? responseTo.profiles?.username ?? "another author",
     slug: responseTo.slug,
     authorUsername: responseTo.profiles?.username ?? null,
@@ -150,7 +159,7 @@ function ContextLine({
               ) : (
                 <span className="font-semibold text-gray-700">{parent.title}</span>
               )}
-              {parent.author ? (
+              {parent.author && parent.hasOwnTitle !== false ? (
                 <>
                   {" by "}
                   {parent.authorUsername ? (
@@ -191,8 +200,8 @@ function ContextLine({
 function Actions({
   post,
   currentUserId,
-  showResponses = true,
-}: Pick<Props, "post" | "currentUserId"> & { showResponses?: boolean }) {
+  showDiscussion = true,
+}: Pick<Props, "post" | "currentUserId"> & { showDiscussion?: boolean }) {
   return (
     <FeedEngagementActions
       postId={post.id}
@@ -202,7 +211,8 @@ function Actions({
       initialLikeCount={post.like_count ?? 0}
       initialBookmarked={post.viewer_bookmarked ?? false}
       responseCount={post.response_count ?? 0}
-      showResponses={showResponses}
+      commentCount={post.comment_count ?? 0}
+      showDiscussion={showDiscussion}
       contentKind={resolveContentKind(post)}
     />
   );
@@ -351,7 +361,7 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo, hideResp
       ) : null}
       {abstract ? <p className="mt-2.5 line-clamp-2 text-[13.5px] leading-[1.6] text-gray-600">{abstract}</p> : null}
       <ResearchManuscriptRow post={post} evidence={evidence} />
-      <Actions post={post} currentUserId={currentUserId} showResponses={false} />
+      <Actions post={post} currentUserId={currentUserId} />
     </article>
   );
 }
