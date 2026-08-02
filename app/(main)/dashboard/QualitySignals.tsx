@@ -48,8 +48,11 @@ export default function QualitySignals({
           const engagement = item.summary.credibilitySignals.find(
             (signal) => signal.label === "Saves and likes"
           );
+          // postQuality emits this signal as "Responses"; looking it up as
+          // "Discussion" never matched, so this tile printed the literal
+          // "0 comments" on every row regardless of the real numbers.
           const discussion = item.summary.credibilitySignals.find(
-            (signal) => signal.label === "Discussion"
+            (signal) => signal.label === "Responses"
           );
 
           return (
@@ -89,7 +92,7 @@ export default function QualitySignals({
                 <div className="rounded-lg bg-white px-3 py-2">
                   <p className="text-gray-500">Discussion</p>
                   <p className="mt-0.5 font-medium text-gray-800">
-                    {discussion?.value ?? "0 comments"}
+                    {discussion?.value ?? "No responses yet"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white px-3 py-2">

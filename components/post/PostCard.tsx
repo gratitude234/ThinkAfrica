@@ -37,6 +37,9 @@ export interface PostCardData {
   read_count?: number | null;
   reference_count?: number;
   response_count?: number;
+  /** Comments on this post. Kept apart from response_count: only the UI sums
+   *  them, so ranking inputs stay untouched. */
+  comment_count?: number;
   citation_id?: string | null;
   published_version_id?: string | null;
   document_original_name?: string | null;
@@ -282,6 +285,12 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
   const badgeClass = TYPE_BADGES[post.type] ?? TYPE_BADGES.blog;
   const likeCount = typeof post.like_count === "number" ? post.like_count : null;
   const responseCount = typeof post.response_count === "number" ? post.response_count : null;
+  // Comments and responses are one conversation to a reader; the bubble should
+  // not read "0" on a post with a live comment thread.
+  const discussionCount =
+    responseCount === null && typeof post.comment_count !== "number"
+      ? null
+      : (responseCount ?? 0) + (post.comment_count ?? 0);
   const readCount = typeof post.read_count === "number" ? post.read_count : null;
   const hasCoverImage = Boolean(post.cover_image_url?.trim());
   const isEditorial = variant === "editorial" || variant === "featured";
@@ -495,7 +504,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
               </div>
               <div className="ml-auto flex shrink-0 items-center gap-2.5 text-gray-500 sm:gap-3">
                 <EngagementMetric icon={<HeartIcon />} value={likeCount} label="likes" />
-                <EngagementMetric icon={<CommentIcon />} value={responseCount} label="responses" />
+                <EngagementMetric icon={<CommentIcon />} value={discussionCount} label="in this discussion" />
                 <EngagementMetric icon={<EyeIcon />} value={readCount} label="reads" />
                 {isEditorial ? <span className="hidden text-gray-400 sm:inline-flex"><BookmarkIcon /></span> : null}
               </div>

@@ -59,14 +59,16 @@ export default async function TopicPage({ params }: PageProps) {
   if (!postsRaw) notFound();
 
   const postIds = postsRaw.map((post) => post.id);
-  const [bookmarkCounts, referenceCounts, responseRows] =
+  const [bookmarkCounts, referenceCounts, commentCounts, responseRows] =
     postIds.length > 0
       ? await Promise.all([
           getCountsByPostId(supabase, "bookmarks", postIds),
           getCountsByPostId(supabase, "post_references", postIds),
+          getCountsByPostId(supabase, "comments", postIds),
           supabase.from("posts").select("in_response_to").in("in_response_to", postIds),
         ])
       : [
+          {} as Record<string, number>,
           {} as Record<string, number>,
           {} as Record<string, number>,
           { data: [] as Array<{ in_response_to?: string | null }> },
@@ -103,6 +105,7 @@ export default async function TopicPage({ params }: PageProps) {
     bookmark_count: bookmarkCounts[p.id] ?? 0,
     reference_count: referenceCounts[p.id] ?? 0,
     response_count: responseCounts[p.id] ?? 0,
+    comment_count: commentCounts[p.id] ?? 0,
     quality_badges: qualitySignals.badges,
     quality_score: qualitySignals.score,
     surface_reason: getFeedSurfaceReason(qualityInput),
@@ -234,6 +237,8 @@ export default async function TopicPage({ params }: PageProps) {
                     (post as { reference_count?: number }).reference_count ?? 0,
                   response_count:
                     (post as { response_count?: number }).response_count ?? 0,
+                  comment_count:
+                    (post as { comment_count?: number }).comment_count ?? 0,
                   quality_score:
                     (post as { quality_score?: number }).quality_score ?? 0,
                   quality_badges:

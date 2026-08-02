@@ -162,7 +162,7 @@ export default function InlineResponseComposer({
             Long-form
           </Link>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-3">
           {characters >= COMMENT_MAX_CHARACTERS - 200 ? (
             <span className={`text-[13px] ${overLimit ? "font-semibold text-red-600" : "text-gray-400"}`}>
               {COMMENT_MAX_CHARACTERS - characters}

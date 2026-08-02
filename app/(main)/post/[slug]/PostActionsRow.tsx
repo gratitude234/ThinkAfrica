@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { usePostEngagement } from "./PostEngagementContext";
-import ResponseStartLink from "@/components/post/ResponseStartLink";
 import ShareButtons from "./ShareButtons";
+import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 
 interface PostActionsRowProps {
   postId: string;
@@ -15,8 +15,10 @@ interface PostActionsRowProps {
   initialLiked: boolean;
   initialLikeCount: number;
   initialBookmarked: boolean;
-  /** Shown alongside the Respond action, mirroring the like count. */
+  /** Shown alongside the reply action: comments plus responses, matching the
+   *  discussion metric on feed cards. */
   responseCount?: number;
+  commentCount?: number;
   /** Rendered at the trailing edge of the bar — keeps secondary actions such as
    *  Report grouped with the row instead of orphaned on a line of their own. */
   reportSlot?: React.ReactNode;
@@ -36,6 +38,7 @@ export default function PostActionsRow({
   initialLikeCount,
   initialBookmarked,
   responseCount = 0,
+  commentCount = 0,
   reportSlot = null,
 }: PostActionsRowProps) {
   const {
@@ -53,6 +56,27 @@ export default function PostActionsRow({
     setInlineActionsVisible,
   } = usePostEngagement();
   const rowRef = useRef<HTMLDivElement | null>(null);
+  const { requestAuth } = useGuestAuthGate();
+  const discussionCount = commentCount + responseCount;
+
+  const goToComposer = () => {
+    if (!userId) {
+      requestAuth("respond", { contentKind: "post" });
+      return;
+    }
+
+    const composer = document.getElementById("inline-response");
+    if (composer) {
+      composer.scrollIntoView({ behavior: "smooth", block: "center" });
+      // preventScroll so focus doesn't fight the smooth scroll above.
+      (composer as HTMLTextAreaElement).focus({ preventScroll: true });
+      return;
+    }
+
+    // No composer on the page (an unpublished post), so at least land on the
+    // thread rather than doing nothing.
+    document.getElementById("comments")?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
     syncLiked(initialLiked);
@@ -106,7 +130,11 @@ export default function PostActionsRow({
           {likeCount}
         </button>
 
-        <ResponseStartLink postId={postId} source="post_actions_row" userId={userId} className={ACTION_CLASS}>
+        {/* The inline composer is a few hundred pixels below this row, so the
+            reply action takes the reader there rather than opening the chooser
+            and navigating away from the post they are replying to. Publishing a
+            full Response is still one click, from inside the composer. */}
+        <button type="button" onClick={goToComposer} className={ACTION_CLASS} aria-label="Reply to this post">
           <svg
             className="h-5 w-5"
             viewBox="0 0 24 24"
@@ -121,11 +149,11 @@ export default function PostActionsRow({
               d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"
             />
           </svg>
-          Respond
-          {responseCount > 0 ? (
-            <span className="text-gray-500">{responseCount}</span>
+          Reply
+          {discussionCount > 0 ? (
+            <span className="text-gray-500">{discussionCount}</span>
           ) : null}
-        </ResponseStartLink>
+        </button>
 
         <button
           type="button"

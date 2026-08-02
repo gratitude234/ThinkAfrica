@@ -9,7 +9,7 @@ import type { PostCardData } from "@/components/post/PostCard";
 import PublishedToast from "./PublishedToast";
 import PostActionsRow from "./PostActionsRow";
 import DiscussionSection from "./DiscussionSection";
-import { getPostDisplayTitle } from "@/lib/postDisplay";
+import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import { formatRelativeTime, pointsForPost } from "@/lib/utils";
 
 interface ConversationAuthor {
@@ -38,7 +38,15 @@ interface ConversationSecondary {
   responseCount: number;
   responseCards: PostCardData[];
   responsesHasMore: boolean;
-  relatedPosts: Array<{ id: string; title: string | null; slug: string }>;
+  commentCount: number;
+  relatedPosts: Array<{
+    id: string;
+    title: string | null;
+    slug: string;
+    content_kind?: string | null;
+    type?: string | null;
+    profiles?: { full_name: string | null; username: string | null } | null;
+  }>;
 }
 
 interface ConversationViewer {
@@ -65,12 +73,17 @@ async function ParentContextLine({ parentPostId }: { parentPostId: string }) {
   const supabase = await createClient();
   const { data: parent } = await supabase
     .from("posts")
-    .select("title, slug")
+    .select("title, slug, content_kind, type, profiles!posts_author_id_fkey (full_name, username)")
     .eq("id", parentPostId)
     .eq("status", "published")
     .maybeSingle();
 
   if (!parent) return null;
+
+  // The author is right there in the row; "this post" named nobody and nothing.
+  const parentProfile = Array.isArray(parent.profiles)
+    ? (parent.profiles[0] ?? null)
+    : (parent.profiles ?? null);
 
   return (
     <p className="mb-4 text-sm text-gray-500">
@@ -80,7 +93,7 @@ async function ParentContextLine({ parentPostId }: { parentPostId: string }) {
         href={`/post/${parent.slug}`}
         className="font-semibold text-gray-700 hover:text-emerald-brand hover:underline"
       >
-        {getPostDisplayTitle(parent) ?? "this post"}
+        {getPostMetadataTitle(parent, parentProfile)}
       </Link>
     </p>
   );
@@ -126,7 +139,9 @@ export default async function PostConversationView({
           relatedPost
             ? {
                 id: relatedPost.id,
-                title: getPostDisplayTitle(relatedPost) ?? "another post",
+                // The related query already carries the author, so a titleless
+                // Post is nameable rather than "another post".
+                title: getPostMetadataTitle(relatedPost, relatedPost.profiles),
                 slug: relatedPost.slug,
               }
             : null
@@ -228,6 +243,7 @@ export default async function PostConversationView({
           initialLikeCount={secondary.likeCount}
           initialBookmarked={viewer.userBookmarked}
           responseCount={secondary.responseCount}
+          commentCount={secondary.commentCount}
         />
         {userId && author && !isOwnPost ? (
           <p className="mt-2 text-right">
