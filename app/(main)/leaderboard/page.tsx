@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import SponsorBanner from "@/components/ui/SponsorBanner";
 import PointsTierBadge from "@/components/ui/PointsTierBadge";
-import { POST_POINTS, type PostType } from "@/lib/utils";
+import { pointsForPost } from "@/lib/utils";
 
 export const revalidate = 120;
 
@@ -46,7 +46,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
     const { data: weeklyPosts } = await supabase
       .from("posts")
       .select(
-        "author_id, type, profiles!posts_author_id_fkey(id, username, full_name, university, avatar_url, points)"
+        "author_id, type, in_response_to, profiles!posts_author_id_fkey(id, username, full_name, university, avatar_url, points)"
       )
       .eq("status", "published")
       .gte("published_at", weekAgo);
@@ -57,7 +57,7 @@ export default async function LeaderboardPage({ searchParams }: PageProps) {
       const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
       if (!profile) continue;
 
-      const points = POST_POINTS[post.type as PostType] ?? 10;
+      const points = pointsForPost(post);
       if (!userMap[profile.id]) {
         userMap[profile.id] = { ...profile, weekly_points: 0 };
       }

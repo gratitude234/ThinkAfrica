@@ -10,7 +10,7 @@ import PublishedToast from "./PublishedToast";
 import PostActionsRow from "./PostActionsRow";
 import DiscussionSection from "./DiscussionSection";
 import { getPostDisplayTitle } from "@/lib/postDisplay";
-import { formatRelativeTime, POST_POINTS, type PostType } from "@/lib/utils";
+import { formatRelativeTime, pointsForPost } from "@/lib/utils";
 
 interface ConversationAuthor {
   id: string;
@@ -37,6 +37,7 @@ interface ConversationSecondary {
   likeCount: number;
   responseCount: number;
   responseCards: PostCardData[];
+  responsesHasMore: boolean;
   relatedPosts: Array<{ id: string; title: string | null; slug: string }>;
 }
 
@@ -55,6 +56,7 @@ interface PostConversationViewProps {
   sanitizedExcerpt: string | null;
   authorName: string;
   metadataTitle: string;
+  responsePages: number;
   secondaryDataPromise: Promise<ConversationSecondary>;
   viewerDataPromise: Promise<ConversationViewer>;
 }
@@ -97,6 +99,7 @@ export default async function PostConversationView({
   sanitizedExcerpt,
   authorName,
   metadataTitle,
+  responsePages,
   secondaryDataPromise,
   viewerDataPromise,
 }: PostConversationViewProps) {
@@ -117,7 +120,7 @@ export default async function PostConversationView({
         postType={post.type}
         title={metadataTitle}
         slug={post.slug}
-        points={POST_POINTS[(post.type as PostType) ?? "blog"] ?? 10}
+        points={pointsForPost(post)}
         username={author?.username ?? ""}
         relatedTarget={
           relatedPost
@@ -259,6 +262,8 @@ export default async function PostConversationView({
         userProfileId={userId}
         responseCount={secondary.responseCount}
         responseCards={secondary.responseCards}
+        responsesHasMore={secondary.responsesHasMore}
+        nextResponsePage={responsePages + 1}
         isPublished={isPublished}
       />
     </div>

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import HomeFeedCard from "@/components/post/HomeFeedCard";
 import type { PostCardData } from "@/components/post/PostCard";
 import CommentsLoader from "./CommentsLoader";
@@ -10,6 +11,9 @@ interface Props {
   userProfileId: string | null;
   responseCount: number;
   responseCards: PostCardData[];
+  responsesHasMore: boolean;
+  /** `?responses=N` for the next page. */
+  nextResponsePage: number;
   /** Drafts and rejected posts get the thread read-only. */
   isPublished: boolean;
 }
@@ -26,6 +30,8 @@ export default function DiscussionSection({
   userProfileId,
   responseCount,
   responseCards,
+  responsesHasMore,
+  nextResponsePage,
   isPublished,
 }: Props) {
   return (
@@ -58,9 +64,24 @@ export default function DiscussionSection({
                 currentUserId={userId}
                 surface="latest"
                 hideRespondingTo
+                showTimestamp
               />
             ))}
           </div>
+
+          {responsesHasMore ? (
+            // A plain link, deliberately: a response renders as a HomeFeedCard,
+            // which is a Server Component, so the next page has to come from the
+            // server. scroll={false} keeps the reader where they were, and the
+            // expanded thread stays linkable.
+            <Link
+              href={`?responses=${nextResponsePage}`}
+              scroll={false}
+              className="inline-flex min-h-11 items-center rounded-lg border border-gray-200 bg-white px-4 text-[13.5px] font-semibold text-gray-700 transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+            >
+              Show more responses
+            </Link>
+          ) : null}
         </section>
       ) : null}
     </div>

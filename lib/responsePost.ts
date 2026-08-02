@@ -51,13 +51,35 @@ export async function validateResponseParent(
 
   const { data: parent } = await supabase
     .from("posts")
-    .select("id, author_id, slug, title, content_kind, article_format, type")
+    .select("id, author_id, slug, title, content_kind, article_format, type, in_response_to")
     .eq("id", parentId)
     .eq("status", "published")
     .maybeSingle();
 
   if (!parent) {
     return { parent: null, error: "That post is no longer available to respond to." };
+  }
+
+  // Depth cap. A response may answer an original post, or a response to one --
+  // but no deeper. Without this, chains grow without limit and there is no
+  // thread view to read them in: each link is a separate page showing only its
+  // own children, so a long chain is only navigable one post at a time.
+  // Comments exist for continuing a conversation past that point.
+  const grandparentId = (parent as { in_response_to?: string | null }).in_response_to;
+  if (grandparentId) {
+    const { data: grandparent } = await supabase
+      .from("posts")
+      .select("in_response_to")
+      .eq("id", grandparentId)
+      .maybeSingle();
+
+    if ((grandparent as { in_response_to?: string | null } | null)?.in_response_to) {
+      return {
+        parent: null,
+        error:
+          "This thread is already two responses deep. Add a comment to it instead of another response.",
+      };
+    }
   }
 
   return { parent: parent as ResponseParentPost, error: null };

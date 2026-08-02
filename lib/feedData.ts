@@ -406,13 +406,35 @@ async function enrichPosts(
  * viewer state, and quality signals as the main feed. Used by the post detail
  * page's Responses section so a response renders identically to a feed card.
  */
+export const RESPONSE_PAGE_SIZE = 10;
+
+export interface ResponsePage {
+  cards: PostCardData[];
+  hasMore: boolean;
+}
+
+/**
+ * A page of responses plus whether more exist, so the detail page can offer to
+ * show them. Over-fetches one row to make `hasMore` a fact rather than a guess,
+ * the same way fetchFeedPage does.
+ */
+export async function fetchResponsePage(
+  supabase: { from: (table: string) => any },
+  postId: string,
+  viewerId: string | null,
+  limit = RESPONSE_PAGE_SIZE
+): Promise<ResponsePage> {
+  const cards = await fetchResponseCards(supabase, postId, viewerId, limit + 1);
+  return { cards: cards.slice(0, limit), hasMore: cards.length > limit };
+}
+
 export async function fetchResponseCards(
   supabase: {
     from: (table: string) => any;
   },
   postId: string,
   viewerId: string | null,
-  limit = 10
+  limit = RESPONSE_PAGE_SIZE
 ): Promise<PostCardData[]> {
   const { data: raw } = await supabase
     .from("posts")

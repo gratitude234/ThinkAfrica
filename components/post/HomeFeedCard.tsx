@@ -9,7 +9,7 @@ import {
   resolveContentKind,
 } from "@/lib/contentModel";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import { sanitizePostExcerpt } from "@/lib/utils";
+import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
 
 interface RespondingToInfo {
   title: string;
@@ -27,6 +27,9 @@ interface Props {
   /** Set where the parent is already the surrounding context — under the very
    *  post being responded to, "Responding to <this post>" is just noise. */
   hideRespondingTo?: boolean;
+  /** Show when this was published. Off in the feed, where recency is implied by
+   *  the ordering; on in a discussion, where "when" is part of following it. */
+  showTimestamp?: boolean;
 }
 
 function deriveRespondingTo(responseTo: PostCardData["response_to"]): RespondingToInfo | null {
@@ -65,7 +68,16 @@ function documentSize(bytes: number | null | undefined) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function AuthorLine({ post, avatarSize = 36 }: { post: PostCardData; avatarSize?: number }) {
+function AuthorLine({
+  post,
+  avatarSize = 36,
+  showTimestamp = false,
+}: {
+  post: PostCardData;
+  avatarSize?: number;
+  showTimestamp?: boolean;
+}) {
+  const publishedAt = post.published_at ?? post.created_at;
   const profile = post.profiles;
   const name = profile?.full_name ?? profile?.username ?? "Indegenius member";
   const coauthorCount = post.co_authors?.length ?? 0;
@@ -104,6 +116,9 @@ function AuthorLine({ post, avatarSize = 36 }: { post: PostCardData; avatarSize?
         ) : null}
         {profile?.university ? (
           <span className="truncate text-ink-muted">· {profile.university}</span>
+        ) : null}
+        {showTimestamp && publishedAt ? (
+          <span className="shrink-0 text-ink-muted">· {formatRelativeTime(publishedAt)}</span>
         ) : null}
       </div>
     </div>
@@ -210,14 +225,14 @@ function FullWidthCover({ post, title, priority }: { post: PostCardData; title: 
   );
 }
 
-function PostFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo }: Props) {
+function PostFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo, showTimestamp }: Props) {
   const title = getPostDisplayTitle(post);
   const excerpt = sanitizePostExcerpt(post.excerpt) || "View post";
 
   return (
     <article className={CARD_SHELL}>
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
-      <AuthorLine post={post} avatarSize={32} />
+      <AuthorLine post={post} avatarSize={32} showTimestamp={showTimestamp} />
       <div className="mt-3">
         {title ? (
           <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
@@ -236,7 +251,7 @@ function PostFeedCard({ post, currentUserId, surface, priority, respondingTo, hi
   );
 }
 
-function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo }: Props) {
+function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo, showTimestamp }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled article";
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const format = getArticleFormatLabel(resolveArticleFormat(post));
@@ -245,7 +260,7 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo,
   return (
     <article className={CARD_SHELL}>
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
-      <AuthorLine post={post} avatarSize={28} />
+      <AuthorLine post={post} avatarSize={28} showTimestamp={showTimestamp} />
       <div className="mt-3 min-w-0">
         <p className={`mb-1.5 font-display text-[10.5px] font-bold uppercase tracking-[0.14em] ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
           Article{format ? ` · ${format}` : ""}{" "}
