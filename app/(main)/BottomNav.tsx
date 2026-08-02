@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import CreateLauncher from "./CreateLauncher";
 import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import { shouldShowMobilePrimaryNav } from "./navRoutes";
+import { useNavAutoHide } from "@/lib/useNavAutoHide";
 import {
   DebatesIcon,
   ExploreIcon,
@@ -42,6 +44,22 @@ export default function BottomNav({
   hasActiveDebate,
 }: BottomNavProps) {
   const pathname = usePathname();
+
+  // Focus inside the bar pins it open -- a destination that slides away from
+  // the finger or the focus ring reaching for it is a trap, not an affordance.
+  const [isNavFocused, setIsNavFocused] = useState(false);
+  // Hooks run before the early return below so the count stays constant across
+  // a route change that flips the bar off.
+  //
+  // Only below md, where this bar renders at all. Restricting it here keeps the
+  // scroll listener off desktop entirely rather than having it compute a state
+  // nothing reads.
+  const isNavHidden = useNavAutoHide({
+    mediaQuery: "(max-width: 767px)",
+    disabled: isNavFocused,
+    revealKey: pathname,
+  });
+
   const isPostPage = pathname.startsWith("/post/");
   const showPrimaryNav = shouldShowMobilePrimaryNav(pathname);
   if (!showPrimaryNav && !isPostPage) {
@@ -60,9 +78,21 @@ export default function BottomNav({
     <>
       <CreateLauncher userId={userId} variant="mobileFab" isPostPage={isPostPage} />
 
+      {/* The bar drops away on a downward scroll and returns on an upward one,
+          in step with the top nav: reading a feed on a phone should get the
+          whole screen, and the destinations are one flick away rather than a
+          page scroll away. transform rather than bottom so the slide is
+          composited and the safe-area padding travels with the bar -- and the
+          bar holds no fixed descendants, so making it a containing block costs
+          nothing. translate-y-full clears that padding too, which a fixed pixel
+          offset would leave stranded on notched devices. */}
       {showPrimaryNav ? (
         <nav
-          className="fixed left-0 right-0 z-50 border-t border-gray-100 bg-white shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] md:hidden"
+          onFocus={() => setIsNavFocused(true)}
+          onBlur={() => setIsNavFocused(false)}
+          className={`fixed left-0 right-0 z-50 border-t border-gray-100 bg-white shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden ${
+            isNavHidden ? "translate-y-full" : "translate-y-0"
+          }`}
           style={{
             bottom: "var(--mobile-visual-viewport-bottom, 0px)",
             paddingBottom: "env(safe-area-inset-bottom)",

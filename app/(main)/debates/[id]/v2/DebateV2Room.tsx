@@ -30,6 +30,7 @@ import V2ModeratorControls from "./V2ModeratorControls";
 import V2SubscriptionControl from "./V2SubscriptionControl";
 import { loadDebateV2Room } from "./loadRoomData";
 import { loadDebateV2RoomSignal } from "./loadRoomSignal";
+import { useStickySubnav } from "@/lib/useStickySubnav";
 import type { DebateV2ArgumentView, DebateV2BallotResults, DebateV2DebateSummary, DebateV2RoomView } from "./types";
 
 const POLL_INTERVAL_MS = 15000;
@@ -126,6 +127,11 @@ export default function DebateV2Room({ debateId, initialRoom }: { debateId: stri
   // the next poll tick establishes its own baseline from that known-fresh
   // state instead of comparing against a signal snapshot from before it.
   const lastSignalRef = useRef<RoomSignalLike | null>(null);
+
+  // Lets the room header retreat off the top with the nav instead of staying
+  // glued there once the nav is gone.
+  const headerRef = useRef<HTMLDivElement>(null);
+  useStickySubnav(headerRef);
 
   const refresh = useCallback(async () => {
     try {
@@ -265,7 +271,10 @@ export default function DebateV2Room({ debateId, initialRoom }: { debateId: stri
 
   return (
     <div>
-      <div className="sticky top-[var(--app-nav-offset)] z-30 -mx-4 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur-xl transition-[top] duration-200 ease-out motion-reduce:transition-none sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div
+        ref={headerRef}
+        className="sticky top-[var(--app-subnav-offset)] z-30 -mx-4 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur-xl transition-[top] duration-200 ease-out motion-reduce:transition-none sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+      >
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <Link href="/debates" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-brand hover:underline">

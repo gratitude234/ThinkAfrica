@@ -14,6 +14,7 @@ import HomeGuestNotice from "./HomeGuestNotice";
 import FeedEmptyState from "./FeedEmptyState";
 import FeedErrorState from "./FeedErrorState";
 import CreateTrigger from "./CreateTrigger";
+import { useStickySubnav } from "@/lib/useStickySubnav";
 
 type TabKey = "home" | "following" | "subscriptions" | "topics" | "latest";
 const EMPTY_POSTS: PostCardData[] = [];
@@ -180,9 +181,14 @@ export default function PostsFeedTabs({
   const [isPinned, setIsPinned] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const feedTopRef = useRef<HTMLDivElement | null>(null);
+  const stripRef = useRef<HTMLDivElement | null>(null);
   const inFlightRef = useRef(new Map<string, Promise<FeedResponse>>());
   const activeRequestRef = useRef(0);
   const loadMoreRequestRef = useRef(0);
+
+  // Lets the control strip retreat off the top with the nav rather than
+  // staying glued there once the nav is gone.
+  useStickySubnav(stripRef);
 
   useEffect(() => {
     const nextKey = feedCacheKey(
@@ -367,16 +373,18 @@ export default function PostsFeedTabs({
     const anchor = feedTopRef.current;
     if (!anchor || typeof window === "undefined") return;
 
-    // The live offset, not the measured height: with the nav retreated the
-    // strip pins at 0, so subtracting a full nav height would land the marker
-    // 60px down, leave the strip unpinned, and open a void at the top of the
-    // column that the reveal only fills in progressively.
-    const navOffset =
+    // The measured height, not the live offset. This scroll always moves
+    // upward, and an upward scroll is exactly what brings the nav back -- so by
+    // the time the tab's new cards are on screen there is a full nav bar at the
+    // top again, and the marker has to land below it. Reserving only the
+    // retreated offset (0) would park the strip's natural position at the very
+    // top, where the revealed nav then overlaps the first card.
+    const navHeight =
       Number.parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--app-nav-offset")
+        getComputedStyle(document.documentElement).getPropertyValue("--app-nav-height")
       ) || 0;
     const target = Math.max(
-      window.scrollY + anchor.getBoundingClientRect().top - navOffset,
+      window.scrollY + anchor.getBoundingClientRect().top - navHeight,
       0
     );
     if (window.scrollY <= target) return;
@@ -619,12 +627,20 @@ export default function PostsFeedTabs({
           apart mid-scroll. Opaque (not bg-white/95) so cards passing beneath
           don't ghost through the control strip.
 
+          Pinned beneath the nav while the nav is there, and off the top of the
+          viewport once it isn't: scrolling down hands the entire screen to the
+          posts, scrolling up brings tabs, chips and nav back together in one
+          movement. Pinning at 0 when the nav retreated was the worst of both --
+          the chrome you wanted gone stayed, and the space it freed went to the
+          strip rather than to the feed.
+
           The bottom edge only appears once pinned: without it a card sliding
           under the strip looked sliced rather than layered. The border is
           always in the box (transparent at rest) so gaining it costs no 1px
           reflow. */}
       <div
-        className={`sticky top-[var(--app-nav-offset)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] border-b bg-white px-4 pb-1 transition-[top,box-shadow] duration-200 ease-out motion-reduce:transition-none sm:mx-0 sm:w-full sm:px-0 ${
+        ref={stripRef}
+        className={`sticky top-[var(--app-subnav-offset)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] border-b bg-white px-4 pb-1 transition-[top,box-shadow] duration-200 ease-out motion-reduce:transition-none sm:mx-0 sm:w-full sm:px-0 ${
           isPinned
             ? "border-gray-200 shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
             : "border-transparent"
