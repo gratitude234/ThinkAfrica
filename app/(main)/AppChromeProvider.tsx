@@ -34,8 +34,13 @@ interface AppChromeContextValue {
 const DEFAULT_NAV_HEIGHT = 60;
 const DEFAULT_REVEAL_FLOOR = 96;
 const TOP_REVEAL_FLOOR = 8;
-const HIDE_DISTANCE = 18;
-const REVEAL_DISTANCE = 10;
+// Sized for a thumb, not a mouse wheel. Momentum scrolling and the rubber-band
+// at either end of the document produce direction reversals of a dozen-odd
+// pixels constantly, so a threshold in that range makes the chrome strobe
+// through a single flick. These are past the noise floor while still landing
+// well inside one deliberate swipe.
+const HIDE_DISTANCE = 64;
+const REVEAL_DISTANCE = 40;
 
 const EXPANDED_CHROME_FALLBACK: AppChromeContextValue = {
   mode: "expanded",

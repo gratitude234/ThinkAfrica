@@ -277,7 +277,7 @@ export default function DebateV2Room({ debateId, initialRoom }: { debateId: stri
         ref={headerRef}
         data-app-context-nav=""
         data-app-chrome-motion=""
-        className="sticky top-[var(--app-nav-height)] z-30 -mx-4 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur-xl transition-transform duration-200 ease-out motion-reduce:transition-none sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+        className="z-30 -mx-4 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
       >
         <div data-app-debate-header-content="" className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">

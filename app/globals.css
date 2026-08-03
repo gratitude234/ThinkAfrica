@@ -61,19 +61,60 @@
   }
 }
 
+/* Every contextual sub-header pins directly beneath the primary nav and rides
+   up with it when the nav retreats. It tracks --app-nav-offset -- the nav's
+   live occupancy -- rather than pinning at a fixed offset and translating
+   itself up by the nav height. Both land the same pixels on screen, but the
+   transform moves only the painted box: the element stays pinned a nav-height
+   lower than it looks, so it pins early, and every measurement of it (where it
+   pinned, what it covers, how tall it is) disagrees with what the reader sees.
+   Driving the sticky offset keeps paint and layout in agreement. Defined once
+   here because all four sub-headers -- the feed controls, both debate rooms
+   and StickySubnav -- have to move identically. */
+[data-app-context-nav] {
+  position: sticky;
+  top: var(--app-nav-offset);
+  transition: top 200ms ease-out;
+}
+
+/* The part of a sub-header that only exists while the chrome is expanded.
+   It collapses its own row rather than just fading, because a faded-but-
+   reserved band is a hole: the strip pins with its full height while the cards
+   below it are still further down the document, so you get a stripe of bare
+   canvas under the tabs that only closes once you have scrolled past it. The
+   0fr row reclaims the space for real; padding sits on the grandchild so the
+   collapsed row can actually reach zero (border-box refuses to shrink below
+   its own padding). The reflow this causes is what scroll anchoring exists
+   for -- the browser corrects scrollTop by the same amount, so nothing the
+   reader is looking at moves. */
+[data-app-context-expanded] {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 200ms ease-out,
+    opacity 200ms ease-out;
+}
+
+[data-app-context-expanded] > * {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app-context-nav],
+  [data-app-context-expanded] {
+    transition: none;
+  }
+}
+
 @media (max-width: 767px) {
   [data-app-chrome][data-chrome-mode="compact"] [data-app-primary-nav] {
     transform: translate3d(0, -100%, 0);
   }
 
-  [data-app-chrome][data-chrome-mode="compact"] [data-app-context-nav] {
-    transform: translate3d(0, calc(-1 * var(--app-nav-height)), 0);
-  }
-
   [data-app-chrome][data-chrome-mode="compact"] [data-app-context-expanded] {
     pointer-events: none;
     opacity: 0;
-    transform: translate3d(0, -8px, 0);
+    grid-template-rows: 0fr;
   }
 
   [data-app-chrome][data-chrome-mode="compact"] [data-app-context-remove] {

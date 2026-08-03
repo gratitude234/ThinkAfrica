@@ -118,22 +118,23 @@ describe("AppChromeProvider", () => {
     ).toHaveLength(1);
   });
 
-  it("requires 18px downward and 10px upward intent", () => {
+  // Thumb-sized, so a flick's own momentum wobble cannot flip the chrome.
+  it("requires 64px downward and 40px upward intent", () => {
     mediaQueries();
     window.scrollY = 100;
     renderProvider();
     flushFrames();
 
-    scrollTo(117);
+    scrollTo(163);
     expect(screen.getByTestId("mode")).toHaveTextContent("expanded");
 
-    scrollTo(118);
+    scrollTo(164);
     expect(screen.getByTestId("mode")).toHaveTextContent("compact");
 
-    scrollTo(109);
+    scrollTo(125);
     expect(screen.getByTestId("mode")).toHaveTextContent("compact");
 
-    scrollTo(108);
+    scrollTo(124);
     expect(screen.getByTestId("mode")).toHaveTextContent("expanded");
   });
 
