@@ -21,14 +21,20 @@ export default function StickySubnav({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  useStickySubnav(ref);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  useStickySubnav(ref, anchorRef);
 
   return (
-    <div
-      ref={ref}
-      className={`sticky top-[var(--app-subnav-offset)] transition-[top] duration-200 ease-out motion-reduce:transition-none ${className}`}
-    >
-      {children}
-    </div>
+    <>
+      <div ref={anchorRef} aria-hidden="true" />
+      <div
+        ref={ref}
+        data-app-context-nav=""
+        data-app-chrome-motion=""
+        className={`sticky top-[var(--app-nav-height)] transition-transform duration-200 ease-out motion-reduce:transition-none ${className}`}
+      >
+        {children}
+      </div>
+    </>
   );
 }

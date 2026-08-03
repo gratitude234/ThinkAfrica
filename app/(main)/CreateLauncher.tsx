@@ -106,6 +106,9 @@ export default function CreateLauncher({
         <button
           type="button"
           onClick={handleTrigger}
+          data-app-compose-fab=""
+          data-app-compose-fab-static={isPostPage ? "" : undefined}
+          data-app-chrome-motion=""
           className="group fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition-[background-color,box-shadow,transform] duration-200 hover:bg-[#0E4B37] hover:shadow-[0_10px_24px_-7px_rgb(7_57_41/0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 active:scale-[0.96] motion-reduce:transition-none"
           style={{
             // On post pages the mobile ReadingBar pill (ReadingBar.tsx) also floats

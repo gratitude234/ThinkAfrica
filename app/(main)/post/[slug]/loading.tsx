@@ -58,7 +58,7 @@ export default function Loading() {
 
         {/* TOC sidebar placeholder */}
         <div className="hidden lg:block lg:col-span-1">
-          <div className="sticky top-24 space-y-2">
+          <div className="sticky top-[var(--app-sticky-offset)] space-y-2">
             <div className="h-3 w-16 bg-gray-200 rounded mb-3" />
             {[...Array(5)].map((_, i) => (
               <div key={i} className="h-3 w-full bg-gray-100 rounded" />

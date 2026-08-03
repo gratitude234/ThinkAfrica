@@ -118,6 +118,7 @@ describe("SideRail", () => {
   it("pins at the shared sticky offset", () => {
     const { container } = renderRail();
     const rail = container.querySelector("aside");
-    expect(rail).toHaveClass("xl:top-[calc(var(--app-nav-offset)+1rem)]");
+    expect(rail).toHaveClass("xl:top-[var(--app-sticky-offset)]");
+    expect(rail.className).not.toMatch(/transition-\[top\]/);
   });
 });

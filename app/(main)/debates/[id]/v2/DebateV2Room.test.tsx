@@ -64,17 +64,19 @@ describe("DebateV2Room", () => {
     expect(screen.getByText("Cast your initial ballot")).toBeInTheDocument();
   });
 
-  // The room header retreats off the top with the nav rather than staying
-  // pinned at 0 once the nav is gone -- following a long exchange on a phone
-  // should get the whole screen, and the title bar is one scroll-up away.
-  // (The measurement behind that offset is covered in lib/useStickySubnav.test.)
-  it("retreats the room header with the nav", () => {
+  it("keeps compact debate context when the primary nav retreats", () => {
     const { container } = render(
       <DebateV2Room debateId="debate-1" initialRoom={makeRoom()} />
     );
 
     expect(container.querySelector(".sticky")).toHaveClass(
-      "top-[var(--app-subnav-offset)]"
+      "top-[var(--app-nav-height)]"
+    );
+    expect(container.querySelector(".sticky")).toHaveAttribute(
+      "data-app-context-nav"
+    );
+    expect(container.querySelector("[data-app-context-remove] button")).toHaveTextContent(
+      "Share"
     );
   });
 

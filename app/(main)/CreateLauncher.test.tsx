@@ -85,4 +85,29 @@ describe("CreateLauncher -- direct-to-composer", () => {
     // -- so there is no breakpoint at which both wrappers are unhidden.
     expect(mobileWrapper).toHaveClass("md:hidden");
   });
+
+  it("lets the shared chrome move a feed FAB down but keeps a post FAB clear of the reading bar", () => {
+    const { rerender } = render(
+      <CreateLauncher userId="user-1" variant="mobileFab" />
+    );
+    let fab = screen.getByRole("button", { name: "Start writing" });
+
+    expect(fab).toHaveAttribute("data-app-compose-fab");
+    expect(fab).toHaveAttribute("data-app-chrome-motion");
+    expect(fab).not.toHaveAttribute("data-app-compose-fab-static");
+    expect(fab).toHaveStyle({
+      bottom:
+        "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
+    });
+
+    rerender(
+      <CreateLauncher userId="user-1" variant="mobileFab" isPostPage />
+    );
+    fab = screen.getByRole("button", { name: "Start writing" });
+    expect(fab).toHaveAttribute("data-app-compose-fab-static");
+    expect(fab).toHaveStyle({
+      bottom:
+        "calc(112px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
+    });
+  });
 });

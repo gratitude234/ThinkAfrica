@@ -23,7 +23,7 @@
     "lib/debateV15.ts",
     "lib/actionInbox.ts",
     "lib/useHasScrolled.ts",
-    "lib/useNavAutoHide.ts",
+    "app/(main)/AppChromeProvider.tsx",
     "lib/notificationRead.ts",
     "lib/notificationCatalog.ts",
     "lib/notificationPreferences.ts",

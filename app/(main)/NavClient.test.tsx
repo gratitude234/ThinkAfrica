@@ -1,21 +1,6 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import NavClient from "./NavClient";
-
-// The auto-hide hook coalesces scroll events into a rAF, so frames are driven
-// by hand here -- otherwise its callbacks land on a real timer after the test
-// that scheduled them has finished.
-let frames: Array<FrameRequestCallback | null> = [];
-
-beforeEach(() => {
-  frames = [];
-  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
-    frames.push(cb)
-  );
-  vi.stubGlobal("cancelAnimationFrame", (id: number) => {
-    frames[id - 1] = null;
-  });
-});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -24,26 +9,6 @@ afterEach(() => {
   document.documentElement.removeAttribute("style");
   document.documentElement.removeAttribute("data-nav-hidden");
 });
-
-function scrollTo(y: number) {
-  act(() => {
-    window.scrollY = y;
-    window.dispatchEvent(new Event("scroll"));
-  });
-  act(() => {
-    const queued = frames;
-    frames = [];
-    queued.forEach((cb) => cb?.(0));
-  });
-}
-
-function navOffset() {
-  return document.documentElement.style.getPropertyValue("--app-nav-offset");
-}
-
-function isNavHidden() {
-  return document.documentElement.dataset.navHidden;
-}
 
 const navigationState = vi.hoisted(() => ({ pathname: "/" }));
 
@@ -177,7 +142,7 @@ describe("NavClient desktop nav handoff", () => {
   });
 });
 
-describe("NavClient auto-hide", () => {
+describe("NavClient shared chrome contract", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
   });
@@ -194,85 +159,12 @@ describe("NavClient auto-hide", () => {
     );
   }
 
-  // jsdom has no layout engine, so the movement itself is asserted through the
-  // one variable that drives it: the bar pins at (offset - height) and every
-  // sub-header at offset, so a published 0px is the whole stack retreating.
-  it("publishes a zero offset once the reader scrolls down", () => {
-    renderNav();
-    expect(navOffset()).toBe("");
-
-    scrollTo(400);
-    expect(navOffset()).toBe("0px");
-  });
-
-  it("clears the offset again as soon as the reader scrolls up", () => {
-    renderNav();
-
-    scrollTo(400);
-    expect(navOffset()).toBe("0px");
-
-    scrollTo(340);
-    expect(navOffset()).toBe("");
-  });
-
-  it("never retreats within the reveal floor", () => {
-    renderNav();
-
-    scrollTo(80);
-    expect(navOffset()).toBe("");
-  });
-
-  it("holds the bar in place while focus is inside it", () => {
-    renderNav();
-
-    fireEvent.focus(screen.getByRole("link", { name: "Open messages" }));
-    scrollTo(400);
-    expect(navOffset()).toBe("");
-  });
-
-  it("stops publishing the offset once unmounted", () => {
-    const { unmount } = renderNav();
-
-    scrollTo(400);
-    expect(navOffset()).toBe("0px");
-
-    unmount();
-    expect(navOffset()).toBe("");
-  });
-
-  // The offset alone cannot carry a sub-header off the top of the viewport --
-  // 0px is the bottom edge of a nav that is no longer there, which is exactly
-  // where the feed's tab strip used to strand itself. The flag is what lets CSS
-  // pull that strip up by its own height instead.
-  it("flags the retreat on <html> so sub-headers can retreat with it", () => {
-    renderNav();
-    expect(isNavHidden()).toBeUndefined();
-
-    scrollTo(400);
-    expect(isNavHidden()).toBe("true");
-
-    scrollTo(340);
-    expect(isNavHidden()).toBeUndefined();
-  });
-
-  it("clears the retreat flag once unmounted", () => {
-    const { unmount } = renderNav();
-
-    scrollTo(400);
-    expect(isNavHidden()).toBe("true");
-
-    unmount();
-    expect(isNavHidden()).toBeUndefined();
-  });
-
-  // The bar's own travel is measured from the sub-header offset, not the nav
-  // offset, so a pinned sub-header makes it travel further and the two edges
-  // stay welded together for the length of the animation.
-  it("pins against the sub-header offset so the chrome moves as one block", () => {
+  it("registers as the primary composited chrome surface", () => {
     const { container } = renderNav();
+    const sticky = container.querySelector<HTMLElement>("[data-app-primary-nav]");
 
-    expect(container.querySelector(".sticky")).toHaveClass(
-      "top-[calc(var(--app-subnav-offset)-var(--app-nav-height))]"
-    );
+    expect(sticky).toHaveAttribute("data-app-chrome-motion");
+    expect(sticky).toHaveClass("sticky", "top-0", "transition-transform");
+    expect(document.documentElement).not.toHaveAttribute("data-nav-hidden");
   });
 });

@@ -1196,7 +1196,7 @@ function DiscoverAside({
   currentUserId: string | null;
 }) {
   return (
-    <aside className="hidden space-y-4 transition-[top] duration-200 ease-out motion-reduce:transition-none lg:sticky lg:top-[calc(var(--app-nav-offset)+1rem)] lg:block">
+    <aside className="hidden space-y-4 lg:sticky lg:top-[var(--app-sticky-offset)] lg:block">
       <DebateRailCard data={data} />
       <WritersRailCard people={data.people} currentUserId={currentUserId} />
       <OpportunitiesRailCard data={data} />
@@ -1395,7 +1395,7 @@ export default async function ExplorePage({ searchParams }: PageProps) {
   const data = await getDiscoverData(supabase, user?.id ?? null);
 
   return (
-    <div className="mx-auto min-w-0 max-w-full overflow-hidden lg:max-w-6xl">
+    <div className="mx-auto min-w-0 max-w-full overflow-x-clip lg:max-w-6xl">
       <RetentionEventTracker
         event="discover_viewed"
         metadata={{

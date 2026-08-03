@@ -94,7 +94,7 @@ export default function SideRail({
       // sliding up while this column stays behind. max-h stays on the measured
       // height: it is a ceiling, not a size, and animating it would resize a
       // scrolling column mid-scroll for no visible gain.
-      className="hidden transition-[top] duration-200 ease-out motion-reduce:transition-none xl:sticky xl:top-[calc(var(--app-nav-offset)+1rem)] xl:block xl:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain"
+      className="hidden xl:sticky xl:top-[var(--app-sticky-offset)] xl:block xl:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain"
     >
       <nav aria-label="Sections" className="flex flex-col gap-0.5">
         <RailLink

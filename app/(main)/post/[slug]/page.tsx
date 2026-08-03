@@ -1323,7 +1323,7 @@ async function ResearchDossierSidebar({
 
   return (
     <aside className="hidden lg:block">
-      <div className="sticky top-24 space-y-4">
+      <div className="sticky top-[var(--app-sticky-offset)] space-y-4">
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
             Manuscript actions
@@ -1886,7 +1886,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
           <Suspense
             fallback={
               <aside className="hidden lg:block">
-                <div className="sticky top-24 space-y-4">
+                <div className="sticky top-[var(--app-sticky-offset)] space-y-4">
                   <SectionSkeleton rows={5} />
                   <SectionSkeleton rows={4} />
                 </div>

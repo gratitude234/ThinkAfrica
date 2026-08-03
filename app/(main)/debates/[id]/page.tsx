@@ -229,10 +229,11 @@ export default async function DebatePage({ params }: PageProps) {
   return (
     <div>
       <StickySubnav className="z-40 -mx-4 border-b border-gray-200 bg-white/95 px-6 py-3 backdrop-blur-xl sm:-mx-6 lg:-mx-8">
-        <div className="mx-auto flex max-w-5xl flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div data-app-debate-header-content="" className="mx-auto flex max-w-5xl flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <Link
               href="/debates"
+              data-app-context-remove=""
               className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-brand hover:underline"
             >
               Debates
@@ -244,15 +245,21 @@ export default async function DebatePage({ params }: PageProps) {
 
           <div className="flex flex-wrap items-center gap-3">
             <DebateStatusPill status={status} />
-            <span className="text-xs font-medium text-gray-500">
-              {argumentCount} {argumentCount === 1 ? "argument" : "arguments"}
-            </span>
             {debate.ends_at && status === "active" ? (
               <DebateCountdown endsAt={debate.ends_at} />
             ) : timeLabel ? (
               <span className="text-xs font-medium text-gray-400">{timeLabel}</span>
             ) : null}
-            <ShareButton />
+            <span
+              data-app-context-remove=""
+              data-app-chrome-motion=""
+              className="inline-flex items-center gap-3 transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none"
+            >
+              <span className="text-xs font-medium text-gray-500">
+                {argumentCount} {argumentCount === 1 ? "argument" : "arguments"}
+              </span>
+              <ShareButton />
+            </span>
           </div>
         </div>
       </StickySubnav>

@@ -388,7 +388,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           </Suspense>
         </div>
 
-        <aside className="hidden self-start transition-[top] duration-200 ease-out motion-reduce:transition-none lg:sticky lg:top-[calc(var(--app-nav-offset)+1rem)] lg:block">
+        <aside className="hidden self-start lg:sticky lg:top-[var(--app-sticky-offset)] lg:block">
           <HomeSidebar
             activeDebate={homeDebate}
             recentDraft={recentDraft ?? null}

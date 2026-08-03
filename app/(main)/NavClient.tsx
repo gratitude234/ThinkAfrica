@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
 import BrandWordmark from "@/components/ui/BrandWordmark";
 import NavUserMenu from "./NavUserMenu";
@@ -12,7 +12,7 @@ import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import { shouldShowMobilePrimaryNav } from "./navRoutes";
 import { NAV_MATCH_PREFIXES, isNavItemActive } from "./navItems";
 import { useHasScrolled } from "@/lib/useHasScrolled";
-import { useNavAutoHide } from "@/lib/useNavAutoHide";
+import { useAppChrome } from "./AppChromeProvider";
 
 interface NavClientProps {
   user: User | null;
@@ -63,7 +63,7 @@ export default function NavClient({
   onOpenSearch,
 }: NavClientProps) {
   const pathname = usePathname();
-  const navRef = useRef<HTMLDivElement>(null);
+  const { registerNav, setInteractionLocked } = useAppChrome();
   // Once content is moving beneath the pinned nav, a flat bar reads as painted
   // on rather than floating above the page.
   const hasScrolled = useHasScrolled();
@@ -72,90 +72,9 @@ export default function NavClient({
   // notification panel, which renders in this subtree -- pins it open. A nav
   // that slides away from the control you just reached for is a trap, not an
   // affordance.
-  const [isNavFocused, setIsNavFocused] = useState(false);
-  const isNavHidden = useNavAutoHide({
-    disabled: isNavFocused,
-    revealKey: pathname,
-  });
-
-  const navHeightRef = useRef(0);
-  const isNavHiddenRef = useRef(false);
-
-  // How much of the nav is currently occupying the top of the viewport. The bar
-  // itself pins at (offset - height) and everything beneath it pins at offset,
-  // so one number moves the whole stack and no sub-header can drift out of
-  // register with the bar's bottom edge mid-animation.
-  //
-  // Published as a literal length rather than left to resolve through the
-  // var() chain in globals.css because PostsFeedTabs reads it back with
-  // getComputedStyle, and whether an unregistered custom property computes to a
-  // substituted value or a raw token stream is engine territory.
-  const publishOffset = useCallback(() => {
-    const root = document.documentElement;
-    // The state, not a length: the page's own sticky sub-header publishes its
-    // height, CSS combines the two. That keeps the nav from having to know what
-    // (if anything) is pinned beneath it on the current route.
-    if (isNavHiddenRef.current) {
-      root.dataset.navHidden = "true";
-    } else {
-      delete root.dataset.navHidden;
-    }
-
-    if (isNavHiddenRef.current) {
-      root.style.setProperty("--app-nav-offset", "0px");
-    } else if (navHeightRef.current > 0) {
-      root.style.setProperty("--app-nav-offset", `${navHeightRef.current}px`);
-    } else {
-      root.style.removeProperty("--app-nav-offset");
-    }
-  }, []);
-
   useEffect(() => {
-    isNavHiddenRef.current = isNavHidden;
-    publishOffset();
-  }, [isNavHidden, publishOffset]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    return () => {
-      root.style.removeProperty("--app-nav-offset");
-      root.style.removeProperty("--app-nav-height");
-      delete root.dataset.navHidden;
-    };
-  }, []);
-
-  // Publish the real rendered height of the sticky nav as --app-nav-height so
-  // sticky sub-headers (debate rooms, feed tabs) can pin flush beneath it.
-  // Hardcoded offsets drifted out of sync with the nav and left sub-headers
-  // sliding underneath it; measuring removes that whole class of bug and keeps
-  // working when the announcement strip wraps at narrow widths.
-  useEffect(() => {
-    const node = navRef.current;
-    if (!node) return;
-
-    const root = document.documentElement;
-    const publishHeight = () => {
-      const height = Math.round(node.getBoundingClientRect().height);
-      if (height > 0) {
-        navHeightRef.current = height;
-        root.style.setProperty("--app-nav-height", `${height}px`);
-      }
-      // The offset is derived from the height, so a re-measure has to restate
-      // it -- otherwise a nav that grows keeps publishing its old offset.
-      publishOffset();
-    };
-
-    publishHeight();
-
-    if (typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", publishHeight);
-      return () => window.removeEventListener("resize", publishHeight);
-    }
-
-    const observer = new ResizeObserver(publishHeight);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [publishOffset]);
+    return () => setInteractionLocked(false);
+  }, [setInteractionLocked]);
 
   const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
   const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
@@ -186,17 +105,19 @@ export default function NavClient({
           on purpose: a transform here would make this a containing block for
           the fixed notification panel and Create sheet rendered inside it.
 
-          Anchored to --app-subnav-offset rather than --app-nav-offset so the
-          bar travels the height of the *whole* chrome when a sub-header is
-          pinned beneath it (the feed's tabs + filter chips). Both resolve to
-          the same number on pages without one; where there is one, this is what
-          keeps the two edges welded together for the length of the animation
-          instead of the nav crawling off while the tabs race ahead of it. */}
+          The shared chrome controller owns its measured height and scroll
+          state, so every mobile chrome surface moves from the same signal. */}
       <div
-        ref={navRef}
-        onFocus={() => setIsNavFocused(true)}
-        onBlur={() => setIsNavFocused(false)}
-        className="sticky top-[calc(var(--app-subnav-offset)-var(--app-nav-height))] z-50 transition-[top] duration-200 ease-out motion-reduce:transition-none"
+        ref={registerNav}
+        data-app-primary-nav=""
+        data-app-chrome-motion=""
+        onFocus={() => setInteractionLocked(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setInteractionLocked(false);
+          }
+        }}
+        className="sticky top-0 z-50 transition-transform duration-200 ease-out motion-reduce:transition-none"
       >
       <nav
         className={`h-[60px] border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${

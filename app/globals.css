@@ -28,43 +28,13 @@
     --ta-border: #E5E7EB;
     --ta-border-soft: #F3F4F6;
     --mobile-visual-viewport-bottom: 0px;
-    /* Height of the sticky site nav. The announcement strip scrolls away and is
-       no longer part of it, so this is just the nav bar. Measured at runtime by
-       NavClient and written back to :root, so sticky sub-headers can pin
-       directly beneath it instead of hardcoding a pixel guess. This value is
-       only the pre-hydration fallback. */
+    /* Provider-scoped values override these pre-hydration fallbacks inside the
+       app shell. The announcement strip is deliberately not part of the nav. */
     --app-nav-height: 60px;
-    /* How much of the nav is currently occupying the top of the viewport: its
-       full height while revealed, 0px once it has retreated on a downward
-       scroll. Everything that pins beneath the nav reads this instead of
-       --app-nav-height, so the bar and its sub-headers move off one number and
-       cannot drift apart mid-animation. Overridden inline on <html> by
-       NavClient; --app-nav-height stays the measured height, and is what the
-       nav's own offset is subtracted from.
-
-       This default is load-bearing rather than cosmetic: with no definition at
-       all, top: var(--app-nav-offset) is invalid at computed-value time and
-       falls back to top: auto, which stops the sub-headers being sticky. */
+    /* Live mobile chrome occupancy. Desktop and reduced-motion modes keep this
+       equal to the measured nav height. */
     --app-nav-offset: var(--app-nav-height);
-    /* Height of the page's own sticky sub-header -- the feed's tab + filter
-       strip, and anything else that pins directly beneath the nav and wants to
-       travel with it. Published at runtime by whichever component owns that
-       strip (see lib/useStickySubnav.ts); 0px on pages without one. */
-    --app-subnav-height: 0px;
-    /* Where that sub-header pins. Directly beneath the nav while the nav is
-       revealed, and fully off the top of the viewport once the nav has
-       retreated -- so a downward scroll clears the entire chrome instead of
-       leaving a control bar glued to the top eating a third of the screen.
-       Everything the reader is actually reading gets the whole viewport. */
-    --app-subnav-offset: var(--app-nav-offset);
-  }
-
-  /* Set by NavClient whenever the nav is retreated. Kept as a CSS branch rather
-     than another JS-published length so the sub-header needs no channel back to
-     the nav: it publishes its height, the nav publishes the state, and the
-     stack resolves in CSS. */
-  html[data-nav-hidden="true"] {
-    --app-subnav-offset: calc(-1 * var(--app-subnav-height));
+    --app-sticky-offset: calc(var(--app-nav-offset) + 1rem);
   }
 
   html {
@@ -72,7 +42,8 @@
   }
 
   body {
-    @apply overflow-x-hidden bg-canvas text-ink antialiased;
+    overflow-x: clip;
+    @apply bg-canvas text-ink antialiased;
   }
 
   ::-webkit-scrollbar {
@@ -88,6 +59,45 @@
     border-radius: 9999px;
     background: #D1D5DB;
   }
+}
+
+@media (max-width: 767px) {
+  [data-app-chrome][data-chrome-mode="compact"] [data-app-primary-nav] {
+    transform: translate3d(0, -100%, 0);
+  }
+
+  [data-app-chrome][data-chrome-mode="compact"] [data-app-context-nav] {
+    transform: translate3d(0, calc(-1 * var(--app-nav-height)), 0);
+  }
+
+  [data-app-chrome][data-chrome-mode="compact"] [data-app-context-expanded] {
+    pointer-events: none;
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+  }
+
+  [data-app-chrome][data-chrome-mode="compact"] [data-app-context-remove] {
+    display: none;
+  }
+
+  [data-app-chrome][data-chrome-mode="compact"] [data-app-debate-header-content] {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  [data-app-chrome][data-chrome-mode="compact"] [data-app-bottom-nav] {
+    transform: translate3d(0, 100%, 0);
+  }
+
+  [data-app-chrome][data-chrome-mode="compact"]
+    [data-app-compose-fab]:not([data-app-compose-fab-static]) {
+    transform: translate3d(0, 52px, 0);
+  }
+}
+
+[data-app-chrome][data-chrome-instant="true"] [data-app-chrome-motion] {
+  transition-duration: 0ms !important;
 }
 
 /* Tiptap editor styles */

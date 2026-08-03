@@ -45,7 +45,7 @@ export default function TableOfContents({ headings }: Props) {
   if (headings.length === 0) return null;
 
   return (
-    <div className="sticky top-24 rounded-lg border border-gray-200 bg-white p-4">
+    <div className="sticky top-[var(--app-sticky-offset)] rounded-lg border border-gray-200 bg-white p-4">
       <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
         Contents
       </h3>

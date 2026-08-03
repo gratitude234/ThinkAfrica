@@ -5,6 +5,7 @@ import AppShell from "./AppShell";
 import NavigationShell from "./NavigationShell";
 import { canReview } from "@/lib/roles";
 import { canAccessAdminHubForRole } from "@/lib/adminAccess";
+import { AppChromeProvider } from "./AppChromeProvider";
 
 export default async function MainLayout({
   children,
@@ -50,23 +51,25 @@ export default async function MainLayout({
   const isLite = isLiteModeServer(cookieStore.toString());
 
   return (
-    <div className={`min-h-screen bg-canvas${isLite ? " lite-mode" : ""}`}>
-      <NavigationShell
-        user={user}
-        profile={profileData}
-        isAdmin={isAdmin}
-        canAccessReview={canAccessReview}
-        hasActiveDebate={(activeDebateCount ?? 0) > 0}
-      />
+    <AppChromeProvider>
+      <div className={`min-h-screen bg-canvas${isLite ? " lite-mode" : ""}`}>
+        <NavigationShell
+          user={user}
+          profile={profileData}
+          isAdmin={isAdmin}
+          canAccessReview={canAccessReview}
+          hasActiveDebate={(activeDebateCount ?? 0) > 0}
+        />
 
-      <AppShell
-        showGuestBanner={!user}
-        userId={user?.id ?? null}
-        username={profileData?.username ?? null}
-        hasActiveDebate={(activeDebateCount ?? 0) > 0}
-      >
-        {children}
-      </AppShell>
-    </div>
+        <AppShell
+          showGuestBanner={!user}
+          userId={user?.id ?? null}
+          username={profileData?.username ?? null}
+          hasActiveDebate={(activeDebateCount ?? 0) > 0}
+        >
+          {children}
+        </AppShell>
+      </div>
+    </AppChromeProvider>
   );
 }

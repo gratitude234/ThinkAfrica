@@ -15,6 +15,7 @@ import FeedEmptyState from "./FeedEmptyState";
 import FeedErrorState from "./FeedErrorState";
 import CreateTrigger from "./CreateTrigger";
 import { useStickySubnav } from "@/lib/useStickySubnav";
+import { useAppChrome } from "./AppChromeProvider";
 
 type TabKey = "home" | "following" | "subscriptions" | "topics" | "latest";
 const EMPTY_POSTS: PostCardData[] = [];
@@ -152,6 +153,7 @@ export default function PostsFeedTabs({
   currentUserId: string | null;
   featuredPost?: HomeFeaturedPost | null;
 }) {
+  const { mode: chromeMode, navHeight, revealChrome } = useAppChrome();
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [typeFilter, setTypeFilter] = useState<FeedContentFilter>(initialType);
   const [timeframe, setTimeframe] = useState<FeedTimeframe>(initialTimeframe);
@@ -188,7 +190,7 @@ export default function PostsFeedTabs({
 
   // Lets the control strip retreat off the top with the nav rather than
   // staying glued there once the nav is gone.
-  useStickySubnav(stripRef);
+  useStickySubnav(stripRef, feedTopRef);
 
   useEffect(() => {
     const nextKey = feedCacheKey(
@@ -379,10 +381,7 @@ export default function PostsFeedTabs({
     // top again, and the marker has to land below it. Reserving only the
     // retreated offset (0) would park the strip's natural position at the very
     // top, where the revealed nav then overlaps the first card.
-    const navHeight =
-      Number.parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--app-nav-height")
-      ) || 0;
+    revealChrome({ immediate: true });
     const target = Math.max(
       window.scrollY + anchor.getBoundingClientRect().top - navHeight,
       0
@@ -391,7 +390,7 @@ export default function PostsFeedTabs({
     // Instant, not smooth: a tab switch should already be at the top by the
     // time the new cards paint, not animating past the old ones.
     window.scrollTo({ top: target, behavior: "auto" });
-  }, []);
+  }, [navHeight, revealChrome]);
 
   const updateState = useCallback(
     (
@@ -640,14 +639,17 @@ export default function PostsFeedTabs({
           reflow. */}
       <div
         ref={stripRef}
-        className={`sticky top-[var(--app-subnav-offset)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] border-b bg-white px-4 pb-1 transition-[top,box-shadow] duration-200 ease-out motion-reduce:transition-none sm:mx-0 sm:w-full sm:px-0 ${
-          isPinned
-            ? "border-gray-200 shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
-            : "border-transparent"
-        }`}
+        data-app-context-nav=""
+        data-app-chrome-motion=""
+        className="pointer-events-none sticky top-[var(--app-nav-height)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] bg-transparent px-4 pb-1 transition-transform duration-200 ease-out motion-reduce:transition-none sm:mx-0 sm:w-full sm:px-0"
       >
         <div
-          className="flex gap-1 overflow-x-auto overscroll-x-contain border-b border-gray-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          data-app-context-primary=""
+          className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-gray-200 bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+            isPinned && chromeMode === "compact"
+              ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
+              : ""
+          }`}
           role="tablist"
           aria-label="Choose feed"
         >
@@ -698,36 +700,48 @@ export default function PostsFeedTabs({
             })}
         </div>
 
-        {activeTab === "subscriptions" ? (
-          <div
-            className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            aria-label="Filter subscriptions"
-          >
-            {(["all", "authors", "topics"] as const).map((source) => (
-              <button
-                key={source}
-                type="button"
-                aria-pressed={subscriptionSource === source}
-                onClick={() =>
-                  updateState(activeTab, typeFilter, timeframe, source)
-                }
-                className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
-                  subscriptionSource === source
-                    ? "border-emerald-brand bg-emerald-brand text-white"
-                    : "border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:text-emerald-800"
-                }`}
-              >
-                {source}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        <div
+          data-app-context-expanded=""
+          data-app-chrome-motion=""
+          aria-hidden={chromeMode === "compact" || undefined}
+          inert={chromeMode === "compact" || undefined}
+          className={`pointer-events-auto border-b bg-white pb-1 transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none ${
+            isPinned && chromeMode === "expanded"
+              ? "border-gray-200 shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
+              : "border-transparent"
+          }`}
+        >
+          {activeTab === "subscriptions" ? (
+            <div
+              className="flex gap-2 overflow-x-auto pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              aria-label="Filter subscriptions"
+            >
+              {(["all", "authors", "topics"] as const).map((source) => (
+                <button
+                  key={source}
+                  type="button"
+                  aria-pressed={subscriptionSource === source}
+                  onClick={() =>
+                    updateState(activeTab, typeFilter, timeframe, source)
+                  }
+                  className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+                    subscriptionSource === source
+                      ? "border-emerald-brand bg-emerald-brand text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:text-emerald-800"
+                  }`}
+                >
+                  {source}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
-        <FeedFilterChips
-          type={typeFilter}
-          onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
-          className="mt-2"
-        />
+          <FeedFilterChips
+            type={typeFilter}
+            onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
+            className="mt-2"
+          />
+        </div>
       </div>
 
       {showFeaturedLead && featuredPost ? <HomeFeaturedLead post={featuredPost} /> : null}

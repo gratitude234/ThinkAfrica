@@ -603,6 +603,14 @@ describe("PostsFeedTabs -- pinned control strip", () => {
     return strip;
   }
 
+  function expandedControls(container: HTMLElement) {
+    const controls = container.querySelector<HTMLElement>(
+      "[data-app-context-expanded]"
+    );
+    if (!controls) throw new Error("expanded feed controls not found");
+    return controls;
+  }
+
   function setPinned(isPinned: boolean) {
     const observer = pinnedStateObserver();
     act(() => {
@@ -618,9 +626,9 @@ describe("PostsFeedTabs -- pinned control strip", () => {
       <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
     );
 
-    const strip = stickyStrip(container);
-    expect(strip).toHaveClass("border-transparent");
-    expect(strip.className).not.toMatch(/shadow-/);
+    const controls = expandedControls(container);
+    expect(controls).toHaveClass("border-transparent");
+    expect(controls.className).not.toMatch(/shadow-/);
   });
 
   it("gains a hairline and shadow once pinned, and drops them again at the top", () => {
@@ -629,14 +637,14 @@ describe("PostsFeedTabs -- pinned control strip", () => {
     );
 
     setPinned(true);
-    const strip = stickyStrip(container);
-    expect(strip).toHaveClass("border-gray-200");
-    expect(strip.className).toMatch(/shadow-/);
-    expect(strip).not.toHaveClass("border-transparent");
+    const controls = expandedControls(container);
+    expect(controls).toHaveClass("border-gray-200");
+    expect(controls.className).toMatch(/shadow-/);
+    expect(controls).not.toHaveClass("border-transparent");
 
     setPinned(false);
-    expect(stickyStrip(container)).toHaveClass("border-transparent");
-    expect(stickyStrip(container).className).not.toMatch(/shadow-/);
+    expect(expandedControls(container)).toHaveClass("border-transparent");
+    expect(expandedControls(container).className).not.toMatch(/shadow-/);
   });
 
   // The border sits in the box at both states so pinning cannot reflow content.
@@ -645,45 +653,32 @@ describe("PostsFeedTabs -- pinned control strip", () => {
       <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
     );
 
-    expect(stickyStrip(container)).toHaveClass("border-b");
+    expect(expandedControls(container)).toHaveClass("border-b");
     setPinned(true);
-    expect(stickyStrip(container)).toHaveClass("border-b");
+    expect(expandedControls(container)).toHaveClass("border-b");
   });
 
-  // The strip pins beneath the nav while the nav is there and clears the top of
-  // the viewport once it isn't -- a downward scroll hands the whole screen to
-  // the posts. --app-nav-offset would have pinned it at 0 instead, which is the
-  // bar-glued-to-the-top behaviour this replaced.
-  it("pins at the retreating sub-header offset, not the nav's bottom edge", () => {
+  it("pins beneath the measured nav and opts into composited chrome motion", () => {
     const { container } = render(
       <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
     );
 
-    expect(stickyStrip(container)).toHaveClass("top-[var(--app-subnav-offset)]");
+    expect(stickyStrip(container)).toHaveClass("top-[var(--app-nav-height)]");
+    expect(stickyStrip(container)).toHaveAttribute("data-app-context-nav");
+    expect(stickyStrip(container)).toHaveAttribute("data-app-chrome-motion");
   });
 
-  // jsdom reports a zero rect for everything, so the measurement is stubbed --
-  // what matters is that the strip's own height is what reaches :root.
-  it("publishes its height so the retreat clears the whole strip", () => {
-    const root = document.documentElement;
-    const rect = vi
-      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
-      .mockReturnValue({ height: 132 } as DOMRect);
+  it("keeps tabs interactive while marking filters as expanded-only", () => {
+    const { container } = render(
+      <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
+    );
 
-    try {
-      const { unmount } = render(
-        <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
-      );
-
-      expect(root.style.getPropertyValue("--app-subnav-height")).toBe("132px");
-
-      // A height left behind would make the next page's nav travel further
-      // than its own height and open a gap above the content.
-      unmount();
-      expect(root.style.getPropertyValue("--app-subnav-height")).toBe("");
-    } finally {
-      rect.mockRestore();
-      root.removeAttribute("style");
-    }
+    expect(container.querySelector("[data-app-context-primary]")).toHaveClass(
+      "pointer-events-auto"
+    );
+    expect(expandedControls(container)).toHaveAttribute(
+      "data-app-context-expanded"
+    );
+    expect(stickyStrip(container)).toHaveClass("pointer-events-none");
   });
 });

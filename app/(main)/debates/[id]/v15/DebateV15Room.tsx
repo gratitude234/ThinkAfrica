@@ -2582,7 +2582,8 @@ export default function DebateV15Room({
   // Lets the room header retreat off the top with the nav instead of staying
   // glued there once the nav is gone.
   const headerRef = useRef<HTMLElement>(null);
-  useStickySubnav(headerRef);
+  const headerAnchorRef = useRef<HTMLDivElement>(null);
+  useStickySubnav(headerRef, headerAnchorRef);
   const activeDeadline = deadlineForPhase(room, room.debate.phase);
   const moderatorName = profileName(room.debate.moderator);
 
@@ -2656,14 +2657,18 @@ export default function DebateV15Room({
 
   return (
     <div className="-mx-4 min-h-screen bg-canvas sm:-mx-6 lg:-mx-8">
+      <div ref={headerAnchorRef} aria-hidden="true" />
       <header
         ref={headerRef}
-        className="sticky top-[var(--app-subnav-offset)] z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur transition-[top] duration-200 ease-out motion-reduce:transition-none sm:px-6 lg:px-8"
+        data-app-context-nav=""
+        data-app-chrome-motion=""
+        className="sticky top-[var(--app-nav-height)] z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur transition-transform duration-200 ease-out motion-reduce:transition-none sm:px-6 lg:px-8"
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+        <div data-app-debate-header-content="" className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="min-w-0">
             <Link
               href="/debates"
+              data-app-context-remove=""
               className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-brand hover:underline"
             >
               ← Debates
@@ -2684,9 +2689,15 @@ export default function DebateV15Room({
                 </span>
               </span>
             ) : null}
-            <ActionButton tone="secondary" onClick={share}>
-              Share
-            </ActionButton>
+            <span
+              data-app-context-remove=""
+              data-app-chrome-motion=""
+              className="transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none"
+            >
+              <ActionButton tone="secondary" onClick={share}>
+                Share
+              </ActionButton>
+            </span>
           </div>
         </div>
       </header>
