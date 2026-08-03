@@ -2662,7 +2662,7 @@ export default function DebateV15Room({
         ref={headerRef}
         data-app-context-nav=""
         data-app-chrome-motion=""
-        className="sticky top-[var(--app-nav-height)] z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur transition-transform duration-200 ease-out motion-reduce:transition-none sm:px-6 lg:px-8"
+        className="z-30 border-b border-green-wash-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8"
       >
         <div data-app-debate-header-content="" className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="min-w-0">

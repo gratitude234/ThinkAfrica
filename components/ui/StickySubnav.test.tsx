@@ -16,11 +16,12 @@ describe("StickySubnav", () => {
       </StickySubnav>
     );
 
-    expect(strip(container)).toHaveClass("sticky");
-    expect(strip(container)).toHaveClass("top-[var(--app-nav-height)]");
+    expect(strip(container)).toHaveAttribute("data-app-context-nav");
     expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true");
   });
 
+  // Pinning, offset and easing live in one CSS rule keyed off the marker
+  // attribute, so a caller cannot pin at a stale offset or forget to move.
   it("owns the movement so callers cannot forget it", () => {
     const { container } = render(
       <StickySubnav>
@@ -28,9 +29,9 @@ describe("StickySubnav", () => {
       </StickySubnav>
     );
 
-    expect(strip(container)).toHaveClass("transition-transform");
+    expect(strip(container)).toHaveAttribute("data-app-context-nav");
     expect(strip(container)).toHaveAttribute("data-app-chrome-motion");
-    expect(strip(container)).toHaveClass("motion-reduce:transition-none");
+    expect(strip(container)).not.toHaveClass("sticky");
   });
 
   it("keeps the caller's own styling", () => {

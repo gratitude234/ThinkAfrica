@@ -598,7 +598,7 @@ describe("PostsFeedTabs -- pinned control strip", () => {
   });
 
   function stickyStrip(container: HTMLElement) {
-    const strip = container.querySelector<HTMLElement>(".sticky");
+    const strip = container.querySelector<HTMLElement>("[data-app-context-nav]");
     if (!strip) throw new Error("sticky control strip not found");
     return strip;
   }
@@ -658,14 +658,53 @@ describe("PostsFeedTabs -- pinned control strip", () => {
     expect(expandedControls(container)).toHaveClass("border-b");
   });
 
-  it("pins beneath the measured nav and opts into composited chrome motion", () => {
+  // The offset itself is the shared rule's job. What has to hold here is that
+  // the strip never pins itself: a local `sticky top-...` would freeze the
+  // offset at the nav's expanded height and reopen the hole under the strip.
+  it("defers pinning to the shared chrome rule", () => {
     const { container } = render(
       <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
     );
 
-    expect(stickyStrip(container)).toHaveClass("top-[var(--app-nav-height)]");
     expect(stickyStrip(container)).toHaveAttribute("data-app-context-nav");
     expect(stickyStrip(container)).toHaveAttribute("data-app-chrome-motion");
+    expect(stickyStrip(container)).not.toHaveClass("sticky");
+  });
+
+  // The wrapper spans the viewport but paints nothing and pads nothing: each
+  // row carries its own full-bleed background, so the filter row can collapse
+  // away without leaving a white band, and cards passing beneath the strip
+  // have no transparent gutter to ghost through.
+  it("keeps the strip transparent and paints each row full-bleed", () => {
+    const { container } = render(
+      <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
+    );
+
+    expect(stickyStrip(container)).not.toHaveClass("bg-white");
+    expect(stickyStrip(container)).not.toHaveClass("px-4");
+    expect(container.querySelector("[data-app-context-primary]")).toHaveClass(
+      "bg-white",
+      "px-4"
+    );
+    expect(expandedControls(container)).toHaveClass("bg-white");
+  });
+
+  // The collapsing row has to be able to reach zero height: padding on the
+  // clipped row itself would floor it at the padding, leaving a band of bare
+  // canvas under the pinned tabs.
+  it("keeps the collapsing row's padding off the clipped box", () => {
+    const { container } = render(
+      <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
+    );
+
+    const controls = expandedControls(container);
+    expect(controls).not.toHaveClass("px-4");
+    expect(controls).not.toHaveClass("pb-1");
+    expect(controls.firstElementChild).not.toHaveClass("px-4");
+    expect(controls.firstElementChild?.firstElementChild).toHaveClass(
+      "px-4",
+      "pb-1"
+    );
   });
 
   it("keeps tabs interactive while marking filters as expanded-only", () => {

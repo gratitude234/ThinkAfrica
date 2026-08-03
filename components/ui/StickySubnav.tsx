@@ -31,7 +31,9 @@ export default function StickySubnav({
         ref={ref}
         data-app-context-nav=""
         data-app-chrome-motion=""
-        className={`sticky top-[var(--app-nav-height)] transition-transform duration-200 ease-out motion-reduce:transition-none ${className}`}
+        // Pinning and movement come from the shared [data-app-context-nav]
+        // rule in globals.css, so every sub-header retreats on one definition.
+        className={className}
       >
         {children}
       </div>

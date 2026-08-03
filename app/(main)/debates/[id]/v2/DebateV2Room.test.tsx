@@ -69,11 +69,8 @@ describe("DebateV2Room", () => {
       <DebateV2Room debateId="debate-1" initialRoom={makeRoom()} />
     );
 
-    expect(container.querySelector(".sticky")).toHaveClass(
-      "top-[var(--app-nav-height)]"
-    );
-    expect(container.querySelector(".sticky")).toHaveAttribute(
-      "data-app-context-nav"
+    expect(container.querySelector("[data-app-context-nav]")).toHaveAttribute(
+      "data-app-chrome-motion"
     );
     expect(container.querySelector("[data-app-context-remove] button")).toHaveTextContent(
       "Share"
