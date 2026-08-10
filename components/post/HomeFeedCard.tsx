@@ -52,7 +52,7 @@ function deriveRespondingTo(responseTo: PostCardData["response_to"]): Responding
 }
 
 const CARD_SHELL =
-  "mb-4 overflow-hidden rounded-[18px] border border-[#e7e3dc] bg-white px-4 py-4 shadow-[0_2px_10px_rgb(17_24_39/0.045)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-[#d9d3c9] hover:shadow-[0_10px_28px_rgb(17_24_39/0.075)] motion-reduce:transform-none motion-reduce:transition-none sm:px-5 sm:py-5";
+  "mb-3 overflow-hidden rounded-[16px] border border-[#e7e3dc] bg-white px-3.5 py-3.5 shadow-[0_2px_10px_rgb(17_24_39/0.045)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-[#d9d3c9] hover:shadow-[0_10px_28px_rgb(17_24_39/0.075)] motion-reduce:transform-none motion-reduce:transition-none sm:mb-4 sm:rounded-[18px] sm:px-5 sm:py-5";
 const FOCUS_RING =
   "rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
 
@@ -126,7 +126,7 @@ function AuthorLine({
           ) : null}
         </div>
         {profile?.university || (showTimestamp && publishedAt) ? (
-          <p className="mt-0.5 truncate text-[12px] leading-[1.4] text-ink-muted">
+          <p className="mt-0.5 truncate text-[12.5px] leading-[1.4] text-gray-600">
             {profile?.university ?? ""}
             {profile?.university && showTimestamp && publishedAt ? " · " : ""}
             {showTimestamp && publishedAt ? formatRelativeTime(publishedAt) : ""}
@@ -183,7 +183,7 @@ function ContextLine({
     );
   }
   if (surface === "home" && post.surface_reason) {
-    return <p className="mb-2.5 text-[12.5px] text-gray-500">{post.surface_reason}</p>;
+    return <p className="mb-2 text-[12px] font-medium text-gray-500 sm:mb-2.5 sm:text-[12.5px]">{post.surface_reason}</p>;
   }
   if (surface === "subscriptions") {
     const reason = post.subscription_match?.reasons[0];
@@ -230,12 +230,12 @@ function TopicLinks({ tags }: { tags: string[] | null }) {
   if (topics.length === 0) return null;
 
   return (
-    <nav aria-label="Publication topics" className="mt-3 flex flex-wrap gap-1.5">
+    <nav aria-label="Publication topics" className="mt-2.5 flex flex-wrap gap-1.5 sm:mt-3">
       {topics.map((topic) => (
         <Link
           key={topic}
           href={`/topics/${encodeURIComponent(topic)}`}
-          className={`inline-flex min-h-8 items-center rounded-full border border-gray-200 bg-canvas px-2.5 text-[11.5px] font-semibold text-gray-600 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 ${FOCUS_RING}`}
+          className={`inline-flex min-h-8 items-center rounded-full border border-gray-200 bg-canvas px-2.5 text-[12px] font-semibold text-gray-700 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 ${FOCUS_RING}`}
         >
           #{topic}
         </Link>
@@ -302,22 +302,22 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo,
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
       <AuthorLine post={post} avatarSize={28} showTimestamp={showTimestamp} />
       <div
-        className={`mt-3 min-w-0 ${
+        className={`mt-2.5 min-w-0 sm:mt-3 ${
           hasCover
-            ? "sm:grid sm:grid-cols-[minmax(0,1fr)_210px] sm:items-start sm:gap-5"
+            ? "grid grid-cols-[minmax(0,1fr)_104px] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_210px] sm:gap-5"
             : ""
         }`}
       >
         <div className="min-w-0">
           <div
-            className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1"
+            className="mb-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 sm:mb-2 sm:gap-x-2"
             aria-label={`Article${format ? `, ${format}` : ""}, ${readingTime} minute read`}
           >
-            <span className="inline-flex min-h-7 items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 font-sans text-[10.5px] font-bold uppercase tracking-[0.12em] text-amber-800">
+            <span className="inline-flex min-h-6 items-center rounded-full border border-amber-200 bg-amber-50 px-2 font-sans text-[10px] font-bold uppercase tracking-[0.11em] text-amber-800 sm:min-h-7 sm:px-2.5 sm:text-[10.5px]">
               Article
             </span>
             {format ? (
-              <span className={`text-[11.5px] font-semibold ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
+              <span className={`hidden text-[11.5px] font-semibold min-[390px]:inline sm:inline ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
                 {format}
               </span>
             ) : null}
@@ -326,9 +326,13 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo,
             </span>
           </div>
           <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-            <h2 className="font-display line-clamp-3 text-[21px] font-semibold leading-[1.2] text-ink sm:text-[23px]">{title}</h2>
+            <h2 className="font-display line-clamp-3 text-[17.5px] font-semibold leading-[1.24] text-ink sm:text-[23px] sm:leading-[1.2]">{title}</h2>
           </Link>
-          {excerpt ? <p className="mt-2.5 line-clamp-2 text-[14.5px] leading-[1.62] text-gray-600">{excerpt}</p> : null}
+          {excerpt ? (
+            <p className={`${hasCover ? "hidden sm:line-clamp-2" : "line-clamp-2"} mt-2 text-[14.5px] leading-[1.58] text-gray-700 sm:mt-2.5 sm:leading-[1.62]`}>
+              {excerpt}
+            </p>
+          ) : null}
           <TopicLinks tags={post.tags} />
         </div>
 
@@ -341,8 +345,8 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo,
             article_format={post.article_format}
             sizes="(max-width: 640px) calc(100vw - 56px), 210px"
             priority={priority}
-            variant="feed"
-            wrapperClassName="mt-3 overflow-hidden rounded-[10px] sm:mt-0"
+            variant="feed-thumbnail"
+            wrapperClassName="overflow-hidden rounded-[10px]"
             className="w-full bg-gray-100"
           />
         ) : null}
@@ -396,7 +400,7 @@ function ResearchManuscriptRow({
   );
 }
 
-function ResearchFeedCard({ post, currentUserId, surface, respondingTo, hideRespondingTo }: Props) {
+function ResearchFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled research paper";
   const abstract = sanitizePostExcerpt(post.excerpt);
   const evidence = post.citation_id ? "Citable" : isFormallyReviewed(post) ? "Reviewed" : null;
@@ -405,11 +409,12 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo, hideResp
     .map((author) => author.profile?.full_name ?? author.profile?.username)
     .filter(Boolean) as string[];
   const hasDocument = Boolean(post.document_original_name || post.document_mime_type);
+  const hasCover = Boolean(post.cover_image_url?.trim());
 
   return (
     <article className={`${CARD_SHELL} border-purple-100 border-l-[3px] border-l-purple-accent`} data-content-kind="research">
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
-      <div className="mb-2.5 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2 sm:mb-2.5">
         <span className="inline-flex min-h-7 items-center rounded-full border border-purple-200 bg-purple-50 px-2.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-purple-accent">Research</span>
         {evidence && !hasDocument ? (
           <span>
@@ -417,16 +422,38 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo, hideResp
           </span>
         ) : null}
       </div>
-      <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-        <h2 className="font-display text-[21px] font-semibold leading-[1.25] text-ink sm:text-[23px]">{title}</h2>
-      </Link>
-      <p className="mt-2.5 text-[13px] font-semibold leading-[1.45] text-gray-800">{primaryAuthor}</p>
-      {post.profiles?.university ? <p className="mt-0.5 text-[12px] text-gray-500">{post.profiles.university}</p> : null}
-      {coauthors.length > 0 ? (
-        <p className="mt-0.5 text-[12px] leading-[1.45] text-gray-500">with {coauthors.join(", ")}</p>
-      ) : null}
-      {abstract ? <p className="mt-3 line-clamp-2 text-[14.5px] leading-[1.62] text-gray-600">{abstract}</p> : null}
-      <TopicLinks tags={post.tags} />
+      <div className={hasCover ? "grid grid-cols-[minmax(0,1fr)_104px] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_210px] sm:gap-5" : ""}>
+        <div className="min-w-0">
+          <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
+            <h2 className="font-display line-clamp-3 text-[17.5px] font-semibold leading-[1.24] text-ink sm:text-[23px] sm:leading-[1.25]">{title}</h2>
+          </Link>
+          <p className="mt-2 text-[13px] font-semibold leading-[1.45] text-gray-800 sm:mt-2.5">{primaryAuthor}</p>
+          {post.profiles?.university ? <p className="mt-0.5 truncate text-[12.5px] text-gray-600">{post.profiles.university}</p> : null}
+          {coauthors.length > 0 ? (
+            <p className="mt-0.5 line-clamp-1 text-[12px] leading-[1.45] text-gray-500">with {coauthors.join(", ")}</p>
+          ) : null}
+          {abstract ? (
+            <p className={`${hasCover ? "hidden sm:line-clamp-2" : "line-clamp-2"} mt-2.5 text-[14.5px] leading-[1.58] text-gray-700 sm:mt-3 sm:leading-[1.62]`}>
+              {abstract}
+            </p>
+          ) : null}
+          <TopicLinks tags={post.tags} />
+        </div>
+        {hasCover ? (
+          <PostImage
+            src={post.cover_image_url as string}
+            alt={title}
+            type={post.type}
+            content_kind={post.content_kind}
+            article_format={post.article_format}
+            sizes="(max-width: 640px) 104px, 210px"
+            priority={priority}
+            variant="feed-thumbnail"
+            wrapperClassName="overflow-hidden rounded-[10px]"
+            className="w-full bg-gray-100"
+          />
+        ) : null}
+      </div>
       <ResearchManuscriptRow post={post} evidence={evidence} />
       <Actions post={post} currentUserId={currentUserId} />
     </article>

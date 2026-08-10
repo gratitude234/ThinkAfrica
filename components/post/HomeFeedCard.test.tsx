@@ -261,12 +261,36 @@ describe("HomeFeedCard", () => {
 
     const article = container.querySelector('[data-content-kind="article"]');
     expect(article).toBeInTheDocument();
-    expect(article?.querySelector('[class*="sm:grid-cols-"]')).toBeInTheDocument();
+    expect(article?.querySelector('[class*="grid-cols-"]')).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
         name: "View image full screen: Why institutions outlast intentions",
       })
     ).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Why institutions outlast intentions" }).parentElement).toHaveClass(
+      "aspect-[4/3]",
+      "sm:aspect-[16/10]"
+    );
+  });
+
+  it("uses the same compact thumbnail treatment for Research covers", () => {
+    render(
+      <HomeFeedCard
+        post={post({
+          title: "A field study of public trust",
+          type: "research",
+          content_kind: "research",
+          cover_image_url: "https://example.com/research-cover.jpg",
+        })}
+        currentUserId="user-1"
+        surface="home"
+      />
+    );
+
+    expect(screen.getByRole("img", { name: "A field study of public trust" }).parentElement).toHaveClass(
+      "aspect-[4/3]",
+      "sm:aspect-[16/10]"
+    );
   });
 
   it("surfaces real publication topics as navigable discovery cues", () => {

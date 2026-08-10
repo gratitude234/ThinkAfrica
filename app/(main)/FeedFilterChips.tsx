@@ -9,6 +9,13 @@ const TYPE_OPTIONS: Array<{ label: string; value: FeedContentFilter }> = [
   { label: "Research", value: "research" },
 ];
 
+const MOBILE_TYPE_OPTIONS: Array<{ label: string; value: FeedContentFilter }> = [
+  { label: "All content", value: "all" },
+  { label: "Posts only", value: "post" },
+  { label: "Articles only", value: "article" },
+  { label: "Research only", value: "research" },
+];
+
 function Chip({
   active,
   onClick,
@@ -45,25 +52,26 @@ export default function FeedFilterChips({
 }) {
   return (
     <div className={className}>
-      <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-gray-200 bg-canvas px-3.5 sm:hidden">
-        <span className="inline-flex items-center gap-2 text-[12.5px] font-semibold text-gray-600">
-          <svg className="h-4 w-4 text-emerald-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M7 12h10m-7 6h4" />
-          </svg>
-          Content
-        </span>
+      <label className="relative ml-auto flex min-h-11 w-fit max-w-full items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3.5 text-gray-700 shadow-sm sm:hidden">
+        <span className="sr-only">Filter feed by content type</span>
+        <svg className="h-4 w-4 shrink-0 text-emerald-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M7 12h10m-7 6h4" />
+        </svg>
         <select
           aria-label="Filter feed by content type"
           value={type}
           onChange={(event) => onTypeChange(event.target.value as FeedContentFilter)}
-          className="min-h-9 max-w-[58%] rounded-lg border-0 bg-white px-3 text-[13px] font-semibold text-ink shadow-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-emerald-brand"
+          className="min-h-9 cursor-pointer appearance-none border-0 bg-transparent py-1 pl-0 pr-5 text-[13px] font-semibold text-ink outline-none focus:ring-0"
         >
-          {TYPE_OPTIONS.map((option) => (
+          {MOBILE_TYPE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
         </select>
+        <svg className="pointer-events-none absolute right-3 h-3.5 w-3.5 text-gray-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+        </svg>
       </label>
 
       <div

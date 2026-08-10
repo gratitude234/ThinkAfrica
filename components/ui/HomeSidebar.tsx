@@ -72,6 +72,7 @@ function PersonalAction({
         <Link href={draftHref(recentDraft)} className="group block rounded-lg bg-canvas p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand">
           <p className="font-display line-clamp-2 text-[15px] font-semibold leading-snug text-ink group-hover:text-emerald-800">{recentDraft.title?.trim() || "Untitled draft"}</p>
           <p className="mt-1 text-[12px] text-gray-500">Saved {formatRelativeTime(recentDraft.updated_at)}</p>
+          <span className="mt-2 inline-flex min-h-8 items-center text-[12px] font-semibold text-emerald-700">Continue draft →</span>
         </Link>
       </SideCard>
     );

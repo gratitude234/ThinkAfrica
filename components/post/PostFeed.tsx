@@ -46,11 +46,10 @@ export function getDiscoveryModuleAt({
 }) {
   if (activeTab !== "home") return null;
 
-  // A discovery module now arrives while the reader is still forming an
-  // opinion of the network, then leaves enough uninterrupted reading space
-  // before the next one. The previous 8/16/24 cadence made useful writers and
-  // debates feel buried on mobile, where the desktop rail does not exist.
-  const discoveryBreakpoints = [5, 11, 17];
+  // Mobile has no right rail, so discovery belongs inside the early reading
+  // journey. The first module arrives after three publications, followed by
+  // calm four-card reading runs before the next two modules.
+  const discoveryBreakpoints = [3, 7, 11];
   const moduleIndex = discoveryBreakpoints.indexOf(completedCount);
   return moduleIndex >= 0 ? modules[moduleIndex] ?? null : null;
 }

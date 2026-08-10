@@ -25,7 +25,7 @@ export default function TopicInterlude({ posts }: { posts: PostCardData[] }) {
   if (!topic) return null;
 
   return (
-    <section className="-mx-4 my-3 border-y border-gray-200 bg-canvas px-4 py-[18px] sm:mx-0 sm:rounded-xl sm:border sm:px-5">
+    <section className="-mx-4 my-3 border-y border-gray-200 bg-canvas px-4 py-4 sm:mx-0 sm:rounded-xl sm:border sm:px-5 sm:py-[18px]">
       <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">
         Topic spotlight
       </p>
@@ -35,12 +35,12 @@ export default function TopicInterlude({ posts }: { posts: PostCardData[] }) {
       >
         #{topic.tag}
       </Link>
-      <div>
+      <div className="flex snap-x gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] sm:grid sm:grid-cols-2 sm:overflow-visible [&::-webkit-scrollbar]:hidden">
         {topic.posts.map((post) => (
           <Link
             key={post.id}
             href={`/post/${post.slug}`}
-            className="mb-1.5 block rounded-lg bg-white px-3.5 py-2.5 text-[13px] font-medium text-gray-700 transition-colors last:mb-0 hover:bg-gray-50"
+            className="block min-h-[68px] w-[230px] shrink-0 snap-start rounded-lg border border-gray-100 bg-white px-3.5 py-2.5 text-[13px] font-semibold leading-[1.45] text-gray-700 transition-colors hover:border-emerald-100 hover:bg-emerald-50/40 sm:w-auto"
           >
             <span className="line-clamp-2">{getPostMetadataTitle(post, post.profiles)}</span>
           </Link>

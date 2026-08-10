@@ -159,7 +159,7 @@ export default function FeedEngagementActions({
   };
 
   const actionClass =
-    "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none sm:px-2.5 sm:text-[12.5px]";
+    "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none sm:px-2.5 sm:text-[13px]";
 
   const discussionCount = commentCount + responseCount;
   const shareLabel =
@@ -185,7 +185,7 @@ export default function FeedEngagementActions({
           <svg className="h-[18px] w-[18px]" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
-          <span className="hidden min-[360px]:inline">{liked ? "Liked" : "Like"}</span>
+          <span className="hidden min-[390px]:inline">Like</span>
           {likeCount > 0 ? <span>{likeCount}</span> : null}
         </button>
 
@@ -201,7 +201,7 @@ export default function FeedEngagementActions({
             <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            <span className="hidden min-[400px]:inline">Discuss</span>
+            <span className="hidden min-[420px]:inline">Discuss</span>
             {discussionCount > 0 ? <span>{discussionCount}</span> : null}
           </Link>
         ) : null}
@@ -219,7 +219,7 @@ export default function FeedEngagementActions({
             <circle cx="18" cy="19" r="3" />
             <path strokeLinecap="round" strokeLinejoin="round" d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4" />
           </svg>
-          <span className="hidden min-[400px]:inline">{shareLabel}</span>
+          <span className="hidden min-[420px]:inline">{shareLabel}</span>
         </button>
 
         <button

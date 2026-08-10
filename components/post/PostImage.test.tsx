@@ -46,13 +46,25 @@ describe("PostImage", () => {
     ).toBeNull();
   });
 
-  it("uses a restrained editorial crop in feed cards with a clear full-image affordance", () => {
+  it("uses a restrained editorial crop without covering the image with an overlay", () => {
     render(<PostImage src={SRC} alt="A portrait" variant="feed" />);
 
     expect(screen.getByRole("img", { name: "A portrait" }).parentElement).toHaveClass(
       "aspect-[16/10]",
       "sm:aspect-[16/9]",
     );
-    expect(screen.getByTitle("View full image")).toHaveTextContent("View full");
+    expect(screen.queryByTitle("View full image")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "View image full screen: A portrait" })
+    ).toBeInTheDocument();
+  });
+
+  it("uses a compact crop for article and research thumbnails", () => {
+    render(<PostImage src={SRC} alt="An article cover" variant="feed-thumbnail" />);
+
+    expect(screen.getByRole("img", { name: "An article cover" }).parentElement).toHaveClass(
+      "aspect-[4/3]",
+      "sm:aspect-[16/10]",
+    );
   });
 });

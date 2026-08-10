@@ -25,7 +25,7 @@ export default function DebateInterlude({
   const status = debate.status ?? "active";
 
   return (
-    <section className="-mx-4 my-3 grid gap-4 border-y border-gray-800 bg-gray-900 p-4 text-white sm:mx-0 sm:rounded-xl sm:border sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5">
+    <section className="-mx-4 my-3 grid gap-3 border-y border-gray-800 bg-gray-900 p-3.5 text-white sm:mx-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:rounded-xl sm:border sm:p-5">
       <div className="min-w-0">
         <div className="mb-2 flex items-center gap-2">
           <span className="h-1.5 w-1.5 animate-pulse motion-reduce:animate-none rounded-full bg-emerald-400" />
@@ -35,7 +35,7 @@ export default function DebateInterlude({
             {remaining ? ` \u00B7 ${remaining}` : ""}
           </p>
         </div>
-        <h3 className="font-display text-[17px] font-semibold leading-snug text-white sm:text-[18px]">
+        <h3 className="font-display line-clamp-3 text-[16.5px] font-semibold leading-snug text-white sm:text-[18px]">
           {debate.title}
         </h3>
         <div className="mt-3">
@@ -51,9 +51,9 @@ export default function DebateInterlude({
       </div>
       <Link
         href={`/debates/${debate.id}`}
-        className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#0E4B37] sm:whitespace-nowrap"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#0E4B37] sm:whitespace-nowrap"
       >
-        Join -&gt;
+        Join debate →
       </Link>
     </section>
   );

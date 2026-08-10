@@ -20,7 +20,7 @@ interface PostImageProps {
    * Feed media uses a predictable editorial crop to keep the timeline
    * scannable. Detail pages retain the image's natural proportions.
    */
-  variant?: "natural" | "feed";
+  variant?: "natural" | "feed" | "feed-thumbnail";
 }
 
 /**
@@ -51,7 +51,13 @@ export default function PostImage({
     triggerRef.current?.focus();
   }, []);
 
-  const isFeedMedia = variant === "feed";
+  const isFeedMedia = variant === "feed" || variant === "feed-thumbnail";
+  const aspectClass =
+    variant === "feed-thumbnail"
+      ? "aspect-[4/3] sm:aspect-[16/10]"
+      : variant === "feed"
+        ? "aspect-[16/10] sm:aspect-[16/9]"
+        : "";
 
   return (
     <>
@@ -71,22 +77,11 @@ export default function PostImage({
           sizes={sizes}
           priority={priority}
           fit={isFeedMedia ? "cover" : "natural"}
-          className={`${
-            isFeedMedia ? "aspect-[16/10] sm:aspect-[16/9]" : ""
-          } ${className}`}
+          className={`${aspectClass} ${className}`}
           imageClassName="object-cover"
           onNaturalFit={isFeedMedia ? undefined : handleNaturalFit}
         />
-        {isFeedMedia ? (
-          <span
-            aria-hidden="true"
-            className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1.5 text-[11.5px] font-semibold leading-none text-white shadow-sm backdrop-blur-sm"
-            title="View full image"
-          >
-            <span className="text-sm leading-none">⤢</span>
-            View full
-          </span>
-        ) : cropped ? (
+        {!isFeedMedia && cropped ? (
           <span
             aria-hidden="true"
             className="absolute bottom-2 right-2 rounded-md bg-black/60 px-1.5 py-1 text-[11px] font-semibold leading-none text-white"

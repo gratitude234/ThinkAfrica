@@ -22,7 +22,7 @@ export default function PeopleInterlude({
   currentUserId: string | null;
 }) {
   return (
-    <section className="-mx-4 my-3 border-y border-gray-200 bg-white px-4 py-[18px] sm:mx-0 sm:rounded-xl sm:border sm:px-5">
+    <section className="-mx-4 my-3 border-y border-gray-200 bg-white px-4 py-4 sm:mx-0 sm:rounded-xl sm:border sm:px-5 sm:py-[18px]">
       <div className="mb-3.5 flex items-center justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
@@ -41,47 +41,51 @@ export default function PeopleInterlude({
         </Link>
       </div>
 
-      <div>
-        {people.map((person) => (
-          <div
+      <div className="-mx-1 flex snap-x gap-2.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+        {people.slice(0, 3).map((person) => (
+          <article
             key={person.id}
-            className="flex items-center gap-3 border-b border-gray-100 py-2 last:border-b-0 last:pb-0"
+            className="w-[218px] shrink-0 snap-start rounded-xl border border-gray-200 bg-canvas p-3 sm:w-auto"
           >
-            <Link href={`/${person.username}`} className="shrink-0">
-              <UserAvatar
-                name={person.full_name ?? person.username ?? "Anonymous"}
-                src={person.avatar_url}
-                size={38}
-              />
-            </Link>
-            <div className="min-w-0 flex-1">
-              <Link href={`/${person.username}`}>
-                <p className="truncate text-sm font-medium text-ink hover:text-emerald-brand">
-                  {person.full_name ?? person.username}
-                </p>
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Link href={`/${person.username}`} className="shrink-0">
+                <UserAvatar
+                  name={person.full_name ?? person.username ?? "Anonymous"}
+                  src={person.avatar_url}
+                  size={38}
+                />
               </Link>
-              {person.university ? (
-                <p className="mt-0.5 truncate text-xs text-ink-muted">
-                  {person.university}
-                </p>
-              ) : null}
+              <div className="min-w-0 flex-1">
+                <Link href={`/${person.username}`}>
+                  <p className="truncate text-sm font-semibold text-ink hover:text-emerald-brand">
+                    {person.full_name ?? person.username}
+                  </p>
+                </Link>
+                {person.university ? (
+                  <p className="mt-0.5 line-clamp-1 text-[12px] text-gray-600">
+                    {person.university}
+                  </p>
+                ) : null}
+              </div>
             </div>
-            {currentUserId ? (
-              <FollowButton
-                followerId={currentUserId}
-                followingId={person.id}
-                authorName={person.full_name ?? person.username}
-                source="home_suggestion"
-              />
-            ) : (
-              <Link
-                href={`/${person.username}`}
-                className="rounded-full border border-gray-200 px-3.5 py-1 text-xs font-medium text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
-              >
-                View
-              </Link>
-            )}
-          </div>
+            <div className="mt-3 flex min-h-9 items-center">
+              {currentUserId ? (
+                <FollowButton
+                  followerId={currentUserId}
+                  followingId={person.id}
+                  authorName={person.full_name ?? person.username}
+                  source="home_suggestion"
+                />
+              ) : (
+                <Link
+                  href={`/${person.username}`}
+                  className="inline-flex min-h-9 items-center rounded-full border border-gray-200 px-3.5 text-xs font-semibold text-gray-700 hover:border-emerald-brand hover:text-emerald-brand"
+                >
+                  View profile
+                </Link>
+              )}
+            </div>
+          </article>
         ))}
       </div>
     </section>
