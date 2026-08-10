@@ -623,15 +623,22 @@ export default function PostsFeedTabs({
 
       {/* Tabs and filter chips pin together as one block. Splitting them let
           the chips slide up under the tabs, which read as the header breaking
-          apart mid-scroll. Opaque (not bg-white/95) so cards passing beneath
-          don't ghost through the control strip.
+          apart mid-scroll. Each row is fully opaque (not bg-white/95) so cards
+          passing beneath don't ghost through whichever rows are showing.
 
-          Pinned beneath the nav while the nav is there, and off the top of the
-          viewport once it isn't: scrolling down hands the entire screen to the
-          posts, scrolling up brings tabs, chips and nav back together in one
-          movement. Pinning at 0 when the nav retreated was the worst of both --
-          the chrome you wanted gone stayed, and the space it freed went to the
-          strip rather than to the feed.
+          Pinned beneath the nav while the nav is there, and at the very top of
+          the viewport once it isn't: scrolling down hands the entire screen to
+          the posts, scrolling up brings tabs, chips and nav back together in
+          one movement. The sticky offset comes from the shared
+          [data-app-context-nav] rule, which tracks the nav's live occupancy --
+          pinning at a fixed offset and translating the strip up instead would
+          leave its reserved flow space behind, where it is no use to anyone.
+
+          The wrapper paints nothing and swallows no taps; each row carries its
+          own full-bleed background and padding. Backgrounding the wrapper
+          would put a white band where the filter row collapses away, and
+          padding it inset those backgrounds from the screen edge, leaving
+          gutters for cards to ghost through.
 
           The bottom edge only appears once pinned: without it a card sliding
           under the strip looked sliced rather than layered. The border is
@@ -641,11 +648,11 @@ export default function PostsFeedTabs({
         ref={stripRef}
         data-app-context-nav=""
         data-app-chrome-motion=""
-        className="pointer-events-none sticky top-[var(--app-nav-height)] z-30 -mx-4 mb-3 w-[calc(100%+2rem)] bg-transparent px-4 pb-1 transition-transform duration-200 ease-out motion-reduce:transition-none sm:mx-0 sm:w-full sm:px-0"
+        className="pointer-events-none z-30 -mx-4 mb-3 w-[calc(100%+2rem)] sm:mx-0 sm:w-full"
       >
         <div
           data-app-context-primary=""
-          className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-gray-200 bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+          className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-gray-200 bg-white px-4 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden ${
             isPinned && chromeMode === "compact"
               ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
               : ""
@@ -705,42 +712,50 @@ export default function PostsFeedTabs({
           data-app-chrome-motion=""
           aria-hidden={chromeMode === "compact" || undefined}
           inert={chromeMode === "compact" || undefined}
-          className={`pointer-events-auto border-b bg-white pb-1 transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none ${
+          className={`pointer-events-auto border-b bg-white ${
             isPinned && chromeMode === "expanded"
               ? "border-gray-200 shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
               : "border-transparent"
           }`}
         >
-          {activeTab === "subscriptions" ? (
-            <div
-              className="flex gap-2 overflow-x-auto pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              aria-label="Filter subscriptions"
-            >
-              {(["all", "authors", "topics"] as const).map((source) => (
-                <button
-                  key={source}
-                  type="button"
-                  aria-pressed={subscriptionSource === source}
-                  onClick={() =>
-                    updateState(activeTab, typeFilter, timeframe, source)
-                  }
-                  className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
-                    subscriptionSource === source
-                      ? "border-emerald-brand bg-emerald-brand text-white"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:text-emerald-800"
-                  }`}
+          {/* Both wrappers are load-bearing. The outer one is the grid row the
+              shared rule clips to nothing (its overflow:hidden comes from
+              there); the inner one holds the padding, which a border-box row
+              cannot collapse below. */}
+          <div>
+            <div className="px-4 pb-1 sm:px-0">
+              {activeTab === "subscriptions" ? (
+                <div
+                  className="flex gap-2 overflow-x-auto pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  aria-label="Filter subscriptions"
                 >
-                  {source}
-                </button>
-              ))}
-            </div>
-          ) : null}
+                  {(["all", "authors", "topics"] as const).map((source) => (
+                    <button
+                      key={source}
+                      type="button"
+                      aria-pressed={subscriptionSource === source}
+                      onClick={() =>
+                        updateState(activeTab, typeFilter, timeframe, source)
+                      }
+                      className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+                        subscriptionSource === source
+                          ? "border-emerald-brand bg-emerald-brand text-white"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:text-emerald-800"
+                      }`}
+                    >
+                      {source}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
-          <FeedFilterChips
-            type={typeFilter}
-            onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
-            className="mt-2"
-          />
+              <FeedFilterChips
+                type={typeFilter}
+                onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
+                className="mt-2"
+              />
+            </div>
+          </div>
         </div>
       </div>
 

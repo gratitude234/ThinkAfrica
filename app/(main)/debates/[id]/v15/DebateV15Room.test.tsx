@@ -121,11 +121,8 @@ describe("DebateV15Room", () => {
   it("keeps compact debate context when the primary nav retreats", () => {
     const { container } = render(<DebateV15Room room={makeRoom()} />);
 
-    expect(container.querySelector("header.sticky")).toHaveClass(
-      "top-[var(--app-nav-height)]"
-    );
-    expect(container.querySelector("header.sticky")).toHaveAttribute(
-      "data-app-context-nav"
+    expect(container.querySelector("header[data-app-context-nav]")).toHaveAttribute(
+      "data-app-chrome-motion"
     );
     expect(container.querySelector("[data-app-context-remove] button")).toHaveTextContent(
       "Share"
