@@ -27,4 +27,15 @@ describe("FeedFilterChips", () => {
     fireEvent.click(screen.getByRole("button", { name: "Posts" }));
     expect(onChange).toHaveBeenCalledWith("post");
   });
+
+  it("offers a compact native selector for the mobile sticky header", () => {
+    const onChange = vi.fn();
+    render(<FeedFilterChips type="all" onTypeChange={onChange} />);
+
+    const select = screen.getByRole("combobox", {
+      name: "Filter feed by content type",
+    });
+    fireEvent.change(select, { target: { value: "research" } });
+    expect(onChange).toHaveBeenCalledWith("research");
+  });
 });

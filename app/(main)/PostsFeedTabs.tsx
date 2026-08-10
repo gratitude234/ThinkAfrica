@@ -695,7 +695,7 @@ export default function PostsFeedTabs({
                   aria-controls="home-feed-panel"
                   aria-selected={activeTab === tab}
                   onClick={() => updateState(tab, typeFilter, timeframe)}
-                  className={`-mb-px min-h-11 shrink-0 border-b-2 px-4 py-2 text-[14px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${
+                  className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 sm:text-[14px] ${
                     activeTab === tab
                       ? "border-emerald-brand bg-emerald-50/70 text-emerald-950"
                       : "border-transparent text-gray-500 hover:text-ink"

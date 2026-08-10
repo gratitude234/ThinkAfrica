@@ -358,7 +358,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           layout. At xl the rail already consumes the left edge, so the feed
           goes fluid and fills the column instead of centering inside it --
           the old justify-center was throwing away ~130px on wide screens. */}
-      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,720px)_minmax(272px,288px)] lg:justify-center lg:gap-8 xl:grid-cols-[minmax(0,780px)_288px] xl:justify-center xl:gap-8">
+      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,720px)_minmax(288px,304px)] lg:justify-center lg:gap-6 xl:grid-cols-[minmax(0,760px)_304px] xl:justify-center xl:gap-7">
         <div className="min-w-0">
           <Suspense fallback={<FeedSkeleton />}>
             <PostsFeedSection

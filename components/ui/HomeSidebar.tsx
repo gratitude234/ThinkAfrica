@@ -44,12 +44,12 @@ interface Props {
   topics: string[];
 }
 
-function SideCard({ children }: { children: ReactNode }) {
-  return <section className="rounded-2xl border border-gray-200 bg-white p-[18px] shadow-[0_2px_8px_rgb(17_24_39/0.035)]">{children}</section>;
+function SideCard({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <section className={`rounded-2xl border border-[#e5e0d8] bg-white p-5 shadow-[0_3px_12px_rgb(17_24_39/0.045)] ${className}`}>{children}</section>;
 }
 
 function Kicker({ children }: { children: ReactNode }) {
-  return <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-gray-500">{children}</p>;
+  return <p className="mb-2 text-[10.5px] font-bold uppercase tracking-[0.17em] text-gray-500">{children}</p>;
 }
 
 export function draftHref(draft: RecentDraft) {
@@ -100,14 +100,14 @@ function FeaturedTodayCard({ post }: { post: FeaturedTodayPost }) {
   const author = post.profiles?.full_name ?? post.profiles?.username ?? "Indegenius contributor";
 
   return (
-    <SideCard>
+    <SideCard className="relative overflow-hidden border-l-[3px] border-l-gold bg-gradient-to-br from-white to-amber-50/35">
       <Kicker>Featured today</Kicker>
       <Link
         href={`/post/${post.slug}`}
         className="group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
       >
-        <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-gray-400">{label}</p>
-        <h3 className="font-display line-clamp-2 text-[15.5px] font-semibold leading-snug text-ink group-hover:text-emerald-800">{title}</h3>
+        <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-amber-700">{label}</p>
+        <h3 className="font-display line-clamp-3 text-[16px] font-semibold leading-[1.3] text-ink group-hover:text-emerald-800">{title}</h3>
       </Link>
       <p className="mt-1.5 truncate text-[12.5px] text-gray-500">{author}</p>
     </SideCard>
@@ -169,13 +169,36 @@ function PeopleCard({ people, currentUserId }: { people: SuggestedPerson[]; curr
 export default function HomeSidebar({ activeDebate, recentDraft, activationState, featuredToday, peopleSuggestions, currentUserId, topics }: Props) {
   return (
     <div className="flex flex-col gap-3.5">
+      <div className="flex items-end justify-between gap-3 px-1 pb-0.5">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Your intellectual brief</p>
+          <p className="mt-0.5 text-[12px] text-gray-500">Ideas, people and debates for you</p>
+        </div>
+        <Link href="/explore" className="shrink-0 text-[11.5px] font-semibold text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">
+          Explore
+        </Link>
+      </div>
       <PersonalAction recentDraft={recentDraft} activationState={activationState} />
       {featuredToday ? <FeaturedTodayCard post={featuredToday} /> : null}
       {activeDebate ? <DebateCard debate={activeDebate} /> : null}
       <PeopleCard people={peopleSuggestions} currentUserId={currentUserId} />
       {topics.length > 0 ? (
-        <nav aria-label="Browse popular topics" className="flex flex-wrap gap-x-3 gap-y-2 px-1 text-[12.5px] text-gray-500">
-          {topics.slice(0, 7).map((topic) => <Link key={topic} href={`/topics/${encodeURIComponent(topic)}`} className="hover:text-emerald-700">{topic}</Link>)}
+        <nav aria-label="Browse popular topics" className="px-1 pt-1">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-gray-500">Explore topics</p>
+            <Link href="/topics" className="text-[11px] font-semibold text-emerald-700 hover:underline">See all</Link>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {topics.slice(0, 7).map((topic) => (
+              <Link
+                key={topic}
+                href={`/topics/${encodeURIComponent(topic)}`}
+                className="inline-flex min-h-8 items-center rounded-full border border-gray-200 bg-white px-2.5 text-[11.5px] font-medium text-gray-600 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+              >
+                {topic}
+              </Link>
+            ))}
+          </div>
         </nav>
       ) : null}
     </div>

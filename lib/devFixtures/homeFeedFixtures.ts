@@ -211,7 +211,7 @@ export const POST_FIXTURES: FixtureCard[] = [
       type: "blog",
       content_kind: "post",
       profiles: WANJIRU,
-      excerpt: "Guests see the same Like/Respond/Save row -- clicking Like or Save should route to sign-in instead of silently failing.",
+      excerpt: "Guests see the same Like/Discuss/Share/Save row -- clicking Like or Save should route to sign-in instead of silently failing.",
       like_count: 41,
       response_count: 6,
       viewer_liked: false,

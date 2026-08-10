@@ -97,4 +97,54 @@ describe("FeedEngagementActions", () => {
       "false"
     );
   });
+
+  it("shares the canonical post URL with the device share sheet", async () => {
+    const originalShare = navigator.share;
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: share,
+    });
+
+    try {
+      renderActions();
+      fireEvent.click(screen.getByRole("button", { name: "Share this item" }));
+
+      await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+      expect(share).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: `${window.location.origin}/post/a-good-article`,
+        })
+      );
+      expect(await screen.findByText("Post shared.")).toBeInTheDocument();
+    } finally {
+      if (originalShare) {
+        Object.defineProperty(navigator, "share", {
+          configurable: true,
+          value: originalShare,
+        });
+      } else {
+        Reflect.deleteProperty(navigator, "share");
+      }
+    }
+  });
+
+  it("keeps zero engagement states inviting instead of printing rows of zeros", () => {
+    render(
+      <FeedEngagementActions
+        postId="post-quiet"
+        slug="a-quiet-post"
+        userId="user-1"
+        initialLiked={false}
+        initialLikeCount={0}
+        initialBookmarked={false}
+        responseCount={0}
+        commentCount={0}
+        contentKind="post"
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Like this item" })).not.toHaveTextContent("0");
+    expect(screen.getByRole("link", { name: "0 in this discussion" })).not.toHaveTextContent("0");
+  });
 });

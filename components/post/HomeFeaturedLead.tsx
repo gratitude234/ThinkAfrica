@@ -37,7 +37,7 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
   const hasCover = Boolean(post.cover_image_url?.trim());
 
   return (
-    <article className="relative mb-4 overflow-hidden rounded-2xl bg-emerald-brand text-white shadow-[0_8px_24px_rgb(7_57_41/0.16)]">
+    <article className="relative mb-4 overflow-hidden rounded-[18px] bg-emerald-brand text-white shadow-[0_9px_26px_rgb(7_57_41/0.18)]">
       {hasCover ? (
         <div className="absolute inset-y-0 right-0 hidden w-[42%] sm:block" aria-hidden="true">
           <PostCover
@@ -53,15 +53,15 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-brand via-emerald-brand/65 to-transparent" />
         </div>
       ) : null}
-      <div className="relative px-5 py-6 sm:max-w-[74%] sm:px-7 sm:py-7">
+      <div className="relative px-4.5 py-5 sm:max-w-[74%] sm:px-7 sm:py-7">
         <p className="font-display text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200">
           Editor&apos;s pick · {label} · {readTime(excerpt)} min
         </p>
         <Link href={`/post/${post.slug}`} className="mt-2 block rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-brand">
-          <h2 className="font-display text-[24px] font-semibold leading-[1.12] sm:text-[28px]">{title}</h2>
+          <h2 className="font-display text-[22px] font-semibold leading-[1.14] sm:text-[28px] sm:leading-[1.12]">{title}</h2>
         </Link>
         {excerpt ? <p className="mt-2.5 line-clamp-2 text-[14.5px] leading-[1.6] text-emerald-50/90">{excerpt}</p> : null}
-        <div className="mt-4 flex items-center justify-between gap-4">
+        <div className="mt-3.5 flex items-center justify-between gap-3 sm:mt-4 sm:gap-4">
           <div className="min-w-0">
             <p className="truncate text-[12.5px] font-semibold">{author}</p>
             {post.profiles?.university ? <p className="truncate text-[11.5px] text-emerald-100/80">{post.profiles.university}</p> : null}

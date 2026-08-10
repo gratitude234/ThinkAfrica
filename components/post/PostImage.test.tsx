@@ -50,8 +50,8 @@ describe("PostImage", () => {
     render(<PostImage src={SRC} alt="A portrait" variant="feed" />);
 
     expect(screen.getByRole("img", { name: "A portrait" }).parentElement).toHaveClass(
-      "aspect-[4/3]",
-      "sm:aspect-[16/10]",
+      "aspect-[16/10]",
+      "sm:aspect-[16/9]",
     );
     expect(screen.getByTitle("View full image")).toHaveTextContent("View full");
   });

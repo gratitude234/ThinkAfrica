@@ -72,7 +72,7 @@ export default function PostImage({
           priority={priority}
           fit={isFeedMedia ? "cover" : "natural"}
           className={`${
-            isFeedMedia ? "aspect-[4/3] sm:aspect-[16/10]" : ""
+            isFeedMedia ? "aspect-[16/10] sm:aspect-[16/9]" : ""
           } ${className}`}
           imageClassName="object-cover"
           onNaturalFit={isFeedMedia ? undefined : handleNaturalFit}

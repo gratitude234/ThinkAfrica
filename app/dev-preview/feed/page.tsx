@@ -203,7 +203,7 @@ export default function FeedPreviewPage() {
       <Section
         id="interludes"
         title="Discovery interludes"
-        note="Rendered directly (not through the impression-tracking feed list) -- For You/Discover only, at most one per eight items, each module at most once per load."
+        note="Rendered directly (not through the impression-tracking feed list) -- For You/Discover only, first shown after five items, with each module appearing at most once per load."
       >
         <div className="mx-auto max-w-[680px]">
           <DebateInterlude debate={DEBATE_FIXTURE} />

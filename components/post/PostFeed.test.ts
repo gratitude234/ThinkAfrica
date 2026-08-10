@@ -13,13 +13,13 @@ describe("Home discovery cadence", () => {
     ).toEqual(["people", "debate", "topic"]);
   });
 
-  it("surfaces one unique module after each block of eight For-you items", () => {
+  it("surfaces discovery early, then leaves six uninterrupted items between modules", () => {
     const modules = ["debate", "people", "topic"] as const;
-    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 7, modules: [...modules] })).toBeNull();
-    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 8, modules: [...modules] })).toBe("debate");
-    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 16, modules: [...modules] })).toBe("people");
-    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 24, modules: [...modules] })).toBe("topic");
-    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 32, modules: [...modules] })).toBeNull();
+    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 4, modules: [...modules] })).toBeNull();
+    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 5, modules: [...modules] })).toBe("debate");
+    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 11, modules: [...modules] })).toBe("people");
+    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 17, modules: [...modules] })).toBe("topic");
+    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 23, modules: [...modules] })).toBeNull();
   });
 
   it("never interrupts Following or Latest", () => {
@@ -27,7 +27,7 @@ describe("Home discovery cadence", () => {
       expect(
         getDiscoveryModuleAt({
           activeTab,
-          completedCount: 8,
+          completedCount: 5,
           modules: ["debate", "people", "topic"],
         })
       ).toBeNull();

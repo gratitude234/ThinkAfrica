@@ -52,7 +52,7 @@ function deriveRespondingTo(responseTo: PostCardData["response_to"]): Responding
 }
 
 const CARD_SHELL =
-  "mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-[0_2px_8px_rgb(17_24_39/0.04)] transition-[border-color,box-shadow] duration-200 hover:border-gray-300 hover:shadow-[0_8px_24px_rgb(17_24_39/0.07)] motion-reduce:transition-none sm:px-5 sm:py-5";
+  "mb-4 overflow-hidden rounded-[18px] border border-[#e7e3dc] bg-white px-4 py-4 shadow-[0_2px_10px_rgb(17_24_39/0.045)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-[#d9d3c9] hover:shadow-[0_10px_28px_rgb(17_24_39/0.075)] motion-reduce:transform-none motion-reduce:transition-none sm:px-5 sm:py-5";
 const FOCUS_RING =
   "rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
 
@@ -217,7 +217,30 @@ function Actions({
       commentCount={post.comment_count ?? 0}
       showDiscussion={showDiscussion}
       contentKind={resolveContentKind(post)}
+      shareTitle={
+        getPostDisplayTitle(post) ??
+        ((sanitizePostExcerpt(post.excerpt) ?? "").slice(0, 120) || undefined)
+      }
     />
+  );
+}
+
+function TopicLinks({ tags }: { tags: string[] | null }) {
+  const topics = (tags ?? []).map((tag) => tag.trim()).filter(Boolean).slice(0, 2);
+  if (topics.length === 0) return null;
+
+  return (
+    <nav aria-label="Publication topics" className="mt-3 flex flex-wrap gap-1.5">
+      {topics.map((topic) => (
+        <Link
+          key={topic}
+          href={`/topics/${encodeURIComponent(topic)}`}
+          className={`inline-flex min-h-8 items-center rounded-full border border-gray-200 bg-canvas px-2.5 text-[11.5px] font-semibold text-gray-600 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 ${FOCUS_RING}`}
+        >
+          #{topic}
+        </Link>
+      ))}
+    </nav>
   );
 }
 
@@ -259,6 +282,7 @@ function PostFeedCard({ post, currentUserId, surface, priority, respondingTo, hi
           </p>
         </Link>
       </div>
+      <TopicLinks tags={post.tags} />
       <FullWidthCover post={post} title={title ?? excerpt} priority={priority} />
       <Actions post={post} currentUserId={currentUserId} />
     </article>
@@ -270,22 +294,59 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo,
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const format = getArticleFormatLabel(resolveArticleFormat(post));
   const isPolicyBrief = format === "Policy Brief";
+  const hasCover = Boolean(post.cover_image_url?.trim());
+  const readingTime = readTime(excerpt);
 
   return (
-    <article className={`${CARD_SHELL} border-l-[3px] border-l-gold`}>
+    <article className={`${CARD_SHELL} border-l-[3px] border-l-gold`} data-content-kind="article">
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
       <AuthorLine post={post} avatarSize={28} showTimestamp={showTimestamp} />
-      <div className="mt-3 min-w-0">
-        <p className={`mb-2 font-display text-[11px] font-bold uppercase tracking-[0.14em] ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
-          Article{format ? ` · ${format}` : ""}{" "}
-          <span className="font-sans font-medium normal-case tracking-normal text-gray-400">· {readTime(excerpt)} min read</span>
-        </p>
-        <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-          <h2 className="font-display line-clamp-3 text-[21px] font-semibold leading-[1.2] text-ink sm:text-[23px]">{title}</h2>
-        </Link>
-        {excerpt ? <p className="mt-2.5 line-clamp-2 text-[14.5px] leading-[1.62] text-gray-600">{excerpt}</p> : null}
+      <div
+        className={`mt-3 min-w-0 ${
+          hasCover
+            ? "sm:grid sm:grid-cols-[minmax(0,1fr)_210px] sm:items-start sm:gap-5"
+            : ""
+        }`}
+      >
+        <div className="min-w-0">
+          <div
+            className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1"
+            aria-label={`Article${format ? `, ${format}` : ""}, ${readingTime} minute read`}
+          >
+            <span className="inline-flex min-h-7 items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 font-sans text-[10.5px] font-bold uppercase tracking-[0.12em] text-amber-800">
+              Article
+            </span>
+            {format ? (
+              <span className={`text-[11.5px] font-semibold ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
+                {format}
+              </span>
+            ) : null}
+            <span className="text-[11.5px] font-medium text-gray-400">
+              {readingTime} min read
+            </span>
+          </div>
+          <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
+            <h2 className="font-display line-clamp-3 text-[21px] font-semibold leading-[1.2] text-ink sm:text-[23px]">{title}</h2>
+          </Link>
+          {excerpt ? <p className="mt-2.5 line-clamp-2 text-[14.5px] leading-[1.62] text-gray-600">{excerpt}</p> : null}
+          <TopicLinks tags={post.tags} />
+        </div>
+
+        {hasCover ? (
+          <PostImage
+            src={post.cover_image_url as string}
+            alt={title}
+            type={post.type}
+            content_kind={post.content_kind}
+            article_format={post.article_format}
+            sizes="(max-width: 640px) calc(100vw - 56px), 210px"
+            priority={priority}
+            variant="feed"
+            wrapperClassName="mt-3 overflow-hidden rounded-[10px] sm:mt-0"
+            className="w-full bg-gray-100"
+          />
+        ) : null}
       </div>
-      <FullWidthCover post={post} title={title} priority={priority} />
       <Actions post={post} currentUserId={currentUserId} />
     </article>
   );
@@ -293,7 +354,8 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo,
 
 function EvidenceBadge({ label }: { label: string }) {
   return (
-    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+    <span className="inline-flex min-h-7 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 text-[10.5px] font-bold text-emerald-700">
+      <span aria-hidden="true">✓</span>
       {label}
     </span>
   );
@@ -345,12 +407,12 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo, hideResp
   const hasDocument = Boolean(post.document_original_name || post.document_mime_type);
 
   return (
-    <article className={`${CARD_SHELL} border-purple-100 border-l-[3px] border-l-purple-accent`}>
+    <article className={`${CARD_SHELL} border-purple-100 border-l-[3px] border-l-purple-accent`} data-content-kind="research">
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="font-display text-[11px] font-bold uppercase tracking-[0.15em] text-purple-accent">Research</span>
+      <div className="mb-2.5 flex flex-wrap items-center gap-2">
+        <span className="inline-flex min-h-7 items-center rounded-full border border-purple-200 bg-purple-50 px-2.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-purple-accent">Research</span>
         {evidence && !hasDocument ? (
-          <span className="ml-auto">
+          <span>
             <EvidenceBadge label={evidence} />
           </span>
         ) : null}
@@ -364,6 +426,7 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo, hideResp
         <p className="mt-0.5 text-[12px] leading-[1.45] text-gray-500">with {coauthors.join(", ")}</p>
       ) : null}
       {abstract ? <p className="mt-3 line-clamp-2 text-[14.5px] leading-[1.62] text-gray-600">{abstract}</p> : null}
+      <TopicLinks tags={post.tags} />
       <ResearchManuscriptRow post={post} evidence={evidence} />
       <Actions post={post} currentUserId={currentUserId} />
     </article>

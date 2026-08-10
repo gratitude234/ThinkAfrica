@@ -44,10 +44,15 @@ export function getDiscoveryModuleAt({
   completedCount: number;
   modules: DiscoveryModule[];
 }) {
-  if (activeTab !== "home" || completedCount < 8 || completedCount % 8 !== 0) {
-    return null;
-  }
-  return modules[completedCount / 8 - 1] ?? null;
+  if (activeTab !== "home") return null;
+
+  // A discovery module now arrives while the reader is still forming an
+  // opinion of the network, then leaves enough uninterrupted reading space
+  // before the next one. The previous 8/16/24 cadence made useful writers and
+  // debates feel buried on mobile, where the desktop rail does not exist.
+  const discoveryBreakpoints = [5, 11, 17];
+  const moduleIndex = discoveryBreakpoints.indexOf(completedCount);
+  return moduleIndex >= 0 ? modules[moduleIndex] ?? null : null;
 }
 
 interface PostFeedProps {

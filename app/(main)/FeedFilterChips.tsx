@@ -44,22 +44,45 @@ export default function FeedFilterChips({
   className?: string;
 }) {
   return (
-    <div
-      // overscroll-x-contain stops a diagonal swipe over the chips from
-      // rubber-banding this strip instead of scrolling the feed behind it.
-      className={`flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
-      role="group"
-      aria-label="Filter feed by content type"
-    >
-      {TYPE_OPTIONS.map((option) => (
-        <Chip
-          key={option.value}
-          active={type === option.value}
-          onClick={() => onTypeChange(option.value)}
+    <div className={className}>
+      <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-gray-200 bg-canvas px-3.5 sm:hidden">
+        <span className="inline-flex items-center gap-2 text-[12.5px] font-semibold text-gray-600">
+          <svg className="h-4 w-4 text-emerald-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M7 12h10m-7 6h4" />
+          </svg>
+          Content
+        </span>
+        <select
+          aria-label="Filter feed by content type"
+          value={type}
+          onChange={(event) => onTypeChange(event.target.value as FeedContentFilter)}
+          className="min-h-9 max-w-[58%] rounded-lg border-0 bg-white px-3 text-[13px] font-semibold text-ink shadow-sm outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-emerald-brand"
         >
-          {option.label}
-        </Chip>
-      ))}
+          {TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div
+        // Desktop keeps the faster one-click chips. Mobile uses the compact
+        // selector above so the sticky feed header is one calm, scannable row.
+        className="hidden gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:none] sm:flex [&::-webkit-scrollbar]:hidden"
+        role="group"
+        aria-label="Filter feed by content type"
+      >
+        {TYPE_OPTIONS.map((option) => (
+          <Chip
+            key={option.value}
+            active={type === option.value}
+            onClick={() => onTypeChange(option.value)}
+          >
+            {option.label}
+          </Chip>
+        ))}
+      </div>
     </div>
   );
 }

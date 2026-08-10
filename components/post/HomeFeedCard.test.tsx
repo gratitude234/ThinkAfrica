@@ -239,8 +239,52 @@ describe("HomeFeedCard", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Why institutions outlast intentions" })).toBeInTheDocument();
-    expect(screen.getByText(/Article · Policy Brief/)).toBeInTheDocument();
+    expect(screen.getByText("Article")).toBeInTheDocument();
+    expect(screen.getByText("Policy Brief")).toBeInTheDocument();
+    expect(screen.getByText("1 min read")).toBeInTheDocument();
     expect(screen.queryByText("Reviewed")).not.toBeInTheDocument();
+  });
+
+  it("renders article covers as compact responsive media instead of a second full-width block", () => {
+    const { container } = render(
+      <HomeFeedCard
+        post={post({
+          title: "Why institutions outlast intentions",
+          type: "essay",
+          content_kind: "article",
+          cover_image_url: "https://example.com/article-cover.jpg",
+        })}
+        currentUserId="user-1"
+        surface="home"
+      />
+    );
+
+    const article = container.querySelector('[data-content-kind="article"]');
+    expect(article).toBeInTheDocument();
+    expect(article?.querySelector('[class*="sm:grid-cols-"]')).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "View image full screen: Why institutions outlast intentions",
+      })
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces real publication topics as navigable discovery cues", () => {
+    render(
+      <HomeFeedCard
+        post={post({ tags: ["Climate Policy", "Public Health", "Education"] })}
+        currentUserId="user-1"
+        surface="home"
+      />
+    );
+
+    expect(screen.getByRole("navigation", { name: "Publication topics" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "#Climate Policy" })).toHaveAttribute(
+      "href",
+      "/topics/Climate%20Policy"
+    );
+    expect(screen.getByRole("link", { name: "#Public Health" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "#Education" })).not.toBeInTheDocument();
   });
 
   it("shows at most the strongest evidence-based Research badge", () => {
