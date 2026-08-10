@@ -1,5 +1,5 @@
 const CARD_SHELL =
-  "mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-4 sm:px-[18px] sm:py-[18px]";
+  "mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 py-4 sm:px-5 sm:py-5";
 
 function Block({ className }: { className: string }) {
   return <div className={`rounded bg-gray-100 ${className}`} />;
@@ -38,7 +38,7 @@ function ArticleSkeletonCard({ withCover = false }: { withCover?: boolean }) {
       <Block className="mt-3 h-2.5 w-24" />
       <Block className="mt-2 h-5 w-5/6" />
       <Block className="mt-2 h-3.5 w-3/5" />
-      {withCover ? <div className="mt-3 aspect-[16/9] w-full rounded-[10px] bg-gray-100" /> : null}
+      {withCover ? <div className="mt-3 aspect-[4/3] w-full rounded-[10px] bg-gray-100 sm:aspect-[16/10]" /> : null}
     </article>
   );
 }

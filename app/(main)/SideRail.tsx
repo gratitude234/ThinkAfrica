@@ -29,14 +29,14 @@ interface SideRailProps {
 // inventing a rail-specific treatment -- this rail is a structural change, not
 // a visual one.
 function railLinkClass(isCurrent: boolean) {
-  return `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+  return `group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-[14.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
     isCurrent
-      ? "bg-canvas font-semibold text-ink"
-      : "font-medium text-ink-muted hover:bg-canvas hover:text-ink"
+      ? "border-emerald-100 bg-emerald-50 font-semibold text-emerald-950"
+      : "border-transparent font-medium text-ink-muted hover:border-gray-200 hover:bg-white hover:text-ink"
   }`;
 }
 
-const ICON_CLASS = "h-5 w-5 shrink-0";
+const ICON_CLASS = "h-[21px] w-[21px] shrink-0";
 
 function RailLink({
   href,
@@ -164,7 +164,7 @@ export default function SideRail({
 
       <CreateTrigger
         userId={userId}
-        className="mt-4 flex w-full min-h-11 items-center justify-center gap-1.5 rounded-lg bg-emerald-brand px-4 py-2.5 text-[13.5px] font-semibold text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+        className="mt-4 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
       >
         <svg
           className="h-4 w-4"

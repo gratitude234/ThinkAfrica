@@ -107,11 +107,11 @@ export default function FeedEngagementActions({
   };
 
   const actionClass =
-    "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none";
+    "inline-flex min-h-11 min-w-11 flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none sm:flex-none";
 
   return (
-    <div className="mt-3 border-t border-gray-100 pt-2.5">
-      <div className="flex items-center gap-1 text-gray-500">
+    <div className="mt-3.5 border-t border-gray-200 pt-2.5">
+      <div className="flex items-center gap-1.5 text-gray-600">
         <button
           type="button"
           onClick={handleLike}
@@ -123,6 +123,7 @@ export default function FeedEngagementActions({
           <svg className="h-[18px] w-[18px]" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
+          <span className="hidden min-[360px]:inline">{liked ? "Liked" : "Like"}</span>
           <span>{likeCount}</span>
         </button>
 
@@ -138,6 +139,7 @@ export default function FeedEngagementActions({
             <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
+            <span className="hidden min-[360px]:inline">Discuss</span>
             <span>{commentCount + responseCount}</span>
           </Link>
         ) : null}
@@ -153,7 +155,7 @@ export default function FeedEngagementActions({
           <svg className="h-[18px] w-[18px]" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
-          <span className="hidden min-[380px]:inline">{bookmarked ? "Saved" : "Save"}</span>
+          <span>{bookmarked ? "Saved" : "Save"}</span>
         </button>
       </div>
       <p

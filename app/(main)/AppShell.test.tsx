@@ -55,8 +55,8 @@ describe("AppShell", () => {
   it("widens the container and becomes a grid only on rail routes", () => {
     const { main } = renderShell("/");
     expect(main?.className).toMatch(/\bxl:grid\b/);
-    expect(main?.className).toMatch(/xl:max-w-\[1360px\]/);
-    expect(main?.className).toMatch(/xl:grid-cols-\[200px_minmax\(0,1fr\)\]/);
+    expect(main?.className).toMatch(/xl:max-w-\[1480px\]/);
+    expect(main?.className).toMatch(/xl:grid-cols-\[184px_minmax\(0,1fr\)\]/);
   });
 
   it("leaves suppressed routes at the original container width", () => {

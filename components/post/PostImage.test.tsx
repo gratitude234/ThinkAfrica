@@ -45,4 +45,14 @@ describe("PostImage", () => {
       uncropped.container.querySelector("[title='Tap to see the whole image']")
     ).toBeNull();
   });
+
+  it("uses a restrained editorial crop in feed cards with a clear full-image affordance", () => {
+    render(<PostImage src={SRC} alt="A portrait" variant="feed" />);
+
+    expect(screen.getByRole("img", { name: "A portrait" }).parentElement).toHaveClass(
+      "aspect-[4/3]",
+      "sm:aspect-[16/10]",
+    );
+    expect(screen.getByTitle("View full image")).toHaveTextContent("View full");
+  });
 });

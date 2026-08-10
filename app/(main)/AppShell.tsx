@@ -20,7 +20,7 @@ const MAIN_BASE =
 // The container only widens on rail routes. Every suppressed route -- messages,
 // post pages, debate rooms, admin -- stays at 1240px and is pixel-identical to
 // before the rail existed, which is what keeps their full-bleed layouts intact.
-const MAIN_WITH_RAIL = `${MAIN_BASE} xl:grid xl:max-w-[1360px] xl:grid-cols-[200px_minmax(0,1fr)] xl:items-start xl:gap-8`;
+const MAIN_WITH_RAIL = `${MAIN_BASE} xl:grid xl:max-w-[1480px] xl:grid-cols-[184px_minmax(0,1fr)] xl:items-start xl:gap-7`;
 
 /**
  * Client shell around the (main) content column.

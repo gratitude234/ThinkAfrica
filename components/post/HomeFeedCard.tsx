@@ -52,7 +52,7 @@ function deriveRespondingTo(responseTo: PostCardData["response_to"]): Responding
 }
 
 const CARD_SHELL =
-  "mb-3 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-[0_1px_2px_rgb(17_24_39/0.025)] sm:px-[18px] sm:py-[18px]";
+  "mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-[0_2px_8px_rgb(17_24_39/0.04)] transition-[border-color,box-shadow] duration-200 hover:border-gray-300 hover:shadow-[0_8px_24px_rgb(17_24_39/0.07)] motion-reduce:transition-none sm:px-5 sm:py-5";
 const FOCUS_RING =
   "rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
 
@@ -110,24 +110,27 @@ function AuthorLine({
       ) : (
         <span className="shrink-0">{avatar}</span>
       )}
-      <div className="flex min-w-0 items-center gap-1.5 text-[12.5px] leading-[1.4]">
-        {profile?.username ? (
-          <Link href={`/${profile.username}`} className={`truncate font-semibold text-ink hover:text-emerald-700 ${FOCUS_RING}`}>
-            {byline}
-          </Link>
-        ) : (
-          <span className="truncate font-semibold text-ink">{byline}</span>
-        )}
-        {profile?.verified ? (
-          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-[7px] font-bold text-white" title="Verified">
-            ✓
-          </span>
-        ) : null}
-        {profile?.university ? (
-          <span className="truncate text-ink-muted">· {profile.university}</span>
-        ) : null}
-        {showTimestamp && publishedAt ? (
-          <span className="shrink-0 text-ink-muted">· {formatRelativeTime(publishedAt)}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-1.5 text-[13.5px] leading-[1.35]">
+          {profile?.username ? (
+            <Link href={`/${profile.username}`} className={`truncate font-semibold text-ink hover:text-emerald-700 ${FOCUS_RING}`}>
+              {byline}
+            </Link>
+          ) : (
+            <span className="truncate font-semibold text-ink">{byline}</span>
+          )}
+          {profile?.verified ? (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-[8px] font-bold text-white" title="Verified">
+              ✓
+            </span>
+          ) : null}
+        </div>
+        {profile?.university || (showTimestamp && publishedAt) ? (
+          <p className="mt-0.5 truncate text-[12px] leading-[1.4] text-ink-muted">
+            {profile?.university ?? ""}
+            {profile?.university && showTimestamp && publishedAt ? " · " : ""}
+            {showTimestamp && publishedAt ? formatRelativeTime(publishedAt) : ""}
+          </p>
         ) : null}
       </div>
     </div>
@@ -143,7 +146,7 @@ function ContextLine({
   if (post.in_response_to && !hideRespondingTo) {
     const parent = respondingTo ?? deriveRespondingTo(post.response_to);
     return (
-      <p className="mb-2 flex items-start gap-1.5 text-[11.5px] leading-[1.45] text-gray-500">
+      <p className="mb-2.5 flex items-start gap-1.5 text-[12.5px] leading-[1.5] text-gray-500">
         <span aria-hidden="true" className="mt-px">↩</span>
         <span className="min-w-0">
           Responding to{" "}
@@ -180,13 +183,13 @@ function ContextLine({
     );
   }
   if (surface === "home" && post.surface_reason) {
-    return <p className="mb-2 text-[11.5px] text-gray-500">{post.surface_reason}</p>;
+    return <p className="mb-2.5 text-[12.5px] text-gray-500">{post.surface_reason}</p>;
   }
   if (surface === "subscriptions") {
     const reason = post.subscription_match?.reasons[0];
     if (reason) {
       return (
-        <p className="mb-2 text-[11.5px] font-medium text-emerald-800">
+        <p className="mb-2.5 text-[12.5px] font-medium text-emerald-800">
           {reason.kind === "author"
             ? `Because you subscribe to ${reason.label}`
             : `From #${reason.label}`}
@@ -227,8 +230,9 @@ function FullWidthCover({ post, title, priority }: { post: PostCardData; title: 
       type={post.type}
       content_kind={post.content_kind}
       article_format={post.article_format}
-      sizes="(max-width: 640px) calc(100vw - 56px), 680px"
+      sizes="(max-width: 640px) calc(100vw - 56px), (max-width: 1024px) 720px, 780px"
       priority={priority}
+      variant="feed"
       wrapperClassName="mt-3"
       className="w-full rounded-[10px] bg-gray-100"
     />
@@ -246,11 +250,11 @@ function PostFeedCard({ post, currentUserId, surface, priority, respondingTo, hi
       <div className="mt-3">
         {title ? (
           <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-            <h2 className="font-display text-[18px] font-semibold leading-[1.28] text-ink">{title}</h2>
+            <h2 className="font-display text-[20px] font-semibold leading-[1.25] text-ink sm:text-[22px]">{title}</h2>
           </Link>
         ) : null}
         <Link href={`/post/${post.slug}`} className={`mt-1.5 block ${FOCUS_RING}`}>
-          <p className={`${title ? "line-clamp-3 text-[15px] text-gray-600" : "line-clamp-5 text-[16px] text-gray-800"} whitespace-pre-line leading-[1.62]`}>
+          <p className={`${title ? "line-clamp-3 text-[15.5px] text-gray-600" : "line-clamp-5 text-[16.5px] text-gray-800"} whitespace-pre-line leading-[1.65]`}>
             {excerpt}
           </p>
         </Link>
@@ -268,18 +272,18 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo,
   const isPolicyBrief = format === "Policy Brief";
 
   return (
-    <article className={CARD_SHELL}>
+    <article className={`${CARD_SHELL} border-l-[3px] border-l-gold`}>
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
       <AuthorLine post={post} avatarSize={28} showTimestamp={showTimestamp} />
       <div className="mt-3 min-w-0">
-        <p className={`mb-1.5 font-display text-[10.5px] font-bold uppercase tracking-[0.14em] ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
+        <p className={`mb-2 font-display text-[11px] font-bold uppercase tracking-[0.14em] ${isPolicyBrief ? "text-purple-accent" : "text-gold-ink"}`}>
           Article{format ? ` · ${format}` : ""}{" "}
           <span className="font-sans font-medium normal-case tracking-normal text-gray-400">· {readTime(excerpt)} min read</span>
         </p>
         <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-          <h2 className="font-display line-clamp-3 text-[19px] font-semibold leading-[1.2] text-ink sm:text-[21px]">{title}</h2>
+          <h2 className="font-display line-clamp-3 text-[21px] font-semibold leading-[1.2] text-ink sm:text-[23px]">{title}</h2>
         </Link>
-        {excerpt ? <p className="mt-2 line-clamp-2 text-[13.5px] leading-[1.58] text-gray-600">{excerpt}</p> : null}
+        {excerpt ? <p className="mt-2.5 line-clamp-2 text-[14.5px] leading-[1.62] text-gray-600">{excerpt}</p> : null}
       </div>
       <FullWidthCover post={post} title={title} priority={priority} />
       <Actions post={post} currentUserId={currentUserId} />
@@ -341,10 +345,10 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo, hideResp
   const hasDocument = Boolean(post.document_original_name || post.document_mime_type);
 
   return (
-    <article className={`${CARD_SHELL} border-purple-100`}>
+    <article className={`${CARD_SHELL} border-purple-100 border-l-[3px] border-l-purple-accent`}>
       <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.15em] text-purple-accent">Research</span>
+        <span className="font-display text-[11px] font-bold uppercase tracking-[0.15em] text-purple-accent">Research</span>
         {evidence && !hasDocument ? (
           <span className="ml-auto">
             <EvidenceBadge label={evidence} />
@@ -352,14 +356,14 @@ function ResearchFeedCard({ post, currentUserId, surface, respondingTo, hideResp
         ) : null}
       </div>
       <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-        <h2 className="font-display text-[19px] font-semibold leading-[1.28] text-ink sm:text-[21px]">{title}</h2>
+        <h2 className="font-display text-[21px] font-semibold leading-[1.25] text-ink sm:text-[23px]">{title}</h2>
       </Link>
-      <p className="mt-2 text-[12px] font-semibold leading-[1.45] text-gray-800">{primaryAuthor}</p>
-      {post.profiles?.university ? <p className="mt-0.5 text-[11.5px] text-gray-500">{post.profiles.university}</p> : null}
+      <p className="mt-2.5 text-[13px] font-semibold leading-[1.45] text-gray-800">{primaryAuthor}</p>
+      {post.profiles?.university ? <p className="mt-0.5 text-[12px] text-gray-500">{post.profiles.university}</p> : null}
       {coauthors.length > 0 ? (
-        <p className="mt-0.5 text-[11.5px] leading-[1.45] text-gray-500">with {coauthors.join(", ")}</p>
+        <p className="mt-0.5 text-[12px] leading-[1.45] text-gray-500">with {coauthors.join(", ")}</p>
       ) : null}
-      {abstract ? <p className="mt-2.5 line-clamp-2 text-[13.5px] leading-[1.6] text-gray-600">{abstract}</p> : null}
+      {abstract ? <p className="mt-3 line-clamp-2 text-[14.5px] leading-[1.62] text-gray-600">{abstract}</p> : null}
       <ResearchManuscriptRow post={post} evidence={evidence} />
       <Actions post={post} currentUserId={currentUserId} />
     </article>
