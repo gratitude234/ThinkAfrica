@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ExpandablePostBody from "./ExpandablePostBody";
 import FeedEngagementActions from "./FeedEngagementActions";
 import PostCover from "./PostCover";
 import PostImage from "./PostImage";
@@ -31,7 +32,11 @@ interface Props {
   hideRespondingTo?: boolean;
   /** Feed cards show recency by default; callers can suppress it explicitly. */
   showTimestamp?: boolean;
+  /** Creates editorial rhythm without changing the underlying content kind. */
+  articlePresentation?: ArticlePresentation;
 }
+
+export type ArticlePresentation = "hero" | "standard";
 
 function deriveRespondingTo(
   responseTo: PostCardData["response_to"]
@@ -362,20 +367,13 @@ function PostFeedCard({
             </h2>
           </Link>
         ) : null}
-        <Link
-          href={`/post/${post.slug}`}
-          className={`${title ? "mt-1.5" : ""} block ${FOCUS_RING}`}
-        >
-          <p
-            className={`${
-              title
-                ? "line-clamp-3 text-[15.5px] text-gray-600"
-                : "line-clamp-6 text-[16px] text-gray-800 sm:text-[16.5px]"
-            } whitespace-pre-line leading-[1.62]`}
-          >
-            {excerpt}
-          </p>
-        </Link>
+        <div className={title ? "mt-1.5" : ""}>
+          <ExpandablePostBody
+            text={excerpt}
+            href={`/post/${post.slug}`}
+            hasTitle={Boolean(title)}
+          />
+        </div>
       </div>
       <TopicLinks tags={post.tags} />
       <FullWidthCover post={post} title={title ?? excerpt} priority={priority} />
@@ -421,15 +419,21 @@ function ArticleFeedCard({
   respondingTo,
   hideRespondingTo,
   showTimestamp,
+  articlePresentation = "hero",
 }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled article";
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const format = getArticleFormatLabel(resolveArticleFormat(post));
   const hasCover = Boolean(post.cover_image_url?.trim());
   const readingTime = readTime(excerpt);
+  const showImmersiveCover = hasCover && articlePresentation === "hero";
 
   return (
-    <article className={ARTICLE_CARD_SHELL} data-content-kind="article">
+    <article
+      className={ARTICLE_CARD_SHELL}
+      data-content-kind="article"
+      data-article-presentation={hasCover ? articlePresentation : "text"}
+    >
       <ContextLine
         post={post}
         surface={surface}
@@ -438,7 +442,8 @@ function ArticleFeedCard({
       />
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
 
-      {hasCover ? (
+      {showImmersiveCover ? (
+        <>
         <Link
           href={`/post/${post.slug}`}
           className={`group relative mt-3 block overflow-hidden rounded-[15px] bg-emerald-brand ${FOCUS_RING}`}
@@ -452,7 +457,7 @@ function ArticleFeedCard({
             sizes="(max-width: 640px) calc(100vw - 56px), (max-width: 1024px) 720px, 780px"
             priority={priority}
             fit="cover"
-            className="aspect-[4/3] w-full bg-emerald-brand sm:aspect-[16/10]"
+            className="aspect-[16/10] w-full bg-emerald-brand sm:aspect-[2/1]"
             imageClassName="object-cover transition-transform duration-500 group-hover:scale-[1.015] motion-reduce:transition-none"
           />
           <span
@@ -464,27 +469,57 @@ function ArticleFeedCard({
             <h2 className="mt-1.5 font-display line-clamp-3 text-[25px] font-semibold leading-[1.08] text-white sm:text-[32px] sm:leading-[1.05]">
               {title}
             </h2>
-            {excerpt ? (
-              <span className="mt-2 line-clamp-2 text-[13.5px] leading-[1.5] text-white/90 max-[359px]:hidden sm:text-[14.5px]">
-                {excerpt}
-              </span>
-            ) : null}
           </span>
         </Link>
+        {excerpt ? (
+          <p className="mt-3 line-clamp-2 text-[14.5px] leading-[1.62] text-gray-700 sm:text-[15px]">
+            {excerpt}
+          </p>
+        ) : null}
+        </>
       ) : (
-        <div className="mt-3 rounded-[14px] border border-amber-100 bg-[#fffdf8] p-4 sm:p-5">
-          <ArticleMeta format={format} readingTime={readingTime} />
-          <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-            <h2 className="mt-2 font-display line-clamp-4 text-[24px] font-semibold leading-[1.12] text-ink sm:text-[30px] sm:leading-[1.08]">
-              {title}
-            </h2>
-          </Link>
-          {excerpt ? (
-            <p className="mt-2.5 line-clamp-3 text-[14.5px] leading-[1.62] text-gray-700 sm:text-[15px]">
-              {excerpt}
-            </p>
+        <>
+          {hasCover ? (
+            <Link
+              href={`/post/${post.slug}`}
+              className={`group mt-3 block overflow-hidden rounded-[14px] border border-amber-100 bg-[#f3f1ec] ${FOCUS_RING}`}
+              data-article-cover="standard"
+            >
+              <PostCover
+                src={post.cover_image_url}
+                alt={title}
+                type={post.type}
+                content_kind={post.content_kind}
+                article_format={post.article_format}
+                sizes="(max-width: 640px) calc(100vw - 56px), (max-width: 1024px) 720px, 780px"
+                priority={priority}
+                fit="cover"
+                className="aspect-[16/9] w-full bg-[#f3f1ec] sm:aspect-[2/1]"
+                imageClassName="object-cover transition-transform duration-500 group-hover:scale-[1.015] motion-reduce:transition-none"
+              />
+            </Link>
           ) : null}
-        </div>
+
+          <div
+            className={`mt-3 ${
+              hasCover
+                ? "border-l-2 border-l-gold pl-3 sm:pl-4"
+                : "rounded-[14px] border border-amber-100 bg-[#fffdf8] p-4 sm:p-5"
+            }`}
+          >
+            <ArticleMeta format={format} readingTime={readingTime} />
+            <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
+              <h2 className="mt-2 font-display line-clamp-3 text-[23px] font-semibold leading-[1.12] text-ink sm:text-[29px] sm:leading-[1.08]">
+                {title}
+              </h2>
+            </Link>
+            {excerpt ? (
+              <p className="mt-2.5 line-clamp-2 text-[14.5px] leading-[1.62] text-gray-700 sm:text-[15px]">
+                {excerpt}
+              </p>
+            ) : null}
+          </div>
+        </>
       )}
 
       <TopicLinks tags={post.tags} tone="article" />

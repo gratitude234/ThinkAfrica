@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import HomeFeedCard from "./HomeFeedCard";
+import HomeFeedCard, { type ArticlePresentation } from "./HomeFeedCard";
 import type { PostCardData } from "./PostCard";
 import { useViewImpression } from "@/lib/useViewImpression";
 
@@ -10,11 +10,13 @@ export default function HomeFeedCardImpression({
   currentUserId,
   surface,
   priority = false,
+  articlePresentation,
 }: {
   post: PostCardData;
   currentUserId: string | null;
   surface: "home" | "following" | "subscriptions" | "topics" | "latest";
   priority?: boolean;
+  articlePresentation?: ArticlePresentation;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useViewImpression(ref, post.slug, surface);
@@ -26,6 +28,7 @@ export default function HomeFeedCardImpression({
         currentUserId={currentUserId}
         surface={surface}
         priority={priority}
+        articlePresentation={articlePresentation}
       />
     </div>
   );
