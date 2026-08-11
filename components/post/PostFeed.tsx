@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { PostCardData } from "./PostCard";
 import HomeFeedCardImpression from "./HomeFeedCardImpression";
-import type { ArticlePresentation } from "./HomeFeedCard";
 import DebateInterlude, { type DebateInterludeData } from "./DebateInterlude";
 import PeopleInterlude from "./PeopleInterlude";
 import TopicInterlude from "./TopicInterlude";
-import { resolveContentKind } from "@/lib/contentModel";
 
 type FeedTabKey =
   | "home"
@@ -56,17 +54,6 @@ export function getDiscoveryModuleAt({
   return moduleIndex >= 0 ? modules[moduleIndex] ?? null : null;
 }
 
-/**
- * One immersive Article opens each three-Article reading run. The following
- * two retain full-width imagery but move the headline below it, preventing a
- * long feed from becoming a wall of identical green overlays.
- */
-export function getArticlePresentation(
-  articleOrdinal: number
-): ArticlePresentation {
-  return articleOrdinal % 3 === 0 ? "hero" : "standard";
-}
-
 interface PostFeedProps {
   posts: PostCardData[];
   activeTab: FeedTabKey;
@@ -99,7 +86,6 @@ export default function PostFeed({
     hasDebate: Boolean(activeDebate),
     hasTopic: topicPosts.length > 1,
   });
-  let articleOrdinal = 0;
 
   const renderDiscoveryModule = (module: DiscoveryModule) => {
     if (module === "people") {
@@ -185,10 +171,6 @@ export default function PostFeed({
         <div>
           {posts.map((post, index) => {
             const completedCount = index + 1;
-            const articlePresentation =
-              resolveContentKind(post) === "article"
-                ? getArticlePresentation(articleOrdinal++)
-                : undefined;
             const discoveryModule = getDiscoveryModuleAt({
               activeTab,
               completedCount,
@@ -202,7 +184,6 @@ export default function PostFeed({
                   currentUserId={currentUserId}
                   surface={activeTab}
                   priority={index === 0}
-                  articlePresentation={articlePresentation}
                 />
                 {discoveryModule ? (
                   <div className="lg:hidden">

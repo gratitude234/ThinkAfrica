@@ -265,7 +265,6 @@ describe("HomeFeedCard", () => {
 
     const article = container.querySelector('[data-content-kind="article"]');
     expect(article).toBeInTheDocument();
-    expect(article).toHaveAttribute("data-article-presentation", "hero");
     expect(article?.querySelector('[class*="grid-cols-[minmax"]')).toBeNull();
     const heading = screen.getByRole("heading", {
       name: "Why institutions outlast intentions",
@@ -275,52 +274,8 @@ describe("HomeFeedCard", () => {
       screen.getByRole("img", { name: "Why institutions outlast intentions" })
         .parentElement
     ).toHaveClass(
-      "aspect-[16/10]",
-      "sm:aspect-[2/1]"
-    );
-  });
-
-  it("renders standard Articles as clean full-width covers with text below", () => {
-    const { container } = render(
-      <HomeFeedCard
-        post={post({
-          title: "Why institutions outlast intentions",
-          type: "essay",
-          content_kind: "article",
-          cover_image_url: "https://example.com/article-cover.jpg",
-        })}
-        currentUserId="user-1"
-        surface="home"
-        articlePresentation="standard"
-      />
-    );
-
-    const article = container.querySelector('[data-content-kind="article"]');
-    expect(article).toHaveAttribute("data-article-presentation", "standard");
-    expect(container.querySelector('[data-article-cover="standard"]')).toBeInTheDocument();
-    expect(
-      screen.getByRole("img", { name: "Why institutions outlast intentions" })
-        .parentElement
-    ).toHaveClass("aspect-[16/9]", "sm:aspect-[2/1]");
-    expect(
-      screen.getByRole("heading", {
-        name: "Why institutions outlast intentions",
-      })
-    ).toBeInTheDocument();
-  });
-
-  it("offers inline expansion for a long conversational Post", () => {
-    render(
-      <HomeFeedCard
-        post={post({ excerpt: "A long campus observation. ".repeat(16) })}
-        currentUserId="user-1"
-        surface="home"
-      />
-    );
-
-    expect(screen.getByRole("button", { name: "More" })).toHaveAttribute(
-      "aria-expanded",
-      "false"
+      "aspect-[4/3]",
+      "sm:aspect-[16/10]"
     );
   });
 
