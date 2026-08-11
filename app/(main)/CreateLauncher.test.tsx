@@ -92,6 +92,8 @@ describe("CreateLauncher -- direct-to-composer", () => {
     const trigger = screen.getByRole("button", { name: "Start writing" });
     expect(trigger).not.toHaveClass("fixed");
     expect(trigger).not.toHaveAttribute("data-app-compose-fab");
+    expect(trigger).toHaveClass("text-emerald-brand");
+    expect(trigger).not.toHaveClass("bg-emerald-brand", "rounded-full");
     expect(trigger.parentElement).toHaveClass("md:hidden");
   });
 

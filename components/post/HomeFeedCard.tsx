@@ -235,7 +235,10 @@ function Actions({
 }
 
 function TopicLinks({ tags }: { tags: string[] | null }) {
-  const topics = (tags ?? []).map((tag) => tag.trim()).filter(Boolean).slice(0, 2);
+  const topics = (tags ?? [])
+    .map((tag) => tag.trim().replace(/^#+/, "").trim())
+    .filter(Boolean)
+    .slice(0, 2);
   if (topics.length === 0) return null;
 
   return (

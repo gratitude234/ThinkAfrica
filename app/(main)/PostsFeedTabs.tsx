@@ -8,7 +8,7 @@ import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { PostCardData } from "@/components/post/PostCard";
 import type { FeedContentFilter, FeedTimeframe } from "@/lib/feedData";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
-import FeedFilterChips from "./FeedFilterChips";
+import FeedFilterChips, { MobileFeedFilterSelect } from "./FeedFilterChips";
 import HomeFeaturedLead, { type HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
 import HomeGuestNotice from "./HomeGuestNotice";
 import FeedEmptyState from "./FeedEmptyState";
@@ -652,60 +652,70 @@ export default function PostsFeedTabs({
       >
         <div
           data-app-context-primary=""
-          className={`pointer-events-auto flex snap-x snap-proximity gap-0.5 overflow-x-auto overscroll-x-contain scroll-px-4 border-b border-gray-200 bg-white px-4 [scrollbar-width:none] sm:gap-1 sm:px-0 [&::-webkit-scrollbar]:hidden ${
+          className={`pointer-events-auto flex min-w-0 items-stretch border-b border-gray-200 bg-white ${
             isPinned && chromeMode === "compact"
               ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
               : ""
           }`}
-          role="tablist"
-          aria-label="Choose feed"
         >
-          {([
-            "home",
-            "following",
-            "subscriptions",
-            "topics",
-            "latest",
-          ] as const)
-            .filter(
-              (tab) =>
-                (tab !== "following" || showFollowingTab) &&
-                (tab !== "topics" || showTopicsTab) &&
-                (tab !== "subscriptions" || showSubscriptionsTab)
-            )
-            .map((tab) => {
-              const label =
-                tab === "home"
-                  ? currentUserId
-                    ? "For you"
-                    : "Discover"
-                  : tab === "following"
-                    ? "Following"
-                    : tab === "subscriptions"
-                      ? "Subscribed"
-                    : tab === "topics"
-                      ? "Topics"
-                      : "Latest";
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  id={`feed-tab-${tab}`}
-                  aria-label={tab === "subscriptions" ? "Subscriptions" : label}
-                  aria-controls="home-feed-panel"
-                  aria-selected={activeTab === tab}
-                  onClick={() => updateState(tab, typeFilter, timeframe)}
-                  className={`-mb-px min-h-11 shrink-0 snap-start border-b-2 px-3 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 sm:text-[14px] ${
-                    activeTab === tab
-                      ? "border-emerald-brand bg-emerald-50/70 text-emerald-950"
-                      : "border-transparent text-gray-600 hover:text-ink"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
+          <div
+            className="flex min-w-0 flex-1 snap-x snap-proximity gap-0.5 overflow-x-auto overscroll-x-contain scroll-px-4 px-4 [scrollbar-width:none] sm:gap-1 sm:px-0 [&::-webkit-scrollbar]:hidden"
+            role="tablist"
+            aria-label="Choose feed"
+          >
+            {([
+              "home",
+              "following",
+              "subscriptions",
+              "topics",
+              "latest",
+            ] as const)
+              .filter(
+                (tab) =>
+                  (tab !== "following" || showFollowingTab) &&
+                  (tab !== "topics" || showTopicsTab) &&
+                  (tab !== "subscriptions" || showSubscriptionsTab)
+              )
+              .map((tab) => {
+                const label =
+                  tab === "home"
+                    ? currentUserId
+                      ? "For you"
+                      : "Discover"
+                    : tab === "following"
+                      ? "Following"
+                      : tab === "subscriptions"
+                        ? "Subscribed"
+                      : tab === "topics"
+                        ? "Topics"
+                        : "Latest";
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    id={`feed-tab-${tab}`}
+                    aria-label={tab === "subscriptions" ? "Subscriptions" : label}
+                    aria-controls="home-feed-panel"
+                    aria-selected={activeTab === tab}
+                    onClick={() => updateState(tab, typeFilter, timeframe)}
+                    className={`-mb-px min-h-11 shrink-0 snap-start border-b-2 px-3 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 sm:text-[14px] ${
+                      activeTab === tab
+                        ? "border-emerald-brand bg-emerald-50/70 text-emerald-950"
+                        : "border-transparent text-gray-600 hover:text-ink"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+          </div>
+          <div className="flex w-12 shrink-0 items-center justify-center border-l border-gray-100 bg-white sm:hidden">
+            <MobileFeedFilterSelect
+              type={typeFilter}
+              onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
+            />
+          </div>
         </div>
 
         <div
@@ -724,7 +734,7 @@ export default function PostsFeedTabs({
               there); the inner one holds the padding, which a border-box row
               cannot collapse below. */}
           <div>
-            <div className="px-4 pb-0.5 sm:px-0">
+            <div className="px-4 sm:px-0 sm:pb-0.5">
               {activeTab === "subscriptions" ? (
                 <div
                   className="flex gap-2 overflow-x-auto pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -753,7 +763,7 @@ export default function PostsFeedTabs({
               <FeedFilterChips
                 type={typeFilter}
                 onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
-                className="mt-1"
+                className="hidden sm:mt-1 sm:block"
               />
             </div>
           </div>

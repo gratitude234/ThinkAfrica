@@ -53,7 +53,7 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-brand via-emerald-brand/65 to-transparent" />
         </div>
       ) : null}
-      <div className="relative px-4 py-4.5 sm:max-w-[74%] sm:px-7 sm:py-7">
+      <div className="relative px-4 pb-5 pt-4 sm:max-w-[74%] sm:px-7 sm:py-7">
         <p className="font-sans text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-200 sm:text-[10.5px]">
           Editor&apos;s pick · {label} · {readTime(excerpt)} min
         </p>
@@ -61,7 +61,7 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
           <h2 className="font-display text-[20px] font-semibold leading-[1.16] min-[390px]:text-[21px] sm:text-[28px] sm:leading-[1.12]">{title}</h2>
         </Link>
         {excerpt ? <p className="mt-2 line-clamp-2 text-[14px] leading-[1.55] text-emerald-50/95 sm:mt-2.5 sm:text-[14.5px] sm:leading-[1.6]">{excerpt}</p> : null}
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2.5 sm:mt-4 sm:gap-4">
+        <div className="mt-3.5 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2.5 sm:mt-4 sm:gap-4">
           <div className="min-w-0 pr-1">
             <p className="truncate text-[12.5px] font-semibold">{author}</p>
             {post.profiles?.university ? <p className="mt-0.5 truncate text-[11.5px] text-emerald-100/90">{post.profiles.university}</p> : null}

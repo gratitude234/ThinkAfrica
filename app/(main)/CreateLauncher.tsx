@@ -104,12 +104,12 @@ export default function CreateLauncher({
           disabled={isNavigating}
           aria-busy={isNavigating || undefined}
           aria-label={isNavigating ? "Opening the composer" : "Start writing"}
-          className="group flex h-11 w-11 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_5px_14px_-6px_rgb(7_57_41/0.55)] ring-1 ring-black/5 transition-[background-color,box-shadow,transform] duration-200 hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 active:scale-[0.96] motion-reduce:transition-none"
+          className="group flex h-11 w-11 items-center justify-center rounded-xl text-emerald-brand transition-[background-color,transform] duration-150 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 active:scale-[0.96] motion-reduce:transition-none"
         >
           {isNavigating ? (
             <SpinnerIcon className="h-[21px] w-[21px]" />
           ) : (
-            <ComposeIcon className="h-[21px] w-[21px] transition-transform duration-200 group-active:scale-95 motion-reduce:transition-none" />
+            <ComposeIcon className="h-[22px] w-[22px] transition-transform duration-150 group-active:scale-95 motion-reduce:transition-none" />
           )}
         </button>
       </div>
