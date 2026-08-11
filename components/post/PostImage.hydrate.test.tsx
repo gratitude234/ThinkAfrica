@@ -41,8 +41,10 @@ describe("PostImage hydration", () => {
     });
 
     expect(recoverable).toEqual([]);
-    // 1080x2340 is far taller than the 3/4 clamp, so the crop hint is shown.
-    expect(container.querySelector("[title='Tap to see the whole image']")).toBeTruthy();
+    // 1080x2340 reaches the timeline-height guard, but object-contain keeps the
+    // complete image visible instead of adding a crop warning.
+    expect(container.querySelector("[title='Tap to see the whole image']")).toBeNull();
+    expect(container.querySelector("img")).toHaveClass("object-contain");
     expect(container.querySelector("[style*='aspect-ratio']")).toBeTruthy();
 
     document.body.removeChild(container);

@@ -35,14 +35,14 @@ interface PostCoverProps {
   priority?: boolean;
   unoptimized?: boolean;
   // Fires once the image reports its intrinsic size in `fit="natural"` mode.
-  // `cropped` means the ratio hit a clamp, so part of the image is out of
-  // view -- callers use it to offer a way to see the whole thing.
+  // `constrained` means the ratio hit a timeline-height guard. Natural media
+  // uses object-contain, so even constrained images remain fully visible.
   onNaturalFit?: (fit: NaturalFit) => void;
 }
 
 export interface NaturalFit {
   ratio: number;
-  cropped: boolean;
+  constrained: boolean;
 }
 
 const FALLBACK_STYLES: Record<string, string> = {
@@ -52,17 +52,19 @@ const FALLBACK_STYLES: Record<string, string> = {
   policy_brief: "from-purple-accent to-[#6B4A94] text-purple-tint/45",
 };
 
-// Bounds for `fit="natural"`, mirroring how a timeline shows attached media:
-// anything between a tall portrait and a wide landscape is shown uncropped,
-// and only the extremes (panoramas, very tall screenshots) get trimmed.
-const NATURAL_MIN_RATIO = 3 / 4;
+// Bounds for `fit="natural"`, mirroring a photo-led timeline: ordinary
+// portrait photography can stay visibly portrait, while extremely tall phone
+// screenshots do not consume several screens of feed. Because natural media
+// uses object-contain, reaching either guard adds breathing room rather than
+// slicing away the image.
+const NATURAL_MIN_RATIO = 2 / 3;
 const NATURAL_MAX_RATIO = 16 / 9;
 // Height reserved before the image reports its intrinsic size.
-const NATURAL_DEFAULT_RATIO = 16 / 9;
+const NATURAL_DEFAULT_RATIO = 4 / 3;
 
 function clampNaturalFit(raw: number): NaturalFit {
   const ratio = Math.min(NATURAL_MAX_RATIO, Math.max(NATURAL_MIN_RATIO, raw));
-  return { ratio, cropped: Math.abs(ratio - raw) > 0.001 };
+  return { ratio, constrained: Math.abs(ratio - raw) > 0.001 };
 }
 
 function normalizeType(type: string | null | undefined): PostType {
@@ -159,8 +161,9 @@ export default function PostCover({
     [src, unoptimized]
   );
   const resolvedImageClassName =
-    imageClassName ?? (fit === "contain" ? "object-contain" : "object-cover");
-  const containerClassName = fit === "contain" ? `bg-white ${className}` : className;
+    imageClassName ?? (fit === "cover" ? "object-cover" : "object-contain");
+  const containerClassName =
+    fit === "cover" ? className : `bg-[#f3f1ec] ${className}`;
   // In natural mode the height comes from the ratio, not from a caller aspect
   // utility, so the same style also backs the no-image fallback box.
   const naturalStyle =

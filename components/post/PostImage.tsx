@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import ImageLightbox from "@/components/ui/ImageLightbox";
-import PostCover, { type NaturalFit } from "./PostCover";
+import PostCover from "./PostCover";
 
 interface PostImageProps {
   src: string;
@@ -16,18 +16,15 @@ interface PostImageProps {
   className?: string;
   /** Styling for the tappable wrapper (spacing around the image). */
   wrapperClassName?: string;
-  /**
-   * Feed media uses a predictable editorial crop to keep the timeline
-   * scannable. Detail pages retain the image's natural proportions.
-   */
-  variant?: "natural" | "feed" | "feed-thumbnail";
+  /** Feed keeps Post media natural, Article thumbnails editorially cropped,
+   *  and Research previews paper-shaped and contained. */
+  variant?: "natural" | "feed" | "feed-thumbnail" | "research-preview";
 }
 
 /**
  * An image attached to a post. Tapping it opens the full-screen viewer rather
  * than following the card's link to the post: the rest of the card already
- * navigates, and the viewer is the only way to see an image the feed's ratio
- * clamp has cropped.
+ * navigates, while the viewer offers a distraction-free inspection.
  */
 export default function PostImage({
   src,
@@ -42,22 +39,23 @@ export default function PostImage({
   variant = "natural",
 }: PostImageProps) {
   const [open, setOpen] = useState(false);
-  const [cropped, setCropped] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
-  const handleNaturalFit = useCallback((fit: NaturalFit) => setCropped(fit.cropped), []);
   const handleClose = useCallback(() => {
     setOpen(false);
     triggerRef.current?.focus();
   }, []);
 
-  const isFeedMedia = variant === "feed" || variant === "feed-thumbnail";
+  const isEditorialCrop = variant === "feed-thumbnail";
+  const isResearchPreview = variant === "research-preview";
   const aspectClass =
-    variant === "feed-thumbnail"
+    isEditorialCrop
       ? "aspect-[4/3] sm:aspect-[16/10]"
-      : variant === "feed"
-        ? "aspect-[16/10] sm:aspect-[16/9]"
+      : isResearchPreview
+        ? "aspect-[3/4]"
         : "";
+  const heightGuard = variant === "feed" ? "max-h-[72svh] sm:max-h-[720px]" : "";
+  const fit = isEditorialCrop ? "cover" : isResearchPreview ? "contain" : "natural";
 
   return (
     <>
@@ -76,20 +74,10 @@ export default function PostImage({
           article_format={article_format}
           sizes={sizes}
           priority={priority}
-          fit={isFeedMedia ? "cover" : "natural"}
-          className={`${aspectClass} ${className}`}
-          imageClassName="object-cover"
-          onNaturalFit={isFeedMedia ? undefined : handleNaturalFit}
+          fit={fit}
+          className={`${aspectClass} ${heightGuard} ${className}`}
+          imageClassName={isEditorialCrop ? "object-cover" : "object-contain"}
         />
-        {!isFeedMedia && cropped ? (
-          <span
-            aria-hidden="true"
-            className="absolute bottom-2 right-2 rounded-md bg-black/60 px-1.5 py-1 text-[11px] font-semibold leading-none text-white"
-            title="Tap to see the whole image"
-          >
-            ⤢
-          </span>
-        ) : null}
       </button>
       <ImageLightbox src={src} alt={alt} open={open} onClose={handleClose} />
     </>

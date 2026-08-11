@@ -17,11 +17,11 @@ function loadWith(img: HTMLImageElement, naturalWidth: number, naturalHeight: nu
 }
 
 describe("PostCover", () => {
-  it("reserves a 16/9 box in natural mode before the image reports its size", () => {
+  it("reserves a balanced 4/3 box before natural media reports its size", () => {
     render(<PostCover src={SRC} alt="Attached image" fit="natural" />);
 
     const box = screen.getByRole("img").parentElement as HTMLElement;
-    expect(ratioOf(box)).toBeCloseTo(16 / 9);
+    expect(ratioOf(box)).toBeCloseTo(4 / 3);
   });
 
   it("adopts the image's own ratio so a portrait photo stays portrait", () => {
@@ -34,7 +34,7 @@ describe("PostCover", () => {
     expect(ratioOf(box)).toBeCloseTo(1080 / 1350);
   });
 
-  it("clamps extremes rather than letting a panorama or a tall screenshot run away", () => {
+  it("constrains extreme ratios without forcing ordinary portraits landscape", () => {
     const { unmount } = render(<PostCover src={SRC} alt="Panorama" fit="natural" />);
     loadWith(screen.getByRole("img") as HTMLImageElement, 3000, 500);
     expect(ratioOf(screen.getByRole("img").parentElement as HTMLElement)).toBeCloseTo(16 / 9);
@@ -42,7 +42,8 @@ describe("PostCover", () => {
 
     render(<PostCover src={SRC} alt="Tall screenshot" fit="natural" />);
     loadWith(screen.getByRole("img") as HTMLImageElement, 1080, 2340);
-    expect(ratioOf(screen.getByRole("img").parentElement as HTMLElement)).toBeCloseTo(3 / 4);
+    expect(ratioOf(screen.getByRole("img").parentElement as HTMLElement)).toBeCloseTo(2 / 3);
+    expect(screen.getByRole("img")).toHaveClass("object-contain");
   });
 
   it("leaves the caller's aspect box alone outside natural mode", () => {

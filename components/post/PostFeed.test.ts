@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  getDiscoveryModuleAt,
-  getDiscoveryModuleOrder,
-  shouldShowSurfaceReason,
-} from "./PostFeed";
+import { getDiscoveryModuleAt, getDiscoveryModuleOrder } from "./PostFeed";
 
 describe("Home discovery cadence", () => {
   it("prioritizes writers for users following fewer than three people", () => {
@@ -36,41 +32,5 @@ describe("Home discovery cadence", () => {
         })
       ).toBeNull();
     }
-  });
-});
-
-describe("Home recommendation labels", () => {
-  it("announces a consecutive recommendation reason only once", () => {
-    expect(
-      shouldShowSurfaceReason({
-        activeTab: "home",
-        currentReason: "From a writer you follow",
-        previousReason: null,
-      })
-    ).toBe(true);
-    expect(
-      shouldShowSurfaceReason({
-        activeTab: "home",
-        currentReason: "From a writer you follow",
-        previousReason: "From a writer you follow",
-      })
-    ).toBe(false);
-  });
-
-  it("shows the label again when the reason changes and leaves other feeds untouched", () => {
-    expect(
-      shouldShowSurfaceReason({
-        activeTab: "home",
-        currentReason: "Popular in your university",
-        previousReason: "From a writer you follow",
-      })
-    ).toBe(true);
-    expect(
-      shouldShowSurfaceReason({
-        activeTab: "latest",
-        currentReason: "From a writer you follow",
-        previousReason: "From a writer you follow",
-      })
-    ).toBe(true);
   });
 });

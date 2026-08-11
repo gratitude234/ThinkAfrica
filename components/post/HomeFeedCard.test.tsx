@@ -33,20 +33,6 @@ function post(overrides: Partial<PostCardData> = {}): PostCardData {
 }
 
 describe("HomeFeedCard", () => {
-  it("can suppress a repeated home recommendation label without hiding the card", () => {
-    render(
-      <HomeFeedCard
-        post={post({ surface_reason: "From a writer you follow" })}
-        currentUserId="user-1"
-        surface="home"
-        showSurfaceReason={false}
-      />
-    );
-
-    expect(screen.queryByText("From a writer you follow")).not.toBeInTheDocument();
-    expect(screen.getByText("A short thought about building better institutions.")).toBeInTheDocument();
-  });
-
   it("renders a titleless Post as body-first content without a fabricated heading", () => {
     const { container } = render(
       <HomeFeedCard post={post()} currentUserId="user-1" surface="home" />
@@ -176,20 +162,24 @@ describe("HomeFeedCard", () => {
     expect(screen.getByText(/Responding to another publication/)).toBeInTheDocument();
   });
 
-  it("shows when it was published only where the surface asks for it", () => {
+  it("shows recency by default and lets contextual callers suppress it", () => {
     const published = { published_at: "2026-07-22T10:00:00.000Z" };
     const { unmount } = render(
       <HomeFeedCard post={post(published)} currentUserId="user-1" surface="home" />
     );
-    // The feed implies recency through its ordering, so no date there.
-    // \b matters: the fixture's "University of Lagos" contains "ago".
-    expect(screen.queryByText(/\bago\b|just now/)).toBeNull();
+    expect(screen.getByText(/\bago\b|just now/)).toBeInTheDocument();
     unmount();
 
     render(
-      <HomeFeedCard post={post(published)} currentUserId="user-1" surface="latest" showTimestamp />
+      <HomeFeedCard
+        post={post(published)}
+        currentUserId="user-1"
+        surface="latest"
+        showTimestamp={false}
+      />
     );
-    expect(screen.getByText(/\bago\b|just now/)).toBeInTheDocument();
+    // \b matters: the fixture's "University of Lagos" contains "ago".
+    expect(screen.queryByText(/\bago\b|just now/)).toBeNull();
   });
 
   it("drops the responding-to line where the parent is already the context", () => {
@@ -255,11 +245,11 @@ describe("HomeFeedCard", () => {
     expect(screen.getByRole("heading", { name: "Why institutions outlast intentions" })).toBeInTheDocument();
     expect(screen.getByText("Article")).toBeInTheDocument();
     expect(screen.getByText("Policy Brief")).toBeInTheDocument();
-    expect(screen.getByText("1 min read")).toBeInTheDocument();
+    expect(screen.getByText("1 min")).toBeInTheDocument();
     expect(screen.queryByText("Reviewed")).not.toBeInTheDocument();
   });
 
-  it("renders article covers as compact responsive media instead of a second full-width block", () => {
+  it("turns an Article cover into one immersive editorial story object", () => {
     const { container } = render(
       <HomeFeedCard
         post={post({
@@ -275,19 +265,21 @@ describe("HomeFeedCard", () => {
 
     const article = container.querySelector('[data-content-kind="article"]');
     expect(article).toBeInTheDocument();
-    expect(article?.querySelector('[class*="grid-cols-"]')).toBeInTheDocument();
+    expect(article?.querySelector('[class*="grid-cols-[minmax"]')).toBeNull();
+    const heading = screen.getByRole("heading", {
+      name: "Why institutions outlast intentions",
+    });
+    expect(heading.closest("a")).toHaveAttribute("href", "/post/clear-thinking");
     expect(
-      screen.getByRole("button", {
-        name: "View image full screen: Why institutions outlast intentions",
-      })
-    ).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Why institutions outlast intentions" }).parentElement).toHaveClass(
+      screen.getByRole("img", { name: "Why institutions outlast intentions" })
+        .parentElement
+    ).toHaveClass(
       "aspect-[4/3]",
       "sm:aspect-[16/10]"
     );
   });
 
-  it("uses the same compact thumbnail treatment for Research covers", () => {
+  it("uses a contained paper-shaped preview for Research covers", () => {
     render(
       <HomeFeedCard
         post={post({
@@ -301,16 +293,17 @@ describe("HomeFeedCard", () => {
       />
     );
 
-    expect(screen.getByRole("img", { name: "A field study of public trust" }).parentElement).toHaveClass(
-      "aspect-[4/3]",
-      "sm:aspect-[16/10]"
-    );
+    const image = screen.getByRole("img", {
+      name: "A field study of public trust",
+    });
+    expect(image.parentElement).toHaveClass("aspect-[3/4]");
+    expect(image).toHaveClass("object-contain");
   });
 
   it("surfaces real publication topics as navigable discovery cues", () => {
     render(
       <HomeFeedCard
-        post={post({ tags: ["#Climate Policy", "##Public Health", "Education"] })}
+        post={post({ tags: ["Climate Policy", "Public Health", "Education"] })}
         currentUserId="user-1"
         surface="home"
       />
@@ -354,8 +347,7 @@ describe("HomeFeedCard", () => {
     // Research used to suppress the discussion metric entirely; it has a
     // comment thread now, so it carries the same count as everything else.
     expect(screen.getByRole("link", { name: "2 in this discussion" })).toBeInTheDocument();
-    // The dashboard-like tinted/bordered PDF sub-card is gone -- the
-    // manuscript row is a plain, borderless metadata line.
+    // Evidence status remains honest and the document row stays lightweight.
     expect(container.querySelector('[class*="bg-purple-tint"]')).toBeNull();
     expect(screen.queryByText(/pages/)).not.toBeInTheDocument();
   });

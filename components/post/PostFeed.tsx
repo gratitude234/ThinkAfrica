@@ -54,19 +54,6 @@ export function getDiscoveryModuleAt({
   return moduleIndex >= 0 ? modules[moduleIndex] ?? null : null;
 }
 
-export function shouldShowSurfaceReason({
-  activeTab,
-  currentReason,
-  previousReason,
-}: {
-  activeTab: FeedTabKey;
-  currentReason: string | null | undefined;
-  previousReason: string | null | undefined;
-}) {
-  if (activeTab !== "home" || !currentReason?.trim()) return true;
-  return currentReason.trim() !== previousReason?.trim();
-}
-
 interface PostFeedProps {
   posts: PostCardData[];
   activeTab: FeedTabKey;
@@ -184,11 +171,6 @@ export default function PostFeed({
         <div>
           {posts.map((post, index) => {
             const completedCount = index + 1;
-            const showSurfaceReason = shouldShowSurfaceReason({
-              activeTab,
-              currentReason: post.surface_reason,
-              previousReason: index > 0 ? posts[index - 1]?.surface_reason : null,
-            });
             const discoveryModule = getDiscoveryModuleAt({
               activeTab,
               completedCount,
@@ -202,7 +184,6 @@ export default function PostFeed({
                   currentUserId={currentUserId}
                   surface={activeTab}
                   priority={index === 0}
-                  showSurfaceReason={showSurfaceReason}
                 />
                 {discoveryModule ? (
                   <div className="lg:hidden">

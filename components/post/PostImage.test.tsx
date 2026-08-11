@@ -11,6 +11,11 @@ function loadFeedImage(naturalWidth: number, naturalHeight: number) {
   fireEvent.load(img);
 }
 
+function ratioOf(el: HTMLElement) {
+  const [width, height = "1"] = el.style.aspectRatio.split("/");
+  return Number(width) / Number(height);
+}
+
 describe("PostImage", () => {
   it("opens the viewer on tap instead of navigating to the post", () => {
     const { container } = render(<PostImage src={SRC} alt="A screenshot" />);
@@ -33,27 +38,24 @@ describe("PostImage", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("flags an image the feed had to crop, and leaves an uncropped one unmarked", () => {
-    const { container, unmount } = render(<PostImage src={SRC} alt="A tall screenshot" />);
+  it("contains a very tall image instead of hiding part of it", () => {
+    const { container } = render(<PostImage src={SRC} alt="A tall screenshot" />);
     loadFeedImage(1080, 2340);
-    expect(container.querySelector("[title='Tap to see the whole image']")).toBeTruthy();
-    unmount();
 
-    const uncropped = render(<PostImage src={SRC} alt="A photo" />);
-    loadFeedImage(1080, 1350);
-    expect(
-      uncropped.container.querySelector("[title='Tap to see the whole image']")
-    ).toBeNull();
+    const image = screen.getByRole("img", { name: "A tall screenshot" });
+    expect(image).toHaveClass("object-contain");
+    expect(ratioOf(image.parentElement as HTMLElement)).toBeCloseTo(2 / 3);
+    expect(container.querySelector("[title='Tap to see the whole image']")).toBeNull();
   });
 
-  it("uses a restrained editorial crop without covering the image with an overlay", () => {
+  it("uses the uploaded image's natural ratio for feed media", () => {
     render(<PostImage src={SRC} alt="A portrait" variant="feed" />);
+    loadFeedImage(1080, 1350);
 
-    expect(screen.getByRole("img", { name: "A portrait" }).parentElement).toHaveClass(
-      "aspect-[16/10]",
-      "sm:aspect-[16/9]",
-    );
-    expect(screen.queryByTitle("View full image")).toBeNull();
+    const image = screen.getByRole("img", { name: "A portrait" });
+    expect(ratioOf(image.parentElement as HTMLElement)).toBeCloseTo(4 / 5);
+    expect(image.parentElement).toHaveClass("max-h-[72svh]", "sm:max-h-[720px]");
+    expect(image).toHaveClass("object-contain");
     expect(
       screen.getByRole("button", { name: "View image full screen: A portrait" })
     ).toBeInTheDocument();
@@ -66,5 +68,13 @@ describe("PostImage", () => {
       "aspect-[4/3]",
       "sm:aspect-[16/10]",
     );
+  });
+
+  it("uses a contained paper ratio for Research previews", () => {
+    render(<PostImage src={SRC} alt="A paper cover" variant="research-preview" />);
+
+    const image = screen.getByRole("img", { name: "A paper cover" });
+    expect(image.parentElement).toHaveClass("aspect-[3/4]");
+    expect(image).toHaveClass("object-contain");
   });
 });
