@@ -39,7 +39,7 @@ describe("CreateLauncher -- direct-to-composer", () => {
   });
 
   it("opens the contextual sign-in gate for a guest instead of navigating", () => {
-    render(<CreateLauncher userId={null} variant="mobileFab" />);
+    render(<CreateLauncher userId={null} variant="mobileHeader" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Start writing" }));
 
@@ -51,7 +51,7 @@ describe("CreateLauncher -- direct-to-composer", () => {
     render(
       <>
         <CreateLauncher userId="user-1" variant="desktop" />
-        <CreateLauncher userId="user-1" variant="mobileFab" />
+        <CreateLauncher userId="user-1" variant="mobileHeader" />
       </>
     );
 
@@ -70,7 +70,7 @@ describe("CreateLauncher -- direct-to-composer", () => {
     render(
       <>
         <CreateLauncher userId="user-1" variant="desktop" />
-        <CreateLauncher userId="user-1" variant="mobileFab" />
+        <CreateLauncher userId="user-1" variant="mobileHeader" />
       </>
     );
 
@@ -86,24 +86,21 @@ describe("CreateLauncher -- direct-to-composer", () => {
     expect(mobileWrapper).toHaveClass("md:hidden");
   });
 
-  it("lets the shared chrome move a feed FAB down but keeps a post FAB clear of the reading bar", () => {
-    const { rerender } = render(
-      <CreateLauncher userId="user-1" variant="mobileFab" />
-    );
-    let fab = screen.getByRole("button", { name: "Start writing" });
+  it("keeps the browse-screen trigger in flow instead of floating over content", () => {
+    render(<CreateLauncher userId="user-1" variant="mobileHeader" />);
+
+    const trigger = screen.getByRole("button", { name: "Start writing" });
+    expect(trigger).not.toHaveClass("fixed");
+    expect(trigger).not.toHaveAttribute("data-app-compose-fab");
+    expect(trigger.parentElement).toHaveClass("md:hidden");
+  });
+
+  it("keeps the post FAB clear of the reading bar", () => {
+    render(<CreateLauncher userId="user-1" variant="mobileFab" />);
+    const fab = screen.getByRole("button", { name: "Start writing" });
 
     expect(fab).toHaveAttribute("data-app-compose-fab");
     expect(fab).toHaveAttribute("data-app-chrome-motion");
-    expect(fab).not.toHaveAttribute("data-app-compose-fab-static");
-    expect(fab).toHaveStyle({
-      bottom:
-        "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
-    });
-
-    rerender(
-      <CreateLauncher userId="user-1" variant="mobileFab" isPostPage />
-    );
-    fab = screen.getByRole("button", { name: "Start writing" });
     expect(fab).toHaveAttribute("data-app-compose-fab-static");
     expect(fab).toHaveStyle({
       bottom:

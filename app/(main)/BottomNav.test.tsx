@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BottomNav from "./BottomNav";
 
@@ -30,19 +30,13 @@ describe("BottomNav compose access", () => {
 
   afterEach(() => cleanup());
 
-  it("shows the compose FAB to guests and opens the contextual sign-in gate instead of the create chooser", () => {
+  it("keeps browse feeds free of an overlapping compose FAB", () => {
     render(
       <BottomNav username={null} userId={null} hasActiveDebate={false} />
     );
 
-    const trigger = screen.getByRole("button", { name: "Start writing" });
-    expect(screen.queryByRole("link", { name: "Start writing" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-
-    fireEvent.click(trigger);
-
-    expect(mocks.requestAuth).toHaveBeenCalledWith("create");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start writing" })).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeInTheDocument();
   });
 
   it("keeps the compose FAB on post pages while hiding the regular bottom nav", () => {

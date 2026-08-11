@@ -703,7 +703,7 @@ describe("PostsFeedTabs -- pinned control strip", () => {
     expect(controls.firstElementChild).not.toHaveClass("px-4");
     expect(controls.firstElementChild?.firstElementChild).toHaveClass(
       "px-4",
-      "pb-1"
+      "pb-0.5"
     );
   });
 

@@ -52,7 +52,7 @@ export default function FeedFilterChips({
 }) {
   return (
     <div className={className}>
-      <label className="relative ml-auto flex min-h-11 w-fit max-w-full items-center gap-2 rounded-full border border-gray-200 bg-canvas px-3.5 text-gray-700 shadow-sm sm:hidden">
+      <label className="relative ml-auto flex min-h-11 w-fit max-w-full items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-gray-800 sm:hidden">
         <span className="sr-only">Filter feed by content type</span>
         <svg className="h-4 w-4 shrink-0 text-emerald-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M7 12h10m-7 6h4" />
@@ -61,7 +61,7 @@ export default function FeedFilterChips({
           aria-label="Filter feed by content type"
           value={type}
           onChange={(event) => onTypeChange(event.target.value as FeedContentFilter)}
-          className="min-h-9 cursor-pointer appearance-none border-0 bg-transparent py-1 pl-0 pr-5 text-[13px] font-semibold text-ink outline-none focus:ring-0"
+          className="min-h-9 cursor-pointer appearance-none border-0 bg-transparent py-1 pl-0 pr-5 text-[12.5px] font-semibold text-gray-900 outline-none focus:ring-0"
         >
           {MOBILE_TYPE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>

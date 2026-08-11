@@ -10,11 +10,13 @@ export default function HomeFeedCardImpression({
   currentUserId,
   surface,
   priority = false,
+  showSurfaceReason = true,
 }: {
   post: PostCardData;
   currentUserId: string | null;
   surface: "home" | "following" | "subscriptions" | "topics" | "latest";
   priority?: boolean;
+  showSurfaceReason?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useViewImpression(ref, post.slug, surface);
@@ -26,6 +28,7 @@ export default function HomeFeedCardImpression({
         currentUserId={currentUserId}
         surface={surface}
         priority={priority}
+        showSurfaceReason={showSurfaceReason}
       />
     </div>
   );

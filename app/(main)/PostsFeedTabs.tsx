@@ -652,7 +652,7 @@ export default function PostsFeedTabs({
       >
         <div
           data-app-context-primary=""
-          className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-gray-200 bg-white px-4 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden ${
+          className={`pointer-events-auto flex snap-x snap-proximity gap-0.5 overflow-x-auto overscroll-x-contain scroll-px-4 border-b border-gray-200 bg-white px-4 [scrollbar-width:none] sm:gap-1 sm:px-0 [&::-webkit-scrollbar]:hidden ${
             isPinned && chromeMode === "compact"
               ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
               : ""
@@ -682,7 +682,7 @@ export default function PostsFeedTabs({
                   : tab === "following"
                     ? "Following"
                     : tab === "subscriptions"
-                      ? "Subscriptions"
+                      ? "Subscribed"
                     : tab === "topics"
                       ? "Topics"
                       : "Latest";
@@ -692,13 +692,14 @@ export default function PostsFeedTabs({
                   type="button"
                   role="tab"
                   id={`feed-tab-${tab}`}
+                  aria-label={tab === "subscriptions" ? "Subscriptions" : label}
                   aria-controls="home-feed-panel"
                   aria-selected={activeTab === tab}
                   onClick={() => updateState(tab, typeFilter, timeframe)}
-                  className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 sm:text-[14px] ${
+                  className={`-mb-px min-h-11 shrink-0 snap-start border-b-2 px-3 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 sm:text-[14px] ${
                     activeTab === tab
                       ? "border-emerald-brand bg-emerald-50/70 text-emerald-950"
-                      : "border-transparent text-gray-500 hover:text-ink"
+                      : "border-transparent text-gray-600 hover:text-ink"
                   }`}
                 >
                   {label}
@@ -723,7 +724,7 @@ export default function PostsFeedTabs({
               there); the inner one holds the padding, which a border-box row
               cannot collapse below. */}
           <div>
-            <div className="px-4 pb-1 sm:px-0">
+            <div className="px-4 pb-0.5 sm:px-0">
               {activeTab === "subscriptions" ? (
                 <div
                   className="flex gap-2 overflow-x-auto pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -752,7 +753,7 @@ export default function PostsFeedTabs({
               <FeedFilterChips
                 type={typeFilter}
                 onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
-                className="mt-2"
+                className="mt-1"
               />
             </div>
           </div>

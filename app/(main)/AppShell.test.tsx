@@ -66,6 +66,16 @@ describe("AppShell", () => {
     expect(main?.className).toMatch(/max-w-\[1240px\]/);
   });
 
+  it("uses a compact top gutter on the home feed without compressing other pages", () => {
+    const { main, unmount } = renderShell("/");
+    expect(main).toHaveClass("pt-3", "sm:pt-5");
+    expect(main).not.toHaveClass("pt-6");
+    unmount();
+
+    const other = renderShell("/explore");
+    expect(other.main).toHaveClass("pt-6");
+  });
+
   it("always wraps content in a min-w-0 column so wide children cannot blow out the track", () => {
     for (const pathname of ["/", "/messages"]) {
       const { unmount } = renderShell(pathname);

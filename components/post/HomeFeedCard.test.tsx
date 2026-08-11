@@ -33,6 +33,20 @@ function post(overrides: Partial<PostCardData> = {}): PostCardData {
 }
 
 describe("HomeFeedCard", () => {
+  it("can suppress a repeated home recommendation label without hiding the card", () => {
+    render(
+      <HomeFeedCard
+        post={post({ surface_reason: "From a writer you follow" })}
+        currentUserId="user-1"
+        surface="home"
+        showSurfaceReason={false}
+      />
+    );
+
+    expect(screen.queryByText("From a writer you follow")).not.toBeInTheDocument();
+    expect(screen.getByText("A short thought about building better institutions.")).toBeInTheDocument();
+  });
+
   it("renders a titleless Post as body-first content without a fabricated heading", () => {
     const { container } = render(
       <HomeFeedCard post={post()} currentUserId="user-1" surface="home" />

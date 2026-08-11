@@ -38,6 +38,9 @@ interface Props {
   /** Show when this was published. Off in the feed, where recency is implied by
    *  the ordering; on in a discussion, where "when" is part of following it. */
   showTimestamp?: boolean;
+  /** Consecutive cards can share the same recommendation reason. The feed
+   *  announces the run once and lets the following cards breathe. */
+  showSurfaceReason?: boolean;
 }
 
 function deriveRespondingTo(responseTo: PostCardData["response_to"]): RespondingToInfo | null {
@@ -52,7 +55,7 @@ function deriveRespondingTo(responseTo: PostCardData["response_to"]): Responding
 }
 
 const CARD_SHELL =
-  "mb-3 overflow-hidden rounded-[16px] border border-[#e7e3dc] bg-white px-3.5 py-3.5 shadow-[0_2px_10px_rgb(17_24_39/0.045)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-[#d9d3c9] hover:shadow-[0_10px_28px_rgb(17_24_39/0.075)] motion-reduce:transform-none motion-reduce:transition-none sm:mb-4 sm:rounded-[18px] sm:px-5 sm:py-5";
+  "mb-4 overflow-hidden rounded-[16px] border border-[#e7e3dc] bg-white px-3.5 py-3.5 shadow-[0_2px_10px_rgb(17_24_39/0.045)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-[#d9d3c9] hover:shadow-[0_10px_28px_rgb(17_24_39/0.075)] motion-reduce:transform-none motion-reduce:transition-none sm:rounded-[18px] sm:px-5 sm:py-5";
 const FOCUS_RING =
   "rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
 
@@ -142,7 +145,8 @@ function ContextLine({
   surface,
   respondingTo,
   hideRespondingTo,
-}: Pick<Props, "post" | "surface" | "respondingTo" | "hideRespondingTo">) {
+  showSurfaceReason = true,
+}: Pick<Props, "post" | "surface" | "respondingTo" | "hideRespondingTo" | "showSurfaceReason">) {
   if (post.in_response_to && !hideRespondingTo) {
     const parent = respondingTo ?? deriveRespondingTo(post.response_to);
     return (
@@ -182,8 +186,13 @@ function ContextLine({
       </p>
     );
   }
-  if (surface === "home" && post.surface_reason) {
-    return <p className="mb-2 text-[12px] font-medium text-gray-500 sm:mb-2.5 sm:text-[12.5px]">{post.surface_reason}</p>;
+  if (surface === "home" && post.surface_reason && showSurfaceReason) {
+    return (
+      <p className="mb-2.5 flex items-center gap-1.5 text-[11.5px] font-semibold leading-[1.4] text-gray-600 sm:text-[12px]">
+        <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
+        {post.surface_reason}
+      </p>
+    );
   }
   if (surface === "subscriptions") {
     const reason = post.subscription_match?.reasons[0];
@@ -262,13 +271,13 @@ function FullWidthCover({ post, title, priority }: { post: PostCardData; title: 
   );
 }
 
-function PostFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo, showTimestamp }: Props) {
+function PostFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo, showTimestamp, showSurfaceReason }: Props) {
   const title = getPostDisplayTitle(post);
   const excerpt = sanitizePostExcerpt(post.excerpt) || "View post";
 
   return (
     <article className={CARD_SHELL}>
-      <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
+      <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} showSurfaceReason={showSurfaceReason} />
       <AuthorLine post={post} avatarSize={32} showTimestamp={showTimestamp} />
       <div className="mt-3">
         {title ? (
@@ -289,7 +298,7 @@ function PostFeedCard({ post, currentUserId, surface, priority, respondingTo, hi
   );
 }
 
-function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo, showTimestamp }: Props) {
+function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo, showTimestamp, showSurfaceReason }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled article";
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const format = getArticleFormatLabel(resolveArticleFormat(post));
@@ -299,7 +308,7 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo,
 
   return (
     <article className={`${CARD_SHELL} border-l-[3px] border-l-gold`} data-content-kind="article">
-      <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
+      <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} showSurfaceReason={showSurfaceReason} />
       <AuthorLine post={post} avatarSize={28} showTimestamp={showTimestamp} />
       <div
         className={`mt-2.5 min-w-0 sm:mt-3 ${
@@ -321,7 +330,7 @@ function ArticleFeedCard({ post, currentUserId, surface, priority, respondingTo,
                 {format}
               </span>
             ) : null}
-            <span className="text-[11.5px] font-medium text-gray-400">
+            <span className="text-[11.5px] font-medium text-gray-500">
               {readingTime} min read
             </span>
           </div>
@@ -384,7 +393,7 @@ function ResearchManuscriptRow({
       >
         PDF
       </span>
-      <span className="min-w-0 truncate text-[11.5px] text-gray-500">
+      <span className="min-w-0 truncate text-[11.5px] text-gray-600">
         PDF manuscript{size ? ` · ${size}` : ""}
       </span>
       {evidence ? <EvidenceBadge label={evidence} /> : null}
@@ -400,7 +409,7 @@ function ResearchManuscriptRow({
   );
 }
 
-function ResearchFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo }: Props) {
+function ResearchFeedCard({ post, currentUserId, surface, priority, respondingTo, hideRespondingTo, showSurfaceReason }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled research paper";
   const abstract = sanitizePostExcerpt(post.excerpt);
   const evidence = post.citation_id ? "Citable" : isFormallyReviewed(post) ? "Reviewed" : null;
@@ -413,7 +422,7 @@ function ResearchFeedCard({ post, currentUserId, surface, priority, respondingTo
 
   return (
     <article className={`${CARD_SHELL} border-purple-100 border-l-[3px] border-l-purple-accent`} data-content-kind="research">
-      <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} />
+      <ContextLine post={post} surface={surface} respondingTo={respondingTo} hideRespondingTo={hideRespondingTo} showSurfaceReason={showSurfaceReason} />
       <div className="mb-2 flex flex-wrap items-center gap-2 sm:mb-2.5">
         <span className="inline-flex min-h-7 items-center rounded-full border border-purple-200 bg-purple-50 px-2.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-purple-accent">Research</span>
         {evidence && !hasDocument ? (
@@ -430,7 +439,7 @@ function ResearchFeedCard({ post, currentUserId, surface, priority, respondingTo
           <p className="mt-2 text-[13px] font-semibold leading-[1.45] text-gray-800 sm:mt-2.5">{primaryAuthor}</p>
           {post.profiles?.university ? <p className="mt-0.5 truncate text-[12.5px] text-gray-600">{post.profiles.university}</p> : null}
           {coauthors.length > 0 ? (
-            <p className="mt-0.5 line-clamp-1 text-[12px] leading-[1.45] text-gray-500">with {coauthors.join(", ")}</p>
+            <p className="mt-0.5 line-clamp-1 text-[12px] leading-[1.45] text-gray-600">with {coauthors.join(", ")}</p>
           ) : null}
           {abstract ? (
             <p className={`${hasCover ? "hidden sm:line-clamp-2" : "line-clamp-2"} mt-2.5 text-[14.5px] leading-[1.58] text-gray-700 sm:mt-3 sm:leading-[1.62]`}>
