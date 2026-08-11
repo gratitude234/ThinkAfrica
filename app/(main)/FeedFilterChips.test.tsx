@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import FeedFilterChips, { MobileFeedFilterSelect } from "./FeedFilterChips";
+import FeedFilterChips from "./FeedFilterChips";
 
 describe("FeedFilterChips", () => {
   it("shows exactly the three content kinds plus All", () => {
@@ -28,15 +28,15 @@ describe("FeedFilterChips", () => {
     expect(onChange).toHaveBeenCalledWith("post");
   });
 
-  it("offers a compact native selector for the mobile sticky header", () => {
+  it("keeps the one-tap content chips available in the mobile sticky header", () => {
     const onChange = vi.fn();
-    render(<MobileFeedFilterSelect type="all" onTypeChange={onChange} />);
+    render(<FeedFilterChips type="all" onTypeChange={onChange} />);
 
-    const select = screen.getByRole("combobox", {
+    const group = screen.getByRole("group", {
       name: "Filter feed by content type",
     });
-    fireEvent.change(select, { target: { value: "research" } });
+    expect(group).toHaveClass("overflow-x-auto");
+    fireEvent.click(screen.getByRole("button", { name: "Research" }));
     expect(onChange).toHaveBeenCalledWith("research");
-    expect(select.closest("label")).toHaveClass("h-11", "w-11");
   });
 });

@@ -94,7 +94,7 @@ export default function NavClient({
       {/* Outside the sticky wrapper: the positioning statement greets you at the
           top of the page, but it never changes, so pinning it cost 36px of
           vertical space on every screen and every scroll. */}
-      <div className="bg-emerald-brand py-1 text-center">
+      <div className="bg-emerald-brand py-1.5 text-center">
         <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold sm:text-[10.5px]">
           Africa&apos;s intellectual social network
         </span>
@@ -120,7 +120,7 @@ export default function NavClient({
         className="sticky top-0 z-50 transition-transform duration-200 ease-out motion-reduce:transition-none"
       >
       <nav
-        className={`h-[56px] border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none md:h-[60px] ${
+        className={`h-[60px] border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
           hasScrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
         }`}
         aria-label="Primary navigation"
@@ -207,13 +207,6 @@ export default function NavClient({
               ) : null}
             </Link>
             {user ? <NotificationBell userId={user.id} /> : null}
-            {showMobilePrimaryNav ? (
-              <CreateLauncher
-                userId={user?.id ?? null}
-                variant="mobileHeader"
-                isActive={isWriteActive}
-              />
-            ) : null}
             <CreateLauncher
               userId={user?.id ?? null}
               variant="desktop"

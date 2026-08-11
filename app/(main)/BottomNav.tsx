@@ -66,9 +66,7 @@ export default function BottomNav({
 
   return (
     <>
-      {isPostPage ? (
-        <CreateLauncher userId={userId} variant="mobileFab" />
-      ) : null}
+      <CreateLauncher userId={userId} variant="mobileFab" isPostPage={isPostPage} />
 
       {/* The bar drops away on a downward scroll and returns on an upward one,
           in step with the top nav: reading a feed on a phone should get the

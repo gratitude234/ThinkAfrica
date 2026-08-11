@@ -15,7 +15,7 @@ interface AppShellProps {
 }
 
 const MAIN_BASE =
-  "mx-auto max-w-[1240px] px-4 pb-32 sm:px-6 md:pb-16 lg:px-8";
+  "mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-6 md:pb-16 lg:px-8";
 
 // The container only widens on rail routes. Every suppressed route -- messages,
 // post pages, debate rooms, admin -- stays at 1240px and is pixel-identical to
@@ -39,10 +39,9 @@ export default function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const showRail = shouldShowDesktopRail(pathname);
-  const topPadding = pathname === "/" ? "pt-3 sm:pt-5" : "pt-6";
 
   return (
-    <main className={`${showRail ? MAIN_WITH_RAIL : MAIN_BASE} ${topPadding}`}>
+    <main className={showRail ? MAIN_WITH_RAIL : MAIN_BASE}>
       {showRail ? (
         <SideRail
           userId={userId}

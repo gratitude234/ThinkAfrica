@@ -683,10 +683,9 @@ describe("PostsFeedTabs -- pinned control strip", () => {
     expect(stickyStrip(container)).not.toHaveClass("bg-white");
     expect(stickyStrip(container)).not.toHaveClass("px-4");
     expect(container.querySelector("[data-app-context-primary]")).toHaveClass(
-      "bg-white"
+      "bg-white",
+      "px-4"
     );
-    expect(container.querySelector("[data-app-context-primary]")).not.toHaveClass("px-4");
-    expect(screen.getByRole("tablist", { name: "Choose feed" })).toHaveClass("px-4");
     expect(expandedControls(container)).toHaveClass("bg-white");
   });
 
@@ -702,21 +701,10 @@ describe("PostsFeedTabs -- pinned control strip", () => {
     expect(controls).not.toHaveClass("px-4");
     expect(controls).not.toHaveClass("pb-1");
     expect(controls.firstElementChild).not.toHaveClass("px-4");
-    expect(controls.firstElementChild?.firstElementChild).toHaveClass("px-4", "sm:pb-0.5");
-    expect(controls.firstElementChild?.firstElementChild).not.toHaveClass("pb-0.5");
-  });
-
-  it("keeps the mobile content filter in the tab strip instead of a separate row", () => {
-    const { container } = render(
-      <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
+    expect(controls.firstElementChild?.firstElementChild).toHaveClass(
+      "px-4",
+      "pb-1"
     );
-
-    const filter = screen.getByRole("combobox", {
-      name: "Filter feed by content type",
-    });
-    expect(filter.closest("[data-app-context-primary]")).not.toBeNull();
-    expect(filter.closest("[data-app-context-expanded]")).toBeNull();
-    expect(container.querySelector("[data-app-context-primary]")).toHaveClass("items-stretch");
   });
 
   it("keeps tabs interactive while marking filters as expanded-only", () => {

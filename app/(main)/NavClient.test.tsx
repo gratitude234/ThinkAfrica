@@ -25,9 +25,7 @@ vi.mock("./NavUserMenu", () => ({
 }));
 
 vi.mock("./CreateLauncher", () => ({
-  default: ({ variant }: { variant?: string }) => (
-    <span data-testid={`create-${variant ?? "desktop"}`} />
-  ),
+  default: () => null,
 }));
 
 vi.mock("@/components/ui/NotificationBell", () => ({
@@ -60,7 +58,6 @@ describe("NavClient mobile Messages visibility", () => {
     expect(
       screen.queryByRole("button", { name: "Open more menu" })
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("create-mobileHeader")).toBeInTheDocument();
   });
 
   it("shows the shortcut on mobile when a post hides the bottom navigation", () => {
@@ -79,7 +76,6 @@ describe("NavClient mobile Messages visibility", () => {
     const messages = screen.getByRole("link", { name: "Open messages" });
     expect(messages).toHaveClass("flex");
     expect(messages).not.toHaveClass("hidden");
-    expect(screen.queryByTestId("create-mobileHeader")).not.toBeInTheDocument();
   });
 });
 
