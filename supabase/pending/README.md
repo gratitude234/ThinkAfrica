@@ -19,3 +19,10 @@ deliveries.
 be promoted before Topic Subscriptions once the Debate migration ledger is
 resolved. It adds only separated Research keywords and a private daily Gemini
 quota; it never rewrites published Research tags or stores draft content.
+
+`profile_private_projection_contract.sql` is the CONTRACT half of the Phase 0
+profile-security rollout. Do not promote it until migrations
+`20260815000001`/`20260815000002` are verified in staging and the application
+version that reads owner-only fields through `get_my_profile_private()` is
+already deployed and exercised. Applying it before that cutover will break
+older settings, onboarding, notification, subscription, and home clients.

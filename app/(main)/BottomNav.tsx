@@ -7,6 +7,7 @@ import CreateLauncher from "./CreateLauncher";
 import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import { shouldShowMobilePrimaryNav } from "./navRoutes";
 import { useAppChrome } from "./AppChromeProvider";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import {
   DebatesIcon,
   ExploreIcon,
@@ -116,29 +117,31 @@ export default function BottomNav({
             </span>
           </Link>
 
-          <Link
-            href="/debates"
-            className={navLinkClass(isDebatesActive)}
-            aria-current={isDebatesActive ? "page" : undefined}
-          >
-            <span className={navPillClass(isDebatesActive)}>
-              <div className="relative">
-                <DebatesIcon className="h-[22px] w-[22px]" />
+          {FEATURE_FLAGS.debates ? (
+            <Link
+              href="/debates"
+              className={navLinkClass(isDebatesActive)}
+              aria-current={isDebatesActive ? "page" : undefined}
+            >
+              <span className={navPillClass(isDebatesActive)}>
+                <div className="relative">
+                  <DebatesIcon className="h-[22px] w-[22px]" />
+                  {hasActiveDebate ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-brand ring-2 ring-white"
+                    />
+                  ) : null}
+                </div>
+                <span className="whitespace-nowrap text-[11px] font-medium">
+                  Debates
+                </span>
                 {hasActiveDebate ? (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-brand ring-2 ring-white"
-                  />
+                  <span className="sr-only">A debate is live now</span>
                 ) : null}
-              </div>
-              <span className="whitespace-nowrap text-[11px] font-medium">
-                Debates
               </span>
-              {hasActiveDebate ? (
-                <span className="sr-only">A debate is live now</span>
-              ) : null}
-            </span>
-          </Link>
+            </Link>
+          ) : null}
 
           <Link
             href="/messages"

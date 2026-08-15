@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import CreateTrigger from "./CreateTrigger";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import {
   BookmarksIcon,
   DebatesIcon,
@@ -110,24 +111,26 @@ export default function SideRail({
           icon={ExploreIcon}
           isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore)}
         />
-        <RailLink
-          href="/debates"
-          label="Debates"
-          icon={DebatesIcon}
-          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates)}
-          badge={
-            hasActiveDebate ? (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-brand ring-2 ring-white"
-              />
-            ) : undefined
-          }
-        >
-          {hasActiveDebate ? (
-            <span className="sr-only">A debate is live now</span>
-          ) : null}
-        </RailLink>
+        {FEATURE_FLAGS.debates ? (
+          <RailLink
+            href="/debates"
+            label="Debates"
+            icon={DebatesIcon}
+            isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates)}
+            badge={
+              hasActiveDebate ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-brand ring-2 ring-white"
+                />
+              ) : undefined
+            }
+          >
+            {hasActiveDebate ? (
+              <span className="sr-only">A debate is live now</span>
+            ) : null}
+          </RailLink>
+        ) : null}
         <RailLink
           href="/opportunities"
           label="Opportunities"

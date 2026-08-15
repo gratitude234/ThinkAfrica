@@ -7,9 +7,9 @@ export default function EditorialStandardsPage() {
         <h1 className="mb-3 text-3xl font-bold text-gray-900">Editorial Standards</h1>
         <p className="leading-relaxed text-gray-500">
           Indegenius is committed to publishing high-quality, original intellectual work from
-          African students. Blogs and essays move through a lighter editorial check. Research and
-          policy briefs follow a formal editorial workflow with reviewer recommendations and a
-          final editor decision before publication.
+          African students and emerging thinkers. Posts and Articles publish directly. Research
+          follows a formal editorial workflow with reviewer recommendations and a final editor
+          decision before publication.
         </p>
       </div>
 
@@ -23,10 +23,10 @@ export default function EditorialStandardsPage() {
                   Type
                 </th>
                 <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                  Word Count
+                  Core requirements
                 </th>
                 <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                  Review Type
+                  Publication path
                 </th>
                 <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
                   Description
@@ -36,36 +36,34 @@ export default function EditorialStandardsPage() {
             <tbody>
               {[
                 {
-                  type: "Blog",
-                  words: "400-1,000",
-                  review: "Editorial Check",
-                  desc: "Opinion pieces, commentary, and personal perspectives on African issues.",
+                  type: "Post",
+                  requirements: "Body up to 2,000 characters; title optional",
+                  publication: "Publishes directly",
+                  desc: "A lightweight idea, observation, question, or conversational contribution.",
                 },
                 {
-                  type: "Essay",
-                  words: "1,000-3,000",
-                  review: "Light Editorial Review",
-                  desc: "Well-argued analytical essays with a clear thesis, evidence, and conclusion.",
+                  type: "Article",
+                  requirements: "Title and long-form rich text",
+                  publication: "Publishes directly",
+                  desc: "Long-form argument, analysis, or commentary. Essay and Policy Brief are optional genres, not review claims.",
                 },
                 {
                   type: "Research",
-                  words: "2,000-8,000",
-                  review: "Peer Review + Editor Decision",
-                  desc: "Original research with methodology, findings, and citations. Reviewer recommendations inform a final editor decision.",
-                },
-                {
-                  type: "Policy Brief",
-                  words: "800-2,000",
-                  review: "Reviewer Recommendation + Editor Decision",
-                  desc: "Targeted recommendations for policymakers. Evidence and reviewer feedback are completed before the editor records the publication decision.",
+                  requirements: "PDF, title, abstract, keywords, authors, and references",
+                  publication: "Formal editorial review",
+                  desc: "A research-paper record that becomes reviewed and citable only after an editor accepts it.",
                 },
               ].map((row) => (
                 <tr key={row.type} className="hover:bg-canvas">
                   <td className="border border-gray-200 px-4 py-3 font-medium text-gray-900">
                     {row.type}
                   </td>
-                  <td className="border border-gray-200 px-4 py-3 text-gray-600">{row.words}</td>
-                  <td className="border border-gray-200 px-4 py-3 text-gray-600">{row.review}</td>
+                  <td className="border border-gray-200 px-4 py-3 text-gray-600">
+                    {row.requirements}
+                  </td>
+                  <td className="border border-gray-200 px-4 py-3 text-gray-600">
+                    {row.publication}
+                  </td>
                   <td className="border border-gray-200 px-4 py-3 text-gray-500">{row.desc}</td>
                 </tr>
               ))}
@@ -84,15 +82,15 @@ export default function EditorialStandardsPage() {
             },
             {
               title: "Evidence and Sources",
-              desc: "Claims should be supported with evidence. Research and policy briefs require structured references. Essays should cite sources where relevant.",
+              desc: "Claims should be supported with evidence. Research requires structured references; Articles should cite sources where relevant.",
             },
             {
               title: "Clarity and Structure",
               desc: "Write with a clear purpose. Each piece should have an introduction, body, and conclusion appropriate to its type.",
             },
             {
-              title: "African Context",
-              desc: "Content should be relevant to African societies, challenges, and opportunities, whether local, national, or continental.",
+              title: "Context and Relevance",
+              desc: "Work may address African or global subjects. Authors should make the relevant context, evidence, and affected communities clear.",
             },
             {
               title: "Respectful Tone",
@@ -113,8 +111,8 @@ export default function EditorialStandardsPage() {
           {[
             {
               step: "1",
-              title: "Submit",
-              desc: "The author submits through the Write page. Research and policy briefs enter the editorial queue instead of publishing immediately.",
+              title: "Submit Research",
+              desc: "The author submits a Research paper through the dedicated Research flow. It enters the editorial queue instead of publishing immediately.",
             },
             {
               step: "2",
@@ -134,7 +132,7 @@ export default function EditorialStandardsPage() {
             {
               step: "5",
               title: "Publication",
-              desc: "Accepted reviewed submissions are published with an archived citation version. Blogs and essays can still publish through the lighter workflow.",
+              desc: "Accepted Research is published with an archived citation version. Posts and Articles publish directly and do not become reviewed or citable because of their type or genre.",
             },
           ].map((item) => (
             <li key={item.step} className="flex gap-4">
@@ -148,6 +146,13 @@ export default function EditorialStandardsPage() {
             </li>
           ))}
         </ol>
+        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          Indegenius currently calls this process formal editorial review, not peer review.
+          “Peer Reviewed” will be used only if a separate, rigorous peer-review system is
+          implemented and verified. Older Policy Brief submissions that entered review before the
+          current content model may complete that legacy workflow; new Policy Briefs are Article
+          genres and publish directly.
+        </div>
       </section>
 
       <div className="rounded-xl bg-canvas p-6 text-center">

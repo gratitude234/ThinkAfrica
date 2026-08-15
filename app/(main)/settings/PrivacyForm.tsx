@@ -64,7 +64,7 @@ export default function PrivacyForm({ profileId, privacySettings }: Props) {
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
-            Who can message you
+            Who can start a conversation with you
           </label>
           <select
             value={settings.allow_messages}
@@ -80,6 +80,10 @@ export default function PrivacyForm({ profileId, privacySettings }: Props) {
             <option value="followers_only">Followers only</option>
             <option value="nobody">No one</option>
           </select>
+          <p className="mt-1.5 text-xs text-gray-500">
+            This controls new conversations. Block a member to stop messages in an
+            existing conversation.
+          </p>
         </div>
 
         <div className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">

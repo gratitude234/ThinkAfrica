@@ -18,6 +18,7 @@ import {
   isAuthorSubscriptionsUxV2Enabled,
   isTopicSubscriptionsEnabled,
 } from "@/lib/featureFlags";
+import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
 
 const VALID_TABS = ["profile", "account", "notifications", "privacy"] as const;
 type SettingsTab = (typeof VALID_TABS)[number];
@@ -46,15 +47,19 @@ export default async function SettingsPage({ searchParams }: PageProps) {
 
   if (!user) redirect("/login?redirectTo=/settings");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "id, username, full_name, bio, country, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, signup_email, avatar_url, interests, cover_image_url, profile_type, secondary_profile_types, organization_name, professional_title, organization_website, notification_prefs, privacy_settings"
-    )
-    .eq("id", user.id)
-    .single();
+  const [{ data: profile }, { data: privateProfileRaw }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "id, username, full_name, bio, country, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, avatar_url, interests, cover_image_url, profile_type, secondary_profile_types, organization_name, professional_title, organization_website"
+      )
+      .eq("id", user.id)
+      .single(),
+    supabase.rpc("get_my_profile_private"),
+  ]);
 
   if (!profile) redirect("/login");
+  const privateProfile = normalizeMyPrivateProfile(privateProfileRaw);
 
   let subscribedAuthors: SubscribedAuthor[] = [];
   if (tab === "notifications" && isAuthorSubscriptionsEnabled()) {
@@ -146,14 +151,14 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     push_author_publications: true,
     push_debate_updates: true,
     ...IN_APP_PREF_DEFAULTS,
-    ...((profile.notification_prefs as Partial<NotificationPrefs>) ?? {}),
+    ...((privateProfile?.notification_prefs as Partial<NotificationPrefs>) ?? {}),
   };
 
   const privacySettings: PrivacySettings = {
     profile_visibility: "public",
     allow_messages: "everyone",
     show_in_directory: true,
-    ...((profile.privacy_settings as Partial<PrivacySettings>) ?? {}),
+    ...((privateProfile?.privacy_settings as Partial<PrivacySettings>) ?? {}),
   };
 
   return (
@@ -227,7 +232,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
               open_to_mentoring: profile.open_to_mentoring ?? false,
               verified: profile.verified ?? false,
               verified_type: profile.verified_type ?? null,
-              signup_email: profile.signup_email ?? null,
+              signup_email: privateProfile?.signup_email ?? user.email ?? null,
               avatar_url: profile.avatar_url ?? null,
               interests: (profile.interests as string[] | null) ?? null,
               cover_image_url: (profile.cover_image_url as string | null) ?? null,

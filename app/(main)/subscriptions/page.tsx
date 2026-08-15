@@ -5,6 +5,7 @@ import SubscriptionsManagerClient, {
   type ManagedAuthorSubscription,
   type ManagedTopicSubscription,
 } from "./SubscriptionsManagerClient";
+import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
 
 export const metadata = {
   title: "Manage subscriptions",
@@ -37,11 +38,7 @@ export default async function SubscriptionsPage() {
         .eq("subscriber_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1000),
-      supabase
-        .from("profiles")
-        .select("notification_prefs")
-        .eq("id", user.id)
-        .single(),
+      supabase.rpc("get_my_profile_private"),
       supabase
         .from("push_subscriptions")
         .select("id")
@@ -86,9 +83,9 @@ export default async function SubscriptionsPage() {
       subscribedAt: row.created_at as string,
     })
   );
+  const privateProfile = normalizeMyPrivateProfile(profileResult.data);
   const preferences =
-    (profileResult.data?.notification_prefs as Record<string, boolean> | null) ??
-    {};
+    (privateProfile?.notification_prefs as Record<string, boolean> | null) ?? {};
 
   return (
     <SubscriptionsManagerClient

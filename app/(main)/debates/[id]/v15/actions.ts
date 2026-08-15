@@ -615,7 +615,6 @@ export async function searchDebatersV15Action(
   const { data, error } = await supabase
     .from("profiles")
     .select("id, username, full_name, university, avatar_url")
-    .is("suspended_at", null)
     .or(`username.ilike.%${escaped}%,full_name.ilike.%${escaped}%`)
     .limit(8);
 

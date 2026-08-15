@@ -13,6 +13,7 @@ import { shouldShowMobilePrimaryNav } from "./navRoutes";
 import { NAV_MATCH_PREFIXES, isNavItemActive } from "./navItems";
 import { useHasScrolled } from "@/lib/useHasScrolled";
 import { useAppChrome } from "./AppChromeProvider";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 interface NavClientProps {
   user: User | null;
@@ -151,13 +152,15 @@ export default function NavClient({
               >
                 Explore
               </Link>
-              <Link
-                href="/debates"
-                className={navItemClass(isDebatesActive)}
-                aria-current={isDebatesActive ? "page" : undefined}
-              >
-                Debates
-              </Link>
+              {FEATURE_FLAGS.debates ? (
+                <Link
+                  href="/debates"
+                  className={navItemClass(isDebatesActive)}
+                  aria-current={isDebatesActive ? "page" : undefined}
+                >
+                  Debates
+                </Link>
+              ) : null}
               <Link
                 href="/opportunities"
                 className={navItemClass(isOpportunitiesActive)}

@@ -115,10 +115,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, persisted: false });
   }
 
+  if (!user) {
+    return NextResponse.json(
+      { error: "Authentication required for this activation event." },
+      { status: 401 }
+    );
+  }
+
   await recordActivationEvent({
     supabase,
     event: body.event,
-    userId: user?.id ?? null,
+    userId: user.id,
     metadata: body.metadata ?? {},
     source: body.source ?? "client",
     route: body.route ?? null,

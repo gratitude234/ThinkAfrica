@@ -3,17 +3,17 @@ import AboutAnimations from "./AboutAnimations";
 import AboutTeamCard, { type TeamMember } from "./AboutTeamCard";
 
 const STATS = [
-  { value: "14+", label: "Universities", target: 14, suffix: "+" },
-  { value: "3", label: "Countries", target: 3 },
-  { value: "200+", label: "Essays Published", target: 200, suffix: "+" },
-  { value: "2024", label: "Founded" },
+  { value: "Post", label: "Lightweight publishing" },
+  { value: "Article", label: "Long-form publishing" },
+  { value: "Research", label: "Formal editorial review" },
+  { value: "Response", label: "Linked publication" },
 ];
 
 const BELIEFS = [
   {
     number: "01",
     title: "Rigour without gatekeeping",
-    body: "Student work can be peer-reviewed, cited, and taken seriously without requiring a PhD or institutional affiliation.",
+    body: "Student work can receive formal editorial review, become citable, and be taken seriously without requiring a PhD or institutional affiliation.",
     accent: "border-l-emerald-brand text-emerald-700",
   },
   {
@@ -92,10 +92,10 @@ const TEAM_MEMBERS: TeamMember[] = [
     image: "/team/olanibi-gratitude.jpeg",
     badgeClass: "bg-amber-50 text-amber-700",
     shortBio:
-      "Self-taught full-stack developer building Indegenius from the ground up while studying at JABU, Nigeria. Ships peer-review workflows, debate mechanics, AI audio summaries, and low-bandwidth modes.",
+      "Self-taught full-stack developer building Indegenius from the ground up while studying at JABU, Nigeria. Ships editorial-review workflows, debate mechanics, AI audio summaries, and low-bandwidth modes.",
     fullBio: [
       "His vision for Indegenius has always been technical as much as intellectual: African university students deserve a platform with the credibility, depth, and design quality of established academic journals, built natively for the realities of the continent.",
-      "He has independently architected and shipped the platform's core systems, from peer-review workflows and debate mechanics to AI-powered audio summaries, low-bandwidth modes, and WhatsApp-native sharing.",
+      "He has independently architected and shipped the platform's core systems, from editorial-review workflows and debate mechanics to AI-powered audio summaries, low-bandwidth modes, and WhatsApp-native sharing.",
       "For Gratitude, Indegenius is proof that the best technology is built by people who live closest to the problem.",
     ],
   },
@@ -179,8 +179,6 @@ export default function AboutPage() {
                 } ${index < 2 ? "border-b border-[#e5e0d8] sm:border-b-0" : ""}`}
               >
                 <span
-                  data-about-stat-target={stat.target}
-                  data-about-stat-suffix={stat.suffix}
                   className="block font-display text-3xl font-bold leading-none text-ink"
                 >
                   {stat.value}

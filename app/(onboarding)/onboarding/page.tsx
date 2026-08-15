@@ -18,6 +18,7 @@ import {
   isProfileType,
   normalizeSecondaryProfileTypes,
 } from "@/lib/profileTypes";
+import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
 
 interface SuggestedProfile {
   id: string;
@@ -218,21 +219,25 @@ export default function OnboardingPage() {
       setUserId(user.id);
       trackActivationEvent({ event: "onboarding_started" });
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select(
-          "profile_type, secondary_profile_types, country, university, field_of_study, interests, onboarding_completed"
-        )
-        .eq("id", user.id)
-        .single();
+      const [{ data: profile }, { data: privateProfileRaw }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select(
+            "profile_type, secondary_profile_types, country, university, field_of_study, interests"
+          )
+          .eq("id", user.id)
+          .single(),
+        supabase.rpc("get_my_profile_private"),
+      ]);
+      const privateProfile = normalizeMyPrivateProfile(privateProfileRaw);
 
       const requestedStep = parseStepParam(searchParams.get("step"));
 
-      if (profile?.onboarding_completed && !requestedStep) {
+      if (privateProfile?.onboarding_completed && !requestedStep) {
         router.push("/");
         return;
       }
-      setAlreadyCompleted(Boolean(profile?.onboarding_completed));
+      setAlreadyCompleted(Boolean(privateProfile?.onboarding_completed));
 
       const nextProfileType = isProfileType(profile?.profile_type)
         ? profile.profile_type
@@ -389,15 +394,17 @@ export default function OnboardingPage() {
     }
 
     setLoading(true);
+    setError(null);
     const supabase = createClient();
-    await supabase
-      .from("profiles")
-      .update({ onboarding_completed: true })
-      .eq("id", userId);
+    const { error: completionError } = await supabase.rpc("complete_onboarding");
     setLoading(false);
 
+    if (completionError) {
+      setError("We couldn't finish your setup. Please try again.");
+      return;
+    }
+
     if (!alreadyCompleted) {
-      trackActivationEvent({ event: "onboarding_completed" });
       setShowPushPrompt(true);
       return;
     }

@@ -6,7 +6,12 @@ import RetentionEventTracker from "@/components/retention/RetentionEventTracker"
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicTopicCounts, type TopicCount } from "@/lib/discoverData";
-import { getPostDisplayTitle, getPostMetadataTitle, isLightweightPost } from "@/lib/postDisplay";
+import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
+import {
+  getArticleFormatLabel,
+  resolveArticleFormat,
+  resolveContentKind,
+} from "@/lib/contentModel";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
@@ -84,7 +89,7 @@ const VALUE_PROPS = [
     num: "02",
     numStyle: "bg-amber-100 text-amber-700",
     title: "Follow credible writers",
-    desc: "Author profiles show university, field of study, peer-review history, and point tier — so you can decide whose work is worth tracking.",
+    desc: "Author profiles show university, field of study, formally reviewed work, and point tier — so you can decide whose work is worth tracking.",
   },
   {
     num: "03",
@@ -97,20 +102,28 @@ const VALUE_PROPS = [
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function typeBadge(post: LandingPost): { classes: string; label: string } {
-  // A genuinely titleless lightweight Post gets the new "Post" label; a
-  // legacy titled Blog (also resolves to "post") keeps its existing
-  // "Blog" label below, same rule as lib/postQuality.ts's contentLabel.
-  if (isLightweightPost(post)) {
+  const kind = resolveContentKind(post);
+
+  if (kind === "article") {
+    const format = getArticleFormatLabel(resolveArticleFormat(post));
+    return {
+      classes: "bg-gold-tint text-gold-ink",
+      label: format ? `Article · ${format}` : "Article",
+    };
+  }
+
+  if (kind === "research") {
+    return {
+      classes: "bg-purple-tint text-purple-accent",
+      label: "Research",
+    };
+  }
+
+  if (kind === "post") {
     return { classes: "bg-green-tint text-emerald-brand", label: "Post" };
   }
 
-  switch (post.type) {
-    case "essay":        return { classes: "bg-gold-tint text-gold-ink",         label: "Essay" };
-    case "research":     return { classes: "bg-purple-tint text-purple-accent",  label: "Research" };
-    case "policy_brief": return { classes: "bg-purple-tint text-purple-accent",  label: "Policy Brief" };
-    case "quick_take":   return { classes: "bg-green-tint text-emerald-brand",   label: "Quick Take" };
-    default:             return { classes: "bg-green-tint text-emerald-brand",   label: "Blog" };
-  }
+  return { classes: "bg-green-tint text-emerald-brand", label: "Content" };
 }
 
 /** Titleless lightweight Post: lead with the excerpt instead of a blank/fabricated headline. */
@@ -198,13 +211,11 @@ export default async function LandingPage() {
 
   const stats = [
     ...(displayUserCount > 0
-      ? [{ value: displayUserCount, suffix: "", label: "Student writers" }]
+      ? [{ value: displayUserCount, suffix: "", label: "Registered profiles" }]
       : []),
     ...(displayPostCount > 0
       ? [{ value: displayPostCount, suffix: "", label: "Published posts" }]
       : []),
-    { value: 142, suffix: "", label: "Universities represented" },
-    { value: 38,  suffix: "", label: "African countries" },
   ];
 
   return (
@@ -425,20 +436,22 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Stats bar ─────────────────────────────────────────────── */}
-      <div id="stats-bar" className="border-b border-gray-200 bg-white py-4 sm:py-5">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:divide-x sm:divide-gray-200">
-            {stats.map(({ value, suffix, label }) => (
-              <div key={label} className="stat-item px-3 py-1 text-center sm:px-10">
-                <div className="font-display text-[26px] font-bold tracking-[-0.02em] text-ink sm:text-[30px]" data-target={value}>
-                  {value >= 1000 ? value.toLocaleString() : value}{suffix}
+      {stats.length > 0 ? (
+        <div id="stats-bar" className="border-b border-gray-200 bg-white py-4 sm:py-5">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:divide-x sm:divide-gray-200">
+              {stats.map(({ value, suffix, label }) => (
+                <div key={label} className="stat-item px-3 py-1 text-center sm:px-10">
+                  <div className="font-display text-[26px] font-bold tracking-[-0.02em] text-ink sm:text-[30px]" data-target={value}>
+                    {value >= 1000 ? value.toLocaleString() : value}{suffix}
+                  </div>
+                  <div className="mx-auto mt-1 max-w-[9rem] text-[11px] font-medium leading-snug text-gray-500 sm:text-xs">{label}</div>
                 </div>
-                <div className="mx-auto mt-1 max-w-[9rem] text-[11px] font-medium leading-snug text-gray-500 sm:text-xs">{label}</div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
       {/* ── Latest posts ──────────────────────────────────────────── */}
       {gridPosts.length > 0 && (
@@ -604,7 +617,7 @@ export default async function LandingPage() {
                 <div className="flex items-center gap-1.5">
                   <span className="debate-dot-live h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-brand" />
                   <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-emerald-600">
-                    Active · 142 arguments
+                    Example · active debate
                   </span>
                 </div>
                 <p className="font-display text-[18px] font-semibold leading-snug text-ink">
@@ -703,8 +716,8 @@ export default async function LandingPage() {
               Start exploring student ideas today
             </h2>
             <p className="mb-7 text-[15px] leading-relaxed opacity-80">
-              No account needed to read. Browse posts, articles, and research from students
-              at 142 African universities.
+              No account needed to read. Browse posts, articles, and research from
+              students and emerging thinkers.
             </p>
             <LandingTrackedLink
               href="/?guest=1"

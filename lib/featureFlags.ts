@@ -1,5 +1,7 @@
-// Single source of truth for what's surfaced in nav.
-// Toggle to true when the section has enough volume to feel alive.
+// Static controls for whether selected sections are surfaced. These are not
+// authorization checks or route guards: a route remains reachable unless it
+// explicitly reads its flag. Toggle only when the section has enough verified
+// volume and operational support to feel alive.
 export const FEATURE_FLAGS = {
   debates: true,
   fellowshipsSection: false,

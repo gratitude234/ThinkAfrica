@@ -25,7 +25,11 @@ export default async function MainLayout({
   // queries sit on the critical path of every click. They're independent of
   // each other -- running them sequentially made each navigation pay both
   // round trips back to back.
-  const [{ data: profileData }, { count: activeDebateCount }] =
+  const [
+    { data: profileData },
+    { count: activeDebateCount },
+    { error: activityDayError },
+  ] =
     await Promise.all([
       user
         ? supabase
@@ -38,7 +42,16 @@ export default async function MainLayout({
         .from("debates")
         .select("id", { count: "exact", head: true })
         .eq("status", "active"),
+      user
+        ? supabase.rpc("record_user_activity_day")
+        : Promise.resolve({ data: null, error: null }),
     ]);
+
+  // The RPC is idempotent by (user_id, UTC date), so navigation can safely
+  // call it without generating duplicate retention facts.
+  if (activityDayError) {
+    console.warn("[measurement] daily activity was not recorded", activityDayError.message);
+  }
 
   const isAdmin =
     !!user &&

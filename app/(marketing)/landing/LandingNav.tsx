@@ -3,12 +3,15 @@
 import Link from "next/link";
 import BrandWordmark from "@/components/ui/BrandWordmark";
 import { useHasScrolled } from "@/lib/useHasScrolled";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 export default function LandingNav() {
   const scrolled = useHasScrolled();
   const navLinks = [
     { label: "Explore", href: "/explore" },
-    { label: "Debates", href: "/debates" },
+    ...(FEATURE_FLAGS.debates
+      ? [{ label: "Debates", href: "/debates" }]
+      : []),
     { label: "Opportunities", href: "/opportunities" },
     { label: "About", href: "/about" },
   ];

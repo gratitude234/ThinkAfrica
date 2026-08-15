@@ -17,6 +17,7 @@ import { mutedNotificationTypes } from "@/lib/notificationPreferences";
 import { shouldUseRealtime } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/utils";
+import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
 
 const POLL_MS = 30_000;
 
@@ -56,15 +57,13 @@ export default function NotificationBell({ userId }: { userId: string }) {
     let cancelled = false;
 
     void supabase
-      .from("profiles")
-      .select("notification_prefs")
-      .eq("id", userId)
-      .maybeSingle()
-      .then(({ data }: { data: { notification_prefs?: unknown } | null }) => {
+      .rpc("get_my_profile_private")
+      .then(({ data }: { data: unknown }) => {
         if (cancelled) return;
+        const privateProfile = normalizeMyPrivateProfile(data);
         // On failure fall back to muting nothing: an unreadable preference should
         // under-filter rather than silently hide a reader's notifications.
-        setMutedTypes(mutedNotificationTypes(data?.notification_prefs));
+        setMutedTypes(mutedNotificationTypes(privateProfile?.notification_prefs));
       });
 
     return () => {

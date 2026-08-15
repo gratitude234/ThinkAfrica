@@ -28,6 +28,7 @@ import {
   isTopicSubscriptionsEnabled,
 } from "@/lib/featureFlags";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
+import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
 
 export const revalidate = 60;
 
@@ -143,12 +144,13 @@ export default async function HomePage({ searchParams }: PageProps) {
     featuredCandidates,
     { data: topicSubscriptions },
     { data: authorSubscriptions },
+    { data: privateProfileRaw },
   ] = await Promise.all([
     user
       ? supabase
           .from("profiles")
           .select(
-            "interests, university, field_of_study, full_name, profile_type, push_prompt_attempt_count, push_prompt_last_shown_at, push_prompt_shown_at"
+            "interests, university, field_of_study, full_name, profile_type"
           )
           .eq("id", user.id)
           .single()
@@ -191,6 +193,9 @@ export default async function HomePage({ searchParams }: PageProps) {
           .eq("subscriber_id", user.id)
           .limit(1000)
       : Promise.resolve({ data: [] as Array<{ author_id: string }> }),
+    user
+      ? supabase.rpc("get_my_profile_private")
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const userInterests = (profileData?.interests as string[] | null) ?? [];
@@ -201,10 +206,11 @@ export default async function HomePage({ searchParams }: PageProps) {
   const welcomePrimaryLabel = isProfileType(profileData?.profile_type)
     ? getProfileTypeLabel(profileData.profile_type)
     : null;
+  const privateProfile = normalizeMyPrivateProfile(privateProfileRaw);
   const legacyPushSeed: LegacyPushPromptSeed = {
-    attemptCount: profileData?.push_prompt_attempt_count ?? 0,
-    lastShownAt: profileData?.push_prompt_last_shown_at ?? null,
-    shownAt: profileData?.push_prompt_shown_at ?? null,
+    attemptCount: privateProfile?.push_prompt_attempt_count ?? 0,
+    lastShownAt: privateProfile?.push_prompt_last_shown_at ?? null,
+    shownAt: privateProfile?.push_prompt_shown_at ?? null,
   };
 
   const { manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult } =

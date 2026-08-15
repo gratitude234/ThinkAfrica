@@ -30,6 +30,22 @@ interface ActivationEventRow {
   metadata?: Record<string, unknown> | null;
 }
 
+interface Phase0MeasurementBaseline {
+  definition_version: number;
+  as_of: string;
+  timezone: string;
+  account_created_count: number;
+  onboarding_completed_count: number;
+  onboarding_timestamp_missing_count: number;
+  first_publish_count: number;
+  second_publish_30d_count: number;
+  meaningful_response_received_count: number;
+  d30_eligible_count: number;
+  d30_retained_count: number;
+  full_funnel_d30_eligible_count: number;
+  full_funnel_d30_retained_count: number;
+}
+
 interface TalentProfileAnalyticsRow {
   open_to_opportunities: boolean | null;
   visibility: string | null;
@@ -185,6 +201,37 @@ function pct(numerator: number, denominator: number) {
   return `${Math.round((numerator / denominator) * 100)}%`;
 }
 
+function parsePhase0MeasurementBaseline(
+  value: unknown
+): Phase0MeasurementBaseline | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const row = value as Record<string, unknown>;
+  const countKeys = [
+    "account_created_count",
+    "onboarding_completed_count",
+    "onboarding_timestamp_missing_count",
+    "first_publish_count",
+    "second_publish_30d_count",
+    "meaningful_response_received_count",
+    "d30_eligible_count",
+    "d30_retained_count",
+    "full_funnel_d30_eligible_count",
+    "full_funnel_d30_retained_count",
+  ] as const;
+
+  if (
+    row.definition_version !== 1 ||
+    typeof row.as_of !== "string" ||
+    row.timezone !== "UTC" ||
+    countKeys.some((key) => typeof row[key] !== "number")
+  ) {
+    return null;
+  }
+
+  return row as unknown as Phase0MeasurementBaseline;
+}
+
 function buildThirtyDayMap() {
   const dayMap: Record<string, number> = {};
   for (let i = 29; i >= 0; i--) {
@@ -268,6 +315,7 @@ export default async function AdminAnalyticsPage() {
     { count: totalMessages },
     { data: debateArgumentsRaw },
     { count: featuredProfileCount },
+    { data: phase0BaselineRaw, error: phase0BaselineError },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -347,11 +395,16 @@ export default async function AdminAnalyticsPage() {
     supabase
       .from("profile_featured_posts")
       .select("user_id", { count: "exact", head: true }),
+    supabase.rpc("get_phase0_measurement_baseline", {
+      p_cohort_start: null,
+      p_cohort_end: null,
+    }),
   ]);
 
   const profiles = (profilesRaw ?? []) as ProfileRow[];
   const totalUsers = profiles.length;
   const activationEvents = (activationEventsRaw ?? []) as ActivationEventRow[];
+  const phase0Baseline = parsePhase0MeasurementBaseline(phase0BaselineRaw);
   const talentProfiles = (talentProfilesRaw ?? []) as TalentProfileAnalyticsRow[];
   const talentInquiries = (talentInquiriesRaw ?? []) as TalentInquiryAnalyticsRow[];
   const notifications = (notificationsRaw ?? []) as NotificationAnalyticsRow[];
@@ -944,8 +997,97 @@ export default async function AdminAnalyticsPage() {
       </div>
 
       <div className="mb-10">
+        <div className="mb-4">
+          <h2 className="text-base font-semibold text-gray-900">
+            Phase 0 Ordered Baseline
+          </h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Durable, all-time account-created cohort. Publications are ordered after
+            onboarding; D30 is the exact UTC signup day + 30. No capped event export is
+            used. Eligibility begins with the first recorded UTC activity day.
+          </p>
+        </div>
+        {phase0Baseline ? (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <HealthCard
+              label="Accounts Created"
+              value={phase0Baseline.account_created_count}
+              trend="neutral"
+              trendLabel="cohort denominator"
+            />
+            <HealthCard
+              label="Onboarding Completed"
+              value={phase0Baseline.onboarding_completed_count}
+              trend="neutral"
+              trendLabel={`${pct(
+                phase0Baseline.onboarding_completed_count,
+                phase0Baseline.account_created_count
+              )} of accounts`}
+            />
+            <HealthCard
+              label="First Publication"
+              value={phase0Baseline.first_publish_count}
+              trend="neutral"
+              trendLabel={`${pct(
+                phase0Baseline.first_publish_count,
+                phase0Baseline.onboarding_completed_count
+              )} of onboarded`}
+            />
+            <HealthCard
+              label="Second in 30 Days"
+              value={phase0Baseline.second_publish_30d_count}
+              trend="neutral"
+              trendLabel={`${pct(
+                phase0Baseline.second_publish_30d_count,
+                phase0Baseline.first_publish_count
+              )} of first publishers`}
+            />
+            <HealthCard
+              label="Meaningful Response"
+              value={phase0Baseline.meaningful_response_received_count}
+              trend="neutral"
+              trendLabel={`${pct(
+                phase0Baseline.meaningful_response_received_count,
+                phase0Baseline.second_publish_30d_count
+              )} of repeat publishers`}
+            />
+            <HealthCard
+              label="Exact D30 Return"
+              value={pct(
+                phase0Baseline.d30_retained_count,
+                phase0Baseline.d30_eligible_count
+              )}
+              trend="neutral"
+              trendLabel={`${phase0Baseline.d30_retained_count.toLocaleString()} of ${phase0Baseline.d30_eligible_count.toLocaleString()} observable accounts`}
+            />
+            <HealthCard
+              label="Full-Funnel D30"
+              value={pct(
+                phase0Baseline.full_funnel_d30_retained_count,
+                phase0Baseline.full_funnel_d30_eligible_count
+              )}
+              trend="neutral"
+              trendLabel={`${phase0Baseline.full_funnel_d30_retained_count.toLocaleString()} of ${phase0Baseline.full_funnel_d30_eligible_count.toLocaleString()} eligible completers`}
+            />
+            <HealthCard
+              label="Missing Onboarding Time"
+              value={phase0Baseline.onboarding_timestamp_missing_count}
+              trend="neutral"
+              trendLabel="legacy completions excluded from ordered stages"
+            />
+          </div>
+        ) : (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {phase0BaselineError
+              ? "The Phase 0 baseline is unavailable until its database migration is applied."
+              : "The Phase 0 baseline returned an unsupported payload."}
+          </div>
+        )}
+      </div>
+
+      <div className="mb-10">
         <h2 className="text-base font-semibold text-gray-900 mb-4">
-          Retention Health
+          Legacy Event Return Signals
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <HealthCard

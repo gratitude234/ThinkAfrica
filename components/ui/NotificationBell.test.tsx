@@ -7,21 +7,20 @@ import type { NotificationData } from "@/lib/notificationData";
 vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
 vi.mock("@/lib/realtime", () => ({ shouldUseRealtime: () => false }));
 
-// The bell reads the profile's notification_prefs once on mount to learn which
-// types the reader has muted, so the stub has to serve that chain.
+// The bell reads owner-only notification_prefs once on mount through the
+// private-profile RPC.
 const storedPrefs = vi.hoisted(() => ({ value: null as unknown }));
 const supabaseStub = vi.hoisted(() => ({
-  from: () => ({
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () =>
-          Promise.resolve({
-            data: { notification_prefs: storedPrefs.value },
-            error: null,
-          }),
-      }),
+  rpc: () =>
+    Promise.resolve({
+      data: [
+        {
+          profile_id: "u1",
+          notification_prefs: storedPrefs.value,
+        },
+      ],
+      error: null,
     }),
-  }),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => supabaseStub }));

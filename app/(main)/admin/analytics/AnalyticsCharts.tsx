@@ -79,7 +79,9 @@ export default function AnalyticsCharts({
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Activation Funnel</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">
+            Legacy Activation Signals
+          </h3>
           {hasFunnelData ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={activationFunnel} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -103,7 +105,9 @@ export default function AnalyticsCharts({
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Retention Activity</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">
+            Legacy Event Activity
+          </h3>
           {hasRetentionData ? (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={retentionByDay} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
