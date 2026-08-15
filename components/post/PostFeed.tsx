@@ -108,8 +108,8 @@ export default function PostFeed({
     <div>
       {posts.length === 0 ? (
         activeTab === "following" ? (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
-            <p className="text-sm text-gray-500">
+          <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
+            <p className="text-sm text-ink-muted">
               You&apos;re not following anyone yet.
             </p>
             <Link
@@ -120,8 +120,8 @@ export default function PostFeed({
             </Link>
           </div>
         ) : activeTab === "topics" ? (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
-            <p className="text-sm text-gray-500">
+          <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
+            <p className="text-sm text-ink-muted">
               You have no matching topic publications yet.
             </p>
             <Link
@@ -132,8 +132,8 @@ export default function PostFeed({
             </Link>
           </div>
         ) : activeTab === "subscriptions" ? (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
-            <p className="text-sm text-gray-500">
+          <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
+            <p className="text-sm text-ink-muted">
               You have no matching subscription publications yet.
             </p>
             <Link
@@ -144,17 +144,17 @@ export default function PostFeed({
             </Link>
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
-            <p className="mb-1 text-lg font-medium text-gray-900">
+          <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
+            <p className="mb-1 text-lg font-medium text-ink">
               No posts match this view yet.
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-muted">
               Try the latest feed or share the first post in this space.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <Link
                 href="/?tab=latest"
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-canvas"
+                className="rounded-lg border border-divider px-4 py-2 text-sm font-medium text-ink-soft hover:border-card-border-hover hover:bg-canvas"
               >
                 View latest
               </Link>

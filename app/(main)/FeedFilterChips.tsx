@@ -23,10 +23,10 @@ function Chip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`min-h-10 shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-2 sm:min-h-11 sm:text-[13px] ${
+      className={`min-h-10 shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-meta font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-2 focus-visible:ring-offset-card sm:min-h-11 ${
         active
           ? "border-emerald-brand bg-emerald-brand text-white"
-          : "border-gray-200 bg-white text-ink-muted hover:border-emerald-brand hover:bg-emerald-50 hover:text-emerald-brand"
+          : "border-divider bg-card text-ink-muted hover:border-emerald-ink hover:text-emerald-ink"
       }`}
     >
       {children}

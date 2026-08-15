@@ -638,7 +638,7 @@ describe("PostsFeedTabs -- pinned control strip", () => {
 
     setPinned(true);
     const controls = expandedControls(container);
-    expect(controls).toHaveClass("border-gray-200");
+    expect(controls).toHaveClass("border-divider");
     expect(controls.className).toMatch(/shadow-/);
     expect(controls).not.toHaveClass("border-transparent");
 
@@ -680,13 +680,16 @@ describe("PostsFeedTabs -- pinned control strip", () => {
       <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
     );
 
-    expect(stickyStrip(container)).not.toHaveClass("bg-white");
+    // `bg-card` is the theme-aware token that replaced the literal `bg-white`;
+    // the guarantee under test is unchanged -- each row paints its own opaque
+    // ground so cards cannot ghost through it, and the wrapper paints none.
+    expect(stickyStrip(container)).not.toHaveClass("bg-card");
     expect(stickyStrip(container)).not.toHaveClass("px-4");
     expect(container.querySelector("[data-app-context-primary]")).toHaveClass(
-      "bg-white",
+      "bg-card",
       "px-4"
     );
-    expect(expandedControls(container)).toHaveClass("bg-white");
+    expect(expandedControls(container)).toHaveClass("bg-card");
   });
 
   // The collapsing row has to be able to reach zero height: padding on the

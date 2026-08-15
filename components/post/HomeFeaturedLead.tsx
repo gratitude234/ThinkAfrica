@@ -38,6 +38,26 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
 
   return (
     <article className="relative mb-4 overflow-hidden rounded-[18px] bg-emerald-brand text-white shadow-[0_9px_26px_rgb(7_57_41/0.18)]">
+      {/* Phones get the cover as a short letterbox strip above the text; from
+          `sm` up it moves to the bleed panel on the right. Previously it was
+          `hidden sm:block` outright, so the single most prominent card in the
+          feed opened on mobile as an unbroken slab of dark green -- the
+          heaviest possible first impression on the smallest screen. */}
+      {hasCover ? (
+        <div className="relative block aspect-[21/9] w-full sm:hidden" aria-hidden="true">
+          <PostCover
+            src={post.cover_image_url}
+            alt=""
+            type={post.type}
+            content_kind={post.content_kind}
+            article_format={post.article_format}
+            sizes="100vw"
+            className="h-full w-full"
+            imageClassName="object-cover opacity-60"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-emerald-brand via-emerald-brand/45 to-transparent" />
+        </div>
+      ) : null}
       {hasCover ? (
         <div className="absolute inset-y-0 right-0 hidden w-[42%] sm:block" aria-hidden="true">
           <PostCover
@@ -53,20 +73,24 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-brand via-emerald-brand/65 to-transparent" />
         </div>
       ) : null}
-      <div className="relative px-4.5 py-5 sm:max-w-[74%] sm:px-7 sm:py-7">
-        <p className="font-display text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200">
+      {/* `px-4.5` was here and compiled to nothing -- Tailwind's spacing scale
+          has no 4.5 step and the config adds none -- so on every phone the
+          kicker, headline, excerpt and byline sat flush against the rounded
+          edge. `sm:px-7` masked it from 640px up. */}
+      <div className={`relative px-5 py-5 sm:max-w-[74%] sm:px-7 sm:py-7 ${hasCover ? "-mt-6 sm:mt-0" : ""}`}>
+        <p className="font-display text-kicker font-bold uppercase text-emerald-200">
           Editor&apos;s pick · {label} · {readTime(excerpt)} min
         </p>
         <Link href={`/post/${post.slug}`} className="mt-2 block rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-brand">
-          <h2 className="font-display text-[22px] font-semibold leading-[1.14] sm:text-[28px] sm:leading-[1.12]">{title}</h2>
+          <h2 className="font-display text-headline font-semibold">{title}</h2>
         </Link>
-        {excerpt ? <p className="mt-2.5 line-clamp-2 text-[14.5px] leading-[1.6] text-emerald-50/90">{excerpt}</p> : null}
+        {excerpt ? <p className="mt-2.5 line-clamp-2 max-w-measure text-excerpt text-emerald-50/90">{excerpt}</p> : null}
         <div className="mt-3.5 flex items-center justify-between gap-3 sm:mt-4 sm:gap-4">
           <div className="min-w-0">
-            <p className="truncate text-[12.5px] font-semibold">{author}</p>
-            {post.profiles?.university ? <p className="truncate text-[11.5px] text-emerald-100/80">{post.profiles.university}</p> : null}
+            <p className="truncate text-meta font-semibold">{author}</p>
+            {post.profiles?.university ? <p className="truncate text-meta text-emerald-100/80">{post.profiles.university}</p> : null}
           </div>
-          <Link href={`/post/${post.slug}`} className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-white px-4 text-[12.5px] font-semibold text-emerald-950 shadow-sm hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-brand">
+          <Link href={`/post/${post.slug}`} className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-white px-4 text-meta font-semibold text-emerald-950 shadow-sm hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-brand">
             {action} →
           </Link>
         </div>

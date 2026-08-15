@@ -25,13 +25,15 @@ export default function TopicInterlude({ posts }: { posts: PostCardData[] }) {
   if (!topic) return null;
 
   return (
-    <section className="-mx-4 my-3 border-y border-gray-200 bg-canvas px-4 py-4 sm:mx-0 sm:rounded-xl sm:border sm:px-5 sm:py-[18px]">
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+    <section className="-mx-4 my-3 border-y border-divider bg-canvas px-4 py-4 sm:mx-0 sm:rounded-xl sm:border sm:px-5 sm:py-[18px]">
+      {/* Was gray-400 -- 2.8:1 on this ground, at 11px, under uppercase
+          letter-spacing. The least legible combination on the page. */}
+      <p className="mb-1.5 text-kicker font-semibold uppercase text-ink-muted">
         Topic spotlight
       </p>
       <Link
         href={`/topics/${encodeURIComponent(topic.tag)}`}
-        className="font-display mb-2.5 block text-[17px] font-semibold text-ink hover:text-emerald-brand"
+        className="font-display mb-2.5 block text-lede font-semibold text-ink hover:text-emerald-ink"
       >
         #{topic.tag}
       </Link>
@@ -40,7 +42,7 @@ export default function TopicInterlude({ posts }: { posts: PostCardData[] }) {
           <Link
             key={post.id}
             href={`/post/${post.slug}`}
-            className="block min-h-[68px] w-[230px] shrink-0 snap-start rounded-lg border border-gray-100 bg-white px-3.5 py-2.5 text-[13px] font-semibold leading-[1.45] text-gray-700 transition-colors hover:border-emerald-100 hover:bg-emerald-50/40 sm:w-auto"
+            className="block min-h-[68px] w-[230px] shrink-0 snap-start rounded-lg border border-card-border bg-card px-3.5 py-2.5 text-meta font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink sm:w-auto"
           >
             <span className="line-clamp-2">{getPostMetadataTitle(post, post.profiles)}</span>
           </Link>

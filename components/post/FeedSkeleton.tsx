@@ -1,8 +1,7 @@
-const CARD_SHELL =
-  "mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 py-4 sm:px-5 sm:py-5";
+import { CARD_SHELL } from "./cardShell";
 
 function Block({ className }: { className: string }) {
-  return <div className={`rounded bg-gray-100 ${className}`} />;
+  return <div className={`rounded bg-divider ${className}`} />;
 }
 
 /** Titleless Post: avatar-first, body text, no cover implied. */
@@ -10,7 +9,7 @@ function PostSkeletonCard() {
   return (
     <article className={CARD_SHELL}>
       <div className="flex items-center gap-2.5">
-        <div className="h-9 w-9 shrink-0 rounded-full bg-gray-100" />
+        <div className="h-9 w-9 shrink-0 rounded-full bg-divider" />
         <div className="flex-1 space-y-1.5">
           <Block className="h-3 w-32" />
           <Block className="h-2.5 w-24" />
@@ -29,7 +28,7 @@ function ArticleSkeletonCard({ withCover = false }: { withCover?: boolean }) {
   return (
     <article className={CARD_SHELL}>
       <div className="flex items-center gap-2.5">
-        <div className="h-9 w-9 shrink-0 rounded-full bg-gray-100" />
+        <div className="h-9 w-9 shrink-0 rounded-full bg-divider" />
         <div className="flex-1 space-y-1.5">
           <Block className="h-3 w-28" />
           <Block className="h-2.5 w-20" />
@@ -38,20 +37,29 @@ function ArticleSkeletonCard({ withCover = false }: { withCover?: boolean }) {
       <Block className="mt-3 h-2.5 w-24" />
       <Block className="mt-2 h-5 w-5/6" />
       <Block className="mt-2 h-3.5 w-3/5" />
-      {withCover ? <div className="mt-3 aspect-[4/3] w-full rounded-[10px] bg-gray-100 sm:aspect-[16/10]" /> : null}
+      {withCover ? <div className="mt-3 aspect-[4/3] w-full rounded-[10px] bg-divider sm:aspect-[16/10]" /> : null}
     </article>
   );
 }
 
-/** Research: metadata-first title/authors/abstract + manuscript line. */
+/**
+ * Research: metadata-first title/authors/abstract + manuscript line. The
+ * preview column is `sm`-only, matching the real card, which drops it on
+ * phones so the title can use the full width.
+ */
 function ResearchSkeletonCard() {
   return (
-    <article className={`${CARD_SHELL} border-purple-100`}>
-      <Block className="h-2.5 w-16" />
-      <Block className="mt-2 h-5 w-4/5" />
-      <Block className="mt-2 h-3 w-2/5" />
-      <Block className="mt-2.5 h-3.5 w-full" />
-      <div className="mt-3 h-14 rounded-lg bg-purple-tint/25" />
+    <article className={CARD_SHELL}>
+      <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_170px] sm:items-start sm:gap-5">
+        <div className="min-w-0">
+          <Block className="h-2.5 w-16" />
+          <Block className="mt-2 h-5 w-4/5" />
+          <Block className="mt-2 h-3 w-2/5" />
+          <Block className="mt-2.5 h-3.5 w-full" />
+        </div>
+        <div className="hidden aspect-[3/4] rounded-[10px] bg-divider sm:block" />
+      </div>
+      <div className="mt-3 h-10 rounded-lg bg-divider/60" />
     </article>
   );
 }
@@ -64,6 +72,12 @@ const SEQUENCE: SkeletonVariant[] = ["post", "article-cover", "research", "post"
  * A restrained mix of Post/Article/Research skeletons (never one repeated
  * generic card) so the Home loading state resembles the real feed and
  * doesn't imply every card has a cover image.
+ *
+ * Geometry comes from the same CARD_SHELL the real cards use. Holding it
+ * separately is what let the two drift -- the skeleton was drawing a 16px
+ * radius, a grey-200 edge and 16px padding against the cards' 18px radius,
+ * warm edge and 14px padding, so every card resized and re-tinted the instant
+ * real content replaced it.
  */
 export default function FeedSkeleton({ count = 4 }: { count?: number }) {
   const items = Array.from({ length: count }, (_, index) => SEQUENCE[index % SEQUENCE.length]);

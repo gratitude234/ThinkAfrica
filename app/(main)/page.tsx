@@ -394,7 +394,15 @@ export default async function HomePage({ searchParams }: PageProps) {
           </Suspense>
         </div>
 
-        <aside className="hidden self-start lg:sticky lg:top-[var(--app-sticky-offset)] lg:block">
+        {/* The rail can stack five cards (draft or activation, featured today,
+            debate, people, topics), which runs past 800px -- taller than the
+            ~700px of usable height on a 1366x768 laptop. A plain sticky top
+            pins the first card and puts everything below the fold permanently
+            out of reach, rendered but unscrollable. Capping the height to what
+            is actually on screen and letting the column scroll inside itself
+            keeps the lower cards reachable; when the content is shorter than
+            the cap, which is the common case, nothing changes at all. */}
+        <aside className="hidden self-start lg:sticky lg:top-[var(--app-sticky-offset)] lg:block lg:max-h-[calc(100svh-var(--app-sticky-offset)-1rem)] lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden">
           <HomeSidebar
             activeDebate={homeDebate}
             recentDraft={recentDraft ?? null}

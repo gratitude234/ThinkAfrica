@@ -22,10 +22,11 @@ export default function PeopleInterlude({
   currentUserId: string | null;
 }) {
   return (
-    <section className="-mx-4 my-3 border-y border-gray-200 bg-white px-4 py-4 sm:mx-0 sm:rounded-xl sm:border sm:px-5 sm:py-[18px]">
+    <section className="-mx-4 my-3 border-y border-divider bg-card px-4 py-4 sm:mx-0 sm:rounded-xl sm:border sm:px-5 sm:py-[18px]">
       <div className="mb-3.5 flex items-center justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+          {/* Was gray-400: 2.8:1, at 11px, uppercase and letter-spaced. */}
+          <p className="text-kicker font-semibold uppercase text-ink-muted">
             Writers to follow
           </p>
           <h3 className="mt-0.5 text-base font-semibold text-ink">
@@ -35,7 +36,7 @@ export default function PeopleInterlude({
         </div>
         <Link
           href="/leaderboard"
-          className="text-[13px] font-semibold text-emerald-brand hover:underline"
+          className="text-meta font-semibold text-emerald-ink hover:underline"
         >
           Explore -&gt;
         </Link>
@@ -45,7 +46,7 @@ export default function PeopleInterlude({
         {people.slice(0, 3).map((person) => (
           <article
             key={person.id}
-            className="w-[218px] shrink-0 snap-start rounded-xl border border-gray-200 bg-canvas p-3 sm:w-auto"
+            className="w-[218px] shrink-0 snap-start rounded-xl border border-card-border bg-canvas p-3 sm:w-auto"
           >
             <div className="flex min-w-0 items-center gap-2.5">
               <Link href={`/${person.username}`} className="shrink-0">
@@ -57,12 +58,12 @@ export default function PeopleInterlude({
               </Link>
               <div className="min-w-0 flex-1">
                 <Link href={`/${person.username}`}>
-                  <p className="truncate text-sm font-semibold text-ink hover:text-emerald-brand">
+                  <p className="truncate text-sm font-semibold text-ink hover:text-emerald-ink">
                     {person.full_name ?? person.username}
                   </p>
                 </Link>
                 {person.university ? (
-                  <p className="mt-0.5 line-clamp-1 text-[12px] text-gray-600">
+                  <p className="mt-0.5 line-clamp-1 text-meta text-ink-muted">
                     {person.university}
                   </p>
                 ) : null}
@@ -79,7 +80,7 @@ export default function PeopleInterlude({
               ) : (
                 <Link
                   href={`/${person.username}`}
-                  className="inline-flex min-h-9 items-center rounded-full border border-gray-200 px-3.5 text-xs font-semibold text-gray-700 hover:border-emerald-brand hover:text-emerald-brand"
+                  className="inline-flex min-h-9 items-center rounded-full border border-card-border px-3.5 text-xs font-semibold text-ink-soft hover:border-emerald-ink hover:text-emerald-ink"
                 >
                   View profile
                 </Link>

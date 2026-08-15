@@ -23,7 +23,15 @@ const EMPTY_POSTS: PostCardData[] = [];
 const CREATE_CTA_CLASS =
   "inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
 const SECONDARY_CTA_CLASS =
-  "inline-flex min-h-11 items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
+  "inline-flex min-h-11 items-center rounded-lg border border-divider bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
+
+const TAB_ORDER = [
+  "home",
+  "following",
+  "subscriptions",
+  "topics",
+  "latest",
+] as const;
 
 const CONTENT_KIND_PLURAL: Record<Exclude<FeedContentFilter, "all">, string> = {
   post: "Posts",
@@ -107,9 +115,13 @@ async function fetchFeed(
 export function EndStateCard() {
   return (
     <div className="flex flex-col items-center gap-2 py-8 text-center">
-      <span aria-hidden="true" className="mb-1 h-px w-8 bg-gray-200" />
-      <p className="text-[13.5px] font-medium text-gray-500">You&apos;re all caught up.</p>
-      <p className="text-[12px] text-gray-400">New posts will appear here as they&apos;re published.</p>
+      <span aria-hidden="true" className="mb-1 h-px w-8 bg-divider" />
+      {/* Both lines are ink-muted. The second used to be gray-400 (#9CA3AF),
+          which is 2.8:1 on white -- under the 4.5:1 floor, at 12px. The
+          hierarchy between the two lines is carried by weight and size now
+          rather than by fading the lower one out of legibility. */}
+      <p className="text-byline font-medium text-ink-muted">You&apos;re all caught up.</p>
+      <p className="text-meta text-ink-muted">New posts will appear here as they&apos;re published.</p>
     </div>
   );
 }
@@ -568,6 +580,46 @@ export default function PostsFeedTabs({
 
   const resetFilterToAll = () => updateState(activeTab, "all", timeframe);
 
+  const visibleTabs = TAB_ORDER.filter(
+    (tab) =>
+      (tab !== "following" || showFollowingTab) &&
+      (tab !== "topics" || showTopicsTab) &&
+      (tab !== "subscriptions" || showSubscriptionsTab)
+  );
+
+  /**
+   * Arrow-key navigation for the tablist. The row already declared
+   * `role="tablist"` and `role="tab"`, which tells assistive technology that
+   * Left/Right move between tabs -- but nothing implemented it, so a keyboard
+   * user got the promise without the behaviour and had to Tab through every
+   * control instead. Paired with the roving `tabIndex` below, which takes the
+   * inactive tabs out of the Tab sequence so the whole row is one stop.
+   *
+   * Activation follows focus, matching what a click already does.
+   */
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = visibleTabs.indexOf(activeTab);
+    if (currentIndex === -1) return;
+
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % visibleTabs.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + visibleTabs.length) % visibleTabs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = visibleTabs.length - 1;
+    }
+
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = visibleTabs[nextIndex];
+    if (!nextTab || nextTab === activeTab) return;
+    document.getElementById(`feed-tab-${nextTab}`)?.focus();
+    updateState(nextTab, typeFilter, timeframe);
+  };
+
   let emptyTitle = "No content yet.";
   let emptyBody = "Be the first to share your ideas with Africa.";
   let emptyCta = (
@@ -652,59 +704,48 @@ export default function PostsFeedTabs({
       >
         <div
           data-app-context-primary=""
-          className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-gray-200 bg-white px-4 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden ${
+          className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-divider bg-card px-4 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden ${
             isPinned && chromeMode === "compact"
               ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
               : ""
           }`}
           role="tablist"
           aria-label="Choose feed"
+          onKeyDown={handleTabKeyDown}
         >
-          {([
-            "home",
-            "following",
-            "subscriptions",
-            "topics",
-            "latest",
-          ] as const)
-            .filter(
-              (tab) =>
-                (tab !== "following" || showFollowingTab) &&
-                (tab !== "topics" || showTopicsTab) &&
-                (tab !== "subscriptions" || showSubscriptionsTab)
-            )
-            .map((tab) => {
-              const label =
-                tab === "home"
-                  ? currentUserId
-                    ? "For you"
-                    : "Discover"
-                  : tab === "following"
-                    ? "Following"
-                    : tab === "subscriptions"
-                      ? "Subscribed"
-                    : tab === "topics"
-                      ? "Topics"
-                      : "Latest";
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  id={`feed-tab-${tab}`}
-                  aria-controls="home-feed-panel"
-                  aria-selected={activeTab === tab}
-                  onClick={() => updateState(tab, typeFilter, timeframe)}
-                  className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 sm:text-[14px] ${
-                    activeTab === tab
-                      ? "border-emerald-brand bg-emerald-50/70 text-emerald-950"
-                      : "border-transparent text-gray-500 hover:text-ink"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
+          {visibleTabs.map((tab) => {
+            const label =
+              tab === "home"
+                ? currentUserId
+                  ? "For you"
+                  : "Discover"
+                : tab === "following"
+                  ? "Following"
+                  : tab === "subscriptions"
+                    ? "Subscribed"
+                  : tab === "topics"
+                    ? "Topics"
+                    : "Latest";
+            return (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                id={`feed-tab-${tab}`}
+                aria-controls="home-feed-panel"
+                aria-selected={activeTab === tab}
+                tabIndex={activeTab === tab ? 0 : -1}
+                onClick={() => updateState(tab, typeFilter, timeframe)}
+                className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-byline font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 ${
+                  activeTab === tab
+                    ? "border-emerald-brand bg-green-tint/70 text-ink dark:bg-emerald-brand/40 dark:text-ink"
+                    : "border-transparent text-ink-muted hover:text-ink"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
         <div
@@ -712,9 +753,9 @@ export default function PostsFeedTabs({
           data-app-chrome-motion=""
           aria-hidden={chromeMode === "compact" || undefined}
           inert={chromeMode === "compact" || undefined}
-          className={`pointer-events-auto border-b bg-white ${
+          className={`pointer-events-auto border-b bg-card ${
             isPinned && chromeMode === "expanded"
-              ? "border-gray-200 shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
+              ? "border-divider shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
               : "border-transparent"
           }`}
         >
@@ -740,7 +781,7 @@ export default function PostsFeedTabs({
                       className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
                         subscriptionSource === source
                           ? "border-emerald-brand bg-emerald-brand text-white"
-                          : "border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:text-emerald-800"
+                          : "border-divider bg-card text-ink-muted hover:border-emerald-ink hover:text-emerald-ink"
                       }`}
                     >
                       {source}
@@ -786,24 +827,33 @@ export default function PostsFeedTabs({
         )}
       </div>
 
+      {/* The same skeleton the first load uses, rather than a line of grey
+          text. It holds the height the incoming cards will occupy instead of
+          collapsing to one row, so the scroll position stays put when they
+          land, and it keeps the two loading states looking like one product. */}
       {isLoadingMore ? (
-        <div className="py-6 text-center text-sm text-gray-400">Loading more...</div>
+        <>
+          <span className="sr-only" role="status" aria-live="polite">
+            Loading more posts
+          </span>
+          <FeedSkeleton count={2} />
+        </>
       ) : null}
 
       {paginationError ? (
         <div
           role="status"
           aria-live="polite"
-          className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center"
+          className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-900 dark:bg-red-950/40"
         >
-          <p className="text-sm text-red-700">Couldn&apos;t load more.</p>
+          <p className="text-sm text-red-700 dark:text-red-300">Couldn&apos;t load more.</p>
           <button
             type="button"
             onClick={() => {
               void loadMore();
             }}
             disabled={isLoadingMore}
-            className="text-sm font-semibold text-red-700 underline decoration-red-300 underline-offset-2 disabled:opacity-60"
+            className="text-sm font-semibold text-red-700 underline decoration-red-300 underline-offset-2 disabled:opacity-60 dark:text-red-300 dark:decoration-red-700"
           >
             Try again
           </button>
