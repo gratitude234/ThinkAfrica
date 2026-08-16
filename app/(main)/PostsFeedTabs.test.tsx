@@ -499,6 +499,92 @@ describe("PostsFeedTabs -- scroll position on tab switch", () => {
   });
 });
 
+describe("PostsFeedTabs -- pagination overlap", () => {
+  beforeEach(() => {
+    mocks.requestAuth.mockReset();
+    observerInstances = [];
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function paginate() {
+    const observer = infiniteScrollObserver();
+    await act(async () => {
+      observer.callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        observer as unknown as IntersectionObserver
+      );
+    });
+  }
+
+  it("appends only posts the reader does not already have", async () => {
+    // Every date-ordered tab pages by offset, so one post published between the
+    // two requests slides the window and re-serves post 2 as the head of page 2.
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ posts: [post("2"), post("3")], hasMore: false }),
+          { status: 200 }
+        )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[post("1"), post("2")]}
+        initialHasMore
+        showFollowingTab
+        currentUserId="user-1"
+      />
+    );
+
+    await paginate();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("feed")).toHaveTextContent("1,2,3")
+    );
+  });
+
+  it("stops paging after three pages that add nothing new", async () => {
+    // A backend that keeps promising more while handing back cards the reader
+    // already has would otherwise re-arm the sentinel forever.
+    // A fresh Response per call: a body can only be read once, so a shared
+    // instance would fail every page after the first for the wrong reason.
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ posts: [post("1")], hasMore: true }), {
+          status: 200,
+        })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[post("1")]}
+        initialHasMore
+        showFollowingTab
+        currentUserId="user-1"
+      />
+    );
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await paginate();
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // Nothing is watching the sentinel any more: the last observer was torn
+    // down and the effect declined to register a replacement, so there is no
+    // longer anything that can re-arm the loop.
+    expect(infiniteScrollObserver().disconnect).toHaveBeenCalled();
+    expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
+  });
+});
+
 describe("PostsFeedTabs -- error and retry states", () => {
   beforeEach(() => {
     mocks.requestAuth.mockReset();

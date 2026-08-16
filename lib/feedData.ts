@@ -71,6 +71,12 @@ type PublicFeedCacheInput = Pick<
 const POST_SELECT =
   "id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, topic_keys, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
 
+// How deep the score-ranked portion of the home feed goes. Every page of the
+// "For you" tab slices this same window, so it has to be a constant -- see the
+// comment at the ranking branch of fetchFeedPageUncached. Ten pages at the
+// client's page size of 12; past it the feed pages reverse-chronologically.
+export const RANKED_FEED_WINDOW = 120;
+
 function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   if (timeframe === "week") {
     return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -880,10 +886,53 @@ async function fetchFeedPageUncached({
     return { posts, hasMore: raw.length > safePageSize };
   }
 
-  const candidateLimit = Math.max(
-    safePageSize * 2,
-    safePage * safePageSize + 12
-  );
+  // The ranked window has to be the same set of posts on every page, and this
+  // is the whole reason: `rankPosts` orders by score, not by date, so widening
+  // the candidate pool per page (which is what `page * pageSize + 12` did)
+  // re-ranks a *different* set each time and then slices it by index. An older
+  // post with real engagement outscores a fresh one with none, so page 2's pool
+  // slotted such posts above the ones page 1 had already delivered and pushed
+  // page 1's tail down into page 2's slice -- the reader scrolls and sees the
+  // same cards again, while whatever got shoved past the window never arrives.
+  //
+  // A fixed window makes every page a slice of one identical ranking, so the
+  // slices tile instead of overlapping. Snapped up to a whole number of pages
+  // so no page straddles the boundary and comes back short.
+  const start = (safePage - 1) * safePageSize;
+  const end = start + safePageSize;
+  const rankedWindow =
+    Math.ceil(RANKED_FEED_WINDOW / safePageSize) * safePageSize;
+
+  const rankingContext: RankingContext = {
+    userId,
+    followedIds: new Set(followedIds),
+    userInterests,
+    userUniversity,
+    userCountry: null,
+  };
+
+  // Past the ranked window there is nothing left to rank against, so the tail
+  // falls back to plain reverse-chronological paging. It starts at date index
+  // `start`, which is at or beyond the window, and the window is exactly the
+  // newest `rankedWindow` posts -- so the tail can never repeat one of them.
+  if (start >= rankedWindow) {
+    const tailQuery = applyPostFilters(
+      reader.from("posts").select(POST_SELECT),
+      { type, cutoff, excludedAuthorIds: excluded }
+    );
+    const { data: tail } = await tailQuery
+      .order("published_at", { ascending: false })
+      .range(start, end);
+
+    const raw = tail ?? [];
+    const posts = await enrichPosts(
+      reader,
+      raw.slice(0, safePageSize),
+      rankingContext
+    );
+    return { posts, hasMore: raw.length > safePageSize };
+  }
+
   const query = applyPostFilters(
     reader.from("posts").select(POST_SELECT),
     {
@@ -893,26 +942,21 @@ async function fetchFeedPageUncached({
     }
   );
 
+  // One row past the window, so the last ranked page knows whether the
+  // chronological tail has anything in it rather than guessing.
   const { data } = await query
     .order("published_at", { ascending: false })
-    .limit(candidateLimit);
+    .limit(rankedWindow + 1);
 
-  const rankingContext: RankingContext = {
-    userId,
-    followedIds: new Set(followedIds),
-    userInterests,
-    userUniversity,
-    userCountry: null,
-  };
-  const enriched = await enrichPosts(reader, data ?? [], rankingContext);
+  const candidates = (data ?? []).slice(0, rankedWindow);
+  const hasTail = (data ?? []).length > rankedWindow;
+  const enriched = await enrichPosts(reader, candidates, rankingContext);
 
   const ranked = rankPosts(enriched, rankingContext);
-  const start = (safePage - 1) * safePageSize;
-  const end = start + safePageSize;
 
   return {
     posts: ranked.slice(start, end),
-    hasMore: ranked.length > end,
+    hasMore: ranked.length > end || hasTail,
   };
 }
 

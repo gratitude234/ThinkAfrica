@@ -310,8 +310,26 @@ export default function PostsFeedTabs({
     ) => {
       setFeedCache((current) => {
         const previous = current[key];
+
+        // Every date-ordered tab pages by offset, so a post published between
+        // two requests slides the whole window down by one and hands back a
+        // card that is already on screen -- rendered twice, under a duplicate
+        // React key. Appending by id rather than by concatenation makes the
+        // list idempotent no matter what the window did underneath it.
+        const carried = append ? (previous?.posts ?? []) : [];
+        const seen = new Set(carried.map((post) => post.id));
+        const added = result.posts.filter((post) => {
+          if (seen.has(post.id)) return false;
+          seen.add(post.id);
+          return true;
+        });
+
+        // Counted from what actually landed, not from what the response
+        // contained: a page of nothing but posts we already have moves the
+        // reader forward exactly as little as an empty one, and three of those
+        // in a row is the end of the feed however it got that way.
         const emptyPageCount =
-          result.posts.length === 0
+          added.length === 0
             ? nextPage === 1
               ? 1
               : (previous?.emptyPageCount ?? 0) + 1
@@ -320,7 +338,7 @@ export default function PostsFeedTabs({
         return {
           ...current,
           [key]: {
-            posts: append ? [...(previous?.posts ?? []), ...result.posts] : result.posts,
+            posts: append ? [...carried, ...added] : added,
             hasMore: result.hasMore,
             page: nextPage,
             emptyPageCount,
@@ -457,6 +475,10 @@ export default function PostsFeedTabs({
     );
     const currentFeed = feedCache[key];
     if (isSwitching || isLoadingMore || !currentFeed?.hasMore) return;
+    // The sentinel is 400px tall in effect and re-arms on every cache write, so
+    // a `hasMore` that never turns false would page forever. Three pages that
+    // added nothing is the same signal the end-state card reads.
+    if (currentFeed.emptyPageCount >= 3) return;
 
     const requestId = loadMoreRequestRef.current + 1;
     loadMoreRequestRef.current = requestId;
@@ -499,6 +521,7 @@ export default function PostsFeedTabs({
         feedCacheKey(activeTab, typeFilter, timeframe, subscriptionSource)
       ];
     if (!sentinelRef.current || !currentFeed?.hasMore || isSwitching) return;
+    if (currentFeed.emptyPageCount >= 3) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
