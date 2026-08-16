@@ -10,6 +10,8 @@ export interface RetentionProgress {
   responseStarts: number;
   notificationsOpened: number;
   returnActionsClicked: number;
+  publishedContributions: number;
+  publishedResponses: number;
 }
 
 export interface RetentionNextAction {
@@ -23,7 +25,9 @@ export interface RetentionNextAction {
     | "write_back"
     | "performance"
     | "follow"
-    | "latest";
+    | "latest"
+    | "campus_prompt"
+    | "second_publication";
   label: string;
   description: string;
   href: string;
@@ -40,6 +44,10 @@ export interface RetentionSummary {
 
 type QueryResult<T> = Promise<{ data?: T[] | null; error?: { message?: string } | null }>;
 type MaybeQueryResult<T> = Promise<{ data?: T | null; error?: { message?: string } | null }>;
+type CountQueryResult = Promise<{
+  count?: number | null;
+  error?: { message?: string } | null;
+}>;
 
 async function readRowsSafe<T>(query: QueryResult<T>): Promise<T[]> {
   try {
@@ -58,6 +66,16 @@ async function readMaybeSafe<T>(query: MaybeQueryResult<T>): Promise<T | null> {
     return result.data ?? null;
   } catch {
     return null;
+  }
+}
+
+async function readCountSafe(query: CountQueryResult): Promise<number> {
+  try {
+    const result = await query;
+    if (result.error) return 0;
+    return result.count ?? 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -86,15 +104,22 @@ export async function getRetentionSummary(
 ): Promise<RetentionSummary> {
   const weekStartedAt = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const profile = await readMaybeSafe<{
-    interests: string[] | null;
-  }>(
-    supabase
-      .from("profiles")
-      .select("interests")
-      .eq("id", userId)
-      .single() as unknown as MaybeQueryResult<{ interests: string[] | null }>
-  );
+  const [profile, campusMembership] = await Promise.all([
+    readMaybeSafe<{ interests: string[] | null }>(
+      supabase
+        .from("profiles")
+        .select("interests")
+        .eq("id", userId)
+        .single() as unknown as MaybeQueryResult<{ interests: string[] | null }>
+    ),
+    readMaybeSafe<{ cohort_id: string }>(
+      supabase
+        .from("campus_cohort_memberships")
+        .select("cohort_id")
+        .eq("user_id", userId)
+        .maybeSingle() as unknown as MaybeQueryResult<{ cohort_id: string }>
+    ),
+  ]);
 
   const interests = Array.isArray(profile?.interests) ? profile.interests : [];
   const relevantPostQuery = supabase
@@ -105,6 +130,30 @@ export async function getRetentionSummary(
     .order("published_at", { ascending: false })
     .limit(1);
 
+  const promptNow = new Date().toISOString();
+  const activeCampusPrompt = campusMembership?.cohort_id
+    ? await readMaybeSafe<{
+        id: string;
+        title: string;
+        prompt_text: string;
+      }>(
+        supabase
+          .from("campus_editorial_prompts")
+          .select("id, title, prompt_text")
+          .eq("cohort_id", campusMembership.cohort_id)
+          .eq("active", true)
+          .lte("starts_at", promptNow)
+          .or(`ends_at.is.null,ends_at.gt.${promptNow}`)
+          .order("starts_at", { ascending: false })
+          .limit(1)
+          .maybeSingle() as unknown as MaybeQueryResult<{
+          id: string;
+          title: string;
+          prompt_text: string;
+        }>
+      )
+    : null;
+
   const [
     events,
     notifications,
@@ -114,6 +163,8 @@ export async function getRetentionSummary(
     recentDraft,
     latestPublishedPost,
     matchedPosts,
+    publishedContributions,
+    publishedResponses,
   ] = await Promise.all([
     readRowsSafe<{ event_name: string }>(
       supabase
@@ -260,6 +311,21 @@ export async function getRetentionSummary(
         ? relevantPostQuery.overlaps("tags", interests)
         : relevantPostQuery) as unknown as QueryResult<{ title: string | null; slug: string }>
     ),
+    readCountSafe(
+      supabase
+        .from("posts")
+        .select("id", { count: "exact", head: true })
+        .eq("author_id", userId)
+        .eq("status", "published") as unknown as CountQueryResult
+    ),
+    readCountSafe(
+      supabase
+        .from("posts")
+        .select("id", { count: "exact", head: true })
+        .eq("author_id", userId)
+        .eq("status", "published")
+        .not("in_response_to", "is", null) as unknown as CountQueryResult
+    ),
   ]);
 
   let suggestedPost: { title: string | null; slug: string } | null =
@@ -285,6 +351,8 @@ export async function getRetentionSummary(
     responseStarts: eventCount(events, "response_started"),
     notificationsOpened: eventCount(events, "notification_opened"),
     returnActionsClicked: eventCount(events, "next_action_clicked"),
+    publishedContributions,
+    publishedResponses,
   };
 
   const responsePost = unreadResponseNotification
@@ -331,6 +399,31 @@ export async function getRetentionSummary(
     });
   }
 
+  if (activeCampusPrompt && publishedContributions < 2) {
+    pushUniqueAction(actions, {
+      key: publishedContributions === 1 ? "second_publication" : "campus_prompt",
+      label:
+        publishedContributions === 1
+          ? "Make your second publication"
+          : activeCampusPrompt.title,
+      description:
+        publishedContributions === 1
+          ? `Use the current campus prompt, “${activeCampusPrompt.title},” to build continuity after your first contribution.`
+          : activeCampusPrompt.prompt_text,
+      href: `/create/post?prompt=${encodeURIComponent(activeCampusPrompt.id)}`,
+      cta: publishedContributions === 1 ? "Publish again" : "Use campus prompt",
+    });
+  } else if (publishedContributions === 1) {
+    pushUniqueAction(actions, {
+      key: "second_publication",
+      label: "Make your second publication",
+      description:
+        "Your Intellectual Record has begun. Publish a second contribution while the first is still fresh.",
+      href: "/create/post",
+      cta: "Publish again",
+    });
+  }
+
   if (unreadEngagementNotification) {
     const typeLabel =
       unreadEngagementNotification.type === "comment"
@@ -352,7 +445,10 @@ export async function getRetentionSummary(
   if (suggestedPost) {
     pushUniqueAction(actions, {
       key: "respond",
-      label: "Respond to a relevant post",
+      label:
+        publishedResponses === 0
+          ? "Publish your first response"
+          : "Respond to a relevant post",
       description: `Read "${titleOrFallback(suggestedPost.title, "a new post")}" and add a short response if you have a useful angle.`,
       href: `/post/${suggestedPost.slug}`,
       cta: "Read and respond",

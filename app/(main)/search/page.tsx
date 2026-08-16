@@ -65,7 +65,7 @@ interface OpportunityResult {
   deadline: string | null;
 }
 
-export interface DiscoverSearchGroup {
+interface DiscoverSearchGroup {
   key: "people" | "posts" | "topics" | "debates" | "opportunities";
   label: string;
   count: number;

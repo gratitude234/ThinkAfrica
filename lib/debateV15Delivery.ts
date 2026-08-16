@@ -98,14 +98,14 @@ function phaseCopy(phase: DebateV15OpenedPhase) {
         emailTitle: "Opening arguments are now active",
         intro: "The debate has started. Open the room to submit your opening argument before the deadline.",
         pushTitle: "Opening arguments are active",
-        pushBody: "Your Debate V1.5 opening stage has started.",
+        pushBody: "Your Indegenius Debate opening stage has started.",
       };
     case "rebuttal":
       return {
         emailTitle: "Rebuttals are now active",
         intro: "The rebuttal stage has started. Open the room to read the opening cases and submit your rebuttal.",
         pushTitle: "Rebuttals are active",
-        pushBody: "Your Debate V1.5 rebuttal stage has started.",
+        pushBody: "Your Indegenius Debate rebuttal stage has started.",
       };
     case "voting":
       return {
@@ -162,7 +162,7 @@ export function buildDebateV15DeliveryContent(
       return {
         email: {
           subject: `You’re invited to a debate on Indegenius`,
-          preview: `You were invited to argue ${side} in a Debate V1.5 motion.`,
+          preview: `You were invited to argue ${side} in an Indegenius Debate motion.`,
           title: "Debate invitation",
           intro:
             "A moderator invited you to take part in a curated one-on-one debate. Open the room to review the schedule and accept or decline.",
@@ -186,7 +186,7 @@ export function buildDebateV15DeliveryContent(
             `${participantName} ${response} your debate invitation`,
             160
           ),
-          preview: `${participantName} ${response} a Debate V1.5 invitation.`,
+          preview: `${participantName} ${response} an Indegenius Debate invitation.`,
           title: `Invitation ${response}`,
           intro: `${participantName} ${response} the invitation to join your debate.`,
           bodyHtml: `${motionBlock(debateTitle)}<p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#4b5563;"><strong style="color:#111827;">Debater:</strong> ${safeName}</p>`,
@@ -244,7 +244,7 @@ export function buildDebateV15DeliveryContent(
       return {
         email: {
           subject: excerpt(`Debate cancelled: ${debateTitle}`, 160),
-          preview: "A Debate V1.5 motion you were participating in was cancelled.",
+          preview: "An Indegenius Debate motion you were participating in was cancelled.",
           title: "Debate cancelled",
           intro:
             "The moderator cancelled this debate. The room remains available as an honest record of what happened.",

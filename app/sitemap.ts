@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SITE_URL, absoluteUrl } from "@/lib/site";
+import { absoluteUrl } from "@/lib/site";
 import { isLowQualityTitle } from "@/lib/postQuality";
 import { isLightweightPost } from "@/lib/postDisplay";
 
@@ -14,10 +14,10 @@ type SitemapRow = {
 };
 
 const staticRoutes: SitemapRow[] = [
-  { url: SITE_URL, changeFrequency: "daily", priority: 1 },
-  { url: absoluteUrl("/landing"), changeFrequency: "weekly", priority: 0.9 },
+  { url: absoluteUrl("/landing"), changeFrequency: "daily", priority: 1 },
   { url: absoluteUrl("/explore"), changeFrequency: "hourly", priority: 0.9 },
   { url: absoluteUrl("/debates"), changeFrequency: "daily", priority: 0.8 },
+  { url: absoluteUrl("/campus"), changeFrequency: "daily", priority: 0.75 },
   { url: absoluteUrl("/opportunities"), changeFrequency: "daily", priority: 0.8 },
   { url: absoluteUrl("/about"), changeFrequency: "monthly", priority: 0.6 },
   { url: absoluteUrl("/topics"), changeFrequency: "weekly", priority: 0.7 },

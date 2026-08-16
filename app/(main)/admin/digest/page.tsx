@@ -3,7 +3,7 @@ import Link from "next/link";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import { createAdminActionClient } from "@/lib/adminAccess";
 import { AdminAccessError, createAdminClient } from "@/lib/supabase/admin";
-import { formatDate, POST_POINTS, type PostType } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import DigestSendButton from "./DigestSendButton";
 
 export default async function AdminDigestPage() {
@@ -22,7 +22,7 @@ export default async function AdminDigestPage() {
     { data: topPosts },
     { data: topDebateRaw },
     { data: openFellowships },
-    { data: weeklyPostsForContrib },
+    { data: campusPromptsRaw },
   ] = await Promise.all([
     supabase
       .from("posts")
@@ -46,10 +46,16 @@ export default async function AdminDigestPage() {
       .limit(3),
 
     supabase
-      .from("posts")
-      .select("author_id, type, profiles!posts_author_id_fkey(full_name, username)")
-      .eq("status", "published")
-      .gte("published_at", weekAgo),
+      .from("campus_editorial_prompts")
+      .select(
+        "id, title, prompt_text, response_question, campus_cohorts!inner(university, status)"
+      )
+      .eq("active", true)
+      .lte("starts_at", new Date().toISOString())
+      .or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`)
+      .in("campus_cohorts.status", ["selected", "active"])
+      .order("starts_at", { ascending: false }),
+
   ]);
 
   // Top debate (most arguments)
@@ -57,20 +63,26 @@ export default async function AdminDigestPage() {
     .map((d) => ({ ...d, argCount: Array.isArray(d.debate_arguments) ? d.debate_arguments.length : (d.debate_arguments as { count: number } | null)?.count ?? 0 }))
     .sort((a, b) => b.argCount - a.argCount)[0] ?? null;
 
-  // Top contributor this week
-  const contribMap: Record<string, { full_name: string; username: string; pts: number }> = {};
-  for (const p of weeklyPostsForContrib ?? []) {
-    const profile = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
-    if (!profile) continue;
-    if (!contribMap[p.author_id]) contribMap[p.author_id] = { ...profile, pts: 0 };
-    contribMap[p.author_id].pts += POST_POINTS[p.type as PostType] ?? 10;
-  }
-  const topContrib = Object.values(contribMap).sort((a, b) => b.pts - a.pts)[0] ?? null;
-
   const posts = (topPosts ?? []).map((p) => ({
     ...p,
     profiles: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
   }));
+
+  const campusPrompts: Array<
+    (NonNullable<typeof campusPromptsRaw>[number]) & {
+      campus: { university: string; status: string } | null;
+    }
+  > = [];
+  const campusPromptKeys = new Set<string>();
+  for (const prompt of campusPromptsRaw ?? []) {
+    const campus = Array.isArray(prompt.campus_cohorts)
+      ? prompt.campus_cohorts[0] ?? null
+      : prompt.campus_cohorts;
+    const campusKey = campus?.university?.trim().toLocaleLowerCase();
+    if (!campusKey || campusPromptKeys.has(campusKey)) continue;
+    campusPromptKeys.add(campusKey);
+    campusPrompts.push({ ...prompt, campus });
+  }
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -87,11 +99,34 @@ export default async function AdminDigestPage() {
       </div>
 
       <div className="space-y-6">
-        {/* Top posts */}
+        <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-6">
+          <h2 className="font-semibold text-gray-900">Campus-specific prompt sections</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Each item is sent only to digest recipients whose profile university matches that selected campus.
+          </p>
+          {campusPrompts.length === 0 ? (
+            <p className="mt-4 text-sm text-gray-400">No campus prompt will be included.</p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {campusPrompts.map((prompt) => (
+                <article key={prompt.id} className="rounded-lg border border-emerald-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    {prompt.campus?.university ?? "Unknown campus"}
+                  </p>
+                  <h3 className="mt-1 text-sm font-semibold text-gray-900">{prompt.title}</h3>
+                  <p className="mt-1 text-sm leading-5 text-gray-500">{prompt.prompt_text}</p>
+                  {prompt.response_question ? <p className="mt-2 text-xs font-medium text-gray-700">Response question: {prompt.response_question}</p> : null}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Publications */}
         <section className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Top Posts This Week</h2>
+          <h2 className="font-semibold text-gray-900 mb-4">Publications Worth Reading</h2>
           {posts.length === 0 ? (
-            <p className="text-sm text-gray-400">No posts this week.</p>
+            <p className="text-sm text-gray-400">No new publications this week.</p>
           ) : (
             <div className="space-y-3">
               {posts.map((post) => (
@@ -107,15 +142,15 @@ export default async function AdminDigestPage() {
           )}
         </section>
 
-        {/* Top debate */}
+        {/* Featured debate */}
         <section className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">Top Debate This Week</h2>
+          <h2 className="font-semibold text-gray-900 mb-3">Featured Debate</h2>
           {topDebate ? (
             <Link href={`/debates/${topDebate.id}`} className="block p-3 rounded-lg hover:bg-gray-50 group">
               <p className="text-sm font-medium text-gray-900 group-hover:text-emerald-brand transition-colors">{topDebate.title}</p>
               <p className="text-xs text-gray-400 mt-0.5">{topDebate.argCount} arguments · {topDebate.status}</p>
             </Link>
-          ) : <p className="text-sm text-gray-400">No debates this week.</p>}
+          ) : <p className="text-sm text-gray-400">No debate to feature right now.</p>}
         </section>
 
         {/* Fellowships */}
@@ -138,21 +173,6 @@ export default async function AdminDigestPage() {
           )}
         </section>
 
-        {/* Top contributor */}
-        <section className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">Top Contributor This Week</h2>
-          {topContrib ? (
-            <Link href={`/${topContrib.username}`} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 group">
-              <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm flex-shrink-0">
-                {topContrib.full_name?.charAt(0)?.toUpperCase() ?? "?"}
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900 group-hover:text-emerald-brand transition-colors">{topContrib.full_name}</p>
-                <p className="text-xs text-gray-400">{topContrib.pts} pts this week</p>
-              </div>
-            </Link>
-          ) : <p className="text-sm text-gray-400">No activity this week.</p>}
-        </section>
       </div>
     </div>
   );

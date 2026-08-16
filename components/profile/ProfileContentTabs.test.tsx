@@ -41,8 +41,44 @@ describe("ProfileContentTabs", () => {
 
   it("shows the matching creation action in an owner's empty tab", () => {
     render(<ProfileContentTabs items={[]} isOwnProfile />);
+    expect(
+      screen.getByRole("link", { name: "Add your first contribution" })
+    ).toHaveAttribute("href", "/create/post");
+    fireEvent.click(screen.getByRole("tab", { name: /Posts/ }));
     expect(screen.getByRole("link", { name: "Write a post" })).toHaveAttribute("href", "/create/post");
     fireEvent.click(screen.getByRole("tab", { name: /Research/ }));
     expect(screen.getByRole("link", { name: "Submit research" })).toHaveAttribute("href", "/submit/research");
+  });
+
+  it("shows responses and debates inside the unified record with factual quality labels", () => {
+    render(
+      <ProfileContentTabs
+        isOwnProfile={false}
+        items={[
+          item({
+            id: "response",
+            slug: "response",
+            in_response_to: "parent",
+            reference_count: 2,
+          }),
+        ]}
+        debateContributions={[
+          {
+            id: "argument-1",
+            content: "A public argument grounded in the motion.",
+            stance: "for",
+            upvotes: 3,
+            round_number: 1,
+            created_at: "2026-07-23T10:00:00.000Z",
+            debates: { id: "debate-1", title: "The public motion" },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText("Source-backed")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "The public motion" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /Responses/ }));
+    expect(screen.getByText("Response")).toBeInTheDocument();
   });
 });

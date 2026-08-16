@@ -124,9 +124,14 @@ describe("PostComposerForm", () => {
       body: "Publish from the keyboard.",
       imageUrl: null,
       inResponseTo: null,
+      promptId: null,
       topics: [],
     });
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/post/published-take"));
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith(
+        "/post/published-take?justPublished=1&live=1"
+      )
+    );
   });
 
   it("keeps the longer-form destinations available as secondary actions", () => {
@@ -139,6 +144,38 @@ describe("PostComposerForm", () => {
     expect(screen.getByRole("link", { name: "Submit research" })).toHaveAttribute(
       "href",
       "/submit/research"
+    );
+  });
+
+  it("carries a verified campus prompt into publication without writing copy for the user", async () => {
+    render(
+      <PostComposerForm
+        userId="user-1"
+        editorialPrompt={{
+          id: "prompt-1",
+          title: "The cost of getting to class",
+          promptText: "Describe one transport constraint your campus should address.",
+          responseQuestion: "Which proposed solution would work in practice?",
+          topic: "Campus transport",
+        }}
+      />
+    );
+
+    expect(screen.getByText("The cost of getting to class")).toBeInTheDocument();
+    const textarea = screen.getByRole("textbox", { name: "Quick take text" });
+    expect(textarea).toHaveValue("");
+
+    fireEvent.change(textarea, { target: { value: "A shuttle schedule should be published." } });
+    fireEvent.click(screen.getByRole("button", { name: "Post" }));
+
+    await waitFor(() =>
+      expect(mocks.createPost).toHaveBeenCalledWith({
+        body: "A shuttle schedule should be published.",
+        imageUrl: null,
+        inResponseTo: null,
+        promptId: "prompt-1",
+        topics: ["Campus transport"],
+      })
     );
   });
 

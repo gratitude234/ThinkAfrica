@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
+import { BRAND_SEO_DESCRIPTION } from "@/lib/brand";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Indegenius",
     short_name: "Indegenius",
-    description:
-      "Posts, articles, and research from African university students.",
+    description: BRAND_SEO_DESCRIPTION,
     start_url: "/",
     scope: "/",
     display: "standalone",

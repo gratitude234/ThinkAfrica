@@ -28,7 +28,7 @@ function baseProfile(overrides: Partial<Parameters<typeof ProfileHeader>[0]["pro
 }
 
 describe("ProfileHeader stats bar", () => {
-  it("labels the combined published-work count 'Published', not 'Publications' -- it includes short Posts, not just Article/Research", () => {
+  it("foregrounds the Intellectual Record and its evidence-backed contribution signals", () => {
     render(
       <ProfileHeader
         profile={baseProfile()}
@@ -44,6 +44,8 @@ describe("ProfileHeader stats bar", () => {
           citableCount: 2,
           reviewedCount: 3,
           coAuthoredCount: 1,
+          responseCount: 4,
+          sourceBackedCount: 5,
           followerCount: 0,
           followingCount: 0,
           totalViews: 0,
@@ -56,7 +58,8 @@ describe("ProfileHeader stats bar", () => {
       />
     );
 
-    expect(screen.getByText("Published")).toBeInTheDocument();
-    expect(screen.queryByText("Publications")).not.toBeInTheDocument();
+    expect(screen.getByText("Record")).toBeInTheDocument();
+    expect(screen.getByText("Responses")).toBeInTheDocument();
+    expect(screen.getByText("Source-backed")).toBeInTheDocument();
   });
 });

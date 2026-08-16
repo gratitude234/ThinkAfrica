@@ -15,6 +15,12 @@ import {
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
+import {
+  BRAND_DESCRIPTION,
+  BRAND_PROMISE,
+  BRAND_SEO_DESCRIPTION,
+  BRAND_TAGLINE,
+} from "@/lib/brand";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -52,14 +58,12 @@ type LandingData = {
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "African Student Posts, Articles, and Research",
-  description:
-    "Read serious posts, articles, research, and debates from African university students and emerging thinkers.",
+  title: "Build Your Intellectual Identity",
+  description: BRAND_SEO_DESCRIPTION,
   alternates: { canonical: canonicalPath("/landing") },
   openGraph: {
-    title: "Indegenius - African Student Posts, Articles, and Research",
-    description:
-      "Read serious posts, articles, research, and debates from African university students and emerging thinkers.",
+    title: `Indegenius | ${BRAND_PROMISE}`,
+    description: BRAND_SEO_DESCRIPTION,
     url: absoluteUrl("/landing"),
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
@@ -67,9 +71,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Indegenius - African Student Posts, Articles, and Research",
-    description:
-      "Read serious posts, articles, research, and debates from African university students and emerging thinkers.",
+    title: `Indegenius | ${BRAND_PROMISE}`,
+    description: BRAND_SEO_DESCRIPTION,
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };
@@ -82,20 +85,20 @@ const VALUE_PROPS = [
   {
     num: "01",
     numStyle: "bg-emerald-100 text-emerald-600",
-    title: "Find serious student ideas",
-    desc: "Read articles and research from students writing beyond the quick-take feed — with real citations, arguments, and bylines.",
+    title: "Discover ideas worth engaging with",
+    desc: "Read Posts, Articles, and Research from people developing ideas through evidence, argument, and public contribution.",
   },
   {
     num: "02",
     numStyle: "bg-amber-100 text-amber-700",
-    title: "Follow credible writers",
-    desc: "Author profiles show university, field of study, formally reviewed work, and point tier — so you can decide whose work is worth tracking.",
+    title: "Build a body of work",
+    desc: "Bring publications, Responses, debates, collaborations, and review signals together in one evidence-backed Intellectual Record.",
   },
   {
     num: "03",
     numStyle: "bg-purple-100 text-purple-700",
-    title: "Respond thoughtfully",
-    desc: "Move from reading into questions, counterpoints, and response posts — or join a structured debate and have your argument evaluated by peers.",
+    title: "Test ideas in public",
+    desc: "Move from reading into questions, counterpoints, Responses, and structured debates that make your reasoning part of your Intellectual Record.",
   },
 ];
 
@@ -214,7 +217,7 @@ export default async function LandingPage() {
       ? [{ value: displayUserCount, suffix: "", label: "Registered profiles" }]
       : []),
     ...(displayPostCount > 0
-      ? [{ value: displayPostCount, suffix: "", label: "Published posts" }]
+      ? [{ value: displayPostCount, suffix: "", label: "Published contributions" }]
       : []),
   ];
 
@@ -237,19 +240,16 @@ export default async function LandingPage() {
               <div className="hero-animate hero-eyebrow mb-4 flex items-center gap-2.5 sm:mb-6">
                 <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-brand" />
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
-                  Africa&apos;s intellectual social network
+                  {BRAND_TAGLINE}
                 </span>
               </div>
 
               <h1 className="hero-animate hero-h1 max-w-[11ch] font-display text-[40px] leading-[1.02] tracking-normal text-ink sm:max-w-none sm:text-[64px]">
-                Where Africa&apos;s<br />
-                best student<br />
-                ideas{" "}
-                <em className="text-emerald-500">live.</em>
+                {BRAND_PROMISE}
               </h1>
 
               <p className="hero-animate hero-sub mt-4 mb-6 max-w-[480px] text-[15px] leading-[1.65] text-ink-muted sm:mt-6 sm:mb-9 sm:text-lg">
-                Posts, articles, and research written by university students across Africa, rigorously argued and openly published.
+                {BRAND_DESCRIPTION}
               </p>
 
               {leadPost ? (
@@ -293,7 +293,7 @@ export default async function LandingPage() {
                   metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, postType: leadPost?.type ?? null, position: "primary" }}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-5 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[#0E4B37] sm:px-7 sm:text-base"
                 >
-                  Start reading
+                  Explore ideas
                   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
                 </LandingTrackedLink>
                 <LandingTrackedLink
@@ -302,7 +302,7 @@ export default async function LandingPage() {
                   metadata={{ source: "hero_secondary" }}
                   className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-3.5 text-[15px] font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:px-7 sm:text-base"
                 >
-                  Claim your handle
+                  Start your Intellectual Record
                 </LandingTrackedLink>
               </div>
 
@@ -326,14 +326,13 @@ export default async function LandingPage() {
                 <p className="text-sm leading-snug text-ink-muted">
                   {displayUserCount > 0 ? (
                     <>
-                      Join{" "}
                       <strong className="text-ink">
                         {displayUserCount.toLocaleString()}
                       </strong>{" "}
-                      students already publishing
+                      registered profiles on Indegenius
                     </>
                   ) : (
-                    "Read student posts, articles, and research already live on Indegenius"
+                    "Explore Posts, Articles, and Research already live on Indegenius"
                   )}
                 </p>
               </div>
@@ -461,7 +460,7 @@ export default async function LandingPage() {
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
                 Real work, real bylines
               </p>
-              <h2 className="font-display text-[28px] font-medium text-ink sm:text-[32px]">Latest from students</h2>
+              <h2 className="font-display text-[28px] font-medium text-ink sm:text-[32px]">Latest contributions</h2>
             </div>
             <LandingTrackedLink
               href="/?guest=1"
@@ -597,8 +596,8 @@ export default async function LandingPage() {
                 Argue the motion.<br />Move the debate.
               </h2>
               <p className="mb-7 max-w-[420px] text-base leading-[1.7] text-ink-muted">
-                Structured academic debates run in live rounds. Make your argument for or against,
-                have it upvoted by readers, and engage with counterpoints in real time.
+                Structured debates run in live rounds. Make your argument for or against,
+                engage with counterpoints, and make your reasoning visible in your Intellectual Record.
               </p>
               <LandingTrackedLink
                 href="/debates"
@@ -617,27 +616,15 @@ export default async function LandingPage() {
                 <div className="flex items-center gap-1.5">
                   <span className="debate-dot-live h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-brand" />
                   <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-emerald-600">
-                    Example · active debate
+                    Example · Active debate
                   </span>
                 </div>
                 <p className="font-display text-[18px] font-semibold leading-snug text-ink">
                   Should African universities adopt English-only instruction policies?
                 </p>
-                <div>
-                  <div id="stance-bar" className="flex h-[5px] overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="stance-for h-full rounded-full bg-emerald-brand"
-                      style={{ "--for-w": "58%" } as React.CSSProperties}
-                    />
-                    <div
-                      className="stance-against h-full rounded-full bg-purple-500"
-                      style={{ "--against-w": "42%" } as React.CSSProperties}
-                    />
-                  </div>
-                  <div className="mt-1 flex justify-between">
-                    <span className="text-[11px] font-medium text-emerald-600">For · 58%</span>
-                    <span className="text-[11px] font-medium text-purple-600">Against · 42%</span>
-                  </div>
+                <div className="flex gap-2" aria-label="Debate stances">
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700">For</span>
+                  <span className="rounded-full bg-purple-50 px-3 py-1 text-[11px] font-medium text-purple-700">Against</span>
                 </div>
                 <div>
                   <LandingTrackedLink
@@ -656,13 +643,13 @@ export default async function LandingPage() {
                 <div className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-400" />
                   <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber-700">
-                    Open for arguments
+                    Example · Open for arguments
                   </span>
                 </div>
                 <p className="font-display text-[18px] font-semibold leading-snug text-ink">
                   Is IMF conditionality still a legitimate development tool in Africa?
                 </p>
-                <p className="text-xs text-ink-muted">Opening round · submissions open this week</p>
+                <p className="text-xs text-ink-muted">Opening round · Add the first argument</p>
               </div>
 
               {/* Closed */}
@@ -670,13 +657,13 @@ export default async function LandingPage() {
                 <div className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400" />
                   <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-gray-500">
-                    Closed · Recap available
+                    Example · Completed debate
                   </span>
                 </div>
                 <p className="font-display text-[18px] font-semibold leading-snug text-ink">
                   Should African nations create a unified continental currency?
                 </p>
-                <p className="text-xs text-ink-muted">234 arguments · Majority: Against</p>
+                <p className="text-xs text-ink-muted">Recap available</p>
               </div>
             </div>
           </div>
@@ -688,7 +675,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">How it works</p>
-            <h2 className="font-display text-[30px] font-medium text-ink sm:text-[36px]">Built for intellectual seriousness</h2>
+            <h2 className="font-display text-[30px] font-medium text-ink sm:text-[36px]">How your intellectual identity grows</h2>
           </div>
           <div id="value-grid" className="grid grid-cols-1 divide-y md:grid-cols-3 md:divide-x md:divide-y-0 divide-gray-200">
             {VALUE_PROPS.map(({ num, numStyle, title, desc }, i) => (
@@ -713,11 +700,11 @@ export default async function LandingPage() {
           <div className="cta-card rounded-2xl bg-gray-900 px-6 py-8 text-white sm:px-10 sm:py-11">
             <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For readers</p>
             <h2 className="mb-3 font-display text-[30px] font-medium leading-[1.1]">
-              Start exploring student ideas today
+              Explore ideas worth engaging with
             </h2>
             <p className="mb-7 text-[15px] leading-relaxed opacity-80">
-              No account needed to read. Browse posts, articles, and research from
-              students and emerging thinkers.
+              No account needed to read. Browse Posts, Articles, and Research from
+              young people who actively engage with ideas.
             </p>
             <LandingTrackedLink
               href="/?guest=1"
@@ -731,13 +718,13 @@ export default async function LandingPage() {
           </div>
 
           <div className="cta-card rounded-2xl bg-emerald-brand px-6 py-8 text-white sm:px-10 sm:py-11">
-            <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For writers</p>
+            <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For contributors</p>
             <h2 className="mb-3 font-display text-[30px] font-medium leading-[1.1]">
-              Publish your research and build your profile
+              Build your Intellectual Record
             </h2>
             <p className="mb-7 text-[15px] leading-relaxed opacity-80">
-              Claim your handle, complete your student profile, and start with a Quick Take.
-              Articles and research papers earn points toward your Scholar tier.
+              Claim your handle, complete your profile, and publish your first idea.
+              Your contributions create a public record of what you write, argue, research, and contribute.
             </p>
             <LandingTrackedLink
               href="/signup"
@@ -745,7 +732,7 @@ export default async function LandingPage() {
               metadata={{ source: "dual_cta_writers" }}
               className="inline-flex items-center gap-1.5 rounded-[10px] bg-white px-7 py-3 text-[15px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50"
             >
-              Claim your handle
+              Start your record
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
             </LandingTrackedLink>
           </div>

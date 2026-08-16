@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import CreateTrigger from "@/app/(main)/CreateTrigger";
+import { BRAND_ORIGIN_STATEMENT, BRAND_PROMISE } from "@/lib/brand";
 
 // "Write" is ambiguous (Post/Article/Research Paper), so it renders the
 // shared Create chooser (CreateTrigger) instead of linking straight to
@@ -48,7 +49,7 @@ export default function Footer({ landing = false }: { landing?: boolean }) {
               Indegenius
             </Link>
             <p className="mt-2 text-sm text-gray-400 leading-relaxed">
-              Where Africa&apos;s Ideas Connect
+              {BRAND_PROMISE}
             </p>
           </div>
 
@@ -113,7 +114,7 @@ export default function Footer({ landing = false }: { landing?: boolean }) {
         </div>
 
         <div className="mt-10 pt-6 border-t border-gray-800 text-center text-xs text-gray-500">
-          &copy; 2025 Indegenius. Built for Africa.
+          &copy; {new Date().getFullYear()} Indegenius. {BRAND_ORIGIN_STATEMENT}
         </div>
       </div>
     </footer>

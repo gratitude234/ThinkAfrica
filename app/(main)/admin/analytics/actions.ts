@@ -5,11 +5,13 @@ import {
   recordAdminAuditEvent,
 } from "@/lib/adminAccess";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
+import { isProfileComplete } from "@/lib/activation";
 
 type ReminderProfileRow = {
   id: string;
   full_name: string | null;
   username: string | null;
+  profile_type: string | null;
   country: string | null;
   university: string | null;
   field_of_study: string | null;
@@ -20,13 +22,7 @@ type ReminderProfileRow = {
 function needsProfileReminder(profile: ReminderProfileRow) {
   return (
     profile.onboarding_completed !== true ||
-    !profile.full_name ||
-    !profile.username ||
-    !profile.country ||
-    !profile.university ||
-    !profile.field_of_study ||
-    !Array.isArray(profile.interests) ||
-    profile.interests.length === 0
+    !isProfileComplete(profile)
   );
 }
 
@@ -36,7 +32,7 @@ export async function sendProfileCompletionReminders() {
     const { data, error } = await admin
       .from("profiles")
       .select(
-        "id, full_name, username, country, university, field_of_study, interests, onboarding_completed"
+        "id, full_name, username, profile_type, country, university, field_of_study, interests, onboarding_completed"
       )
       .limit(10000);
 
@@ -60,11 +56,11 @@ export async function sendProfileCompletionReminders() {
       const result = await sendUserEmail({
         recipientId: profile.id,
         subject: "Finish setting up your Indegenius profile",
-        preview: "Complete your profile so readers can trust your work.",
-        title: "Finish your Indegenius profile",
+        preview: "Complete your profile and begin building your Intellectual Record.",
+        title: "Build your intellectual identity.",
         intro:
-          "Your profile is almost ready. Add the missing details so your posts, comments, and opportunity signals carry a credible academic identity.",
-        ctaLabel: "Complete profile",
+          "Your profile is almost ready. Add the missing details, then publish or respond to begin an evidence-backed record of what you think and contribute.",
+        ctaLabel: "Start your Intellectual Record",
         ctaPath: "/onboarding",
         preferenceKey: "email_profile_reminders",
         idempotencyKey: `profile-reminder:${reminderKey}:${profile.id}`,

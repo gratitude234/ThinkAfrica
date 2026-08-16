@@ -28,12 +28,12 @@ export default function WelcomeBanner({ firstName, primaryLabel }: WelcomeBanner
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-display text-xl font-semibold text-white">
-            Welcome to Indegenius, {firstName}.
+            Your intellectual identity starts here, {firstName}.
           </h2>
           <p className="mt-1.5 text-sm leading-relaxed text-white/80">
             {primaryLabel
-              ? `Your ${primaryLabel} profile is ready. We're building your feed now.`
-              : "Your profile is ready. We're building your feed now."}
+              ? `Your ${primaryLabel} profile is ready. Your first published contribution will begin your Intellectual Record.`
+              : "Your profile is ready. Your first published contribution will begin your Intellectual Record."}
           </p>
         </div>
         <button

@@ -30,11 +30,21 @@ export interface ActivationState {
   nextTask: ActivationTask | null;
 }
 
+export type ProfileCompletionSnapshot = {
+  full_name?: unknown;
+  username?: unknown;
+  profile_type?: unknown;
+  country?: unknown;
+  university?: unknown;
+  field_of_study?: unknown;
+  interests?: unknown;
+};
+
 function hasText(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function isProfileComplete(profile: Record<string, unknown> | null) {
+export function isProfileComplete(profile: ProfileCompletionSnapshot | null) {
   const interests = profile?.interests;
   const rawProfileType =
     typeof profile?.profile_type === "string" ? profile.profile_type : null;
@@ -179,31 +189,31 @@ export async function getActivationState(
   const tasks: ActivationTask[] = [
     {
       key: "profile",
-      label: "Complete profile",
-      description: "Add the essentials that help readers understand who you are and what you follow.",
+      label: "Complete your intellectual profile",
+      description: "Add context that helps readers understand the person behind the work.",
       href: "/settings",
       done: profileComplete,
     },
     {
       key: "follow",
-      label: "Follow 3 relevant writers",
+      label: "Follow 3 people you want to read",
       description: `${Math.min(followCount, 3)} of 3 followed. This makes your feed useful from day one.`,
       href: "/onboarding?step=follow",
       done: followCount >= 3,
     },
     {
       key: "read",
-      label: "Read or respond to something relevant",
-      description: "Open, save, or discuss a few posts so Indegenius can learn what matters to you.",
+      label: "Read or respond to a relevant idea",
+      description: "Open, save, or respond so Indegenius can learn what matters to you.",
       href: "/?tab=latest",
       done: hasMeaningfulEngagement,
     },
     {
       key: "start",
-      label: "Share a quick post",
+      label: "Start your first contribution",
       description: firstContributionLabel
         ? `${firstContributionLabel}. Keep shaping it into a public idea.`
-        : "Turn one clear point from class, campus, or the news into a short post.",
+        : "Turn one clear idea from your studies, work, community, or the news into a Post.",
       href: "/create/post",
       done: firstContributionStarted,
     },

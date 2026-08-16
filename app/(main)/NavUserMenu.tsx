@@ -13,58 +13,20 @@ interface NavUserMenuProps {
     username: string;
     full_name: string | null;
     avatar_url?: string | null;
-    points?: number;
     role?: "student" | "reviewer" | "editor" | "admin";
   } | null;
-  points: number;
   isAdmin?: boolean;
   canAccessReview?: boolean;
-}
-
-function getTier(
-  points: number
-): { label: string; color: string; ring: string } {
-  if (points >= 500) {
-    return {
-      label: "Platinum",
-      color: "text-purple-600",
-      ring: "ring-purple-400",
-    };
-  }
-
-  if (points >= 200) {
-    return {
-      label: "Gold",
-      color: "text-amber-500",
-      ring: "ring-amber-400",
-    };
-  }
-
-  if (points >= 50) {
-    return {
-      label: "Silver",
-      color: "text-gray-400",
-      ring: "ring-gray-300",
-    };
-  }
-
-  return {
-    label: "Bronze",
-    color: "text-orange-500",
-    ring: "ring-orange-300",
-  };
 }
 
 export default function NavUserMenu({
   user,
   profile,
-  points,
   isAdmin,
   canAccessReview,
 }: NavUserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const tier = getTier(points);
   const displayName =
     profile?.full_name ?? user?.email?.split("@")[0] ?? "Account";
   const profileUsername = getUsableProfileUsername(profile?.username ?? null);
@@ -133,8 +95,8 @@ export default function NavUserMenu({
             <p className="text-sm font-semibold text-gray-900 truncate">
               {displayName}
             </p>
-            <span className={`text-xs font-semibold ${tier.color}`}>
-              {tier.label} · {points} pts
+            <span className="text-xs font-medium text-emerald-700">
+              Intellectual Record
             </span>
           </div>
           {profile && (
@@ -156,7 +118,7 @@ export default function NavUserMenu({
                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                 />
               </svg>
-              Profile
+              Intellectual Record
             </Link>
           )}
           <Link
@@ -177,7 +139,7 @@ export default function NavUserMenu({
                 d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
               />
             </svg>
-            Dashboard
+            Writing dashboard
           </Link>
           {canAccessReview ? (
             <Link

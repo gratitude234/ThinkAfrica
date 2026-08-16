@@ -72,7 +72,7 @@ export default function ResetPasswordPage() {
       title="Set a new password."
       subtitle="Choose a password you have not used before. You will return to sign in when the update is complete."
       proofItems={PROOF_ITEMS}
-      quote="A credible academic profile needs a login flow that feels calm, clear, and secure."
+      quote="Your work should be easy for you to return to and hard for anyone else to access."
       quoteSource="Indegenius account standard"
       footer={
         <>

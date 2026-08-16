@@ -119,7 +119,7 @@ export default function CreateLauncher({
               ? "calc(112px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))"
               : "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
           }}
-          aria-label={isNavigating ? "Opening the composer" : "Start writing"}
+          aria-label={isNavigating ? "Opening the composer" : "Publish a contribution"}
           disabled={isNavigating}
           aria-busy={isNavigating || undefined}
         >
@@ -149,7 +149,7 @@ export default function CreateLauncher({
         ) : (
           <PlusIcon className="h-3.5 w-3.5" />
         )}
-        Create
+        Publish
       </button>
     </div>
   );

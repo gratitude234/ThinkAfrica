@@ -14,13 +14,15 @@ import { createClient } from "@/lib/supabase/client";
 import { useResendCooldown } from "../useResendCooldown";
 import {
   resendSignupConfirmationEmail,
+  sendWelcomeEmail,
   sendSignupConfirmationEmail,
 } from "../accountEmailActions";
+import { BRAND_PROMISE } from "@/lib/brand";
 
 const PROOF_ITEMS = [
-  "Claim a trusted student byline",
-  "Publish quick takes and long-form work",
-  "Follow people, topics, and debates",
+  "Build a public record of your ideas",
+  "Publish Posts, Articles, and Research",
+  "Respond, debate, and collaborate",
 ];
 
 type VerificationType = "signup" | "magiclink";
@@ -189,10 +191,19 @@ export default function SignupPage() {
       type: verificationType,
     });
 
-    setVerifyLoading(false);
     if (verifyError) {
+      setVerifyLoading(false);
       setResendError(formatAuthError(verifyError.message));
       return;
+    }
+
+    try {
+      await sendWelcomeEmail({
+        email: form.email.trim(),
+        fullName: form.fullName,
+      });
+    } catch (welcomeEmailError) {
+      console.error("Welcome email failed", welcomeEmailError);
     }
 
     window.location.href = "/onboarding";
@@ -208,11 +219,11 @@ export default function SignupPage() {
   return (
     <AuthShell
       eyebrow="Create your profile"
-      title="Join Africa's student intellectual network."
-      subtitle="Start with your name and email. Next, pick your role, interests, and a few optional follows."
+      title={BRAND_PROMISE}
+      subtitle="Start with your name and email. Next, choose your role, topics, and people to follow."
       proofItems={PROOF_ITEMS}
-      quote="Turn your strongest campus ideas into work other students can read, cite, and respond to."
-      quoteSource="Indegenius onboarding promise"
+      quote="Turn what you think, write, argue, and research into a record others can explore."
+      quoteSource="The Indegenius promise"
       footer={
         <>
           Already have an account?{" "}
@@ -314,7 +325,7 @@ export default function SignupPage() {
             required
             autoComplete="email"
             inputMode="email"
-            placeholder="you@university.edu"
+            placeholder="you@example.com"
             className={INPUT_STYLES}
           />
         </div>

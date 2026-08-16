@@ -20,7 +20,7 @@ export interface GuestAuthCopy {
 }
 
 const GENERIC_DESCRIPTION =
-  "Join Indegenius to take part in Africa's intellectual social network.";
+  "Join Indegenius to publish ideas and build your Intellectual Record.";
 
 export function getGuestAuthCopy(
   intent: GuestAuthIntent,

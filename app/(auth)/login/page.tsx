@@ -20,7 +20,7 @@ import { resendSignupConfirmationEmail } from "../accountEmailActions";
 const PROOF_ITEMS = [
   "Return to drafts and saved reading",
   "Keep debates and replies in context",
-  "Build one credible academic profile",
+  "Keep building your Intellectual Record",
 ];
 
 type VerificationType = "signup" | "magiclink";
@@ -49,7 +49,7 @@ function LoginForm() {
   const isWritingRedirect = redirectTo.startsWith("/write");
   const introCopy = isWritingRedirect
     ? "Sign in to start your draft and keep autosave tied to your profile."
-    : "Sign in to continue reading, responding, and building your profile.";
+    : "Sign in to keep reading, responding, and building your Intellectual Record.";
   const signupHref =
     redirectTo === "/" ? "/signup" : `/signup?redirectTo=${encodeURIComponent(redirectTo)}`;
 
@@ -143,7 +143,7 @@ function LoginForm() {
   return (
     <AuthShell
       eyebrow="Welcome back"
-      title="Pick up where your ideas left off."
+      title="Continue building your Intellectual Record."
       subtitle={introCopy}
       proofItems={PROOF_ITEMS}
       quote="Serious ideas deserve a place where readers can find, test, and build on them."
@@ -206,7 +206,7 @@ function LoginForm() {
             required
             autoComplete="email"
             inputMode="email"
-            placeholder="you@university.edu"
+            placeholder="you@example.com"
             className={INPUT_STYLES}
           />
         </div>

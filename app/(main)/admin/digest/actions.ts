@@ -5,7 +5,6 @@ import {
   recordAdminAuditEvent,
 } from "@/lib/adminAccess";
 import { absoluteUrl, escapeHtml, logEmailResult, sendUserEmail } from "@/lib/email";
-import { POST_POINTS, type PostType } from "@/lib/utils";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 
 type AdminClient = Awaited<ReturnType<typeof createAdminActionClient>>["admin"];
@@ -13,6 +12,10 @@ type AdminClient = Awaited<ReturnType<typeof createAdminActionClient>>["admin"];
 type DigestProfileRow = {
   id: string;
   notification_prefs: unknown;
+  campus_cohort_memberships:
+    | { cohort_id: string }[]
+    | { cohort_id: string }
+    | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -32,15 +35,15 @@ function formatDigestDate(value: string | null) {
   }).format(new Date(value));
 }
 
-async function getDigestRecipientIds(admin: AdminClient) {
-  const recipientIds: string[] = [];
+async function getDigestRecipients(admin: AdminClient) {
+  const recipients: DigestProfileRow[] = [];
   const pageSize = 1000;
   let from = 0;
 
   while (true) {
     const { data, error } = await admin
       .from("profiles")
-      .select("id, notification_prefs")
+      .select("id, notification_prefs, campus_cohort_memberships(cohort_id)")
       .range(from, from + pageSize - 1);
 
     if (error) {
@@ -48,17 +51,16 @@ async function getDigestRecipientIds(admin: AdminClient) {
     }
 
     const rows = (data ?? []) as DigestProfileRow[];
-    recipientIds.push(
+    recipients.push(
       ...rows
         .filter((profile) => wantsDigestEmail(profile.notification_prefs))
-        .map((profile) => profile.id)
     );
 
     if (rows.length < pageSize) break;
     from += pageSize;
   }
 
-  return recipientIds;
+  return recipients;
 }
 
 async function buildWeeklyDigest(admin: AdminClient) {
@@ -68,7 +70,7 @@ async function buildWeeklyDigest(admin: AdminClient) {
     { data: topPosts },
     { data: topDebateRaw },
     { data: openFellowships },
-    { data: weeklyPostsForContrib },
+    { data: campusPromptsRaw },
   ] = await Promise.all([
     admin
       .from("posts")
@@ -92,11 +94,31 @@ async function buildWeeklyDigest(admin: AdminClient) {
       .limit(3),
 
     admin
-      .from("posts")
-      .select("author_id, type, profiles!posts_author_id_fkey(full_name, username)")
-      .eq("status", "published")
-      .gte("published_at", weekAgo),
+      .from("campus_editorial_prompts")
+      .select(
+        "id, cohort_id, title, prompt_text, response_question, campus_cohorts!inner(status)"
+      )
+      .eq("active", true)
+      .lte("starts_at", new Date().toISOString())
+      .or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`)
+      .in("campus_cohorts.status", ["selected", "active"])
+      .order("starts_at", { ascending: false }),
+
   ]);
+
+  const campusPrompts = new Map<
+    string,
+    { id: string; title: string; promptText: string; responseQuestion: string | null }
+  >();
+  for (const prompt of campusPromptsRaw ?? []) {
+    if (campusPrompts.has(prompt.cohort_id)) continue;
+    campusPrompts.set(prompt.cohort_id, {
+      id: prompt.id,
+      title: prompt.title,
+      promptText: prompt.prompt_text,
+      responseQuestion: prompt.response_question,
+    });
+  }
 
   const posts = (topPosts ?? []).map((post) => ({
     ...post,
@@ -112,17 +134,6 @@ async function buildWeeklyDigest(admin: AdminClient) {
           : (debate.debate_arguments as { count: number } | null)?.count ?? 0,
       }))
       .sort((left, right) => right.argCount - left.argCount)[0] ?? null;
-
-  const contribMap: Record<string, { full_name: string; username: string; pts: number }> = {};
-  for (const post of weeklyPostsForContrib ?? []) {
-    const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
-    if (!profile) continue;
-    if (!contribMap[post.author_id]) {
-      contribMap[post.author_id] = { ...profile, pts: 0 };
-    }
-    contribMap[post.author_id].pts += POST_POINTS[post.type as PostType] ?? 10;
-  }
-  const topContrib = Object.values(contribMap).sort((a, b) => b.pts - a.pts)[0] ?? null;
 
   const postItems =
     posts.length > 0
@@ -140,7 +151,7 @@ async function buildWeeklyDigest(admin: AdminClient) {
               )}</span></li>`
           )
           .join("")
-      : `<li style="margin:0;color:#6b7280;">No new top posts this week.</li>`;
+      : `<li style="margin:0;color:#6b7280;">No new publications this week.</li>`;
 
   const fellowshipItems =
     (openFellowships ?? []).length > 0
@@ -169,9 +180,9 @@ async function buildWeeklyDigest(admin: AdminClient) {
       : `<li style="margin:0;color:#6b7280;">No open fellowships this week.</li>`;
 
   const bodyHtml = `
-    <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Top posts this week</h2>
+    <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Publications worth reading</h2>
     <ul style="margin:0 0 18px;padding-left:20px;font-size:14px;line-height:1.6;color:#374151;">${postItems}</ul>
-    <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Top debate</h2>
+    <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Featured debate</h2>
     <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#374151;">${
       topDebate
         ? `<a href="${escapeHtml(
@@ -181,39 +192,55 @@ async function buildWeeklyDigest(admin: AdminClient) {
           )}</a><br><span style="color:#6b7280;font-size:13px;">${topDebate.argCount} arguments - ${escapeHtml(
             topDebate.status
           )}</span>`
-        : "No debates this week."
+        : "No debate to feature right now."
     }</p>
     <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Open fellowships</h2>
     <ul style="margin:0 0 18px;padding-left:20px;font-size:14px;line-height:1.6;color:#374151;">${fellowshipItems}</ul>
-    ${
-      topContrib
-        ? `<h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Top contributor</h2><p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#374151;"><strong>${escapeHtml(
-            topContrib.full_name ?? topContrib.username
-          )}</strong><br><span style="color:#6b7280;font-size:13px;">${topContrib.pts} pts this week</span></p>`
-        : ""
-    }
   `;
 
   const bodyTextLines = [
-    "Top posts:",
+    "Publications worth reading:",
     ...posts.map(
       (post) =>
         `- ${getPostMetadataTitle(post, post.profiles)} (${post.view_count ?? 0} views): ${absoluteUrl(`/post/${post.slug}`)}`
     ),
     "",
     topDebate
-      ? `Top debate: ${topDebate.title} (${topDebate.argCount} arguments): ${absoluteUrl(`/debates/${topDebate.id}`)}`
-      : "Top debate: No debates this week.",
+      ? `Featured debate: ${topDebate.title} (${topDebate.argCount} arguments): ${absoluteUrl(`/debates/${topDebate.id}`)}`
+      : "Featured debate: No debate to feature right now.",
     "",
     "Open fellowships:",
     ...(openFellowships ?? []).map(
       (fellowship) =>
         `- ${fellowship.title}: ${absoluteUrl(`/fellowships/${fellowship.id}`)}`
     ),
-    topContrib ? `Top contributor: ${topContrib.full_name ?? topContrib.username}` : "",
   ].filter(Boolean);
 
-  return { bodyHtml, bodyTextLines };
+  return { bodyHtml, bodyTextLines, campusPrompts };
+}
+
+function campusPromptDigest(
+  prompt:
+    | { id: string; title: string; promptText: string; responseQuestion: string | null }
+    | null
+) {
+  if (!prompt) return { html: "", text: [] as string[] };
+  const promptUrl = absoluteUrl(`/create/post?prompt=${encodeURIComponent(prompt.id)}`);
+  return {
+    html: `
+      <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Your campus prompt</h2>
+      <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#374151;"><strong>${escapeHtml(prompt.title)}</strong><br>${escapeHtml(prompt.promptText)}</p>
+      ${prompt.responseQuestion ? `<p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#6b7280;">Response question: ${escapeHtml(prompt.responseQuestion)}</p>` : ""}
+      <p style="margin:0 0 18px;"><a href="${escapeHtml(promptUrl)}" style="color:#047857;font-weight:700;text-decoration:none;">Write from this prompt</a></p>
+    `,
+    text: [
+      "Your campus prompt:",
+      `${prompt.title}: ${prompt.promptText}`,
+      ...(prompt.responseQuestion ? [`Response question: ${prompt.responseQuestion}`] : []),
+      promptUrl,
+      "",
+    ],
+  };
 }
 
 export async function recordDigestPreviewReviewed() {
@@ -242,7 +269,7 @@ export async function recordDigestPreviewReviewed() {
 export async function sendWeeklyDigestEmails() {
   try {
     const { admin, context } = await createAdminActionClient("digest.manage");
-    const recipientIds = await getDigestRecipientIds(admin);
+    const recipients = await getDigestRecipients(admin);
     const digest = await buildWeeklyDigest(admin);
     const digestKey = new Date().toISOString().slice(0, 10);
 
@@ -250,23 +277,34 @@ export async function sendWeeklyDigestEmails() {
     let skipped = 0;
     let failed = 0;
 
-    for (const recipientId of recipientIds) {
+    for (const recipient of recipients) {
+      const memberships = Array.isArray(recipient.campus_cohort_memberships)
+        ? recipient.campus_cohort_memberships
+        : recipient.campus_cohort_memberships
+          ? [recipient.campus_cohort_memberships]
+          : [];
+      const campusPrompt = memberships
+        .map((membership) => digest.campusPrompts.get(membership.cohort_id))
+        .find((prompt) => Boolean(prompt)) ?? null;
+      const campusSection = campusPromptDigest(
+        campusPrompt
+      );
       const result = await sendUserEmail({
-        recipientId,
+        recipientId: recipient.id,
         subject: "This week on Indegenius",
-        preview: "Top posts, debates, fellowships, and contributors from Indegenius.",
+        preview: "New publications, debates, and opportunities from Indegenius.",
         title: "This week on Indegenius",
         intro:
-          "Here is a short editorial digest of activity worth following across Indegenius this week.",
-        bodyHtml: digest.bodyHtml,
-        bodyTextLines: digest.bodyTextLines,
+          "Here are ideas and conversations worth returning to this week.",
+        bodyHtml: `${campusSection.html}${digest.bodyHtml}`,
+        bodyTextLines: [...campusSection.text, ...digest.bodyTextLines],
         ctaLabel: "Open Indegenius",
         ctaPath: "/",
         preferenceKey: "email_digest",
-        idempotencyKey: `weekly-digest:${digestKey}:${recipientId}`,
+        idempotencyKey: `weekly-digest:${digestKey}:${recipient.id}`,
       });
 
-      logEmailResult(`weekly_digest:${recipientId}`, result);
+      logEmailResult(`weekly_digest:${recipient.id}`, result);
       if ("ok" in result && result.ok) sent += 1;
       else if ("skipped" in result) skipped += 1;
       else failed += 1;
@@ -282,7 +320,7 @@ export async function sendWeeklyDigestEmails() {
         sent,
         skipped,
         failed,
-        total: recipientIds.length,
+        total: recipients.length,
         source: "admin_digest_button",
       },
     });
@@ -292,7 +330,7 @@ export async function sendWeeklyDigestEmails() {
       sent,
       skipped,
       failed,
-      total: recipientIds.length,
+      total: recipients.length,
     };
   } catch (error) {
     return {

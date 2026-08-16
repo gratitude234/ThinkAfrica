@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import UserAvatar from "@/components/ui/UserAvatar";
 import {
@@ -12,6 +13,14 @@ import {
   type TalentDiscoverySignal,
 } from "@/lib/talentDiscovery";
 import { createClient } from "@/lib/supabase/server";
+import { canonicalPath } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Discover Contributors and Emerging Thinkers",
+  description:
+    "Discover Indegenius contributors through their public work, skills, interests, and opportunity readiness.",
+  alternates: { canonical: canonicalPath("/talent") },
+};
 
 interface PageProps {
   searchParams: Promise<{
@@ -207,7 +216,7 @@ export default async function TalentPage({ searchParams }: PageProps) {
         <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Discover credible student talent
+              Discover credible emerging talent
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-500">
               Filter by fit, proof, and readiness, then send structured outreach
@@ -332,7 +341,7 @@ export default async function TalentPage({ searchParams }: PageProps) {
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-14 text-center">
           <p className="font-medium text-gray-900">No talent profiles match these filters.</p>
           <p className="mt-1 text-sm text-gray-500">
-            Broaden the criteria or check back as more students make their
+            Broaden the criteria or check back as more contributors make their
             opportunity profile discoverable.
           </p>
         </div>
@@ -343,7 +352,7 @@ export default async function TalentPage({ searchParams }: PageProps) {
             const profileHref = profile?.username
               ? `/${profile.username}?tab=opportunities`
               : "#";
-            const displayName = profile?.full_name ?? profile?.username ?? "Student profile";
+            const displayName = profile?.full_name ?? profile?.username ?? "Contributor profile";
             return (
               <Link
                 key={talent.id}
@@ -364,7 +373,7 @@ export default async function TalentPage({ searchParams }: PageProps) {
                     <p className="mt-0.5 truncate text-xs text-gray-500">
                       {[profile?.field_of_study, profile?.university]
                         .filter(Boolean)
-                        .join(" / ") || "Academic profile"}
+                        .join(" / ") || "Contributor profile"}
                     </p>
                     {profile?.country ? (
                       <p className="mt-0.5 text-xs text-gray-400">{profile.country}</p>

@@ -129,7 +129,7 @@ export async function assignReviewer(postId: string, reviewerId: string, round: 
         subject: "Your Indegenius submission is under review",
         preview: `"${post.title}" is now under review.`,
         title: "Your submission is under review",
-        intro: `Your submission "${post.title}" is now under review. You'll typically hear back within about a week.`,
+        intro: `Your submission "${post.title}" is now under review. We'll notify you when an editor records a decision or requests a revision.`,
         ctaLabel: "View submission",
         ctaPath: `/post/${post.slug}`,
         idempotencyKey: `review-started:${postId}:${round}`,

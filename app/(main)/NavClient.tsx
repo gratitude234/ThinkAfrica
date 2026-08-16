@@ -14,6 +14,7 @@ import { NAV_MATCH_PREFIXES, isNavItemActive } from "./navItems";
 import { useHasScrolled } from "@/lib/useHasScrolled";
 import { useAppChrome } from "./AppChromeProvider";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { BRAND_TAGLINE } from "@/lib/brand";
 
 interface NavClientProps {
   user: User | null;
@@ -21,7 +22,6 @@ interface NavClientProps {
     username: string;
     full_name: string | null;
     avatar_url?: string | null;
-    points?: number;
     role?: "student" | "reviewer" | "editor" | "admin";
   } | null;
   isAdmin: boolean;
@@ -79,10 +79,11 @@ export default function NavClient({
 
   const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
   const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
+  const isCampusActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.campus);
   const isDebatesActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates);
-  const isOpportunitiesActive = isNavItemActive(
+  const isResponsesActive = isNavItemActive(
     pathname,
-    NAV_MATCH_PREFIXES.opportunities
+    NAV_MATCH_PREFIXES.responses
   );
   const isWriteActive = pathname.startsWith("/write");
   const showMobilePrimaryNav = shouldShowMobilePrimaryNav(pathname);
@@ -97,7 +98,7 @@ export default function NavClient({
           vertical space on every screen and every scroll. */}
       <div className="bg-emerald-brand py-1.5 text-center">
         <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold sm:text-[10.5px]">
-          Africa&apos;s intellectual social network
+          {BRAND_TAGLINE}
         </span>
       </div>
       {/* Retreats off the top on a downward scroll and comes back the moment
@@ -143,14 +144,28 @@ export default function NavClient({
                 className={navItemClass(isHomeActive)}
                 aria-current={isHomeActive ? "page" : undefined}
               >
-                Home
+                For you
               </Link>
               <Link
                 href="/explore"
                 className={navItemClass(isExploreActive)}
                 aria-current={isExploreActive ? "page" : undefined}
               >
-                Explore
+                Discover
+              </Link>
+              <Link
+                href="/responses"
+                className={navItemClass(isResponsesActive)}
+                aria-current={isResponsesActive ? "page" : undefined}
+              >
+                Responses
+              </Link>
+              <Link
+                href="/campus"
+                className={navItemClass(isCampusActive)}
+                aria-current={isCampusActive ? "page" : undefined}
+              >
+                Campus
               </Link>
               {FEATURE_FLAGS.debates ? (
                 <Link
@@ -161,13 +176,6 @@ export default function NavClient({
                   Debates
                 </Link>
               ) : null}
-              <Link
-                href="/opportunities"
-                className={navItemClass(isOpportunitiesActive)}
-                aria-current={isOpportunitiesActive ? "page" : undefined}
-              >
-                Opportunities
-              </Link>
             </div>
 
             <button
@@ -192,7 +200,7 @@ export default function NavClient({
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
-              <span className="truncate">Search posts, articles, research, writers…</span>
+              <span className="truncate">Search ideas, topics, and people…</span>
             </button>
           </div>
 
@@ -219,7 +227,6 @@ export default function NavClient({
               <NavUserMenu
                 user={user}
                 profile={profile}
-                points={profile?.points ?? 0}
                 isAdmin={isAdmin}
                 canAccessReview={canAccessReview}
               />

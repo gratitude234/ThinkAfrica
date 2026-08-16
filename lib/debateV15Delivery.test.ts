@@ -103,6 +103,7 @@ describe("Debate V1.5 delivery", () => {
       expect(content.email.bodyTextLines.join(" ")).toContain(
         common.debateTitle
       );
+      expect(JSON.stringify(content)).not.toContain("V1.5");
     }
   );
 

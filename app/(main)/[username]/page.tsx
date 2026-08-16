@@ -25,6 +25,8 @@ import { createClient } from "@/lib/supabase/server";
 import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
 import { isFormallyReviewed } from "@/lib/contentModel";
 import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
+import { getEngagementCounts } from "@/lib/dailyBrief";
+import { getIntellectualRecordSummary } from "@/lib/intellectualRecord";
 
 interface PageProps {
   params: Promise<{ username: string }>;
@@ -53,6 +55,7 @@ interface ProfileRecord {
   verified: boolean;
   verified_type: string | null;
   interests: string[] | null;
+  profile_type: string | null;
   created_at: string;
 }
 
@@ -109,15 +112,15 @@ type PortfolioPost = ProfilePost & {
 };
 
 interface PortfolioSummaryStats {
+  contributionCount: number;
   publishedCount: number;
+  responseCount: number;
+  sourceBackedCount: number;
   citableCount: number;
   reviewedCount: number;
   coAuthoredCount: number;
   debateContributionCount: number;
-  recognitionCount: number;
-  readiness: OpportunityReadinessSummary;
-  isOpenToOpportunities: boolean;
-  opportunityVisible: boolean;
+  qualityLabelledCount: number;
 }
 
 interface TopArgumentRecord {
@@ -126,6 +129,7 @@ interface TopArgumentRecord {
   stance: string | null;
   upvotes: number | null;
   round_number: number | null;
+  created_at: string;
   debate_id: string;
   debates: {
     id: string;
@@ -189,31 +193,29 @@ function PortfolioSummary({
 }) {
   const tiles = [
     {
-      label: "Published work",
+      label: "Contributions",
+      value: stats.contributionCount.toLocaleString(),
+      detail: "Published work and public debate arguments",
+    },
+    {
+      label: "Published ideas",
       value: stats.publishedCount.toLocaleString(),
-      detail: "Public pieces attached to this profile",
+      detail: "Posts, Articles, Research, and Responses",
     },
     {
-      label: "Citable / reviewed",
-      value: `${stats.citableCount.toLocaleString()} / ${stats.reviewedCount.toLocaleString()}`,
-      detail: "Archived citations and high-signal formats",
+      label: "Linked responses",
+      value: stats.responseCount.toLocaleString(),
+      detail: "Contributions connected directly to another idea",
     },
     {
-      label: "Debate contributions",
+      label: "Quality-labelled",
+      value: stats.qualityLabelledCount.toLocaleString(),
+      detail: `${stats.sourceBackedCount.toLocaleString()} source-backed / ${stats.reviewedCount.toLocaleString()} reviewed / ${stats.citableCount.toLocaleString()} citable`,
+    },
+    {
+      label: "Debate arguments",
       value: stats.debateContributionCount.toLocaleString(),
-      detail: "Arguments contributed in public debates",
-    },
-    {
-      label: "Recognition",
-      value: stats.recognitionCount.toLocaleString(),
-      detail: "Badges and verified academic identity",
-    },
-    {
-      label: "Opportunity readiness",
-      value: `${stats.readiness.score}%`,
-      detail: stats.isOpenToOpportunities
-        ? stats.readiness.statusLabel
-        : "Not currently open to opportunities",
+      detail: "Arguments contributed to public debates",
     },
   ];
 
@@ -222,31 +224,31 @@ function PortfolioSummary({
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-            Portfolio summary
+            Intellectual Record
           </p>
           <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
-            Proof for selectors and collaborators
+            The record at a glance
           </h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
-            A quick read on this profile&apos;s academic output, recognition, and opportunity signal.
+            Every count below is tied to a public contribution or inspectable quality signal.
           </p>
         </div>
 
-        {isOwnProfile && stats.readiness.nextAction ? (
+        {isOwnProfile ? (
           <Link
-            href={stats.readiness.nextAction.actionHref}
+            href="/create/post"
             className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100"
           >
-            {stats.readiness.nextAction.actionLabel}
+            Add contribution
           </Link>
-        ) : stats.opportunityVisible ? (
+        ) : (
           <Link
-            href={`/${profileUsername}#featured-work`}
+            href={`/${profileUsername}#intellectual-record`}
             className="text-sm font-semibold text-emerald-brand transition-colors hover:text-emerald-700"
           >
-            Review portfolio
+            Browse the full record
           </Link>
-        ) : null}
+        )}
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -284,13 +286,13 @@ function CredibilityPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-            Academic signal
+            Contribution quality
           </p>
           <h2 className="font-display mt-1 text-lg font-semibold text-gray-900">
-            {summary.strongestSignal ?? "Building academic signal"}
+            {summary.strongestSignal ?? "Building a credible record"}
           </h2>
           <p className="mt-1 text-sm leading-6 text-gray-500">
-            Based on public work, academic identity, verification, and portfolio readiness.
+            Based on published work, attached evidence, completed review, and collaboration records.
           </p>
         </div>
         {isOwnProfile ? (
@@ -315,7 +317,7 @@ function CredibilityPanel({
         </div>
       ) : (
         <p className="mt-4 rounded-xl border border-dashed border-gray-200 bg-canvas px-4 py-3 text-sm text-gray-500">
-          More credibility signals will appear as this profile publishes, verifies identity, and features work.
+          Quality signals will appear as this profile publishes source-backed, reviewed, citable, or co-authored work.
         </p>
       )}
     </section>
@@ -334,7 +336,7 @@ function ProfileCompletionPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-            Complete your academic profile
+            Complete your intellectual profile
           </p>
           <h2 className="mt-1 text-base font-semibold text-gray-900">
             {summary.profileCompletionScore}% profile credibility
@@ -404,9 +406,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description = profile.bio
     ? clampText(profile.bio, 155)
     : clampText(
-        `${displayName}, ${profile.field_of_study ?? "student"} at ${
-          profile.university ?? "their university"
-        }. ${(postCount ?? 0).toLocaleString()} published works on Indegenius.`,
+        `View ${displayName}'s Intellectual Record, including ${(postCount ?? 0).toLocaleString()} published contributions, on Indegenius.`,
         155
       );
   const image = profile.avatar_url ?? "/logo.png";
@@ -436,7 +436,7 @@ export default async function UserProfilePage({ params }: PageProps) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, username, full_name, country, university, field_of_study, graduation_year, is_alumni, bio, avatar_url, points, cover_image_url, verified, verified_type, interests, created_at"
+      "id, username, full_name, country, university, field_of_study, graduation_year, is_alumni, bio, avatar_url, points, cover_image_url, verified, verified_type, interests, profile_type, created_at"
     )
     .eq("username", username)
     .single<ProfileRecord>();
@@ -502,11 +502,11 @@ export default async function UserProfilePage({ params }: PageProps) {
     supabase
       .from("debate_arguments")
       .select(
-        "id, content, stance, upvotes, round_number, debate_id, debates!debate_arguments_debate_id_fkey(id, title, status)"
+        "id, content, stance, upvotes, round_number, created_at, debate_id, debates!debate_arguments_debate_id_fkey(id, title, status)"
       )
       .eq("author_id", profile.id)
-      .order("upvotes", { ascending: false })
-      .limit(3),
+      .order("created_at", { ascending: false })
+      .limit(50),
     supabase
       .from("profile_featured_posts")
       .select("post_id, position")
@@ -608,21 +608,28 @@ export default async function UserProfilePage({ params }: PageProps) {
     })
     .filter((post): post is NonNullable<typeof post> => post !== null);
 
-  const mergedPosts = [
+  const mergedPostsBase = [
     ...normalizedPosts,
     ...normalizedCoAuthoredPosts.filter(
       (post) => !normalizedPosts.some((ownedPost) => ownedPost.id === post?.id)
     ),
   ] as PortfolioPost[];
 
-  const portfolioPostIds = mergedPosts.map((post) => post.id);
-  const { data: portfolioLikeCounts } =
+  const portfolioPostIds = mergedPostsBase.map((post) => post.id);
+  const [{ data: portfolioLikeCounts }, engagementCounts] = await Promise.all([
     portfolioPostIds.length > 0
-      ? await supabase
+      ? supabase
           .from("post_like_counts")
           .select("like_count")
           .in("post_id", portfolioPostIds)
-      : { data: [] };
+      : Promise.resolve({ data: [] }),
+    getEngagementCounts(supabase, portfolioPostIds),
+  ]);
+  const mergedPosts = mergedPostsBase.map((post) => ({
+    ...post,
+    reference_count: engagementCounts.referenceCounts[post.id] ?? 0,
+    response_count: engagementCounts.responseCounts[post.id] ?? 0,
+  }));
 
   const badges = (userBadges ?? [])
     .map((userBadge) =>
@@ -679,6 +686,13 @@ export default async function UserProfilePage({ params }: PageProps) {
         ? argument.debates[0]
         : argument.debates,
     }));
+  const topArgumentsForDisplay = [...normalizedTopArguments]
+    .sort(
+      (left, right) =>
+        (right.upvotes ?? 0) - (left.upvotes ?? 0) ||
+        new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+    )
+    .slice(0, 3);
 
   const opportunityVisible =
     !!talentProfile?.open_to_opportunities &&
@@ -754,16 +768,27 @@ export default async function UserProfilePage({ params }: PageProps) {
     (mergedPosts.length > 0 ||
       Boolean(talentProfile?.open_to_opportunities) ||
       Boolean(talentProfile));
+  const recordSummary = getIntellectualRecordSummary({
+    posts: mergedPosts.map((post) => ({
+      inResponseTo: post.in_response_to,
+      citationId: post.citation_id,
+      publishedVersionId: post.published_version_id,
+      referenceCount: post.reference_count,
+      coAuthorCount: post.co_authors?.length ?? 0,
+      isCoAuthor: post.isCoAuthor,
+    })),
+    debateContributionCount,
+  });
   const portfolioSummary: PortfolioSummaryStats = {
-    publishedCount: mergedPosts.length,
-    citableCount: citableWorkCount,
-    reviewedCount: reviewedWorkCount,
-    coAuthoredCount: coAuthoredWorkCount,
-    debateContributionCount: debateContributionCount ?? 0,
-    recognitionCount: badges.length + (profile.verified ? 1 : 0),
-    readiness: opportunityReadiness,
-    isOpenToOpportunities: Boolean(talentProfile?.open_to_opportunities),
-    opportunityVisible,
+    contributionCount: recordSummary.contributionCount,
+    publishedCount: recordSummary.publishedCount,
+    responseCount: recordSummary.responseCount,
+    sourceBackedCount: recordSummary.sourceBackedCount,
+    citableCount: recordSummary.citableCount,
+    reviewedCount: recordSummary.reviewedCount,
+    coAuthoredCount: recordSummary.coAuthoredCount,
+    debateContributionCount: recordSummary.debateContributionCount,
+    qualityLabelledCount: recordSummary.qualityLabelledCount,
   };
   const credibilitySummary = getProfileCredibilitySummary({
     profile,
@@ -773,6 +798,8 @@ export default async function UserProfilePage({ params }: PageProps) {
       reviewedCount: reviewedWorkCount,
       coAuthoredCount: coAuthoredWorkCount,
       debateContributionCount: debateContributionCount ?? 0,
+      sourceBackedCount: recordSummary.sourceBackedCount,
+      responseCount: recordSummary.responseCount,
       followerCount: followerCount ?? 0,
       badgeCount: badges.length,
       topicCount: topicStats.length,
@@ -808,6 +835,8 @@ export default async function UserProfilePage({ params }: PageProps) {
           citableCount: citableWorkCount,
           reviewedCount: reviewedWorkCount,
           coAuthoredCount: coAuthoredWorkCount,
+          responseCount: recordSummary.responseCount,
+          sourceBackedCount: recordSummary.sourceBackedCount,
           followerCount: followerCount ?? 0,
           followingCount: followingCount ?? 0,
           totalViews,
@@ -819,17 +848,21 @@ export default async function UserProfilePage({ params }: PageProps) {
         }}
       />
 
-      <ProfileContentTabs items={mergedPosts} isOwnProfile={isOwnProfile} />
-
-      <CredibilityPanel summary={credibilitySummary} isOwnProfile={isOwnProfile} />
-
-      {isOwnProfile ? <ProfileCompletionPanel summary={credibilitySummary} /> : null}
-
       <PortfolioSummary
         stats={portfolioSummary}
         profileUsername={profile.username}
         isOwnProfile={isOwnProfile}
       />
+
+      <ProfileContentTabs
+        items={mergedPosts}
+        debateContributions={normalizedTopArguments}
+        isOwnProfile={isOwnProfile}
+      />
+
+      <CredibilityPanel summary={credibilitySummary} isOwnProfile={isOwnProfile} />
+
+      {isOwnProfile ? <ProfileCompletionPanel summary={credibilitySummary} /> : null}
 
       <OpportunityBanner
         isOwnProfile={isOwnProfile}
@@ -894,7 +927,7 @@ export default async function UserProfilePage({ params }: PageProps) {
             />
           </div>
 
-          <TopArguments argumentsList={normalizedTopArguments} />
+          <TopArguments argumentsList={topArgumentsForDisplay} />
 
           {isOwnProfile ? (
             <section className="space-y-4">

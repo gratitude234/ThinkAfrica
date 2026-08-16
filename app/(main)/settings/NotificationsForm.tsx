@@ -96,7 +96,7 @@ const PUSH_ROWS: { key: keyof NotificationPrefs; label: string; description: str
   { key: "push_follows", label: "New followers", description: "Browser push when someone follows you" },
   { key: "push_daily_brief", label: "Daily brief", description: "One browser push a day with today's top post and live debate" },
   { key: "push_author_publications", label: "Subscribed author publications", description: "Browser push for Articles and Research from subscribed authors" },
-  { key: "push_debate_updates", label: "Debate updates", description: "Browser push for important Debate V1.5 invitations and lifecycle changes" },
+  { key: "push_debate_updates", label: "Debate updates", description: "Browser push for important debate invitations and lifecycle changes" },
 ];
 
 type PushState = "checking" | "unsupported" | "default" | "denied" | "active" | "unsubscribed";

@@ -1,20 +1,24 @@
 ﻿import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
+import { BRAND_PROMISE, BRAND_TAGLINE } from "@/lib/brand";
 
 export const runtime = "edge";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const title = searchParams.get("title") ?? "Indegenius";
+  const title = searchParams.get("title") ?? BRAND_PROMISE;
   const author = searchParams.get("author") ?? "";
   const university = searchParams.get("university") ?? "";
-  const type = searchParams.get("type") ?? "essay";
+  const type = searchParams.get("type") ?? "brand";
 
   const typeLabel: Record<string, string> = {
+    brand: BRAND_TAGLINE,
     research: "Research",
-    essay: "Essay",
-    policy_brief: "Policy Brief",
-    blog: "Blog",
+    article: "Article",
+    essay: "Article · Essay",
+    policy_brief: "Article · Policy Brief",
+    post: "Post",
+    blog: "Post",
   };
 
   return new ImageResponse(
@@ -45,7 +49,7 @@ export async function GET(request: NextRequest) {
               textTransform: "uppercase",
             }}
           >
-            {typeLabel[type] ?? "Essay"}
+            {typeLabel[type] ?? "Publication"}
           </div>
         </div>
 

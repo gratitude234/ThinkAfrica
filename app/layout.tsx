@@ -5,6 +5,11 @@ import "./globals.css";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
 import ServiceWorkerRegister from "@/components/push/ServiceWorkerRegister";
 import GuestAuthGateProvider from "@/components/ui/GuestAuthGateProvider";
+import {
+  BRAND_PROMISE,
+  BRAND_SEO_DESCRIPTION,
+  BRAND_TAGLINE,
+} from "@/lib/brand";
 
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
@@ -24,26 +29,31 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: SITE_NAME,
   title: {
-    default: "Indegenius - Africa's Intellectual Social Network",
+    default: `Indegenius - ${BRAND_PROMISE}`,
     template: "%s - Indegenius",
   },
-  description:
-    "Research, essays, and policy briefs from African university students.",
+  description: BRAND_SEO_DESCRIPTION,
+  keywords: [
+    "intellectual identity",
+    "ideas",
+    "publishing",
+    "research",
+    "debates",
+    "African intellectual network",
+  ],
   manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
-    title: "Indegenius - Africa's Intellectual Social Network",
-    description:
-      "Research, essays, and policy briefs from African university students.",
+    title: `Indegenius - ${BRAND_PROMISE}`,
+    description: BRAND_SEO_DESCRIPTION,
     url: SITE_URL,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Indegenius - Africa's Intellectual Social Network",
-    description:
-      "Research, essays, and policy briefs from African university students.",
+    title: `Indegenius - ${BRAND_PROMISE}`,
+    description: `${BRAND_SEO_DESCRIPTION} ${BRAND_TAGLINE}.`,
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
   icons: {

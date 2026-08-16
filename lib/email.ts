@@ -3,6 +3,7 @@ import "server-only";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SITE_URL } from "@/lib/site";
+import { BRAND_PROMISE, BRAND_TAGLINE } from "@/lib/brand";
 
 export type NotificationPreferenceKey =
   | "email_comments"
@@ -128,6 +129,8 @@ export function renderEmailShell(input: {
     ? `<p class="email-text" style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#374151;">${escapeHtml(input.intro)}</p>`
     : "";
   const footerNote = escapeHtml(input.footerNote ?? DEFAULT_FOOTER_NOTE);
+  const brandPromise = escapeHtml(BRAND_PROMISE);
+  const brandTagline = escapeHtml(BRAND_TAGLINE);
   const ctaHtml =
     input.ctaLabel && input.ctaHref
       ? `<div style="margin:28px 0 18px;">
@@ -166,6 +169,7 @@ export function renderEmailShell(input: {
             <tr>
               <td style="padding:22px 26px;border-bottom:1px solid #eef2f0;">
                 <div style="font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:20px;font-weight:700;color:#073929;">Indegenius</div>
+                <div class="email-muted" style="margin-top:4px;font-size:12px;line-height:1.5;color:#6b7280;">${brandPromise}</div>
               </td>
             </tr>
             <tr>
@@ -178,6 +182,7 @@ export function renderEmailShell(input: {
             </tr>
             <tr>
               <td class="email-footer" style="padding:18px 26px;background:#f9fafb;border-top:1px solid #eef2f0;font-size:12px;line-height:1.6;color:#6b7280;">
+                <div style="margin-bottom:5px;font-weight:600;color:#4b5563;">${brandTagline}</div>
                 ${footerNote}
               </td>
             </tr>
@@ -305,6 +310,9 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       ...(input.bodyTextLines ?? []),
       ...(input.ctaLabel && ctaHref ? ["", `${input.ctaLabel}: ${ctaHref}`] : []),
       "",
+      BRAND_PROMISE,
+      BRAND_TAGLINE,
+      "",
       input.footerNote ?? "Manage email preferences in Indegenius notification settings.",
     ].join("\n");
 
@@ -357,6 +365,9 @@ export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSen
     ...(input.intro ? [input.intro] : []),
     ...(input.bodyTextLines ?? []),
     ...(input.ctaLabel && ctaHref ? ["", `${input.ctaLabel}: ${ctaHref}`] : []),
+    "",
+    BRAND_PROMISE,
+    BRAND_TAGLINE,
     "",
     input.footerNote ?? "Manage email preferences in Indegenius notification settings.",
   ].join("\n");

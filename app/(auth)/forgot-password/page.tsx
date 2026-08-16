@@ -194,7 +194,7 @@ export default function ForgotPasswordPage() {
               required
               autoComplete="email"
               inputMode="email"
-              placeholder="you@university.edu"
+              placeholder="you@example.com"
               className={INPUT_STYLES}
             />
           </div>

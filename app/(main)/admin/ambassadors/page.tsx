@@ -27,7 +27,7 @@ export default async function AdminAmbassadorsPage() {
   const { data: applicationsRaw } = await supabase
     .from("campus_ambassadors")
     .select(`
-      id, university, status, referral_count, joined_at,
+      id, university, status, referral_count, joined_at, motivation, outreach_plan,
       profiles!campus_ambassadors_user_id_fkey (username, full_name, university, avatar_url)
     `)
     .order("joined_at", { ascending: true });
@@ -75,6 +75,18 @@ export default async function AdminAmbassadorsPage() {
                       <p className="text-xs text-gray-400 mt-0.5">
                         Applied {formatDate(app.joined_at)} · {app.referral_count} referrals
                       </p>
+                      {app.motivation ? (
+                        <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
+                          <span className="font-semibold text-gray-800">Motivation:</span>{" "}
+                          {app.motivation}
+                        </p>
+                      ) : null}
+                      {app.outreach_plan ? (
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
+                          <span className="font-semibold text-gray-800">Operating plan:</span>{" "}
+                          {app.outreach_plan}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">

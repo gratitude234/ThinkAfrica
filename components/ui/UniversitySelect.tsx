@@ -200,6 +200,7 @@ export default function UniversitySelect({
         disabled={disabled}
         autoComplete="off"
         role="combobox"
+        aria-label="University"
         aria-autocomplete="list"
         aria-expanded={open}
         aria-haspopup="listbox"

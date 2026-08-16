@@ -142,7 +142,7 @@ export function getOpportunityMatchSummary(
     score += 15;
     reasons.push({
       key: "profile",
-      label: "Matches your academic profile",
+      label: "Matches your profile",
       tone: "purple",
     });
   }

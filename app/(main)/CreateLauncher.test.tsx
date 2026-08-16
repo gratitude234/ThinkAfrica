@@ -23,16 +23,18 @@ describe("CreateLauncher -- direct-to-composer", () => {
   it("navigates the mobile FAB straight to the Post composer, with no chooser dialog", () => {
     render(<CreateLauncher userId="user-1" variant="mobileFab" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Start writing" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Publish a contribution" })
+    );
 
     expect(mocks.push).toHaveBeenCalledWith("/create/post");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("navigates the desktop Create button straight to the Post composer", () => {
+  it("navigates the desktop Publish button straight to the Post composer", () => {
     render(<CreateLauncher userId="user-1" variant="desktop" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
 
     expect(mocks.push).toHaveBeenCalledWith("/create/post");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -41,7 +43,9 @@ describe("CreateLauncher -- direct-to-composer", () => {
   it("opens the contextual sign-in gate for a guest instead of navigating", () => {
     render(<CreateLauncher userId={null} variant="mobileFab" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Start writing" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Publish a contribution" })
+    );
 
     expect(mocks.requestAuth).toHaveBeenCalledWith("create");
     expect(mocks.push).not.toHaveBeenCalled();
@@ -55,8 +59,10 @@ describe("CreateLauncher -- direct-to-composer", () => {
       </>
     );
 
-    expect(screen.getByRole("button", { name: "Create" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start writing" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Publish a contribution" })
+    ).toBeInTheDocument();
   });
 
   // jsdom has no real layout/media-query engine, so this can't be proven by
@@ -74,8 +80,10 @@ describe("CreateLauncher -- direct-to-composer", () => {
       </>
     );
 
-    const desktopWrapper = screen.getByRole("button", { name: "Create" }).parentElement;
-    const mobileWrapper = screen.getByRole("button", { name: "Start writing" }).parentElement;
+    const desktopWrapper = screen.getByRole("button", { name: "Publish" }).parentElement;
+    const mobileWrapper = screen.getByRole("button", {
+      name: "Publish a contribution",
+    }).parentElement;
 
     // Desktop control: hidden by default, appears only from `md` up.
     expect(desktopWrapper).toHaveClass("hidden", "md:inline-flex");
@@ -90,7 +98,7 @@ describe("CreateLauncher -- direct-to-composer", () => {
     const { rerender } = render(
       <CreateLauncher userId="user-1" variant="mobileFab" />
     );
-    let fab = screen.getByRole("button", { name: "Start writing" });
+    let fab = screen.getByRole("button", { name: "Publish a contribution" });
 
     expect(fab).toHaveAttribute("data-app-compose-fab");
     expect(fab).toHaveAttribute("data-app-chrome-motion");
@@ -103,7 +111,7 @@ describe("CreateLauncher -- direct-to-composer", () => {
     rerender(
       <CreateLauncher userId="user-1" variant="mobileFab" isPostPage />
     );
-    fab = screen.getByRole("button", { name: "Start writing" });
+    fab = screen.getByRole("button", { name: "Publish a contribution" });
     expect(fab).toHaveAttribute("data-app-compose-fab-static");
     expect(fab).toHaveStyle({
       bottom:

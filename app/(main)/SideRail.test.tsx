@@ -36,37 +36,47 @@ describe("SideRail", () => {
     const hrefFor = (name: string) =>
       screen.getByRole("link", { name }).getAttribute("href");
 
-    expect(hrefFor("Home")).toBe("/");
-    expect(hrefFor("Explore")).toBe("/explore");
+    expect(hrefFor("For you")).toBe("/");
+    expect(hrefFor("Discover")).toBe("/explore");
+    expect(hrefFor("Campus")).toBe("/campus");
     expect(hrefFor("Debates")).toBe("/debates");
+    expect(hrefFor("Responses")).toBe("/responses");
     expect(hrefFor("Opportunities")).toBe("/opportunities");
     expect(hrefFor("Bookmarks")).toBe("/bookmarks");
     expect(hrefFor("Messages")).toBe("/messages");
-    expect(hrefFor("Me")).toBe("/me");
+    expect(hrefFor("My record")).toBe("/me");
   });
 
   it("marks the current section with aria-current", () => {
     renderRail({}, "/");
-    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "For you" })).toHaveAttribute(
       "aria-current",
       "page"
     );
-    expect(screen.getByRole("link", { name: "Explore" })).not.toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Discover" })).not.toHaveAttribute(
       "aria-current"
     );
   });
 
-  it("treats /discover as the Explore section", () => {
+  it("treats /discover as the Discover section", () => {
     renderRail({}, "/discover");
-    expect(screen.getByRole("link", { name: "Explore" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Discover" })).toHaveAttribute(
       "aria-current",
       "page"
     );
   });
 
-  it("keeps Me lit across the account surfaces", () => {
+  it("marks the campus hub as its own section", () => {
+    renderRail({}, "/campus");
+    expect(screen.getByRole("link", { name: "Campus" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
+  it("keeps My record lit across the account surfaces", () => {
     renderRail({}, "/settings");
-    expect(screen.getByRole("link", { name: "Me" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "My record" })).toHaveAttribute(
       "aria-current",
       "page"
     );
@@ -98,9 +108,9 @@ describe("SideRail", () => {
     );
   });
 
-  it("offers a Create action", () => {
+  it("offers a Publish action", () => {
     renderRail();
-    expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /publish/i })).toBeInTheDocument();
   });
 
   it("is hidden below the xl breakpoint", () => {

@@ -12,6 +12,13 @@ import { createPost } from "./actions";
 interface PostComposerFormProps {
   userId: string;
   parentPost?: { id: string; displayTitle: string } | null;
+  editorialPrompt?: {
+    id: string;
+    title: string;
+    promptText: string;
+    responseQuestion: string | null;
+    topic: string | null;
+  } | null;
 }
 
 interface DraftBackup {
@@ -75,11 +82,17 @@ function clearDraftBackup(userId: string) {
   }
 }
 
-export default function PostComposerForm({ userId, parentPost = null }: PostComposerFormProps) {
+export default function PostComposerForm({
+  userId,
+  parentPost = null,
+  editorialPrompt = null,
+}: PostComposerFormProps) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [topics, setTopics] = useState<string[]>([]);
+  const [topics, setTopics] = useState<string[]>(() =>
+    editorialPrompt?.topic ? [editorialPrompt.topic] : []
+  );
   const [showTopics, setShowTopics] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -149,6 +162,7 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
       body,
       imageUrl,
       inResponseTo: parentPost?.id ?? null,
+      promptId: editorialPrompt?.id ?? null,
       topics,
     });
 
@@ -162,8 +176,8 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
     // the write/actions.ts convention) -- don't also fire it here, or
     // every publish records two rows.
     clearDraftBackup(userId);
-    router.push(`/post/${result.slug}`);
-  }, [body, canSubmit, imageUrl, parentPost, router, submitting, topics, userId]);
+    router.push(`/post/${result.slug}?justPublished=1&live=1`);
+  }, [body, canSubmit, editorialPrompt, imageUrl, parentPost, router, submitting, topics, userId]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -215,6 +229,25 @@ export default function PostComposerForm({ userId, parentPost = null }: PostComp
           <p className="mt-0.5 truncate text-sm font-medium text-gray-900">
             {parentPost.displayTitle}
           </p>
+        </div>
+      ) : null}
+
+      {editorialPrompt ? (
+        <div className="mx-4 mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 sm:mx-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+            Campus editorial prompt
+          </p>
+          <p className="mt-1 text-sm font-semibold text-gray-900">
+            {editorialPrompt.title}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-gray-600">
+            {editorialPrompt.promptText}
+          </p>
+          {editorialPrompt.responseQuestion ? (
+            <p className="mt-2 text-xs font-medium text-emerald-800">
+              Response question: {editorialPrompt.responseQuestion}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

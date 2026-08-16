@@ -1,10 +1,19 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminContext, hasCapability } from "@/lib/adminAccess";
 import { formatDate } from "@/lib/utils";
 import Tag from "@/components/ui/Tag";
 import FeaturePolicyButton from "./FeaturePolicyButton";
 import SponsorBanner from "@/components/ui/SponsorBanner";
+import { canonicalPath } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Policy Ideas and Briefs",
+  description:
+    "Explore policy ideas and Policy Briefs published by Indegenius contributors, with Africa as an important lens rather than a boundary on ideas.",
+  alternates: { canonical: canonicalPath("/policy") },
+};
 
 export default async function PolicyHubPage() {
   const supabase = await createClient();
@@ -65,7 +74,7 @@ export default async function PolicyHubPage() {
       <div className="text-center mb-10">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Policy Hub</h1>
         <p className="text-gray-500 text-lg">
-          Student-Generated Policy Ideas for Africa
+          Policy ideas from Indegenius contributors
         </p>
       </div>
 

@@ -1,3 +1,5 @@
+import { isAcademicProfileType, isProfileType } from "@/lib/profileTypes";
+
 export type CredibilityTone = "emerald" | "sky" | "purple" | "amber" | "gray";
 
 export interface ProfileCredibilityBadge {
@@ -24,6 +26,7 @@ export interface ProfileCredibilityInput {
     verified?: boolean | null;
     verified_type?: string | null;
     interests?: string[] | null;
+    profile_type?: string | null;
   } | null;
   stats?: {
     publishedCount?: number | null;
@@ -37,6 +40,8 @@ export interface ProfileCredibilityInput {
     featuredWorkCount?: number | null;
     opportunityReadinessScore?: number | null;
     isOpenToOpportunities?: boolean | null;
+    sourceBackedCount?: number | null;
+    responseCount?: number | null;
   };
 }
 
@@ -61,6 +66,10 @@ export function getProfileCredibilitySummary(
   const profile = input.profile;
   const stats = input.stats ?? {};
   const interests = profile?.interests ?? [];
+  const profileType = isProfileType(profile?.profile_type)
+    ? profile.profile_type
+    : null;
+  const academicProfile = profileType ? isAcademicProfileType(profileType) : false;
   const checks: Array<{ key: string; label: string; href: string; done: boolean }> = [
     {
       key: "photo",
@@ -70,7 +79,7 @@ export function getProfileCredibilitySummary(
     },
     {
       key: "bio",
-      label: "Add a short academic bio",
+      label: "Add a short bio",
       href: "/settings",
       done: present(profile?.bio),
     },
@@ -80,18 +89,22 @@ export function getProfileCredibilitySummary(
       href: "/settings",
       done: present(profile?.country),
     },
-    {
-      key: "university",
-      label: "Add university",
-      href: "/settings",
-      done: present(profile?.university),
-    },
-    {
-      key: "field",
-      label: "Add field of study",
-      href: "/settings",
-      done: present(profile?.field_of_study),
-    },
+    ...(academicProfile
+      ? [
+          {
+            key: "university",
+            label: "Add university",
+            href: "/settings",
+            done: present(profile?.university),
+          },
+          {
+            key: "field",
+            label: "Add field of study",
+            href: "/settings",
+            done: present(profile?.field_of_study),
+          },
+        ]
+      : []),
     {
       key: "interests",
       label: "Select writing topics",
@@ -104,17 +117,27 @@ export function getProfileCredibilitySummary(
       href: profile?.username ? `/${profile.username}#featured-work` : "/dashboard",
       done: positive(stats.featuredWorkCount),
     },
-    {
-      key: "opportunities",
-      label: "Complete opportunity readiness",
-      href: profile?.username ? `/${profile.username}#opportunity-profile` : "/dashboard",
-      done:
-        stats.isOpenToOpportunities === true &&
-        (stats.opportunityReadinessScore ?? 0) >= 80,
-    },
   ];
 
   const badges: ProfileCredibilityBadge[] = [];
+  if (positive(stats.sourceBackedCount)) {
+    badges.push({ key: "source_backed", label: "Source-backed work", tone: "emerald" });
+  }
+  if (positive(stats.citableCount)) {
+    badges.push({ key: "citable", label: "Citable work", tone: "sky" });
+  }
+  if (positive(stats.reviewedCount)) {
+    badges.push({ key: "reviewed", label: "Reviewed work", tone: "purple" });
+  }
+  if (positive(stats.coAuthoredCount)) {
+    badges.push({ key: "coauthor", label: "Co-authored work", tone: "amber" });
+  }
+  if (positive(stats.debateContributionCount)) {
+    badges.push({ key: "debate", label: "Debate contributor", tone: "amber" });
+  }
+  if (positive(stats.responseCount)) {
+    badges.push({ key: "responses", label: "Published responses", tone: "amber" });
+  }
   if (profile?.verified) {
     badges.push({
       key: "verified",
@@ -130,21 +153,6 @@ export function getProfileCredibilitySummary(
       label: [profile.field_of_study, profile.university].filter(Boolean).join(" / "),
       tone: "gray",
     });
-  }
-  if (positive(stats.citableCount)) {
-    badges.push({ key: "citable", label: "Citable work", tone: "sky" });
-  }
-  if (positive(stats.reviewedCount)) {
-    badges.push({ key: "reviewed", label: "Reviewed work", tone: "purple" });
-  }
-  if (positive(stats.coAuthoredCount)) {
-    badges.push({ key: "coauthor", label: "Co-authored work", tone: "amber" });
-  }
-  if (positive(stats.debateContributionCount)) {
-    badges.push({ key: "debate", label: "Debate contributor", tone: "amber" });
-  }
-  if (stats.isOpenToOpportunities && (stats.opportunityReadinessScore ?? 0) >= 80) {
-    badges.push({ key: "opportunity_ready", label: "Opportunity-ready", tone: "emerald" });
   }
 
   const completionScore = Math.round(

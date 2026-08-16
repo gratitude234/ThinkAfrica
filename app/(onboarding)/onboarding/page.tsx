@@ -19,6 +19,7 @@ import {
   normalizeSecondaryProfileTypes,
 } from "@/lib/profileTypes";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
+import { BRAND_PROMISE } from "@/lib/brand";
 
 interface SuggestedProfile {
   id: string;
@@ -415,7 +416,7 @@ export default function OnboardingPage() {
 
   const finishOnboarding = useCallback(() => {
     startEnteringApp(() => {
-      router.push("/?welcome=1");
+      router.push("/explore?welcome=1");
     });
   }, [router]);
 
@@ -442,20 +443,20 @@ export default function OnboardingPage() {
   };
 
   const titles: Record<Step, string> = {
-    persona: "What best describes you?",
-    identity: isAcademicProfile ? "Tell us where you study" : "Where are you based?",
-    interests: "What are you interested in?",
-    follow: "Follow a few thinkers",
+    persona: "How do you engage with ideas?",
+    identity: "Add your background",
+    interests: "Which ideas do you want to explore?",
+    follow: "Follow people worth reading",
   };
 
   const subtitles: Record<Step, string> = {
-    persona: "Choose the profile that fits best. You can add more roles later.",
+    persona: "Choose the role that fits best. This shapes your starting experience, not what you can publish.",
     identity: isAcademicProfile
-      ? "This helps us verify your academic credentials."
-      : "Just your country, we'll keep this quick.",
+      ? "Add your university and field so readers understand the context behind your work. Verification is a separate review."
+      : "Add your country to give readers context. You can update it later.",
     interests:
-      "Pick up to 6 interests for recommendations. Publication alerts require a separate topic subscription.",
-    follow: "Get to know people shaping conversations in your fields.",
+      "Choose up to 6 topics to shape what you discover. You can change them later.",
+    follow: "Start with people whose work you want to read, respond to, or build on.",
   };
 
   if (!ready) {
@@ -527,9 +528,10 @@ export default function OnboardingPage() {
 
         <div className="flex-shrink-0 px-5 pb-1 pt-4">
           {step === "persona" ? (
-            <p className="font-display mb-3.5 text-lg font-bold text-emerald-brand">
-              Indegenius
-            </p>
+            <div className="mb-3.5">
+              <p className="font-display text-lg font-bold text-emerald-brand">Indegenius</p>
+              <p className="mt-0.5 text-xs font-medium text-ink-muted">{BRAND_PROMISE}</p>
+            </div>
           ) : null}
           <h1 className="font-display text-[22px] font-semibold leading-tight text-ink">
             {titles[step]}
@@ -617,18 +619,22 @@ export default function OnboardingPage() {
             <div className="flex flex-col gap-[18px]">
               <div>
                 <FieldLabel>Country</FieldLabel>
-                <select
+                <input
+                  list="country-options"
                   value={country}
                   onChange={(event) => handleCountryChange(event.target.value)}
+                  autoComplete="country-name"
+                  aria-label="Country"
+                  placeholder="e.g. Nigeria, Brazil, or Canada"
                   className={INPUT_STYLES}
-                >
-                  <option value="">Select country</option>
+                />
+                <datalist id="country-options">
                   {AFRICAN_COUNTRIES.map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>
                   ))}
-                </select>
+                </datalist>
               </div>
 
               {isAcademicProfile ? (
@@ -647,6 +653,7 @@ export default function OnboardingPage() {
                     <input
                       value={fieldOfStudy}
                       onChange={(event) => setFieldOfStudy(event.target.value)}
+                      aria-label="Field of study"
                       placeholder="e.g. Public Health"
                       className={INPUT_STYLES}
                     />
@@ -696,7 +703,7 @@ export default function OnboardingPage() {
                 </div>
               ) : suggestions.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-gray-200 p-8 text-center text-sm text-ink-muted">
-                  No suggestions yet. You can still continue and explore the latest posts.
+                  No suggestions yet. You can still continue and explore the latest ideas.
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
@@ -760,11 +767,11 @@ export default function OnboardingPage() {
             className="flex h-12 w-full items-center justify-center rounded-xl bg-emerald-brand text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isEnteringApp
-              ? "Setting up your feed..."
+              ? "Opening discovery..."
               : loading
                 ? "Saving..."
                 : step === "follow"
-                  ? "Finish setup"
+                  ? "Discover your first idea"
                   : "Continue"}
           </button>
         </div>

@@ -7,7 +7,6 @@ type TestProfile = {
   username: string | null;
   full_name: string | null;
   avatar_url: string | null;
-  points: number | null;
   role: "student" | "reviewer" | "editor" | "admin" | null;
 };
 
@@ -46,7 +45,6 @@ const standardProfile: TestProfile = {
   username: "writer",
   full_name: "A Writer",
   avatar_url: null,
-  points: 125,
   role: "student",
 };
 
@@ -84,13 +82,13 @@ describe("MePage", () => {
     expect(state.redirect).toHaveBeenCalledWith("/settings");
   });
 
-  it("renders identity, points, and standard account destinations", async () => {
+  it("renders the Intellectual Record entry and standard account destinations", async () => {
     await renderPage();
 
     expect(screen.getByRole("heading", { name: "A Writer" })).toBeInTheDocument();
-    expect(screen.getByText("125 pts")).toBeInTheDocument();
+    expect(screen.getByText("Your Intellectual Record")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "View public profile" })
+      screen.getByRole("link", { name: "Open Intellectual Record" })
     ).toHaveAttribute("href", "/writer");
     expect(screen.getByRole("link", { name: /My writing/ })).toHaveAttribute(
       "href",

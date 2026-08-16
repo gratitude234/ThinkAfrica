@@ -468,6 +468,46 @@ export async function fetchResponseCards(
   return enrichPosts(supabase, rows, rankingContext);
 }
 
+/**
+ * Public response-discovery feed. Unlike fetchResponsePage(), which is scoped
+ * to one parent post, this returns recent published responses across the
+ * network so Responses can be a first-class navigation destination.
+ */
+export async function fetchRecentResponsePage(
+  supabase: { from: (table: string) => any },
+  viewerId: string | null,
+  page = 1,
+  pageSize = 20
+): Promise<ResponsePage> {
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.min(Math.max(pageSize, 1), 30);
+  const offset = (safePage - 1) * safePageSize;
+  const { data: raw } = await supabase
+    .from("posts")
+    .select(POST_SELECT)
+    .not("in_response_to", "is", null)
+    .eq("status", "published")
+    .order("published_at", { ascending: false })
+    .range(offset, offset + safePageSize);
+
+  const rows = (raw ?? []) as unknown[];
+  const hasMore = rows.length > safePageSize;
+  const rankingContext: RankingContext = {
+    userId: viewerId,
+    followedIds: new Set(),
+    userInterests: [],
+    userUniversity: null,
+    userCountry: null,
+  };
+  const cards = await enrichPosts(
+    supabase,
+    rows.slice(0, safePageSize),
+    rankingContext
+  );
+
+  return { cards, hasMore };
+}
+
 export async function fetchCitableFeed(
   supabase: {
     from: (table: string) => any;

@@ -1,6 +1,6 @@
 # Indegenius
 
-Indegenius is an intellectual social network, originating in African university communities, for publishing ideas, discussing them, and building a credible public record of contribution.
+Indegenius is where young people who actively engage with ideas build their intellectual identity. They publish ideas, test them through thoughtful discourse, and create an evidence-backed Intellectual Record of what they write, argue, research, and contribute. Imagined in Africa, Indegenius is Africa's First Intellectual Social Network—and ideas have no borders.
 
 ## Tech stack
 

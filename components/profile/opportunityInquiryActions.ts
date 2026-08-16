@@ -75,14 +75,14 @@ export async function submitOpportunityInquiry(
   if (fitReason.length < 30) {
     return {
       ok: false,
-      error: "Explain why this specific student is a fit.",
+      error: "Explain why this specific contributor is a fit.",
     };
   }
 
   if (message.length < 40) {
     return {
       ok: false,
-      error: "Add a substantive message so the student can evaluate the opportunity.",
+      error: "Add a substantive message so the contributor can evaluate the opportunity.",
     };
   }
 

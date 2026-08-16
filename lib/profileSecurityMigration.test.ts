@@ -90,7 +90,7 @@ describe("Phase 0 profile-security migration", () => {
 
   it("moves every owner-facing private read to the RPC", () => {
     for (const source of ownerReadCallsites) {
-      expect(source).toContain('rpc("get_my_profile_private")');
+      expect(source).toMatch(/rpc\(\s*"get_my_profile_private"\s*\)/);
     }
   });
 });

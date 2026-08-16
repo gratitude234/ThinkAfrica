@@ -58,6 +58,8 @@ interface ProfileHeaderProps {
     citableCount: number;
     reviewedCount: number;
     coAuthoredCount: number;
+    responseCount: number;
+    sourceBackedCount: number;
     followerCount: number;
     followingCount: number;
     totalViews: number;
@@ -107,11 +109,14 @@ export default function ProfileHeader({
     // publications), so calling it "Publications" overclaimed. See
     // PublicationsSection, which correctly scopes "Publications" to
     // Article/Research only.
-    { label: "Published", value: stats.postCount },
-    { label: "Citable", value: stats.citableCount },
+    {
+      label: "Record",
+      value: stats.postCount + stats.debateContributionCount,
+    },
+    { label: "Responses", value: stats.responseCount },
+    { label: "Source-backed", value: stats.sourceBackedCount },
     { label: "Reviewed", value: stats.reviewedCount },
-    { label: "Co-authored", value: stats.coAuthoredCount },
-    { label: "Reads", value: stats.totalViews },
+    { label: "Citable", value: stats.citableCount },
   ];
   const verifiedLabel = profile.verified_type
     ? profile.verified_type.charAt(0).toUpperCase() +

@@ -60,6 +60,8 @@ const ALLOWED_EVENTS = new Set<ActivationEventName>([
   "message_started",
   "message_sent",
   "response_thread_opened",
+  "campus_hub_viewed",
+  "campus_prompt_opened",
   "push_nudge_shown",
   "push_nudge_action",
   "push_permission_resolved",

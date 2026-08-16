@@ -607,7 +607,7 @@ function buildOpportunityHighlights(
     return [
       {
         key: "open-profiles",
-        title: "Find open academic profiles",
+        title: "Find open contributor profiles",
         body: `${summary.openProfileCount.toLocaleString()} people are open to collaborations or roles.`,
         href: "/opportunities",
         kind: "profiles",

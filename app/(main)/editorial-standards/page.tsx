@@ -7,7 +7,7 @@ export default function EditorialStandardsPage() {
         <h1 className="mb-3 text-3xl font-bold text-gray-900">Editorial Standards</h1>
         <p className="leading-relaxed text-gray-500">
           Indegenius is committed to publishing high-quality, original intellectual work from
-          African students and emerging thinkers. Posts and Articles publish directly. Research
+          young people who actively engage with ideas. Posts and Articles publish directly. Research
           follows a formal editorial workflow with reviewer recommendations and a final editor
           decision before publication.
         </p>

@@ -1,9 +1,11 @@
+import { BRAND_NAME } from "@/lib/brand";
+
 // Falls back to the confirmed production domain if NEXT_PUBLIC_APP_DOMAIN
 // isn't set in the environment (e.g. Vercel). Prefer setting the env var so
 // preview/staging deployments can differ from production.
 export const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || "indegenius.africa";
 export const SITE_URL = `https://www.${APP_DOMAIN}`;
-export const SITE_NAME = "Indegenius";
+export const SITE_NAME = BRAND_NAME;
 
 // Confirm these mailboxes exist at the real domain before relying on them.
 export const CONTACT_EMAILS = {
@@ -11,7 +13,7 @@ export const CONTACT_EMAILS = {
   legal: `legal@${APP_DOMAIN}`,
   editorial: `editorial@${APP_DOMAIN}`,
 };
-export const DEFAULT_OG_IMAGE = "/og-default.png";
+export const DEFAULT_OG_IMAGE = "/api/og";
 
 export function absoluteUrl(path: string) {
   if (/^https?:\/\//i.test(path)) return path;

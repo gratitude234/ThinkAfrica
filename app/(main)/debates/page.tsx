@@ -21,14 +21,14 @@ import {
 export const revalidate = 30;
 
 export const metadata: Metadata = {
-  title: "Student Debates on Africa, Education and Society",
+  title: "Structured Debates",
   description:
-    "Join structured Indegenius debates where students argue motions, vote on positions, and build stronger public ideas.",
+    "Argue motions, respond to counterpoints, and make your public reasoning part of your Intellectual Record.",
   alternates: { canonical: canonicalPath("/debates") },
   openGraph: {
-    title: "Student Debates on Africa, Education and Society",
+    title: "Structured Debates | Indegenius",
     description:
-      "Join structured Indegenius debates where students argue motions, vote on positions, and build stronger public ideas.",
+      "Argue motions, respond to counterpoints, and make your public reasoning part of your Intellectual Record.",
     url: absoluteUrl("/debates"),
     siteName: SITE_NAME,
     images: [
@@ -38,9 +38,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Student Debates on Africa, Education and Society",
+    title: "Structured Debates | Indegenius",
     description:
-      "Join structured Indegenius debates where students argue motions, vote on positions, and build stronger public ideas.",
+      "Argue motions, respond to counterpoints, and make your public reasoning part of your Intellectual Record.",
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };

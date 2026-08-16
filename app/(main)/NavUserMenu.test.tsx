@@ -30,13 +30,12 @@ describe("NavUserMenu profile destination", () => {
           full_name: "A Writer",
           avatar_url: null,
         }}
-        points={25}
       />
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
 
-    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Intellectual Record" })).toHaveAttribute(
       "href",
       "/writer"
     );
@@ -51,13 +50,12 @@ describe("NavUserMenu profile destination", () => {
           full_name: "A Writer",
           avatar_url: null,
         }}
-        points={25}
       />
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
 
-    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Intellectual Record" })).toHaveAttribute(
       "href",
       "/settings"
     );
@@ -71,7 +69,6 @@ describe("NavUserMenu profile destination", () => {
         full_name: "A Writer",
         avatar_url: null,
       },
-      points: 25,
     };
     const { rerender } = render(<NavUserMenu {...props} />);
     fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import CreateLauncher from "./CreateLauncher";
-import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import { shouldShowMobilePrimaryNav } from "./navRoutes";
 import { useAppChrome } from "./AppChromeProvider";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
@@ -12,7 +11,7 @@ import {
   DebatesIcon,
   ExploreIcon,
   HomeIcon,
-  MessagesIcon,
+  ResponsesIcon,
   NAV_MATCH_PREFIXES,
   ProfileIcon,
   isAccountNavActive,
@@ -31,8 +30,7 @@ function navLinkClass(isCurrent: boolean) {
   }`;
 }
 
-// px-2 rather than px-3: five destinations have to share a 320px-wide bar,
-// and the wider pill pushed "Messages" into wrapping on the narrowest phones.
+// px-2 rather than px-3: five destinations have to share a 320px-wide bar.
 function navPillClass(isCurrent: boolean) {
   return `flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 transition-colors duration-150 ${
     isCurrent ? "bg-emerald-50" : ""
@@ -60,10 +58,12 @@ export default function BottomNav({
   const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
   const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
   const isDebatesActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates);
-  const isMessagesActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.messages);
+  const isResponsesActive = isNavItemActive(
+    pathname,
+    NAV_MATCH_PREFIXES.responses
+  );
   const profileHref = userId ? "/me" : "/signup";
   const profileActive = isAccountNavActive(pathname, { userId, username });
-  const profileLabel = userId ? "Me" : "Join";
 
   return (
     <>
@@ -102,7 +102,7 @@ export default function BottomNav({
           >
             <span className={navPillClass(isHomeActive)}>
               <HomeIcon className="h-[22px] w-[22px]" filled={isHomeActive} />
-              <span className="whitespace-nowrap text-[11px] font-medium">Home</span>
+              <span className="whitespace-nowrap text-[11px] font-medium">For you</span>
             </span>
           </Link>
 
@@ -113,7 +113,7 @@ export default function BottomNav({
           >
             <span className={navPillClass(isExploreActive)}>
               <ExploreIcon className="h-[22px] w-[22px]" />
-              <span className="whitespace-nowrap text-[11px] font-medium">Explore</span>
+              <span className="whitespace-nowrap text-[11px] font-medium">Discover</span>
             </span>
           </Link>
 
@@ -144,21 +144,13 @@ export default function BottomNav({
           ) : null}
 
           <Link
-            href="/messages"
-            className={navLinkClass(isMessagesActive)}
-            aria-current={isMessagesActive ? "page" : undefined}
+            href="/responses"
+            className={navLinkClass(isResponsesActive)}
+            aria-current={isResponsesActive ? "page" : undefined}
           >
-            <span className={navPillClass(isMessagesActive)}>
-              <div className="relative">
-                <MessagesIcon
-                  className="h-[22px] w-[22px]"
-                  filled={isMessagesActive}
-                />
-                {userId ? (
-                  <MessagesUnreadBadge userId={userId} className="-right-1.5 -top-1.5" />
-                ) : null}
-              </div>
-              <span className="whitespace-nowrap text-[11px] font-medium">Messages</span>
+            <span className={navPillClass(isResponsesActive)}>
+              <ResponsesIcon className="h-[22px] w-[22px]" />
+              <span className="whitespace-nowrap text-[11px] font-medium">Responses</span>
             </span>
           </Link>
 
@@ -169,7 +161,9 @@ export default function BottomNav({
           >
             <span className={navPillClass(profileActive)}>
               <ProfileIcon className="h-[22px] w-[22px]" filled={profileActive} />
-              <span className="whitespace-nowrap text-[11px] font-medium">{profileLabel}</span>
+              <span className="whitespace-nowrap text-[11px] font-medium">
+                {userId ? "Record" : "Join"}
+              </span>
             </span>
           </Link>
         </div>

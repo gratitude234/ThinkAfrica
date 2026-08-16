@@ -10,7 +10,6 @@ import {
   type DiscoverTab,
 } from "@/lib/discoverData";
 import { type PostCardData } from "@/components/post/PostCard";
-import { resolveArticleFormat, resolveContentKind } from "@/lib/contentModel";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import UserAvatar from "@/components/ui/UserAvatar";
 import StickySubnav from "@/components/ui/StickySubnav";
@@ -18,20 +17,31 @@ import FollowButton from "@/components/ui/FollowButton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import DiscoverTrackedLink from "../discover/DiscoverTrackedLink";
 import DiscoverTopicsGrid from "../discover/DiscoverTopicsGrid";
+import MobileOpportunitiesBanner from "./MobileOpportunitiesBanner";
+import IntellectualRecordWelcome from "@/components/ui/IntellectualRecordWelcome";
+import {
+  filterPostsByExplore,
+  getExploreFilters,
+  GENRE_FILTERS,
+  PRIMARY_FILTERS,
+  type ExploreGenreFilter,
+  type ExplorePrimaryFilter,
+} from "./exploreFilters";
 import { formatDate } from "@/lib/utils";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
+
+const EXPLORE_DESCRIPTION =
+  "Discover Posts, Articles, Research, debates, topics, and people building evidence-backed Intellectual Records on Indegenius.";
 
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Explore African Student Posts, Articles, and Research",
-  description:
-    "Discover trending posts, articles, citable research, topics, and emerging African student writers on Indegenius.",
+  title: "Explore Ideas and Intellectual Work",
+  description: EXPLORE_DESCRIPTION,
   alternates: { canonical: canonicalPath("/explore") },
   openGraph: {
-    title: "Explore African Student Posts, Articles, and Research",
-    description:
-      "Discover trending posts, articles, citable research, topics, and emerging African student writers on Indegenius.",
+    title: "Explore Ideas and Intellectual Work",
+    description: EXPLORE_DESCRIPTION,
     url: absoluteUrl("/explore"),
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
@@ -39,9 +49,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Explore African Student Posts, Articles, and Research",
-    description:
-      "Discover trending posts, articles, citable research, topics, and emerging African student writers on Indegenius.",
+    title: "Explore Ideas and Intellectual Work",
+    description: EXPLORE_DESCRIPTION,
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };
@@ -51,6 +60,7 @@ interface PageProps {
     tab?: string;
     type?: string;
     genre?: string;
+    welcome?: string;
   }>;
 }
 
@@ -72,71 +82,7 @@ const TABS: Array<{
   { value: "people", label: "People", href: "/explore?tab=people" },
 ];
 
-// Primary Explore filters are the three top-level content kinds (plus
-// "All"). "Blog" and "Policy" used to be shown as peer-level primary
-// filters, but Blog/Essay/Policy Brief are not top-level content types --
-// see docs/content-model.md. Essay/Policy Brief now live one level down,
-// as a genre *refinement* that only applies while "Articles" is active.
-export type ExplorePrimaryFilter = "all" | "post" | "article" | "research";
-export type ExploreGenreFilter = "all" | "general" | "essay" | "policy_brief";
 type DiscoveryPromptSource = DiscoverData["personalizedPrompts"][number]["source"];
-
-export const PRIMARY_FILTERS: Array<{
-  value: ExplorePrimaryFilter;
-  label: string;
-}> = [
-  { value: "all", label: "All" },
-  { value: "post", label: "Posts" },
-  { value: "article", label: "Articles" },
-  { value: "research", label: "Research" },
-];
-
-export const GENRE_FILTERS: Array<{
-  value: ExploreGenreFilter;
-  label: string;
-}> = [
-  { value: "all", label: "All genres" },
-  { value: "general", label: "General" },
-  { value: "essay", label: "Essay" },
-  { value: "policy_brief", label: "Policy Brief" },
-];
-
-function isExploreGenreFilter(value: string): value is ExploreGenreFilter {
-  return (
-    value === "all" || value === "general" || value === "essay" || value === "policy_brief"
-  );
-}
-
-// Legacy `?type=` values from before the three-content-kind model. Kept so
-// old links/bookmarks keep resolving:
-//   - `blog` (the old flat type) -> Posts.
-//   - `essay`/`policy_brief` (the old flat types) -> Articles, narrowed to
-//     that specific genre -- these historically meant "only this genre",
-//     unlike the current `article` value which means "all genres".
-//   - `post`/`article`/`research` are the current primary-filter values.
-const LEGACY_TYPE_PARAM: Record<string, { primary: ExplorePrimaryFilter; genre: ExploreGenreFilter }> = {
-  blog: { primary: "post", genre: "all" },
-  post: { primary: "post", genre: "all" },
-  article: { primary: "article", genre: "all" },
-  essay: { primary: "article", genre: "essay" },
-  policy_brief: { primary: "article", genre: "policy_brief" },
-  research: { primary: "research", genre: "all" },
-};
-
-export function getExploreFilters(
-  typeParam: string | null | undefined,
-  genreParam: string | null | undefined
-): { primary: ExplorePrimaryFilter; genre: ExploreGenreFilter } {
-  if (!typeParam || !(typeParam in LEGACY_TYPE_PARAM)) {
-    return { primary: "all", genre: "all" };
-  }
-
-  const mapped = LEGACY_TYPE_PARAM[typeParam];
-  if (mapped.primary === "article" && genreParam && isExploreGenreFilter(genreParam)) {
-    return { primary: "article", genre: genreParam };
-  }
-  return mapped;
-}
 
 function getExploreHref(
   tab: DiscoverTab,
@@ -158,35 +104,6 @@ function getExploreHref(
 
   const query = params.toString();
   return query ? `/explore?${query}` : "/explore";
-}
-
-export function filterPostsByExplore(
-  posts: PostCardData[],
-  primary: ExplorePrimaryFilter,
-  genre: ExploreGenreFilter = "all"
-) {
-  // Every filter is resolved against the new-model columns, never the
-  // legacy `type` column directly (see docs/content-model.md), so a
-  // brand-new Policy-Brief-format Article (whose legacy `type` is always
-  // "essay") and a future titleless Post with no legacy type are still
-  // classified correctly.
-  if (primary === "post") {
-    return posts.filter((post) => resolveContentKind(post) === "post");
-  }
-  if (primary === "research") {
-    return posts.filter((post) => resolveContentKind(post) === "research");
-  }
-  if (primary === "article") {
-    const articles = posts.filter((post) => resolveContentKind(post) === "article");
-    if (genre === "general") {
-      return articles.filter((post) => resolveArticleFormat(post) === null);
-    }
-    if (genre === "essay" || genre === "policy_brief") {
-      return articles.filter((post) => resolveArticleFormat(post) === genre);
-    }
-    return articles;
-  }
-  return posts;
 }
 
 const PROMPT_STYLES: Record<
@@ -415,6 +332,14 @@ function DiscoverTabs({
             </DiscoverTrackedLink>
           );
         })}
+        <DiscoverTrackedLink
+          href="/campus"
+          event="discover_item_clicked"
+          metadata={{ itemType: "campus", surface: "explore_tabs" }}
+          className="mb-[-1px] border-b-2 border-transparent px-3.5 py-3 text-[13px] font-semibold text-gray-500 transition-colors hover:text-ink sm:px-4 sm:text-[13.5px]"
+        >
+          Campus
+        </DiscoverTrackedLink>
       </div>
     </StickySubnav>
   );
@@ -997,61 +922,6 @@ function MobileDebateBanner({ data }: { data: DiscoverData }) {
   );
 }
 
-export function MobileOpportunitiesBanner({
-  openProfileCount,
-  openFellowshipCount,
-}: {
-  openProfileCount: number;
-  openFellowshipCount: number;
-}) {
-  const signals = [
-    openProfileCount > 0
-      ? `${openProfileCount.toLocaleString()} open ${
-          openProfileCount === 1 ? "profile" : "profiles"
-        }`
-      : null,
-    openFellowshipCount > 0
-      ? `${openFellowshipCount.toLocaleString()} curated ${
-          openFellowshipCount === 1 ? "opening" : "openings"
-        }`
-      : null,
-  ].filter(Boolean);
-  const summary =
-    signals.length > 0
-      ? signals.join(" · ")
-      : "Discover openings and make your profile visible.";
-
-  return (
-    <DiscoverTrackedLink
-      href="/opportunities"
-      metadata={{ item: "mobile_opportunities", surface: "explore" }}
-      className="mb-4 flex min-h-16 items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3.5 lg:hidden"
-    >
-      <span className="min-w-0">
-        <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-          Opportunities
-        </span>
-        <span className="mt-1 block text-xs leading-5 text-emerald-950">
-          {summary}
-        </span>
-      </span>
-      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-emerald-700">
-        Explore
-        <svg
-          className="h-3.5 w-3.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="m9 5 7 7-7 7" />
-        </svg>
-      </span>
-    </DiscoverTrackedLink>
-  );
-}
-
 function WritersRailCard({
   people,
   currentUserId,
@@ -1136,7 +1006,7 @@ function OpportunitiesRailCard({ data }: { data: DiscoverData }) {
       <h3 className="mt-2 font-display text-sm font-semibold leading-snug text-ink">
         {hasOpportunitySignal
           ? "Find people and openings connected to serious work"
-          : "Make your academic profile discoverable"}
+          : "Make your Intellectual Record discoverable"}
       </h3>
       <p className="mt-1.5 text-xs leading-5 text-ink-muted">
         {hasOpportunitySignal
@@ -1384,7 +1254,7 @@ function ActiveSection({
 }
 
 export default async function ExplorePage({ searchParams }: PageProps) {
-  const { tab, type, genre } = await searchParams;
+  const { tab, type, genre, welcome } = await searchParams;
   const activeTab = getDiscoverTab(tab);
   const { primary: activePrimary, genre: activeGenre } = getExploreFilters(type, genre);
   const supabase = await createClient();
@@ -1407,12 +1277,14 @@ export default async function ExplorePage({ searchParams }: PageProps) {
         }}
       />
 
+      {user && welcome === "1" ? <IntellectualRecordWelcome /> : null}
+
       <div className="mb-5 min-w-0 max-w-full sm:mb-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-brand">
           Explore
         </p>
         <h1 className="mt-1 text-[23px] font-semibold leading-[1.12] tracking-normal text-ink sm:mt-2 sm:text-[30px]">
-          Find serious student ideas
+          Find ideas worth engaging with
         </h1>
         <p className="mt-1.5 max-w-2xl text-[13px] leading-5 text-ink-muted sm:mt-2 sm:text-sm sm:leading-6">
           <span className="sm:hidden">

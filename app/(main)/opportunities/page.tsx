@@ -21,15 +21,16 @@ import RetentionEventTracker from "@/components/retention/RetentionEventTracker"
 import UserAvatar from "@/components/ui/UserAvatar";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
 
+const OPPORTUNITIES_DESCRIPTION =
+  "Discover fellowships and opportunities connected to the interests and evidence-backed profiles of Indegenius contributors.";
+
 export const metadata: Metadata = {
-  title: "Student Opportunities, Profiles and Fellowships",
-  description:
-    "Find student opportunities, fellowships, open talent profiles, and African university writers ready for serious work.",
+  title: "Opportunities for Emerging Thinkers",
+  description: OPPORTUNITIES_DESCRIPTION,
   alternates: { canonical: canonicalPath("/opportunities") },
   openGraph: {
-    title: "Student Opportunities, Profiles and Fellowships",
-    description:
-      "Find student opportunities, fellowships, open talent profiles, and African university writers ready for serious work.",
+    title: "Opportunities for Emerging Thinkers",
+    description: OPPORTUNITIES_DESCRIPTION,
     url: absoluteUrl("/opportunities"),
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
@@ -37,9 +38,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Student Opportunities, Profiles and Fellowships",
-    description:
-      "Find student opportunities, fellowships, open talent profiles, and African university writers ready for serious work.",
+    title: "Opportunities for Emerging Thinkers",
+    description: OPPORTUNITIES_DESCRIPTION,
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };
@@ -337,8 +337,8 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
               Get ready, find openings, and be discovered
             </h1>
             <p className="mt-2 max-w-3xl text-base leading-relaxed text-gray-500">
-              A student-first workspace for curated opportunities, profile
-              readiness, and serious inbound interest from partners.
+              A workspace connecting intellectual contribution with curated
+              opportunities, profile readiness, and serious inbound interest from partners.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 rounded-xl bg-canvas p-4 text-center">
@@ -477,7 +477,7 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Open profiles</h2>
           <p className="text-sm text-gray-500">
-            Students who have made their work discoverable for partners and
+            Contributors who have made their work discoverable to partners and
             collaborators.
           </p>
         </div>

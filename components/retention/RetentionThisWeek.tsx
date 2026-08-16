@@ -142,6 +142,19 @@ export default function RetentionThisWeek({
           hint="New signals"
         />
       </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <ProgressTile
+          label="Published record"
+          value={progress.publishedContributions}
+          hint="All public contributions"
+        />
+        <ProgressTile
+          label="Published responses"
+          value={progress.publishedResponses}
+          hint="Contribution loops entered"
+        />
+      </div>
     </section>
   );
 }

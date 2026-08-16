@@ -96,6 +96,45 @@ export function MessagesIcon({ className, filled }: NavIconProps) {
   );
 }
 
+export function ResponsesIcon({ className }: NavIconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 7h10a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-4l-4 3v-3H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3Z"
+      />
+      <path strokeLinecap="round" d="M8 11h8" />
+    </svg>
+  );
+}
+
+export function CampusIcon({ className }: NavIconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m3 9 9-5 9 5-9 5-9-5Zm3 2.5V17c2.8 2.1 9.2 2.1 12 0v-5.5M21 9v7"
+      />
+    </svg>
+  );
+}
+
 export function ProfileIcon({ className, filled }: NavIconProps) {
   return (
     <svg
@@ -160,6 +199,8 @@ export const NAV_MATCH_PREFIXES = {
   debates: ["/debates"],
   opportunities: ["/opportunities"],
   messages: ["/messages"],
+  responses: ["/responses"],
+  campus: ["/campus"],
   bookmarks: ["/bookmarks"],
   notifications: ["/notifications"],
 } as const;

@@ -120,7 +120,7 @@ export default function ContactInquiryModal({
               Inquiry sent
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-500">
-              The student will see this in their dashboard and notifications.
+              The contributor will see this in their dashboard and notifications.
               Your reply email is included so they can follow up directly.
             </p>
             <div className="mt-5 flex justify-end">
@@ -139,7 +139,7 @@ export default function ContactInquiryModal({
               Contact about an opportunity
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              Include the organization, role, reply email, and why this student
+              Include the organization, role, reply email, and why this contributor
               is a relevant fit.
             </p>
           </>
@@ -242,7 +242,7 @@ export default function ContactInquiryModal({
                   message: event.target.value,
                 }))
               }
-              placeholder="Describe the opportunity, timeline, commitment expected, and why this student's work caught your attention."
+              placeholder="Describe the opportunity, timeline, commitment expected, and why this contributor's work caught your attention."
               className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
             />
           </div>

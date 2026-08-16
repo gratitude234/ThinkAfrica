@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { MobileOpportunitiesBanner } from "./page";
+import MobileOpportunitiesBanner from "./MobileOpportunitiesBanner";
 
 describe("MobileOpportunitiesBanner", () => {
   it("links mobile visitors to Opportunities and summarizes available signals", () => {

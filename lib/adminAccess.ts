@@ -60,9 +60,15 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     capability: "opportunities.manage",
   },
   {
+    href: "/admin/campuses",
+    title: "Campus Programs",
+    description: "Operate selected cohorts, editorial prompts, and recurring campus programs.",
+    capability: "ambassadors.manage",
+  },
+  {
     href: "/admin/ambassadors",
     title: "Ambassadors",
-    description: "Review ambassador applications.",
+    description: "Review applications and activate Ambassadors at selected campuses.",
     capability: "ambassadors.manage",
   },
   {

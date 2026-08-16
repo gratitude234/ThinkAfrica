@@ -10,7 +10,7 @@ import PublishedToast from "./PublishedToast";
 import PostActionsRow from "./PostActionsRow";
 import DiscussionSection from "./DiscussionSection";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import { formatRelativeTime, pointsForPost } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface ConversationAuthor {
   id: string;
@@ -133,7 +133,6 @@ export default async function PostConversationView({
         postType={post.type}
         title={metadataTitle}
         slug={post.slug}
-        points={pointsForPost(post)}
         username={author?.username ?? ""}
         relatedTarget={
           relatedPost

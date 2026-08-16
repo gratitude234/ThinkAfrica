@@ -8,31 +8,38 @@ export default async function AmbassadorsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch active ambassadors with profile info
-  const { data: ambassadorsRaw } = await supabase
-    .from("campus_ambassadors")
-    .select(`
-      id, university, referral_count,
-      profiles!campus_ambassadors_user_id_fkey (username, full_name, avatar_url)
-    `)
-    .eq("status", "active")
-    .order("referral_count", { ascending: false });
+  const [ambassadorsResult, cohortsResult, applicationResult] = await Promise.all([
+    supabase
+      .from("campus_ambassadors")
+      .select(`
+        id, university, referral_count,
+        profiles!campus_ambassadors_user_id_fkey (username, full_name, avatar_url)
+      `)
+      .eq("status", "active")
+      .order("referral_count", { ascending: false }),
+    supabase
+      .from("campus_cohorts")
+      .select("id, university, country, status")
+      .in("status", ["selected", "active"])
+      .order("university", { ascending: true }),
+    user
+      ? supabase
+          .from("campus_ambassadors")
+          .select("status")
+          .eq("user_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const ambassadorsRaw = ambassadorsResult.data;
+  const selectedCohorts = cohortsResult.data ?? [];
 
   const ambassadors = (ambassadorsRaw ?? []).map((a) => ({
     ...a,
     profiles: Array.isArray(a.profiles) ? a.profiles[0] : a.profiles,
   }));
 
-  // Check if user is already an ambassador
-  let existingApplication = null;
-  if (user) {
-    const { data } = await supabase
-      .from("campus_ambassadors")
-      .select("status")
-      .eq("user_id", user.id)
-      .single();
-    existingApplication = data;
-  }
+  const existingApplication = applicationResult.data;
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -47,10 +54,17 @@ export default async function AmbassadorsPage() {
           Campus Ambassador Program
         </h1>
         <p className="text-gray-600 max-w-2xl mx-auto mb-6">
-          Represent Indegenius at your university and help grow Africa&apos;s largest student intellectual community.
+          Represent Indegenius at your university and help students turn ideas into lasting Intellectual Records.
         </p>
 
-        {existingApplication ? (
+        {existingApplication?.status === "active" ? (
+          <Link
+            href="/ambassadors/dashboard"
+            className="inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-6 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
+          >
+            Open Ambassador Dashboard
+          </Link>
+        ) : existingApplication ? (
           <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
             existingApplication.status === "active"
               ? "bg-emerald-100 text-emerald-700"
@@ -79,23 +93,23 @@ export default async function AmbassadorsPage() {
         {[
           {
             icon: "🎓",
-            title: "Represent Your University",
-            desc: "Be the official Indegenius voice at your campus and connect students to the platform.",
+            title: "Operate Your Campus Cohort",
+            desc: "Run the shared editorial prompt and recurring programs at a selected campus.",
           },
           {
             icon: "🏆",
-            title: "Earn Bonus Points",
-            desc: "Get extra points for every student you refer who publishes their first post.",
+            title: "Develop Community Leadership",
+            desc: "Practice editorial programming, discussion facilitation, and contributor support on your campus.",
           },
           {
             icon: "✨",
-            title: "Get Featured",
-            desc: "Your profile is highlighted across the platform as a community leader.",
+            title: "Build Publication Habits",
+            desc: "Help contributors return for a second publication instead of stopping after their first.",
           },
           {
             icon: "🎙",
-            title: "Exclusive Access",
-            desc: "Access mentor sessions, campus playbooks, and early platform features.",
+            title: "Create Response Loops",
+            desc: "Connect campus ideas through questions, extensions, and evidence-backed counterpoints.",
           },
         ].map((item) => (
           <div key={item.title} className="bg-white rounded-xl border border-gray-200 p-5">
@@ -104,6 +118,28 @@ export default async function AmbassadorsPage() {
             <p className="text-sm text-gray-500">{item.desc}</p>
           </div>
         ))}
+      </div>
+
+      <div className="mb-12">
+        <h2 className="mb-1 text-xl font-bold text-gray-900">Selected Campus Cohorts</h2>
+        <p className="mb-4 text-sm text-gray-500">
+          Ambassador applications and programs are concentrated on these campuses.
+        </p>
+        {selectedCohorts.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+            The first campus cohort has not been selected yet.
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {selectedCohorts.map((cohort) => (
+              <Link key={cohort.id} href="/campus" className="rounded-xl border border-gray-200 bg-white p-5 transition-colors hover:border-emerald-200">
+                <p className="font-semibold text-gray-900">{cohort.university}</p>
+                <p className="mt-1 text-xs text-gray-500">{cohort.country ?? "Country not set"}</p>
+                <span className="mt-3 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold capitalize text-emerald-700">{cohort.status}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Active ambassadors */}

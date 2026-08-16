@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BrandWordmark from "@/components/ui/BrandWordmark";
+import { BRAND_DESCRIPTION, BRAND_PROMISE, BRAND_TAGLINE } from "@/lib/brand";
 
 type AuthShellProps = {
   children: React.ReactNode;
@@ -49,12 +50,10 @@ export function AuthShell({
                 {eyebrow}
               </p>
               <h2 className="font-display mt-5 text-[48px] font-semibold leading-[1.02] text-white">
-                Ideas, arguments, and academic identity in one place.
+                {BRAND_PROMISE}
               </h2>
               <p className="mt-5 max-w-md text-sm leading-7 text-white/62">
-                Join the student network built around thoughtful publishing,
-                credible profiles, and conversations that travel beyond one
-                campus.
+                {BRAND_DESCRIPTION}
               </p>
             </div>
           </div>
@@ -94,7 +93,7 @@ export function AuthShell({
                 <BrandWordmark iconClassName="h-7 w-7" textClassName="text-[21px]" />
               </Link>
               <p className="mt-3 text-[13px] font-medium text-ink-muted">
-                Africa&apos;s Intellectual Network
+                {BRAND_TAGLINE}
               </p>
             </div>
 

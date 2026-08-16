@@ -65,6 +65,7 @@ export async function createPost(input: {
   body: string;
   imageUrl?: string | null;
   inResponseTo?: string | null;
+  promptId?: string | null;
   topics: string[];
 }) {
   const supabase = await createClient();
@@ -126,6 +127,56 @@ export async function createPost(input: {
     responseParent = parentValidation.parent;
   }
 
+  let campusPromptId: string | null = null;
+  if (input.promptId) {
+    const [
+      { data: cohortMembership },
+      { data: ambassadorAssignment },
+      { data: prompt },
+    ] = await Promise.all([
+      supabase
+        .from("campus_cohort_memberships")
+        .select("cohort_id")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("campus_ambassadors")
+        .select("campus_cohort_id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .maybeSingle(),
+      supabase
+        .from("campus_editorial_prompts")
+        .select(
+          "id, cohort_id, starts_at, ends_at, active, campus_cohorts!inner(status)"
+        )
+        .eq("id", input.promptId)
+        .maybeSingle(),
+    ]);
+    const cohort = prompt
+      ? Array.isArray(prompt.campus_cohorts)
+        ? prompt.campus_cohorts[0] ?? null
+        : prompt.campus_cohorts
+      : null;
+    const now = Date.now();
+    const startsAt = prompt?.starts_at ? new Date(prompt.starts_at).getTime() : NaN;
+    const endsAt = prompt?.ends_at ? new Date(prompt.ends_at).getTime() : null;
+    const validPrompt = Boolean(
+      prompt?.active &&
+        cohort &&
+        ["selected", "active"].includes(cohort.status) &&
+        (cohortMembership?.cohort_id === prompt.cohort_id ||
+          ambassadorAssignment?.campus_cohort_id === prompt.cohort_id) &&
+        Number.isFinite(startsAt) &&
+        startsAt <= now &&
+        (endsAt === null || endsAt > now)
+    );
+    if (!validPrompt) {
+      return { error: "This campus prompt is no longer available to your cohort.", slug: null as string | null };
+    }
+    campusPromptId = prompt?.id ?? null;
+  }
+
   const normalizedBody = normalizeShortPostText(input.body);
   const sanitizedContent = buildShortPostHtml(input.body);
   const excerpt = deriveShortPostExcerpt(normalizedBody);
@@ -162,6 +213,7 @@ export async function createPost(input: {
   revalidatePath("/dashboard");
   revalidatePath(`/post/${slug}`);
   revalidatePath("/");
+  if (campusPromptId) revalidatePath("/campus");
 
   schedulePublicationDistribution(data.id, "Short Post");
 
@@ -183,11 +235,34 @@ export async function createPost(input: {
     });
   }
 
+  if (campusPromptId) {
+    const { error: promptLinkError } = await supabase
+      .from("campus_prompt_submissions")
+      .insert({ prompt_id: campusPromptId, post_id: data.id, author_id: user.id });
+    if (promptLinkError) {
+      console.warn("[campus] published post could not be linked to prompt", promptLinkError.message);
+    } else {
+      await recordActivationEvent({
+        supabase,
+        event: "campus_prompt_published",
+        userId: user.id,
+        metadata: { postId: data.id, promptId: campusPromptId },
+        source: "server_action",
+        route: "/create/post",
+      });
+    }
+  }
+
   await recordActivationEvent({
     supabase,
     event: "post_submitted",
     userId: user.id,
-    metadata: { postId: data.id, postType: "blog", status: "published" },
+    metadata: {
+      postId: data.id,
+      postType: "blog",
+      status: "published",
+      promptId: campusPromptId,
+    },
     source: "server_action",
     route: "/create/post",
   });

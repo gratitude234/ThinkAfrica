@@ -277,16 +277,16 @@ export async function sendWelcomeEmail(input: {
   const email = normalizeEmail(input.email);
   const name = input.fullName?.trim();
   const intro = name
-    ? `Welcome to Indegenius, ${name}. Finish your profile so your writing, comments, and follows carry a credible academic identity.`
-    : "Welcome to Indegenius. Finish your profile so your writing, comments, and follows carry a credible academic identity.";
+    ? `Welcome to Indegenius, ${name}. Complete your profile, then publish or respond to begin an evidence-backed record of what you think and contribute.`
+    : "Welcome to Indegenius. Complete your profile, then publish or respond to begin an evidence-backed record of what you think and contribute.";
 
   const result = await sendDirectEmail({
     to: email,
-    subject: "Welcome to Indegenius",
-    preview: "Finish setting up your Indegenius profile.",
-    title: "Welcome to Indegenius",
+    subject: "Start building your intellectual identity",
+    preview: "Complete your profile and begin your Intellectual Record.",
+    title: "Build your intellectual identity.",
     intro,
-    ctaLabel: "Complete your profile",
+    ctaLabel: "Start your Intellectual Record",
     ctaPath: "/onboarding",
     idempotencyKey: `welcome:${email}`,
   });

@@ -41,8 +41,8 @@ export const PROFILE_TYPE_OPTIONS = [
   },
   {
     value: "other",
-    label: "Other",
-    description: "Use this if none of the listed identities fits well.",
+    label: "Independent thinker / other",
+    description: "Writing and developing ideas outside the listed roles.",
   },
 ] as const;
 

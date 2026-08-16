@@ -2,24 +2,17 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const foundation = readFileSync(
-  resolve(
-    process.cwd(),
-    "supabase/migrations/20260728000001_debate_v1_5_foundation.sql"
-  ),
-  "utf8"
+function readSource(path: string) {
+  return readFileSync(resolve(process.cwd(), path), "utf8").replace(/\r\n?/g, "\n");
+}
+
+const foundation = readSource(
+  "supabase/migrations/20260728000001_debate_v1_5_foundation.sql"
 );
-const rpcs = readFileSync(
-  resolve(
-    process.cwd(),
-    "supabase/migrations/20260728000002_debate_v1_5_rpcs.sql"
-  ),
-  "utf8"
+const rpcs = readSource(
+  "supabase/migrations/20260728000002_debate_v1_5_rpcs.sql"
 );
-const actions = readFileSync(
-  resolve(process.cwd(), "app/(main)/debates/[id]/v15/actions.ts"),
-  "utf8"
-);
+const actions = readSource("app/(main)/debates/[id]/v15/actions.ts");
 
 const clientRpcNames = [
   "create_debate_v1_5",

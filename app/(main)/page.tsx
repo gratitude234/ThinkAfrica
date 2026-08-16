@@ -22,35 +22,33 @@ import {
   type FeaturedPostRow as FeaturedPostRaw,
 } from "@/lib/dailyBrief";
 import PostsFeedSection from "./PostsFeedSection";
-import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl, canonicalPath } from "@/lib/site";
+import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
 import {
   isAuthorSubscriptionsUxV2Enabled,
   isTopicSubscriptionsEnabled,
 } from "@/lib/featureFlags";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
+import { BRAND_PROMISE, BRAND_SEO_DESCRIPTION } from "@/lib/brand";
 
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "African Student Posts, Articles and Research",
-  description:
-    "Discover posts, articles, research, debates, and policy ideas from African students and scholars.",
-  alternates: { canonical: canonicalPath("/") },
+  title: "Build Your Intellectual Identity",
+  description: BRAND_SEO_DESCRIPTION,
+  alternates: { canonical: canonicalPath("/landing") },
   openGraph: {
-    title: "Indegenius - Africa's Intellectual Social Network",
-    description:
-      "Discover posts, articles, research, debates, and policy ideas from African students and scholars.",
-    url: SITE_URL,
+    title: `Indegenius | ${BRAND_PROMISE}`,
+    description: BRAND_SEO_DESCRIPTION,
+    url: absoluteUrl("/landing"),
     siteName: SITE_NAME,
     images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Indegenius - Africa's Intellectual Social Network",
-    description:
-      "Discover posts, articles, research, debates, and policy ideas from African students and scholars.",
+    title: `Indegenius | ${BRAND_PROMISE}`,
+    description: BRAND_SEO_DESCRIPTION,
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
 };

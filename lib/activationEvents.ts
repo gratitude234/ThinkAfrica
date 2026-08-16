@@ -55,6 +55,11 @@ export type ActivationEventName =
   | "message_started"
   | "message_sent"
   | "response_thread_opened"
+  | "campus_hub_viewed"
+  | "campus_prompt_opened"
+  | "campus_prompt_published"
+  | "ambassador_activity_logged"
+  | "ambassador_application_submitted"
   | "push_nudge_shown"
   | "push_nudge_action"
   | "push_permission_resolved"
@@ -85,6 +90,7 @@ const VIEW_EVENTS = new Set<ActivationEventName>([
   "fellowship_opened",
   "collaboration_panel_viewed",
   "response_thread_opened",
+  "campus_hub_viewed",
   "weekly_digest_previewed",
   "quality_check_viewed",
   "author_subscription_nudge_shown",

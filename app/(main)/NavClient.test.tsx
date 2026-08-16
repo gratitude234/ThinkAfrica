@@ -101,7 +101,7 @@ describe("NavClient desktop nav handoff", () => {
   it("hands the primary links to the side rail at xl", () => {
     renderNav();
 
-    const links = screen.getByRole("link", { name: "Home" }).parentElement;
+    const links = screen.getByRole("link", { name: "For you" }).parentElement;
     expect(links).toHaveClass("xl:hidden");
   });
 
@@ -136,7 +136,7 @@ describe("NavClient desktop nav handoff", () => {
   it("leaves the announcement strip outside the sticky wrapper", () => {
     const { container } = renderNav();
 
-    const strip = screen.getByText("Africa's intellectual social network");
+    const strip = screen.getByText("Africa's First Intellectual Social Network");
     expect(strip.closest(".sticky")).toBeNull();
     expect(container.querySelector(".sticky")).not.toBeNull();
   });

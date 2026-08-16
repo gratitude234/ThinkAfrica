@@ -1,6 +1,34 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import AboutAnimations from "./AboutAnimations";
 import AboutTeamCard, { type TeamMember } from "./AboutTeamCard";
+import {
+  BRAND_AUDIENCE,
+  BRAND_ORIGIN_STATEMENT,
+  BRAND_PROMISE,
+  BRAND_SEO_DESCRIPTION,
+} from "@/lib/brand";
+import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: { absolute: "About Indegenius | Build Your Intellectual Identity" },
+  description: BRAND_SEO_DESCRIPTION,
+  alternates: { canonical: canonicalPath("/about") },
+  openGraph: {
+    title: `About Indegenius | ${BRAND_PROMISE}`,
+    description: BRAND_SEO_DESCRIPTION,
+    url: absoluteUrl("/about"),
+    siteName: SITE_NAME,
+    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `About Indegenius | ${BRAND_PROMISE}`,
+    description: BRAND_SEO_DESCRIPTION,
+    images: [absoluteUrl(DEFAULT_OG_IMAGE)],
+  },
+};
 
 const STATS = [
   { value: "Post", label: "Lightweight publishing" },
@@ -13,19 +41,19 @@ const BELIEFS = [
   {
     number: "01",
     title: "Rigour without gatekeeping",
-    body: "Student work can receive formal editorial review, become citable, and be taken seriously without requiring a PhD or institutional affiliation.",
+    body: "Serious work can receive formal editorial review, become citable, and be taken seriously without requiring a PhD or institutional affiliation.",
     accent: "border-l-emerald-brand text-emerald-700",
   },
   {
     number: "02",
-    title: "Pan-African by design",
-    body: "Ideas from Accra, Nairobi, Lagos, and Cape Town belong in the same conversation. Borders are not intellectual boundaries.",
+    title: "African in origin, open to ideas",
+    body: `${BRAND_ORIGIN_STATEMENT} Ideas from Accra, Nairobi, Lagos, Cape Town, and beyond belong in the same conversation.`,
     accent: "border-l-purple-accent text-purple-accent",
   },
   {
     number: "03",
-    title: "Built for the continent's realities",
-    body: "From low-bandwidth mode to WhatsApp-native sharing and audio summaries, we build for how Africa actually connects.",
+    title: "Designed from lived context",
+    body: "From low-bandwidth mode to WhatsApp-native sharing and audio summaries, we build from how people across Africa actually connect.",
     accent: "border-l-gold text-amber-700",
   },
 ];
@@ -33,24 +61,24 @@ const BELIEFS = [
 const GAPS = [
   {
     number: "01",
-    title: "Ideas stay on campus",
-    body: "Brilliant student research and policy thinking is buried in university repositories or lives only in seminar rooms, seen by no one who can act on it.",
+    title: "Ideas disappear without a record",
+    body: "Valuable thinking is scattered across private documents, classrooms, workplaces, and temporary feeds, where few people can find or build on it.",
     tag: "Access gap",
     accent: "bg-emerald-brand",
     tagClass: "bg-emerald-400/15 text-emerald-200",
   },
   {
     number: "02",
-    title: "No shared intellectual space",
-    body: "African students lack a high-quality common platform to publish, debate, and collaborate across institutions and borders.",
+    title: "Contribution stays fragmented",
+    body: "Young people who engage seriously with ideas lack one place to publish, debate, collaborate, and build a durable record across communities.",
     tag: "Platform gap",
     accent: "bg-purple-accent",
     tagClass: "bg-purple-400/15 text-purple-200",
   },
   {
     number: "03",
-    title: "Disconnected from decision-makers",
-    body: "Student voices on pressing issues rarely reach the policymakers and institutions who most need to hear them.",
+    title: "Potential is hard to verify",
+    body: "Strong ideas from emerging thinkers rarely reach the institutions, collaborators, and communities that could act on them.",
     tag: "Impact gap",
     accent: "bg-gold",
     tagClass: "bg-amber-400/15 text-amber-200",
@@ -79,10 +107,10 @@ const TEAM_MEMBERS: TeamMember[] = [
     imagePosition: "50% 48%",
     badgeClass: "bg-purple-50 text-purple-700",
     shortBio:
-      "Law student and Co-Founder, driven by the belief that Africa's students have ideas worth hearing, publishing, debating, and acting on. Responsible for building Indegenius's credibility infrastructure across institutions.",
+      "Law student and Co-Founder, driven by the belief that Africa's young thinkers have ideas worth hearing, publishing, debating, and acting on. Responsible for building Indegenius's credibility infrastructure across institutions.",
     fullBio: [
-      "Malik sees Indegenius as more than an app: a movement for student voices, intellectual growth, and Pan-African impact.",
-      "He is helping build a place where young African thinkers can connect across universities, challenge ideas through debates, and produce research that can influence institutions, communities, and public policy.",
+      "Malik sees Indegenius as more than an app: a movement for young thinkers, intellectual growth, and Pan-African impact.",
+      "He is helping build a place where young thinkers can connect across communities, challenge ideas through debates, and produce research that can influence institutions, communities, and public policy.",
       "His commitment is rooted in the belief that Africa's future will be shaped by the quality of ideas its young people are allowed to express, test, and refine.",
     ],
   },
@@ -94,7 +122,7 @@ const TEAM_MEMBERS: TeamMember[] = [
     shortBio:
       "Self-taught full-stack developer building Indegenius from the ground up while studying at JABU, Nigeria. Ships editorial-review workflows, debate mechanics, AI audio summaries, and low-bandwidth modes.",
     fullBio: [
-      "His vision for Indegenius has always been technical as much as intellectual: African university students deserve a platform with the credibility, depth, and design quality of established academic journals, built natively for the realities of the continent.",
+      "His vision for Indegenius has always been technical as much as intellectual: a platform that began in African university communities can offer young people the credibility, depth, and design quality their serious work deserves.",
       "He has independently architected and shipped the platform's core systems, from editorial-review workflows and debate mechanics to AI-powered audio summaries, low-bandwidth modes, and WhatsApp-native sharing.",
       "For Gratitude, Indegenius is proof that the best technology is built by people who live closest to the problem.",
     ],
@@ -153,17 +181,15 @@ export default function AboutPage() {
             data-about-delay="1"
             className="mx-auto max-w-[740px] font-display text-[40px] font-bold leading-[1.08] tracking-tight text-ink sm:text-[56px] lg:text-[64px]"
           >
-            Where African student ideas <em className="text-emerald-700">become </em>
-            the record
+            {BRAND_PROMISE}
           </h1>
           <p
             data-about-reveal="up"
             data-about-delay="2"
             className="mx-auto mt-5 max-w-[520px] text-base leading-[1.75] text-ink-muted"
           >
-            A platform built on the conviction that Africa&apos;s most important
-            thinking is happening on its campuses, and it deserves to be heard
-            far beyond them.
+            Indegenius helps young people turn what they write, argue, research,
+            and contribute into a lasting Intellectual Record. {BRAND_ORIGIN_STATEMENT}
           </p>
 
           <div
@@ -201,16 +227,16 @@ export default function AboutPage() {
             </h2>
             <div className="mt-5 space-y-4 text-[15px] leading-[1.8] text-ink-muted">
               <p>
-                Africa&apos;s most pressing problems, from governance to climate
-                to economic design, are being studied, debated, and partially
-                solved in university seminar rooms and student dormitories. But
-                almost none of it reaches the people who need it.
+                Serious ideas are being developed everywhere: in classrooms,
+                workplaces, communities, and private drafts. Too often, that
+                thinking remains scattered and disappears before others can
+                discover, test, or build on it.
               </p>
               <p>
-                Indegenius was founded to fix that. Not as a blog, not as a
-                social feed, but as a serious publishing and intellectual
-                community built natively for African students, in African
-                contexts, with African ambition.
+                Indegenius was founded in African university communities to fix
+                that—not as a blog or another quick-take feed, but as
+                infrastructure for publishing, discourse, and evidence-backed
+                intellectual identity.
               </p>
             </div>
 
@@ -303,12 +329,12 @@ export default function AboutPage() {
         <div className="mb-10 max-w-[540px]" data-about-reveal="up">
           <Eyebrow>The founding team</Eyebrow>
           <h2 className="font-display text-3xl font-bold tracking-tight text-ink sm:text-[34px]">
-            Built by students, for students
+            Built from Africa, for people who engage with ideas
           </h2>
           <p className="mt-3 text-[15px] leading-[1.75] text-ink-muted">
-            Indegenius is led by students and operators who believe African
-            student ideas deserve serious infrastructure, patient leadership,
-            and world-class execution.
+            Indegenius is led by students and operators building serious
+            infrastructure for {BRAND_AUDIENCE} whose work deserves patient
+            development and world-class execution.
           </p>
         </div>
 
@@ -367,26 +393,24 @@ export default function AboutPage() {
               Join the community
             </p>
             <h2 className="font-display text-3xl font-bold leading-tight tracking-tight text-white sm:text-[42px]">
-              Ready to add your voice
-              <br />
-              to <em className="text-emerald-brand">the record?</em>
+              Ready to build your intellectual identity?
             </h2>
             <p className="mx-auto mt-4 max-w-[460px] text-[15px] leading-[1.7] text-white/60">
-              Join Africa&apos;s most ambitious intellectual community. Read,
-              write, debate. Free for all students.
+              Join people who take ideas seriously. Read, publish, respond,
+              debate, and build a record that grows with you. Free to join.
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3">
               <Link
                 href="/write"
                 className="inline-flex rounded-[10px] bg-emerald-brand px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-[#0E4B37]"
               >
-                Start Writing
+                Start your record
               </Link>
               <Link
                 href="/?guest=1"
                 className="inline-flex rounded-[10px] border border-white/15 bg-white/10 px-8 py-3.5 text-sm font-medium text-white/85 transition hover:bg-white/15"
               >
-                Explore Essays
+                Explore ideas
               </Link>
             </div>
           </div>

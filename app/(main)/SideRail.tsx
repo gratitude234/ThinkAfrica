@@ -8,6 +8,7 @@ import CreateTrigger from "./CreateTrigger";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import {
   BookmarksIcon,
+  CampusIcon,
   DebatesIcon,
   ExploreIcon,
   HomeIcon,
@@ -15,6 +16,7 @@ import {
   NAV_MATCH_PREFIXES,
   OpportunitiesIcon,
   ProfileIcon,
+  ResponsesIcon,
   isAccountNavActive,
   isNavItemActive,
   type NavIconProps,
@@ -100,14 +102,14 @@ export default function SideRail({
       <nav aria-label="Sections" className="flex flex-col gap-0.5">
         <RailLink
           href="/"
-          label="Home"
+          label="For you"
           icon={HomeIcon}
           fillWhenActive
           isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.home)}
         />
         <RailLink
           href="/explore"
-          label="Explore"
+          label="Discover"
           icon={ExploreIcon}
           isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore)}
         />
@@ -131,6 +133,26 @@ export default function SideRail({
             ) : null}
           </RailLink>
         ) : null}
+        <RailLink
+          href="/responses"
+          label="Responses"
+          icon={ResponsesIcon}
+          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.responses)}
+        />
+        <RailLink
+          href="/campus"
+          label="Campus"
+          icon={CampusIcon}
+          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.campus)}
+        />
+        <RailLink
+          href={userId ? "/me" : "/signup"}
+          label={userId ? "My record" : "Join"}
+          icon={ProfileIcon}
+          fillWhenActive
+          isCurrent={accountActive}
+        />
+        <div className="my-2 border-t border-gray-200" aria-hidden="true" />
         <RailLink
           href="/opportunities"
           label="Opportunities"
@@ -156,13 +178,6 @@ export default function SideRail({
             ) : undefined
           }
         />
-        <RailLink
-          href={userId ? "/me" : "/signup"}
-          label={userId ? "Me" : "Join"}
-          icon={ProfileIcon}
-          fillWhenActive
-          isCurrent={accountActive}
-        />
       </nav>
 
       <CreateTrigger
@@ -179,7 +194,7 @@ export default function SideRail({
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
         </svg>
-        Create
+        Publish
       </CreateTrigger>
     </aside>
   );

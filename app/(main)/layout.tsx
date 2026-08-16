@@ -34,7 +34,7 @@ export default async function MainLayout({
       user
         ? supabase
             .from("profiles")
-            .select("points, username, full_name, role, avatar_url")
+            .select("username, full_name, role, avatar_url")
             .eq("id", user.id)
             .single()
         : Promise.resolve({ data: null }),

@@ -84,13 +84,13 @@ function PersonalAction({
 
   return (
     <SideCard>
-      <Kicker>Complete your setup</Kicker>
+      <Kicker>Start building your record</Kicker>
       <p className="text-[14px] font-semibold text-ink">{activationState.nextTask.label}</p>
       <p className="mt-1 text-[12.5px] leading-5 text-gray-500">{activationState.nextTask.description}</p>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100" aria-label={`${progress}% complete`} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
         <div className="h-full rounded-full bg-emerald-brand" style={{ width: `${progress}%` }} />
       </div>
-      <Link href={activationState.nextTask.href} className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">Continue setup →</Link>
+      <Link href={activationState.nextTask.href} className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">Continue →</Link>
     </SideCard>
   );
 }

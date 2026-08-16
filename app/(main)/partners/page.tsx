@@ -1,5 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
+import type { Metadata } from "next";
 import PartnerContactForm from "./PartnerContactForm";
+import { canonicalPath } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Institutional Partners",
+  description:
+    "Institutions supporting serious ideas, evidence-backed intellectual identity, and emerging thinkers on Indegenius.",
+  alternates: { canonical: canonicalPath("/partners") },
+};
 
 const TYPE_STYLES: Record<string, string> = {
   university: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -32,7 +41,7 @@ export default async function PartnersPage() {
       <div className="text-center mb-12">
         <h1 className="text-3xl font-bold text-gray-900 mb-3">Institutional Partners</h1>
         <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-          Institutions That Believe in African Student Scholarship
+          Institutions that help serious ideas travel further
         </p>
       </div>
 
@@ -94,7 +103,7 @@ export default async function PartnersPage() {
             Become a Partner
           </h2>
           <p className="text-gray-500 text-sm text-center mb-6">
-            Join the growing network of institutions supporting African student scholarship.
+            Support emerging thinkers and the evidence-backed work in their Intellectual Records.
           </p>
           <PartnerContactForm />
         </div>

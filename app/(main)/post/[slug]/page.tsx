@@ -10,7 +10,6 @@ import AuthorRelationshipProvider from "@/components/profile/AuthorRelationshipP
 import {
   formatDate,
   formatRelativeTime,
-  pointsForPost,
   sanitizePostExcerpt,
   getPostMetaDescription,
   type PostType,
@@ -1132,12 +1131,10 @@ async function PostContinueExploringSection({
 async function PostPublishSuccessSection({
   post,
   author,
-  points,
   secondaryDataPromise,
 }: {
   post: PostRecord;
   author: AuthorProfile | null;
-  points: number;
   secondaryDataPromise: Promise<SecondaryData>;
 }) {
   const { relatedPosts } = await secondaryDataPromise;
@@ -1149,7 +1146,6 @@ async function PostPublishSuccessSection({
       postType={post.type}
       title={getPostMetadataTitle(post, author)}
       slug={post.slug}
-      points={points}
       username={author?.username ?? ""}
       relatedTarget={
         related
@@ -1467,7 +1463,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
-  const authorLabel = author?.full_name ?? author?.username ?? "a student";
+  const authorLabel = author?.full_name ?? author?.username ?? "an Indegenius contributor";
   const metadataTitle = getPostMetadataTitle(post, author);
   const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
   const description = getPostMetaDescription({
@@ -1740,7 +1736,6 @@ export default async function PostPage({ params, searchParams }: PageProps) {
               <PostPublishSuccessSection
                 post={post}
                 author={author}
-                points={pointsForPost(post)}
                 secondaryDataPromise={secondaryDataPromise}
               />
             </Suspense>
@@ -2026,7 +2021,6 @@ export default async function PostPage({ params, searchParams }: PageProps) {
             <PostPublishSuccessSection
               post={post}
               author={author}
-              points={pointsForPost(post)}
               secondaryDataPromise={secondaryDataPromise}
             />
           </Suspense>

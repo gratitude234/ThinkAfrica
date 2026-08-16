@@ -105,7 +105,7 @@ export default async function MePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("username, full_name, avatar_url, points, role")
+    .select("username, full_name, avatar_url, role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -170,7 +170,7 @@ export default async function MePage() {
                 {username ? `@${username}` : user.email}
               </p>
               <p className="mt-1 text-xs font-semibold text-emerald-700">
-                {(profile.points ?? 0).toLocaleString()} pts
+                Your Intellectual Record
               </p>
             </div>
           </div>
@@ -179,7 +179,7 @@ export default async function MePage() {
             href={profileHref}
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
           >
-            {username ? "View public profile" : "Complete profile"}
+            {username ? "Open Intellectual Record" : "Complete profile"}
           </Link>
         </div>
       </section>

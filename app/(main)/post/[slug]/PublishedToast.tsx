@@ -18,7 +18,6 @@ interface Props {
   postType: string;
   title: string;
   slug: string;
-  points: number;
   username: string;
   relatedTarget: RelatedTarget | null;
 }
@@ -27,14 +26,14 @@ type NextAction =
   | "read_related"
   | "read_latest"
   | "write_response"
-  | "view_dashboard";
+  | "view_record"
+  | "track_review";
 
 export default function PublishedToast({
   postId,
   postType,
   title,
   slug,
-  points,
   username,
   relatedTarget,
 }: Props) {
@@ -124,11 +123,11 @@ export default function PublishedToast({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                {isLive ? "Published" : "Submitted for review"}
+                {isLive ? "Added to your record" : "Submitted for review"}
               </p>
               <h2 className="mt-2 font-display text-2xl font-semibold leading-tight text-ink">
                 {isLive
-                  ? "Your first contribution is live"
+                  ? "This contribution is now part of your Intellectual Record"
                   : "Your contribution is in the editorial queue"}
               </h2>
             </div>
@@ -144,8 +143,8 @@ export default function PublishedToast({
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
             {isLive
-              ? `You earned +${points} points, and this piece now strengthens your public Indegenius profile. Keep the loop going by reading a related idea and adding a response if you have a useful angle.`
-              : "Your submission is now in editorial review. You'll be notified when a reviewer submits feedback or an editor makes a decision. Keep the momentum going — a response post often surfaces your next angle."}
+              ? "It now appears as a dated, public contribution on your profile. Keep the loop going by reading a related idea and adding a response when you have a useful angle."
+              : "Your submission is in editorial review. If accepted, its reviewed and citable evidence will appear with it in your Intellectual Record."}
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -173,16 +172,16 @@ export default function PublishedToast({
               </ResponseStartLink>
             ) : isLive ? (
               <Link
-                href={username ? `/${username}#featured-work` : "/dashboard"}
-                onClick={() => trackNextAction("view_dashboard")}
+                href={username ? `/${username}#intellectual-record` : "/dashboard"}
+                onClick={() => trackNextAction("view_record")}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
               >
-                View portfolio
+                View my record
               </Link>
             ) : (
               <Link
                 href="/dashboard"
-                onClick={() => trackNextAction("view_dashboard")}
+                onClick={() => trackNextAction("track_review")}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
               >
                 Track review status
@@ -239,7 +238,7 @@ export default function PublishedToast({
                   onClick={() => void onCopy("profile")}
                   className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
                 >
-                  {copiedTarget === "profile" ? "Profile copied" : "Copy profile"}
+                  {copiedTarget === "profile" ? "Record link copied" : "Copy record link"}
                 </button>
               ) : null}
             </div>
@@ -284,10 +283,6 @@ export default function PublishedToast({
                 </li>
               ))}
             </ol>
-
-            <p className="mt-4 text-xs leading-5 text-emerald-900/60">
-              Initial feedback usually arrives within 7–10 days.
-            </p>
 
             <div className="mt-4 grid grid-cols-3 gap-2">
               <button

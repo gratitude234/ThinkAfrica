@@ -4,6 +4,7 @@ import Link from "next/link";
 import BrandWordmark from "@/components/ui/BrandWordmark";
 import { useHasScrolled } from "@/lib/useHasScrolled";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { BRAND_TAGLINE } from "@/lib/brand";
 
 export default function LandingNav() {
   const scrolled = useHasScrolled();
@@ -20,7 +21,7 @@ export default function LandingNav() {
     <div className="sticky top-0 z-50">
       <div className="bg-emerald-brand py-1.5 text-center">
         <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold sm:text-[10.5px]">
-          Africa&apos;s intellectual social network
+          {BRAND_TAGLINE}
         </span>
       </div>
       <nav

@@ -24,6 +24,10 @@ describe("isNavItemActive", () => {
     ["/debates/live-room", NAV_MATCH_PREFIXES.debates, true],
     ["/debatesomething", NAV_MATCH_PREFIXES.debates, false],
 
+    ["/campus", NAV_MATCH_PREFIXES.campus, true],
+    ["/campus/programs", NAV_MATCH_PREFIXES.campus, true],
+    ["/campuses", NAV_MATCH_PREFIXES.campus, false],
+
     ["/opportunities", NAV_MATCH_PREFIXES.opportunities, true],
     ["/opportunities/123", NAV_MATCH_PREFIXES.opportunities, true],
 

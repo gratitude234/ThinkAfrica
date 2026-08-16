@@ -72,7 +72,7 @@ export async function updateVerificationStatus(input: {
           ? `Your Indegenius profile has been verified${
               nextVerifiedType ? ` as ${nextVerifiedType}` : ""
             }. This trust signal now appears on your public profile and byline.`
-          : "Your Indegenius profile verification was revoked or changed. Review your profile details if you need to update your academic identity.",
+          : "Your Indegenius profile verification was revoked or changed. Review your profile or supporting credentials if you need to update them.",
         ctaLabel: "Open profile settings",
         ctaPath: "/settings?tab=profile",
         preferenceKey: "email_account_security",

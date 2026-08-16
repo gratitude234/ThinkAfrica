@@ -7,7 +7,7 @@ import {
   PRIMARY_FILTERS,
   type ExploreGenreFilter,
   type ExplorePrimaryFilter,
-} from "./page";
+} from "./exploreFilters";
 
 describe("Explore taxonomy -- primary filter chips", () => {
   it("shows exactly All, Posts, Articles, Research as primary filters, in that order", () => {

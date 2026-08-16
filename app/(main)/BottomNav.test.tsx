@@ -35,8 +35,8 @@ describe("BottomNav compose access", () => {
       <BottomNav username={null} userId={null} hasActiveDebate={false} />
     );
 
-    const trigger = screen.getByRole("button", { name: "Start writing" });
-    expect(screen.queryByRole("link", { name: "Start writing" })).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Publish a contribution" });
+    expect(screen.queryByRole("link", { name: "Publish a contribution" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     fireEvent.click(trigger);
@@ -52,7 +52,7 @@ describe("BottomNav compose access", () => {
       <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
     );
 
-    expect(screen.getByRole("button", { name: "Start writing" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish a contribution" })).toBeInTheDocument();
     expect(
       screen.queryByRole("navigation", { name: "Primary navigation" })
     ).not.toBeInTheDocument();
@@ -65,7 +65,7 @@ describe("BottomNav compose access", () => {
       <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
     );
 
-    expect(screen.queryByRole("button", { name: "Start writing" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Publish a contribution" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Primary navigation" })).not.toBeInTheDocument();
   });
 });
@@ -78,15 +78,15 @@ describe("BottomNav account label and safe areas", () => {
 
   afterEach(() => cleanup());
 
-  it("labels the account destination Join for a guest and Me for a signed-in user", () => {
+  it("labels the account destination Join for a guest and Record for a signed-in user", () => {
     const { rerender } = render(
       <BottomNav username={null} userId={null} hasActiveDebate={false} />
     );
     expect(screen.getByText("Join")).toBeInTheDocument();
-    expect(screen.queryByText("Me")).not.toBeInTheDocument();
+    expect(screen.queryByText("Record")).not.toBeInTheDocument();
 
     rerender(<BottomNav username="writer" userId="user-1" hasActiveDebate={false} />);
-    expect(screen.getByText("Me")).toBeInTheDocument();
+    expect(screen.getByText("Record")).toBeInTheDocument();
     expect(screen.queryByText("Join")).not.toBeInTheDocument();
   });
 
@@ -103,13 +103,13 @@ describe("BottomNav account label and safe areas", () => {
     expect(nav.className).toMatch(/\bfixed\b/);
     expect(nav).toHaveStyle({ paddingBottom: "env(safe-area-inset-bottom)" });
 
-    for (const label of ["Home", "Explore", "Debates", "Messages", "Me"]) {
+    for (const label of ["For you", "Discover", "Debates", "Responses", "Record"]) {
       const link = screen.getByText(label).closest("a");
       expect(link?.className).toMatch(/h-full/);
     }
   });
 
-  it("keeps Me selected throughout the signed-in account area", () => {
+  it("keeps Record selected throughout the signed-in account area", () => {
     for (const pathname of [
       "/me",
       "/writer",
@@ -121,7 +121,7 @@ describe("BottomNav account label and safe areas", () => {
       const { unmount } = render(
         <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
       );
-      expect(screen.getByText("Me").closest("a")).toHaveAttribute(
+      expect(screen.getByText("Record").closest("a")).toHaveAttribute(
         "aria-current",
         "page"
       );

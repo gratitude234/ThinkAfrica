@@ -1,160 +1,103 @@
-﻿"use client";
-
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import ApplicationForm from "./ApplicationForm";
 
-export default function AmbassadorApplyPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [university, setUniversity] = useState("");
-  const [why, setWhy] = useState("");
-  const [howRecruit, setHowRecruit] = useState("");
+export default async function AmbassadorApplyPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login?redirectTo=/ambassadors/apply");
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        router.push("/login?redirectTo=/ambassadors/apply");
-        return;
-      }
-      supabase
-        .from("profiles")
-        .select("university")
-        .eq("id", user.id)
-        .single()
-        .then(({ data }) => {
-          if (data?.university) setUniversity(data.university);
-        });
-    });
-  }, [router]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      router.push("/login?redirectTo=/ambassadors/apply");
-      return;
-    }
-
-    const { error: insertError } = await supabase
+  const [{ data: profile }, { data: existingApplication }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("university")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
       .from("campus_ambassadors")
-      .insert([{ user_id: user.id, university, status: "pending" }]);
+      .select("status")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
 
-    if (insertError) {
-      setError(
-        insertError.code === "23505"
-          ? "You have already applied."
-          : insertError.message
-      );
-      setLoading(false);
-      return;
-    }
-
-    setSubmitted(true);
-    setLoading(false);
-  };
-
-  if (submitted) {
-    return (
-      <div className="max-w-lg mx-auto text-center py-16">
-        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Application Submitted!</h1>
-        <p className="text-gray-500 mb-6">
-          Thank you for applying to become an Indegenius Campus Ambassador. We&apos;ll review your application and get back to you soon.
-        </p>
-        <Link
-          href="/ambassadors"
-          className="inline-flex items-center px-5 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-[#0E4B37] transition-colors"
-        >
-          Back to Ambassadors
-        </Link>
-      </div>
-    );
-  }
+  const university = profile?.university?.trim() ?? "";
+  const { data: cohort } = university
+    ? await supabase
+        .from("campus_cohorts")
+        .select("id, university")
+        .in("status", ["selected", "active"])
+        .ilike("university", university)
+        .maybeSingle()
+    : { data: null };
 
   return (
-    <div className="max-w-xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Ambassador Application</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Tell us why you&apos;d be a great Indegenius ambassador at your campus.
+    <div className="mx-auto max-w-xl">
+      <header className="mb-8">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-brand">
+          Campus density
         </p>
-      </div>
+        <h1 className="mt-2 font-display text-3xl font-semibold text-gray-950">
+          Ambassador application
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-gray-500">
+          Ambassadors operate a selected cohort through editorial prompts,
+          response circles, and recurring publication support.
+        </p>
+      </header>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            University <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            required
-            value={university}
-            onChange={(e) => setUniversity(e.target.value)}
-            placeholder="e.g. University of Lagos"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Why do you want to be an ambassador? <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            rows={4}
-            required
-            value={why}
-            onChange={(e) => setWhy(e.target.value)}
-            placeholder="Share your motivation and connection to the Indegenius mission..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            How will you recruit contributors? <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            rows={4}
-            required
-            value={howRecruit}
-            onChange={(e) => setHowRecruit(e.target.value)}
-            placeholder="Describe your plan to grow the Indegenius community at your campus..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-brand focus:border-transparent resize-none"
-          />
-        </div>
-
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-emerald-brand text-white text-sm font-medium rounded-lg hover:bg-[#0E4B37] disabled:opacity-50 transition-colors"
+      {existingApplication ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-7 text-center">
+          <h2 className="text-lg font-semibold text-gray-950">
+            Application {existingApplication.status}
+          </h2>
+          <p className="mt-2 text-sm text-gray-500">
+            {existingApplication.status === "active"
+              ? "Your Ambassador tools are ready."
+              : "The team will update this status after reviewing your campus plan."}
+          </p>
+          <Link
+            href={
+              existingApplication.status === "active"
+                ? "/ambassadors/dashboard"
+                : "/ambassadors"
+            }
+            className="mt-5 inline-flex min-h-11 items-center font-semibold text-emerald-700"
           >
-            {loading ? "Submitting..." : "Submit Application"}
-          </button>
+            {existingApplication.status === "active"
+              ? "Open Ambassador dashboard"
+              : "Back to Ambassadors"}{" "}
+            →
+          </Link>
         </div>
-      </form>
+      ) : !university ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6">
+          <h2 className="font-semibold text-amber-950">Add your university first</h2>
+          <p className="mt-2 text-sm leading-6 text-amber-800">
+            Campus applications are tied to the university on your profile.
+          </p>
+          <Link href="/settings" className="mt-4 inline-flex min-h-11 items-center font-semibold text-amber-900">
+            Update profile →
+          </Link>
+        </div>
+      ) : !cohort ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-6">
+          <h2 className="font-semibold text-gray-950">
+            Applications are not open at {university}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-gray-500">
+            Phase 3 intentionally concentrates support on selected campuses.
+            Your campus can be considered after the current cohorts show durable retention.
+          </p>
+          <Link href="/campus" className="mt-4 inline-flex min-h-11 items-center font-semibold text-emerald-700">
+            View selected campuses →
+          </Link>
+        </div>
+      ) : (
+        <ApplicationForm university={cohort.university} />
+      )}
     </div>
   );
 }
