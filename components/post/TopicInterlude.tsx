@@ -24,8 +24,12 @@ export default function TopicInterlude({ posts }: { posts: PostCardData[] }) {
 
   if (!topic) return null;
 
+  /* Inset and boxed while the feed rows around it bleed and are not -- see
+     PeopleInterlude for why that relationship inverted. The ground moved from
+     canvas to card for the same reason the chips below moved the other way: on
+     a canvas feed the old fill was the page's own colour. */
   return (
-    <section className="-mx-4 my-3 border-y border-divider bg-canvas px-4 py-4 sm:mx-0 sm:rounded-xl sm:border sm:px-5 sm:py-[18px]">
+    <section className="my-5 rounded-2xl border border-card-border bg-card px-4 py-4 sm:my-6 sm:px-5 sm:py-[18px]">
       {/* Was gray-400 -- 2.8:1 on this ground, at 11px, under uppercase
           letter-spacing. The least legible combination on the page. */}
       <p className="mb-1.5 text-kicker font-semibold uppercase text-ink-muted">
@@ -42,7 +46,7 @@ export default function TopicInterlude({ posts }: { posts: PostCardData[] }) {
           <Link
             key={post.id}
             href={`/post/${post.slug}`}
-            className="block min-h-[68px] w-[230px] shrink-0 snap-start rounded-lg border border-card-border bg-card px-3.5 py-2.5 text-meta font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink sm:w-auto"
+            className="block min-h-[68px] w-[230px] shrink-0 snap-start rounded-lg border border-card-border bg-canvas px-3.5 py-2.5 text-meta font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink sm:w-auto"
           >
             <span className="line-clamp-2">{getPostMetadataTitle(post, post.profiles)}</span>
           </Link>

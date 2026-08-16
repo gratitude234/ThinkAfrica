@@ -179,8 +179,13 @@ export default function FeedEngagementActions({
           ? "Copied"
           : "Share";
 
+  // Spacing, not a rule. This used to draw `border-t border-divider`, which
+  // was invisible work inside a bordered card but lands a few pixels above the
+  // feed row's own bottom hairline now that the feed is flat -- two parallel
+  // lines closing every post, which is a box by another name. The gap alone
+  // separates the actions from the prose; the row hairline below ends the post.
   return (
-    <div className="mt-3.5 border-t border-divider pt-2.5">
+    <div className="mt-4 pt-0.5">
       {/* Flex, not `grid grid-cols-4`. Discuss is conditional, so on any card
           that hides it the fixed four-column grid packed three buttons into
           the first three columns and left a quarter of the row empty. */}

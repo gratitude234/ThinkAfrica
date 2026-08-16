@@ -288,7 +288,7 @@ function TopicLinks({ tags }: { tags: string[] | null }) {
         <Link
           key={topic}
           href={`/topics/${encodeURIComponent(topic)}`}
-          className={`inline-flex min-h-8 items-center rounded-full border border-divider bg-canvas px-2.5 text-meta font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink ${FOCUS_RING}`}
+          className={`inline-flex min-h-8 items-center rounded-full border border-card-border bg-card px-2.5 text-meta font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink ${FOCUS_RING}`}
         >
           #{topic}
         </Link>
@@ -314,13 +314,13 @@ function FullWidthCover({
       type={post.type}
       content_kind={post.content_kind}
       article_format={post.article_format}
-      // 100vw less the shell's px-4 (32) and the card's px-3.5 (28). The old
-      // hint said 56 and was picking a slightly too-small source on phones.
-      sizes="(max-width: 640px) calc(100vw - 60px), (max-width: 1024px) 720px, 780px"
+      // 100vw less the row's own px-4 (32); the shell's px-4 is cancelled by
+      // the row's -mx-4 on phones, so it no longer enters the arithmetic.
+      sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) 720px, 780px"
       priority={priority}
       variant="feed"
       wrapperClassName="mt-3 overflow-hidden rounded-[14px]"
-      className="w-full rounded-[14px] bg-canvas"
+      className="w-full rounded-[14px] bg-card"
     />
   );
 }
@@ -441,7 +441,7 @@ function ArticleFeedCard({
             type={post.type}
             content_kind={post.content_kind}
             article_format={post.article_format}
-            sizes="(max-width: 640px) calc(100vw - 60px), (max-width: 1024px) 720px, 780px"
+            sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) 720px, 780px"
             priority={priority}
             fit="cover"
             className="aspect-[4/3] w-full bg-emerald-brand sm:aspect-[16/10]"
@@ -468,7 +468,9 @@ function ArticleFeedCard({
         // "front". It is neutral now rather than amber-on-cream: the kicker
         // directly above it is already gold, and doubling the hue on the panel
         // was what made an all-Article stretch of feed look uniformly tinted.
-        <div className="mt-3 rounded-[14px] border border-card-border bg-canvas p-4 sm:p-5">
+        // The ground flipped from canvas to card when rows went flat -- on a
+        // canvas row the old fill was the row's own colour, i.e. invisible.
+        <div className="mt-3 rounded-[14px] border border-card-border bg-card p-4 sm:p-5">
           <ArticleMeta format={format} readingTime={readingTime} />
           <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
             <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink">
@@ -550,8 +552,15 @@ function ResearchManuscriptRow({ post }: { post: PostCardData }) {
   );
   if (!hasDocument) return null;
 
+  // Spacing alone, no rule and no panel. The `border-t` this used to draw sat
+  // a few pixels above the row's own bottom hairline, so a research row ended
+  // in two parallel lines -- the boxed-in look the flat feed exists to remove.
+  // Boxing it instead was the other obvious fix and is the wrong one: the
+  // research layout is deliberately metadata-first with no PDF sub-card (see
+  // the note on the research section of /dev-preview/feed), and a bordered
+  // panel here would rebuild exactly the sub-card that decision removed.
   return (
-    <div className="mt-3 flex min-w-0 items-center gap-2 border-t border-divider pt-2.5">
+    <div className="mt-3 flex min-w-0 items-center gap-2">
       <span
         aria-hidden="true"
         className="flex h-[25px] w-[22px] shrink-0 items-center justify-center rounded-[3px] bg-purple-accent text-[7px] font-bold tracking-wide text-card"

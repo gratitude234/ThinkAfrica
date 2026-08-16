@@ -21,8 +21,14 @@ export default function PeopleInterlude({
   reason: string;
   currentUserId: string | null;
 }) {
+  /* Inset and boxed, where the feed rows around it now bleed and are not. The
+     relationship inverted when the feed went flat: this used to bleed
+     edge-to-edge on phones so it would stand out from a column of cards, and
+     would now be one more full-width block in a column of full-width blocks. A
+     border is the page's scarcest signal again, so the interruption is what
+     gets one. */
   return (
-    <section className="-mx-4 my-3 border-y border-divider bg-card px-4 py-4 sm:mx-0 sm:rounded-xl sm:border sm:px-5 sm:py-[18px]">
+    <section className="my-5 rounded-2xl border border-card-border bg-card px-4 py-4 sm:my-6 sm:px-5 sm:py-[18px]">
       <div className="mb-3.5 flex items-center justify-between">
         <div>
           {/* Was gray-400: 2.8:1, at 11px, uppercase and letter-spaced. */}

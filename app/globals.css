@@ -47,7 +47,13 @@
     --ta-card-rgb: 255 255 255;
     --ta-card-border-rgb: 233 229 222; /* #E9E5DE */
     --ta-card-border-hover-rgb: 221 215 206; /* #DDD7CE */
-    --ta-divider-rgb: 229 231 235; /* #E5E7EB, was gray-200 */
+    /* Warm, not gray-200. Once the feed went flat this stopped being a
+       hairline buried inside a card and became the only structure holding the
+       column together -- repeated on every row of a scroll. A cool grey
+       (#E5E7EB) against the warm canvas read faintly blue and dirty at that
+       repetition; this sits in the same family as --ta-card-border-rgb, a
+       touch stronger because it now carries the layout on its own. */
+    --ta-divider-rgb: 230 225 217; /* #E6E1D9 */
 
     --mobile-visual-viewport-bottom: 0px;
     /* Provider-scoped values override these pre-hydration fallbacks inside the
@@ -83,7 +89,12 @@
     --ta-card-rgb: 26 29 27;
     --ta-card-border-rgb: 47 51 48; /* #2F3330 */
     --ta-card-border-hover-rgb: 64 69 65; /* #404541 */
-    --ta-divider-rgb: 42 46 43; /* #2A2E2B */
+    /* Softened alongside the light-mode warming, for the opposite reason: feed
+       rows now sit on the canvas (#121413) rather than the card (#1A1D1B), so
+       the old #2A2E2B was a 50% bigger step than it had been and the rules
+       started to out-shout the prose. #242825 restores the original weight
+       relative to its new ground. */
+    --ta-divider-rgb: 36 40 37; /* #242825 */
   }
 
   html {

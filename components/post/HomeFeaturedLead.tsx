@@ -37,7 +37,12 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
   const hasCover = Boolean(post.cover_image_url?.trim());
 
   return (
-    <article className="relative mb-4 overflow-hidden rounded-[18px] bg-emerald-brand text-white shadow-[0_9px_26px_rgb(7_57_41/0.18)]">
+    // Kept boxed, rounded and shadowed while the feed rows below it are none
+    // of those. That is the point: with the card chrome gone from the feed,
+    // an edge is a scarce signal, and the one post the editors chose is worth
+    // spending it on. Margin matches the interludes' `my-5 sm:my-6` so the
+    // page has a single rhythm for "this is not an ordinary row".
+    <article className="relative mb-5 overflow-hidden rounded-[18px] bg-emerald-brand text-white shadow-[0_9px_26px_rgb(7_57_41/0.18)] sm:mb-6">
       {/* Phones get the cover as a short letterbox strip above the text; from
           `sm` up it moves to the bleed panel on the right. Previously it was
           `hidden sm:block` outright, so the single most prominent card in the
