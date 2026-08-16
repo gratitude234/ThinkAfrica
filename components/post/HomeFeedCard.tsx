@@ -125,36 +125,51 @@ function AuthorLine({
       ) : (
         <span className="shrink-0">{avatar}</span>
       )}
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1.5 text-byline">
-          {profile?.username ? (
-            <Link
-              href={`/${profile.username}`}
-              className={`truncate font-semibold text-ink hover:text-emerald-ink ${FOCUS_RING}`}
-            >
-              {byline}
-            </Link>
-          ) : (
-            <span className="truncate font-semibold text-ink">{byline}</span>
-          )}
-          {profile?.verified ? (
-            // The glyph takes the card's own ground colour rather than a fixed
-            // white, so it stays legible when the badge fill lightens in dark
-            // mode instead of turning into white-on-pale-lilac.
-            <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-card ${verificationClass}`}
-              title="Verified"
-            >
-              ✓
-            </span>
-          ) : null}
-        </div>
-        {profile?.university || (showTimestamp && publishedAt) ? (
-          <p className="mt-0.5 truncate text-meta text-ink-muted">
-            {profile?.university ?? ""}
-            {profile?.university && showTimestamp && publishedAt ? " · " : ""}
-            {showTimestamp && publishedAt ? formatRelativeTime(publishedAt) : ""}
-          </p>
+      {/* One line, not two. The university and timestamp used to sit on their
+          own line under the name, which cost a line of height on every post in
+          the feed -- four posts on screen meant four lines spent on metadata.
+          X, Medium and Substack all run name, source and time together on a
+          single line, and none of them lose anything by it.
+
+          Shrink order matters when the line runs out of room, and it is the
+          reverse of source order: the university truncates first (it is the
+          least load-bearing), the name truncates second, and the timestamp
+          never truncates -- "22h" is three characters and is the one piece a
+          reader scans for. Hence `shrink-0` on the time and its separator, and
+          `min-w-0` on the university so it is the flex item that gives way. */}
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-byline">
+        {profile?.username ? (
+          <Link
+            href={`/${profile.username}`}
+            className={`truncate font-semibold text-ink hover:text-emerald-ink ${FOCUS_RING}`}
+          >
+            {byline}
+          </Link>
+        ) : (
+          <span className="truncate font-semibold text-ink">{byline}</span>
+        )}
+        {profile?.verified ? (
+          // The glyph takes the card's own ground colour rather than a fixed
+          // white, so it stays legible when the badge fill lightens in dark
+          // mode instead of turning into white-on-pale-lilac.
+          <span
+            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-card ${verificationClass}`}
+            title="Verified"
+          >
+            ✓
+          </span>
+        ) : null}
+        {profile?.university ? (
+          <span className="min-w-0 truncate text-meta text-ink-muted">
+            <span aria-hidden="true">· </span>
+            {profile.university}
+          </span>
+        ) : null}
+        {showTimestamp && publishedAt ? (
+          <span className="shrink-0 whitespace-nowrap text-meta text-ink-muted">
+            <span aria-hidden="true">· </span>
+            {formatRelativeTime(publishedAt)}
+          </span>
         ) : null}
       </div>
     </div>
@@ -464,13 +479,18 @@ function ArticleFeedCard({
           </span>
         </Link>
       ) : (
-        // The cover-less article still needs a block that reads as the piece's
-        // "front". It is neutral now rather than amber-on-cream: the kicker
-        // directly above it is already gold, and doubling the hue on the panel
-        // was what made an all-Article stretch of feed look uniformly tinted.
-        // The ground flipped from canvas to card when rows went flat -- on a
-        // canvas row the old fill was the row's own colour, i.e. invisible.
-        <div className="mt-3 rounded-[14px] border border-card-border bg-card p-4 sm:p-5">
+        // No panel. A cover-less article used to get a bordered white block to
+        // stand in for the "front" a cover would have given it, but it was the
+        // last boxed thing left in a feed built to have none -- and it charged
+        // for the privilege twice, once in its own 20px of padding and again
+        // in the 12px above it, pushing the headline ~35px further from the
+        // byline than the same headline sits in a Post row.
+        //
+        // Nothing is lost by removing it. The kicker below already announces
+        // the piece as an Article, the Bodoni headline already distinguishes
+        // it from a Post's sans one, and the row hairline already says where
+        // the article stops. The box was restating all three.
+        <div className="mt-3">
           <ArticleMeta format={format} readingTime={readingTime} />
           <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
             <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">

@@ -158,8 +158,19 @@ export default function FeedEngagementActions({
     }
   };
 
+  // `ring-offset-canvas`, not `-card`. These buttons sat on a white card when
+  // the ring was written; they sit on the canvas row now, and a card-coloured
+  // offset drew a white halo around the focused button instead of blending
+  // into the ground behind it.
   const actionClass =
-    "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-meta font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none sm:px-2.5";
+    "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-meta font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-wait disabled:opacity-60 motion-reduce:transition-none sm:px-2.5";
+
+  // `hover:bg-card`, not `hover:bg-canvas`. The canvas wash worked when these
+  // buttons sat on a white card, and briefly still worked when the row itself
+  // washed to white on hover. The row has no hover state any more, so a canvas
+  // wash on a canvas row painted nothing at all -- only the text colour was
+  // still moving. White-on-cream restores the chip.
+  const actionHoverBg = "hover:bg-card";
 
   /**
    * One breakpoint for all four labels. They used to appear at three different
@@ -186,17 +197,27 @@ export default function FeedEngagementActions({
   // separates the actions from the prose; the row hairline below ends the post.
   return (
     <div className="mt-4 pt-0.5">
-      {/* Flex, not `grid grid-cols-4`. Discuss is conditional, so on any card
-          that hides it the fixed four-column grid packed three buttons into
-          the first three columns and left a quarter of the row empty. */}
-      <div className="flex items-center justify-between gap-1 text-ink-muted">
+      {/* Clustered left, not spread across the row. This was
+          `justify-between`, which pinned Like to the far left edge and Save to
+          the far right -- roughly 900px apart on a desktop column, with an
+          empty gulf between them. Nothing was gained by the distance: the four
+          belong to the same post and read as one control group, so they should
+          sit like one. It was also the single biggest reason the feed felt
+          spread out.
+
+          `justify-start` with a real gap matches how X and Medium both group
+          their engagement controls. Flex rather than `grid grid-cols-4`
+          because Discuss is conditional, and a fixed four-column grid packed
+          three buttons into the first three columns and left a quarter of the
+          row empty whenever it was hidden. */}
+      <div className="flex items-center justify-start gap-1 text-ink-muted sm:gap-2">
         <button
           type="button"
           onClick={handleLike}
           disabled={likePending}
           aria-pressed={liked}
           aria-label={liked ? "Unlike this item" : "Like this item"}
-          className={`${actionClass} ${liked ? "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400" : "hover:bg-canvas hover:text-red-600 dark:hover:text-red-400"}`}
+          className={`${actionClass} ${liked ? "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400" : `${actionHoverBg} hover:text-red-600 dark:hover:text-red-400`}`}
         >
           <svg className="h-[18px] w-[18px]" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -212,7 +233,7 @@ export default function FeedEngagementActions({
           <Link
             href={`/post/${slug}#comments`}
             aria-label={`${discussionCount} in this discussion`}
-            className={`${actionClass} hover:bg-canvas hover:text-emerald-ink`}
+            className={`${actionClass} ${actionHoverBg} hover:text-emerald-ink`}
           >
             <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -227,7 +248,7 @@ export default function FeedEngagementActions({
           onClick={handleShare}
           disabled={shareStatus === "sharing"}
           aria-label="Share this item"
-          className={`${actionClass} hover:bg-canvas hover:text-blue-700 dark:hover:text-blue-400`}
+          className={`${actionClass} ${actionHoverBg} hover:text-blue-700 dark:hover:text-blue-400`}
         >
           <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="18" cy="5" r="3" />
@@ -244,7 +265,7 @@ export default function FeedEngagementActions({
           disabled={bookmarkPending}
           aria-pressed={bookmarked}
           aria-label={bookmarked ? "Remove from saved" : "Save for later"}
-          className={`${actionClass} ${bookmarked ? "bg-green-tint text-emerald-brand dark:bg-emerald-brand dark:text-emerald-ink" : "hover:bg-canvas hover:text-emerald-ink"}`}
+          className={`${actionClass} ${bookmarked ? "bg-green-tint text-emerald-brand dark:bg-emerald-brand dark:text-emerald-ink" : `${actionHoverBg} hover:text-emerald-ink`}`}
         >
           <svg className="h-[18px] w-[18px]" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />

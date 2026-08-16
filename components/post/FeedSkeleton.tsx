@@ -4,17 +4,32 @@ function Block({ className }: { className: string }) {
   return <div className={`rounded bg-divider ${className}`} />;
 }
 
+/**
+ * Avatar plus a single metadata line, matching AuthorLine.
+ *
+ * This drew two stacked bars until the real byline collapsed onto one line --
+ * name above, university below. Left alone it would have put the drift back
+ * that CARD_SHELL exists to prevent: every card visibly shedding a line at the
+ * moment content arrived.
+ */
+function SkeletonByline({ nameWidth }: { nameWidth: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="h-9 w-9 shrink-0 rounded-full bg-divider" />
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Block className={`h-3 ${nameWidth}`} />
+        <Block className="h-2.5 w-20" />
+        <Block className="h-2.5 w-8" />
+      </div>
+    </div>
+  );
+}
+
 /** Titleless Post: avatar-first, body text, no cover implied. */
 function PostSkeletonCard() {
   return (
     <article className={CARD_SHELL}>
-      <div className="flex items-center gap-2.5">
-        <div className="h-9 w-9 shrink-0 rounded-full bg-divider" />
-        <div className="flex-1 space-y-1.5">
-          <Block className="h-3 w-32" />
-          <Block className="h-2.5 w-24" />
-        </div>
-      </div>
+      <SkeletonByline nameWidth="w-32" />
       <div className="mt-3 space-y-2">
         <Block className="h-3.5 w-full" />
         <Block className="h-3.5 w-4/5" />
@@ -27,13 +42,7 @@ function PostSkeletonCard() {
 function ArticleSkeletonCard({ withCover = false }: { withCover?: boolean }) {
   return (
     <article className={CARD_SHELL}>
-      <div className="flex items-center gap-2.5">
-        <div className="h-9 w-9 shrink-0 rounded-full bg-divider" />
-        <div className="flex-1 space-y-1.5">
-          <Block className="h-3 w-28" />
-          <Block className="h-2.5 w-20" />
-        </div>
-      </div>
+      <SkeletonByline nameWidth="w-28" />
       <Block className="mt-3 h-2.5 w-24" />
       <Block className="mt-2 h-5 w-5/6" />
       <Block className="mt-2 h-3.5 w-3/5" />

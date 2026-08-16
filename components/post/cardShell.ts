@@ -35,10 +35,18 @@
  *    manuscript row in HomeFeedCard). Two hairlines a few pixels apart rebuild
  *    the box the row exists to be rid of.
  *
- * Spacing is deliberately unchanged in total. The gap that used to sit between
- * cards moved inside the row, where it separates content instead of objects:
- * 20+20 between adjacent rows on mobile against the old 14+12+14, and 28+28
- * from `sm` up against the old 20+16+20. Both come to the same 40px and 56px.
+ * Spacing was first carried over unchanged from the card form -- 40px between
+ * rows on mobile, 56px from `sm` up, matching the old 14+12+14 and 20+16+20 to
+ * the pixel. That was a mistake, and a deliberate one, which is the worst kind.
+ * Those totals were calibrated for *detached* cards, where the gap was the only
+ * thing marking where one post ended: nothing else separated them, so it had to
+ * be generous. A hairline does that job now. Adding a divider and keeping the
+ * full gap is belt and braces, and it read as exactly that -- a feed of posts
+ * flung apart from each other.
+ *
+ * Now 16+16 on mobile and 20+20 from `sm` up: 32px and 40px between rows. Still
+ * well clear of X's ~24px, which is right, because a row here is a headline
+ * plus three lines of excerpt rather than a two-line message.
  *
  * The mobile `-mx-4` cancels the app shell's `px-4` so the rule reaches the
  * screen edge, while `px-4` puts the text back where it was; net, the row
@@ -49,7 +57,7 @@
 
 /** The one row geometry. Real cards and skeletons share it verbatim. */
 export const CARD_SHELL =
-  "-mx-4 border-b border-divider px-4 py-5 sm:mx-0 sm:py-7";
+  "-mx-4 border-b border-divider px-4 py-4 sm:mx-0 sm:py-5";
 
 /**
  * There is deliberately no hover state on the row itself.
