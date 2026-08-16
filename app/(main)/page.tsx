@@ -124,6 +124,19 @@ export default async function HomePage({ searchParams }: PageProps) {
     redirect("/landing");
   }
 
+  // Content-kind filtering moved off the home feed and onto Explore, which
+  // already had the same four filters plus a genre refinement underneath.
+  // Hand old `/?type=research` links over rather than dropping the filter
+  // silently: without the chips there is no longer any control on this page
+  // that could show such a filter is active or clear it, so honouring the
+  // param here would strand the reader in a narrowed feed with no way out.
+  // The raw value is passed through untouched because Explore reads the same
+  // `?type=` names and additionally maps the pre-content-model ones
+  // (`blog`, `essay`, `policy_brief`) that may still be sitting in bookmarks.
+  if (type && type !== "all") {
+    redirect(`/explore?type=${encodeURIComponent(type)}`);
+  }
+
   const showWelcomeBanner = Boolean(user) && welcome === "1";
 
   const draftCutoff = new Date(
@@ -392,7 +405,15 @@ export default async function HomePage({ searchParams }: PageProps) {
           </Suspense>
         </div>
 
-        <aside className="hidden self-start lg:sticky lg:top-[var(--app-sticky-offset)] lg:block">
+        {/* The rail can stack five cards (draft or activation, featured today,
+            debate, people, topics), which runs past 800px -- taller than the
+            ~700px of usable height on a 1366x768 laptop. A plain sticky top
+            pins the first card and puts everything below the fold permanently
+            out of reach, rendered but unscrollable. Capping the height to what
+            is actually on screen and letting the column scroll inside itself
+            keeps the lower cards reachable; when the content is shorter than
+            the cap, which is the common case, nothing changes at all. */}
+        <aside className="hidden self-start lg:sticky lg:top-[var(--app-sticky-offset)] lg:block lg:max-h-[calc(100svh-var(--app-sticky-offset)-1rem)] lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden">
           <HomeSidebar
             activeDebate={homeDebate}
             recentDraft={recentDraft ?? null}

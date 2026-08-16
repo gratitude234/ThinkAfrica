@@ -3,6 +3,7 @@ import FeedEngagementActions from "./FeedEngagementActions";
 import PostCover from "./PostCover";
 import PostImage from "./PostImage";
 import type { PostCardData } from "./PostCard";
+import { CARD_SHELL, FOCUS_RING } from "./cardShell";
 import {
   getArticleFormatLabel,
   isFormallyReviewed,
@@ -48,14 +49,6 @@ function deriveRespondingTo(
     authorUsername: responseTo.profiles?.username ?? null,
   };
 }
-
-const BASE_CARD_SHELL =
-  "mb-3 overflow-hidden rounded-[18px] border bg-white px-3.5 py-3.5 shadow-[0_2px_12px_rgb(17_24_39/0.045)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[0_10px_28px_rgb(17_24_39/0.07)] motion-reduce:transform-none motion-reduce:transition-none sm:mb-4 sm:rounded-[20px] sm:px-5 sm:py-5";
-const POST_CARD_SHELL = `${BASE_CARD_SHELL} border-[#e9e5de] hover:border-[#ddd7ce]`;
-const ARTICLE_CARD_SHELL = `${BASE_CARD_SHELL} border-[#e6ddca] hover:border-[#d8c79f]`;
-const RESEARCH_CARD_SHELL = `${BASE_CARD_SHELL} border-purple-100 border-t-[3px] border-t-purple-accent bg-[#fcfaff] hover:border-purple-200`;
-const FOCUS_RING =
-  "rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
 
 function initials(name: string) {
   return name
@@ -113,7 +106,7 @@ function AuthorLine({
   ) : (
     <span
       style={avatarDimensions}
-      className="flex items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-800"
+      className="flex items-center justify-center rounded-full bg-green-tint text-[11px] font-bold text-emerald-brand dark:bg-emerald-brand dark:text-emerald-ink"
     >
       {initials(name)}
     </span>
@@ -132,33 +125,51 @@ function AuthorLine({
       ) : (
         <span className="shrink-0">{avatar}</span>
       )}
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1.5 text-[13.5px] leading-[1.35] sm:text-[14px]">
-          {profile?.username ? (
-            <Link
-              href={`/${profile.username}`}
-              className={`truncate font-semibold text-ink hover:text-emerald-700 ${FOCUS_RING}`}
-            >
-              {byline}
-            </Link>
-          ) : (
-            <span className="truncate font-semibold text-ink">{byline}</span>
-          )}
-          {profile?.verified ? (
-            <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-white ${verificationClass}`}
-              title="Verified"
-            >
-              ✓
-            </span>
-          ) : null}
-        </div>
-        {profile?.university || (showTimestamp && publishedAt) ? (
-          <p className="mt-0.5 truncate text-[12px] leading-[1.4] text-gray-500 sm:text-[12.5px]">
-            {profile?.university ?? ""}
-            {profile?.university && showTimestamp && publishedAt ? " · " : ""}
-            {showTimestamp && publishedAt ? formatRelativeTime(publishedAt) : ""}
-          </p>
+      {/* One line, not two. The university and timestamp used to sit on their
+          own line under the name, which cost a line of height on every post in
+          the feed -- four posts on screen meant four lines spent on metadata.
+          X, Medium and Substack all run name, source and time together on a
+          single line, and none of them lose anything by it.
+
+          Shrink order matters when the line runs out of room, and it is the
+          reverse of source order: the university truncates first (it is the
+          least load-bearing), the name truncates second, and the timestamp
+          never truncates -- "22h" is three characters and is the one piece a
+          reader scans for. Hence `shrink-0` on the time and its separator, and
+          `min-w-0` on the university so it is the flex item that gives way. */}
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-byline">
+        {profile?.username ? (
+          <Link
+            href={`/${profile.username}`}
+            className={`truncate font-semibold text-ink hover:text-emerald-ink ${FOCUS_RING}`}
+          >
+            {byline}
+          </Link>
+        ) : (
+          <span className="truncate font-semibold text-ink">{byline}</span>
+        )}
+        {profile?.verified ? (
+          // The glyph takes the card's own ground colour rather than a fixed
+          // white, so it stays legible when the badge fill lightens in dark
+          // mode instead of turning into white-on-pale-lilac.
+          <span
+            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-card ${verificationClass}`}
+            title="Verified"
+          >
+            ✓
+          </span>
+        ) : null}
+        {profile?.university ? (
+          <span className="min-w-0 truncate text-meta text-ink-muted">
+            <span aria-hidden="true">· </span>
+            {profile.university}
+          </span>
+        ) : null}
+        {showTimestamp && publishedAt ? (
+          <span className="shrink-0 whitespace-nowrap text-meta text-ink-muted">
+            <span aria-hidden="true">· </span>
+            {formatRelativeTime(publishedAt)}
+          </span>
         ) : null}
       </div>
     </div>
@@ -177,7 +188,7 @@ function ContextLine({
   if (post.in_response_to && !hideRespondingTo) {
     const parent = respondingTo ?? deriveRespondingTo(post.response_to);
     return (
-      <p className="mb-2.5 flex items-start gap-1.5 text-[12.5px] leading-[1.5] text-gray-500">
+      <p className="mb-2.5 flex items-start gap-1.5 text-meta text-ink-muted">
         <span aria-hidden="true" className="mt-px">
           ↩
         </span>
@@ -188,12 +199,12 @@ function ContextLine({
               {parent.slug ? (
                 <Link
                   href={`/post/${parent.slug}`}
-                  className={`font-semibold text-gray-700 hover:text-emerald-700 hover:underline ${FOCUS_RING}`}
+                  className={`font-semibold text-ink-soft hover:text-emerald-ink hover:underline ${FOCUS_RING}`}
                 >
                   {parent.title}
                 </Link>
               ) : (
-                <span className="font-semibold text-gray-700">{parent.title}</span>
+                <span className="font-semibold text-ink-soft">{parent.title}</span>
               )}
               {parent.author && parent.hasOwnTitle !== false ? (
                 <>
@@ -201,7 +212,7 @@ function ContextLine({
                   {parent.authorUsername ? (
                     <Link
                       href={`/${parent.authorUsername}`}
-                      className={`hover:text-emerald-700 hover:underline ${FOCUS_RING}`}
+                      className={`hover:text-emerald-ink hover:underline ${FOCUS_RING}`}
                     >
                       {parent.author}
                     </Link>
@@ -221,7 +232,7 @@ function ContextLine({
 
   if (surface === "home" && post.surface_reason) {
     return (
-      <p className="mb-2.5 flex items-center gap-2 text-[12px] font-semibold text-gold-ink sm:text-[12.5px]">
+      <p className="mb-2.5 flex items-center gap-2 text-meta font-semibold text-gold-ink">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden="true" />
         {post.surface_reason}
       </p>
@@ -232,7 +243,7 @@ function ContextLine({
     const reason = post.subscription_match?.reasons[0];
     if (reason) {
       return (
-        <p className="mb-2.5 text-[12.5px] font-medium text-emerald-800">
+        <p className="mb-2.5 text-meta font-medium text-emerald-ink">
           {reason.kind === "author"
             ? `Because you subscribe to ${reason.label}`
             : `From #${reason.label}`}
@@ -269,25 +280,19 @@ function Actions({
   );
 }
 
-function TopicLinks({
-  tags,
-  tone = "post",
-}: {
-  tags: string[] | null;
-  tone?: "post" | "article" | "research";
-}) {
+/**
+ * Topic chips carry no content-kind tint. They used to come in three tones
+ * (grey for Post, amber for Article, purple for Research), which meant the
+ * same hue appeared on the card border, the kicker and the chips at once, and
+ * a mixed feed showed three palettes stacked. The kicker states the kind
+ * already; the chips just need to read as navigable.
+ */
+function TopicLinks({ tags }: { tags: string[] | null }) {
   const topics = (tags ?? [])
     .map((tag) => tag.trim())
     .filter(Boolean)
     .slice(0, 2);
   if (topics.length === 0) return null;
-
-  const toneClass =
-    tone === "research"
-      ? "border-purple-100 bg-purple-50 text-purple-accent hover:border-purple-300 hover:bg-purple-100"
-      : tone === "article"
-        ? "border-amber-100 bg-amber-50 text-gold-ink hover:border-amber-300 hover:bg-amber-100"
-        : "border-gray-200 bg-canvas text-gray-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800";
 
   return (
     <nav
@@ -298,7 +303,7 @@ function TopicLinks({
         <Link
           key={topic}
           href={`/topics/${encodeURIComponent(topic)}`}
-          className={`inline-flex min-h-8 items-center rounded-full border px-2.5 text-[12px] font-semibold transition-colors ${toneClass} ${FOCUS_RING}`}
+          className={`inline-flex min-h-8 items-center rounded-full border border-card-border bg-card px-2.5 text-meta font-semibold text-ink-soft transition-colors hover:border-emerald-ink hover:text-emerald-ink ${FOCUS_RING}`}
         >
           #{topic}
         </Link>
@@ -324,11 +329,13 @@ function FullWidthCover({
       type={post.type}
       content_kind={post.content_kind}
       article_format={post.article_format}
-      sizes="(max-width: 640px) calc(100vw - 56px), (max-width: 1024px) 720px, 780px"
+      // 100vw less the row's own px-4 (32); the shell's px-4 is cancelled by
+      // the row's -mx-4 on phones, so it no longer enters the arithmetic.
+      sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) 720px, 780px"
       priority={priority}
       variant="feed"
       wrapperClassName="mt-3 overflow-hidden rounded-[14px]"
-      className="w-full rounded-[14px] bg-[#f3f1ec]"
+      className="w-full rounded-[14px] bg-card"
     />
   );
 }
@@ -346,7 +353,7 @@ function PostFeedCard({
   const excerpt = sanitizePostExcerpt(post.excerpt) || "View post";
 
   return (
-    <article className={POST_CARD_SHELL} data-content-kind="post">
+    <article className={CARD_SHELL} data-content-kind="post">
       <ContextLine
         post={post}
         surface={surface}
@@ -356,8 +363,8 @@ function PostFeedCard({
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
       <div className="mt-3">
         {title ? (
-          <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-            <h2 className="font-sans text-[19px] font-semibold leading-[1.3] text-ink sm:text-[21px]">
+          <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
+            <h2 className="font-sans text-title font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
               {title}
             </h2>
           </Link>
@@ -369,9 +376,9 @@ function PostFeedCard({
           <p
             className={`${
               title
-                ? "line-clamp-3 text-[15.5px] text-gray-600"
-                : "line-clamp-6 text-[16px] text-gray-800 sm:text-[16.5px]"
-            } whitespace-pre-line leading-[1.62]`}
+                ? "line-clamp-3 text-excerpt text-ink-soft"
+                : "line-clamp-6 text-lede text-ink"
+            } max-w-measure whitespace-pre-line`}
           >
             {excerpt}
           </p>
@@ -395,7 +402,7 @@ function ArticleMeta({
 }) {
   return (
     <p
-      className={`font-sans text-[10.5px] font-bold uppercase tracking-[0.15em] sm:text-[11px] ${
+      className={`font-sans text-kicker font-bold uppercase ${
         onCover ? "text-[#f1c86e]" : "text-gold-ink"
       }`}
       aria-label={`Article${format ? `, ${format}` : ""}, ${readingTime} minute read`}
@@ -429,7 +436,7 @@ function ArticleFeedCard({
   const readingTime = readTime(excerpt);
 
   return (
-    <article className={ARTICLE_CARD_SHELL} data-content-kind="article">
+    <article className={CARD_SHELL} data-content-kind="article">
       <ContextLine
         post={post}
         surface={surface}
@@ -449,7 +456,7 @@ function ArticleFeedCard({
             type={post.type}
             content_kind={post.content_kind}
             article_format={post.article_format}
-            sizes="(max-width: 640px) calc(100vw - 56px), (max-width: 1024px) 720px, 780px"
+            sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) 720px, 780px"
             priority={priority}
             fit="cover"
             className="aspect-[4/3] w-full bg-emerald-brand sm:aspect-[16/10]"
@@ -461,33 +468,44 @@ function ArticleFeedCard({
           />
           <span className="absolute inset-x-0 bottom-0 block p-4 text-white sm:p-5">
             <ArticleMeta format={format} readingTime={readingTime} onCover />
-            <h2 className="mt-1.5 font-display line-clamp-3 text-[25px] font-semibold leading-[1.08] text-white sm:text-[32px] sm:leading-[1.05]">
+            <h2 className="mt-1.5 font-display line-clamp-3 text-display font-semibold text-white">
               {title}
             </h2>
             {excerpt ? (
-              <span className="mt-2 line-clamp-2 text-[13.5px] leading-[1.5] text-white/90 max-[359px]:hidden sm:text-[14.5px]">
+              <span className="mt-2 line-clamp-2 text-meta text-white/90 max-[359px]:hidden">
                 {excerpt}
               </span>
             ) : null}
           </span>
         </Link>
       ) : (
-        <div className="mt-3 rounded-[14px] border border-amber-100 bg-[#fffdf8] p-4 sm:p-5">
+        // No panel. A cover-less article used to get a bordered white block to
+        // stand in for the "front" a cover would have given it, but it was the
+        // last boxed thing left in a feed built to have none -- and it charged
+        // for the privilege twice, once in its own 20px of padding and again
+        // in the 12px above it, pushing the headline ~35px further from the
+        // byline than the same headline sits in a Post row.
+        //
+        // Nothing is lost by removing it. The kicker below already announces
+        // the piece as an Article, the Bodoni headline already distinguishes
+        // it from a Post's sans one, and the row hairline already says where
+        // the article stops. The box was restating all three.
+        <div className="mt-3">
           <ArticleMeta format={format} readingTime={readingTime} />
-          <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-            <h2 className="mt-2 font-display line-clamp-4 text-[24px] font-semibold leading-[1.12] text-ink sm:text-[30px] sm:leading-[1.08]">
+          <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
+            <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
               {title}
             </h2>
           </Link>
           {excerpt ? (
-            <p className="mt-2.5 line-clamp-3 text-[14.5px] leading-[1.62] text-gray-700 sm:text-[15px]">
+            <p className="mt-2.5 line-clamp-3 max-w-measure text-excerpt text-ink-soft">
               {excerpt}
             </p>
           ) : null}
         </div>
       )}
 
-      <TopicLinks tags={post.tags} tone="article" />
+      <TopicLinks tags={post.tags} />
       <Actions post={post} currentUserId={currentUserId} />
     </article>
   );
@@ -515,11 +533,11 @@ function ResearchDocumentPreview({
         type={post.type}
         content_kind={post.content_kind}
         article_format={post.article_format}
-        sizes="(max-width: 640px) 104px, 170px"
+        sizes="170px"
         priority={priority}
         variant="research-preview"
-        wrapperClassName="overflow-hidden rounded-[10px] border border-purple-100 bg-white shadow-sm"
-        className="w-full bg-white"
+        wrapperClassName="overflow-hidden rounded-[10px] border border-card-border bg-card shadow-sm"
+        className="w-full bg-card"
       />
     );
   }
@@ -530,18 +548,18 @@ function ResearchDocumentPreview({
     <Link
       href={`/post/${post.slug}`}
       aria-label={`View ${title} manuscript`}
-      className={`relative block aspect-[3/4] overflow-hidden rounded-[10px] border border-purple-100 bg-white p-3 shadow-sm transition-colors hover:border-purple-300 ${FOCUS_RING}`}
+      className={`relative block aspect-[3/4] overflow-hidden rounded-[10px] border border-card-border bg-card p-3 shadow-sm transition-colors hover:border-purple-accent ${FOCUS_RING}`}
     >
       <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-purple-accent">
         PDF manuscript
       </span>
-      <span className="mt-2 block font-display line-clamp-4 text-[11px] font-semibold leading-[1.18] text-ink sm:text-[13px]">
+      <span className="mt-2 block font-display line-clamp-4 text-[13px] font-semibold leading-[1.18] text-ink">
         {title}
       </span>
       <span className="absolute inset-x-3 bottom-3 space-y-1.5" aria-hidden="true">
-        <span className="block h-1 rounded-full bg-purple-100" />
-        <span className="block h-1 w-5/6 rounded-full bg-purple-100" />
-        <span className="block h-1 w-3/5 rounded-full bg-purple-100" />
+        <span className="block h-1 rounded-full bg-divider" />
+        <span className="block h-1 w-5/6 rounded-full bg-divider" />
+        <span className="block h-1 w-3/5 rounded-full bg-divider" />
       </span>
     </Link>
   );
@@ -554,22 +572,29 @@ function ResearchManuscriptRow({ post }: { post: PostCardData }) {
   );
   if (!hasDocument) return null;
 
+  // Spacing alone, no rule and no panel. The `border-t` this used to draw sat
+  // a few pixels above the row's own bottom hairline, so a research row ended
+  // in two parallel lines -- the boxed-in look the flat feed exists to remove.
+  // Boxing it instead was the other obvious fix and is the wrong one: the
+  // research layout is deliberately metadata-first with no PDF sub-card (see
+  // the note on the research section of /dev-preview/feed), and a bordered
+  // panel here would rebuild exactly the sub-card that decision removed.
   return (
-    <div className="mt-3 flex min-w-0 items-center gap-2 border-t border-purple-100 pt-2.5">
+    <div className="mt-3 flex min-w-0 items-center gap-2">
       <span
         aria-hidden="true"
-        className="flex h-[25px] w-[22px] shrink-0 items-center justify-center rounded-[3px] bg-purple-accent text-[7px] font-bold tracking-wide text-white"
+        className="flex h-[25px] w-[22px] shrink-0 items-center justify-center rounded-[3px] bg-purple-accent text-[7px] font-bold tracking-wide text-card"
       >
         PDF
       </span>
-      <span className="min-w-0 truncate text-[11.5px] text-gray-500">
+      <span className="min-w-0 truncate text-meta text-ink-muted">
         PDF manuscript{size ? ` · ${size}` : ""}
       </span>
       <span className="flex-1" />
       <Link
         href={`/post/${post.slug}`}
         aria-label="View paper"
-        className={`inline-flex min-h-10 shrink-0 items-center rounded-md px-1.5 text-[12px] font-bold text-purple-accent hover:underline ${FOCUS_RING}`}
+        className={`inline-flex min-h-10 shrink-0 items-center rounded-md px-1.5 text-meta font-bold text-purple-accent hover:underline ${FOCUS_RING}`}
       >
         View paper →
       </Link>
@@ -603,7 +628,7 @@ function ResearchFeedCard({
   );
 
   return (
-    <article className={RESEARCH_CARD_SHELL} data-content-kind="research">
+    <article className={CARD_SHELL} data-content-kind="research">
       <ContextLine
         post={post}
         surface={surface}
@@ -617,15 +642,21 @@ function ResearchFeedCard({
         showCoauthorCount={false}
       />
 
+      {/* Side-by-side only from `sm` up. On a 375px phone the old two-column
+          grid left the title roughly 199px -- about 16 characters a line of
+          21px Bodoni, clamped to four lines -- so the single densest piece of
+          text in the feed got its narrowest column. Below `sm` the text block
+          now spans the full card and the preview is dropped; the manuscript
+          row underneath still states that a PDF exists and links to it. */}
       <div
         className={`mt-3 min-w-0 ${
           hasPreview
-            ? "grid grid-cols-[minmax(0,1fr)_104px] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_170px] sm:gap-5"
+            ? "sm:grid sm:grid-cols-[minmax(0,1fr)_170px] sm:items-start sm:gap-5"
             : ""
         }`}
       >
         <div className="min-w-0">
-          <p className="text-[10.5px] font-bold uppercase tracking-[0.15em] text-purple-accent sm:text-[11px]">
+          <p className="text-kicker font-bold uppercase text-purple-accent">
             <span>Research</span>
             {evidence ? (
               <>
@@ -634,30 +665,32 @@ function ResearchFeedCard({
               </>
             ) : null}
           </p>
-          <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-            <h2 className="mt-2 font-display line-clamp-4 text-[21px] font-semibold leading-[1.13] text-ink sm:text-[27px] sm:leading-[1.1]">
+          <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
+            <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
               {title}
             </h2>
           </Link>
           {abstract ? (
             <p
               className={`${
-                hasPreview ? "line-clamp-3" : "line-clamp-4"
-              } mt-2.5 text-[13.5px] leading-[1.58] text-gray-700 sm:text-[14.5px] sm:leading-[1.62]`}
+                hasPreview ? "sm:line-clamp-3" : ""
+              } mt-2.5 line-clamp-4 max-w-measure text-excerpt text-ink-soft`}
             >
               {abstract}
             </p>
           ) : null}
           {coauthors.length > 0 ? (
-            <p className="mt-2 line-clamp-2 text-[11.5px] leading-[1.45] text-gray-500">
+            <p className="mt-2 line-clamp-2 text-meta text-ink-muted">
               with {coauthors.join(", ")}
             </p>
           ) : null}
-          <TopicLinks tags={post.tags} tone="research" />
+          <TopicLinks tags={post.tags} />
         </div>
 
         {hasPreview ? (
-          <ResearchDocumentPreview post={post} title={title} priority={priority} />
+          <div className="hidden sm:block">
+            <ResearchDocumentPreview post={post} title={title} priority={priority} />
+          </div>
         ) : null}
       </div>
 

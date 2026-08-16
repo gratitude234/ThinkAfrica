@@ -437,7 +437,12 @@ describe("PostsFeedTabs -- empty states", () => {
 
     await waitFor(() => expect(screen.getByTestId("feed")).toBeInTheDocument());
     expect(screen.getByRole("tab", { name: "Latest", selected: true })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    // The reset used to be asserted via the "All" chip's aria-pressed state.
+    // Content-kind filtering now lives on Explore, so there is no chip on this
+    // surface to read it from -- but the behaviour under test is unchanged and
+    // still observable two ways: the fetch mock above asserts the refetch
+    // carries no `type` param, and the filtered empty state is gone.
+    expect(screen.queryByText("No Articles here yet.")).not.toBeInTheDocument();
 
     vi.unstubAllGlobals();
   });
@@ -491,6 +496,92 @@ describe("PostsFeedTabs -- scroll position on tab switch", () => {
     });
 
     expect(scrollTo).not.toHaveBeenCalled();
+  });
+});
+
+describe("PostsFeedTabs -- pagination overlap", () => {
+  beforeEach(() => {
+    mocks.requestAuth.mockReset();
+    observerInstances = [];
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function paginate() {
+    const observer = infiniteScrollObserver();
+    await act(async () => {
+      observer.callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        observer as unknown as IntersectionObserver
+      );
+    });
+  }
+
+  it("appends only posts the reader does not already have", async () => {
+    // Every date-ordered tab pages by offset, so one post published between the
+    // two requests slides the window and re-serves post 2 as the head of page 2.
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ posts: [post("2"), post("3")], hasMore: false }),
+          { status: 200 }
+        )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[post("1"), post("2")]}
+        initialHasMore
+        showFollowingTab
+        currentUserId="user-1"
+      />
+    );
+
+    await paginate();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("feed")).toHaveTextContent("1,2,3")
+    );
+  });
+
+  it("stops paging after three pages that add nothing new", async () => {
+    // A backend that keeps promising more while handing back cards the reader
+    // already has would otherwise re-arm the sentinel forever.
+    // A fresh Response per call: a body can only be read once, so a shared
+    // instance would fail every page after the first for the wrong reason.
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ posts: [post("1")], hasMore: true }), {
+          status: 200,
+        })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[post("1")]}
+        initialHasMore
+        showFollowingTab
+        currentUserId="user-1"
+      />
+    );
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await paginate();
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // Nothing is watching the sentinel any more: the last observer was torn
+    // down and the effect declined to register a replacement, so there is no
+    // longer anything that can re-arm the loop.
+    expect(infiniteScrollObserver().disconnect).toHaveBeenCalled();
+    expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
   });
 });
 
@@ -638,7 +729,7 @@ describe("PostsFeedTabs -- pinned control strip", () => {
 
     setPinned(true);
     const controls = expandedControls(container);
-    expect(controls).toHaveClass("border-gray-200");
+    expect(controls).toHaveClass("border-divider");
     expect(controls.className).toMatch(/shadow-/);
     expect(controls).not.toHaveClass("border-transparent");
 
@@ -680,13 +771,16 @@ describe("PostsFeedTabs -- pinned control strip", () => {
       <PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />
     );
 
-    expect(stickyStrip(container)).not.toHaveClass("bg-white");
+    // `bg-card` is the theme-aware token that replaced the literal `bg-white`;
+    // the guarantee under test is unchanged -- each row paints its own opaque
+    // ground so cards cannot ghost through it, and the wrapper paints none.
+    expect(stickyStrip(container)).not.toHaveClass("bg-card");
     expect(stickyStrip(container)).not.toHaveClass("px-4");
     expect(container.querySelector("[data-app-context-primary]")).toHaveClass(
-      "bg-white",
+      "bg-card",
       "px-4"
     );
-    expect(expandedControls(container)).toHaveClass("bg-white");
+    expect(expandedControls(container)).toHaveClass("bg-card");
   });
 
   // The collapsing row has to be able to reach zero height: padding on the

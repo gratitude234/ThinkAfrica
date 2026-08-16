@@ -27,6 +27,34 @@
     --ta-ink-faint: #9CA3AF;
     --ta-border: #E5E7EB;
     --ta-border-soft: #F3F4F6;
+
+    /* Theme-aware palette, as space-separated RGB channels so Tailwind can
+       apply opacity modifiers to them. Consumed via the `themed()` helper in
+       tailwind.config.ts -- never reference these directly in a component.
+
+       Light mode. Every value here is the hex that was previously hard-coded
+       in the config or inline in a feed component, so switching the tokens on
+       is a no-op until `.dark` is set. */
+    --ta-emerald-brand-rgb: 7 57 41; /* #073929 */
+    --ta-emerald-ink-rgb: 4 120 87; /* #047857 */
+    --ta-gold-ink-rgb: 138 93 30; /* #8A5D1E */
+    --ta-purple-accent-rgb: 57 26 96; /* #391A60 */
+    --ta-canvas-rgb: 250 248 245; /* #FAF8F5 */
+    --ta-surface-rgb: 255 255 255; /* #FFFFFF */
+    --ta-ink-rgb: 26 26 26; /* #1A1A1A */
+    --ta-ink-soft-rgb: 75 85 99; /* #4B5563, was gray-600 */
+    --ta-ink-muted-rgb: 107 107 107; /* #6B6B6B, 4.83:1 on white */
+    --ta-card-rgb: 255 255 255;
+    --ta-card-border-rgb: 233 229 222; /* #E9E5DE */
+    --ta-card-border-hover-rgb: 221 215 206; /* #DDD7CE */
+    /* Warm, not gray-200. Once the feed went flat this stopped being a
+       hairline buried inside a card and became the only structure holding the
+       column together -- repeated on every row of a scroll. A cool grey
+       (#E5E7EB) against the warm canvas read faintly blue and dirty at that
+       repetition; this sits in the same family as --ta-card-border-rgb, a
+       touch stronger because it now carries the layout on its own. */
+    --ta-divider-rgb: 230 225 217; /* #E6E1D9 */
+
     --mobile-visual-viewport-bottom: 0px;
     /* Provider-scoped values override these pre-hydration fallbacks inside the
        app shell. The announcement strip is deliberately not part of the nav. */
@@ -37,8 +65,48 @@
     --app-sticky-offset: calc(var(--app-nav-offset) + 1rem);
   }
 
+  /* Dark mode. A warm, slightly green-shifted dark rather than pure black --
+     neutral greys next to the emerald brand read as blue and cheap. The three
+     accent inks are lightened versions of the same brand hues, because
+     #073929, #8A5D1E and #391A60 are fills: they all fall below 3:1 on a dark
+     ground and cannot set type there.
+
+     Contrast on the card ground (#1A1D1B): ink 13.9:1, ink-soft 9.6:1,
+     ink-muted 6.1:1, gold-ink 7.9:1, purple-accent 6.8:1, emerald-ink 7.6:1.
+
+     Scoped to `.dark` (never `prefers-color-scheme`) so it stays inert until
+     a theme toggle exists and the rest of the app has a dark palette. */
+  .dark {
+    --ta-emerald-brand-rgb: 12 76 55; /* #0C4C37, lifted off the canvas */
+    --ta-emerald-ink-rgb: 90 190 148; /* #5ABE94 */
+    --ta-gold-ink-rgb: 214 168 92; /* #D6A85C */
+    --ta-purple-accent-rgb: 178 150 224; /* #B296E0 */
+    --ta-canvas-rgb: 18 20 19; /* #121413 */
+    --ta-surface-rgb: 26 29 27; /* #1A1D1B */
+    --ta-ink-rgb: 237 235 230; /* #EDEBE6 */
+    --ta-ink-soft-rgb: 196 193 186; /* #C4C1BA */
+    --ta-ink-muted-rgb: 156 154 148; /* #9C9A94 */
+    --ta-card-rgb: 26 29 27;
+    --ta-card-border-rgb: 47 51 48; /* #2F3330 */
+    --ta-card-border-hover-rgb: 64 69 65; /* #404541 */
+    /* Softened alongside the light-mode warming, for the opposite reason: feed
+       rows now sit on the canvas (#121413) rather than the card (#1A1D1B), so
+       the old #2A2E2B was a 50% bigger step than it had been and the rules
+       started to out-shout the prose. #242825 restores the original weight
+       relative to its new ground. */
+    --ta-divider-rgb: 36 40 37; /* #242825 */
+  }
+
   html {
     scrollbar-color: #D1D5DB transparent;
+  }
+
+  html.dark {
+    scrollbar-color: #3F443F transparent;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #3F443F;
   }
 
   body {

@@ -2,7 +2,7 @@ export default function FeedErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div
       role="alert"
-      className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center"
+      className="rounded-xl border border-card-border bg-card px-6 py-16 text-center"
     >
       <svg
         className="mx-auto mb-3 h-8 w-8 text-red-500"
@@ -18,8 +18,8 @@ export default function FeedErrorState({ onRetry }: { onRetry: () => void }) {
           d="M12 9v4m0 4h.01M10.3 3.9L2.8 17a2 2 0 001.7 3h15a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"
         />
       </svg>
-      <h2 className="text-base font-semibold text-gray-900">Couldn&apos;t load your feed</h2>
-      <p className="mt-1 text-sm text-gray-500">Check your connection and try again.</p>
+      <h2 className="text-base font-semibold text-ink">Couldn&apos;t load your feed</h2>
+      <p className="mt-1 text-sm text-ink-muted">Check your connection and try again.</p>
       <button
         type="button"
         onClick={onRetry}
