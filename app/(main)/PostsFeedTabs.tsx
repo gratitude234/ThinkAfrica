@@ -8,7 +8,6 @@ import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { PostCardData } from "@/components/post/PostCard";
 import type { FeedContentFilter, FeedTimeframe } from "@/lib/feedData";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
-import FeedFilterChips from "./FeedFilterChips";
 import HomeFeaturedLead, { type HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
 import HomeGuestNotice from "./HomeGuestNotice";
 import FeedEmptyState from "./FeedEmptyState";
@@ -736,9 +735,17 @@ export default function PostsFeedTabs({
                 aria-selected={activeTab === tab}
                 tabIndex={activeTab === tab ? 0 : -1}
                 onClick={() => updateState(tab, typeFilter, timeframe)}
+                // Underline only. These carried a `bg-green-tint/70` fill as
+                // well, which made the active tab read as a pressed button
+                // sitting in a box -- the same doubled-signal problem the feed
+                // cards had, and the reason two stacked control rows looked
+                // like two competing systems. The underline was already here
+                // and is sufficient on its own; X and Medium both settled on
+                // exactly this for the same job. Tabs are navigation, not an
+                // action, so they should be the quietest thing on the page.
                 className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-byline font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 ${
                   activeTab === tab
-                    ? "border-emerald-brand bg-green-tint/70 text-ink dark:bg-emerald-brand/40 dark:text-ink"
+                    ? "border-emerald-brand text-ink"
                     : "border-transparent text-ink-muted hover:text-ink"
                 }`}
               >
@@ -790,11 +797,25 @@ export default function PostsFeedTabs({
                 </div>
               ) : null}
 
-              <FeedFilterChips
-                type={typeFilter}
-                onTypeChange={(nextType) => updateState(activeTab, nextType, timeframe)}
-                className="mt-2"
-              />
+              {/* The All / Posts / Articles / Research chips used to sit here.
+                  They now live only on Explore, which already offered the same
+                  four filters plus a genre refinement (General / Essay /
+                  Policy Brief) that this row never had -- so this was the
+                  weaker of two copies, charging every visitor a second row of
+                  chrome for a filter most of them never touch.
+
+                  Splitting it that way also splits the job cleanly: Home is
+                  where you go to be surprised, Explore is where you go looking
+                  for something specific, and narrowing to one content kind is
+                  a seeking action. `/?type=` links hand off to Explore (see
+                  app/(main)/page.tsx) so old bookmarks keep their intent.
+
+                  `typeFilter` is deliberately still threaded through this
+                  component. The feed API and fetchFeedPage still accept a
+                  content filter, the empty states still describe one, and the
+                  prop is still part of this component's contract -- home just
+                  never sets it to anything but "all" now. Ripping the plumbing
+                  out is a separate, larger change. */}
             </div>
           </div>
         </div>

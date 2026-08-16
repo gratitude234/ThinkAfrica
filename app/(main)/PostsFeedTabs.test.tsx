@@ -437,7 +437,12 @@ describe("PostsFeedTabs -- empty states", () => {
 
     await waitFor(() => expect(screen.getByTestId("feed")).toBeInTheDocument());
     expect(screen.getByRole("tab", { name: "Latest", selected: true })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    // The reset used to be asserted via the "All" chip's aria-pressed state.
+    // Content-kind filtering now lives on Explore, so there is no chip on this
+    // surface to read it from -- but the behaviour under test is unchanged and
+    // still observable two ways: the fetch mock above asserts the refetch
+    // carries no `type` param, and the filtered empty state is gone.
+    expect(screen.queryByText("No Articles here yet.")).not.toBeInTheDocument();
 
     vi.unstubAllGlobals();
   });

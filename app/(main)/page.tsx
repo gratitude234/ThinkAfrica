@@ -126,6 +126,19 @@ export default async function HomePage({ searchParams }: PageProps) {
     redirect("/landing");
   }
 
+  // Content-kind filtering moved off the home feed and onto Explore, which
+  // already had the same four filters plus a genre refinement underneath.
+  // Hand old `/?type=research` links over rather than dropping the filter
+  // silently: without the chips there is no longer any control on this page
+  // that could show such a filter is active or clear it, so honouring the
+  // param here would strand the reader in a narrowed feed with no way out.
+  // The raw value is passed through untouched because Explore reads the same
+  // `?type=` names and additionally maps the pre-content-model ones
+  // (`blog`, `essay`, `policy_brief`) that may still be sitting in bookmarks.
+  if (type && type !== "all") {
+    redirect(`/explore?type=${encodeURIComponent(type)}`);
+  }
+
   const showWelcomeBanner = Boolean(user) && welcome === "1";
 
   const draftCutoff = new Date(
