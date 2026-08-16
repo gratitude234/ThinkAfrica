@@ -3,7 +3,7 @@ import FeedEngagementActions from "./FeedEngagementActions";
 import PostCover from "./PostCover";
 import PostImage from "./PostImage";
 import type { PostCardData } from "./PostCard";
-import { CARD_SHELL_INTERACTIVE, FOCUS_RING } from "./cardShell";
+import { CARD_SHELL, FOCUS_RING } from "./cardShell";
 import {
   getArticleFormatLabel,
   isFormallyReviewed,
@@ -338,7 +338,7 @@ function PostFeedCard({
   const excerpt = sanitizePostExcerpt(post.excerpt) || "View post";
 
   return (
-    <article className={CARD_SHELL_INTERACTIVE} data-content-kind="post">
+    <article className={CARD_SHELL} data-content-kind="post">
       <ContextLine
         post={post}
         surface={surface}
@@ -348,8 +348,8 @@ function PostFeedCard({
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
       <div className="mt-3">
         {title ? (
-          <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-            <h2 className="font-sans text-title font-semibold text-ink">
+          <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
+            <h2 className="font-sans text-title font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
               {title}
             </h2>
           </Link>
@@ -421,7 +421,7 @@ function ArticleFeedCard({
   const readingTime = readTime(excerpt);
 
   return (
-    <article className={CARD_SHELL_INTERACTIVE} data-content-kind="article">
+    <article className={CARD_SHELL} data-content-kind="article">
       <ContextLine
         post={post}
         surface={surface}
@@ -472,8 +472,8 @@ function ArticleFeedCard({
         // canvas row the old fill was the row's own colour, i.e. invisible.
         <div className="mt-3 rounded-[14px] border border-card-border bg-card p-4 sm:p-5">
           <ArticleMeta format={format} readingTime={readingTime} />
-          <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-            <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink">
+          <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
+            <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
               {title}
             </h2>
           </Link>
@@ -608,7 +608,7 @@ function ResearchFeedCard({
   );
 
   return (
-    <article className={CARD_SHELL_INTERACTIVE} data-content-kind="research">
+    <article className={CARD_SHELL} data-content-kind="research">
       <ContextLine
         post={post}
         surface={surface}
@@ -645,8 +645,8 @@ function ResearchFeedCard({
               </>
             ) : null}
           </p>
-          <Link href={`/post/${post.slug}`} className={FOCUS_RING}>
-            <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink">
+          <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
+            <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
               {title}
             </h2>
           </Link>

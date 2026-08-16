@@ -26,10 +26,10 @@
  *
  * Two consequences worth knowing before editing:
  *
- * 1. Rows sit on the canvas, so `bg-card` is now free to be the *hover* state.
- *    That reuses a token already tuned for both themes rather than inventing a
- *    wash. It also means any child that used `bg-canvas` to lift off the old
- *    white card ground now needs `bg-card` instead, or it disappears.
+ * 1. Rows sit on the canvas, so any child that used `bg-canvas` to lift off
+ *    the old white card ground now needs `bg-card` instead, or it disappears
+ *    into the row. The same goes for a `hover:bg-canvas` that used to read
+ *    against a white card and is now a no-op.
  * 2. The rule between rows is the only structure left on the page, so internal
  *    rules were removed rather than kept (see FeedEngagementActions, and the
  *    manuscript row in HomeFeedCard). Two hairlines a few pixels apart rebuild
@@ -40,32 +40,43 @@
  * 20+20 between adjacent rows on mobile against the old 14+12+14, and 28+28
  * from `sm` up against the old 20+16+20. Both come to the same 40px and 56px.
  *
- * The mobile `-mx-4` cancels the app shell's `px-4` so the rule and the hover
- * wash reach the screen edge, while `px-4` puts the text back where it was;
- * net, the row recovers the 28px of measure the card's own padding was taking.
- * From `sm` up the shell's padding is wider than the bleed, so the row simply
- * fills its grid column -- rule and wash spanning the full column, text inset
- * by `px-4` within it.
+ * The mobile `-mx-4` cancels the app shell's `px-4` so the rule reaches the
+ * screen edge, while `px-4` puts the text back where it was; net, the row
+ * recovers the 28px of measure the card's own padding was taking. From `sm` up
+ * the shell's padding is wider than the bleed, so the row simply fills its grid
+ * column -- rule spanning the full column, text inset by `px-4` within it.
  */
 
-/** Resting appearance. Use for anything non-interactive, e.g. skeletons. */
+/** The one row geometry. Real cards and skeletons share it verbatim. */
 export const CARD_SHELL =
   "-mx-4 border-b border-divider px-4 py-5 sm:mx-0 sm:py-7";
 
 /**
- * Resting appearance plus hover feedback.
+ * There is deliberately no hover state on the row itself.
  *
- * The hover lift (`-translate-y-px`) that used to be here is gone. On a grid
- * of products a lift reads as affordance; on a single column of prose it makes
- * the page twitch as the pointer crosses it, animating cards the reader is not
- * looking at while they read one that is standing still. Dropping the
- * transform also drops a compositor paint on every pointer move.
+ * The hover lift (`-translate-y-px`) the card form used is gone for the
+ * obvious reason: on a grid of products a lift reads as affordance, but on a
+ * single column of prose it makes the page twitch as the pointer crosses it,
+ * animating rows the reader is not looking at. The `hover:bg-card` wash that
+ * briefly replaced it is gone for a better one.
  *
- * The border-and-shadow hover it was paired with is gone too, for the simple
- * reason that a row has neither. A flat background wash marks the row under
- * the pointer without adding any edge the resting state does not have.
+ * A whole-row hover means "this whole row is one click target." On X that is
+ * true -- the row is a single link to the tweet -- and the wash is a promise
+ * the row keeps. Here it is false: a row is roughly eight independent links
+ * (author, avatar, title, excerpt, cover, tags, parent post, manuscript) plus
+ * four action buttons, and the space between them does nothing at all. Washing
+ * the whole row advertises a target that is not there, on a surface up to
+ * ~500px tall, which is a much larger visual event than the same gesture on a
+ * three-line tweet.
+ *
+ * It also undoes the point of the flat feed: `bg-card` on canvas is precisely
+ * the white-on-cream step the row form removed, so hovering redrew the card we
+ * had just deleted.
+ *
+ * Hover feedback belongs on the things that are actually clickable, and now
+ * lives there -- titles and excerpts go emerald on hover, matching the links
+ * in the interludes and the rail. Callers use CARD_SHELL directly.
  */
-export const CARD_SHELL_INTERACTIVE = `${CARD_SHELL} transition-colors duration-200 hover:bg-card motion-reduce:transition-none`;
 
 /**
  * Shared focus treatment for links inside a row. Gold against both grounds,
