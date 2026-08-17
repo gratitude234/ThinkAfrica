@@ -342,6 +342,45 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
       `${context.actorName} declined your co-author invitation on ${context.postTitle}.`,
     hrefFor: toPost,
   },
+  research_collaboration_request: {
+    label: "Research collaboration request",
+    category: "activity",
+    priority: 32,
+    cta: "Review request",
+    actionKey: "research_collaboration_request",
+    actionable: true,
+    icon: "users",
+    tone: "neutral",
+    describe: (context) =>
+      `${context.actorName} sent you a research collaboration request.`,
+    hrefFor: () => "/research",
+  },
+  research_collaboration_accepted: {
+    label: "Research request accepted",
+    category: "activity",
+    priority: 61,
+    cta: "Open project",
+    actionKey: "research_collaboration_accepted",
+    actionable: false,
+    icon: "users",
+    tone: "positive",
+    describe: (context) =>
+      `${context.actorName} accepted your research collaboration request.`,
+    hrefFor: () => "/research",
+  },
+  research_collaboration_declined: {
+    label: "Research request declined",
+    category: "activity",
+    priority: 62,
+    cta: "Open research",
+    actionKey: "research_collaboration_declined",
+    actionable: false,
+    icon: "users",
+    tone: "neutral",
+    describe: (context) =>
+      `${context.actorName} declined your research collaboration request.`,
+    hrefFor: () => "/research",
+  },
 
   // --- Debates --------------------------------------------------------------
   debate_invitation: {

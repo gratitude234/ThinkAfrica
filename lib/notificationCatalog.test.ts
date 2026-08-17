@@ -38,6 +38,9 @@ const EMITTED_TYPES = [
   "co_author_invite",
   "co_author_accepted",
   "co_author_declined",
+  "research_collaboration_request",
+  "research_collaboration_accepted",
+  "research_collaboration_declined",
   // editorial
   "review_assigned",
   "review_started",

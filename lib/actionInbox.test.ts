@@ -53,6 +53,7 @@ describe("actionability", () => {
     "response_post",
     "opportunity_inquiry",
     "co_author_invite",
+    "research_collaboration_request",
     "debate_invitation",
   ])("treats %s as something the reader must act on", (type) => {
     expect(isActionableType(type)).toBe(true);

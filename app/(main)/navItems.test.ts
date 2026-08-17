@@ -28,6 +28,10 @@ describe("isNavItemActive", () => {
     ["/campus/programs", NAV_MATCH_PREFIXES.campus, true],
     ["/campuses", NAV_MATCH_PREFIXES.campus, false],
 
+    ["/research", NAV_MATCH_PREFIXES.research, true],
+    ["/research/projects/project-one", NAV_MATCH_PREFIXES.research, true],
+    ["/researchers", NAV_MATCH_PREFIXES.research, false],
+
     ["/opportunities", NAV_MATCH_PREFIXES.opportunities, true],
     ["/opportunities/123", NAV_MATCH_PREFIXES.opportunities, true],
 

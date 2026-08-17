@@ -18,6 +18,7 @@ const staticRoutes: SitemapRow[] = [
   { url: absoluteUrl("/explore"), changeFrequency: "hourly", priority: 0.9 },
   { url: absoluteUrl("/debates"), changeFrequency: "daily", priority: 0.8 },
   { url: absoluteUrl("/campus"), changeFrequency: "daily", priority: 0.75 },
+  { url: absoluteUrl("/research"), changeFrequency: "daily", priority: 0.8 },
   { url: absoluteUrl("/opportunities"), changeFrequency: "daily", priority: 0.8 },
   { url: absoluteUrl("/about"), changeFrequency: "monthly", priority: 0.6 },
   { url: absoluteUrl("/topics"), changeFrequency: "weekly", priority: 0.7 },
@@ -30,7 +31,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const supabase = createAdminClient();
 
-    const [postsResult, debatesResult, profilesResult, publishedAuthorsResult] = await Promise.all([
+    const [
+      postsResult,
+      debatesResult,
+      profilesResult,
+      publishedAuthorsResult,
+      researchProjectsResult,
+      researcherProfilesResult,
+    ] = await Promise.all([
       supabase
         .from("posts")
         .select("slug, title, type, content_kind, published_at, created_at, updated_at")
@@ -54,10 +62,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       // profile content gate below — a thin author_id-only scan, not paginated
       // with the main posts query above.
       supabase.from("posts").select("author_id").eq("status", "published").limit(5000),
+      supabase
+        .from("research_projects")
+        .select("slug, updated_at")
+        .eq("visibility", "public")
+        .neq("status", "archived")
+        .order("updated_at", { ascending: false })
+        .limit(1000),
+      supabase.from("researcher_profiles").select("user_id").limit(5000),
     ]);
 
     const authorsWithPublishedPosts = new Set(
       publishedAuthorsResult.data?.map((row) => row.author_id) ?? []
+    );
+    const profilesWithResearchPractice = new Set(
+      researcherProfilesResult.data?.map((row) => row.user_id) ?? []
     );
 
     const postRoutes =
@@ -97,7 +116,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
           const hasBio = Boolean(profile.bio?.trim());
           const hasPublishedPost = authorsWithPublishedPosts.has(profile.id);
-          return hasBio || hasPublishedPost;
+          return hasBio || hasPublishedPost || profilesWithResearchPractice.has(profile.id);
         })
         .map((profile) => ({
           url: absoluteUrl(`/${profile.username}`),
@@ -106,7 +125,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           priority: 0.55,
         })) ?? [];
 
-    return [...staticRoutes, ...postRoutes, ...debateRoutes, ...profileRoutes];
+    const researchProjectRoutes =
+      researchProjectsResult.data?.map((project) => ({
+        url: absoluteUrl(`/research/projects/${project.slug}`),
+        lastModified: project.updated_at ?? undefined,
+        changeFrequency: "weekly" as const,
+        priority: 0.7,
+      })) ?? [];
+
+    return [
+      ...staticRoutes,
+      ...postRoutes,
+      ...debateRoutes,
+      ...researchProjectRoutes,
+      ...profileRoutes,
+    ];
   } catch (error) {
     console.error("[sitemap] failed to build dynamic sitemap", error);
     return staticRoutes;

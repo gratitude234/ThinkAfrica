@@ -60,6 +60,16 @@ export type ActivationEventName =
   | "campus_prompt_published"
   | "ambassador_activity_logged"
   | "ambassador_application_submitted"
+  | "research_hub_viewed"
+  | "research_project_viewed"
+  | "research_proposal_created"
+  | "research_project_status_changed"
+  | "research_update_published"
+  | "research_asset_added"
+  | "research_profile_updated"
+  | "research_collaboration_request_created"
+  | "research_collaboration_request_accepted"
+  | "research_collaboration_request_declined"
   | "push_nudge_shown"
   | "push_nudge_action"
   | "push_permission_resolved"
@@ -91,6 +101,8 @@ const VIEW_EVENTS = new Set<ActivationEventName>([
   "collaboration_panel_viewed",
   "response_thread_opened",
   "campus_hub_viewed",
+  "research_hub_viewed",
+  "research_project_viewed",
   "weekly_digest_previewed",
   "quality_check_viewed",
   "author_subscription_nudge_shown",

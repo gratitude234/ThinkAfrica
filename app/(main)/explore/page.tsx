@@ -340,6 +340,14 @@ function DiscoverTabs({
         >
           Campus
         </DiscoverTrackedLink>
+        <DiscoverTrackedLink
+          href="/research"
+          event="discover_item_clicked"
+          metadata={{ itemType: "research_project", surface: "explore_tabs" }}
+          className="mb-[-1px] border-b-2 border-transparent px-3.5 py-3 text-[13px] font-semibold text-gray-500 transition-colors hover:text-ink sm:px-4 sm:text-[13.5px]"
+        >
+          Research projects
+        </DiscoverTrackedLink>
       </div>
     </StickySubnav>
   );

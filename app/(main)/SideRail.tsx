@@ -16,6 +16,7 @@ import {
   NAV_MATCH_PREFIXES,
   OpportunitiesIcon,
   ProfileIcon,
+  ResearchIcon,
   ResponsesIcon,
   isAccountNavActive,
   isNavItemActive,
@@ -144,6 +145,12 @@ export default function SideRail({
           label="Campus"
           icon={CampusIcon}
           isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.campus)}
+        />
+        <RailLink
+          href="/research"
+          label="Research"
+          icon={ResearchIcon}
+          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.research)}
         />
         <RailLink
           href={userId ? "/me" : "/signup"}

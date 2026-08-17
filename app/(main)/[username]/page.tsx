@@ -9,6 +9,10 @@ import OpportunityProfileEditor from "@/components/opportunities/OpportunityProf
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileContentTabs from "@/components/profile/ProfileContentTabs";
+import ResearchProfileCard, {
+  type PublicResearchProfile,
+  type PublicResearchProject,
+} from "@/components/profile/ResearchProfileCard";
 import TopArguments from "@/components/profile/TopArguments";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import TrackedActionLink from "@/components/retention/TrackedActionLink";
@@ -121,6 +125,14 @@ interface PortfolioSummaryStats {
   coAuthoredCount: number;
   debateContributionCount: number;
   qualityLabelledCount: number;
+}
+
+interface ResearchMembershipRow {
+  role: string;
+  project:
+    | Omit<PublicResearchProject, "role">
+    | Array<Omit<PublicResearchProject, "role">>
+    | null;
 }
 
 interface TopArgumentRecord {
@@ -464,6 +476,8 @@ export default async function UserProfilePage({ params }: PageProps) {
     followStatus,
     subscriptionStatus,
     blockStatus,
+    { data: researcherProfile },
+    { data: researchMemberships },
   ] = await Promise.all([
     supabase
       .from("posts")
@@ -570,7 +584,37 @@ export default async function UserProfilePage({ params }: PageProps) {
           .eq("blocked_id", profile.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase
+      .from("researcher_profiles")
+      .select(
+        "headline, overview, research_interests, methods, collaboration_status, preferred_roles, orcid_url, website_url"
+      )
+      .eq("user_id", profile.id)
+      .maybeSingle(),
+    supabase
+      .from("research_project_members")
+      .select(
+        "role, project:research_projects!research_project_members_project_id_fkey(id, slug, title, summary, status, disciplines, updated_at)"
+      )
+      .eq("user_id", profile.id)
+      .eq("status", "active")
+      .order("joined_at", { ascending: false }),
   ]);
+
+  const publicResearchProjects = (
+    (researchMemberships ?? []) as unknown as ResearchMembershipRow[]
+  )
+    .map((membership) => {
+      const project = Array.isArray(membership.project)
+        ? membership.project[0]
+        : membership.project;
+      return project ? { ...project, role: membership.role } : null;
+    })
+    .filter((project): project is PublicResearchProject => project !== null)
+    .sort(
+      (left, right) =>
+        new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime()
+    );
 
   const normalizedPosts = ((posts ?? []) as unknown as ProfilePostRow[]).map(
     (post) => ({
@@ -857,6 +901,13 @@ export default async function UserProfilePage({ params }: PageProps) {
       <ProfileContentTabs
         items={mergedPosts}
         debateContributions={normalizedTopArguments}
+        isOwnProfile={isOwnProfile}
+      />
+
+      <ResearchProfileCard
+        displayName={displayName}
+        profile={(researcherProfile as PublicResearchProfile | null) ?? null}
+        projects={publicResearchProjects}
         isOwnProfile={isOwnProfile}
       />
 

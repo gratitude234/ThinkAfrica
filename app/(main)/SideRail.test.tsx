@@ -39,6 +39,7 @@ describe("SideRail", () => {
     expect(hrefFor("For you")).toBe("/");
     expect(hrefFor("Discover")).toBe("/explore");
     expect(hrefFor("Campus")).toBe("/campus");
+    expect(hrefFor("Research")).toBe("/research");
     expect(hrefFor("Debates")).toBe("/debates");
     expect(hrefFor("Responses")).toBe("/responses");
     expect(hrefFor("Opportunities")).toBe("/opportunities");
@@ -69,6 +70,14 @@ describe("SideRail", () => {
   it("marks the campus hub as its own section", () => {
     renderRail({}, "/campus");
     expect(screen.getByRole("link", { name: "Campus" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
+  it("marks research projects as their own section", () => {
+    renderRail({}, "/research/projects/urban-water-access");
+    expect(screen.getByRole("link", { name: "Research" })).toHaveAttribute(
       "aria-current",
       "page"
     );

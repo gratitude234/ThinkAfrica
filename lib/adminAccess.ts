@@ -90,6 +90,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     capability: "analytics.view",
   },
   {
+    href: "/admin/research",
+    title: "Research Expansion",
+    description: "Measure structured inquiry, collaboration, outputs, and the Phase 4 exit gate.",
+    capability: "analytics.view",
+  },
+  {
     href: "/admin/digest",
     title: "Digest",
     description: "Preview the weekly editorial digest.",

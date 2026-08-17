@@ -135,6 +135,25 @@ export function CampusIcon({ className }: NavIconProps) {
   );
 }
 
+export function ResearchIcon({ className }: NavIconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 3h6m-5 0v5l-5.5 9.25A2.5 2.5 0 0 0 6.65 21h10.7a2.5 2.5 0 0 0 2.15-3.75L14 8V3M7.5 15h9"
+      />
+    </svg>
+  );
+}
+
 export function ProfileIcon({ className, filled }: NavIconProps) {
   return (
     <svg
@@ -201,6 +220,7 @@ export const NAV_MATCH_PREFIXES = {
   messages: ["/messages"],
   responses: ["/responses"],
   campus: ["/campus"],
+  research: ["/research"],
   bookmarks: ["/bookmarks"],
   notifications: ["/notifications"],
 } as const;

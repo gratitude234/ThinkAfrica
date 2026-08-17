@@ -80,6 +80,10 @@ export default function NavClient({
   const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
   const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
   const isCampusActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.campus);
+  const isResearchActive = isNavItemActive(
+    pathname,
+    NAV_MATCH_PREFIXES.research
+  );
   const isDebatesActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates);
   const isResponsesActive = isNavItemActive(
     pathname,
@@ -166,6 +170,13 @@ export default function NavClient({
                 aria-current={isCampusActive ? "page" : undefined}
               >
                 Campus
+              </Link>
+              <Link
+                href="/research"
+                className={navItemClass(isResearchActive)}
+                aria-current={isResearchActive ? "page" : undefined}
+              >
+                Research
               </Link>
               {FEATURE_FLAGS.debates ? (
                 <Link
