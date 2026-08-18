@@ -80,20 +80,6 @@ function normalizeType(type: string | null | undefined): PostType {
   return "blog";
 }
 
-function shouldBypassOptimizer(src: string | null | undefined) {
-  if (!src) return false;
-
-  try {
-    const url = new URL(src);
-    return (
-      url.hostname.endsWith(".supabase.co") &&
-      url.pathname.startsWith("/storage/v1/object/public/")
-    );
-  } catch {
-    return false;
-  }
-}
-
 export default function PostCover({
   src,
   alt,
@@ -156,10 +142,9 @@ export default function PostCover({
       : (POST_TYPE_LABELS[postType] ?? "Post");
   const resolvedAlt = alt?.trim() || `${typeLabel} cover image`;
   const fallbackStyle = FALLBACK_STYLES[postType] ?? FALLBACK_STYLES.blog;
-  const imageUnoptimized = useMemo(
-    () => unoptimized ?? shouldBypassOptimizer(src),
-    [src, unoptimized]
-  );
+  // Supabase public storage is already covered by next.config.mjs
+  // remotePatterns, so let next/image serve responsive, cached variants.
+  const imageUnoptimized = unoptimized ?? false;
   const resolvedImageClassName =
     imageClassName ?? (fit === "cover" ? "object-cover" : "object-contain");
   const containerClassName =

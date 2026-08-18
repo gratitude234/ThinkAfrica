@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import FeedSkeleton from "@/components/post/FeedSkeleton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
@@ -11,7 +12,12 @@ import WelcomeBanner from "@/components/ui/WelcomeBanner";
 import type { LegacyPushPromptSeed } from "@/lib/pushPromptPolicy";
 import { getActivationState, type ActivationState } from "@/lib/activation";
 import { getProfileTypeLabel, isProfileType } from "@/lib/profileTypes";
-import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
+import { getFeedSurfaceReason } from "@/lib/postQuality";
+import { scorePost, type RankingContext } from "@/lib/feedRanking";
+import {
+  getFeedExcludedUserIds,
+  getPostIdsWithExcludedAuthors,
+} from "@/lib/blocking";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import {
   getActiveDebate,
@@ -137,6 +143,18 @@ export default async function HomePage({ searchParams }: PageProps) {
     redirect(`/explore?type=${encodeURIComponent(type)}`);
   }
 
+  // Home no longer exposes a timeframe control. Canonicalize old bookmarked
+  // URLs instead of silently narrowing the feed with an invisible filter.
+  if (timeframe && timeframe !== "all") {
+    const canonicalParams = new URLSearchParams();
+    if (guest === "1") canonicalParams.set("guest", "1");
+    if (tab) canonicalParams.set("tab", tab);
+    if (source) canonicalParams.set("source", source);
+    if (welcome === "1") canonicalParams.set("welcome", "1");
+    const query = canonicalParams.toString();
+    redirect(query ? `/?${query}` : "/");
+  }
+
   const showWelcomeBanner = Boolean(user) && welcome === "1";
 
   const draftCutoff = new Date(
@@ -156,6 +174,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     { data: topicSubscriptions },
     { data: authorSubscriptions },
     { data: privateProfileRaw },
+    excludedAuthorIds,
   ] = await Promise.all([
     user
       ? supabase
@@ -207,6 +226,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     user
       ? supabase.rpc("get_my_profile_private")
       : Promise.resolve({ data: null, error: null }),
+    getFeedExcludedUserIds(user?.id ?? null, { strict: true }),
   ]);
 
   const userInterests = (profileData?.interests as string[] | null) ?? [];
@@ -223,6 +243,20 @@ export default async function HomePage({ searchParams }: PageProps) {
     lastShownAt: privateProfile?.push_prompt_last_shown_at ?? null,
     shownAt: privateProfile?.push_prompt_shown_at ?? null,
   };
+  const peopleAndActivationPromise: Promise<
+    [SuggestedPeopleResult, ActivationState | null]
+  > = user
+    ? Promise.all([
+        getSuggestedPeople(supabase, {
+          currentUserId: user.id,
+          university: userUniversity,
+          fieldOfStudy: userFieldOfStudy,
+          excludedUserIds: excludedAuthorIds,
+          limit: 3,
+        }),
+        getActivationState(supabase, user.id),
+      ])
+    : Promise.resolve([{ suggestions: [], reason: "" }, null]);
 
   const { manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult } =
     featuredCandidates;
@@ -254,23 +288,53 @@ export default async function HomePage({ searchParams }: PageProps) {
     (latestPublishedResult.data as FeaturedPostRaw | null) ?? null;
   const recentFeaturedCandidatesRaw =
     (recentFeaturedCandidatesResult.data ?? []) as FeaturedPostRaw[];
-  const featuredPostsRaw = uniqueFeaturedPosts([
+  const unfilteredFeaturedPosts = uniqueFeaturedPosts([
     ...(manualFeaturedRaw ? [manualFeaturedRaw] : []),
     ...recentFeaturedCandidatesRaw,
     ...(latestPublishedRaw ? [latestPublishedRaw] : []),
   ]);
+  const blockedAuthorSet = new Set(excludedAuthorIds);
+  const unfilteredFeaturedIds = unfilteredFeaturedPosts.map((post) => post.id);
+  const featuredMetricsReader = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createAdminClient()
+    : supabase;
+  const [blockedCoauthoredPostIdRows, engagementCounts] = await Promise.all([
+    getPostIdsWithExcludedAuthors(
+      unfilteredFeaturedIds,
+      excludedAuthorIds,
+      { strict: true }
+    ),
+    getEngagementCounts(featuredMetricsReader, unfilteredFeaturedIds),
+  ]);
+  const blockedCoauthoredPostIds = new Set(blockedCoauthoredPostIdRows);
+  const featuredPostsRaw = unfilteredFeaturedPosts.filter(
+    (post) =>
+      !blockedAuthorSet.has(post.author_id) &&
+      !blockedCoauthoredPostIds.has(post.id)
+  );
   const featuredPostsNorm = featuredPostsRaw.map((post) => ({
     ...post,
     profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
   }));
 
-  const featuredIds = featuredPostsNorm.map((post) => post.id);
-  const { referenceCounts, bookmarkCounts, responseCounts } =
-    await getEngagementCounts(supabase, featuredIds);
+  const { referenceCounts, bookmarkCounts, responseCounts } = engagementCounts;
+  const rankingContext: RankingContext = {
+    userId: user?.id ?? null,
+    followedIds: new Set(followedIds),
+    userInterests,
+    userUniversity,
+    userCountry: null,
+  };
   const qualityRankedFeaturedPosts = featuredPostsNorm
     .map((post) => {
       const interestMatch = Boolean(
-        post.tags?.some((tag) => userInterests.includes(tag))
+        post.tags?.some((tag) =>
+          userInterests.some(
+            (interest) =>
+              interest.trim().toLocaleLowerCase("en") ===
+              tag.trim().toLocaleLowerCase("en")
+          )
+        )
       );
       const qualityInput = {
         type: post.type,
@@ -290,7 +354,39 @@ export default async function HomePage({ searchParams }: PageProps) {
       return {
         ...post,
         quality_reason: getFeedSurfaceReason(qualityInput),
-        quality_score: getQualityScore(qualityInput),
+        quality_score: scorePost(
+          {
+            id: post.id,
+            title: post.title,
+            slug: post.slug,
+            excerpt: post.excerpt,
+            type: post.type,
+            content_kind: post.content_kind,
+            article_format: post.article_format,
+            tags: post.tags,
+            created_at: post.published_at ?? new Date(0).toISOString(),
+            published_at: post.published_at,
+            author_id: post.author_id,
+            view_count: post.view_count,
+            impression_count: post.impression_count,
+            read_count: post.read_count,
+            bookmark_count: bookmarkCounts[post.id] ?? 0,
+            reference_count: referenceCounts[post.id] ?? 0,
+            response_count: responseCounts[post.id] ?? 0,
+            citation_id: post.citation_id,
+            published_version_id: post.published_version_id,
+            profiles: post.profiles
+              ? {
+                  username: post.profiles.username ?? "",
+                  full_name: post.profiles.full_name,
+                  university: post.profiles.university,
+                  avatar_url: post.profiles.avatar_url,
+                  verified: post.profiles.verified,
+                }
+              : null,
+          },
+          rankingContext
+        ),
       };
     })
     .sort((left, right) => right.quality_score - left.quality_score);
@@ -302,7 +398,17 @@ export default async function HomePage({ searchParams }: PageProps) {
     qualityRankedFeaturedPosts.find(
       (post) => post.id !== manualFeaturedPost?.id
     ) ?? null;
-  const featuredPost = manualFeaturedPost ?? automaticFeaturedPost;
+  const featuredPost = manualFeaturedPost
+    ? { ...manualFeaturedPost, featured_provenance: "editorial" as const }
+    : automaticFeaturedPost
+      ? {
+          ...automaticFeaturedPost,
+          featured_provenance:
+            automaticFeaturedPost.id === latestPublishedRaw?.id
+              ? ("latest" as const)
+              : ("recommended" as const),
+        }
+      : null;
 
   // A second, distinct candidate for the sidebar's "Featured today" card --
   // never the same record as the main Editor's Pick lead. Reuses the
@@ -317,20 +423,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     featuredPosts: qualityRankedFeaturedPosts,
   });
 
-  let peopleResult: SuggestedPeopleResult = { suggestions: [], reason: "" };
-  let activationState: ActivationState | null = null;
-
-  if (user) {
-    [peopleResult, activationState] = await Promise.all([
-      getSuggestedPeople(supabase, {
-        currentUserId: user.id,
-        university: userUniversity,
-        fieldOfStudy: userFieldOfStudy,
-        limit: 3,
-      }),
-      getActivationState(supabase, user.id),
-    ]);
-  }
+  const [peopleResult, activationState] = await peopleAndActivationPromise;
 
   const showFollowingEligible = !!user;
   const showSubscriptionsEligible =
@@ -388,6 +481,7 @@ export default async function HomePage({ searchParams }: PageProps) {
               followedIds={followedIds}
               authorSubscriptionIds={authorSubscriptionIds}
               topicSubscriptionKeys={topicSubscriptionKeys}
+              excludedAuthorIds={excludedAuthorIds}
               subscriptionSource={
                 tab === "topics" && showSubscriptionsEligible
                   ? "topics"

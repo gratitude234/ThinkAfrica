@@ -36,9 +36,8 @@ export default function PeopleInterlude({
             Writers to follow
           </p>
           <h3 className="mt-0.5 text-base font-semibold text-ink">
-            Based on your reading history
+            {reason || "Suggested for you"}
           </h3>
-          <p className="mt-0.5 text-xs text-ink-muted">{reason}</p>
         </div>
         <Link
           href="/leaderboard"

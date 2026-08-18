@@ -60,11 +60,6 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-function readTime(excerpt: string | null) {
-  const words = excerpt?.trim().split(/\s+/).filter(Boolean).length ?? 0;
-  return Math.max(1, Math.ceil(words / 200));
-}
-
 function documentSize(bytes: number | null | undefined) {
   if (!bytes) return null;
   if (bytes < 1024 * 1024) {
@@ -397,7 +392,7 @@ function ArticleMeta({
   onCover = false,
 }: {
   format: string | null;
-  readingTime: number;
+  readingTime: number | null;
   onCover?: boolean;
 }) {
   return (
@@ -405,7 +400,7 @@ function ArticleMeta({
       className={`font-sans text-kicker font-bold uppercase ${
         onCover ? "text-[#f1c86e]" : "text-gold-ink"
       }`}
-      aria-label={`Article${format ? `, ${format}` : ""}, ${readingTime} minute read`}
+      aria-label={`Article${format ? `, ${format}` : ""}${readingTime ? `, ${readingTime} minute read` : ""}`}
     >
       <span>Article</span>
       {format ? (
@@ -414,8 +409,12 @@ function ArticleMeta({
           <span>{format}</span>
         </>
       ) : null}
-      <span aria-hidden="true"> · </span>
-      <span>{readingTime} min</span>
+      {readingTime ? (
+        <>
+          <span aria-hidden="true"> · </span>
+          <span>{readingTime} min</span>
+        </>
+      ) : null}
     </p>
   );
 }
@@ -433,7 +432,10 @@ function ArticleFeedCard({
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const format = getArticleFormatLabel(resolveArticleFormat(post));
   const hasCover = Boolean(post.cover_image_url?.trim());
-  const readingTime = readTime(excerpt);
+  const readingTime =
+    typeof post.reading_minutes === "number" && post.reading_minutes > 0
+      ? Math.ceil(post.reading_minutes)
+      : null;
 
   return (
     <article className={CARD_SHELL} data-content-kind="article">

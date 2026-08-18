@@ -35,7 +35,7 @@ export default function DiscussionSection({
   isPublished,
 }: Props) {
   return (
-    <div className="mt-10">
+    <div id="discussion" className="mt-10 scroll-mt-24">
       {isPublished ? <InlineResponseComposer parentPostId={postId} userId={userId} /> : null}
 
       <div className="mt-8">

@@ -26,11 +26,13 @@ export async function getSuggestedPeople(
     currentUserId,
     university,
     fieldOfStudy,
+    excludedUserIds,
     limit = 3,
   }: {
     currentUserId: string;
     university: string | null;
     fieldOfStudy: string | null;
+    excludedUserIds?: string[];
     limit?: number;
   }
 ): Promise<SuggestedPeopleResult> {
@@ -40,11 +42,15 @@ export async function getSuggestedPeople(
       .select("following_id")
       .eq("follower_id", currentUserId)
       .limit(1000),
-    supabase
-      .from("user_blocks")
-      .select("blocked_id")
-      .eq("blocker_id", currentUserId)
-      .limit(1000),
+    excludedUserIds
+      ? Promise.resolve({
+          data: excludedUserIds.map((blocked_id) => ({ blocked_id })),
+        })
+      : supabase
+          .from("user_blocks")
+          .select("blocked_id")
+          .eq("blocker_id", currentUserId)
+          .limit(1000),
   ]);
 
   const excludeIds = [

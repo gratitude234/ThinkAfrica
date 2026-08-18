@@ -121,10 +121,11 @@ function DebateCard({ debate }: { debate: DebateInterludeData }) {
   const total = forCount + againstCount;
   const forPct = total > 0 ? Math.round((forCount / total) * 100) : 50;
   const remaining = formatTimeUntil(debate.endsAt ?? null);
+  const statusLabel = debate.status === "active" ? "Live debate" : "Open debate";
 
   return (
     <section className="rounded-2xl bg-gray-900 p-[18px] text-white shadow-[0_8px_24px_rgb(17_24_39/0.14)]">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-300">Live debate</p>
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-300">{statusLabel}</p>
       <Link href={`/debates/${debate.id}`}><h2 className="font-display line-clamp-3 text-[17px] font-semibold leading-[1.25] hover:text-emerald-100">{debate.title}</h2></Link>
       <p className="mt-1.5 text-[12px] text-gray-400">{debate.argumentCount} arguments{remaining ? ` · ${remaining}` : ""}</p>
       <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-gray-700" aria-label={`${forPct}% for, ${100 - forPct}% against`}>

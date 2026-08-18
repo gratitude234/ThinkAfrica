@@ -18,6 +18,7 @@ import LikeButton from "./LikeButton";
 import BookmarkButton from "./BookmarkButton";
 import { PostEngagementProvider } from "./PostEngagementContext";
 import ViewTracker from "./ViewTracker";
+import { createPostEngagementToken } from "@/lib/postEngagementToken";
 import ReadingProgressBar from "./ReadingProgressBar";
 import ReadingBar from "./ReadingBar";
 import ShareButtons from "./ShareButtons";
@@ -1576,6 +1577,9 @@ export default async function PostPage({ params, searchParams }: PageProps) {
   }
 
   const isPublished = post.status === "published";
+  const engagementToken = isPublished
+    ? createPostEngagementToken(post.id, slug)
+    : null;
   const author = getAuthor(post);
   const sanitizedContent = sanitizePostHtml(post.content);
   const sanitizedExcerpt = sanitizePostExcerpt(post.excerpt);
@@ -1638,7 +1642,13 @@ export default async function PostPage({ params, searchParams }: PageProps) {
         <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
           <div className="relative">
             {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
-            {isPublished ? <ViewTracker slug={slug} wordCount={wordCount} /> : null}
+            {isPublished ? (
+              <ViewTracker
+                slug={slug}
+                wordCount={wordCount}
+                engagementToken={engagementToken}
+              />
+            ) : null}
             <Suspense fallback={<SectionSkeleton rows={6} />}>
               <PostConversationView
                 post={post}
@@ -1684,7 +1694,11 @@ export default async function PostPage({ params, searchParams }: PageProps) {
               />
             </Suspense>
             <ReadingProgressBar />
-            <ViewTracker slug={slug} wordCount={wordCount} />
+            <ViewTracker
+              slug={slug}
+              wordCount={wordCount}
+              engagementToken={engagementToken}
+            />
           </>
         ) : null}
 
@@ -1938,7 +1952,11 @@ export default async function PostPage({ params, searchParams }: PageProps) {
           {/* A scroll-progress affordance implies a long-form read; skip it
               for titleless lightweight Posts, which are short by design. */}
           {displayTitle ? <ReadingProgressBar /> : null}
-          <ViewTracker slug={slug} wordCount={wordCount} />
+          <ViewTracker
+            slug={slug}
+            wordCount={wordCount}
+            engagementToken={engagementToken}
+          />
         </>
       ) : null}
 

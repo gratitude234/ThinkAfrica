@@ -17,7 +17,7 @@ export default function PostCardImpression({
   surface = "feed",
 }: PostCardImpressionProps) {
   const ref = useRef<HTMLDivElement>(null);
-  useViewImpression(ref, post.slug, surface);
+  useViewImpression(ref, post.slug, surface, post.feed_exposure);
 
   return (
     <div ref={ref}>

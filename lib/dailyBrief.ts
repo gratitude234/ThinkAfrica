@@ -53,6 +53,7 @@ export const FEATURED_POST_SELECT = `
 `;
 
 const FEATURED_FALLBACK_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const FEATURED_CANDIDATE_LIMIT = 48;
 
 export function uniqueFeaturedPosts<T extends { id: string }>(posts: T[]): T[] {
   const seen = new Set<string>();
@@ -65,7 +66,7 @@ export function uniqueFeaturedPosts<T extends { id: string }>(posts: T[]): T[] {
 
 /**
  * Same three queries the homepage banner uses to source a featured post:
- * an editor-manual pick, a pool of recent high-view candidates, and a
+ * an editor-manual pick, a broad pool of recent candidates, and a
  * latest-published fallback. Shared so the homepage and the daily-brief
  * cron read from one definition instead of two.
  */
@@ -90,9 +91,9 @@ export async function getFeaturedPostCandidates(supabase: SupabaseClient) {
         .select(FEATURED_POST_SELECT)
         .eq("status", "published")
         .gte("published_at", featuredFallbackCutoff)
-        .order("view_count", { ascending: false })
         .order("published_at", { ascending: false })
-        .limit(12),
+        .order("id", { ascending: false })
+        .limit(FEATURED_CANDIDATE_LIMIT),
 
       supabase
         .from("posts")
@@ -164,12 +165,31 @@ export async function getEngagementCounts(
     return { referenceCounts: {}, bookmarkCounts: {}, responseCounts: {} };
   }
 
-  const [{ data: references }, { data: bookmarks }, { data: responses }] =
+  const [referencesResult, bookmarksResult, responsesResult] =
     await Promise.all([
       supabase.from("post_references").select("post_id").in("post_id", featuredIds),
       supabase.from("bookmarks").select("post_id").in("post_id", featuredIds),
-      supabase.from("posts").select("in_response_to").in("in_response_to", featuredIds),
+      supabase
+        .from("posts")
+        .select("in_response_to")
+        .eq("status", "published")
+        .in("in_response_to", featuredIds),
     ]);
+
+  const failedResult = [
+    referencesResult,
+    bookmarksResult,
+    responsesResult,
+  ].find((result) => result.error);
+  if (failedResult?.error) {
+    throw new Error("Unable to load featured-post engagement counts.", {
+      cause: failedResult.error,
+    });
+  }
+
+  const references = referencesResult.data;
+  const bookmarks = bookmarksResult.data;
+  const responses = responsesResult.data;
 
   return {
     referenceCounts: countBy(

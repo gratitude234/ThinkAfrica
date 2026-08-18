@@ -8,13 +8,15 @@ import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { PostCardData } from "@/components/post/PostCard";
 import type { FeedContentFilter, FeedTimeframe } from "@/lib/feedData";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
-import HomeFeaturedLead, { type HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
+import type { HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
+import HomeFeaturedLeadImpression from "@/components/post/HomeFeaturedLeadImpression";
 import HomeGuestNotice from "./HomeGuestNotice";
 import FeedEmptyState from "./FeedEmptyState";
 import FeedErrorState from "./FeedErrorState";
 import CreateTrigger from "./CreateTrigger";
 import { useStickySubnav } from "@/lib/useStickySubnav";
 import { useAppChrome } from "./AppChromeProvider";
+import { trackActivationEvent } from "@/lib/activationEvents";
 
 type TabKey = "home" | "following" | "subscriptions" | "topics" | "latest";
 const EMPTY_POSTS: PostCardData[] = [];
@@ -41,6 +43,17 @@ const CONTENT_KIND_PLURAL: Record<Exclude<FeedContentFilter, "all">, string> = {
 interface FeedResponse {
   posts: PostCardData[];
   hasMore: boolean;
+  nextCursor?: string | null;
+}
+
+class FeedRequestError extends Error {
+  constructor(
+    readonly code: string | null,
+    readonly status: number
+  ) {
+    super("Failed to load feed");
+    this.name = "FeedRequestError";
+  }
 }
 
 interface FeedCacheEntry extends FeedResponse {
@@ -90,12 +103,16 @@ async function fetchFeed(
   type: FeedContentFilter,
   timeframe: FeedTimeframe,
   page: number,
-  source: SubscriptionFeedSource
+  source: SubscriptionFeedSource,
+  feedSessionId: string,
+  cursor?: string | null
 ): Promise<FeedResponse> {
   const params = new URLSearchParams();
   params.set("tab", tab);
   params.set("page", page.toString());
   params.set("pageSize", "12");
+  params.set("session", feedSessionId);
+  if (cursor) params.set("cursor", cursor);
   if (type !== "all") params.set("type", type);
   if (timeframe !== "all") params.set("timeframe", timeframe);
   if (tab === "subscriptions") params.set("source", source);
@@ -105,7 +122,12 @@ async function fetchFeed(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to load feed");
+    const payload = (await response.json().catch(() => null)) as {
+      error?: { code?: unknown };
+    } | null;
+    const code =
+      typeof payload?.error?.code === "string" ? payload.error.code : null;
+    throw new FeedRequestError(code, response.status);
   }
 
   return (await response.json()) as FeedResponse;
@@ -131,6 +153,8 @@ export default function PostsFeedTabs({
   initialTimeframe,
   initialPosts,
   initialHasMore,
+  initialNextCursor = null,
+  initialLoadFailed = false,
   initialSubscriptionSource = "all",
   showFollowingTab,
   showTopicsTab = false,
@@ -147,6 +171,8 @@ export default function PostsFeedTabs({
   initialTimeframe: FeedTimeframe;
   initialPosts: PostCardData[];
   initialHasMore: boolean;
+  initialNextCursor?: string | null;
+  initialLoadFailed?: boolean;
   initialSubscriptionSource?: SubscriptionFeedSource;
   showFollowingTab: boolean;
   showTopicsTab?: boolean;
@@ -179,6 +205,7 @@ export default function PostsFeedTabs({
     )]: {
       posts: initialPosts,
       hasMore: initialHasMore,
+      nextCursor: initialNextCursor,
       page: 1,
       emptyPageCount: initialPosts.length === 0 ? 1 : 0,
     },
@@ -189,12 +216,15 @@ export default function PostsFeedTabs({
   // full retry state (nothing loaded yet for this tab/filter), while
   // paginationError leaves every already-loaded card in place and only
   // adds a compact inline retry banner at the bottom.
-  const [initialError, setInitialError] = useState(false);
+  const [initialError, setInitialError] = useState(initialLoadFailed);
   const [paginationError, setPaginationError] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const feedTopRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
+  const feedSessionIdRef = useRef(
+    initialPosts[0]?.feed_exposure?.feedSessionId ?? crypto.randomUUID()
+  );
   const inFlightRef = useRef(new Map<string, Promise<FeedResponse>>());
   const activeRequestRef = useRef(0);
   const loadMoreRequestRef = useRef(0);
@@ -204,6 +234,11 @@ export default function PostsFeedTabs({
   useStickySubnav(stripRef, feedTopRef);
 
   useEffect(() => {
+    const incomingFeedSessionId =
+      initialPosts[0]?.feed_exposure?.feedSessionId;
+    if (incomingFeedSessionId) {
+      feedSessionIdRef.current = incomingFeedSessionId;
+    }
     const nextKey = feedCacheKey(
       initialTab,
       initialType,
@@ -219,16 +254,19 @@ export default function PostsFeedTabs({
       [nextKey]: {
         posts: initialPosts,
         hasMore: initialHasMore,
+        nextCursor: initialNextCursor,
         page: 1,
         emptyPageCount: initialPosts.length === 0 ? 1 : 0,
       },
     }));
     setIsSwitching(false);
     setIsLoadingMore(false);
-    setInitialError(false);
+    setInitialError(initialLoadFailed);
     setPaginationError(false);
   }, [
     initialHasMore,
+    initialLoadFailed,
+    initialNextCursor,
     initialPosts,
     initialSubscriptionSource,
     initialTab,
@@ -274,7 +312,8 @@ export default function PostsFeedTabs({
       nextType: FeedContentFilter,
       nextTimeframe: FeedTimeframe,
       nextPage: number,
-      nextSource: SubscriptionFeedSource
+      nextSource: SubscriptionFeedSource,
+      nextCursor: string | null = null
     ) => {
       const key = feedCacheKey(
         nextTab,
@@ -282,7 +321,8 @@ export default function PostsFeedTabs({
         nextTimeframe,
         nextSource
       );
-      const requestKey = `${key}:${nextPage}`;
+      const cursor = nextTab === "home" ? null : nextCursor;
+      const requestKey = `${key}:${nextPage}:${cursor ?? "offset"}`;
       const existing = inFlightRef.current.get(requestKey);
       if (existing) return existing;
 
@@ -291,10 +331,12 @@ export default function PostsFeedTabs({
         nextType,
         nextTimeframe,
         nextPage,
-        nextSource
+        nextSource,
+        feedSessionIdRef.current,
+        cursor
       ).finally(() => {
-          inFlightRef.current.delete(requestKey);
-        });
+        inFlightRef.current.delete(requestKey);
+      });
       inFlightRef.current.set(requestKey, request);
       return request;
     },
@@ -311,11 +353,9 @@ export default function PostsFeedTabs({
       setFeedCache((current) => {
         const previous = current[key];
 
-        // Every date-ordered tab pages by offset, so a post published between
-        // two requests slides the whole window down by one and hands back a
-        // card that is already on screen -- rendered twice, under a duplicate
-        // React key. Appending by id rather than by concatenation makes the
-        // list idempotent no matter what the window did underneath it.
+        // Chronological tabs normally continue from a keyset cursor; ranked
+        // Home still pages its fixed score window by index. ID dedupe remains
+        // a final defense for retries and older clients using offset fallback.
         const carried = append ? (previous?.posts ?? []) : [];
         const seen = new Set(carried.map((post) => post.id));
         const added = result.posts.filter((post) => {
@@ -340,6 +380,7 @@ export default function PostsFeedTabs({
           [key]: {
             posts: append ? [...carried, ...added] : added,
             hasMore: result.hasMore,
+            nextCursor: result.nextCursor ?? null,
             page: nextPage,
             emptyPageCount,
           },
@@ -379,7 +420,8 @@ export default function PostsFeedTabs({
           nextType,
           nextTimeframe,
           1,
-          nextSource
+          nextSource,
+          null
         );
         writeFeedPage(key, result, 1, false);
       } catch {
@@ -437,6 +479,21 @@ export default function PostsFeedTabs({
       const hasCachedFeed = Boolean(feedCache[nextKey]);
       const requestId = activeRequestRef.current + 1;
       activeRequestRef.current = requestId;
+      // Invalidate any pagination request owned by the previous tab/filter.
+      // Its result may still warm that old cache key, but it cannot change the
+      // loading or error state for the newly active view.
+      loadMoreRequestRef.current += 1;
+
+      if (nextTab !== activeTab) {
+        trackActivationEvent({
+          event: "home_tab_changed",
+          metadata: {
+            fromTab: activeTab,
+            toTab: nextTab,
+            feedSessionId: feedSessionIdRef.current,
+          },
+        });
+      }
 
       setActiveTab(nextTab);
       setTypeFilter(nextType);
@@ -444,6 +501,7 @@ export default function PostsFeedTabs({
       setSubscriptionSource(nextSource);
       setInitialError(false);
       setPaginationError(false);
+      setIsLoadingMore(false);
       setIsSwitching(!hasCachedFeed);
       scrollFeedToTop();
       syncUrl(nextTab, nextType, nextTimeframe, nextSource);
@@ -453,7 +511,14 @@ export default function PostsFeedTabs({
         showSkeleton: !hasCachedFeed,
       });
     },
-    [feedCache, reloadFeed, scrollFeedToTop, subscriptionSource, syncUrl]
+    [
+      activeTab,
+      feedCache,
+      reloadFeed,
+      scrollFeedToTop,
+      subscriptionSource,
+      syncUrl,
+    ]
   );
 
   const retryInitial = useCallback(() => {
@@ -491,11 +556,28 @@ export default function PostsFeedTabs({
         typeFilter,
         timeframe,
         nextPage,
-        subscriptionSource
+        subscriptionSource,
+        currentFeed.nextCursor ?? null
       );
       writeFeedPage(key, result, nextPage, true);
-    } catch {
+    } catch (error) {
       if (loadMoreRequestRef.current === requestId) {
+        if (
+          error instanceof FeedRequestError &&
+          error.code === "INVALID_CURSOR"
+        ) {
+          // Cursors are intentionally version/context-bound. After a deploy or
+          // context change, clear the rejected cursor so Retry can fall back to
+          // the same page number instead of repeating a permanent 400.
+          setFeedCache((current) => {
+            const entry = current[key];
+            if (!entry) return current;
+            return {
+              ...current,
+              [key]: { ...entry, nextCursor: null },
+            };
+          });
+        }
         setPaginationError(true);
       }
     } finally {
@@ -588,10 +670,6 @@ export default function PostsFeedTabs({
   const hasMore = currentFeed?.hasMore ?? false;
   const emptyPageCount = currentFeed?.emptyPageCount ?? 0;
   const showSkeleton = isSwitching && !currentFeed;
-  const showEmpty = !initialError && !showSkeleton && posts.length === 0;
-  const showFeedList = !initialError && !showSkeleton && posts.length > 0;
-  const showEndState =
-    showFeedList && !isLoadingMore && (!hasMore || emptyPageCount >= 3);
   const showFeaturedLead =
     activeTab === "home" && typeFilter === "all" && Boolean(featuredPost) && !initialError && !showSkeleton;
   // The featured lead already shows this record above the feed -- don't
@@ -599,6 +677,16 @@ export default function PostsFeedTabs({
   const visiblePosts = showFeaturedLead
     ? posts.filter((candidate) => candidate.id !== featuredPost?.id)
     : posts;
+  const hasVisibleContent = showFeaturedLead || visiblePosts.length > 0;
+  const showEmpty = !initialError && !showSkeleton && !hasVisibleContent;
+  const showFeedList =
+    !initialError && !showSkeleton && visiblePosts.length > 0;
+  const showEndState =
+    hasVisibleContent &&
+    !initialError &&
+    !showSkeleton &&
+    !isLoadingMore &&
+    (!hasMore || emptyPageCount >= 3);
 
   const resetFilterToAll = () => updateState(activeTab, "all", timeframe);
 
@@ -844,7 +932,9 @@ export default function PostsFeedTabs({
         </div>
       </div>
 
-      {showFeaturedLead && featuredPost ? <HomeFeaturedLead post={featuredPost} /> : null}
+      {showFeaturedLead && featuredPost ? (
+        <HomeFeaturedLeadImpression post={featuredPost} />
+      ) : null}
 
       <div
         id="home-feed-panel"
@@ -858,7 +948,7 @@ export default function PostsFeedTabs({
           <FeedSkeleton />
         ) : showEmpty ? (
           <FeedEmptyState title={emptyTitle} body={emptyBody} cta={emptyCta} />
-        ) : (
+        ) : showFeedList ? (
           <PostFeed
             posts={visiblePosts}
             activeTab={activeTab}
@@ -867,8 +957,9 @@ export default function PostsFeedTabs({
             peopleSuggestionReason={peopleSuggestionReason}
             prioritizePeopleSuggestions={prioritizePeopleSuggestions}
             currentUserId={currentUserId}
+            prioritizeFirstPost={!showFeaturedLead}
           />
-        )}
+        ) : null}
       </div>
 
       {/* The same skeleton the first load uses, rather than a line of grey

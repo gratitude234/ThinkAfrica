@@ -42,9 +42,10 @@ export function normalizeFeedContentFilter(
 export interface FeedPageResult {
   posts: PostCardData[];
   hasMore: boolean;
+  nextCursor?: string | null;
 }
 
-interface FeedOptions {
+export interface FeedOptions {
   supabase: {
     from: (table: string) => any;
   };
@@ -61,21 +62,220 @@ interface FeedOptions {
   topicSubscriptionKeys?: string[];
   subscriptionSource?: SubscriptionFeedSource;
   excludedAuthorIds?: string[];
+  cursor?: string | null;
+}
+
+type FeedSupabaseClient = FeedOptions["supabase"];
+
+interface FeedEnrichmentVisibility {
+  excludedAuthorIds?: string[];
+  excludedPostIds?: string[];
+}
+
+interface SupabaseQueryResult<T> {
+  data: T | null;
+  error?: unknown;
+}
+
+/**
+ * A database failure while assembling feed data. Keeping the original error
+ * (and its PostgREST code when present) lets route handlers report a real 5xx
+ * instead of turning a broken query into a convincing empty feed.
+ */
+export class FeedDataError extends Error {
+  readonly operation: string;
+  readonly code?: string;
+  readonly cause: unknown;
+
+  constructor(operation: string, cause: unknown) {
+    const source = cause as { message?: unknown; code?: unknown } | null;
+    const detail =
+      typeof source?.message === "string" && source.message.trim()
+        ? source.message
+        : "Unknown database error";
+    super(`Feed data query failed (${operation}): ${detail}`);
+    this.name = "FeedDataError";
+    this.operation = operation;
+    this.code =
+      typeof source?.code === "string" && source.code ? source.code : undefined;
+    this.cause = cause;
+  }
+}
+
+export class FeedCursorError extends Error {
+  constructor(message = "Invalid or mismatched feed cursor.") {
+    super(message);
+    this.name = "FeedCursorError";
+  }
+}
+
+function expectRows<T>(
+  result: SupabaseQueryResult<T[]>,
+  operation: string
+): T[] {
+  if (result.error) throw new FeedDataError(operation, result.error);
+  return result.data ?? [];
+}
+
+function normalizePositiveInteger(
+  value: number,
+  fallback: number,
+  maximum: number
+): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(Math.trunc(value), 1), maximum);
 }
 
 type PublicFeedCacheInput = Pick<
   FeedOptions,
-  "tab" | "page" | "pageSize" | "type" | "timeframe"
+  "tab" | "page" | "pageSize" | "type" | "timeframe" | "cursor"
 >;
 
+// topic_keys intentionally is not part of the baseline contract. That column
+// belongs to the separately deployed topic-subscriptions schema; selecting it
+// here made every feed fail when the feature migration was not installed.
+// Only the topic-subscription branch asks PostgREST for it.
 const POST_SELECT =
-  "id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, topic_keys, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
+  "id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
+const POST_SELECT_WITH_TOPIC_KEYS = `${POST_SELECT}, topic_keys`;
 
 // How deep the score-ranked portion of the home feed goes. Every page of the
 // "For you" tab slices this same window, so it has to be a constant -- see the
 // comment at the ranking branch of fetchFeedPageUncached. Ten pages at the
 // client's page size of 12; past it the feed pages reverse-chronologically.
 export const RANKED_FEED_WINDOW = 120;
+export const MAX_FEED_PAGE = 100;
+export const MAX_FEED_PAGE_SIZE = 30;
+
+type ChronologicalFeedTab = Exclude<FeedTabKey, "home">;
+
+interface FeedCursorContext {
+  tab: ChronologicalFeedTab;
+  type: FeedContentFilter;
+  timeframe: FeedTimeframe;
+  subscriptionSource: SubscriptionFeedSource | null;
+}
+
+interface FeedCursorPosition {
+  publishedAt: string;
+  id: string;
+}
+
+interface FeedCursorPayload extends FeedCursorContext, FeedCursorPosition {
+  version: 1;
+}
+
+const FEED_CURSOR_VERSION = 1;
+const MAX_CURSOR_LENGTH = 2048;
+const SAFE_CURSOR_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
+function getCursorContext(
+  tab: FeedTabKey,
+  type: FeedContentFilter | null,
+  timeframe: FeedTimeframe,
+  subscriptionSource: SubscriptionFeedSource
+): FeedCursorContext | null {
+  if (tab === "home") return null;
+  return {
+    tab,
+    type: type ?? "all",
+    timeframe,
+    subscriptionSource:
+      tab === "topics"
+        ? "topics"
+        : tab === "subscriptions"
+          ? subscriptionSource
+          : null,
+  };
+}
+
+function decodeFeedCursor(
+  cursor: string | null | undefined,
+  expectedContext: FeedCursorContext | null
+): FeedCursorPosition | null {
+  if (cursor == null) return null;
+  if (!expectedContext) {
+    throw new FeedCursorError("Cursors are not supported by the ranked home feed.");
+  }
+  if (
+    cursor.length === 0 ||
+    cursor.length > MAX_CURSOR_LENGTH ||
+    !/^[A-Za-z0-9_-]+$/.test(cursor)
+  ) {
+    throw new FeedCursorError();
+  }
+
+  try {
+    const bytes = Buffer.from(cursor, "base64url");
+    if (bytes.toString("base64url") !== cursor) {
+      throw new FeedCursorError();
+    }
+    const payload = JSON.parse(bytes.toString("utf8")) as Partial<FeedCursorPayload>;
+    if (
+      payload.version !== FEED_CURSOR_VERSION ||
+      payload.tab !== expectedContext.tab ||
+      payload.type !== expectedContext.type ||
+      payload.timeframe !== expectedContext.timeframe ||
+      payload.subscriptionSource !== expectedContext.subscriptionSource ||
+      typeof payload.publishedAt !== "string" ||
+      typeof payload.id !== "string" ||
+      !SAFE_CURSOR_ID.test(payload.id)
+    ) {
+      throw new FeedCursorError();
+    }
+
+    const canonicalPublishedAt = new Date(payload.publishedAt).toISOString();
+    if (canonicalPublishedAt !== payload.publishedAt) {
+      throw new FeedCursorError();
+    }
+    return { publishedAt: canonicalPublishedAt, id: payload.id };
+  } catch (error) {
+    if (error instanceof FeedCursorError) throw error;
+    throw new FeedCursorError();
+  }
+}
+
+function encodeFeedCursor(
+  row: Record<string, unknown>,
+  context: FeedCursorContext
+): string {
+  const rawPublishedAt = row.published_at;
+  const id = row.id;
+  if (
+    typeof rawPublishedAt !== "string" ||
+    !Number.isFinite(Date.parse(rawPublishedAt)) ||
+    typeof id !== "string" ||
+    !SAFE_CURSOR_ID.test(id)
+  ) {
+    throw new FeedCursorError(
+      "The feed cannot continue because its last item has no valid cursor position."
+    );
+  }
+
+  const payload: FeedCursorPayload = {
+    version: FEED_CURSOR_VERSION,
+    ...context,
+    publishedAt: new Date(rawPublishedAt).toISOString(),
+    id,
+  };
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+function applyKeysetCursor(query: any, cursor: FeedCursorPosition | null) {
+  if (!cursor) return query;
+  return query.or(
+    `published_at.lt.${cursor.publishedAt},and(published_at.eq.${cursor.publishedAt},id.lt.${cursor.id})`
+  );
+}
+
+function getNextCursor(
+  rows: Array<Record<string, unknown>>,
+  hasMore: boolean,
+  context: FeedCursorContext
+): string | null {
+  if (!hasMore || rows.length === 0) return null;
+  return encodeFeedCursor(rows[rows.length - 1], context);
+}
 
 function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   if (timeframe === "week") {
@@ -96,9 +296,15 @@ export async function getCountsByPostId(
 ): Promise<Record<string, number>> {
   if (postIds.length === 0) return {};
 
-  const { data } = await supabase.from(table).select("post_id").in("post_id", postIds);
+  const result = (await supabase
+    .from(table)
+    .select("post_id")
+    .in("post_id", postIds)) as SupabaseQueryResult<
+    Array<{ post_id?: string }>
+  >;
+  const data = expectRows(result, `count ${table}`);
 
-  return (data ?? []).reduce(
+  return data.reduce(
     (acc: Record<string, number>, row: { post_id?: string }) => {
       const key = (row as { post_id?: string }).post_id;
       if (!key) return acc;
@@ -120,12 +326,15 @@ async function getLikeCountsByPostId(
 ): Promise<Record<string, number>> {
   if (postIds.length === 0) return {};
 
-  const { data } = await supabase
+  const result = (await supabase
     .from("post_like_counts")
     .select("post_id, like_count")
-    .in("post_id", postIds);
+    .in("post_id", postIds)) as SupabaseQueryResult<
+    Array<{ post_id: string; like_count: number }>
+  >;
+  const data = expectRows(result, "load like aggregates");
 
-  return ((data ?? []) as Array<{ post_id: string; like_count: number }>).reduce(
+  return data.reduce(
     (acc, row) => {
       acc[row.post_id] = row.like_count;
       return acc;
@@ -134,12 +343,51 @@ async function getLikeCountsByPostId(
   );
 }
 
+async function getExcludedCreditedPostIds(
+  reader: FeedSupabaseClient,
+  excludedAuthorIds: string[]
+): Promise<string[]> {
+  if (excludedAuthorIds.length === 0) return [];
+
+  const result = (await reader
+    .from("post_authors")
+    .select("post_id")
+    .in("user_id", excludedAuthorIds)
+    .not("accepted_at", "is", null)) as SupabaseQueryResult<
+    Array<{ post_id: string }>
+  >;
+
+  return Array.from(
+    new Set(
+      expectRows(result, "load posts credited to excluded authors")
+        .map((row) => row.post_id)
+        .filter(Boolean)
+    )
+  );
+}
+
+async function applyViewerCommentCounts(
+  viewerClient: FeedSupabaseClient,
+  posts: PostCardData[]
+): Promise<PostCardData[]> {
+  if (posts.length === 0) return posts;
+  const counts = await getCountsByPostId(
+    viewerClient,
+    "comments",
+    posts.map((post) => post.id)
+  );
+  return posts.map((post) => ({
+    ...post,
+    comment_count: counts[post.id] ?? 0,
+  }));
+}
+
 async function enrichPosts(
-  supabase: {
-    from: (table: string) => any;
-  },
+  reader: FeedSupabaseClient,
   raw: unknown[],
-  rankingContext?: RankingContext
+  rankingContext?: RankingContext,
+  viewerClient: FeedSupabaseClient | null = reader,
+  visibility: FeedEnrichmentVisibility = {}
 ): Promise<PostCardData[]> {
   const ids = (raw as Array<{ id: string }>).map((post) => post.id);
   const authorIds = Array.from(
@@ -161,19 +409,25 @@ async function enrichPosts(
     viewerLikesResult,
     viewerBookmarksResult,
   ] = await Promise.all([
-    getLikeCountsByPostId(supabase, ids),
-    getCountsByPostId(supabase, "bookmarks", ids),
-    getCountsByPostId(supabase, "post_references", ids),
+    getLikeCountsByPostId(reader, ids),
+    getCountsByPostId(reader, "bookmarks", ids),
+    getCountsByPostId(reader, "post_references", ids),
     // Read with the caller's client, never the admin one: the RLS SELECT policy
     // on comments is what hides moderated rows, so a service-role count leaks
     // them. An author legitimately sees their own hidden comment, so this
     // number is per-viewer by design.
-    getCountsByPostId(supabase, "comments", ids),
+    viewerClient
+      ? getCountsByPostId(viewerClient, "comments", ids)
+      : Promise.resolve({} as Record<string, number>),
     ids.length > 0
-      ? supabase.from("posts").select("in_response_to").in("in_response_to", ids)
+      ? reader
+          .from("posts")
+          .select("in_response_to")
+          .in("in_response_to", ids)
+          .eq("status", "published")
       : Promise.resolve({ data: [], error: null }),
     authorIds.length > 0
-      ? supabase
+      ? reader
           .from("profiles")
           .select(
             "id, username, full_name, university, avatar_url, verified, verified_type"
@@ -181,7 +435,7 @@ async function enrichPosts(
           .in("id", authorIds)
       : Promise.resolve({ data: [], error: null }),
     ids.length > 0
-      ? supabase
+      ? reader
           .from("post_authors")
           .select("post_id, user_id, display_order")
           .in("post_id", ids)
@@ -189,14 +443,14 @@ async function enrichPosts(
           .order("display_order", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
     ids.length > 0 && rankingContext?.userId
-      ? supabase
+      ? reader
           .from("likes")
           .select("post_id")
           .eq("user_id", rankingContext.userId)
           .in("post_id", ids)
       : Promise.resolve({ data: [], error: null }),
     ids.length > 0 && rankingContext?.userId
-      ? supabase
+      ? reader
           .from("bookmarks")
           .select("post_id")
           .eq("user_id", rankingContext.userId)
@@ -204,9 +458,34 @@ async function enrichPosts(
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const responseCountsByPostId = ((responseCounts.data ?? []) as Array<{
-    in_response_to?: string | null;
-  }>).reduce(
+  const responseRows = expectRows<{ in_response_to?: string | null }>(
+    responseCounts,
+    "count published responses"
+  );
+  const profileRows = expectRows<{
+    id: string;
+    username: string;
+    full_name: string | null;
+    university: string | null;
+    avatar_url: string | null;
+    verified?: boolean;
+    verified_type?: string | null;
+  }>(profilesResult, "load feed author profiles");
+  const acceptedPostAuthorRows = expectRows<{
+    post_id: string;
+    user_id: string;
+    display_order: number;
+  }>(postAuthorsResult, "load accepted post authors");
+  const viewerLikeRows = expectRows<{ post_id: string }>(
+    viewerLikesResult,
+    "load viewer likes"
+  );
+  const viewerBookmarkRows = expectRows<{ post_id: string }>(
+    viewerBookmarksResult,
+    "load viewer bookmarks"
+  );
+
+  const responseCountsByPostId = responseRows.reduce(
     (acc, row) => {
       if (row.in_response_to) {
         acc[row.in_response_to] = (acc[row.in_response_to] ?? 0) + 1;
@@ -216,21 +495,9 @@ async function enrichPosts(
     {} as Record<string, number>
   );
 
-  const profiles = (profilesResult.data ?? []) as Array<{
-    id: string;
-    username: string;
-    full_name: string | null;
-    university: string | null;
-    avatar_url: string | null;
-    verified?: boolean;
-    verified_type?: string | null;
-  }>;
+  const profiles = profileRows;
 
-  const acceptedPostAuthors = (postAuthorsResult.data ?? []) as Array<{
-    post_id: string;
-    user_id: string;
-    display_order: number;
-  }>;
+  const acceptedPostAuthors = acceptedPostAuthorRows;
 
   const coAuthorIds = Array.from(
     new Set(acceptedPostAuthors.map((row) => row.user_id).filter(Boolean))
@@ -238,42 +505,67 @@ async function enrichPosts(
 
   const coAuthorProfilesResult =
     coAuthorIds.length > 0
-      ? await supabase
+      ? await reader
           .from("profiles")
           .select("id, username, full_name")
           .in("id", coAuthorIds)
       : { data: [], error: null };
+  const coAuthorProfiles = expectRows<{
+    id: string;
+    username: string;
+    full_name: string | null;
+  }>(coAuthorProfilesResult, "load coauthor profiles");
 
   // Response context (Part 5): batch-fetch the parent post's title/author for
   // any row that is itself a response, so the feed can render a real
   // "Responding to X by Y" line instead of a generic fallback. A parent that
   // no longer resolves (unpublished/removed) is simply omitted -- callers
   // fail safe to the generic line rather than crash or link to nothing.
+  const excludedParentPostIds = new Set(
+    (visibility.excludedPostIds ?? []).filter(Boolean)
+  );
+  const excludedParentAuthorIds = Array.from(
+    new Set((visibility.excludedAuthorIds ?? []).filter(Boolean))
+  );
   const responseToIds = Array.from(
     new Set(
       (raw as Array<{ in_response_to?: string | null }>)
         .map((post) => post.in_response_to)
-        .filter(Boolean) as string[]
+        .filter(
+          (id): id is string =>
+            typeof id === "string" && !excludedParentPostIds.has(id)
+        )
     )
   );
 
-  const parentPostsResult =
+  let parentPostsQuery =
     responseToIds.length > 0
-      ? await supabase
+      ? reader
           .from("posts")
           .select("id, slug, title, type, content_kind, author_id")
           .in("id", responseToIds)
           .eq("status", "published")
-      : { data: [], error: null };
-
-  const parentPosts = (parentPostsResult.data ?? []) as Array<{
+      : null;
+  if (parentPostsQuery && excludedParentAuthorIds.length > 0) {
+    parentPostsQuery = parentPostsQuery.not(
+      "author_id",
+      "in",
+      `(${excludedParentAuthorIds.join(",")})`
+    );
+  }
+  const parentPostsResult = parentPostsQuery
+    ? await parentPostsQuery
+    : { data: [], error: null };
+  const parentPostRows = expectRows<{
     id: string;
     slug: string;
     title: string | null;
     type: string;
     content_kind: string | null;
     author_id: string;
-  }>;
+  }>(parentPostsResult, "load response parent posts");
+
+  const parentPosts = parentPostRows;
 
   const parentAuthorIds = Array.from(
     new Set(parentPosts.map((parent) => parent.author_id).filter(Boolean))
@@ -281,18 +573,19 @@ async function enrichPosts(
 
   const parentAuthorProfilesResult =
     parentAuthorIds.length > 0
-      ? await supabase
+      ? await reader
           .from("profiles")
           .select("id, username, full_name")
           .in("id", parentAuthorIds)
       : { data: [], error: null };
+  const parentAuthorProfiles = expectRows<{
+    id: string;
+    username: string;
+    full_name: string | null;
+  }>(parentAuthorProfilesResult, "load response parent authors");
 
   const parentAuthorProfilesById = new Map(
-    ((parentAuthorProfilesResult.data ?? []) as Array<{
-      id: string;
-      username: string;
-      full_name: string | null;
-    }>).map((profile) => [profile.id, profile])
+    parentAuthorProfiles.map((profile) => [profile.id, profile])
   );
 
   const parentPostsById = new Map(
@@ -315,21 +608,13 @@ async function enrichPosts(
 
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
   const viewerLikedIds = new Set(
-    ((viewerLikesResult.data ?? []) as Array<{ post_id: string }>).map(
-      (row) => row.post_id
-    )
+    viewerLikeRows.map((row) => row.post_id)
   );
   const viewerBookmarkedIds = new Set(
-    ((viewerBookmarksResult.data ?? []) as Array<{ post_id: string }>).map(
-      (row) => row.post_id
-    )
+    viewerBookmarkRows.map((row) => row.post_id)
   );
   const coAuthorProfilesById = new Map(
-    ((coAuthorProfilesResult.data ?? []) as Array<{
-      id: string;
-      username: string;
-      full_name: string | null;
-    }>).map((profile) => [profile.id, profile])
+    coAuthorProfiles.map((profile) => [profile.id, profile])
   );
 
   const coAuthorsByPostId = acceptedPostAuthors.reduce(
@@ -357,6 +642,14 @@ async function enrichPosts(
       }>
     >
   );
+  // Keep explanatory metadata aligned with feedRanking's relevance signal.
+  // Raw profile interests and post tags are user-entered, so exact-string
+  // comparison loses matches that differ only by surrounding space or case.
+  const normalizedInterests = new Set(
+    (rankingContext?.userInterests ?? [])
+      .map((interest) => interest.trim().toLocaleLowerCase("en"))
+      .filter(Boolean)
+  );
 
   return (raw as Array<Record<string, unknown>>).map((post) => {
     const id = (post.id as string) ?? "";
@@ -372,8 +665,10 @@ async function enrichPosts(
     );
     const interestMatch = Boolean(
       tags &&
-        rankingContext?.userInterests.length &&
-        tags.some((tag) => rankingContext.userInterests.includes(tag))
+        normalizedInterests.size > 0 &&
+        tags.some((tag) =>
+          normalizedInterests.has(tag.trim().toLocaleLowerCase("en"))
+        )
     );
     const qualityInput = {
       type: post.type as string | null,
@@ -440,8 +735,21 @@ export async function fetchResponsePage(
   viewerId: string | null,
   limit = RESPONSE_PAGE_SIZE
 ): Promise<ResponsePage> {
-  const cards = await fetchResponseCards(supabase, postId, viewerId, limit + 1);
-  return { cards: cards.slice(0, limit), hasMore: cards.length > limit };
+  const safeLimit = normalizePositiveInteger(
+    limit,
+    RESPONSE_PAGE_SIZE,
+    MAX_FEED_PAGE_SIZE
+  );
+  const cards = await fetchResponseCards(
+    supabase,
+    postId,
+    viewerId,
+    safeLimit + 1
+  );
+  return {
+    cards: cards.slice(0, safeLimit),
+    hasMore: cards.length > safeLimit,
+  };
 }
 
 export async function fetchResponseCards(
@@ -452,15 +760,21 @@ export async function fetchResponseCards(
   viewerId: string | null,
   limit = RESPONSE_PAGE_SIZE
 ): Promise<PostCardData[]> {
-  const { data: raw } = await supabase
+  const safeLimit = normalizePositiveInteger(
+    limit,
+    RESPONSE_PAGE_SIZE,
+    MAX_FEED_PAGE_SIZE + 1
+  );
+  const result = (await supabase
     .from("posts")
     .select(POST_SELECT)
     .eq("in_response_to", postId)
     .eq("status", "published")
     .order("published_at", { ascending: false })
-    .limit(limit);
+    .order("id", { ascending: false })
+    .limit(safeLimit)) as SupabaseQueryResult<unknown[]>;
 
-  const rows = (raw ?? []) as unknown[];
+  const rows = expectRows(result, "load responses for post");
   if (rows.length === 0) return [];
 
   const rankingContext: RankingContext = {
@@ -485,18 +799,23 @@ export async function fetchRecentResponsePage(
   page = 1,
   pageSize = 20
 ): Promise<ResponsePage> {
-  const safePage = Math.max(1, page);
-  const safePageSize = Math.min(Math.max(pageSize, 1), 30);
+  const safePage = normalizePositiveInteger(page, 1, MAX_FEED_PAGE);
+  const safePageSize = normalizePositiveInteger(
+    pageSize,
+    20,
+    MAX_FEED_PAGE_SIZE
+  );
   const offset = (safePage - 1) * safePageSize;
-  const { data: raw } = await supabase
+  const result = (await supabase
     .from("posts")
     .select(POST_SELECT)
     .not("in_response_to", "is", null)
     .eq("status", "published")
     .order("published_at", { ascending: false })
-    .range(offset, offset + safePageSize);
+    .order("id", { ascending: false })
+    .range(offset, offset + safePageSize)) as SupabaseQueryResult<unknown[]>;
 
-  const rows = (raw ?? []) as unknown[];
+  const rows = expectRows(result, "load recent responses");
   const hasMore = rows.length > safePageSize;
   const rankingContext: RankingContext = {
     userId: viewerId,
@@ -521,30 +840,36 @@ export async function fetchCitableFeed(
   pageSize = 8
 ): Promise<PostCardData[]> {
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return fetchCachedCitableFeed(pageSize);
+    const posts = await fetchCachedCitableFeed(pageSize);
+    return applyViewerCommentCounts(supabase, posts);
   }
 
-  return fetchCitableFeedUncached(supabase, pageSize);
+  return fetchCitableFeedUncached(supabase, pageSize, supabase);
 }
 
 async function fetchCitableFeedUncached(
-  supabase: {
-    from: (table: string) => any;
-  },
-  pageSize = 8
+  supabase: FeedSupabaseClient,
+  pageSize = 8,
+  viewerClient: FeedSupabaseClient | null = supabase
 ): Promise<PostCardData[]> {
   const reader = process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createAdminClient()
     : supabase;
-  const safePageSize = Math.min(Math.max(pageSize, 1), 30);
+  const safePageSize = normalizePositiveInteger(
+    pageSize,
+    8,
+    MAX_FEED_PAGE_SIZE
+  );
 
-  const { data: citableRows } = await reader
+  const result = (await reader
     .from("posts")
     .select(POST_SELECT)
     .eq("status", "published")
     .not("citation_id", "is", null)
     .order("published_at", { ascending: false })
-    .limit(safePageSize);
+    .order("id", { ascending: false })
+    .limit(safePageSize)) as SupabaseQueryResult<unknown[]>;
+  const citableRows = expectRows(result, "load citable feed");
 
   // Phase 4A: this used to pad a short "Citable" shelf with
   // .in("type", ["research", "policy_brief"]) rows regardless of whether
@@ -562,13 +887,20 @@ async function fetchCitableFeedUncached(
   // evidence-based query above actually found -- fewer than pageSize
   // items is correct when fewer than pageSize posts have real citation
   // evidence yet.
-  return enrichPosts(reader, (citableRows ?? []).slice(0, safePageSize));
+  return enrichPosts(
+    reader,
+    citableRows.slice(0, safePageSize),
+    undefined,
+    viewerClient
+  );
 }
 
 const fetchCachedCitableFeed = unstable_cache(
   async (pageSize: number) => {
     const admin = createAdminClient();
-    return fetchCitableFeedUncached(admin, pageSize);
+    // Viewer-visible comment counts are attached after the cached result is
+    // read, through the request's RLS client. Never cache an admin count.
+    return fetchCitableFeedUncached(admin, pageSize, null);
   },
   ["citable-feed"],
   { revalidate: 300, tags: ["feed", "citable-feed"] }
@@ -580,10 +912,12 @@ export function applyPostFilters(
     type,
     cutoff,
     excludedAuthorIds,
+    excludedPostIds,
   }: {
     type: FeedContentFilter | null;
     cutoff: string | null;
     excludedAuthorIds?: string[];
+    excludedPostIds?: string[];
   }
 ) {
   let nextQuery = query.eq("status", "published");
@@ -601,6 +935,18 @@ export function applyPostFilters(
       "in",
       `(${excludedAuthorIds.join(",")})`
     );
+  }
+  if (excludedPostIds && excludedPostIds.length > 0) {
+    // A blocked user can be the primary author or an accepted coauthor. The
+    // latter needs an id anti-filter because PostgREST does not expose a
+    // reliable NOT-EXISTS relation filter in this query shape.
+    for (let index = 0; index < excludedPostIds.length; index += 100) {
+      nextQuery = nextQuery.not(
+        "id",
+        "in",
+        `(${excludedPostIds.slice(index, index + 100).join(",")})`
+      );
+    }
   }
   return nextQuery;
 }
@@ -620,7 +966,14 @@ export async function fetchFeedPage({
   topicSubscriptionKeys,
   subscriptionSource,
   excludedAuthorIds,
+  cursor,
 }: FeedOptions): Promise<FeedPageResult> {
+  // Validate before entering unstable_cache so bad cursors always surface as
+  // the exported client error type rather than as a cached-function failure.
+  decodeFeedCursor(
+    cursor,
+    getCursorContext(tab, type, timeframe, subscriptionSource ?? "all")
+  );
   const shouldUsePublicCache =
     process.env.SUPABASE_SERVICE_ROLE_KEY &&
     !userId &&
@@ -635,7 +988,18 @@ export async function fetchFeedPage({
     tab !== "subscriptions";
 
   if (shouldUsePublicCache) {
-    return fetchCachedPublicFeedPage({ tab, page, pageSize, type, timeframe });
+    const cached = await fetchCachedPublicFeedPage({
+      tab,
+      page,
+      pageSize,
+      type,
+      timeframe,
+      cursor,
+    });
+    return {
+      ...cached,
+      posts: await applyViewerCommentCounts(supabase, cached.posts),
+    };
   }
 
   return fetchFeedPageUncached({
@@ -653,6 +1017,7 @@ export async function fetchFeedPage({
     topicSubscriptionKeys,
     subscriptionSource,
     excludedAuthorIds,
+    cursor,
   });
 }
 
@@ -671,14 +1036,36 @@ async function fetchFeedPageUncached({
   topicSubscriptionKeys,
   subscriptionSource = "all",
   excludedAuthorIds,
-}: FeedOptions): Promise<FeedPageResult> {
+  cursor,
+}: FeedOptions,
+viewerClientOverride?: FeedSupabaseClient | null): Promise<FeedPageResult> {
   const reader = process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createAdminClient()
     : supabase;
-  const safePage = Math.max(1, page);
-  const safePageSize = Math.min(Math.max(pageSize, 1), 30);
+  const viewerClient =
+    viewerClientOverride === undefined ? supabase : viewerClientOverride;
+  const safePage = normalizePositiveInteger(page, 1, MAX_FEED_PAGE);
+  const safePageSize = normalizePositiveInteger(
+    pageSize,
+    12,
+    MAX_FEED_PAGE_SIZE
+  );
   const cutoff = getTimeframeCutoff(timeframe);
-  const excluded = excludedAuthorIds ?? [];
+  const cursorContext = getCursorContext(
+    tab,
+    type,
+    timeframe,
+    subscriptionSource
+  );
+  const cursorPosition = decodeFeedCursor(cursor, cursorContext);
+  const excluded = Array.from(
+    new Set((excludedAuthorIds ?? []).filter(Boolean))
+  );
+  const excludedPostIds = await getExcludedCreditedPostIds(reader, excluded);
+  const enrichmentVisibility: FeedEnrichmentVisibility = {
+    excludedAuthorIds: excluded,
+    excludedPostIds,
+  };
 
   if (tab === "following") {
     const visibleFollowedIds =
@@ -687,21 +1074,30 @@ async function fetchFeedPageUncached({
         : followedIds;
 
     if (visibleFollowedIds.length === 0) {
-      return { posts: [], hasMore: false };
+      return { posts: [], hasMore: false, nextCursor: null };
     }
 
-    const start = (safePage - 1) * safePageSize;
+    const start = cursorPosition ? 0 : (safePage - 1) * safePageSize;
     const end = start + safePageSize;
-    const query = applyPostFilters(
+    let query = applyPostFilters(
       reader.from("posts").select(POST_SELECT),
-      { type, cutoff, excludedAuthorIds: excluded }
-    );
-    const { data } = await query
-      .in("author_id", visibleFollowedIds)
+      { type, cutoff, excludedAuthorIds: excluded, excludedPostIds }
+    ).in("author_id", visibleFollowedIds);
+    query = applyKeysetCursor(query, cursorPosition)
       .order("published_at", { ascending: false })
-      .range(start, end);
+      .order("id", { ascending: false });
+    const result = (await (cursorPosition
+      ? query.limit(safePageSize + 1)
+      : query.range(start, end))) as SupabaseQueryResult<
+      Array<Record<string, unknown>>
+    >;
 
-    const raw = data ?? [];
+    const raw = expectRows<Record<string, unknown>>(
+      result,
+      "load following feed"
+    );
+    const deliveredRows = raw.slice(0, safePageSize);
+    const hasMore = raw.length > safePageSize;
     const rankingContext: RankingContext = {
       userId,
       followedIds: new Set(followedIds),
@@ -711,10 +1107,16 @@ async function fetchFeedPageUncached({
     };
     const posts = await enrichPosts(
       reader,
-      raw.slice(0, safePageSize),
-      rankingContext
+      deliveredRows,
+      rankingContext,
+      viewerClient,
+      enrichmentVisibility
     );
-    return { posts, hasMore: raw.length > safePageSize };
+    return {
+      posts,
+      hasMore,
+      nextCursor: getNextCursor(deliveredRows, hasMore, cursorContext!),
+    };
   }
 
   if (tab === "topics" || tab === "subscriptions") {
@@ -733,28 +1135,47 @@ async function fetchFeedPageUncached({
       (tab === "subscriptions" && !isAuthorSubscriptionsUxV2Enabled()) ||
       (!includeAuthors && !includeTopics)
     ) {
-      return { posts: [], hasMore: false };
+      return { posts: [], hasMore: false, nextCursor: null };
     }
 
-    const start = (safePage - 1) * safePageSize;
+    const start = cursorPosition ? 0 : (safePage - 1) * safePageSize;
     const end = start + safePageSize;
-    const candidateLimit = end + safePageSize + 1;
+    const candidateLimit = cursorPosition
+      ? safePageSize + 1
+      : end + safePageSize + 1;
     const excludedWithSelf = Array.from(new Set([...excluded, userId]));
+    // Self-authored subscription entries include accepted coauthor credits,
+    // not only primary authorship. Resolve those ids before any source applies
+    // its limit; deleting them after the merge could turn a full candidate
+    // window into an empty/exhausted page while older eligible posts remained.
+    const viewerCreditedPostIds = await getExcludedCreditedPostIds(reader, [
+      userId,
+    ]);
+    const subscriptionExcludedPostIds = Array.from(
+      new Set([...excludedPostIds, ...viewerCreditedPostIds])
+    );
     const rowsById = new Map<string, Record<string, unknown>>();
     const matchedAuthorsByPost = new Map<string, Set<string>>();
     const matchedTopicsByPost = new Map<string, string[]>();
 
     if (includeTopics) {
-      const query = applyPostFilters(
-        reader.from("posts").select(POST_SELECT),
-        { type, cutoff, excludedAuthorIds: excludedWithSelf }
-      );
-      const { data } = await query
-        .overlaps("topic_keys", subscribedTopics)
+      let query = applyPostFilters(
+        reader.from("posts").select(POST_SELECT_WITH_TOPIC_KEYS),
+        {
+          type,
+          cutoff,
+          excludedAuthorIds: excludedWithSelf,
+          excludedPostIds: subscriptionExcludedPostIds,
+        }
+      ).overlaps("topic_keys", subscribedTopics);
+      query = applyKeysetCursor(query, cursorPosition)
         .order("published_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(candidateLimit);
-      for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+        .order("id", { ascending: false });
+      const result = (await query.limit(candidateLimit)) as SupabaseQueryResult<
+        Array<Record<string, unknown>>
+      >;
+      const topicRows = expectRows(result, "load topic subscription feed");
+      for (const row of topicRows) {
         const id = row.id as string;
         rowsById.set(id, row);
         matchedTopicsByPost.set(
@@ -767,79 +1188,90 @@ async function fetchFeedPageUncached({
     }
 
     if (includeAuthors) {
-      const primaryQuery = applyPostFilters(
+      let primaryQuery = applyPostFilters(
         reader.from("posts").select(POST_SELECT),
-        { type, cutoff, excludedAuthorIds: excludedWithSelf }
-      );
-      const [{ data: primaryRows }, { data: creditedRows }] = await Promise.all([
-        primaryQuery
-          .in("author_id", subscribedAuthors)
-          .order("published_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(candidateLimit),
+        {
+          type,
+          cutoff,
+          excludedAuthorIds: excludedWithSelf,
+          excludedPostIds: subscriptionExcludedPostIds,
+        }
+      ).in("author_id", subscribedAuthors);
+      primaryQuery = applyKeysetCursor(primaryQuery, cursorPosition)
+        .order("published_at", { ascending: false })
+        .order("id", { ascending: false });
+      // Query coauthor matches from posts, not from an arbitrarily limited
+      // slice of post_authors. The top-level recency order and cursor now pick
+      // the candidates, so prolific subscribed authors cannot have newer work
+      // silently omitted by an unordered credit lookup.
+      let coauthorQuery = applyPostFilters(
         reader
-          .from("post_authors")
-          .select("post_id, user_id")
-          .in("user_id", subscribedAuthors)
-          .not("accepted_at", "is", null)
-          .limit(candidateLimit * 2),
-      ]);
+          .from("posts")
+          .select(
+            `${POST_SELECT}, subscription_author_credits:post_authors!inner(user_id, accepted_at)`
+          ),
+        {
+          type,
+          cutoff,
+          excludedAuthorIds: excludedWithSelf,
+          excludedPostIds: subscriptionExcludedPostIds,
+        }
+      )
+        .in("subscription_author_credits.user_id", subscribedAuthors)
+        .not("subscription_author_credits.accepted_at", "is", null);
+      coauthorQuery = applyKeysetCursor(coauthorQuery, cursorPosition)
+        .order("published_at", { ascending: false })
+        .order("id", { ascending: false });
 
-      for (const row of (primaryRows ?? []) as Array<Record<string, unknown>>) {
+      const [primaryResult, coauthoredResult] = await Promise.all([
+        primaryQuery.limit(candidateLimit),
+        coauthorQuery.limit(candidateLimit),
+      ]);
+      const primaryRows = expectRows<Record<string, unknown>>(
+        primaryResult,
+        "load author subscription feed"
+      );
+      const coauthoredRows = expectRows<
+        Record<string, unknown> & {
+          subscription_author_credits?:
+            | Array<{ user_id?: string; accepted_at?: string | null }>
+            | { user_id?: string; accepted_at?: string | null }
+            | null;
+        }
+      >(
+        coauthoredResult,
+        "load subscribed coauthor posts"
+      );
+
+      for (const row of primaryRows) {
         const id = row.id as string;
         rowsById.set(id, row);
         matchedAuthorsByPost.set(id, new Set([row.author_id as string]));
       }
 
-      const coauthorIds = Array.from(
-        new Set(
-          ((creditedRows ?? []) as Array<{ post_id: string }>).map(
-            (row) => row.post_id
-          )
-        )
-      );
-      if (coauthorIds.length > 0) {
-        const coauthorQuery = applyPostFilters(
-          reader.from("posts").select(POST_SELECT),
-          { type, cutoff, excludedAuthorIds: excludedWithSelf }
-        );
-        const { data: coauthoredRows } = await coauthorQuery
-          .in("id", coauthorIds)
-          .order("published_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(candidateLimit);
-        for (const row of (coauthoredRows ?? []) as Array<
-          Record<string, unknown>
-        >) {
-          rowsById.set(row.id as string, row);
-        }
-        for (const row of (creditedRows ?? []) as Array<{
-          post_id: string;
-          user_id: string;
-        }>) {
-          if (!rowsById.has(row.post_id)) continue;
-          const matches =
-            matchedAuthorsByPost.get(row.post_id) ?? new Set<string>();
-          matches.add(row.user_id);
-          matchedAuthorsByPost.set(row.post_id, matches);
-        }
-      }
-    }
-    const candidateIds = Array.from(rowsById.keys());
-    if (candidateIds.length > 0) {
-      const { data: viewerCredits } = await reader
-        .from("post_authors")
-        .select("post_id")
-        .eq("user_id", userId)
-        .not("accepted_at", "is", null)
-        .in("post_id", candidateIds);
-      for (const row of (viewerCredits ?? []) as Array<{ post_id: string }>) {
-        rowsById.delete(row.post_id);
-        matchedAuthorsByPost.delete(row.post_id);
-        matchedTopicsByPost.delete(row.post_id);
-      }
-    }
+      for (const row of coauthoredRows) {
+        const { subscription_author_credits: embeddedCredits, ...postRow } = row;
+        const id = postRow.id as string;
+        rowsById.set(id, postRow);
 
+        const credits = Array.isArray(embeddedCredits)
+          ? embeddedCredits
+          : embeddedCredits
+            ? [embeddedCredits]
+            : [];
+        const matches = matchedAuthorsByPost.get(id) ?? new Set<string>();
+        for (const credit of credits) {
+          if (
+            typeof credit.user_id === "string" &&
+            credit.accepted_at != null &&
+            subscribedAuthors.includes(credit.user_id)
+          ) {
+            matches.add(credit.user_id);
+          }
+        }
+        if (matches.size > 0) matchedAuthorsByPost.set(id, matches);
+      }
+    }
     const orderedRows = Array.from(rowsById.values()).sort((left, right) => {
       const leftDate =
         (left.published_at as string | null) ??
@@ -861,10 +1293,14 @@ async function fetchFeedPageUncached({
       userUniversity,
       userCountry: null,
     };
+    const deliveredRows = orderedRows.slice(start, end);
+    const hasMore = orderedRows.length > end;
     const posts = await enrichPosts(
       reader,
-      orderedRows.slice(start, end),
-      rankingContext
+      deliveredRows,
+      rankingContext,
+      viewerClient,
+      enrichmentVisibility
     );
     for (const post of posts) {
       const authorIds = Array.from(matchedAuthorsByPost.get(post.id) ?? []);
@@ -896,21 +1332,32 @@ async function fetchFeedPageUncached({
       }
       post.subscription_match = { authorIds, topicKeys, reasons };
     }
-    return { posts, hasMore: orderedRows.length > end };
+    return {
+      posts,
+      hasMore,
+      nextCursor: getNextCursor(deliveredRows, hasMore, cursorContext!),
+    };
   }
 
   if (tab === "latest") {
-    const start = (safePage - 1) * safePageSize;
+    const start = cursorPosition ? 0 : (safePage - 1) * safePageSize;
     const end = start + safePageSize;
-    const query = applyPostFilters(
+    let query = applyPostFilters(
       reader.from("posts").select(POST_SELECT),
-      { type, cutoff, excludedAuthorIds: excluded }
+      { type, cutoff, excludedAuthorIds: excluded, excludedPostIds }
     );
-    const { data } = await query
+    query = applyKeysetCursor(query, cursorPosition)
       .order("published_at", { ascending: false })
-      .range(start, end);
+      .order("id", { ascending: false });
+    const result = (await (cursorPosition
+      ? query.limit(safePageSize + 1)
+      : query.range(start, end))) as SupabaseQueryResult<
+      Array<Record<string, unknown>>
+    >;
 
-    const raw = data ?? [];
+    const raw = expectRows<Record<string, unknown>>(result, "load latest feed");
+    const deliveredRows = raw.slice(0, safePageSize);
+    const hasMore = raw.length > safePageSize;
     const rankingContext: RankingContext = {
       userId,
       followedIds: new Set(followedIds),
@@ -920,10 +1367,16 @@ async function fetchFeedPageUncached({
     };
     const posts = await enrichPosts(
       reader,
-      raw.slice(0, safePageSize),
-      rankingContext
+      deliveredRows,
+      rankingContext,
+      viewerClient,
+      enrichmentVisibility
     );
-    return { posts, hasMore: raw.length > safePageSize };
+    return {
+      posts,
+      hasMore,
+      nextCursor: getNextCursor(deliveredRows, hasMore, cursorContext!),
+    };
   }
 
   // The ranked window has to be the same set of posts on every page, and this
@@ -958,17 +1411,20 @@ async function fetchFeedPageUncached({
   if (start >= rankedWindow) {
     const tailQuery = applyPostFilters(
       reader.from("posts").select(POST_SELECT),
-      { type, cutoff, excludedAuthorIds: excluded }
+      { type, cutoff, excludedAuthorIds: excluded, excludedPostIds }
     );
-    const { data: tail } = await tailQuery
+    const tailResult = (await tailQuery
       .order("published_at", { ascending: false })
-      .range(start, end);
+      .order("id", { ascending: false })
+      .range(start, end)) as SupabaseQueryResult<unknown[]>;
 
-    const raw = tail ?? [];
+    const raw = expectRows(tailResult, "load chronological feed tail");
     const posts = await enrichPosts(
       reader,
       raw.slice(0, safePageSize),
-      rankingContext
+      rankingContext,
+      viewerClient,
+      enrichmentVisibility
     );
     return { posts, hasMore: raw.length > safePageSize };
   }
@@ -979,18 +1435,27 @@ async function fetchFeedPageUncached({
       type,
       cutoff,
       excludedAuthorIds: excluded,
+      excludedPostIds,
     }
   );
 
   // One row past the window, so the last ranked page knows whether the
   // chronological tail has anything in it rather than guessing.
-  const { data } = await query
+  const result = (await query
     .order("published_at", { ascending: false })
-    .limit(rankedWindow + 1);
+    .order("id", { ascending: false })
+    .limit(rankedWindow + 1)) as SupabaseQueryResult<unknown[]>;
+  const data = expectRows(result, "load ranked feed candidates");
 
-  const candidates = (data ?? []).slice(0, rankedWindow);
-  const hasTail = (data ?? []).length > rankedWindow;
-  const enriched = await enrichPosts(reader, candidates, rankingContext);
+  const candidates = data.slice(0, rankedWindow);
+  const hasTail = data.length > rankedWindow;
+  const enriched = await enrichPosts(
+    reader,
+    candidates,
+    rankingContext,
+    viewerClient,
+    enrichmentVisibility
+  );
 
   const ranked = rankPosts(enriched, rankingContext);
 
@@ -1007,20 +1472,27 @@ const fetchCachedPublicFeedPage = unstable_cache(
     pageSize,
     type,
     timeframe,
+    cursor,
   }: PublicFeedCacheInput): Promise<FeedPageResult> => {
     const admin = createAdminClient();
-    return fetchFeedPageUncached({
-      supabase: admin,
-      tab,
-      page,
-      pageSize,
-      type,
-      timeframe,
-      userId: null,
-      userInterests: [],
-      userUniversity: null,
-      followedIds: [],
-    });
+    return fetchFeedPageUncached(
+      {
+        supabase: admin,
+        tab,
+        page,
+        pageSize,
+        type,
+        timeframe,
+        cursor,
+        userId: null,
+        userInterests: [],
+        userUniversity: null,
+        followedIds: [],
+      },
+      // Cached public cards deliberately omit comment counts. The request's
+      // RLS client attaches visible counts after the cache lookup.
+      null
+    );
   },
   ["public-feed-page"],
   { revalidate: 120, tags: ["feed", "public-feed"] }

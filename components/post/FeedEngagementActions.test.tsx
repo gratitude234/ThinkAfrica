@@ -145,6 +145,13 @@ describe("FeedEngagementActions", () => {
     );
 
     expect(screen.getByRole("button", { name: "Like this item" })).not.toHaveTextContent("0");
-    expect(screen.getByRole("link", { name: "0 in this discussion" })).not.toHaveTextContent("0");
+    const discussionLink = screen.getByRole("link", {
+      name: "0 in this discussion",
+    });
+    expect(discussionLink).not.toHaveTextContent("0");
+    expect(discussionLink).toHaveAttribute(
+      "href",
+      "/post/a-quiet-post#discussion"
+    );
   });
 });

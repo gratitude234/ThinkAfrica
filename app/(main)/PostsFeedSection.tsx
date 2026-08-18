@@ -2,12 +2,17 @@ import PostsFeedTabs from "./PostsFeedTabs";
 import {
   fetchFeedPage,
   normalizeFeedContentFilter,
+  RANKED_FEED_WINDOW,
   type FeedContentFilter,
+  type FeedPageResult,
   type FeedTimeframe,
   type FeedTabKey,
 } from "@/lib/feedData";
+import {
+  createFeaturedExposure,
+  prepareFeedPageForClient,
+} from "@/lib/feedExposure";
 import { createClient } from "@/lib/supabase/server";
-import { getBlockedUserIds } from "@/lib/blocking";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import type { HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
@@ -22,6 +27,7 @@ interface Props {
   followedIds: string[];
   authorSubscriptionIds: string[];
   topicSubscriptionKeys: string[];
+  excludedAuthorIds: string[];
   subscriptionSource: SubscriptionFeedSource;
   showFollowingEligible: boolean;
   showTopicsEligible: boolean;
@@ -73,6 +79,7 @@ export default async function PostsFeedSection({
   followedIds,
   authorSubscriptionIds,
   topicSubscriptionKeys,
+  excludedAuthorIds,
   subscriptionSource,
   showFollowingEligible,
   showTopicsEligible,
@@ -92,32 +99,60 @@ export default async function PostsFeedSection({
   );
   const initialType = getInitialType(type);
   const initialTimeframe = getInitialTimeframe(timeframe);
-  const excludedAuthorIds = await getBlockedUserIds(userId);
+  let initialFeed: FeedPageResult = { posts: [], hasMore: false };
+  let initialLoadFailed = false;
 
-  const initialFeed = await fetchFeedPage({
-    supabase,
+  try {
+    initialFeed = await fetchFeedPage({
+      supabase,
+      tab: initialTab,
+      page: 1,
+      pageSize: 12,
+      type: initialType === "all" ? null : initialType,
+      timeframe: initialTimeframe,
+      userId,
+      userInterests,
+      userUniversity,
+      followedIds,
+      authorSubscriptionIds,
+      topicSubscriptionKeys,
+      subscriptionSource,
+      excludedAuthorIds,
+    });
+  } catch (error) {
+    initialLoadFailed = true;
+    console.error("[home-feed] initial feed query failed", error);
+  }
+
+  const requestId = crypto.randomUUID();
+  const clientFeed = prepareFeedPageForClient(initialFeed, {
     tab: initialTab,
     page: 1,
     pageSize: 12,
-    type: initialType === "all" ? null : initialType,
-    timeframe: initialTimeframe,
-    userId,
-    userInterests,
-    userUniversity,
-    followedIds,
-    authorSubscriptionIds,
-    topicSubscriptionKeys,
-    subscriptionSource,
-    excludedAuthorIds,
+    rankedWindow: RANKED_FEED_WINDOW,
+    requestId,
   });
+  const clientFeaturedPost = featuredPost
+    ? {
+        ...featuredPost,
+        feed_exposure: createFeaturedExposure(
+          featuredPost.id,
+          featuredPost.slug,
+          featuredPost.featured_provenance ?? "recommended",
+          requestId
+        ),
+      }
+    : null;
 
   return (
     <PostsFeedTabs
       initialTab={initialTab}
       initialType={initialType}
       initialTimeframe={initialTimeframe}
-      initialPosts={initialFeed.posts}
-      initialHasMore={initialFeed.hasMore}
+      initialPosts={clientFeed.posts}
+      initialHasMore={clientFeed.hasMore}
+      initialNextCursor={clientFeed.nextCursor ?? null}
+      initialLoadFailed={initialLoadFailed}
       showFollowingTab={showFollowingEligible}
       showTopicsTab={showTopicsEligible}
       showSubscriptionsTab={showSubscriptionsEligible}
@@ -127,7 +162,7 @@ export default async function PostsFeedSection({
       peopleSuggestionReason={peopleSuggestionReason}
       prioritizePeopleSuggestions={prioritizePeopleSuggestions}
       currentUserId={userId}
-      featuredPost={featuredPost}
+      featuredPost={clientFeaturedPost}
     />
   );
 }

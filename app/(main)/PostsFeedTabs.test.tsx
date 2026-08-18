@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PostsFeedTabs from "./PostsFeedTabs";
 import type { PostCardData } from "@/components/post/PostCard";
 
-const mocks = vi.hoisted(() => ({ requestAuth: vi.fn(), push: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  requestAuth: vi.fn(),
+  push: vi.fn(),
+  trackActivationEvent: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
@@ -19,6 +23,10 @@ vi.mock("@/components/post/PostFeed", () => ({
 
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
   useGuestAuthGate: () => ({ requestAuth: mocks.requestAuth }),
+}));
+
+vi.mock("@/lib/activationEvents", () => ({
+  trackActivationEvent: mocks.trackActivationEvent,
 }));
 
 vi.mock("next/link", () => ({
@@ -112,6 +120,8 @@ const common = {
 describe("PostsFeedTabs", () => {
   beforeEach(() => {
     mocks.requestAuth.mockReset();
+    mocks.push.mockReset();
+    mocks.trackActivationEvent.mockReset();
     observerInstances = [];
   });
 
@@ -241,6 +251,22 @@ describe("PostsFeedTabs featured-lead deduplication", () => {
 
     expect(screen.getByTestId("feed").textContent).toBe("a,b");
   });
+
+  it("treats a featured-only result as content without rendering an empty list", () => {
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[feedPost("featured-1")]}
+        showFollowingTab={false}
+        currentUserId={null}
+        featuredPost={{ ...featuredPost, featured_provenance: "editorial" }}
+      />
+    );
+
+    expect(screen.queryByTestId("feed")).not.toBeInTheDocument();
+    expect(screen.queryByText("No posts match this view yet.")).not.toBeInTheDocument();
+    expect(screen.getByText(/Editor’s pick/)).toBeInTheDocument();
+  });
 });
 
 describe("PostsFeedTabs caught-up state", () => {
@@ -303,6 +329,7 @@ describe("PostsFeedTabs caught-up state", () => {
 describe("PostsFeedTabs -- loading state", () => {
   beforeEach(() => {
     mocks.requestAuth.mockReset();
+    mocks.trackActivationEvent.mockReset();
     vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
   });
 
@@ -323,6 +350,15 @@ describe("PostsFeedTabs -- loading state", () => {
     render(<PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Latest" }));
+
+    expect(mocks.trackActivationEvent).toHaveBeenCalledWith({
+      event: "home_tab_changed",
+      metadata: expect.objectContaining({
+        fromTab: "home",
+        toTab: "latest",
+        feedSessionId: expect.any(String),
+      }),
+    });
 
     // The skeleton renders instead of the (mocked) feed while the fetch is in flight.
     expect(screen.queryByTestId("feed")).not.toBeInTheDocument();
@@ -520,6 +556,35 @@ describe("PostsFeedTabs -- pagination overlap", () => {
     });
   }
 
+  it("uses the server cursor when loading more chronological posts", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ posts: [], hasMore: false }), {
+          status: 200,
+        })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialTab="latest"
+        initialPosts={[post("1")]}
+        initialHasMore
+        initialNextCursor="opaque-cursor"
+        showFollowingTab
+        currentUserId="user-1"
+      />
+    );
+
+    await paginate();
+
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0]);
+    expect(new URL(requestUrl, "http://localhost").searchParams.get("cursor")).toBe(
+      "opaque-cursor"
+    );
+  });
+
   it("appends only posts the reader does not already have", async () => {
     // Every date-ordered tab pages by offset, so one post published between the
     // two requests slides the window and re-serves post 2 as the head of page 2.
@@ -592,6 +657,20 @@ describe("PostsFeedTabs -- error and retry states", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("shows a server-render failure as a retryable feed error", () => {
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialLoadFailed
+        showFollowingTab
+        currentUserId="user-1"
+      />
+    );
+
+    expect(screen.getByText("Couldn't load your feed")).toBeInTheDocument();
+    expect(screen.queryByText("No content yet.")).not.toBeInTheDocument();
   });
 
   it("shows the initial-failure state and recovers on a successful retry, refetching the current tab", async () => {
@@ -672,6 +751,104 @@ describe("PostsFeedTabs -- error and retry states", () => {
     // targeted the failed next page, not a full reload from page 1.
     const secondCallUrl = fetchMock.mock.calls[1][0] as string;
     expect(new URL(secondCallUrl, "http://localhost").searchParams.get("page")).toBe("2");
+  });
+
+  it("clears a rejected cursor before retrying the same chronological page", async () => {
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: { code: "INVALID_CURSOR", message: "expired" },
+          }),
+          { status: 400 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ posts: [post("2")], hasMore: false }), {
+          status: 200,
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialTab="latest"
+        initialPosts={[post("1")]}
+        initialHasMore
+        initialNextCursor="rejected-cursor"
+        showFollowingTab
+        currentUserId="user-1"
+      />
+    );
+
+    await act(async () => {
+      infiniteScrollObserver().callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        infiniteScrollObserver() as unknown as IntersectionObserver
+      );
+    });
+    await waitFor(() =>
+      expect(screen.getByText("Couldn't load more.")).toBeInTheDocument()
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    });
+
+    const firstUrl = new URL(String(fetchMock.mock.calls[0][0]), "http://localhost");
+    const retryUrl = new URL(String(fetchMock.mock.calls[1][0]), "http://localhost");
+    expect(firstUrl.searchParams.get("cursor")).toBe("rejected-cursor");
+    expect(retryUrl.searchParams.has("cursor")).toBe(false);
+    expect(retryUrl.searchParams.get("page")).toBe("2");
+  });
+
+  it("does not leak an old tab's pagination failure into the new tab", async () => {
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+    let resolveOldPage!: (response: Response) => void;
+    const oldPage = new Promise<Response>((resolve) => {
+      resolveOldPage = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => oldPage)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ posts: [post("latest")], hasMore: false }), {
+          status: 200,
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PostsFeedTabs
+        {...common}
+        initialPosts={[post("1")]}
+        initialHasMore
+        showFollowingTab
+        currentUserId="user-1"
+      />
+    );
+
+    await act(async () => {
+      infiniteScrollObserver().callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        infiniteScrollObserver() as unknown as IntersectionObserver
+      );
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: "Latest" }));
+    });
+    await act(async () => {
+      resolveOldPage(new Response("failed", { status: 500 }));
+      await oldPage;
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Latest", selected: true })).toBeInTheDocument()
+    );
+    expect(screen.queryByText("Couldn't load more.")).not.toBeInTheDocument();
   });
 });
 

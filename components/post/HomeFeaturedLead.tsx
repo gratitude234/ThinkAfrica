@@ -3,6 +3,7 @@ import PostCover from "./PostCover";
 import { getArticleFormatLabel, resolveArticleFormat, resolveContentKind } from "@/lib/contentModel";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { sanitizePostExcerpt } from "@/lib/utils";
+import type { FeedExposure } from "@/lib/feedExposure";
 
 export interface HomeFeaturedPost {
   id: string;
@@ -13,17 +14,15 @@ export interface HomeFeaturedPost {
   content_kind?: string | null;
   article_format?: string | null;
   cover_image_url?: string | null;
+  reading_minutes?: number | null;
+  featured_provenance?: "editorial" | "recommended" | "latest";
+  feed_exposure?: FeedExposure;
   profiles: {
     username: string | null;
     full_name: string | null;
     university?: string | null;
     avatar_url?: string | null;
   } | null;
-}
-
-function readTime(excerpt: string | null) {
-  const words = excerpt?.trim().split(/\s+/).filter(Boolean).length ?? 0;
-  return Math.max(1, Math.ceil(words / 200));
 }
 
 export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
@@ -35,12 +34,22 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
   const label = kind === "research" ? "Research" : kind === "post" ? "Post" : format ? `Article · ${format}` : "Article";
   const action = kind === "research" ? "View paper" : kind === "post" ? "Read post" : "Read article";
   const hasCover = Boolean(post.cover_image_url?.trim());
+  const provenanceLabel =
+    post.featured_provenance === "editorial"
+      ? "Editor’s pick"
+      : post.featured_provenance === "latest"
+        ? "Latest publication"
+        : "Recommended for you";
+  const readingMinutes =
+    typeof post.reading_minutes === "number" && post.reading_minutes > 0
+      ? Math.ceil(post.reading_minutes)
+      : null;
 
   return (
     // Kept boxed, rounded and shadowed while the feed rows below it are none
     // of those. That is the point: with the card chrome gone from the feed,
-    // an edge is a scarce signal, and the one post the editors chose is worth
-    // spending it on. Margin matches the interludes' `my-5 sm:my-6` so the
+    // an edge is a scarce signal, and the one promoted lead is worth spending
+    // it on. Margin matches the interludes' `my-5 sm:my-6` so the
     // page has a single rhythm for "this is not an ordinary row".
     <article className="relative mb-5 overflow-hidden rounded-[18px] bg-emerald-brand text-white shadow-[0_9px_26px_rgb(7_57_41/0.18)] sm:mb-6">
       {/* Phones get the cover as a short letterbox strip above the text; from
@@ -57,6 +66,7 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
             content_kind={post.content_kind}
             article_format={post.article_format}
             sizes="100vw"
+            priority
             className="h-full w-full"
             imageClassName="object-cover opacity-60"
           />
@@ -72,6 +82,7 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
             content_kind={post.content_kind}
             article_format={post.article_format}
             sizes="280px"
+            priority
             className="h-full w-full"
             imageClassName="object-cover opacity-45"
           />
@@ -84,7 +95,8 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
           edge. `sm:px-7` masked it from 640px up. */}
       <div className={`relative px-5 py-5 sm:max-w-[74%] sm:px-7 sm:py-7 ${hasCover ? "-mt-6 sm:mt-0" : ""}`}>
         <p className="font-display text-kicker font-bold uppercase text-emerald-200">
-          Editor&apos;s pick · {label} · {readTime(excerpt)} min
+          {provenanceLabel} · {label}
+          {readingMinutes ? ` · ${readingMinutes} min` : ""}
         </p>
         <Link href={`/post/${post.slug}`} className="mt-2 block rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-brand">
           <h2 className="font-display text-headline font-semibold">{title}</h2>

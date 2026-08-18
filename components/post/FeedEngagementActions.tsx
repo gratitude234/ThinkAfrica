@@ -227,11 +227,11 @@ export default function FeedEngagementActions({
         </button>
 
         {showDiscussion ? (
-          // #comments, not #responses: the responses section only renders when
-          // responses exist, so a card showing "0" used to link to an anchor
-          // that wasn't on the page. The comment thread is always there.
+          // The total includes both lightweight comments and published
+          // Responses, so link to the shared discussion overview rather than
+          // implying the combined number is a comment count.
           <Link
-            href={`/post/${slug}#comments`}
+            href={`/post/${slug}#discussion`}
             aria-label={`${discussionCount} in this discussion`}
             className={`${actionClass} ${actionHoverBg} hover:text-emerald-ink`}
           >

@@ -4,6 +4,10 @@ import { useEffect, useRef } from "react";
 import { useOptionalAuthorRelationship } from "@/components/profile/AuthorRelationshipProvider";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { qualifiedReadThresholds } from "@/lib/publicationDelivery";
+import {
+  consumeStoredFeedExposure,
+  type StoredFeedExposure,
+} from "@/lib/useViewImpression";
 
 const VIEW_SESSION_KEY = (slug: string) => `ta_post_view_${slug}`;
 const READ_SESSION_KEY = (slug: string) => `ta_post_read_${slug}`;
@@ -31,14 +35,18 @@ function getScrollDepth() {
 function postEngagement(
   slug: string,
   eventType: "view" | "read",
-  payload: Record<string, string | number | null> = {}
+  engagementToken: string | null,
+  payload: Record<string, string | number | null> = {},
+  metadata: StoredFeedExposure | null = null
 ) {
   return fetch(`/api/posts/${encodeURIComponent(slug)}/${eventType}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       route: `${window.location.pathname}${window.location.search}`,
+      engagementToken,
       deliveryToken: getDeliveryToken(),
+      metadata,
       ...payload,
     }),
     keepalive: true,
@@ -48,24 +56,43 @@ function postEngagement(
 export default function ViewTracker({
   slug,
   wordCount,
+  engagementToken,
 }: {
   slug: string;
   wordCount: number;
+  engagementToken: string | null;
 }) {
   const relationship = useOptionalAuthorRelationship();
   const activeSecondsRef = useRef(0);
   const maxScrollDepthRef = useRef(0);
   const readFiredRef = useRef(false);
+  const exposureRef = useRef<StoredFeedExposure | null>(null);
 
   useEffect(() => {
+    const exposure = consumeStoredFeedExposure(slug);
+    exposureRef.current = exposure;
     const viewSessionKey = sessionKey(VIEW_SESSION_KEY, slug);
     if (!sessionStorage.getItem(viewSessionKey)) {
       sessionStorage.setItem(viewSessionKey, "1");
-      void postEngagement(slug, "view");
+      void postEngagement(slug, "view", engagementToken, {}, exposure);
     }
 
-    trackActivationEvent({ event: "post_opened", metadata: { slug } });
-  }, [slug]);
+    trackActivationEvent({
+      event: "post_opened",
+      metadata: {
+        slug,
+        ...(exposure?.exposureId
+          ? {
+              exposureId: exposure.exposureId,
+              feedSessionId: exposure.feedSessionId,
+              requestId: exposure.requestId,
+              algorithmVersion: exposure.algorithmVersion,
+              experimentVariant: exposure.experimentVariant,
+            }
+          : {}),
+      },
+    });
+  }, [engagementToken, slug]);
 
   useEffect(() => {
     const readSessionKey = sessionKey(READ_SESSION_KEY, slug);
@@ -86,10 +113,16 @@ export default function ViewTracker({
 
       readFiredRef.current = true;
       sessionStorage.setItem(readSessionKey, "1");
-      void postEngagement(slug, "read", {
-        readSeconds: activeSecondsRef.current,
-        scrollDepth: maxScrollDepthRef.current,
-      });
+      void postEngagement(
+        slug,
+        "read",
+        engagementToken,
+        {
+          readSeconds: activeSecondsRef.current,
+          scrollDepth: maxScrollDepthRef.current,
+        },
+        exposureRef.current
+      );
       relationship?.offerQualifiedReadNudge();
     };
 
@@ -115,7 +148,7 @@ export default function ViewTracker({
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [relationship, slug, wordCount]);
+  }, [engagementToken, relationship, slug, wordCount]);
 
   return null;
 }

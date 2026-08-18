@@ -42,7 +42,7 @@ describe("HomeFeedCard", () => {
     expect(screen.getByText("A short thought about building better institutions.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "2 in this discussion" })).toHaveAttribute(
       "href",
-      "/post/clear-thinking#comments"
+      "/post/clear-thinking#discussion"
     );
   });
 
@@ -205,8 +205,7 @@ describe("HomeFeedCard", () => {
     );
 
     const link = screen.getByRole("link", { name: "5 in this discussion" });
-    // #responses only exists when responses do; #comments is always rendered.
-    expect(link).toHaveAttribute("href", "/post/clear-thinking#comments");
+    expect(link).toHaveAttribute("href", "/post/clear-thinking#discussion");
     expect(link).toHaveTextContent("5");
   });
 
@@ -236,6 +235,7 @@ describe("HomeFeedCard", () => {
           type: "essay",
           content_kind: "article",
           article_format: "policy_brief",
+          reading_minutes: 6,
         })}
         currentUserId="user-1"
         surface="latest"
@@ -245,7 +245,7 @@ describe("HomeFeedCard", () => {
     expect(screen.getByRole("heading", { name: "Why institutions outlast intentions" })).toBeInTheDocument();
     expect(screen.getByText("Article")).toBeInTheDocument();
     expect(screen.getByText("Policy Brief")).toBeInTheDocument();
-    expect(screen.getByText("1 min")).toBeInTheDocument();
+    expect(screen.getByText("6 min")).toBeInTheDocument();
     expect(screen.queryByText("Reviewed")).not.toBeInTheDocument();
   });
 

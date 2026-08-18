@@ -16,6 +16,7 @@ import {
   resolveContentKind,
 } from "@/lib/contentModel";
 import type { SubscriptionMatchReason } from "@/lib/publicationDelivery";
+import type { FeedExposure } from "@/lib/feedExposure";
 
 export interface PostCardData {
   id: string;
@@ -29,6 +30,7 @@ export interface PostCardData {
   tags: string[] | null;
   created_at: string;
   published_at: string | null;
+  reading_minutes?: number | null;
   author_id?: string;
   like_count?: number;
   bookmark_count?: number;
@@ -56,6 +58,7 @@ export interface PostCardData {
     tone: "emerald" | "sky" | "purple" | "amber" | "gray";
   }>;
   surface_reason?: string | null;
+  feed_exposure?: FeedExposure;
   subscription_match?: {
     authorIds: string[];
     topicKeys: string[];

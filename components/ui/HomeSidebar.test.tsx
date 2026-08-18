@@ -76,6 +76,26 @@ describe("HomeSidebar", () => {
     expect(screen.queryByText(/No live debate/i)).not.toBeInTheDocument();
   });
 
+  it("distinguishes an open debate from one that is live", () => {
+    render(
+      <HomeSidebar
+        {...baseProps}
+        activeDebate={{
+          id: "debate-1",
+          title: "Should cities ban private cars downtown?",
+          status: "open",
+          endsAt: null,
+          argumentCount: 0,
+          motionForCount: 0,
+          motionAgainstCount: 0,
+        }}
+      />
+    );
+
+    expect(screen.getByText("Open debate")).toBeInTheDocument();
+    expect(screen.queryByText("Live debate")).not.toBeInTheDocument();
+  });
+
   it("caps writer suggestions at three", () => {
     const people = ["a", "b", "c", "d"].map((id) => ({
       id,

@@ -68,6 +68,7 @@ interface PostFeedProps {
   peopleSuggestionReason?: string;
   prioritizePeopleSuggestions?: boolean;
   currentUserId?: string | null;
+  prioritizeFirstPost?: boolean;
 }
 
 export default function PostFeed({
@@ -78,6 +79,7 @@ export default function PostFeed({
   peopleSuggestionReason = "Suggested for you",
   prioritizePeopleSuggestions = false,
   currentUserId = null,
+  prioritizeFirstPost = true,
 }: PostFeedProps) {
   const topicPosts = posts.filter((post) => (post.tags ?? []).length > 0);
   const discoveryModules = getDiscoveryModuleOrder({
@@ -178,12 +180,15 @@ export default function PostFeed({
             });
 
             return (
-              <div key={post.id}>
+              <div
+                key={post.id}
+                className="[contain-intrinsic-size:auto_520px] [content-visibility:auto]"
+              >
                 <HomeFeedCardImpression
                   post={post}
                   currentUserId={currentUserId}
                   surface={activeTab}
-                  priority={index === 0}
+                  priority={prioritizeFirstPost && index === 0}
                 />
                 {discoveryModule ? (
                   <div className="lg:hidden">
