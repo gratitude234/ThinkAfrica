@@ -11,37 +11,37 @@ export const PROFILE_TYPE_OPTIONS = [
   },
   {
     value: "educator",
-    label: "Lecturer / educator",
+    label: "Lecturer / Educator",
     description: "Teaching, supervising, or mentoring students and contributors.",
   },
   {
     value: "ngo_nonprofit",
-    label: "NGO / nonprofit worker",
+    label: "NGO / Nonprofit Worker",
     description: "Working on programs, advocacy, research, or community impact.",
   },
   {
     value: "founder",
-    label: "Founder / entrepreneur",
+    label: "Founder / Entrepreneur",
     description: "Building a company, product, venture, or social enterprise.",
   },
   {
     value: "policy_government",
-    label: "Policy / government",
+    label: "Policy / Government",
     description: "Working in public policy, civic institutions, or government.",
   },
   {
     value: "journalist_media",
-    label: "Journalist / media",
+    label: "Journalist / Media",
     description: "Reporting, editing, producing, or analyzing public issues.",
   },
   {
     value: "professional",
-    label: "Professional / industry expert",
+    label: "Professional / Industry Expert",
     description: "Applying specialist experience from industry or practice.",
   },
   {
     value: "other",
-    label: "Independent thinker / other",
+    label: "Independent Thinker / Other",
     description: "Writing and developing ideas outside the listed roles.",
   },
 ] as const;
