@@ -30,6 +30,7 @@ import CiteThis from "./CiteThis";
 import CopyCitationIdButton from "./CopyCitationIdButton";
 import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
 import PostCover from "@/components/post/PostCover";
+import { formatTagLabel } from "@/lib/tags";
 import CollaborationPanel from "@/components/collaboration/CollaborationPanel";
 import ReportButton from "@/components/moderation/ReportButton";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
@@ -1828,7 +1829,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
 
             {post.tags && post.tags.length > 0 ? (
               <div className="mb-8 flex flex-wrap gap-2">
-                {post.tags.map((tag) => (
+                {post.tags.map((tag) => formatTagLabel(tag)).filter(Boolean).map((tag) => (
                   <Link
                     key={tag}
                     href={`/topics/${encodeURIComponent(tag)}`}

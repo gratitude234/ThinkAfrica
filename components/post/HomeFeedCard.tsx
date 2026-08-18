@@ -11,6 +11,7 @@ import {
   resolveContentKind,
 } from "@/lib/contentModel";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
+import { formatTagLabel } from "@/lib/tags";
 import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
 
 interface RespondingToInfo {
@@ -58,6 +59,23 @@ function initials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+/**
+ * Reading time from the stored body word count.
+ *
+ * This used to count the words in `excerpt`, which is capped at roughly thirty
+ * words, so `ceil(words / 200)` was always 1 and every card in the feed
+ * reported "1 min" no matter how long the article was.
+ *
+ * Returns null rather than a floor of 1 when the count is missing: a post can
+ * legitimately have no body (a research entry that is only a PDF), and the
+ * column is only populated once the 20260818 migration runs. Omitting the
+ * segment is honest; printing "1 min" is the bug again in a smaller font.
+ */
+function readTime(wordCount: number | null | undefined) {
+  if (!wordCount || wordCount <= 0) return null;
+  return Math.max(1, Math.ceil(wordCount / 200));
 }
 
 function documentSize(bytes: number | null | undefined) {
@@ -154,8 +172,19 @@ function AuthorLine({
             ✓
           </span>
         ) : null}
+        {/* Dropped outright below 480px rather than left to truncate.
+            The shrink order above is right in principle, but on a phone there
+            was not enough room for it to work: name and university both hit
+            their minimum and both truncated, so the line read "Mayowa
+            Akinto... · Adeleke Univ..." and identified nobody. One whole line
+            of every card, spent on two halves of two words.
+
+            The name is the part a reader recognises and the part that makes
+            the byline a byline, so on the narrowest screens it takes the
+            space and the university waits on the profile a tap away. From
+            480px up there is room for both and the shrink order applies. */}
         {profile?.university ? (
-          <span className="min-w-0 truncate text-meta text-ink-muted">
+          <span className="min-w-0 truncate text-meta text-ink-muted max-[479px]:hidden">
             <span aria-hidden="true">· </span>
             {profile.university}
           </span>
@@ -283,8 +312,13 @@ function Actions({
  * already; the chips just need to read as navigable.
  */
 function TopicLinks({ tags }: { tags: string[] | null }) {
+  // `formatTagLabel` rather than a plain trim: the chip renders its own '#',
+  // so a stored "#africa" printed as "##africa" and linked to a /topics page
+  // keyed on the hashed spelling. Stripping here fixes the label and the
+  // destination together, and keeps rows written before the normalization
+  // migration displaying correctly.
   const topics = (tags ?? [])
-    .map((tag) => tag.trim())
+    .map((tag) => formatTagLabel(tag))
     .filter(Boolean)
     .slice(0, 2);
   if (topics.length === 0) return null;
@@ -386,21 +420,21 @@ function PostFeedCard({
   );
 }
 
+// The `onCover` variant (a lighter gold, for the kicker sitting on a darkened
+// photograph) went with the overlay layout and is gone with it.
 function ArticleMeta({
   format,
   readingTime,
-  onCover = false,
 }: {
   format: string | null;
   readingTime: number | null;
-  onCover?: boolean;
 }) {
   return (
     <p
-      className={`font-sans text-kicker font-bold uppercase ${
-        onCover ? "text-[#f1c86e]" : "text-gold-ink"
+      className="font-sans text-kicker font-bold uppercase text-gold-ink"
+      aria-label={`Article${format ? `, ${format}` : ""}${
+        readingTime ? `, ${readingTime} minute read` : ""
       }`}
-      aria-label={`Article${format ? `, ${format}` : ""}${readingTime ? `, ${readingTime} minute read` : ""}`}
     >
       <span>Article</span>
       {format ? (
@@ -432,11 +466,26 @@ function ArticleFeedCard({
   const excerpt = sanitizePostExcerpt(post.excerpt);
   const format = getArticleFormatLabel(resolveArticleFormat(post));
   const hasCover = Boolean(post.cover_image_url?.trim());
-  const readingTime =
-    typeof post.reading_minutes === "number" && post.reading_minutes > 0
-      ? Math.ceil(post.reading_minutes)
-      : null;
+  const readingTime = readTime(post.word_count);
 
+  // One layout, cover or no cover.
+  //
+  // An article with a cover used to print its kicker, headline and excerpt
+  // *over* the image under a dark gradient, while a cover-less one printed the
+  // same three things as ordinary text below the byline. Two grammars
+  // alternating down a single column, so a reader re-learned where the
+  // headline was on every card and never settled into a scan.
+  //
+  // The overlay was also the half that read worse. The scrim is one fixed
+  // gradient over photographs it knows nothing about, so a pale sky or a lit
+  // subject at the crop's bottom edge took white text at whatever contrast
+  // happened to fall out; and `line-clamp-3` on a display-size face inside a
+  // fixed-height crop truncated real headlines mid-phrase.
+  //
+  // So: text below for every article, and the cover becomes what it always
+  // was, an illustration. The Editor's pick lead keeps its own treatment --
+  // one deliberately dramatic card at the top of the page, on an image the
+  // editors chose, is worth the exception the feed rows are not.
   return (
     <article className={CARD_SHELL} data-content-kind="article">
       <ContextLine
@@ -447,10 +496,36 @@ function ArticleFeedCard({
       />
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
 
+      <div className="mt-3">
+        <ArticleMeta format={format} readingTime={readingTime} />
+        <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
+          <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
+            {title}
+          </h2>
+        </Link>
+        {excerpt ? (
+          <p className="mt-2.5 line-clamp-3 max-w-measure text-excerpt text-ink-soft">
+            {excerpt}
+          </p>
+        ) : null}
+      </div>
+
+      <TopicLinks tags={post.tags} />
+
       {hasCover ? (
+        // 16:9 rather than the overlay's 4:3. A near-square crop on a phone
+        // meant one article filled the screen, and a feed that shows a reader
+        // one post at a time reads as empty however much is in it. The wider
+        // crop gives back about a quarter of each card's height.
+        //
+        // Links to the post rather than opening the zoom viewer a Post's image
+        // gets: on an article the cover is a lede illustration, so the whole
+        // card should behave as one target.
         <Link
           href={`/post/${post.slug}`}
-          className={`group relative mt-3 block overflow-hidden rounded-[15px] bg-emerald-brand ${FOCUS_RING}`}
+          tabIndex={-1}
+          aria-hidden="true"
+          className="group mt-3 block overflow-hidden rounded-[14px] bg-green-tint"
         >
           <PostCover
             src={post.cover_image_url}
@@ -461,53 +536,12 @@ function ArticleFeedCard({
             sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) 720px, 780px"
             priority={priority}
             fit="cover"
-            className="aspect-[4/3] w-full bg-emerald-brand sm:aspect-[16/10]"
+            className="aspect-[16/9] w-full"
             imageClassName="object-cover transition-transform duration-500 group-hover:scale-[1.015] motion-reduce:transition-none"
           />
-          <span
-            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#052f23]/95 via-[#052f23]/48 via-55% to-transparent"
-            aria-hidden="true"
-          />
-          <span className="absolute inset-x-0 bottom-0 block p-4 text-white sm:p-5">
-            <ArticleMeta format={format} readingTime={readingTime} onCover />
-            <h2 className="mt-1.5 font-display line-clamp-3 text-display font-semibold text-white">
-              {title}
-            </h2>
-            {excerpt ? (
-              <span className="mt-2 line-clamp-2 text-meta text-white/90 max-[359px]:hidden">
-                {excerpt}
-              </span>
-            ) : null}
-          </span>
         </Link>
-      ) : (
-        // No panel. A cover-less article used to get a bordered white block to
-        // stand in for the "front" a cover would have given it, but it was the
-        // last boxed thing left in a feed built to have none -- and it charged
-        // for the privilege twice, once in its own 20px of padding and again
-        // in the 12px above it, pushing the headline ~35px further from the
-        // byline than the same headline sits in a Post row.
-        //
-        // Nothing is lost by removing it. The kicker below already announces
-        // the piece as an Article, the Bodoni headline already distinguishes
-        // it from a Post's sans one, and the row hairline already says where
-        // the article stops. The box was restating all three.
-        <div className="mt-3">
-          <ArticleMeta format={format} readingTime={readingTime} />
-          <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
-            <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
-              {title}
-            </h2>
-          </Link>
-          {excerpt ? (
-            <p className="mt-2.5 line-clamp-3 max-w-measure text-excerpt text-ink-soft">
-              {excerpt}
-            </p>
-          ) : null}
-        </div>
-      )}
+      ) : null}
 
-      <TopicLinks tags={post.tags} />
       <Actions post={post} currentUserId={currentUserId} />
     </article>
   );

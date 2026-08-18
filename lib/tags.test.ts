@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatTagLabel,
   getTopicValuesValidationError,
   isSubscribableTopicValue,
   normalizeTagValue,
@@ -17,5 +18,23 @@ describe("topic key normalization", () => {
     expect(getTopicValuesValidationError(["valid", "a".repeat(81)])).toMatch(
       /between 1 and 80/
     );
+  });
+});
+
+describe("tag hash handling", () => {
+  it("strips a leading hash so '#africa' and 'africa' are one topic key", () => {
+    expect(normalizeTagValue("#africa")).toBe("africa");
+    expect(normalizeTagValue("##africa")).toBe("africa");
+    expect(normalizeTagValue("#africa")).toBe(normalizeTagValue("Africa"));
+  });
+
+  it("keeps a hash that is not leading", () => {
+    expect(normalizeTagValue("c#")).toBe("c#");
+  });
+
+  it("formats a display label without adding or keeping a hash", () => {
+    expect(formatTagLabel("#African Culture")).toBe("African Culture");
+    expect(formatTagLabel("African Culture")).toBe("African Culture");
+    expect(formatTagLabel("#")).toBe("");
   });
 });

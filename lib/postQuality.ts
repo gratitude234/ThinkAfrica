@@ -207,9 +207,26 @@ export function getPublicQualitySignals(
   };
 }
 
+/**
+ * The one line above a feed card explaining why it is there.
+ *
+ * Ordered by how much the reader could not have worked out for themselves,
+ * which is the opposite of the old order.
+ *
+ * `followedAuthor` used to sit second and is gone entirely. On a feed made
+ * mostly of people the reader follows it fired on nearly every card, and a
+ * label repeated eight rows running stops being read as information. It was
+ * also telling the reader something the byline directly beneath it already
+ * says, and which they knew before they opened the page.
+ *
+ * "Quality signals are rising" is gone too. It described the internal scoring
+ * model rather than anything the reader can act on, in the model's own
+ * vocabulary. There is no reader-facing sentence behind it worth keeping, so
+ * the line is now simply absent on posts with nothing specific to say --
+ * which is most of them, and that is the point: the label earns attention by
+ * being rare.
+ */
 export function getFeedSurfaceReason(input: PublicQualityInput): string | null {
-  if (input.interestMatch) return "Matches your reading interests";
-  if (input.followedAuthor) return "From a writer you follow";
   if (input.referenceCount && input.referenceCount > 0) {
     return "Source-backed post";
   }
@@ -218,7 +235,7 @@ export function getFeedSurfaceReason(input: PublicQualityInput): string | null {
   }
   if ((input.responseCount ?? 0) > 0) return "Active response thread";
   if ((input.bookmarkCount ?? 0) >= 3) return "Saved by readers";
-  if (getQualityScore(input) >= 35) return "Quality signals are rising";
+  if (input.interestMatch) return "Matches your reading interests";
   return null;
 }
 

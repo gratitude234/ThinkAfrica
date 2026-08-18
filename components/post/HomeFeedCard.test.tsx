@@ -227,6 +227,26 @@ describe("HomeFeedCard", () => {
     expect(screen.getByRole("link", { name: "4 in this discussion" })).toBeInTheDocument();
   });
 
+  // The chip renders its own '#', so a tag stored as "#africa" printed as
+  // "##africa" and linked to a /topics page keyed on the hashed spelling.
+  it("renders a stored tag with one hash and links to the unhashed topic", () => {
+    render(
+      <HomeFeedCard
+        post={post({ tags: ["#africa", "Human Rights"] })}
+        currentUserId="user-1"
+        surface="home"
+      />
+    );
+
+    const link = screen.getByRole("link", { name: "#africa" });
+    expect(link).toHaveAttribute("href", "/topics/africa");
+    expect(screen.queryByText("##africa")).toBeNull();
+    expect(screen.getByRole("link", { name: "#Human Rights" })).toHaveAttribute(
+      "href",
+      "/topics/Human%20Rights"
+    );
+  });
+
   it("renders Article identity with its optional genre as secondary metadata", () => {
     render(
       <HomeFeedCard
@@ -235,7 +255,7 @@ describe("HomeFeedCard", () => {
           type: "essay",
           content_kind: "article",
           article_format: "policy_brief",
-          reading_minutes: 6,
+          word_count: 1400,
         })}
         currentUserId="user-1"
         surface="latest"
@@ -245,12 +265,71 @@ describe("HomeFeedCard", () => {
     expect(screen.getByRole("heading", { name: "Why institutions outlast intentions" })).toBeInTheDocument();
     expect(screen.getByText("Article")).toBeInTheDocument();
     expect(screen.getByText("Policy Brief")).toBeInTheDocument();
-    expect(screen.getByText("6 min")).toBeInTheDocument();
+    expect(screen.getByText("7 min")).toBeInTheDocument();
     expect(screen.queryByText("Reviewed")).not.toBeInTheDocument();
   });
 
-  it("turns an Article cover into one immersive editorial story object", () => {
-    const { container } = render(
+  // Regression: reading time was derived from `excerpt`, which is capped at
+  // roughly thirty words, so ceil(words / 200) was always 1 and every card in
+  // the feed reported "1 min" regardless of the article behind it.
+  it("derives reading time from the body word count, not the excerpt", () => {
+    const { rerender } = render(
+      <HomeFeedCard
+        post={post({
+          title: "Why institutions outlast intentions",
+          content_kind: "article",
+          excerpt: "Six words is all this is.",
+          word_count: 3000,
+        })}
+        currentUserId="user-1"
+        surface="latest"
+      />
+    );
+
+    expect(screen.getByText("15 min")).toBeInTheDocument();
+    expect(screen.queryByText("1 min")).not.toBeInTheDocument();
+
+    rerender(
+      <HomeFeedCard
+        post={post({
+          title: "Why institutions outlast intentions",
+          content_kind: "article",
+          excerpt: "Six words is all this is.",
+          word_count: 240,
+        })}
+        currentUserId="user-1"
+        surface="latest"
+      />
+    );
+
+    expect(screen.getByText("2 min")).toBeInTheDocument();
+  });
+
+  it("omits the reading time rather than inventing one when no count is stored", () => {
+    render(
+      <HomeFeedCard
+        post={post({
+          title: "Why institutions outlast intentions",
+          content_kind: "article",
+          word_count: null,
+        })}
+        currentUserId="user-1"
+        surface="latest"
+      />
+    );
+
+    expect(screen.getByText("Article")).toBeInTheDocument();
+    expect(screen.queryByText(/\bmin\b/)).not.toBeInTheDocument();
+  });
+
+  // An Article with a cover used to print its headline *over* the image under
+  // a fixed dark gradient, while a cover-less one printed it as ordinary text.
+  // Two layouts alternating down one column, and the overlay was the half that
+  // read worse: one scrim over photographs it knows nothing about, and a
+  // line-clamp that truncated real headlines mid-phrase. Both now render the
+  // same way, and the cover is an illustration below the text.
+  it("renders an Article the same way with a cover as without one", () => {
+    const withCover = render(
       <HomeFeedCard
         post={post({
           title: "Why institutions outlast intentions",
@@ -263,20 +342,41 @@ describe("HomeFeedCard", () => {
       />
     );
 
-    const article = container.querySelector('[data-content-kind="article"]');
-    expect(article).toBeInTheDocument();
-    expect(article?.querySelector('[class*="grid-cols-[minmax"]')).toBeNull();
     const heading = screen.getByRole("heading", {
       name: "Why institutions outlast intentions",
     });
     expect(heading.closest("a")).toHaveAttribute("href", "/post/clear-thinking");
-    expect(
-      screen.getByRole("img", { name: "Why institutions outlast intentions" })
-        .parentElement
-    ).toHaveClass(
-      "aspect-[4/3]",
-      "sm:aspect-[16/10]"
+    // The headline is card text, not a layer inside the image link.
+    expect(heading.closest("a")?.querySelector("img")).toBeNull();
+    expect(heading).toHaveClass("text-ink");
+
+    const cover = withCover.container.querySelector("img");
+    expect(cover?.parentElement).toHaveClass("aspect-[16/9]");
+    // Decorative: the headline link directly above already carries the
+    // destination, so the cover is not a second tab stop to the same place.
+    const coverLink = cover?.closest("a");
+    expect(coverLink).toHaveAttribute("aria-hidden", "true");
+    expect(coverLink).toHaveAttribute("tabindex", "-1");
+
+    withCover.unmount();
+
+    render(
+      <HomeFeedCard
+        post={post({
+          title: "Why institutions outlast intentions",
+          type: "essay",
+          content_kind: "article",
+        })}
+        currentUserId="user-1"
+        surface="home"
+      />
     );
+
+    const bare = screen.getByRole("heading", {
+      name: "Why institutions outlast intentions",
+    });
+    expect(bare).toHaveClass("text-ink");
+    expect(bare.className).toBe(heading.className);
   });
 
   it("uses a contained paper-shaped preview for Research covers", () => {

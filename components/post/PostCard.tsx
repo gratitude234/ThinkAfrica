@@ -30,13 +30,16 @@ export interface PostCardData {
   tags: string[] | null;
   created_at: string;
   published_at: string | null;
-  reading_minutes?: number | null;
   author_id?: string;
   like_count?: number;
   bookmark_count?: number;
   view_count?: number | null;
   impression_count?: number | null;
   read_count?: number | null;
+  /** Words in the post body, maintained by a database trigger. Feeds the
+   *  reading time, which used to be derived from the excerpt and so reported
+   *  "1 min" for every post ever published. */
+  word_count?: number | null;
   reference_count?: number;
   response_count?: number;
   /** Comments on this post. Kept apart from response_count: only the UI sums
@@ -146,11 +149,13 @@ const QUALITY_BADGE_CLASSES = {
   gray: "border-gray-200 bg-gray-50 text-gray-600",
 };
 
-function estimateReadTime(excerpt: string | null): number {
-  return Math.max(
-    1,
-    Math.ceil((excerpt?.trim().split(/\s+/).filter(Boolean).length ?? 0) / 200)
-  );
+// Reads the stored body word count, not the excerpt. Counting the excerpt --
+// capped at roughly thirty words -- meant this returned 1 for every post ever
+// written. Null when the count is unavailable so callers can drop the label
+// rather than print a minute figure they have no basis for.
+function estimateReadTime(wordCount: number | null | undefined): number | null {
+  if (!wordCount || wordCount <= 0) return null;
+  return Math.max(1, Math.ceil(wordCount / 200));
 }
 
 function formatDocumentSize(value: number | null | undefined) {
@@ -267,14 +272,16 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
         : getContentKindLabel(resolvedKind)
       : (POST_TYPE_LABELS[post.type as PostType] ?? post.type);
   const excerpt = sanitizePostExcerpt(post.excerpt);
-  const readTime = estimateReadTime(excerpt);
+  const readTime = estimateReadTime(post.word_count);
   const documentSize = formatDocumentSize(post.document_size_bytes);
   const readingLabel =
     post.type === "research"
       ? documentSize
         ? `PDF manuscript / ${documentSize}`
         : "PDF manuscript"
-      : `${readTime} min read`;
+      : readTime
+        ? `${readTime} min read`
+        : null;
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
   const authorHref = author?.username ? `/${author.username}` : null;
   const coAuthorCount = post.co_authors?.length ?? 0;
@@ -365,9 +372,11 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
             <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold ${badgeClass}`}>
               {typeLabel}
             </span>
-            <span className="text-[11px] font-medium text-ink-muted">
-              {readingLabel}
-            </span>
+            {readingLabel ? (
+              <span className="text-[11px] font-medium text-ink-muted">
+                {readingLabel}
+              </span>
+            ) : null}
             {post.type === "research" && !isExplore ? (
               <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${SIGNAL_BADGES.pdf}`}>
                 PDF

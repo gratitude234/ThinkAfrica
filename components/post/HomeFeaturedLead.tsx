@@ -14,7 +14,8 @@ export interface HomeFeaturedPost {
   content_kind?: string | null;
   article_format?: string | null;
   cover_image_url?: string | null;
-  reading_minutes?: number | null;
+  /** Words in the post body, maintained by a database trigger. */
+  word_count?: number | null;
   featured_provenance?: "editorial" | "recommended" | "latest";
   feed_exposure?: FeedExposure;
   profiles: {
@@ -23,6 +24,14 @@ export interface HomeFeaturedPost {
     university?: string | null;
     avatar_url?: string | null;
   } | null;
+}
+
+// Counted the excerpt, which is capped at roughly thirty words, so this always
+// returned 1. Null when there is no stored body count rather than a floor of
+// 1: the kicker drops the segment instead of printing a number it cannot know.
+function readTime(wordCount: number | null | undefined) {
+  if (!wordCount || wordCount <= 0) return null;
+  return Math.max(1, Math.ceil(wordCount / 200));
 }
 
 export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
@@ -40,10 +49,7 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
       : post.featured_provenance === "latest"
         ? "Latest publication"
         : "Recommended for you";
-  const readingMinutes =
-    typeof post.reading_minutes === "number" && post.reading_minutes > 0
-      ? Math.ceil(post.reading_minutes)
-      : null;
+  const readingMinutes = readTime(post.word_count);
 
   return (
     // Kept boxed, rounded and shadowed while the feed rows below it are none

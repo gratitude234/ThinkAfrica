@@ -265,3 +265,49 @@ describe("public quality signals are evidence-based, not name-based", () => {
     expect(reviewed).toBeGreaterThan(unreviewed);
   });
 });
+
+describe("feed surface reason rationing", () => {
+  it("no longer labels a followed author, which fired on nearly every card", () => {
+    const reason = getFeedSurfaceReason({
+      type: "blog",
+      citationId: null,
+      publishedVersionId: null,
+      followedAuthor: true,
+    });
+
+    expect(reason).toBeNull();
+  });
+
+  it("says nothing rather than describing the scoring model", () => {
+    const reason = getFeedSurfaceReason({
+      type: "blog",
+      citationId: null,
+      publishedVersionId: null,
+      likeCount: 40,
+      viewCount: 500,
+    });
+
+    expect(reason).toBeNull();
+  });
+
+  it("still names a concrete signal the reader could not have guessed", () => {
+    expect(
+      getFeedSurfaceReason({
+        type: "blog",
+        citationId: null,
+        publishedVersionId: null,
+        followedAuthor: true,
+        referenceCount: 2,
+      })
+    ).toBe("Source-backed post");
+
+    expect(
+      getFeedSurfaceReason({
+        type: "blog",
+        citationId: null,
+        publishedVersionId: null,
+        responseCount: 3,
+      })
+    ).toBe("Active response thread");
+  });
+});
