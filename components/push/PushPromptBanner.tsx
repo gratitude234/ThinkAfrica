@@ -137,7 +137,7 @@ export default function PushPromptBanner({ userId, legacySeed }: Props) {
         <h2 className="mt-1 text-sm font-semibold text-gray-900">Turn on push notifications</h2>
         <p className="mt-1 max-w-xl text-sm text-gray-500">
           Get notified when your submissions are published, someone messages you, or comments
-          on your post — even when Indegenius isn&apos;t open in your browser.
+          on your post, even when Indegenius isn&apos;t open in your browser.
         </p>
         {error ? (
           <p className="mt-2 text-sm text-red-600" role="alert" aria-live="assertive">

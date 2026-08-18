@@ -18,7 +18,7 @@ export default function ForYouEmptyState() {
         Nothing matches your interests yet.
       </p>
       <p className="mt-1 text-sm text-gray-500">
-        Explore popular topics — tap any to follow.
+        Explore popular topics. Tap any to follow.
       </p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {DISCOVERY_TOPICS.map((topic) => (

@@ -366,7 +366,7 @@ export default function NotificationsPageClient({
             if (result.error) {
               setToast({
                 message: result.conflict
-                  ? "Could not undo — some of those notifications have newer activity."
+                  ? "Could not undo: some of those notifications have newer activity."
                   : `Could not undo: ${result.error}`,
               });
               await refresh();

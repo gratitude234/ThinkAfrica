@@ -57,8 +57,8 @@ export default function PrivacyForm({ profileId, privacySettings }: Props) {
             }
             className={INPUT_STYLES}
           >
-            <option value="public">Public — anyone can view your profile</option>
-            <option value="members_only">Members only — signed-in users only</option>
+            <option value="public">Public: anyone can view your profile</option>
+            <option value="members_only">Members only: signed-in users only</option>
           </select>
         </div>
 

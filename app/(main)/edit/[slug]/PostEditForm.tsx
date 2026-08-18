@@ -63,7 +63,7 @@ export default function PostEditForm({
       <div>
         <h1 className="font-display text-2xl font-semibold text-gray-900">Edit post</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Publishing status and permalink stay the same — only the text and image change.
+          Publishing status and permalink stay the same. Only the text and image change.
         </p>
       </div>
 
@@ -91,7 +91,7 @@ export default function PostEditForm({
         </div>
         {isOverLimit ? (
           <p id="post-edit-error" role="alert" className="mt-1 text-xs font-medium text-red-600">
-            Posts can be at most {SHORT_POST_MAX_CHARACTERS.toLocaleString()} characters — trim{" "}
+            Posts can be at most {SHORT_POST_MAX_CHARACTERS.toLocaleString()} characters. Trim{" "}
             {(characterCount - SHORT_POST_MAX_CHARACTERS).toLocaleString()} more.
           </p>
         ) : null}

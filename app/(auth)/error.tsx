@@ -23,7 +23,7 @@ export default function AuthError({
         We couldn&apos;t load this step
       </h1>
       <p className="mt-2 text-sm leading-6 text-gray-500">
-        Something went wrong signing you in. Try again — if it keeps happening,
+        Something went wrong signing you in. Try again. If it keeps happening,
         your session may have expired.
       </p>
 

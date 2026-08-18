@@ -583,7 +583,7 @@ export async function publishPost(input: {
 
   if (isLowQualityTitle(input.title)) {
     return {
-      error: "Add a real title before publishing — \"Untitled draft\" and similar placeholders aren't allowed.",
+      error: "Add a real title before publishing. \"Untitled draft\" and similar placeholders aren't allowed.",
       slug: null as string | null,
     };
   }

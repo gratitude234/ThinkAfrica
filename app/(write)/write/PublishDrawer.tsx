@@ -165,7 +165,7 @@ export default function PublishDrawer({
     }
 
     if (isLowQualityTitle(title)) {
-      setError("Add a real title before publishing — \"Untitled draft\" and similar placeholders aren't allowed.");
+      setError("Add a real title before publishing. \"Untitled draft\" and similar placeholders aren't allowed.");
       return;
     }
 

@@ -136,7 +136,7 @@ export default function NotificationPermissionPrompt({ userId, onContinue }: Pro
         </h2>
         <p id="push-prompt-description" className="mt-1.5 text-sm text-ink-muted">
           Get notified the moment your submission is published, rejected, or sent back for
-          revision — even when Indegenius isn&apos;t open in your browser.
+          revision, even when Indegenius isn&apos;t open in your browser.
         </p>
         {error ? (
           <p className="mt-3 text-sm text-red-600" role="alert" aria-live="assertive">

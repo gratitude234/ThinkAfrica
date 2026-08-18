@@ -87,7 +87,7 @@ export default function V2Lobby({
             {membership.debaterStance ? (
               <div className="mt-2 flex items-center gap-2">
                 <span className="rounded-full border-2 border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                  Arguing {STANCE_LABELS[membership.debaterStance]} — locked
+                  Arguing {STANCE_LABELS[membership.debaterStance]} · locked
                 </span>
               </div>
             ) : pendingStance ? (
@@ -136,7 +136,7 @@ export default function V2Lobby({
             <p className="text-sm font-semibold text-gray-800">Judging</p>
             {membership.isJuror ? (
               <span className="mt-2 inline-flex rounded-full border-2 border-gray-300 bg-gray-50 px-3 py-1 text-xs font-bold text-gray-700">
-                You&apos;re a juror — no stance
+                You&apos;re a juror · no stance
               </span>
             ) : (
               <Button size="sm" variant="secondary" className="mt-2" onClick={() => void joinAsJuror()} loading={joiningJuror}>

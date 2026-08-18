@@ -234,7 +234,7 @@ export default function AboutPage() {
               </p>
               <p>
                 Indegenius was founded in African university communities to fix
-                that—not as a blog or another quick-take feed, but as
+                that. Not as a blog or another quick-take feed, but as
                 infrastructure for publishing, discourse, and evidence-backed
                 intellectual identity.
               </p>

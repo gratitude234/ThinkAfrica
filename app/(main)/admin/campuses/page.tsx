@@ -133,6 +133,7 @@ function MetricCard({
         </span>
       </div>
       <p className="mt-2 text-2xl font-semibold text-gray-950">
+        {/* eslint-disable-next-line no-restricted-syntax -- em dash as the "no data" marker is correct typesetting, not prose. */}
         {rate === null ? "—" : `${rate.toFixed(1)}%`}
       </p>
       <p className="mt-1 text-[11px] text-gray-500">

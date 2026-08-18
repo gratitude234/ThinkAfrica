@@ -152,7 +152,7 @@ export default function ResponseChooser({
           >
             <span className="text-sm font-semibold text-ink">Quick response</span>
             <span className="mt-0.5 text-xs leading-5 text-ink-muted">
-              A short, titleless post — publishes immediately.
+              A short, titleless post. Publishes immediately.
             </span>
           </Link>
           <Link

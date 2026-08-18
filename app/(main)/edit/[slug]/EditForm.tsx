@@ -513,7 +513,7 @@ export default function EditForm({
       {post.status === "pending_revision" ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-medium text-amber-900">
-            Revision requested — respond to round {post.current_round} by{" "}
+            Revision requested. Respond to round {post.current_round} by{" "}
             {post.revision_due_at
               ? new Date(post.revision_due_at).toLocaleDateString("en-US", {
                   year: "numeric",

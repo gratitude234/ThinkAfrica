@@ -812,7 +812,7 @@ async function PostReviewStatusPanel({
         title="Editorial review status"
         description={
           post.status === "pending_revision"
-            ? "Reviewers have requested changes. Use the button to edit and resubmit — your revisions will be tracked as a new round."
+            ? "Reviewers have requested changes. Use the button to edit and resubmit. Your revisions will be tracked as a new round."
             : "You'll be notified when reviewers submit feedback or an editor makes a decision. This timeline updates automatically."
         }
         actionHref={

@@ -812,7 +812,7 @@ export default function WritePage() {
             <div className="hidden lg:block">
               <p className="text-sm font-semibold text-ink">Write an Article</p>
               <p className="mt-0.5 text-xs text-gray-400">
-                Long-form, with a title — publishes immediately.
+                Long-form, with a title. Publishes immediately.
               </p>
             </div>
             <span

@@ -590,7 +590,7 @@ export default async function DebatesPage({ searchParams }: PageProps) {
 
       {fellBackToOtherTab ? (
         <p className="mb-4 rounded-lg border border-gray-200 bg-surface px-4 py-2.5 text-sm text-ink-muted">
-          No debate is live right now — showing{" "}
+          No debate is live right now. Showing{" "}
           {filter === "recruiting" ? "debates recruiting debaters" : "completed debates"}.
         </p>
       ) : null}

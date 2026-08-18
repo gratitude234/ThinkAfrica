@@ -83,7 +83,7 @@ describe("PostComposerForm", () => {
 
     fireEvent.change(textarea, { target: { value: "a".repeat(2001) } });
     expect(postButton).toBeDisabled();
-    expect(screen.getByRole("alert")).toHaveTextContent("trim 1 more");
+    expect(screen.getByRole("alert")).toHaveTextContent("Trim 1 more");
   });
 
   it("disables posting while an image is uploading", () => {

@@ -926,7 +926,7 @@ function ArgumentComposer({
           className="mt-4 rounded-xl border border-gold bg-gold-tint p-3 text-sm font-semibold text-gold-ink"
         >
           {minutesLeft <= 0
-            ? "This deadline is passing right now — submit immediately."
+            ? "This deadline is passing right now. Submit immediately."
             : `Only ${formatMinutesLeft(minutesLeft)} left to submit your ${phase}.`}
         </p>
       ) : null}
@@ -1059,7 +1059,7 @@ function ArgumentComposer({
         aria-describedby={blockedReason ? "v15-submit-blocked" : undefined}
         className="mt-4 w-full"
       >
-        {busy ? "Submitting…" : `Submit ${phase} — final`}
+        {busy ? "Submitting…" : `Submit final ${phase}`}
       </ActionButton>
       {blockedReason ? (
         <p
@@ -1234,10 +1234,10 @@ function SideSlot({
               }`}
             >
               {slot.status === "accepted"
-                ? `${stance.toUpperCase()} — confirmed`
+                ? `${stance.toUpperCase()} · confirmed`
                 : slot.status === "declined"
                   ? "Invitation declined"
-                  : `${stance.toUpperCase()} — awaiting response`}
+                  : `${stance.toUpperCase()} · awaiting response`}
             </span>
             {room.isManager ? (
               <button
@@ -1706,7 +1706,7 @@ function RecruitingView({
       {
         key: accept ? "respond:accept" : "respond:decline",
         success: accept
-          ? "You're confirmed as a debater. Watch the opening deadline — you get one submission."
+          ? "You're confirmed as a debater. You get one submission, so watch the opening deadline."
           : "Invitation declined. The moderator can now invite someone else.",
       }
     );
@@ -2013,7 +2013,7 @@ function VotingView({
         </h2>
         <p className="mt-2 text-sm leading-6 text-gold-ink">
           Argument upvotes identify strong arguments. They do not decide the
-          debate — only your final vote counts toward the verdict.
+          debate. Only your final vote counts toward the verdict.
         </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {(["for", "against"] as const).map((stance) => (
@@ -2241,10 +2241,10 @@ function VerdictView({
     outcome === "no_votes"
       ? "No final votes were cast"
       : outcome === "tied"
-        ? `Community vote tied — ${forPercent}% to ${againstPercent}%`
+        ? `Community vote tied ${forPercent}% to ${againstPercent}%`
         : outcome === "for"
-          ? `FOR wins — ${forPercent}% to ${againstPercent}%`
-          : `AGAINST wins — ${againstPercent}% to ${forPercent}%`;
+          ? `FOR wins ${forPercent}% to ${againstPercent}%`
+          : `AGAINST wins ${againstPercent}% to ${forPercent}%`;
   const sources = Array.from(
     new Map(
       room.arguments
@@ -2349,7 +2349,7 @@ function VerdictView({
               />
               <RecapBlock
                 stance="for"
-                title="Strongest — FOR"
+                title="Strongest FOR argument"
                 text={
                   room.debate.recapStrongestFor ??
                   "No strongest FOR argument was identified."
@@ -2357,7 +2357,7 @@ function VerdictView({
               />
               <RecapBlock
                 stance="against"
-                title="Strongest — AGAINST"
+                title="Strongest AGAINST argument"
                 text={
                   room.debate.recapStrongestAgainst ??
                   "No strongest AGAINST argument was identified."
@@ -2517,7 +2517,7 @@ function CancelledView({
         className="rounded-2xl border border-red-200 bg-red-50 p-5"
       >
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-red-700">
-          Cancelled — not completed
+          Cancelled · not completed
         </p>
         <h2 className="mt-1 font-display text-2xl font-bold text-ink">
           This debate was cancelled by the moderator.

@@ -30,7 +30,7 @@ export default function MainError({
         This page didn&apos;t load
       </h1>
       <p className="mt-2 text-sm leading-6 text-gray-500">
-        Something went wrong on our side. Your work isn&apos;t lost — try again,
+        Something went wrong on our side. Your work isn&apos;t lost. Try again,
         or head back to the feed.
       </p>
 

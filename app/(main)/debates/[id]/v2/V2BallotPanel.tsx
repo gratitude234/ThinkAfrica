@@ -184,7 +184,7 @@ export default function V2BallotPanel({
               </option>
               {[1, 2, 3, 4, 5].map((level) => (
                 <option key={level} value={level}>
-                  {level} — {CONFIDENCE_LABELS[level]}
+                  {level} · {CONFIDENCE_LABELS[level]}
                 </option>
               ))}
             </select>
@@ -204,7 +204,7 @@ export default function V2BallotPanel({
                 <option value="">None in particular</option>
                 {eligibleArguments.map((argument) => (
                   <option key={argument.id} value={argument.id}>
-                    {(argument.claim ?? argument.content).slice(0, 60)} — {argument.author?.full_name ?? argument.author?.username ?? "Unknown"}
+                    {(argument.claim ?? argument.content).slice(0, 60)} · {argument.author?.full_name ?? argument.author?.username ?? "Unknown"}
                   </option>
                 ))}
               </select>

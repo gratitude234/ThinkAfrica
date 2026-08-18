@@ -31,7 +31,7 @@ export default function WriteError({
         The editor hit a problem
       </h1>
       <p className="mt-2 text-sm leading-6 text-gray-500">
-        Your draft is backed up in this browser — reloading the editor should
+        Your draft is backed up in this browser. Reloading the editor should
         bring it back.
       </p>
 

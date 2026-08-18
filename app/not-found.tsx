@@ -11,7 +11,7 @@ export default function NotFound() {
         <div className="text-7xl font-black text-gray-200 mb-4 select-none">404</div>
 
         <h1 className="text-2xl font-bold text-gray-900 mb-3">
-          This page doesn&apos;t exist — but your ideas do.
+          We couldn&apos;t find that page.
         </h1>
         <p className="text-gray-500 text-sm mb-8">
           The page you&apos;re looking for may have moved or never existed. Head back to explore what&apos;s happening on Indegenius.

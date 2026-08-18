@@ -294,8 +294,8 @@ export default function PostComposerForm({
           />
           {isOverLimit ? (
             <p id="post-body-error" role="alert" className="mt-1 text-xs font-medium text-red-600">
-              Quick takes can be at most {SHORT_POST_MAX_CHARACTERS.toLocaleString()} characters —
-              trim {(characterCount - SHORT_POST_MAX_CHARACTERS).toLocaleString()} more.
+              Quick takes can be at most {SHORT_POST_MAX_CHARACTERS.toLocaleString()} characters.
+              Trim {(characterCount - SHORT_POST_MAX_CHARACTERS).toLocaleString()} more.
             </p>
           ) : null}
         </div>
@@ -403,7 +403,7 @@ export default function PostComposerForm({
       >
         <p className="text-sm leading-6 text-gray-600">
           <span className="md:hidden">
-            Quick takes are short and conversational, no title needed — they publish instantly.
+            Quick takes are short and conversational, no title needed. They publish instantly.
             Writing something longer?
           </span>
           <span className="hidden whitespace-nowrap md:inline">Need more room?</span>

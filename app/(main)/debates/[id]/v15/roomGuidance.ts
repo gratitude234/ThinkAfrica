@@ -70,7 +70,7 @@ export function resolveDebateV15Guidance(
       if (input.bothDebatersAccepted) {
         return {
           tone: "action",
-          heading: "Both sides are confirmed — you can start",
+          heading: "Both sides are confirmed. You can start",
           body: "Publish the schedule and open the debate whenever you are ready. Nothing moves until you do.",
         };
       }
@@ -94,7 +94,7 @@ export function resolveDebateV15Guidance(
     if (role === "debater") {
       return {
         tone: "waiting",
-        heading: "You are confirmed — nothing to do yet",
+        heading: "You are confirmed. Nothing to do yet",
         body: "You will be able to write once the other side accepts and the moderator starts the debate. You will be notified.",
       };
     }
@@ -125,7 +125,7 @@ export function resolveDebateV15Guidance(
       }
       return {
         tone: "action",
-        heading: `Your turn — write your ${noun}`,
+        heading: `Your turn to write your ${noun}`,
         body:
           phase === "opening"
             ? "Make your case in one submission, up to 300 words, with up to five sources. It is final once sent."
@@ -137,7 +137,7 @@ export function resolveDebateV15Guidance(
       if (input.missingSides.length === 0) {
         return {
           tone: "action",
-          heading: "Both sides have submitted — you can advance",
+          heading: "Both sides have submitted. You can advance",
           body: `Move the room on when you are ready. Advancing closes ${noun}s for good and cannot be undone.`,
         };
       }
@@ -147,7 +147,7 @@ export function resolveDebateV15Guidance(
           ? `${sideList(input.missingSides)} missed the ${noun} deadline`
           : `Waiting on ${sideList(input.missingSides)}`,
         body: deadlinePassed
-          ? "Extend the deadline to give them longer, or advance without them — advancing is permanent."
+          ? "Extend the deadline to give them longer, or advance without them. Advancing is permanent."
           : `Nothing is needed from you until both sides have submitted, or until the ${noun} deadline passes.`,
       };
     }
@@ -191,7 +191,7 @@ export function resolveDebateV15Guidance(
   if (role === "debater") {
     return {
       tone: "action",
-      heading: "Your arguments are in — now you vote like everyone else",
+      heading: "Your arguments are in. Now you vote like everyone else",
       body: "Debating is over and the community decides. Your vote counts once, the same as any reader's.",
     };
   }

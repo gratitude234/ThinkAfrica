@@ -210,7 +210,7 @@ describe("DebateV15Room", () => {
       )
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Submit opening — final" })
+      screen.getByRole("button", { name: "Submit final opening" })
     );
 
     const alert = await screen.findByRole("alert");
@@ -234,7 +234,7 @@ describe("DebateV15Room", () => {
       )
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Submit opening — final" })
+      screen.getByRole("button", { name: "Submit final opening" })
     );
 
     expect(

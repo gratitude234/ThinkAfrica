@@ -56,7 +56,7 @@ export default function ActivationBanner({
     <div className="mb-6 flex items-center gap-3 border-b border-gray-100 bg-canvas px-4 py-2 text-sm text-ink-muted sm:px-6 lg:px-8">
       <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-brand" />
       <span>
-        {doneCount} of 3 —{" "}
+        {doneCount} of 3 ·{" "}
         <Link href={nextStep.href} className="font-medium text-ink hover:underline">
           {nextStep.label} →
         </Link>

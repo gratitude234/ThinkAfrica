@@ -122,10 +122,10 @@ export default function AssignReviewers({
           >
             {hasSuggestions ? (
               <>
-                <optgroup label="Suggested — shared background with author">
+                <optgroup label="Suggested: shared background with author">
                   {suggestedReviewers.map((reviewer) => (
                     <option key={reviewer.id} value={reviewer.id}>
-                      {reviewer.full_name ?? reviewer.username} —{" "}
+                      {reviewer.full_name ?? reviewer.username} ·{" "}
                       {getReviewerMatchLabel(reviewer, authorFieldOfStudy, authorUniversity)}
                     </option>
                   ))}

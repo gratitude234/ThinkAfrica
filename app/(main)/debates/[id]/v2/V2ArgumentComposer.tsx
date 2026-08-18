@@ -228,7 +228,7 @@ export default function V2ArgumentComposer({
       );
       setCopied(true);
     } catch {
-      setError("Could not copy automatically — select the text above and copy it manually.");
+      setError("Could not copy automatically. Select the text above and copy it manually.");
     }
   }
 
@@ -356,7 +356,7 @@ export default function V2ArgumentComposer({
           <p className="mt-1 text-sm leading-6 text-amber-800">
             You were writing your {draftContext.entryType} statement, but this
             round is now the {entryType}. Your text has not been sent and has
-            not been changed — it is kept below so you can copy it before
+            not been changed. It is kept below so you can copy it before
             starting your {entryType}.
           </p>
         </div>
@@ -434,7 +434,7 @@ export default function V2ArgumentComposer({
               </option>
               {eligibleParents.map((parent) => (
                 <option key={parent.id} value={parent.id}>
-                  {parent.stance === "for" ? "For" : "Against"} — {(parent.author?.full_name ?? parent.author?.username ?? "Unknown")}:{" "}
+                  {parent.stance === "for" ? "For" : "Against"} · {(parent.author?.full_name ?? parent.author?.username ?? "Unknown")}:{" "}
                   {(parent.claim ?? parent.content).slice(0, 50)}
                 </option>
               ))}

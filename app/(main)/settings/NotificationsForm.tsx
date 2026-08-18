@@ -394,8 +394,8 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
           <h2 className="mb-1 text-base font-semibold text-gray-900">In the app</h2>
           <p className="mb-4 text-xs text-gray-500">
             What shows up in your notifications inbox and the bell. Anything that
-            needs a response from you — review requests, invitations, editorial and
-            account decisions — always comes through and is not listed here.
+            needs a response from you (review requests, invitations, editorial and
+            account decisions) always comes through and is not listed here.
           </p>
           <div className="space-y-3">
             {IN_APP_PREF_GROUPS.map((group) =>

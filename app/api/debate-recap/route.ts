@@ -52,6 +52,7 @@ function formatArgument(
 ) {
   if (!argument) return "No argument submitted.";
   const profile = getProfile(argument);
+  // eslint-disable-next-line no-restricted-syntax -- em dash before an attribution is correct typesetting, not prose.
   return `"${argument.content.slice(0, maxLength)}" — ${
     profile?.full_name ?? "Participant"
   } (${argument.upvotes ?? 0} argument upvotes)`;

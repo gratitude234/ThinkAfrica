@@ -254,7 +254,7 @@ export function buildDebateV15DeliveryContent(
         },
         push: {
           title: "Debate cancelled",
-          body: excerpt(`${debateTitle} — ${reason}`),
+          body: excerpt(`${debateTitle} · ${reason}`),
         },
       };
     }
@@ -313,7 +313,7 @@ export function buildDebateV15DeliveryContent(
           subject: excerpt(`The ${stage} deadline has passed`, 160),
           preview: `This debate is now waiting for its moderator, not for you.`,
           title: `The ${stage} deadline has passed`,
-          intro: `Submissions for this stage are closed. The debate now waits for its moderator to move it forward — there is nothing further for you to do right now, and you have not missed anything you can still act on.`,
+          intro: `Submissions for this stage are closed. The debate now waits for its moderator to move it forward. There is nothing further for you to do right now, and you have not missed anything you can still act on.`,
           bodyHtml: motionBlock(debateTitle),
           bodyTextLines: [motion],
           ctaLabel: "View the debate",
