@@ -26,7 +26,7 @@ export default async function TopicPage({ params }: PageProps) {
   let postsQuery = supabase
     .from("posts")
     .select(`
-      id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id,
+      id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url, citation_id, published_version_id,
       profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
       post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
     `)

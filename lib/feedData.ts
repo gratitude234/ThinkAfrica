@@ -68,8 +68,11 @@ type PublicFeedCacheInput = Pick<
   "tab" | "page" | "pageSize" | "type" | "timeframe"
 >;
 
+// `word_count` and not `content`: the cards print a reading time, and pulling a
+// dozen full article bodies per page to derive one number each would be a bad
+// trade. The column is maintained by a trigger (see the 20260818 migration).
 const POST_SELECT =
-  "id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, topic_keys, created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
+  "id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, topic_keys, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
 
 // How deep the score-ranked portion of the home feed goes. Every page of the
 // "For you" tab slices this same window, so it has to be a constant -- see the

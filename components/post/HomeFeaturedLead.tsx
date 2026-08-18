@@ -13,6 +13,7 @@ export interface HomeFeaturedPost {
   content_kind?: string | null;
   article_format?: string | null;
   cover_image_url?: string | null;
+  word_count?: number | null;
   profiles: {
     username: string | null;
     full_name: string | null;
@@ -21,9 +22,12 @@ export interface HomeFeaturedPost {
   } | null;
 }
 
-function readTime(excerpt: string | null) {
-  const words = excerpt?.trim().split(/\s+/).filter(Boolean).length ?? 0;
-  return Math.max(1, Math.ceil(words / 200));
+// Counted the excerpt, which is capped at roughly thirty words, so this always
+// returned 1. Null when there is no stored body count rather than a floor of
+// 1: the kicker drops the segment instead of printing a number it cannot know.
+function readTime(wordCount: number | null | undefined) {
+  if (!wordCount || wordCount <= 0) return null;
+  return Math.max(1, Math.ceil(wordCount / 200));
 }
 
 export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
@@ -35,6 +39,7 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
   const label = kind === "research" ? "Research" : kind === "post" ? "Post" : format ? `Article · ${format}` : "Article";
   const action = kind === "research" ? "View paper" : kind === "post" ? "Read post" : "Read article";
   const hasCover = Boolean(post.cover_image_url?.trim());
+  const minutes = readTime(post.word_count);
 
   return (
     // Kept boxed, rounded and shadowed while the feed rows below it are none
@@ -84,7 +89,8 @@ export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
           edge. `sm:px-7` masked it from 640px up. */}
       <div className={`relative px-5 py-5 sm:max-w-[74%] sm:px-7 sm:py-7 ${hasCover ? "-mt-6 sm:mt-0" : ""}`}>
         <p className="font-display text-kicker font-bold uppercase text-emerald-200">
-          Editor&apos;s pick · {label} · {readTime(excerpt)} min
+          Editor&apos;s pick · {label}
+          {minutes ? ` · ${minutes} min` : ""}
         </p>
         <Link href={`/post/${post.slug}`} className="mt-2 block rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-brand">
           <h2 className="font-display text-headline font-semibold">{title}</h2>

@@ -50,8 +50,34 @@ export const MAX_SHORT_POST_TOPICS = 3;
 export const MAX_LONG_FORM_TOPICS = 5;
 export const MAX_RESEARCH_KEYWORDS = 10;
 
+/**
+ * Strips the leading '#' authors type out of habit.
+ *
+ * Every surface that shows a topic renders its own '#' prefix, so a stored
+ * "#africa" printed as "##africa". Worse than the cosmetics: an unstripped
+ * hash made "#africa" and "africa" two different topic keys, quietly splitting
+ * one topic's posts and subscribers across two pages.
+ *
+ * Trimmed before and after so "  # africa " normalizes the same as "#africa".
+ */
+export function stripTagHash(tag: string) {
+  return tag.trim().replace(/^#+/, "").trim();
+}
+
 export function normalizeTagValue(tag: string) {
-  return tag.trim().toLowerCase().replace(/\s+/g, " ");
+  return stripTagHash(tag).toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * The display form of a stored tag: original casing, no leading hash.
+ *
+ * Distinct from `normalizeTagValue`, which lowercases for key comparison.
+ * Callers render their own '#', so this must not add one. Rows written before
+ * the hash was stripped on the way in still carry it, so display strips too
+ * rather than trusting the stored value.
+ */
+export function formatTagLabel(tag: string) {
+  return stripTagHash(tag);
 }
 
 export function isSubscribableTopicValue(tag: string) {

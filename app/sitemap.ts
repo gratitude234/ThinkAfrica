@@ -66,7 +66,7 @@ async function collect<T>(
   try {
     const result = await Promise.race([query, deadline]);
     if (!result) {
-      console.warn(`[sitemap] ${label} exceeded ${QUERY_TIMEOUT_MS}ms — omitting those URLs`);
+      console.warn(`[sitemap] ${label} exceeded ${QUERY_TIMEOUT_MS}ms, omitting those URLs`);
       return [];
     }
     if (result.error) {
@@ -85,7 +85,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     supabase = createAdminClient();
   } catch (error) {
-    console.error("[sitemap] admin client unavailable — serving static routes only", error);
+    console.error("[sitemap] admin client unavailable, serving static routes only", error);
     return staticRoutes;
   }
 

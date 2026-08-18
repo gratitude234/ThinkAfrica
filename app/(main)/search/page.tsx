@@ -10,6 +10,7 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { isFormallyReviewed } from "@/lib/contentModel";
+import { formatTagLabel } from "@/lib/tags";
 
 interface PostResult {
   id: string;
@@ -297,7 +298,13 @@ function SearchPageContent() {
 
         ((data ?? []) as TrendingRow[]).forEach((post) => {
           (post.tags ?? []).forEach((tag) => {
-            counts[tag] = (counts[tag] ?? 0) + 1;
+            // Tally on the hash-stripped label, not the raw tag. Keying on the
+            // raw value counted "#africa" and "africa" as two separate topics,
+            // so a topic split across both spellings ranked as two half-sized
+            // entries and could miss the trending list entirely.
+            const label = formatTagLabel(tag);
+            if (!label) return;
+            counts[label] = (counts[label] ?? 0) + 1;
           });
         });
 
