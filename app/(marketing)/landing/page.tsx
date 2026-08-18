@@ -22,6 +22,7 @@ import {
   BRAND_TAGLINE,
 } from "@/lib/brand";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
+import { createDeadline, withDeadline } from "@/lib/queryDeadline";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -56,6 +57,12 @@ type LandingData = {
 };
 
 export const revalidate = 300;
+
+// The landing page is prerendered, and Vercel aborts static generation of a
+// route that runs past 60s. Bound the database work well under that so a slow
+// Supabase degrades the page to its copy-only shell instead of failing the
+// build -- the next revalidation (300s) fills the content back in.
+const DATA_TIMEOUT_MS = Number(process.env.LANDING_QUERY_TIMEOUT_MS ?? 20_000);
 
 export const metadata: Metadata = {
   title: "Build Your Intellectual Identity",
@@ -154,50 +161,91 @@ function authorLine(post: LandingPost) {
   };
 }
 
-async function fetchLandingData(
-  supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>
-): Promise<LandingData> {
-  const [{ data: postsRaw }, { count: postCount }, { count: userCount }, topicCounts] =
-    await Promise.all([
-      supabase
-        .from("posts")
-        .select(
-          `id, title, slug, type, content_kind, article_format, excerpt, cover_image_url, view_count, published_at, featured,
-           profiles!posts_author_id_fkey (username, full_name, university)`
-        )
-        .eq("status", "published")
-        .order("featured", { ascending: false })
-        .order("view_count", { ascending: false })
-        .order("published_at", { ascending: false })
-        .limit(7),
-      supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", "published"),
-      supabase.from("profiles").select("id", { count: "exact", head: true }),
-      getPublicTopicCounts(supabase),
-    ]);
+type LandingCore = Omit<LandingData, "topics">;
+
+const EMPTY_CORE: LandingCore = { postsRaw: [], postCount: 0, userCount: 0 };
+
+async function fetchLandingCore(
+  supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>,
+  signal?: AbortSignal
+): Promise<LandingCore> {
+  const featured = supabase
+    .from("posts")
+    .select(
+      `id, title, slug, type, content_kind, article_format, excerpt, cover_image_url, view_count, published_at, featured,
+       profiles!posts_author_id_fkey (username, full_name, university)`
+    )
+    .eq("status", "published")
+    .order("featured", { ascending: false })
+    .order("view_count", { ascending: false })
+    .order("published_at", { ascending: false })
+    .limit(7);
+  const publishedCount = supabase
+    .from("posts")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "published");
+  const profileCount = supabase.from("profiles").select("id", { count: "exact", head: true });
+
+  const [{ data: postsRaw }, { count: postCount }, { count: userCount }] = await Promise.all([
+    signal ? featured.abortSignal(signal) : featured,
+    signal ? publishedCount.abortSignal(signal) : publishedCount,
+    signal ? profileCount.abortSignal(signal) : profileCount,
+  ]);
 
   return {
     postsRaw: (postsRaw ?? []) as LandingPostRaw[],
     postCount: postCount ?? 0,
     userCount: userCount ?? 0,
-    topics: topicCounts
-      .sort((a, b) => b.count - a.count)
-      .slice(0, TOPICS_DISPLAY_LIMIT),
   };
 }
 
-const getCachedLandingData = unstable_cache(
-  async () => fetchLandingData(createAdminClient()),
+const getCachedLandingCore = unstable_cache(
+  async () => fetchLandingCore(createAdminClient()),
   ["marketing-landing-data"],
   { revalidate: 300, tags: ["landing", "public"] }
 );
 
+// The two halves are cached separately and fetched side by side. Nesting one
+// unstable_cache call inside another (topic counts inside the landing fetch)
+// serialised them and is not a supported pattern.
+async function loadLandingData(): Promise<LandingData> {
+  const deadline = createDeadline(DATA_TIMEOUT_MS);
+
+  try {
+    const usingServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = usingServiceRole ? null : await createClient();
+
+    const [core, topicCounts] = await Promise.all([
+      withDeadline(
+        "landing content",
+        supabase ? fetchLandingCore(supabase, deadline.signal) : getCachedLandingCore(),
+        deadline,
+        EMPTY_CORE
+      ),
+      withDeadline<TopicCount[]>(
+        "landing topics",
+        supabase ? getPublicTopicCounts(supabase) : getPublicTopicCounts(),
+        deadline,
+        []
+      ),
+    ]);
+
+    return {
+      ...core,
+      topics: [...topicCounts].sort((a, b) => b.count - a.count).slice(0, TOPICS_DISPLAY_LIMIT),
+    };
+  } catch (error) {
+    console.error("[landing] failed to load landing data", error);
+    return { ...EMPTY_CORE, topics: [] };
+  } finally {
+    deadline.cancel();
+  }
+}
+
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default async function LandingPage() {
-  const { postsRaw, postCount, userCount, topics } =
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? await getCachedLandingData()
-      : await fetchLandingData(await createClient());
+  const { postsRaw, postCount, userCount, topics } = await loadLandingData();
 
   const posts: LandingPost[] = postsRaw.map((p) => ({
     ...p,

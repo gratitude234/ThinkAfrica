@@ -266,12 +266,17 @@ async function getFeed(
   return result.posts;
 }
 
+// `supabase` is only consulted on the uncached path -- callers that already
+// know a service role key is configured (and so would have theirs ignored) can
+// omit it rather than building a client for nothing.
 export async function getPublicTopicCounts(
-  supabase: SupabaseLike
+  supabase?: SupabaseLike
 ): Promise<TopicCount[]> {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? getCachedTopicCounts()
-    : getTopicCountsUncached(supabase);
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return getCachedTopicCounts();
+  if (!supabase) {
+    throw new Error("getPublicTopicCounts needs a Supabase client without SUPABASE_SERVICE_ROLE_KEY.");
+  }
+  return getTopicCountsUncached(supabase);
 }
 
 async function getTopics(

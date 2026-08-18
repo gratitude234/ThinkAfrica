@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { absoluteUrl } from "@/lib/site";
 import { isLowQualityTitle } from "@/lib/postQuality";
 import { isLightweightPost } from "@/lib/postDisplay";
+import { createDeadline, withDeadline, type QueryDeadline } from "@/lib/queryDeadline";
 
 export const revalidate = 3600;
 
@@ -61,23 +62,19 @@ const staticRoutes: SitemapRow[] = [
 async function collect<T>(
   label: string,
   query: PromiseLike<QueryResponse<T>>,
-  deadline: Promise<null>
+  deadline: QueryDeadline
 ): Promise<T[]> {
-  try {
-    const result = await Promise.race([query, deadline]);
-    if (!result) {
-      console.warn(`[sitemap] ${label} exceeded ${QUERY_TIMEOUT_MS}ms — omitting those URLs`);
-      return [];
-    }
-    if (result.error) {
-      console.warn(`[sitemap] ${label} failed`, result.error);
-      return [];
-    }
-    return result.data ?? [];
-  } catch (error) {
-    console.warn(`[sitemap] ${label} failed`, error);
+  const result = await withDeadline<QueryResponse<T>>(label, query, deadline, {
+    data: [],
+    error: null,
+  });
+
+  if (result.error) {
+    console.warn(`[sitemap] ${label} failed`, result.error);
     return [];
   }
+
+  return result.data ?? [];
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -89,17 +86,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return staticRoutes;
   }
 
-  // One deadline shared by every query, plus an abort signal so whatever is
-  // still in flight when it passes stops holding the render open.
-  const controller = new AbortController();
-  let expire: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<null>((resolve) => {
-    expire = setTimeout(() => {
-      controller.abort();
-      resolve(null);
-    }, QUERY_TIMEOUT_MS);
-  });
-  const signal = controller.signal;
+  // One deadline shared by every query, whose abort signal stops whatever is
+  // still in flight when it passes from holding the render open.
+  const deadline = createDeadline(QUERY_TIMEOUT_MS);
+  const signal = deadline.signal;
 
   try {
     const [
@@ -240,6 +230,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("[sitemap] failed to build dynamic sitemap", error);
     return staticRoutes;
   } finally {
-    clearTimeout(expire);
+    deadline.cancel();
   }
 }
