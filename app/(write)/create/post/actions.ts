@@ -14,6 +14,7 @@ import {
 } from "@/lib/shortPostContent";
 import { buildShortPostHtml } from "@/lib/shortPostHtml";
 import { notifyResponseParentAuthor, validateResponseParent } from "@/lib/responsePost";
+import { ensureDraft } from "@/app/(write)/write/actions";
 import { schedulePublicationDistribution } from "@/lib/publicationDistribution";
 import {
   getTopicValuesValidationError,
@@ -376,4 +377,98 @@ export async function updatePost(input: {
   revalidatePath("/dashboard");
 
   return { error: null, slug: existing.slug as string };
+}
+
+/**
+ * A working title for a promoted draft, taken from the writer's own opening
+ * words.
+ *
+ * An Article row cannot have a blank title -- see
+ * posts_title_required_unless_post_check in the Phase 2 migration, and the
+ * matching guard in DraftManager.saveDraft() that refuses to autosave an
+ * untitled Article rather than invent one. This is not that case: a Post has
+ * no title field at all, so promotion is the exact moment a title has to come
+ * into existence, and the honest source for it is the text already written.
+ * The composer opens with it in an editable title field, so it reads as a
+ * starting point rather than a decision made for the user.
+ */
+const WORKING_TITLE_MAX_LENGTH = 80;
+
+function deriveWorkingTitle(normalizedBody: string): string {
+  const firstSentence = normalizedBody.split(/(?<=[.!?])\s|\n/)[0] ?? normalizedBody;
+  // Sentence-ending punctuation is stripped before any truncation, so a title
+  // shortened below does not have its own ellipsis eaten by this step.
+  const condensed = firstSentence
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.,;:]+$/, "");
+
+  if (condensed.length > WORKING_TITLE_MAX_LENGTH) {
+    return `${condensed
+      .slice(0, WORKING_TITLE_MAX_LENGTH)
+      .replace(/\s+\S*$/, "")}...`;
+  }
+
+  // normalizedBody is already known non-empty, so this only falls back when
+  // the opening "sentence" was punctuation the trim above stripped to nothing.
+  return condensed || normalizedBody.slice(0, WORKING_TITLE_MAX_LENGTH);
+}
+
+/**
+ * Carries an in-progress Post across to the Article composer.
+ *
+ * The two composers keep separate drafts (this one in localStorage under
+ * `indegenius:post-draft:<userId>`, the Article composer in DraftManager),
+ * so "Write an article" used to drop whatever had already been typed. That
+ * punished the exact moment someone decided their idea deserved more room.
+ *
+ * Promoting instead persists the text as a real Article draft server-side and
+ * hands back its id, so the composer can open it with ?draft=<id> and the work
+ * survives a device switch, not just a tab reload.
+ *
+ * Deliberately permissive about length: this is a draft, not a publish, and
+ * the whole point is that the body is about to grow past Post limits. Only an
+ * empty body is rejected.
+ */
+export async function promoteToArticle(input: {
+  body: string;
+  imageUrl?: string | null;
+  topics: string[];
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in.", draftId: null as string | null };
+  }
+
+  const normalized = normalizeShortPostText(input.body);
+  if (normalized.length === 0) {
+    return { error: "Write something first.", draftId: null as string | null };
+  }
+
+  // Same storage-ownership check publishing uses -- a client-supplied URL
+  // never reaches the row unmodified. An unrecognized one is dropped rather
+  // than raised, since losing a cover image must not block the handoff.
+  const coverImageUrl =
+    input.imageUrl && isSafePostImageUrl(input.imageUrl, user.id) ? input.imageUrl : "";
+
+  // ensureDraft() owns Article draft creation (auth, suspension, topic
+  // validation, sanitization, and the Phase 4A content_kind/type dual-write),
+  // so this action only converts the Post-shaped payload into its input.
+  return ensureDraft({
+    draftId: null,
+    title: deriveWorkingTitle(normalized),
+    // Left blank on purpose. The feed summary is its own editorial act and
+    // the publish drawer asks for it directly; auto-filling it from the body
+    // would also tick the draft checklist's "useful summary" box with text
+    // the writer never chose.
+    excerpt: "",
+    content: buildShortPostHtml(normalized),
+    tags: input.topics,
+    postType: "essay",
+    coverImageUrl,
+  });
 }

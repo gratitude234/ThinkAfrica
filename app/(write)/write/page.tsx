@@ -22,6 +22,7 @@ import { useDraftManager, readDraftBackupRaw } from "./DraftManager";
 import PublishDrawer from "./PublishDrawer";
 import CoverImageDialog from "./CoverImageDialog";
 import WriteCanvasSkeleton from "./WriteCanvasSkeleton";
+import DraftSignalBar from "./DraftSignalBar";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import { ensureDraft, savePostReferences } from "./actions";
 import {
@@ -1049,6 +1050,17 @@ export default function WritePage() {
             </div>
           ) : null}
 
+          <DraftSignalBar
+            postType={postType}
+            title={title}
+            excerpt={excerpt}
+            content={content}
+            tags={tags}
+            references={references}
+            wordCount={wordCount}
+            inResponseToTitle={inResponseToTitle}
+          />
+
           <div className="sticky top-[92px] z-20 mb-8 hidden lg:block">
             <div className="flex min-h-[52px] items-center gap-1 rounded-xl border border-gray-200 bg-white/95 px-2.5 py-2 shadow-sm shadow-black/[0.03] backdrop-blur">
               {DESKTOP_TOOLBAR_BUTTONS.map((btn) => (
@@ -1165,8 +1177,18 @@ export default function WritePage() {
       </div>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white shadow-[0_-4px_16px_rgba(15,23,42,0.05)] lg:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="fixed inset-x-0 z-40 border-t border-gray-200 bg-white shadow-[0_-4px_16px_rgba(15,23,42,0.05)] lg:hidden"
+        style={{
+          // Ride above the soft keyboard instead of hiding behind it. The
+          // variable is published by (write)/layout.tsx and is 0px whenever no
+          // keyboard is open, so this collapses to a plain bottom-0 bar.
+          bottom: "var(--mobile-visual-viewport-bottom, 0px)",
+          // Home-indicator clearance only matters while the bar is actually at
+          // the bottom edge; once the keyboard lifts it, that padding would just
+          // be a gap, so it shrinks by however far the bar has risen.
+          paddingBottom:
+            "max(0px, calc(env(safe-area-inset-bottom) - var(--mobile-visual-viewport-bottom, 0px)))",
+        }}
       >
         <div className="mx-auto max-w-[1080px] px-5 sm:px-8 lg:px-10">
           <div className="lg:w-[calc(100%-340px)]">

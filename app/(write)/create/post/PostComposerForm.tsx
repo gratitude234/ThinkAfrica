@@ -7,7 +7,7 @@ import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import PublishingTopicSelector from "@/components/topic/PublishingTopicSelector";
 import { countShortPostCharacters, SHORT_POST_MAX_CHARACTERS } from "@/lib/shortPostContent";
 import { MAX_SHORT_POST_TOPICS } from "@/lib/tags";
-import { createPost } from "./actions";
+import { createPost, promoteToArticle } from "./actions";
 
 interface PostComposerFormProps {
   userId: string;
@@ -98,6 +98,7 @@ export default function PostComposerForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingRestore, setPendingRestore] = useState<DraftBackup | null>(null);
+  const [promoting, setPromoting] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -117,7 +118,11 @@ export default function PostComposerForm({
     // gets to press "Restore". Autosave resumes once the user restores
     // (pendingRestore clears, body is repopulated) or discards
     // (pendingRestore clears, storage is already cleared explicitly).
-    if (submitting || pendingRestore) return undefined;
+    //
+    // `promoting` is held to the same rule: once the body has been handed to
+    // the Article composer, this timer must not write it back, or the next
+    // visit here would offer to restore a draft that has already moved.
+    if (submitting || promoting || pendingRestore) return undefined;
 
     saveTimer.current = setTimeout(() => {
       if (body.trim().length === 0) {
@@ -130,7 +135,33 @@ export default function PostComposerForm({
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [body, imageUrl, pendingRestore, submitting, topics, userId]);
+  }, [body, imageUrl, pendingRestore, promoting, submitting, topics, userId]);
+
+  // "Write an article" must not cost someone the paragraphs they already
+  // typed. With a body present the text becomes a real Article draft first,
+  // and the composer opens that draft instead of a blank canvas.
+  const handleWriteArticle = useCallback(async () => {
+    if (body.trim().length === 0) {
+      router.push("/write?kind=article");
+      return;
+    }
+
+    setPromoting(true);
+    setError(null);
+
+    const result = await promoteToArticle({ body, imageUrl, topics });
+
+    if (result.error || !result.draftId) {
+      setPromoting(false);
+      setError(result.error ?? "Could not open the article composer. Try again.");
+      return;
+    }
+
+    // Only now is the text safely on the server, so the local Post backup can
+    // go without any window where the draft exists in neither place.
+    clearDraftBackup(userId);
+    router.push(`/write?draft=${result.draftId}`);
+  }, [body, imageUrl, router, topics, userId]);
 
   const restoreBackup = useCallback(() => {
     if (!pendingRestore) return;
@@ -411,26 +442,41 @@ export default function PostComposerForm({
         {/* The Create entry points go straight to this composer (no chooser
             interstitial), so the longer-form paths surface here instead. */}
         <div className="mt-3 flex flex-wrap items-center gap-2.5 md:mt-0 md:flex-nowrap md:gap-1">
-          <Link
-            href="/write?kind=article"
-            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-gold-tint px-4 py-2 text-sm font-semibold text-gold-ink transition-colors hover:bg-[#F1E4C8] md:rounded-lg md:bg-transparent md:px-2.5 md:hover:bg-gold-tint"
+          <button
+            type="button"
+            onClick={handleWriteArticle}
+            disabled={promoting || submitting}
+            aria-busy={promoting || undefined}
+            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-gold-tint px-4 py-2 text-sm font-semibold text-gold-ink transition-colors hover:bg-[#F1E4C8] disabled:opacity-60 md:rounded-lg md:bg-transparent md:px-2.5 md:hover:bg-gold-tint"
           >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16.862 4.487 18.55 2.8a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897l12.682-12.68Z"
-              />
-            </svg>
-            Write an article
-          </Link>
+            {promoting ? (
+              <svg
+                className="h-4 w-4 animate-spin motion-reduce:animate-none"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+              </svg>
+            ) : (
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16.862 4.487 18.55 2.8a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897l12.682-12.68Z"
+                />
+              </svg>
+            )}
+            {promoting ? "Moving your draft" : "Write an article"}
+          </button>
           <Link
             href="/submit/research"
             className="inline-flex min-h-10 items-center gap-2 rounded-full bg-purple-tint px-4 py-2 text-sm font-semibold text-purple-accent transition-colors hover:bg-[#E2DAEC] md:rounded-lg md:bg-transparent md:px-2.5 md:hover:bg-purple-tint"

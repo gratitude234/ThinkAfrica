@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import NavClient from "./NavClient";
 import BottomNav from "./BottomNav";
 import SearchOverlay from "@/components/ui/SearchOverlay";
+import { useVisualViewportBottom } from "@/lib/useVisualViewportBottom";
 
 interface NavigationShellProps {
   user: User | null;
@@ -28,6 +29,8 @@ export default function NavigationShell({
 }: NavigationShellProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  useVisualViewportBottom();
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
@@ -44,78 +47,6 @@ export default function NavigationShell({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    const visualViewport = window.visualViewport;
-
-    if (!visualViewport) {
-      root.style.setProperty("--mobile-visual-viewport-bottom", "0px");
-      return () => root.style.removeProperty("--mobile-visual-viewport-bottom");
-    }
-
-    let animationFrame: number | null = null;
-
-    const isEditableFocused = () => {
-      const active = document.activeElement;
-      if (!(active instanceof HTMLElement)) return false;
-      return (
-        active.tagName === "INPUT" ||
-        active.tagName === "TEXTAREA" ||
-        active.isContentEditable
-      );
-    };
-
-    const syncVisualViewport = () => {
-      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
-
-      animationFrame = requestAnimationFrame(() => {
-        // Only account for the visual viewport shrinking when a keyboard is
-        // plausibly open (an editable element is focused). Otherwise this
-        // diff also picks up the mobile browser's address/toolbar collapsing
-        // on scroll, which shoves fixed bottom UI (e.g. the compose FAB) out
-        // of view until that chrome settles.
-        if (!isEditableFocused()) {
-          root.style.setProperty("--mobile-visual-viewport-bottom", "0px");
-          return;
-        }
-
-        const layoutHeight = Math.max(
-          window.innerHeight,
-          document.documentElement.clientHeight
-        );
-        const obscuredBottom = Math.max(
-          0,
-          Math.round(
-            layoutHeight - visualViewport.height - visualViewport.offsetTop
-          )
-        );
-
-        root.style.setProperty(
-          "--mobile-visual-viewport-bottom",
-          `${obscuredBottom}px`
-        );
-      });
-    };
-
-    syncVisualViewport();
-    visualViewport.addEventListener("resize", syncVisualViewport);
-    visualViewport.addEventListener("scroll", syncVisualViewport);
-    window.addEventListener("resize", syncVisualViewport);
-    window.addEventListener("orientationchange", syncVisualViewport);
-    document.addEventListener("focusin", syncVisualViewport);
-    document.addEventListener("focusout", syncVisualViewport);
-
-    return () => {
-      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
-      visualViewport.removeEventListener("resize", syncVisualViewport);
-      visualViewport.removeEventListener("scroll", syncVisualViewport);
-      window.removeEventListener("resize", syncVisualViewport);
-      window.removeEventListener("orientationchange", syncVisualViewport);
-      document.removeEventListener("focusin", syncVisualViewport);
-      document.removeEventListener("focusout", syncVisualViewport);
-      root.style.removeProperty("--mobile-visual-viewport-bottom");
-    };
-  }, []);
 
   return (
     <>

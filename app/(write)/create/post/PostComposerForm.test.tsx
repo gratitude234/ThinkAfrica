@@ -5,6 +5,7 @@ import PostComposerForm from "./PostComposerForm";
 const mocks = vi.hoisted(() => ({
   back: vi.fn(),
   createPost: vi.fn(),
+  promoteToArticle: vi.fn(),
   push: vi.fn(),
 }));
 
@@ -14,6 +15,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("./actions", () => ({
   createPost: mocks.createPost,
+  promoteToArticle: mocks.promoteToArticle,
 }));
 
 vi.mock("@/components/ui/CoverImageUploader", () => ({
@@ -51,8 +53,10 @@ describe("PostComposerForm", () => {
     window.localStorage.clear();
     mocks.back.mockReset();
     mocks.createPost.mockReset();
+    mocks.promoteToArticle.mockReset();
     mocks.push.mockReset();
     mocks.createPost.mockResolvedValue({ error: null, slug: "published-take" });
+    mocks.promoteToArticle.mockResolvedValue({ error: null, draftId: "draft-9" });
   });
 
   it("expands and collapses the topic selector with an accessible relationship", () => {
@@ -137,14 +141,68 @@ describe("PostComposerForm", () => {
   it("keeps the longer-form destinations available as secondary actions", () => {
     renderComposer();
 
-    expect(screen.getByRole("link", { name: "Write an article" })).toHaveAttribute(
-      "href",
-      "/write?kind=article"
-    );
+    expect(screen.getByRole("button", { name: "Write an article" })).toBeEnabled();
     expect(screen.getByRole("link", { name: "Submit research" })).toHaveAttribute(
       "href",
       "/submit/research"
     );
+  });
+
+  it("opens a blank article composer when nothing has been typed yet", () => {
+    renderComposer();
+
+    fireEvent.click(screen.getByRole("button", { name: "Write an article" }));
+
+    expect(mocks.promoteToArticle).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith("/write?kind=article");
+  });
+
+  it("carries an in-progress quick take into the article composer instead of dropping it", async () => {
+    const { textarea } = renderComposer();
+    fireEvent.change(textarea, {
+      target: { value: "This deserves more room than a quick take." },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Write an article" }));
+
+    await waitFor(() =>
+      expect(mocks.promoteToArticle).toHaveBeenCalledWith({
+        body: "This deserves more room than a quick take.",
+        imageUrl: null,
+        topics: [],
+      })
+    );
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith("/write?draft=draft-9")
+    );
+  });
+
+  it("does not leave a stale restore offer behind after a successful handoff", async () => {
+    const { textarea } = renderComposer();
+    fireEvent.change(textarea, { target: { value: "Moving this to an article." } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Write an article" }));
+
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith("/write?draft=draft-9")
+    );
+
+    // The autosave timer must not write the body back once it has moved,
+    // or returning here would offer to restore a draft that now lives
+    // in the Article composer.
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    expect(window.localStorage.getItem("indegenius:post-draft:user-1")).toBeNull();
+  });
+
+  it("keeps the local backup and stays put when the handoff fails", async () => {
+    mocks.promoteToArticle.mockResolvedValue({ error: "Network down", draftId: null });
+    const { textarea } = renderComposer();
+    fireEvent.change(textarea, { target: { value: "Work worth keeping." } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Write an article" }));
+
+    expect(await screen.findByText("Network down")).toBeInTheDocument();
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 
   it("carries a verified campus prompt into publication without writing copy for the user", async () => {

@@ -30,7 +30,16 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-import { createPost } from "./actions";
+// promoteToArticle delegates Article-draft creation to ensureDraft (auth,
+// suspension, topic rules, sanitization, Phase 4A dual-write). These tests
+// are about the Post-to-Article conversion itself, so they assert on the
+// payload handed over rather than re-testing ensureDraft.
+const ensureDraftMock = vi.hoisted(() => vi.fn(async () => ({ error: null, draftId: "draft-1" })));
+vi.mock("@/app/(write)/write/actions", () => ({
+  ensureDraft: ensureDraftMock,
+}));
+
+import { createPost, promoteToArticle } from "./actions";
 
 function baseInput(overrides: Partial<Parameters<typeof createPost>[0]> = {}) {
   return {
@@ -195,5 +204,90 @@ describe("createPost", () => {
       expect(result.error).toBeNull();
       expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
     });
+  });
+});
+
+describe("promoteToArticle", () => {
+  beforeEach(() => {
+    fakeSupabase.current = makeFakeSupabase({});
+    ensureDraftMock.mockClear();
+    ensureDraftMock.mockResolvedValue({ error: null, draftId: "draft-1" });
+  });
+
+  it("carries the body over as sanitized Article HTML instead of dropping it", async () => {
+    const result = await promoteToArticle({
+      body: "Buses run late every morning. Nobody publishes a schedule.",
+      imageUrl: null,
+      topics: ["Campus transport"],
+    });
+
+    expect(result).toEqual({ error: null, draftId: "draft-1" });
+    const payload = ensureDraftMock.mock.calls[0][0];
+    expect(payload.content).toContain("Buses run late every morning.");
+    expect(payload.content).toContain("Nobody publishes a schedule.");
+    expect(payload.tags).toEqual(["Campus transport"]);
+    expect(payload.draftId).toBeNull();
+  });
+
+  it("gives the Article the writer's own opening line as a working title", async () => {
+    await promoteToArticle({
+      body: "Buses run late every morning. Nobody publishes a schedule.",
+      imageUrl: null,
+      topics: [],
+    });
+
+    // An Article row cannot be titleless (posts_title_required_unless_post_check),
+    // and the title must not be an invented placeholder.
+    expect(ensureDraftMock.mock.calls[0][0].title).toBe("Buses run late every morning");
+  });
+
+  it("shortens a long opening sentence on a word boundary", async () => {
+    await promoteToArticle({
+      body: "The university keeps publishing transport timetables that nobody on campus has ever been able to rely on in practice",
+      imageUrl: null,
+      topics: [],
+    });
+
+    const title = ensureDraftMock.mock.calls[0][0].title;
+    expect(title.length).toBeLessThanOrEqual(84);
+    expect(title.endsWith("...")).toBe(true);
+    expect(title).toContain("The university keeps publishing");
+  });
+
+  it("leaves the feed summary for the writer rather than deriving one", async () => {
+    await promoteToArticle({
+      body: "Buses run late every morning.",
+      imageUrl: null,
+      topics: [],
+    });
+
+    expect(ensureDraftMock.mock.calls[0][0].excerpt).toBe("");
+  });
+
+  it("drops a cover image that is not this user's own upload", async () => {
+    await promoteToArticle({
+      body: "Buses run late every morning.",
+      imageUrl: "https://evil.example.com/tracker.png",
+      topics: [],
+    });
+
+    expect(ensureDraftMock.mock.calls[0][0].coverImageUrl).toBe("");
+  });
+
+  it("refuses an empty body without creating anything", async () => {
+    const result = await promoteToArticle({ body: "   ", imageUrl: null, topics: [] });
+
+    expect(result.draftId).toBeNull();
+    expect(result.error).toBe("Write something first.");
+    expect(ensureDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("requires a signed-in user", async () => {
+    fakeSupabase.current = makeFakeSupabase({}, null);
+
+    const result = await promoteToArticle({ body: "Anything.", imageUrl: null, topics: [] });
+
+    expect(result.error).toBe("You must be signed in.");
+    expect(ensureDraftMock).not.toHaveBeenCalled();
   });
 });
