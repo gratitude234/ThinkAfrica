@@ -10,6 +10,9 @@
  */
 
 import { getBlockedUserIds } from "@/lib/blocking";
+import { DEFAULT_COMMENT_SORT, type CommentSort } from "@/lib/commentSort";
+
+export { DEFAULT_COMMENT_SORT, isCommentSort, type CommentSort } from "@/lib/commentSort";
 
 export interface CommentAuthorProfile {
   username: string | null;
@@ -46,6 +49,28 @@ export interface CommentPage {
  *  thread that stops mid-answer is worse than a long one. */
 export const COMMENT_PAGE_SIZE = 20;
 
+/**
+ * Keyset cursors, one shape per sort.
+ *
+ * `new` pages on `created_at` alone. `top` needs the tiebreaker in the cursor
+ * as well, or every comment sharing a score would repeat or vanish across the
+ * page boundary -- so it encodes `upvotes|created_at` and filters on the pair.
+ */
+function encodeCursor(sort: CommentSort, row: ThreadReply): string {
+  return sort === "top" ? `${row.upvotes}|${row.created_at}` : row.created_at;
+}
+
+function decodeCursor(sort: CommentSort, cursor: string) {
+  if (sort !== "top") return { createdAt: cursor, upvotes: null as number | null };
+  const separator = cursor.indexOf("|");
+  if (separator === -1) return { createdAt: cursor, upvotes: null as number | null };
+  const upvotes = Number.parseInt(cursor.slice(0, separator), 10);
+  return {
+    createdAt: cursor.slice(separator + 1),
+    upvotes: Number.isFinite(upvotes) ? upvotes : null,
+  };
+}
+
 const COMMENT_SELECT =
   "id, content, created_at, updated_at, upvotes, parent_id, author_id, profiles!comments_author_id_fkey (username, full_name, avatar_url)";
 
@@ -71,13 +96,16 @@ export async function fetchCommentPage(
     viewerId,
     viewerProfileId,
     before,
+    sort = DEFAULT_COMMENT_SORT,
     pageSize = COMMENT_PAGE_SIZE,
   }: {
     postId: string;
     viewerId: string | null;
     viewerProfileId?: string | null;
-    /** `created_at` cursor: return top-level comments older than this. */
+    /** Keyset cursor from the previous page's `nextCursor`. Shape depends on
+     *  `sort`, so the two must always be sent together. */
     before?: string | null;
+    sort?: CommentSort;
     pageSize?: number;
   }
 ): Promise<CommentPage> {
@@ -88,10 +116,24 @@ export async function fetchCommentPage(
     .select(COMMENT_SELECT)
     .eq("post_id", postId)
     .is("parent_id", null)
-    .order("created_at", { ascending: false })
     .limit(pageSize + 1);
 
-  if (before) topLevelQuery = topLevelQuery.lt("created_at", before);
+  topLevelQuery =
+    sort === "top"
+      ? topLevelQuery
+          .order("upvotes", { ascending: false })
+          .order("created_at", { ascending: false })
+      : topLevelQuery.order("created_at", { ascending: false });
+
+  if (before) {
+    const { createdAt, upvotes } = decodeCursor(sort, before);
+    topLevelQuery =
+      sort === "top" && upvotes !== null
+        ? topLevelQuery.or(
+            `upvotes.lt.${upvotes},and(upvotes.eq.${upvotes},created_at.lt.${createdAt})`
+          )
+        : topLevelQuery.lt("created_at", createdAt);
+  }
 
   const [{ data: topLevelRaw }, blockedIds] = await Promise.all([
     topLevelQuery,
@@ -150,10 +192,12 @@ export async function fetchCommentPage(
     }
   }
 
+  const lastRow = pageRows[pageRows.length - 1];
+
   return {
     comments,
     hasMore,
-    nextCursor: pageRows[pageRows.length - 1]?.created_at ?? null,
+    nextCursor: lastRow ? encodeCursor(sort, lastRow) : null,
     userVotedCommentIds,
   };
 }

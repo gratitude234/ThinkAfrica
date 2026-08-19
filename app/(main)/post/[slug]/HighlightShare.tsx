@@ -28,12 +28,14 @@ export default function HighlightShare({ containerId, postSlug, postId }: Highli
     const container = document.getElementById(containerId);
     if (!container) return;
 
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
     const hideTooltip = () => {
       setTooltip(null);
       setCopied(false);
     };
 
-    const handleMouseUp = () => {
+    const readSelection = () => {
       const selection = window.getSelection();
       const selectedText = selection?.toString().trim() ?? "";
 
@@ -49,34 +51,62 @@ export default function HighlightShare({ containerId, postSlug, postId }: Highli
       }
 
       const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
 
       if (!container.contains(range.commonAncestorContainer)) {
         hideTooltip();
         return;
       }
 
+      const rect = range.getBoundingClientRect();
+      // A selection running to the top of the viewport has no room above it,
+      // and on touch the native handles sit right on the range. Flip below
+      // when the tooltip would be clipped, and keep it inside the gutters.
+      const above = rect.top - 12;
+      const flip = above < 56;
+      const margin = 76;
+
       setTooltip({
         text: selectedText,
-        top: rect.top - 48,
-        left: rect.left + rect.width / 2,
+        top: flip ? rect.bottom + 52 : above,
+        left: Math.min(
+          Math.max(rect.left + rect.width / 2, margin),
+          Math.max(window.innerWidth - margin, margin)
+        ),
       });
     };
 
-    const handleDocumentMouseDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node)) { hideTooltip(); return; }
+    /**
+     * `selectionchange` rather than `mouseup`.
+     *
+     * Touch selection never fires `mouseup`, so on a phone this toolbar simply
+     * did not exist -- and neither did the keyboard path, since shift+arrow
+     * selection does not fire it either. `selectionchange` covers mouse, touch
+     * and keyboard alike. It fires continuously while a selection is being
+     * dragged, so settle first and read once.
+     */
+    const handleSelectionChange = () => {
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(readSelection, 220);
+    };
+
+    const handleDocumentPointerDown = (event: Event) => {
+      if (!(event.target instanceof Node)) {
+        hideTooltip();
+        return;
+      }
       if (container.contains(event.target)) return;
       if (tooltipRef.current?.contains(event.target)) return;
       hideTooltip();
     };
 
-    container.addEventListener("mouseup", handleMouseUp);
-    document.addEventListener("mousedown", handleDocumentMouseDown);
+    document.addEventListener("selectionchange", handleSelectionChange);
+    document.addEventListener("pointerdown", handleDocumentPointerDown);
     window.addEventListener("scroll", hideTooltip, true);
 
     return () => {
-      container.removeEventListener("mouseup", handleMouseUp);
-      document.removeEventListener("mousedown", handleDocumentMouseDown);
+      if (settleTimer) clearTimeout(settleTimer);
+      document.removeEventListener("selectionchange", handleSelectionChange);
+      document.removeEventListener("pointerdown", handleDocumentPointerDown);
       window.removeEventListener("scroll", hideTooltip, true);
     };
   }, [containerId]);
@@ -93,27 +123,29 @@ export default function HighlightShare({ containerId, postSlug, postId }: Highli
   return (
     <div
       ref={tooltipRef}
-      className="fixed z-20 rounded-xl bg-gray-900 px-3 py-2 text-xs text-white shadow-xl"
+      className="fixed z-20 rounded-xl bg-gray-900 px-1 text-meta text-white shadow-xl"
       style={{
         top: tooltip.top,
         left: tooltip.left,
         transform: "translate(-50%, -100%)",
       }}
     >
-      <div className="flex items-center gap-3">
+      {/* min-h-11 throughout: this is now reachable by touch, where the old
+          text-xs targets were well under the 44px floor. */}
+      <div className="flex items-center">
         <button
           type="button"
           onClick={handleReply}
           disabled={isOpeningComposer}
           aria-busy={isOpeningComposer || undefined}
-          className="flex items-center gap-1.5 font-medium transition-colors hover:text-emerald-300 disabled:opacity-60"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 font-medium transition-colors hover:text-emerald-300 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset"
         >
-          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4" />
           </svg>
           {isOpeningComposer ? "Opening…" : "Reply to this"}
         </button>
-        <span className="text-gray-600">·</span>
+        <span aria-hidden="true" className="h-5 w-px bg-white/20" />
         <button
           type="button"
           onClick={async () => {
@@ -121,9 +153,9 @@ export default function HighlightShare({ containerId, postSlug, postId }: Highli
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          className="transition-colors hover:text-gray-300"
+          className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium transition-colors hover:text-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset"
         >
-          {copied ? "Copied!" : "Copy quote"}
+          {copied ? "Copied" : "Copy quote"}
         </button>
       </div>
     </div>

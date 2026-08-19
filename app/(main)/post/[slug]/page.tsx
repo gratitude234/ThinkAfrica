@@ -14,16 +14,15 @@ import {
   getPostMetaDescription,
   type PostType,
 } from "@/lib/utils";
-import LikeButton from "./LikeButton";
-import BookmarkButton from "./BookmarkButton";
 import { PostEngagementProvider } from "./PostEngagementContext";
 import ViewTracker from "./ViewTracker";
 import { createPostEngagementToken } from "@/lib/postEngagementToken";
 import ReadingProgressBar from "./ReadingProgressBar";
 import ReadingBar from "./ReadingBar";
-import ShareButtons from "./ShareButtons";
 import AuthorBioCard from "./AuthorBioCard";
 import TableOfContents from "./TableOfContents";
+import BodyContents from "./BodyContents";
+import BackLink from "@/components/ui/BackLink";
 import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
 import CiteThis from "./CiteThis";
@@ -38,7 +37,6 @@ import type { PostCardData } from "@/components/post/PostCard";
 import { RESPONSE_PAGE_SIZE, fetchResponsePage } from "@/lib/feedData";
 import { countComments } from "@/lib/commentThread";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
-import ResponseStartLink from "@/components/post/ResponseStartLink";
 import PostConversationView from "./PostConversationView";
 import DiscussionSection from "./DiscussionSection";
 import PostActionsRow from "./PostActionsRow";
@@ -53,6 +51,7 @@ import {
   isFormallyReviewed,
   resolveArticleFormat,
   resolveContentKind,
+  type ArticleFormat,
 } from "@/lib/contentModel";
 import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
 
@@ -200,12 +199,63 @@ function countWords(content: string): number {
   return content.replace(/<[^>]*>/g, " ").trim().split(/\s+/).filter(Boolean).length;
 }
 
-function injectHeadingIds(content: string): string {
+interface BodyHeading {
+  id: string;
+  text: string;
+  level: number;
+}
+
+/**
+ * Stamps an id on every h2/h3 in the body *and* hands back the list.
+ *
+ * The ids were already being injected, but nothing read them on the editorial
+ * template: TableOfContents was mounted only in the research sidebar, against
+ * three hardcoded entries, on the one kind whose prose body is never rendered.
+ * Essays start at a 500 word minimum and policy briefs at 400, and neither had
+ * a contents list.
+ */
+function injectHeadingIds(content: string): { html: string; headings: BodyHeading[] } {
+  const headings: BodyHeading[] = [];
   let index = 0;
-  return content.replace(/<h([23])([^>]*)>(.*?)<\/h[23]>/gi, (_, level, attrs, text) => {
-    const id = `heading-${index++}`;
-    return `<h${level}${attrs} id="${id}">${text}</h${level}>`;
-  });
+
+  const html = content.replace(
+    /<h([23])([^>]*)>([\s\S]*?)<\/h[23]>/gi,
+    (_match, level: string, attrs: string, inner: string) => {
+      const id = `heading-${index++}`;
+      const text = inner
+        .replace(/<[^>]*>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .trim();
+      if (text) headings.push({ id, text, level: Number.parseInt(level, 10) });
+      return `<h${level}${attrs} id="${id}">${inner}</h${level}>`;
+    }
+  );
+
+  return { html, headings };
+}
+
+/**
+ * Whether the body earns a drop cap.
+ *
+ * A 5rem floated capital needs a paragraph deep enough to wrap around it, and
+ * it needs a letter to set. It used to land on the first paragraph of every
+ * article at 640px and up: one-sentence ledes, paragraphs opening on a
+ * quotation mark, paragraphs opening on a digit.
+ */
+const DROP_CAP_MIN_CHARACTERS = 180;
+
+function earnsDropCap(content: string, format: ArticleFormat | null): boolean {
+  if (format !== "essay" && format !== "policy_brief") return false;
+
+  const firstParagraph = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1];
+  if (!firstParagraph) return false;
+
+  const text = firstParagraph.replace(/<[^>]*>/g, "").trim();
+  if (text.length < DROP_CAP_MIN_CHARACTERS) return false;
+
+  // A floated cap on a quote mark or a numeral is a typographic accident.
+  return /^\p{Letter}/u.test(text);
 }
 
 function renderReferenceShortcodes(content: string): string {
@@ -285,7 +335,7 @@ function getResearchStatusTone(status: string) {
   if (status === "published") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (status === "pending_revision") return "border-amber-200 bg-amber-50 text-amber-800";
   if (status === "pending") return "border-sky-200 bg-sky-50 text-sky-800";
-  return "border-gray-200 bg-gray-50 text-gray-700";
+  return "border-card-border bg-canvas text-ink-soft";
 }
 
 function getVersionKindLabel(value: string | null | undefined) {
@@ -569,12 +619,37 @@ async function getViewerData({
   };
 }
 
+/**
+ * The author's own labels for the piece, and the reader's route into
+ * /topics/[tag]. The editorial template rendered none at all: tags were mapped
+ * in the research branch only, so an essay, a blog post or a policy brief was
+ * the one page that could not link into the taxonomy it had just fed.
+ */
+function PostTags({ tags }: { tags: string[] | null }) {
+  const labels = (tags ?? []).map((tag) => formatTagLabel(tag)).filter(Boolean);
+  if (labels.length === 0) return null;
+
+  return (
+    <div className="mb-8 flex flex-wrap gap-2">
+      {labels.map((tag) => (
+        <Link
+          key={tag}
+          href={`/topics/${encodeURIComponent(tag)}`}
+          className="rounded-full border border-card-border bg-surface px-3 py-1 text-meta text-ink-soft transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+        >
+          #{tag}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function SectionSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="animate-pulse motion-reduce:animate-none space-y-3">
       <div className="h-4 w-24 rounded bg-gray-200" />
       {[...Array(rows)].map((_, index) => (
-        <div key={index} className="h-4 rounded bg-gray-100" />
+        <div key={index} className="h-4 rounded bg-canvas" />
       ))}
     </div>
   );
@@ -654,8 +729,8 @@ async function HeaderCoAuthors({
           href={`/${coAuthor.profile?.username}`}
           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
             mode === "editorial"
-              ? "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:text-gray-900"
-              : "border-white/20 bg-white/10 text-white/75 hover:border-white/30 hover:text-white"
+              ? "border-card-border bg-canvas text-ink-soft hover:border-card-border-hover hover:text-ink"
+              : "border-white/20 bg-surface/10 text-white/75 hover:border-white/30 hover:text-white"
           }`}
         >
           {coAuthor.corresponding_author ? "Corresponding / " : ""}
@@ -709,7 +784,7 @@ async function DetailAuthorRow({
           />
         </Link>
         <div className="min-w-0">
-          <p className="text-[15px] leading-snug">
+          <p className="text-excerpt leading-snug">
             <Link
               href={`/${author.username}`}
               className="font-bold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
@@ -717,15 +792,15 @@ async function DetailAuthorRow({
               {authorName}
             </Link>
             {author.university ? (
-              <span className="text-gray-500"> · {author.university}</span>
+              <span className="text-ink-muted"> · {author.university}</span>
             ) : null}
           </p>
           {coAuthorNames.length > 0 ? (
-            <p className="mt-0.5 text-[13px] leading-5 text-gray-500">
+            <p className="mt-0.5 text-meta leading-5 text-ink-muted">
               with {coAuthorNames.join(", ")}
             </p>
           ) : null}
-          <p className="mt-0.5 text-[13px] leading-5 text-gray-400">
+          <p className="mt-0.5 text-meta leading-5 text-ink-muted">
             {formatRelativeTime(post.published_at ?? post.created_at)}
           </p>
         </div>
@@ -865,10 +940,10 @@ async function PostReferencesAndCitation({
           className="mb-8 scroll-mt-24 border-t border-[#EDE9E2] pt-6"
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+            <h2 className="text-kicker font-semibold uppercase text-ink-muted">
               References
             </h2>
-            <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-medium text-gray-600">
+            <span className="rounded-full bg-canvas px-3 py-1 text-kicker font-medium text-ink-soft">
               {references.length} listed
             </span>
           </div>
@@ -877,14 +952,14 @@ async function PostReferencesAndCitation({
               <li
                 key={reference.id}
                 id={`ref-${index + 1}`}
-                className="flex gap-3 border-t border-gray-100 py-3 text-[13px] leading-relaxed text-gray-600 first:border-t-0"
+                className="flex gap-3 border-t border-divider py-3 text-meta leading-relaxed text-ink-soft first:border-t-0"
               >
-                <span className="min-w-[2rem] shrink-0 font-bold text-emerald-600">
+                <span className="min-w-[2rem] shrink-0 font-bold text-emerald-ink">
                   [{index + 1}]
                 </span>
                 <div>
-                  <p className="font-medium text-gray-900">{reference.title}</p>
-                  <p className="mt-0.5 text-xs text-gray-500">
+                  <p className="font-medium text-ink">{reference.title}</p>
+                  <p className="mt-0.5 text-xs text-ink-muted">
                     {[reference.authors, reference.year, reference.source]
                       .filter(Boolean)
                       .join(" / ") || "Reference details not provided"}
@@ -892,7 +967,7 @@ async function PostReferencesAndCitation({
                   {reference.doi || reference.url ? (
                     <p className="mt-1 text-xs">
                       {reference.doi ? (
-                        <span className="mr-2 text-gray-500">
+                        <span className="mr-2 text-ink-muted">
                           DOI: {reference.doi}
                         </span>
                       ) : null}
@@ -901,7 +976,7 @@ async function PostReferencesAndCitation({
                           href={reference.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="font-medium text-emerald-700 hover:underline"
+                          className="font-medium text-emerald-ink hover:underline"
                         >
                           Open source
                         </a>
@@ -1054,10 +1129,10 @@ async function PostContinueExploringSection({
   if (relatedPosts.length === 0 && !previousPost && !nextPost) return null;
 
   return (
-    <section className="mt-14 border-t border-gray-200 pt-6">
+    <section className="mt-14 border-t border-card-border pt-6">
       {relatedPosts.length > 0 ? (
         <>
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+          <h3 className="text-kicker font-semibold uppercase text-ink-muted">
             More like this
           </h3>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1065,7 +1140,7 @@ async function PostContinueExploringSection({
               <Link
                 key={item.id}
                 href={`/post/${item.slug}`}
-                className="group flex overflow-hidden rounded-lg border border-gray-200 bg-white transition-all hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:flex-col"
+                className="group flex overflow-hidden rounded-lg border border-card-border bg-surface transition-all hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:flex-col"
               >
                 <div className="h-[92px] w-[112px] shrink-0 overflow-hidden sm:h-[96px] sm:w-full">
                   <PostCover
@@ -1080,10 +1155,10 @@ async function PostContinueExploringSection({
                   />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col p-3">
-                  <p className="line-clamp-2 text-[12.5px] font-semibold leading-snug text-gray-900 transition-colors group-hover:text-emerald-brand">
+                  <p className="line-clamp-2 text-meta font-semibold leading-snug text-ink transition-colors group-hover:text-emerald-brand">
                     {getPostMetadataTitle(item, item.profiles)}
                   </p>
-                  <p className="mt-auto pt-2 text-[10px] text-gray-400">
+                  <p className="mt-auto pt-2 text-kicker text-ink-muted">
                     {item.profiles?.full_name ?? item.profiles?.username}
                   </p>
                 </div>
@@ -1096,17 +1171,17 @@ async function PostContinueExploringSection({
       {previousPost || nextPost ? (
         <nav
           aria-label="Adjacent posts"
-          className="mt-8 grid gap-4 border-t border-gray-200 pt-5 sm:grid-cols-2"
+          className="mt-8 grid gap-4 border-t border-card-border pt-5 sm:grid-cols-2"
         >
           {previousPost ? (
             <Link
               href={`/post/${previousPost.slug}`}
               className="group min-w-0 transition-colors hover:text-emerald-brand"
             >
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+              <span className="block text-kicker font-semibold uppercase text-ink-muted">
                 <span aria-hidden="true">&larr;</span> Previous
               </span>
-              <span className="mt-1 line-clamp-2 text-sm font-medium text-gray-600 transition-colors group-hover:text-emerald-brand">
+              <span className="mt-1 line-clamp-2 text-sm font-medium text-ink-soft transition-colors group-hover:text-emerald-brand">
                 {getPostMetadataTitle(previousPost)}
               </span>
             </Link>
@@ -1116,10 +1191,10 @@ async function PostContinueExploringSection({
               href={`/post/${nextPost.slug}`}
               className="group min-w-0 transition-colors hover:text-emerald-brand sm:col-start-2 sm:text-right"
             >
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+              <span className="block text-kicker font-semibold uppercase text-ink-muted">
                 Next <span aria-hidden="true">&rarr;</span>
               </span>
-              <span className="mt-1 line-clamp-2 text-sm font-medium text-gray-600 transition-colors group-hover:text-emerald-brand">
+              <span className="mt-1 line-clamp-2 text-sm font-medium text-ink-soft transition-colors group-hover:text-emerald-brand">
                 {getPostMetadataTitle(nextPost)}
               </span>
             </Link>
@@ -1173,7 +1248,8 @@ async function PostResponsesSection({
   responsePages: number;
   secondaryDataPromise: Promise<SecondaryData>;
 }) {
-  const { responseCards, responseCount, responsesHasMore } = await secondaryDataPromise;
+  const { responseCards, responseCount, responsesHasMore, commentCount } =
+    await secondaryDataPromise;
 
   return (
     <DiscussionSection
@@ -1185,6 +1261,7 @@ async function PostResponsesSection({
       responsesHasMore={responsesHasMore}
       nextResponsePage={responsePages + 1}
       isPublished={post.status === "published"}
+      commentCount={commentCount}
     />
   );
 }
@@ -1247,8 +1324,8 @@ function ResearchReviewTimeline({
   ].filter(Boolean) as Array<{ label: string; value: string; detail: string }>;
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
-      <h2 className="mb-4 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+    <section className="rounded-lg border border-card-border bg-surface p-4">
+      <h2 className="mb-4 text-kicker font-bold uppercase text-ink-muted">
         Review timeline
       </h2>
       <div className="space-y-4">
@@ -1259,13 +1336,13 @@ function ResearchReviewTimeline({
               aria-hidden="true"
             />
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              <p className="text-kicker font-bold uppercase text-ink-muted">
                 {item.label}
               </p>
-              <p className="mt-0.5 text-sm font-semibold text-slate-950">
+              <p className="mt-0.5 text-sm font-semibold text-ink">
                 {item.value}
               </p>
-              <p className="mt-0.5 break-words text-xs leading-5 text-slate-500">
+              <p className="mt-0.5 break-words text-xs leading-5 text-ink-muted">
                 {item.detail}
               </p>
             </div>
@@ -1276,12 +1353,97 @@ function ResearchReviewTimeline({
   );
 }
 
+/**
+ * The dossier modules, for viewers who never see the sidebar.
+ *
+ * ResearchDossierSidebar is `hidden lg:block`, so on a phone a research record
+ * lost its credibility signals, its review timeline and its contents outright.
+ * Not deferred, not collapsed: absent, on the audience most likely to be reading
+ * on a phone. Same modules, same data promises, disclosed rather than deleted.
+ *
+ * Collapsed by default rather than open: it sits between the abstract and the
+ * manuscript PDF, and opening it by default pushes the primary action of a
+ * research page off the first screen.
+ */
+async function ResearchDossierDisclosure({
+  post,
+  userId,
+  sanitizedContent,
+  wordCount,
+  parentPostId,
+  isPublished,
+  author,
+  secondaryDataPromise,
+}: {
+  post: PostRecord;
+  userId: string | null;
+  sanitizedContent: string;
+  wordCount: number;
+  parentPostId: string | null;
+  isPublished: boolean;
+  author: AuthorProfile | null;
+  secondaryDataPromise: Promise<SecondaryData>;
+}) {
+  const secondary = await secondaryDataPromise;
+  const summary = getFullQualitySummary({
+    post,
+    author,
+    sanitizedContent,
+    wordCount,
+    parentPostId,
+    secondary,
+  });
+
+  return (
+    <details className="group mb-4 overflow-hidden rounded-xl border border-card-border bg-surface lg:hidden">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-ink">About this work</span>
+          <span className="mt-0.5 block text-meta leading-5 text-ink-muted">
+            Credibility signals, review timeline
+            {post.citation_id ? ", citation" : ""}
+          </span>
+        </span>
+        <svg
+          className="h-5 w-5 shrink-0 text-ink-muted transition-transform group-open:rotate-180 motion-reduce:transition-none"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </summary>
+      <div className="space-y-3 border-t border-card-border bg-canvas p-3">
+        <CredibilityPanel
+          postId={post.id}
+          summary={summary}
+          isPublished={isPublished}
+          userId={userId}
+        />
+        <ResearchReviewTimeline post={post} secondary={secondary} />
+        {post.citation_id ? (
+          <div className="space-y-2 [&_a]:w-full [&_button]:w-full">
+            <CopyCitationIdButton citationId={post.citation_id} />
+            <Link
+              href={`/publication/${post.citation_id}`}
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-card-border bg-surface px-3 py-2 text-sm font-medium text-emerald-ink transition-colors hover:bg-canvas"
+            >
+              Citation archive
+            </Link>
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
 async function ResearchDossierSidebar({
   post,
   author,
   userId,
   sanitizedContent,
-  sanitizedExcerpt,
   wordCount,
   parentPostId,
   isPublished,
@@ -1292,7 +1454,6 @@ async function ResearchDossierSidebar({
   author: AuthorProfile | null;
   userId: string | null;
   sanitizedContent: string;
-  sanitizedExcerpt: string | null;
   wordCount: number;
   parentPostId: string | null;
   isPublished: boolean;
@@ -1322,9 +1483,14 @@ async function ResearchDossierSidebar({
   return (
     <aside className="hidden lg:block">
       <div className="sticky top-[var(--app-sticky-offset)] space-y-4">
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-            Manuscript actions
+        {/* Evidence actions only. Like, Save, Share and Respond used to live here
+            too, which meant a research page at xl offered the same four actions
+            three times over: here, in PostActionsRow, and in the floating bar.
+            Those belong to the reader's engagement with the piece, and the
+            inline row plus the docked bar already carry them. */}
+        <section className="rounded-lg border border-card-border bg-surface p-4">
+          <h2 className="mb-3 text-kicker font-bold uppercase text-ink-muted">
+            Manuscript
           </h2>
           <div className="space-y-2 [&_a]:w-full [&_button]:w-full">
             {post.document_path ? (
@@ -1346,38 +1512,10 @@ async function ResearchDossierSidebar({
                 <CopyCitationIdButton citationId={post.citation_id} />
                 <Link
                   href={`/publication/${post.citation_id}`}
-                  className="inline-flex min-h-10 items-center justify-center rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-50"
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg border border-card-border bg-surface px-3 py-2 text-sm font-medium text-emerald-ink transition-colors hover:bg-canvas"
                 >
                   Citation archive
                 </Link>
-              </>
-            ) : null}
-            {isPublished ? (
-              <>
-                <LikeButton
-                  postId={post.id}
-                  initialLiked={viewer.userLiked}
-                  initialLikeCount={secondary.likeCount}
-                  userId={userId}
-                />
-                <BookmarkButton
-                  postId={post.id}
-                  initialBookmarked={viewer.userBookmarked}
-                  userId={userId}
-                />
-                <ShareButtons
-                  title={getPostMetadataTitle(post, author)}
-                  slug={post.slug}
-                  excerpt={sanitizedExcerpt}
-                  authorName={author?.full_name ?? null}
-                />
-                <ResponseStartLink
-                  postId={post.id}
-                  source="research_dossier_sidebar"
-                  className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-                >
-                  Write a response
-                </ResponseStartLink>
               </>
             ) : null}
           </div>
@@ -1388,11 +1526,11 @@ async function ResearchDossierSidebar({
         <TableOfContents headings={dossierHeadings} />
 
         {author ? (
-          <section className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="font-display text-[15px] font-semibold text-ink">
+          <section className="rounded-lg border border-card-border bg-surface p-4">
+            <h2 className="font-display text-excerpt font-semibold text-ink">
               Get every new publication
             </h2>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-gray-500">
+            <p className="mt-1 text-kicker leading-relaxed text-ink-muted">
               Follow {author.full_name ?? author.username} for the feed, or
               subscribe for every new publication.
             </p>
@@ -1411,7 +1549,7 @@ async function ResearchDossierSidebar({
               ) : userId === author.id ? (
                 <Link
                   href="/dashboard"
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-canvas"
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-card-border bg-surface px-3 text-xs font-semibold text-ink-soft transition-colors hover:bg-canvas"
                 >
                   View dashboard
                 </Link>
@@ -1586,9 +1724,9 @@ export default async function PostPage({ params, searchParams }: PageProps) {
   const sanitizedExcerpt = sanitizePostExcerpt(post.excerpt);
   const readTime = estimateReadTime(sanitizedContent);
   const wordCount = countWords(sanitizedContent);
-  const contentWithIds = renderReferenceShortcodes(
-    injectHeadingIds(sanitizedContent)
-  );
+  const { html: headedContent, headings: bodyHeadings } =
+    injectHeadingIds(sanitizedContent);
+  const contentWithIds = renderReferenceShortcodes(headedContent);
   const authorName = author?.full_name ?? author?.username ?? "Anonymous";
   const displayTitle = getPostDisplayTitle(post);
   const metadataTitle = getPostMetadataTitle(post, author);
@@ -1703,36 +1841,39 @@ export default async function PostPage({ params, searchParams }: PageProps) {
           </>
         ) : null}
 
-        <header className="mx-auto max-w-[720px] bg-white pb-2 pt-1 sm:px-2 sm:pt-3">
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-          >
-            <span aria-hidden="true">‹</span> Back to feed
-          </Link>
+        {/* Shares the body grid's container and left edge below, and caps its
+            measure at the main column's 760px. A separately-centred max-w-[720px]
+            box left the headline sitting ~196px right of the abstract it names. */}
+        <header className="mx-auto max-w-[1200px] px-4 pb-2 pt-1 sm:px-6 sm:pt-3 lg:px-8">
+          <div className="lg:max-w-[760px]">
+          {/* Real history, not a hardcoded "/". Arrive from a profile, a search
+              result or a topic page and "Back to feed" was a lie. */}
+          <BackLink className="inline-flex min-h-11 items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">
+            <span aria-hidden="true">‹</span> Back
+          </BackLink>
 
           <div className="mt-1 flex flex-wrap items-center gap-2.5">
-            <span className="font-display text-[11px] font-bold uppercase tracking-[0.16em] text-purple-accent">
+            <span className="font-display text-kicker font-bold uppercase text-purple-accent">
               Research
             </span>
             {post.citation_id || isReviewedWork(post) ? (
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-kicker font-semibold text-emerald-ink">
                 {post.citation_id ? "Citable" : "Reviewed"}
               </span>
             ) : post.status !== "published" ? (
               <span
-                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${getResearchStatusTone(post.status)}`}
+                className={`rounded-full border px-2.5 py-0.5 text-kicker font-semibold ${getResearchStatusTone(post.status)}`}
               >
                 {formatResearchStatus(post.status)}
               </span>
             ) : null}
           </div>
 
-          <h1 className="font-display mt-3 max-w-[700px] text-[30px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink sm:text-[40px]">
+          <h1 className="font-display mt-3 max-w-[700px] text-feature font-semibold tracking-[-0.02em] text-ink">
             {post.title}
           </h1>
 
-          <Suspense fallback={<div className="mt-5 h-12 animate-pulse motion-reduce:animate-none rounded-lg bg-gray-100" />}>
+          <Suspense fallback={<div className="mt-5 h-12 animate-pulse motion-reduce:animate-none rounded-lg bg-canvas" />}>
             <DetailAuthorRow
               post={post}
               author={author}
@@ -1743,6 +1884,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
               viewerDataPromise={viewerDataPromise}
             />
           </Suspense>
+          </div>
         </header>
 
         <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-4 pb-20 pt-8 sm:px-6 lg:grid-cols-[minmax(0,760px)_300px] lg:gap-[52px] lg:px-8">
@@ -1756,7 +1898,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
             </Suspense>
 
             {post.status === "draft" ? (
-              <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+              <div className="mb-6 rounded-xl border border-card-border bg-canvas p-4 text-sm text-ink-soft">
                 This research record is a <strong>draft</strong> and is only
                 visible to you.{" "}
                 <Link
@@ -1780,22 +1922,35 @@ export default async function PostPage({ params, searchParams }: PageProps) {
             ) : null}
 
             <section id="abstract" className="mb-4 scroll-mt-24 rounded-xl bg-purple-tint/60 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-purple-accent">
+              <p className="text-kicker font-bold uppercase text-purple-accent">
                 Abstract
               </p>
-              <p className="mt-2 text-[16px] leading-[1.7] text-gray-800">
+              <p className="mt-2 text-lede text-ink">
                 {sanitizedExcerpt ?? "No abstract was provided for this research record."}
               </p>
             </section>
 
+            <Suspense fallback={null}>
+              <ResearchDossierDisclosure
+                post={post}
+                author={author}
+                userId={userId}
+                sanitizedContent={sanitizedContent}
+                wordCount={wordCount}
+                parentPostId={parentPostId}
+                isPublished={isPublished}
+                secondaryDataPromise={secondaryDataPromise}
+              />
+            </Suspense>
+
             {post.document_path ? (
               <section
                 id="manuscript"
-                className="mb-4 flex scroll-mt-24 items-center gap-3 rounded-xl border border-gray-200 bg-white p-3.5"
+                className="mb-4 flex scroll-mt-24 items-center gap-3 rounded-xl border border-card-border bg-surface p-3.5"
               >
                 <span
                   aria-hidden="true"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-purple-accent text-[10px] font-bold tracking-wide text-white"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-purple-accent text-kicker font-bold tracking-wide text-white"
                 >
                   PDF
                 </span>
@@ -1803,7 +1958,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
                   <span className="block truncate text-sm font-semibold text-ink">
                     {post.document_original_name ?? "Research manuscript"}
                   </span>
-                  <span className="block text-xs text-gray-500">
+                  <span className="block text-xs text-ink-muted">
                     {formatDocumentSize(post.document_size_bytes) ?? "PDF"}
                   </span>
                 </span>
@@ -1811,7 +1966,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
                   href={`/api/research-document/${post.id}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="shrink-0 rounded-lg bg-gray-100 px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:bg-gray-200"
+                  className="shrink-0 rounded-lg bg-canvas px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:bg-divider"
                 >
                   View manuscript
                 </a>
@@ -1827,19 +1982,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
               </div>
             )}
 
-            {post.tags && post.tags.length > 0 ? (
-              <div className="mb-8 flex flex-wrap gap-2">
-                {post.tags.map((tag) => formatTagLabel(tag)).filter(Boolean).map((tag) => (
-                  <Link
-                    key={tag}
-                    href={`/topics/${encodeURIComponent(tag)}`}
-                    className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[13px] text-gray-600 transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand"
-                  >
-                    #{tag}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
+            <PostTags tags={post.tags} />
 
             <Suspense fallback={<SectionSkeleton rows={4} />}>
               <PostReferencesAndCitation
@@ -1908,7 +2051,6 @@ export default async function PostPage({ params, searchParams }: PageProps) {
               author={author}
               userId={userId}
               sanitizedContent={sanitizedContent}
-              sanitizedExcerpt={sanitizedExcerpt}
               wordCount={wordCount}
               parentPostId={parentPostId}
               isPublished={isPublished}
@@ -1933,11 +2075,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
       postId={post.id}
     >
       <PostEngagementProvider postId={post.id} userId={userId} contentKind={resolvedKind}>
-      {/* Half the 680px column + a 28px gutter + the 56px rail — see ReadingBar. */}
-      <div
-        className="relative"
-        style={{ "--reading-rail-offset": "424px" } as React.CSSProperties}
-      >
+      <div className="relative">
       {articleJsonLd ? <ArticleJsonLd data={articleJsonLd} /> : null}
       {isPublished ? (
         <>
@@ -1963,12 +2101,11 @@ export default async function PostPage({ params, searchParams }: PageProps) {
 
       <header className="mx-auto max-w-[680px] pb-2 pt-1 sm:pt-3">
         <div>
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-          >
-            <span aria-hidden="true">‹</span> Back to feed
-          </Link>
+          {/* Real history, not a hardcoded "/". Arrive from a profile, a search
+              result or a topic page and "Back to feed" was a lie. */}
+          <BackLink className="inline-flex min-h-11 items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">
+            <span aria-hidden="true">‹</span> Back
+          </BackLink>
 
           <div className="mt-1 flex flex-wrap items-center gap-2.5">
             <span
@@ -1980,7 +2117,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
             >
               Article{articleFormatLabel ? ` · ${articleFormatLabel}` : ""}
             </span>
-            <span className="text-[12px] font-medium text-gray-400">{readTime} min read</span>
+            <span className="text-meta font-medium text-ink-muted">{readTime} min read</span>
           </div>
 
           {parentPostId ? (
@@ -1992,12 +2129,12 @@ export default async function PostPage({ params, searchParams }: PageProps) {
           ) : null}
 
           {displayTitle ? (
-            <h1 className="font-display mt-4 text-[30px] font-semibold leading-[1.08] tracking-[-0.02em] text-ink sm:text-[40px]">
+            <h1 className="font-display mt-4 text-feature font-semibold tracking-[-0.02em] text-ink">
               {displayTitle}
             </h1>
           ) : null}
 
-          <Suspense fallback={<div className="mt-5 h-12 animate-pulse motion-reduce:animate-none rounded-lg bg-gray-100" />}>
+          <Suspense fallback={<div className="mt-5 h-12 animate-pulse motion-reduce:animate-none rounded-lg bg-canvas" />}>
             <DetailAuthorRow
               post={post}
               author={author}
@@ -2028,7 +2165,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
             article_format={post.article_format}
             sizes="(max-width: 720px) calc(100vw - 32px), 680px"
             priority
-            className="aspect-[16/9] w-full rounded-[10px] border border-gray-200 bg-gray-100"
+            className="aspect-[16/9] w-full rounded-[10px] border border-card-border bg-canvas"
             imageClassName="object-cover"
           />
         </div>
@@ -2045,7 +2182,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
           </Suspense>
 
           {post.status === "draft" ? (
-            <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+            <div className="mb-6 rounded-xl border border-card-border bg-canvas p-4 text-sm text-ink-soft">
               This post is a <strong>draft</strong> and is only visible to you.{" "}
               <Link href={`/edit/${post.slug}`} className="font-semibold underline">
                 Edit &amp; publish
@@ -2064,14 +2201,22 @@ export default async function PostPage({ params, searchParams }: PageProps) {
             <AudioSummaryPlayer audioUrl={post.audio_summary_url} />
           ) : null}
 
-          <div className="article-journal-body article-redesign-body relative mb-10 sm:mb-12">
+          <BodyContents headings={bodyHeadings} />
+
+          <div
+            className={`article-journal-body article-redesign-body relative mb-10 sm:mb-12${
+              earnsDropCap(sanitizedContent, isArticlePost ? resolveArticleFormat(post) : null) ? " has-dropcap" : ""
+            }`}
+          >
             <HighlightShare containerId="post-article-prose" postSlug={post.slug} postId={post.id} />
             <div
               id="post-article-prose"
-              className="article-journal-body prose prose-gray max-w-[680px] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-normal prose-headings:text-gray-900"
+              className="article-journal-body prose prose-gray max-w-[680px] prose-lg prose-a:text-emerald-brand prose-headings:font-semibold prose-headings:tracking-normal prose-headings:text-ink"
               dangerouslySetInnerHTML={{ __html: contentWithIds }}
             />
           </div>
+
+          <PostTags tags={post.tags} />
 
           <Suspense fallback={<SectionSkeleton rows={4} />}>
             <PostReferencesAndCitation

@@ -14,7 +14,13 @@ import {
   getCommentBodyError,
   normalizeCommentText,
 } from "@/lib/commentContent";
-import { fetchCommentPage, type CommentPage } from "@/lib/commentThread";
+import {
+  DEFAULT_COMMENT_SORT,
+  fetchCommentPage,
+  isCommentSort,
+  type CommentPage,
+  type CommentSort,
+} from "@/lib/commentThread";
 
 type CommentAuthor = {
   username: string | null;
@@ -219,6 +225,9 @@ export async function submitComment(input: SubmitCommentInput): Promise<{
 export async function loadMoreComments(input: {
   postId: string;
   cursor: string | null;
+  /** Must match the sort the cursor was minted under: the cursor shape differs
+   *  between `top` and `new`. Omitted means the first page's default. */
+  sort?: CommentSort;
 }): Promise<{ error: string | null; page?: CommentPage }> {
   const supabase = await createClient();
   const {
@@ -230,6 +239,7 @@ export async function loadMoreComments(input: {
       postId: input.postId,
       viewerId: user?.id ?? null,
       before: input.cursor,
+      sort: isCommentSort(input.sort) ? input.sort : DEFAULT_COMMENT_SORT,
     });
     return { error: null, page };
   } catch (error) {

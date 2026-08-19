@@ -44,7 +44,7 @@ export default function AuthorBioCard({
   const authorName = author.full_name ?? author.username ?? "Anonymous";
 
   return (
-    <div className="mb-9 flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4 sm:gap-[18px] sm:px-6 sm:py-5">
+    <div className="mb-9 flex items-center gap-4 rounded-2xl border border-card-border bg-surface p-4 sm:gap-[18px] sm:px-6 sm:py-5">
       <UserAvatar
         name={authorName}
         src={author.avatar_url}
@@ -54,20 +54,20 @@ export default function AuthorBioCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+            <p className="mb-1 text-kicker font-semibold uppercase text-ink-muted">
               Written by
             </p>
             <Link
               href={`/${author.username}`}
-              className="font-display block truncate text-[19px] font-semibold leading-tight text-gray-900 transition-colors hover:text-emerald-brand"
+              className="font-display block truncate text-title font-semibold leading-tight text-ink transition-colors hover:text-emerald-brand"
             >
               {authorName}
             </Link>
-            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-gray-500 sm:text-xs">
+            <p className="mt-1 line-clamp-2 text-kicker leading-4 text-ink-muted sm:text-xs">
               {author.field_of_study ? `${author.field_of_study} · ` : ""}
               {author.university}
               {isCorrespondingAuthor ? (
-                <span className="ml-2 font-medium text-emerald-700">Corresponding author</span>
+                <span className="ml-2 font-medium text-emerald-ink">Corresponding author</span>
               ) : null}
             </p>
           </div>
@@ -86,7 +86,7 @@ export default function AuthorBioCard({
           ) : null}
         </div>
         {author.bio ? (
-          <p className="mt-3 hidden text-sm leading-relaxed text-gray-600 sm:block">{author.bio}</p>
+          <p className="mt-3 hidden text-sm leading-relaxed text-ink-soft sm:block">{author.bio}</p>
         ) : null}
         {coAuthors.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -94,7 +94,7 @@ export default function AuthorBioCard({
               <Link
                 key={coAuthor.user_id}
                 href={`/${coAuthor.profile.username}`}
-                className="inline-flex min-h-8 items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-brand"
+                className="inline-flex min-h-8 items-center rounded-full border border-card-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:border-emerald-200 hover:text-emerald-brand"
               >
                 {coAuthor.corresponding_author ? "Corresponding · " : ""}
                 {coAuthor.profile.full_name ?? coAuthor.profile.username}

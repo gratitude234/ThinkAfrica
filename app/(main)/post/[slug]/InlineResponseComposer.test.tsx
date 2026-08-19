@@ -117,8 +117,38 @@ describe("InlineResponseComposer", () => {
   it("offers the long-form editor as the third path", () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
 
-    expect(screen.getByRole("link", { name: "Long-form" }).getAttribute("href")).toBe(
-      "/write?inResponseTo=parent-1&kind=article"
+    expect(
+      screen.getByRole("link", { name: "Open the full editor" }).getAttribute("href")
+    ).toBe("/write?inResponseTo=parent-1&kind=article");
+  });
+
+  it("gives Response the same weight as Comment rather than a text link", () => {
+    render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
+
+    const respond = screen.getByRole("button", { name: "Publish as a Response" });
+    const comment = screen.getByRole("button", { name: "Comment" });
+
+    // Both are full-height buttons. Response used to be a 13px text link beside
+    // a filled button, which styled the consequential action as the throwaway.
+    expect(respond.className).toContain("min-h-11");
+    expect(comment.className).toContain("min-h-11");
+  });
+
+  it("keeps the textarea id addressable so a second composer can coexist", () => {
+    const { unmount } = render(
+      <InlineResponseComposer parentPostId="parent-1" userId="user-1" />
     );
+    expect(document.getElementById("inline-response")).not.toBeNull();
+    unmount();
+
+    render(
+      <InlineResponseComposer
+        parentPostId="parent-1"
+        userId="user-1"
+        composerId="inline-response-foot"
+      />
+    );
+    expect(document.getElementById("inline-response-foot")).not.toBeNull();
+    expect(document.getElementById("inline-response")).toBeNull();
   });
 });

@@ -45,13 +45,13 @@ export default function TableOfContents({ headings }: Props) {
   if (headings.length === 0) return null;
 
   return (
-    <div className="sticky top-[var(--app-sticky-offset)] rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
+    <div className="sticky top-[var(--app-sticky-offset)] rounded-lg border border-card-border bg-surface p-4">
+      <h3 className="mb-3 text-kicker font-bold uppercase text-ink-muted">
         Contents
       </h3>
       <nav className="relative">
         {/* Background rail */}
-        <div className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-gray-100" />
+        <div className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-canvas" />
 
         <div className="space-y-0.5">
           {headings.map((heading) => {
@@ -60,19 +60,17 @@ export default function TableOfContents({ headings }: Props) {
               <a
                 key={heading.id}
                 href={`#${heading.id}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  document
-                    .getElementById(heading.id)
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  setActiveId(heading.id);
-                }}
-                className={`relative block py-1 text-[12px] leading-snug transition-colors ${
+                /* No preventDefault. Scrolling by hand left the URL hash
+                   untouched, so no section was linkable and Back could not
+                   undo a jump. `scroll-margin-top` on the targets keeps them
+                   clear of the sticky nav. */
+                onClick={() => setActiveId(heading.id)}
+                className={`relative block py-1 text-meta leading-snug transition-colors ${
                   heading.level === 3 ? "pl-6" : "pl-4"
                 } ${
                   isActive
-                    ? "font-semibold text-emerald-600"
-                    : "font-normal text-gray-400 hover:text-gray-700"
+                    ? "font-semibold text-emerald-ink"
+                    : "font-normal text-ink-muted hover:text-ink-soft"
                 }`}
               >
                 {isActive ? (

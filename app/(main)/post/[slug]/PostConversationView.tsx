@@ -86,12 +86,12 @@ async function ParentContextLine({ parentPostId }: { parentPostId: string }) {
     : (parent.profiles ?? null);
 
   return (
-    <p className="mb-4 text-sm text-gray-500">
+    <p className="mb-4 text-sm text-ink-muted">
       <span aria-hidden="true">↩ </span>
       Responding to{" "}
       <Link
         href={`/post/${parent.slug}`}
-        className="font-semibold text-gray-700 hover:text-emerald-brand hover:underline"
+        className="font-semibold text-ink-soft hover:text-emerald-brand hover:underline"
       >
         {getPostMetadataTitle(parent, parentProfile)}
       </Link>
@@ -147,12 +147,12 @@ export default async function PostConversationView({
         }
       />
 
-      <BackLink className="inline-flex min-h-11 items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">
+      <BackLink className="inline-flex min-h-11 items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">
         <span aria-hidden="true">‹</span> Back
       </BackLink>
 
       {post.status === "draft" ? (
-        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+        <div className="mt-4 rounded-xl border border-card-border bg-canvas p-4 text-sm text-ink-soft">
           This post is a <strong>draft</strong> and is only visible to you.{" "}
           <Link href={`/edit/${post.slug}`} className="font-semibold underline">
             Edit &amp; publish
@@ -174,14 +174,14 @@ export default async function PostConversationView({
             <div className="min-w-0">
               <Link
                 href={`/${author.username}`}
-                className="block truncate text-[16px] font-bold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+                className="block truncate text-lede font-bold text-ink transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
               >
                 {authorName}
               </Link>
               {author.university ? (
-                <p className="truncate text-[14px] leading-5 text-gray-500">{author.university}</p>
+                <p className="truncate text-byline leading-5 text-ink-muted">{author.university}</p>
               ) : null}
-              <p className="text-[13px] leading-5 text-gray-400">
+              <p className="text-meta leading-5 text-ink-muted">
                 {formatRelativeTime(post.published_at ?? post.created_at)}
               </p>
             </div>
@@ -209,12 +209,12 @@ export default async function PostConversationView({
             one -- but a Post that does carry a title showed it in the feed and
             nowhere here, which also left the page with no h1. */}
         {displayTitle ? (
-          <h1 className="mb-3 font-display text-[26px] font-semibold leading-[1.25] text-ink sm:text-[30px]">
+          <h1 className="mb-3 font-display text-headline font-semibold text-ink">
             {displayTitle}
           </h1>
         ) : null}
         <div
-          className="text-[19px] leading-[1.62] text-gray-900 [&_a]:text-emerald-brand [&_a]:underline [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
+          className="text-title text-ink [&_a]:text-emerald-brand [&_a]:underline [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
           dangerouslySetInnerHTML={{ __html: bodyHtml }}
         />
         {post.cover_image_url ? (
@@ -225,7 +225,7 @@ export default async function PostConversationView({
             sizes="(max-width: 680px) calc(100vw - 32px), 640px"
             priority
             wrapperClassName="mt-5"
-            className="w-full overflow-hidden rounded-xl bg-gray-100"
+            className="w-full overflow-hidden rounded-xl bg-canvas"
           />
         ) : null}
       </div>
@@ -251,7 +251,7 @@ export default async function PostConversationView({
               targetId={post.id}
               targetLabel={`"${metadataTitle}"`}
               variant="text"
-              className="text-xs text-gray-400 hover:text-red-600"
+              className="text-xs text-ink-muted hover:text-red-600"
             />
           </p>
         ) : null}
@@ -263,7 +263,7 @@ export default async function PostConversationView({
             <Link
               key={topic}
               href={`/topics/${encodeURIComponent(topic)}`}
-              className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[13px] text-gray-600 transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+              className="rounded-full border border-card-border bg-surface px-3 py-1 text-meta text-ink-soft transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
             >
               #{topic}
             </Link>
@@ -280,6 +280,7 @@ export default async function PostConversationView({
         responsesHasMore={secondary.responsesHasMore}
         nextResponsePage={responsePages + 1}
         isPublished={isPublished}
+        commentCount={secondary.commentCount}
       />
     </div>
   );

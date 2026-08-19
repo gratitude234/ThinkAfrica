@@ -85,19 +85,19 @@ export default function CiteThis({
   ];
 
   return (
-    <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-5">
+    <div className="min-w-0 rounded-lg border border-card-border bg-surface p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
+          <p className="text-kicker font-bold uppercase text-ink-muted">
             Cite this essay
           </p>
-          <h2 className="mt-1 text-base font-semibold text-gray-900">Publication citation</h2>
+          <h2 className="mt-1 text-base font-semibold text-ink">Publication citation</h2>
         </div>
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-kicker font-semibold text-emerald-ink">
           Archived
         </span>
       </div>
-      <p className="-mt-2 mb-4 text-sm text-gray-500">
+      <p className="-mt-2 mb-4 text-sm text-ink-muted">
         Use the archived citation metadata for this publication.
       </p>
 
@@ -110,7 +110,7 @@ export default function CiteThis({
             className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               activeTab === tab.id
                 ? "bg-emerald-700 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700"
+                : "bg-canvas text-ink-soft hover:bg-emerald-50 hover:text-emerald-ink"
             }`}
           >
             {tab.label}
@@ -118,8 +118,8 @@ export default function CiteThis({
         ))}
       </div>
 
-      <div className="min-w-0 rounded-lg border border-gray-100 bg-canvas p-4">
-        <pre className="whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">
+      <div className="min-w-0 rounded-lg border border-divider bg-canvas p-4">
+        <pre className="whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-soft [overflow-wrap:anywhere]">
           {formatted[activeTab]}
         </pre>
         <button
@@ -129,13 +129,13 @@ export default function CiteThis({
             setCopiedTab(activeTab);
             setTimeout(() => setCopiedTab(null), 1200);
           }}
-          className="mt-3 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+          className="mt-3 rounded-lg border border-emerald-200 bg-surface px-3 py-1.5 text-sm font-medium text-emerald-ink transition-colors hover:bg-emerald-50"
         >
           {copiedTab === activeTab ? "Copied" : "Copy citation"}
         </button>
       </div>
 
-      <p className="mt-3 text-xs italic text-gray-500">
+      <p className="mt-3 text-xs italic text-ink-muted">
         This citation URL resolves to the archived published version attached to
         this citation ID.
       </p>

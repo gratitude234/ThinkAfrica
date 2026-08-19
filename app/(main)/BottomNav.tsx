@@ -94,7 +94,7 @@ export default function BottomNav({
           }}
           aria-label="Primary navigation"
         >
-        <div className="flex h-[60px] items-center justify-around px-2">
+        <div className="flex h-[var(--app-bottom-nav-height)] items-center justify-around px-2">
           <Link
             href="/"
             className={navLinkClass(isHomeActive)}

@@ -15,6 +15,12 @@ import { submitComment } from "./commentActions";
 interface InlineResponseComposerProps {
   parentPostId: string;
   userId: string | null;
+  /** The thread renders a second composer at its foot, so the textarea id has
+   *  to be unique. PostActionsRow scrolls to the default one by id. */
+  composerId?: string;
+  /** The foot composer sits under the thread it belongs to and needs no
+   *  restatement of what the box is for. */
+  label?: string;
 }
 
 const LONG_FORM_HREF = (postId: string) =>
@@ -34,6 +40,8 @@ const LONG_FORM_HREF = (postId: string) =>
 export default function InlineResponseComposer({
   parentPostId,
   userId,
+  composerId = "inline-response",
+  label = "Write a comment",
 }: InlineResponseComposerProps) {
   const router = useRouter();
   const { requestAuth } = useGuestAuthGate();
@@ -51,8 +59,8 @@ export default function InlineResponseComposer({
 
   if (!userId) {
     return (
-      <div className="mt-4 rounded-xl border border-gray-200 bg-white px-4 py-4">
-        <p className="text-[15px] text-gray-600">Join the conversation.</p>
+      <div className="mt-4 rounded-xl border border-card-border bg-surface px-4 py-4">
+        <p className="text-excerpt text-ink-soft">Join the conversation.</p>
         <button
           type="button"
           onClick={() => requestAuth("respond", { contentKind: "post" })}
@@ -104,12 +112,12 @@ export default function InlineResponseComposer({
   };
 
   return (
-    <div className="mt-4 rounded-xl border border-gray-200 bg-white px-4 py-3">
-      <label htmlFor="inline-response" className="sr-only">
-        Write a comment
+    <div className="mt-4 rounded-xl border border-card-border bg-surface px-4 py-3">
+      <label htmlFor={composerId} className="sr-only">
+        {label}
       </label>
       <textarea
-        id="inline-response"
+        id={composerId}
         ref={textareaRef}
         value={body}
         onChange={(event) => {
@@ -127,12 +135,12 @@ export default function InlineResponseComposer({
         rows={2}
         disabled={busy}
         placeholder="Add a comment…"
-        aria-describedby={error ? "inline-response-error" : undefined}
-        className="w-full resize-none bg-transparent text-[16px] leading-[1.6] text-gray-900 outline-none placeholder:text-gray-400 disabled:opacity-60"
+        aria-describedby={error ? `${composerId}-error` : undefined}
+        className="w-full resize-none bg-transparent text-lede text-ink outline-none placeholder:text-ink-muted disabled:opacity-60"
       />
 
       {suggestResponse ? (
-        <p className="mt-1 rounded-lg bg-green-tint px-3 py-2 text-[13px] leading-[1.5] text-emerald-brand">
+        <p className="mt-1 rounded-lg bg-green-tint px-3 py-2 text-meta text-emerald-brand">
           This is long enough to stand on its own. Publishing it as a{" "}
           <strong className="font-semibold">Response</strong> gives it its own page and
           puts it in the feed, on your profile, and on the leaderboard.
@@ -140,34 +148,39 @@ export default function InlineResponseComposer({
       ) : null}
 
       {error ? (
-        <p id="inline-response-error" role="alert" className="mt-1 text-[13px] text-red-600">
+        <p id={`${composerId}-error`} role="alert" className="mt-1 text-meta text-red-600">
           {error}
         </p>
       ) : null}
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-2">
-        <div className="flex items-center gap-3">
+      {/* "Publish as a Response" creates a post with its own page, feed
+          presence, profile placement and leaderboard score. It used to be a
+          13px grey text link sitting beside a filled Comment button, so the
+          consequential action was styled as the throwaway one. It is a
+          full-size button now. Comment stays the filled default: elevating
+          Response to the primary would push people into publishing a permanent
+          public artifact they only meant to reply with. */}
+      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-divider pt-2">
+        <Link
+          href={LONG_FORM_HREF(parentPostId)}
+          className="text-meta text-ink-muted underline-offset-2 hover:text-emerald-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+        >
+          Open the full editor
+        </Link>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {characters >= COMMENT_MAX_CHARACTERS - 200 ? (
+            <span className={`text-meta ${overLimit ? "font-semibold text-red-600" : "text-ink-muted"}`}>
+              {COMMENT_MAX_CHARACTERS - characters}
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => void postAsResponse()}
             disabled={characters === 0 || overLimit || busy}
-            className="text-[13px] font-medium text-gray-600 underline-offset-2 hover:text-emerald-brand hover:underline disabled:cursor-not-allowed disabled:text-gray-400 disabled:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 items-center rounded-lg border border-card-border bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
           >
             Publish as a Response
           </button>
-          <Link
-            href={LONG_FORM_HREF(parentPostId)}
-            className="text-[13px] text-gray-500 underline-offset-2 hover:text-emerald-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-          >
-            Long-form
-          </Link>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          {characters >= COMMENT_MAX_CHARACTERS - 200 ? (
-            <span className={`text-[13px] ${overLimit ? "font-semibold text-red-600" : "text-gray-400"}`}>
-              {COMMENT_MAX_CHARACTERS - characters}
-            </span>
-          ) : null}
           <button
             type="button"
             onClick={() => void postComment()}

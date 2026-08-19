@@ -117,15 +117,15 @@ export default function PublishedToast({
   };
 
   return (
-    <section className="mb-6 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm shadow-black/[0.03]">
-      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="p-5 sm:p-6">
+    <section className="mb-6 overflow-hidden rounded-2xl border border-emerald-100 bg-surface shadow-sm shadow-black/[0.03]">
+      <div className="grid gap-0">
+        <div className="p-4 sm:p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-ink">
                 {isLive ? "Added to your record" : "Submitted for review"}
               </p>
-              <h2 className="mt-2 font-display text-2xl font-semibold leading-tight text-ink">
+              <h2 className="mt-1.5 font-display text-title font-semibold leading-snug text-ink sm:text-xl">
                 {isLive
                   ? "This contribution is now part of your Intellectual Record"
                   : "Your contribution is in the editorial queue"}
@@ -134,20 +134,20 @@ export default function PublishedToast({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-lg px-2 py-1 text-xl leading-none text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
+              className="rounded-lg px-2 py-1 text-xl leading-none text-ink-muted transition-colors hover:bg-canvas hover:text-ink-soft"
               aria-label="Dismiss publish success panel"
             >
               x
             </button>
           </div>
 
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
             {isLive
               ? "It now appears as a dated, public contribution on your profile. Keep the loop going by reading a related idea and adding a response when you have a useful angle."
               : "Your submission is in editorial review. If accepted, its reviewed and citable evidence will appear with it in your Intellectual Record."}
           </p>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
             <Link
               href={primaryAction.href}
               onClick={() => trackNextAction(primaryAction.action)}
@@ -174,7 +174,7 @@ export default function PublishedToast({
               <Link
                 href={username ? `/${username}#intellectual-record` : "/dashboard"}
                 onClick={() => trackNextAction("view_record")}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-card-border px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-canvas"
               >
                 View my record
               </Link>
@@ -182,7 +182,7 @@ export default function PublishedToast({
               <Link
                 href="/dashboard"
                 onClick={() => trackNextAction("track_review")}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-card-border px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-canvas"
               >
                 Track review status
               </Link>
@@ -191,8 +191,8 @@ export default function PublishedToast({
         </div>
 
         {isLive ? (
-          <div className="border-t border-emerald-50 bg-emerald-50/55 p-4 lg:border-l lg:border-t-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+          <div className="border-t border-emerald-50 bg-emerald-50/55 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-ink">
               Share second
             </p>
             <p className="mt-1 text-xs leading-5 text-emerald-900/75">
@@ -204,31 +204,31 @@ export default function PublishedToast({
               <button
                 type="button"
                 onClick={onWhatsApp}
-                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+                className="rounded-lg border border-emerald-100 bg-surface py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-emerald-50"
               >
                 WhatsApp
               </button>
               <button
                 type="button"
                 onClick={onX}
-                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+                className="rounded-lg border border-emerald-100 bg-surface py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-emerald-50"
               >
                 X
               </button>
               <button
                 type="button"
                 onClick={onLinkedIn}
-                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+                className="rounded-lg border border-emerald-100 bg-surface py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-emerald-50"
               >
                 LinkedIn
               </button>
             </div>
 
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => void onCopy("post")}
-                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+                className="rounded-lg border border-emerald-100 bg-surface py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-emerald-50"
               >
                 {copiedTarget === "post" ? "Post copied" : "Copy post link"}
               </button>
@@ -236,7 +236,7 @@ export default function PublishedToast({
                 <button
                   type="button"
                   onClick={() => void onCopy("profile")}
-                  className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+                  className="rounded-lg border border-emerald-100 bg-surface py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-emerald-50"
                 >
                   {copiedTarget === "profile" ? "Record link copied" : "Copy record link"}
                 </button>
@@ -244,8 +244,8 @@ export default function PublishedToast({
             </div>
           </div>
         ) : (
-          <div className="border-t border-emerald-50 bg-emerald-50/55 p-4 lg:border-l lg:border-t-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+          <div className="border-t border-emerald-50 bg-emerald-50/55 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-ink">
               What happens next
             </p>
 
@@ -273,7 +273,7 @@ export default function PublishedToast({
                 ] as const
               ).map(({ n, label, detail }) => (
                 <li key={n} className="flex gap-3">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-kicker font-bold text-emerald-ink">
                     {n}
                   </span>
                   <div>
@@ -288,21 +288,21 @@ export default function PublishedToast({
               <button
                 type="button"
                 onClick={onWhatsApp}
-                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+                className="rounded-lg border border-emerald-100 bg-surface py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-emerald-50"
               >
                 WhatsApp
               </button>
               <button
                 type="button"
                 onClick={onX}
-                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+                className="rounded-lg border border-emerald-100 bg-surface py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-emerald-50"
               >
                 X
               </button>
               <button
                 type="button"
                 onClick={onLinkedIn}
-                className="rounded-lg border border-emerald-100 bg-white py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-emerald-50"
+                className="rounded-lg border border-emerald-100 bg-surface py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-emerald-50"
               >
                 LinkedIn
               </button>

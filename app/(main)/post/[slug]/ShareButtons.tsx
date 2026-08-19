@@ -23,6 +23,62 @@ export default function ShareButtons({
   const relativeUrl = `/post/${slug}`;
   const [url, setUrl] = useState(relativeUrl);
   const menuRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const closeMenu = (returnFocus = true) => {
+    setMenuOpen(false);
+    if (returnFocus) triggerRef.current?.focus();
+  };
+
+  /**
+   * The keyboard model the `role="menu"` was already promising.
+   *
+   * The element announced itself as a menu with no arrow keys, no Escape, no
+   * focus move on open and no focus return on close, so a screen reader was
+   * told about a widget that did not behave like one.
+   */
+  const moveFocus = (delta: number) => {
+    const items = Array.from(
+      listRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []
+    );
+    if (items.length === 0) return;
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    const next = (current + delta + items.length) % items.length;
+    items[current === -1 && delta < 0 ? items.length - 1 : next]?.focus();
+  };
+
+  const onMenuKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMenu();
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      moveFocus(1);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      moveFocus(-1);
+      return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      const items = Array.from(
+        listRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []
+      );
+      (event.key === "Home" ? items[0] : items[items.length - 1])?.focus();
+    }
+  };
+
+  // Focus the first item when the menu opens, so a keyboard user lands inside
+  // it rather than having to tab past the trigger to reach it.
+  useEffect(() => {
+    if (!menuOpen) return;
+    listRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [menuOpen]);
 
   useEffect(() => {
     setUrl(`${window.location.origin}${relativeUrl}`);
@@ -60,7 +116,9 @@ export default function ShareButtons({
   const copyLink = () => {
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
-      setMenuOpen(false);
+      // Copying keeps the reader here, so focus goes back to the trigger that
+      // now reads "Copied" rather than being dropped on the document.
+      closeMenu();
       setTimeout(() => setCopied(false), 2000);
     });
   };
@@ -87,12 +145,19 @@ export default function ShareButtons({
   return (
     <div ref={menuRef} className={flat ? "relative" : "relative w-full sm:w-auto"}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={sharePost}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" && menuOpen) {
+            event.preventDefault();
+            moveFocus(1);
+          }
+        }}
         className={
           flat
-            ? "inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-[15px] font-medium text-gray-700 transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-            : "inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 sm:w-auto"
+            ? "inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-excerpt font-medium text-ink-soft transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+            : "inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-card-border bg-surface px-3 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-emerald-200 hover:text-emerald-ink sm:w-auto"
         }
         aria-haspopup="menu"
         aria-expanded={menuOpen}
@@ -115,16 +180,19 @@ export default function ShareButtons({
 
       {menuOpen ? (
         <div
+          ref={listRef}
           role="menu"
-          className="absolute right-0 top-[calc(100%+8px)] z-30 w-full min-w-[220px] overflow-hidden rounded-lg border border-gray-200 bg-white p-2 shadow-xl sm:w-[240px]"
+          aria-label="Share this post"
+          onKeyDown={onMenuKeyDown}
+          className="absolute right-0 top-[calc(100%+8px)] z-30 w-full min-w-[220px] overflow-hidden rounded-lg border border-card-border bg-surface p-2 shadow-xl sm:w-[240px]"
         >
           <a
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
             role="menuitem"
-            className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            onClick={() => setMenuOpen(false)}
+            className="block rounded-lg px-3 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas focus-visible:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset"
+            onClick={() => closeMenu(false)}
           >
             WhatsApp
           </a>
@@ -133,8 +201,8 @@ export default function ShareButtons({
             target="_blank"
             rel="noopener noreferrer"
             role="menuitem"
-            className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            onClick={() => setMenuOpen(false)}
+            className="block rounded-lg px-3 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas focus-visible:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset"
+            onClick={() => closeMenu(false)}
           >
             X
           </a>
@@ -143,8 +211,8 @@ export default function ShareButtons({
             target="_blank"
             rel="noopener noreferrer"
             role="menuitem"
-            className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            onClick={() => setMenuOpen(false)}
+            className="block rounded-lg px-3 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas focus-visible:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset"
+            onClick={() => closeMenu(false)}
           >
             LinkedIn
           </a>
@@ -152,7 +220,7 @@ export default function ShareButtons({
             type="button"
             role="menuitem"
             onClick={copyLink}
-            className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-soft transition-colors hover:bg-canvas focus-visible:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset"
           >
             Copy link
           </button>

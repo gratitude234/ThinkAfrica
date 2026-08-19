@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import Toast from "@/components/ui/Toast";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
@@ -16,6 +15,17 @@ interface Props {
   slug: string;
 }
 
+/**
+ * The persistent action bar for a post, and the alternate for PostActionsRow:
+ * it stays hidden for as long as that inline row is on screen.
+ *
+ * One bar at every width. It used to be two -- a bottom pill under `lg:hidden`
+ * and a floating vertical rail under `hidden xl:block` -- which left 1024px to
+ * 1279px with no persistent actions at all, and put the pill in the same
+ * 56-60px band as the mobile tab bar with a lower z-index, so on a phone it
+ * rendered behind the nav. Docking above the tab bar with a shared height token
+ * fixes both, and drops the rail's `--reading-rail-offset` magic number with it.
+ */
 export default function ReadingBar({
   postId,
   userId,
@@ -62,28 +72,28 @@ export default function ReadingBar({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handleLike = () => {
-    void toggleLike();
-  };
-
-  const handleBookmark = () => {
-    void toggleBookmark();
-  };
-
   const handleShare = () => {
     const url = `${window.location.origin}/post/${slug}`;
     if (navigator.share) {
-      navigator.share({ title, url });
-    } else {
-      navigator.clipboard.writeText(url);
+      navigator.share({ title, url }).catch(() => {
+        /* The reader dismissed the sheet. Nothing to recover from. */
+      });
+      return;
     }
+    void navigator.clipboard.writeText(url).then(() => {
+      setToastMessage("Link copied.");
+    });
   };
 
-  // The inline actions row owns these actions whenever it is on screen; the
-  // floating bar only stands in for it once it has scrolled out of view.
+  // The inline actions row owns these actions whenever it is on screen; this
+  // bar only stands in for it once the row has scrolled out of view.
   const showBar = visible && !inlineActionsVisible;
 
   if (!showBar && !toastMessage) return null;
+
+  const cell =
+    "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset sm:flex-row sm:gap-1.5";
+  const label = "text-kicker font-semibold sm:text-meta";
 
   return (
     <>
@@ -91,144 +101,111 @@ export default function ReadingBar({
         <Toast message={toastMessage} onDone={() => setToastMessage(null)} />
       ) : null}
       {!showBar ? null : (
-        <>
-      {/* ── Mobile / tablet: horizontal pill at bottom ── */}
-      <div
-        className="fixed inset-x-0 z-40 px-4 lg:hidden"
-        style={{
-          bottom:
-            "calc(0.75rem + var(--mobile-visual-viewport-bottom, 0px))",
-          paddingBottom: "calc(env(safe-area-inset-bottom) + 4px)",
-        }}
-      >
-        <div className="mx-auto flex min-h-[56px] max-w-[420px] items-center rounded-2xl border border-gray-200 bg-white/95 px-1 shadow-[0_14px_34px_-14px_rgb(0_0_0/0.42)] backdrop-blur">
-          <Link
-            href="/"
-            className="flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2 text-gray-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
-            aria-label="Go to the Indegenius home page"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 10.75L12 3l9 7.75V21H14.75v-5.5h-5.5V21H3V10.75z" />
-            </svg>
-            <span className="text-[11px] font-semibold">Home</span>
-          </Link>
-
-          <button
-            onClick={handleLike}
-            className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2 transition-colors hover:bg-gray-50 ${liked ? "text-red-500" : "text-gray-500"}`}
-            aria-label={liked ? "Unlike" : "Like"}
-          >
-            <svg className="h-5 w-5" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
-            <span className="text-[11px] font-semibold">{likeCount}</span>
-          </button>
-
-          <button
-            onClick={handleBookmark}
-            className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2 transition-colors hover:bg-gray-50 ${bookmarked ? "text-emerald-600" : "text-gray-500"}`}
-            aria-label={bookmarked ? "Unsave" : "Save"}
-          >
-            <svg className="h-5 w-5" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-            </svg>
-            <span className="text-[11px] font-semibold">{bookmarked ? "Saved" : "Save"}</span>
-          </button>
-
-          <button
-            onClick={handleShare}
-            className="flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2 text-gray-500 transition-colors hover:bg-gray-50"
-            aria-label="Share"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
-            </svg>
-            <span className="text-[11px] font-semibold">Share</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── Desktop: slim vertical rail, sitting in the left margin beside the article ── */}
-      {/* How far left of centre the rail sits depends on the article layout, so each   */}
-      {/* branch of the post page declares it via --reading-rail-offset. The default    */}
-      {/* (640px) is the research layout's max-w-[1200px] two-column geometry; the      */}
-      {/* editorial branch overrides it to 424px = half its 680px column + a 28px       */}
-      {/* gutter + the rail's own 56px width.                                           */}
-      {/* left:50% rather than 50vw — vw includes the scrollbar width and would sit the */}
-      {/* rail a few px off true centre.                                                */}
-      <div
-        className="hidden xl:block"
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          marginLeft: "calc(-1 * var(--reading-rail-offset, 640px))",
-          transform: "translateY(-50%)",
-          zIndex: 40,
-        }}
-      >
-        <div className="flex flex-col items-center gap-1 rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_4px_24px_-2px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.03)]">
-          {/* Like */}
-          <button
-            onClick={handleLike}
-            className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 ${liked ? "text-red-500" : "text-gray-400"}`}
-            aria-label={liked ? "Unlike" : "Like"}
-          >
-            <svg className="h-5 w-5" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
-          </button>
-          <span className={`text-[11px] font-semibold tabular-nums leading-none ${liked ? "text-red-500" : "text-gray-400"}`}>
-            {likeCount}
-          </span>
-
-          {/* Bookmark */}
-          <button
-            onClick={handleBookmark}
-            className={`mt-1 flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 ${bookmarked ? "text-emerald-600" : "text-gray-400"}`}
-            aria-label={bookmarked ? "Unsave" : "Save"}
-          >
-            <svg className="h-5 w-5" fill={bookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-            </svg>
-          </button>
-
-          {/* Share */}
-          <button
-            onClick={handleShare}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Share"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
-            </svg>
-          </button>
-
-          {/* Divider */}
-          <div className="my-0.5 h-px w-6 rounded-full bg-gray-200" />
-
-          {/* Write a response */}
-          <ResponseStartLink
-            postId={postId}
-            source="reading_bar"
-            userId={userId}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-emerald-600 transition-colors hover:bg-emerald-50"
-          >
-            <span className="sr-only">Write a response</span>
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-              aria-hidden="true"
+        <div
+          /* Docks above the mobile tab bar, then reclaims that space from md up
+             where BottomNav is hidden. */
+          className="pointer-events-none fixed inset-x-0 z-40 px-4 [--post-bar-inset:calc(var(--app-bottom-nav-height)+0.5rem)] md:[--post-bar-inset:1rem]"
+          style={{
+            bottom:
+              "calc(var(--mobile-visual-viewport-bottom, 0px) + var(--post-bar-inset) + env(safe-area-inset-bottom))",
+          }}
+        >
+          <div className="pointer-events-auto mx-auto flex min-h-[56px] max-w-[420px] items-center rounded-2xl border border-card-border bg-surface/95 px-1 shadow-[0_14px_34px_-14px_rgb(0_0_0/0.42)] backdrop-blur sm:max-w-[500px]">
+            <button
+              type="button"
+              onClick={() => void toggleLike()}
+              aria-pressed={liked ?? undefined}
+              aria-label={liked ? "Unlike this post" : "Like this post"}
+              className={`${cell} ${liked ? "text-red-600" : "text-ink-muted"}`}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4" />
-            </svg>
-          </ResponseStartLink>
+              <svg
+                className="h-5 w-5"
+                fill={liked ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+              <span className={`${label} tabular-nums`}>{likeCount}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void toggleBookmark()}
+              aria-pressed={bookmarked ?? undefined}
+              aria-label={bookmarked ? "Remove bookmark" : "Save this post"}
+              className={`${cell} ${bookmarked ? "text-emerald-ink" : "text-ink-muted"}`}
+            >
+              <svg
+                className="h-5 w-5"
+                fill={bookmarked ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                />
+              </svg>
+              <span className={label}>{bookmarked ? "Saved" : "Save"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleShare}
+              aria-label="Share this post"
+              className={`${cell} text-ink-muted`}
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"
+                />
+              </svg>
+              <span className={label}>Share</span>
+            </button>
+
+            <ResponseStartLink
+              postId={postId}
+              source="reading_bar"
+              userId={userId}
+              className={`${cell} text-emerald-ink`}
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4"
+                />
+              </svg>
+              <span className={label}>Respond</span>
+            </ResponseStartLink>
+          </div>
         </div>
-      </div>
-        </>
       )}
     </>
   );

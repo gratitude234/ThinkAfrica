@@ -76,6 +76,13 @@ const config: Config = {
         title: ["clamp(19px, 16.17px + 0.76vw, 21px)", { lineHeight: "1.3" }],
         headline: ["clamp(22px, 13.51px + 2.26vw, 28px)", { lineHeight: "1.12" }],
         display: ["clamp(25px, 15.09px + 2.64vw, 32px)", { lineHeight: "1.08" }],
+        /**
+         * The post detail headline, the largest type in the app. `display` tops
+         * out at 32px and the article h1 wants 40px, so the page was carrying
+         * its own `text-[30px] sm:text-[40px]` pair -- the exact two-sizes-half-
+         * a-pixel-apart pattern the fluid tokens above exist to retire.
+         */
+        feature: ["clamp(30px, 25.86px + 1.1vw, 40px)", { lineHeight: "1.06" }],
       },
 
       // The comfortable reading measure for feed prose. 68 characters sits in

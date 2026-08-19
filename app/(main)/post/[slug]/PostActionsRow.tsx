@@ -25,7 +25,7 @@ interface PostActionsRowProps {
 }
 
 const ACTION_CLASS =
-  "inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-[15px] font-medium text-gray-700 transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
+  "inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-excerpt font-medium text-ink-soft transition-colors hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
 
 export default function PostActionsRow({
   postId,
@@ -104,7 +104,7 @@ export default function PostActionsRow({
   }, [setInlineActionsVisible]);
 
   return (
-    <div ref={rowRef} className="border-y border-gray-200 py-1.5">
+    <div ref={rowRef} className="border-y border-card-border py-1.5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:gap-x-8">
         <button
           type="button"
@@ -151,7 +151,7 @@ export default function PostActionsRow({
           </svg>
           Reply
           {discussionCount > 0 ? (
-            <span className="text-gray-500">{discussionCount}</span>
+            <span className="text-ink-muted">{discussionCount}</span>
           ) : null}
         </button>
 
