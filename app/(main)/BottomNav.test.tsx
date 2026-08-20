@@ -45,14 +45,20 @@ describe("BottomNav compose access", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("keeps the compose FAB on post pages while hiding the regular bottom nav", () => {
+  it("renders no mobile chrome on post pages, FAB included", () => {
     navigationState.pathname = "/post/a-test-post";
 
     render(
       <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
     );
 
-    expect(screen.getByRole("button", { name: "Publish a contribution" })).toBeInTheDocument();
+    // The post page floats its own ReadingBar, whose Respond writes a reply to
+    // the piece being read. The compose FAB opened a blank /create/post from
+    // 40px away, so the corner offered two writing controls and the more
+    // prominent one led away from the article.
+    expect(
+      screen.queryByRole("button", { name: "Publish a contribution" })
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("navigation", { name: "Primary navigation" })
     ).not.toBeInTheDocument();

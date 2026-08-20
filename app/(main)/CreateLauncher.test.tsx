@@ -94,28 +94,18 @@ describe("CreateLauncher -- direct-to-composer", () => {
     expect(mobileWrapper).toHaveClass("md:hidden");
   });
 
-  it("lets the shared chrome move a feed FAB down but keeps a post FAB clear of the reading bar", () => {
-    const { rerender } = render(
-      <CreateLauncher userId="user-1" variant="mobileFab" />
-    );
-    let fab = screen.getByRole("button", { name: "Publish a contribution" });
+  it("clears the mobile tab bar, with no post-page special case left to keep in step", () => {
+    render(<CreateLauncher userId="user-1" variant="mobileFab" />);
+    const fab = screen.getByRole("button", { name: "Publish a contribution" });
 
     expect(fab).toHaveAttribute("data-app-compose-fab");
     expect(fab).toHaveAttribute("data-app-chrome-motion");
-    expect(fab).not.toHaveAttribute("data-app-compose-fab-static");
+    // The 112px post-page variant is gone with the post-page FAB itself. It
+    // existed only to clear the ReadingBar, and it was a second offset that had
+    // to be re-tuned by hand whenever the bar moved.
     expect(fab).toHaveStyle({
       bottom:
         "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
-    });
-
-    rerender(
-      <CreateLauncher userId="user-1" variant="mobileFab" isPostPage />
-    );
-    fab = screen.getByRole("button", { name: "Publish a contribution" });
-    expect(fab).toHaveAttribute("data-app-compose-fab-static");
-    expect(fab).toHaveStyle({
-      bottom:
-        "calc(112px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
     });
   });
 });

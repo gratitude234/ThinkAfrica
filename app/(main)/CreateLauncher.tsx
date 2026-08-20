@@ -8,7 +8,6 @@ interface CreateLauncherProps {
   userId: string | null;
   variant?: "desktop" | "mobileFab";
   isActive?: boolean;
-  isPostPage?: boolean;
 }
 
 function PlusIcon({ className = "h-4 w-4" }: { className?: string }) {
@@ -88,7 +87,6 @@ export default function CreateLauncher({
   userId,
   variant = "desktop",
   isActive = false,
-  isPostPage = false,
 }: CreateLauncherProps) {
   const router = useRouter();
   const { requestAuth } = useGuestAuthGate();
@@ -107,17 +105,14 @@ export default function CreateLauncher({
           type="button"
           onClick={handleTrigger}
           data-app-compose-fab=""
-          data-app-compose-fab-static={isPostPage ? "" : undefined}
           data-app-chrome-motion=""
           className="group fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition-[background-color,box-shadow,transform] duration-200 hover:bg-[#0E4B37] hover:shadow-[0_10px_24px_-7px_rgb(7_57_41/0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 active:scale-[0.96] motion-reduce:transition-none"
           style={{
-            // On post pages the mobile ReadingBar pill (ReadingBar.tsx) also floats
-            // near the bottom; its top edge lands right at the 72px mark, so it needs
-            // extra clearance here to avoid the two overlapping when the pill grows
-            // a few px taller than its 56px baseline (larger text-size settings, etc).
-            bottom: isPostPage
-              ? "calc(112px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))"
-              : "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
+            // Clears the mobile tab bar. There is no post-page branch any more:
+            // BottomNav no longer renders on /post/*, so this never has to share
+            // the corner with the ReadingBar.
+            bottom:
+              "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
           }}
           aria-label={isNavigating ? "Opening the composer" : "Publish a contribution"}
           disabled={isNavigating}

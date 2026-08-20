@@ -102,12 +102,13 @@ export default function ReadingBar({
       ) : null}
       {!showBar ? null : (
         <div
-          /* Docks above the mobile tab bar, then reclaims that space from md up
-             where BottomNav is hidden. */
-          className="pointer-events-none fixed inset-x-0 z-40 px-4 [--post-bar-inset:calc(var(--app-bottom-nav-height)+0.5rem)] md:[--post-bar-inset:1rem]"
+          /* Nothing else floats at the foot of a post: shouldShowMobilePrimaryNav
+             is false for /post/*, so neither the tab bar nor the compose FAB
+             renders here. One inset works at every width. */
+          className="pointer-events-none fixed inset-x-0 z-40 px-4"
           style={{
             bottom:
-              "calc(var(--mobile-visual-viewport-bottom, 0px) + var(--post-bar-inset) + env(safe-area-inset-bottom))",
+              "calc(var(--mobile-visual-viewport-bottom, 0px) + 0.75rem + env(safe-area-inset-bottom))",
           }}
         >
           <div className="pointer-events-auto mx-auto flex min-h-[56px] max-w-[420px] items-center rounded-2xl border border-card-border bg-surface/95 px-1 shadow-[0_14px_34px_-14px_rgb(0_0_0/0.42)] backdrop-blur sm:max-w-[500px]">

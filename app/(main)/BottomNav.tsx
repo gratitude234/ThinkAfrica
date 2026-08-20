@@ -49,9 +49,12 @@ export default function BottomNav({
     return () => setInteractionLocked(false);
   }, [setInteractionLocked]);
 
-  const isPostPage = pathname.startsWith("/post/");
   const showPrimaryNav = shouldShowMobilePrimaryNav(pathname);
-  if (!showPrimaryNav && !isPostPage) {
+  // Post pages get no mobile chrome from here. They used to keep the compose
+  // FAB alone, which put a second floating writing control 40px from the
+  // ReadingBar's Respond -- and the FAB opens a blank /create/post, so it led
+  // away from the piece being read rather than into a reply to it.
+  if (!showPrimaryNav) {
     return null;
   }
 
@@ -67,7 +70,7 @@ export default function BottomNav({
 
   return (
     <>
-      <CreateLauncher userId={userId} variant="mobileFab" isPostPage={isPostPage} />
+      <CreateLauncher userId={userId} variant="mobileFab" />
 
       {/* The bar drops away on a downward scroll and returns on an upward one,
           in step with the top nav: reading a feed on a phone should get the
@@ -77,8 +80,7 @@ export default function BottomNav({
           bar holds no fixed descendants, so making it a containing block costs
           nothing. translate-y-full clears that padding too, which a fixed pixel
           offset would leave stranded on notched devices. */}
-      {showPrimaryNav ? (
-        <nav
+      <nav
           data-app-bottom-nav=""
           data-app-chrome-motion=""
           onFocus={() => setInteractionLocked(true)}
@@ -94,7 +96,7 @@ export default function BottomNav({
           }}
           aria-label="Primary navigation"
         >
-        <div className="flex h-[var(--app-bottom-nav-height)] items-center justify-around px-2">
+        <div className="flex h-[60px] items-center justify-around px-2">
           <Link
             href="/"
             className={navLinkClass(isHomeActive)}
@@ -167,8 +169,7 @@ export default function BottomNav({
             </span>
           </Link>
         </div>
-        </nav>
-      ) : null}
+      </nav>
     </>
   );
 }

@@ -63,11 +63,6 @@
        equal to the measured nav height. */
     --app-nav-offset: var(--app-nav-height);
     --app-sticky-offset: calc(var(--app-nav-offset) + 1rem);
-    /* The mobile tab bar's own height. Shared so anything docking above it
-       (the post reading bar) clears it instead of guessing at 60px and
-       rendering underneath. BottomNav is md:hidden, so callers that dock at
-       md and up override this to 0px rather than reading it. */
-    --app-bottom-nav-height: 60px;
   }
 
   /* Dark mode. A warm, slightly green-shifted dark rather than pure black --
