@@ -6,9 +6,17 @@ interface Props {
   postId: string;
   userId: string | null;
   userProfileId: string | null;
+  /** False when "Discussion · N" is the only tier on the page and already
+   *  names the count, so the thread does not repeat it. */
+  showHeading: boolean;
 }
 
-export default async function CommentsLoader({ postId, userId, userProfileId }: Props) {
+export default async function CommentsLoader({
+  postId,
+  userId,
+  userProfileId,
+  showHeading,
+}: Props) {
   const supabase = await createClient();
 
   const [page, totalCount] = await Promise.all([
@@ -26,6 +34,7 @@ export default async function CommentsLoader({ postId, userId, userProfileId }: 
       userId={userId}
       userProfileId={userProfileId}
       userVotedCommentIds={page.userVotedCommentIds}
+      showHeading={showHeading}
     />
   );
 }

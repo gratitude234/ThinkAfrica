@@ -51,7 +51,6 @@ import {
   isFormallyReviewed,
   resolveArticleFormat,
   resolveContentKind,
-  type ArticleFormat,
 } from "@/lib/contentModel";
 import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
 
@@ -242,12 +241,15 @@ function injectHeadingIds(content: string): { html: string; headings: BodyHeadin
  * it needs a letter to set. It used to land on the first paragraph of every
  * article at 640px and up: one-sentence ledes, paragraphs opening on a
  * quotation mark, paragraphs opening on a digit.
+ *
+ * Deliberately not gated on article_format. A generic Article resolves to a
+ * null format, so gating on essay/policy_brief silently removed the cap from
+ * the most common kind of post there is. The length and first-character tests
+ * below are what actually prevent the bad settings.
  */
 const DROP_CAP_MIN_CHARACTERS = 180;
 
-function earnsDropCap(content: string, format: ArticleFormat | null): boolean {
-  if (format !== "essay" && format !== "policy_brief") return false;
-
+function earnsDropCap(content: string): boolean {
   const firstParagraph = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1];
   if (!firstParagraph) return false;
 
@@ -2205,7 +2207,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
 
           <div
             className={`article-journal-body article-redesign-body relative mb-10 sm:mb-12${
-              earnsDropCap(sanitizedContent, isArticlePost ? resolveArticleFormat(post) : null) ? " has-dropcap" : ""
+              earnsDropCap(sanitizedContent) ? " has-dropcap" : ""
             }`}
           >
             <HighlightShare containerId="post-article-prose" postSlug={post.slug} postId={post.id} />

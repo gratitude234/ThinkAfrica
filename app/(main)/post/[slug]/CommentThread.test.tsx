@@ -350,6 +350,21 @@ describe("CommentThread", () => {
     expect(screen.getByText("Reply number 4.")).toBeInTheDocument();
   });
 
+  it("drops its own heading when Discussion above is the only tier", () => {
+    // A post with no Responses was rendering "Discussion · 0" and
+    // "Comments · 0" stacked, with the composer wedged between them.
+    renderThread({ initialComments: [], initialTotalCount: 0, showHeading: false });
+
+    expect(screen.queryByText(/^Comments · /)).toBeNull();
+    expect(screen.getByText("No comments yet. Start the conversation.")).toBeInTheDocument();
+  });
+
+  it("keeps its heading when Responses share the section", () => {
+    renderThread({ initialTotalCount: 24, showHeading: true });
+
+    expect(screen.getByText("Comments · 24")).toBeInTheDocument();
+  });
+
   it("gives every comment a permalink", () => {
     renderThread();
 

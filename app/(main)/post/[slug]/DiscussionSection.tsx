@@ -102,7 +102,12 @@ export default function DiscussionSection({
             <p className="text-excerpt text-ink-muted">Loading comments…</p>
           }
         >
-          <CommentsLoader postId={postId} userId={userId} userProfileId={userProfileId} />
+          <CommentsLoader
+            postId={postId}
+            userId={userId}
+            userProfileId={userProfileId}
+            showHeading={responseCards.length > 0}
+          />
         </Suspense>
       </div>
 

@@ -30,6 +30,10 @@ interface CommentThreadProps {
   userId: string | null;
   userProfileId: string | null;
   userVotedCommentIds?: string[];
+  /** False when "Discussion · N" above is the only tier and already carries the
+   *  count. Without this a post with no Responses showed "Discussion · 0" and
+   *  "Comments · 0" stacked, with the composer wedged between them. */
+  showHeading?: boolean;
 }
 
 /** Replies shown before a chain collapses behind "Show N more replies". */
@@ -58,6 +62,7 @@ export default function CommentThread({
   userId,
   userProfileId,
   userVotedCommentIds = [],
+  showHeading = true,
 }: CommentThreadProps) {
   const { requestAuth } = useGuestAuthGate();
   const [comments, setComments] = useState<ThreadComment[]>(() =>
@@ -454,10 +459,16 @@ export default function CommentThread({
 
   return (
     <section id="comments" className="scroll-mt-24">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-title font-semibold text-ink">
-          Comments · {totalCount}
-        </h2>
+      <div
+        className={`flex flex-wrap items-center gap-3 ${
+          showHeading ? "justify-between" : "justify-end"
+        }`}
+      >
+        {showHeading ? (
+          <h2 className="font-display text-title font-semibold text-ink">
+            Comments · {totalCount}
+          </h2>
+        ) : null}
 
         {/* The score has to change something, or the upvote button is a lie. */}
         {comments.length > 1 ? (
