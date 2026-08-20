@@ -45,6 +45,7 @@ import { getMessageEligibility } from "@/lib/messaging";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
 import { getPostQualitySummary } from "@/lib/postQuality";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
+import { earnsDropCap, stripLeadingEmptyParagraphs } from "@/lib/articleTypography";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import {
   getArticleFormatLabel,
@@ -232,32 +233,6 @@ function injectHeadingIds(content: string): { html: string; headings: BodyHeadin
   );
 
   return { html, headings };
-}
-
-/**
- * Whether the body earns a drop cap.
- *
- * A 5rem floated capital needs a paragraph deep enough to wrap around it, and
- * it needs a letter to set. It used to land on the first paragraph of every
- * article at 640px and up: one-sentence ledes, paragraphs opening on a
- * quotation mark, paragraphs opening on a digit.
- *
- * Deliberately not gated on article_format. A generic Article resolves to a
- * null format, so gating on essay/policy_brief silently removed the cap from
- * the most common kind of post there is. The length and first-character tests
- * below are what actually prevent the bad settings.
- */
-const DROP_CAP_MIN_CHARACTERS = 180;
-
-function earnsDropCap(content: string): boolean {
-  const firstParagraph = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1];
-  if (!firstParagraph) return false;
-
-  const text = firstParagraph.replace(/<[^>]*>/g, "").trim();
-  if (text.length < DROP_CAP_MIN_CHARACTERS) return false;
-
-  // A floated cap on a quote mark or a numeral is a typographic accident.
-  return /^\p{Letter}/u.test(text);
 }
 
 function renderReferenceShortcodes(content: string): string {
@@ -1726,8 +1701,9 @@ export default async function PostPage({ params, searchParams }: PageProps) {
   const sanitizedExcerpt = sanitizePostExcerpt(post.excerpt);
   const readTime = estimateReadTime(sanitizedContent);
   const wordCount = countWords(sanitizedContent);
-  const { html: headedContent, headings: bodyHeadings } =
-    injectHeadingIds(sanitizedContent);
+  const { html: headedContent, headings: bodyHeadings } = injectHeadingIds(
+    stripLeadingEmptyParagraphs(sanitizedContent)
+  );
   const contentWithIds = renderReferenceShortcodes(headedContent);
   const authorName = author?.full_name ?? author?.username ?? "Anonymous";
   const displayTitle = getPostDisplayTitle(post);

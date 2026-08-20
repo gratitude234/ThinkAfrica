@@ -315,10 +315,11 @@
 
 @media (min-width: 640px) {
   /* Drop cap on the first paragraph of the article body.
-     Opt-in: page.tsx adds `has-dropcap` only for essay and policy-brief
-     formats whose opening paragraph is long enough to carry a 5rem floated
-     capital. It used to land on every article unconditionally, so a
-     one-sentence lede got a cap taller than the paragraph beside it. */
+     Opt-in: page.tsx adds `has-dropcap` only when the opening paragraph is
+     long enough to wrap around a 5rem floated capital and actually starts on a
+     letter. It used to land on every article unconditionally, so a
+     one-sentence lede got a cap taller than the paragraph beside it, and an
+     opening quotation mark or numeral got set at 5rem. */
   .article-journal-body.has-dropcap .prose > p:first-of-type::first-letter {
 font-family: var(--font-bodoni), Georgia, serif;
     font-size: 5rem;
