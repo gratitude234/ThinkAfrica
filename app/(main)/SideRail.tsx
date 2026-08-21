@@ -98,7 +98,15 @@ export default function SideRail({
       // sliding up while this column stays behind. max-h stays on the measured
       // height: it is a ceiling, not a size, and animating it would resize a
       // scrolling column mid-scroll for no visible gain.
-      className="hidden xl:sticky xl:top-[var(--app-sticky-offset)] xl:block xl:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain"
+      //
+      // Deliberately not overscroll-contain. Containment is for a surface you
+      // would lose your place behind (a thread, a dropdown); a nav rail beside
+      // a feed is not one. It also made the behaviour depend on window height:
+      // on a tall window the rail fits, is not really a scroller, and the wheel
+      // passes through to the page, while on a short one the page stopped dead
+      // under the pointer. Chaining keeps one gesture meaning one thing
+      // wherever it lands.
+      className="hidden xl:sticky xl:top-[var(--app-sticky-offset)] xl:block xl:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] xl:self-start xl:overflow-y-auto"
     >
       <nav aria-label="Sections" className="flex flex-col gap-0.5">
         <RailLink
