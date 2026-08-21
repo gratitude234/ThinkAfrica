@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import {
   fetchCitableFeed,
   fetchFeedPage,
+  type FeedContentFilter,
   type FeedTimeframe,
   type FeedTabKey,
 } from "@/lib/feedData";
@@ -27,8 +28,6 @@ export interface DiscoverTopic {
 }
 
 export interface DiscoverPerson extends SuggestedPerson {
-  points: number | null;
-  field_of_study: string | null;
   followed: boolean;
   subscribed: boolean;
 }
@@ -41,15 +40,6 @@ export interface DiscoverDebate {
   argumentCount: number;
 }
 
-export interface DiscoverPrompt {
-  key: string;
-  label: string;
-  description: string;
-  href: string;
-  cta: string;
-  source: "interest" | "follow" | "conversation" | "debate" | "opportunity" | "trending";
-}
-
 export interface DiscoverConversation {
   postId: string;
   title: string;
@@ -58,14 +48,6 @@ export interface DiscoverConversation {
   reason: string;
   responseCount: number;
   referenceCount: number;
-}
-
-export interface DiscoverOpportunityHighlight {
-  key: string;
-  title: string;
-  body: string;
-  href: string;
-  kind: "fellowship" | "profiles" | "setup";
 }
 
 export interface DiscoverFellowship {
@@ -80,23 +62,41 @@ export interface DiscoverOpportunitySummary {
   openFellowshipCount: number;
 }
 
+/**
+ * One page of a paginated Explore shelf. `hasMore`/`nextCursor` come straight
+ * from `fetchFeedPage` so the client can continue the same query through
+ * `/api/feed` instead of the shelf ending wherever the server render stopped.
+ */
+export interface DiscoverFeedSlice {
+  posts: PostCardData[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+/**
+ * The content filter Explore renders under, resolved before any query runs.
+ * `primary` is pushed down to the database; `genre` refines Articles in memory
+ * because article_format is descriptive metadata rather than a feed axis.
+ */
+export interface DiscoverFilters {
+  primary: FeedContentFilter;
+  genre: "all" | "general" | "essay" | "policy_brief";
+}
+
 export interface DiscoverData {
   userInterests: string[];
   topicSubscriptionKeys: string[];
   userUniversity: string | null;
   followedIds: string[];
-  forYouPosts: PostCardData[];
-  trendingPosts: PostCardData[];
+  forYou: DiscoverFeedSlice;
+  trending: DiscoverFeedSlice;
   citablePosts: PostCardData[];
   topics: DiscoverTopic[];
   people: DiscoverPerson[];
   peopleReason: string;
-  personalizedPrompts: DiscoverPrompt[];
   activeConversations: DiscoverConversation[];
-  activeDebate: DiscoverDebate | null;
   debateHighlights: DiscoverDebate[];
   fellowships: DiscoverFellowship[];
-  opportunityHighlights: DiscoverOpportunityHighlight[];
   opportunitySummary: DiscoverOpportunitySummary;
 }
 
@@ -247,14 +247,20 @@ async function getFeed(
     followedIds: string[];
     excludedAuthorIds?: string[];
     pageSize: number;
+    type: FeedContentFilter;
   }
-) {
+): Promise<DiscoverFeedSlice> {
   const result = await fetchFeedPage({
     supabase,
     tab: options.tab,
     page: 1,
     pageSize: options.pageSize,
-    type: null,
+    // The active filter is pushed down to the query. It used to be hardcoded
+    // to null while Explore filtered the returned page in memory, so asking
+    // for Research searched only whatever handful of posts the unfiltered
+    // ranking happened to return and reported "nothing here" when none of
+    // them matched.
+    type: options.type === "all" ? null : options.type,
     timeframe: options.timeframe,
     userId: options.userId,
     userInterests: options.userInterests,
@@ -263,7 +269,11 @@ async function getFeed(
     excludedAuthorIds: options.excludedAuthorIds,
   });
 
-  return result.posts;
+  return {
+    posts: result.posts,
+    hasMore: result.hasMore,
+    nextCursor: result.nextCursor ?? null,
+  };
 }
 
 export async function getPublicTopicCounts(
@@ -343,12 +353,14 @@ async function getPeople(
     userUniversity,
     fieldOfStudy,
     followedIds,
+    blockedIds,
     authorSubscriptionIds,
   }: {
     userId: string | null;
     userUniversity: string | null;
     fieldOfStudy: string | null;
     followedIds: string[];
+    blockedIds: string[];
     authorSubscriptionIds: string[];
   }
 ): Promise<{ people: DiscoverPerson[]; reason: string }> {
@@ -360,6 +372,11 @@ async function getPeople(
       currentUserId: userId,
       university: userUniversity,
       fieldOfStudy,
+      // Both graphs are already loaded by getUserContext. Passing them in
+      // stops getSuggestedPeople re-querying follows and user_blocks for rows
+      // this request is already holding.
+      followedIds,
+      excludedUserIds: blockedIds,
       limit: 8,
     });
 
@@ -367,10 +384,12 @@ async function getPeople(
       reason: result.reason,
       people: result.suggestions.map((person) => ({
         ...person,
-        points: null,
-        field_of_study: null,
-        followed: false,
-        subscribed: false,
+        // Suggestions are drawn from people the viewer does not already
+        // follow, so `followed` is false by construction. The academic
+        // signal now survives instead of being stubbed to null, which is
+        // what made a signed-in person card carry less than a signed-out one.
+        followed: followed.has(person.id),
+        subscribed: subscribed.has(person.id),
       })),
     };
   }
@@ -435,13 +454,6 @@ const getCachedTopPeople = unstable_cache(
   ["discover-top-people"],
   { revalidate: 300, tags: ["discover", "people"] }
 );
-
-async function getActiveDebate(
-  supabase: SupabaseLike
-): Promise<DiscoverDebate | null> {
-  const debates = await getDebateHighlights(supabase);
-  return debates[0] ?? null;
-}
 
 async function getDebateHighlights(
   supabase: SupabaseLike
@@ -606,139 +618,39 @@ function buildActiveConversations(posts: PostCardData[]): DiscoverConversation[]
     }));
 }
 
-function buildOpportunityHighlights(
-  fellowships: DiscoverFellowship[],
-  summary: DiscoverOpportunitySummary
-): DiscoverOpportunityHighlight[] {
-  const fellowshipHighlights = fellowships.slice(0, 2).map((fellowship) => ({
-    key: `fellowship-${fellowship.id}`,
-    title: fellowship.title,
-    body: fellowship.sponsor_name ?? "Curated opportunity",
-    href: `/fellowships/${fellowship.id}`,
-    kind: "fellowship" as const,
-  }));
 
-  if (fellowshipHighlights.length > 0) return fellowshipHighlights;
+/**
+ * A full first page rather than a shelf. Explore used to fetch six posts with
+ * no way to ask for a seventh, so the page ended a few seconds after it
+ * loaded. This matches the home feed's page size; `/api/feed` continues from
+ * here when the reader asks for more.
+ */
+export const EXPLORE_PAGE_SIZE = 12;
 
-  if (summary.openProfileCount > 0) {
-    return [
-      {
-        key: "open-profiles",
-        title: "Find open contributor profiles",
-        body: `${summary.openProfileCount.toLocaleString()} people are open to collaborations or roles.`,
-        href: "/opportunities",
-        kind: "profiles",
-      },
-    ];
-  }
-
-  return [
-    {
-      key: "setup-profile",
-      title: "Make your profile discoverable",
-      body: "Signal your skills, interests, and availability for collaboration.",
-      href: "/opportunities",
-      kind: "setup",
-    },
-  ];
-}
-
-function buildPersonalizedPrompts({
-  userId,
-  interests,
-  followedIds,
-  topics,
-  people,
-  activeConversations,
-  debateHighlights,
-  opportunityHighlights,
-}: {
-  userId: string | null;
-  interests: string[];
-  followedIds: string[];
-  topics: DiscoverTopic[];
-  people: DiscoverPerson[];
-  activeConversations: DiscoverConversation[];
-  debateHighlights: DiscoverDebate[];
-  opportunityHighlights: DiscoverOpportunityHighlight[];
-}): DiscoverPrompt[] {
-  const prompts: DiscoverPrompt[] = [];
-  const firstInterest = interests[0] ?? topics[0]?.tag;
-
-  if (firstInterest) {
-    prompts.push({
-      key: "interest-topic",
-      label: `Read ${firstInterest}`,
-      description: userId
-        ? "Start with work connected to your saved interests."
-        : "Start with a topic the community is writing about.",
-      href: `/topics/${encodeURIComponent(firstInterest)}`,
-      cta: "Open topic",
-      source: interests.length > 0 ? "interest" : "trending",
-    });
-  }
-
-  if (userId && followedIds.length < 3 && people.length > 0) {
-    prompts.push({
-      key: "follow-writers",
-      label: "Follow useful writers",
-      description: "Following a few writers makes Explore and Home sharper.",
-      href: "/explore?tab=people",
-      cta: "Find writers",
-      source: "follow",
-    });
-  }
-
-  if (activeConversations.length > 0) {
-    prompts.push({
-      key: "active-conversation",
-      label: "Join an active conversation",
-      description: activeConversations[0].reason,
-      href: `/post/${activeConversations[0].slug}`,
-      cta: "Read and respond",
-      source: "conversation",
-    });
-  }
-
-  if (debateHighlights.length > 0) {
-    prompts.push({
-      key: "debate",
-      label: "Join a debate",
-      description: `${debateHighlights[0].argumentCount.toLocaleString()} arguments so far.`,
-      href: `/debates/${debateHighlights[0].id}`,
-      cta: "Open debate",
-      source: "debate",
-    });
-  }
-
-  if (opportunityHighlights.length > 0) {
-    prompts.push({
-      key: "opportunity",
-      label: "Explore opportunities",
-      description: opportunityHighlights[0].body,
-      href: opportunityHighlights[0].href,
-      cta: "View opportunity",
-      source: "opportunity",
-    });
-  }
-
-  return prompts.slice(0, 3);
-}
+/**
+ * The Citable shelf is deliberately finite: fetchCitableFeed is a cached,
+ * offset-less query over posts carrying real citation evidence, and there is
+ * usually little enough of it that a full page is the whole archive. It gets
+ * a bigger shelf and an explicit exit link rather than a load-more path.
+ */
+const CITABLE_SHELF_SIZE = 12;
 
 export async function getDiscoverData(
   supabase: SupabaseLike,
-  userId: string | null
+  userId: string | null,
+  filters: DiscoverFilters = { primary: "all", genre: "all" }
 ): Promise<DiscoverData> {
   const userContext = await getUserContext(supabase, userId);
 
   const [
-    forYouPosts,
-    trendingPosts,
+    forYou,
+    trending,
     citablePosts,
     topics,
     peopleResult,
     debateHighlights,
     fellowships,
+    opportunitySummary,
   ] = await Promise.all([
     getFeed(supabase, {
       tab: "home",
@@ -748,7 +660,8 @@ export async function getDiscoverData(
       userUniversity: userContext.university,
       followedIds: userContext.followedIds,
       excludedAuthorIds: userContext.blockedIds,
-      pageSize: 6,
+      pageSize: EXPLORE_PAGE_SIZE,
+      type: filters.primary,
     }),
     getFeed(supabase, {
       tab: "home",
@@ -757,59 +670,47 @@ export async function getDiscoverData(
       userInterests: [],
       userUniversity: null,
       followedIds: [],
-      pageSize: 8,
+      pageSize: EXPLORE_PAGE_SIZE,
+      type: filters.primary,
     }),
-    fetchCitableFeed(supabase, 8),
+    fetchCitableFeed(supabase, CITABLE_SHELF_SIZE),
     getTopics(supabase, userContext.interests),
     getPeople(supabase, {
       userId,
       userUniversity: userContext.university,
       fieldOfStudy: userContext.fieldOfStudy,
       followedIds: userContext.followedIds,
+      blockedIds: userContext.blockedIds,
       authorSubscriptionIds: userContext.authorSubscriptionIds,
     }),
     getDebateHighlights(supabase),
     getFellowships(supabase),
+    // Previously awaited on its own line after this Promise.all, which added a
+    // whole serial round trip to every Explore render for a query that depends
+    // on nothing above it.
+    getOpportunitySummary(supabase),
   ]);
 
-  const opportunitySummary = await getOpportunitySummary(supabase);
   const activeConversations = buildActiveConversations([
-    ...forYouPosts,
-    ...trendingPosts,
+    ...forYou.posts,
+    ...trending.posts,
     ...citablePosts,
   ]);
-  const opportunityHighlights = buildOpportunityHighlights(
-    fellowships,
-    opportunitySummary
-  );
-  const personalizedPrompts = buildPersonalizedPrompts({
-    userId,
-    interests: userContext.interests,
-    followedIds: userContext.followedIds,
-    topics,
-    people: peopleResult.people,
-    activeConversations,
-    debateHighlights,
-    opportunityHighlights,
-  });
 
   return {
     userInterests: userContext.interests,
     topicSubscriptionKeys: userContext.topicSubscriptionKeys,
     userUniversity: userContext.university,
     followedIds: userContext.followedIds,
-    forYouPosts,
-    trendingPosts,
+    forYou,
+    trending,
     citablePosts,
     topics,
     people: peopleResult.people,
     peopleReason: peopleResult.reason,
-    personalizedPrompts,
     activeConversations,
-    activeDebate: debateHighlights[0] ?? null,
     debateHighlights,
     fellowships,
-    opportunityHighlights,
     opportunitySummary,
   };
 }

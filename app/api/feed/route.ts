@@ -45,6 +45,18 @@ function getType(param: string | null) {
   return normalized === "all" ? null : normalized;
 }
 
+/**
+ * Explore's Trending shelf is deliberately global: its first page is rendered
+ * with no viewer signals so everyone sees the same week. Without this flag the
+ * continuation request would be personalized for a signed-in reader, so page 2
+ * would be ranked against a different feed than page 1 and the reader would
+ * see repeats and gaps across the seam. Blocking is deliberately NOT waived
+ * here -- a depersonalized shelf still must not surface a blocked author.
+ */
+function isPersonalized(param: string | null) {
+  return param !== "0";
+}
+
 function getPositiveInteger(
   param: string | null,
   fallback: number,
@@ -79,6 +91,7 @@ export async function GET(request: NextRequest) {
     const tab = getTab(params.get("tab"));
     const timeframe = getTimeframe(params.get("timeframe"));
     const type = getType(params.get("type"));
+    const personalized = isPersonalized(params.get("personalized"));
     const subscriptionSource = getSource(params.get("source"));
     const cursor = params.get("cursor");
     const requestedFeedSessionId = params.get("session");
@@ -147,17 +160,21 @@ export async function GET(request: NextRequest) {
         throw new Error("Unable to load feed personalization context.");
       }
 
-      userInterests = (profile?.interests as string[] | null) ?? [];
-      userUniversity = profile?.university ?? null;
-      followedIds = (followedUsers ?? []).map(
-        (row: { following_id: string }) => row.following_id
-      );
-      topicSubscriptionKeys = (topicSubscriptions ?? []).map(
-        (row: { topic_key: string }) => row.topic_key
-      );
-      authorSubscriptionIds = (authorSubscriptions ?? []).map(
-        (row: { author_id: string }) => row.author_id
-      );
+      // A depersonalized request keeps the viewer's block list and drops every
+      // ranking signal, so the shelf matches the anonymous first page exactly.
+      if (personalized) {
+        userInterests = (profile?.interests as string[] | null) ?? [];
+        userUniversity = profile?.university ?? null;
+        followedIds = (followedUsers ?? []).map(
+          (row: { following_id: string }) => row.following_id
+        );
+        topicSubscriptionKeys = (topicSubscriptions ?? []).map(
+          (row: { topic_key: string }) => row.topic_key
+        );
+        authorSubscriptionIds = (authorSubscriptions ?? []).map(
+          (row: { author_id: string }) => row.author_id
+        );
+      }
       excludedAuthorIds = blockedIds;
     }
 
@@ -168,7 +185,7 @@ export async function GET(request: NextRequest) {
       pageSize,
       type,
       timeframe,
-      userId: user?.id ?? null,
+      userId: personalized ? user?.id ?? null : null,
       userInterests,
       userUniversity,
       followedIds,

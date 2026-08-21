@@ -7,7 +7,7 @@ import {
   type ActivationEventName,
 } from "@/lib/activationEvents";
 
-interface DiscoverTrackedLinkProps {
+interface ExploreTrackedLinkProps {
   href: string;
   children: ReactNode;
   className?: string;
@@ -19,14 +19,14 @@ interface DiscoverTrackedLinkProps {
   metadata?: Record<string, string | number | boolean | null>;
 }
 
-export default function DiscoverTrackedLink({
+export default function ExploreTrackedLink({
   href,
   children,
   className,
   ariaCurrent,
   event = "discover_item_clicked",
   metadata = {},
-}: DiscoverTrackedLinkProps) {
+}: ExploreTrackedLinkProps) {
   return (
     <Link
       href={href}

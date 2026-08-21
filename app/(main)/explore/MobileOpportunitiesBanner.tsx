@@ -1,4 +1,4 @@
-import DiscoverTrackedLink from "../discover/DiscoverTrackedLink";
+import ExploreTrackedLink from "./ExploreTrackedLink";
 
 export default function MobileOpportunitiesBanner({
   openProfileCount,
@@ -25,20 +25,20 @@ export default function MobileOpportunitiesBanner({
       : "Discover openings and make your profile visible.";
 
   return (
-    <DiscoverTrackedLink
+    <ExploreTrackedLink
       href="/opportunities"
       metadata={{ item: "mobile_opportunities", surface: "explore" }}
-      className="mb-4 flex min-h-16 items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3.5 lg:hidden"
+      className="mb-4 flex min-h-16 items-center justify-between gap-3 rounded-xl border border-green-wash-border bg-green-tint px-4 py-3.5 lg:hidden"
     >
       <span className="min-w-0">
-        <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+        <span className="block text-kicker font-semibold uppercase text-emerald-ink">
           Opportunities
         </span>
-        <span className="mt-1 block text-xs leading-5 text-emerald-950">
+        <span className="mt-1 block text-meta leading-5 text-ink">
           {summary}
         </span>
       </span>
-      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-emerald-700">
+      <span className="inline-flex shrink-0 items-center gap-1 text-meta font-semibold text-emerald-ink">
         Explore
         <svg
           className="h-3.5 w-3.5"
@@ -51,6 +51,6 @@ export default function MobileOpportunitiesBanner({
           <path strokeLinecap="round" strokeLinejoin="round" d="m9 5 7 7-7 7" />
         </svg>
       </span>
-    </DiscoverTrackedLink>
+    </ExploreTrackedLink>
   );
 }

@@ -90,6 +90,14 @@
     "components/profile/RecordPanel.tsx",
     "components/profile/ProfileDetails.tsx",
     "components/profile/RecentActivity.tsx",
-    "app/api/feed/route.ts"
+    "app/api/feed/route.ts",
+    "app/(main)/explore/page.tsx",
+    "app/(main)/explore/ExploreFeed.tsx",
+    "app/(main)/explore/ExploreTrackedLink.tsx",
+    "app/(main)/explore/ExploreTopicsGrid.tsx",
+    "app/(main)/explore/MobileOpportunitiesBanner.tsx",
+    "app/(main)/explore/exploreFilters.ts",
+    "app/(main)/explore/loading.tsx",
+    "app/(main)/discover/page.tsx"
   ]
 }

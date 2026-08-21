@@ -83,3 +83,39 @@ export function filterPostsByExplore(
   }
   return posts;
 }
+
+/**
+ * The Explore primary filter and the feed's content filter are the same three
+ * kinds under different names. Keeping the mapping explicit means a future
+ * divergence is a compile error here rather than a silently unfiltered query.
+ */
+export function toFeedContentFilter(
+  primary: ExplorePrimaryFilter
+): "all" | "post" | "article" | "research" {
+  return primary;
+}
+
+export function getPrimaryFilterLabel(primary: ExplorePrimaryFilter): string {
+  return (
+    PRIMARY_FILTERS.find((filter) => filter.value === primary)?.label ?? "All"
+  );
+}
+
+export function getGenreFilterLabel(genre: ExploreGenreFilter): string {
+  return (
+    GENRE_FILTERS.find((filter) => filter.value === genre)?.label ?? "All genres"
+  );
+}
+
+/**
+ * Whether the genre chips are narrowing an already-loaded set of Articles
+ * rather than the query itself. `article_format` is descriptive metadata, not
+ * a feed axis, so Essay/Policy Brief/General refine in memory. The UI says so
+ * when a refinement empties the page instead of claiming nothing exists.
+ */
+export function isGenreRefinementActive(
+  primary: ExplorePrimaryFilter,
+  genre: ExploreGenreFilter
+) {
+  return primary === "article" && genre !== "all";
+}

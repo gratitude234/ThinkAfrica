@@ -8,7 +8,7 @@ import type { DiscoverTopic } from "@/lib/discoverData";
 import TopicSubscribeButton from "@/components/topic/TopicSubscribeButton";
 import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
 
-interface DiscoverTopicsGridProps {
+interface ExploreTopicsGridProps {
   topics: DiscoverTopic[];
   initialInterests: string[];
   initialSubscribedTopicKeys: string[];
@@ -19,12 +19,12 @@ function normalizeTag(value: string) {
   return value.trim().toLowerCase();
 }
 
-export default function DiscoverTopicsGrid({
+export default function ExploreTopicsGrid({
   topics,
   initialInterests,
   initialSubscribedTopicKeys,
   userId,
-}: DiscoverTopicsGridProps) {
+}: ExploreTopicsGridProps) {
   const [interests, setInterests] = useState(initialInterests);
   const [savingTag, setSavingTag] = useState<string | null>(null);
   const interestKeys = new Set(interests.map(normalizeTag));
@@ -72,9 +72,9 @@ export default function DiscoverTopicsGrid({
 
   if (topics.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center">
-        <p className="text-sm font-medium text-gray-700">No topics yet.</p>
-        <p className="mt-1 text-sm text-gray-400">
+      <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-10 text-center">
+        <p className="text-byline font-medium text-ink">No topics yet.</p>
+        <p className="mt-1 text-meta text-ink-muted">
           Published posts with tags will appear here.
         </p>
       </div>
@@ -89,7 +89,7 @@ export default function DiscoverTopicsGrid({
         return (
           <div
             key={topic.tag}
-            className="flex min-h-[68px] items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3"
+            className="flex min-h-[68px] items-center gap-3 rounded-xl border border-card-border bg-card px-4 py-3"
           >
             <Link
               href={`/topics/${encodeURIComponent(topic.tag)}`}
@@ -101,10 +101,10 @@ export default function DiscoverTopicsGrid({
               }}
               className="min-w-0 flex-1"
             >
-              <span className="block truncate text-sm font-semibold text-ink hover:text-emerald-brand">
+              <span className="block truncate text-byline font-semibold text-ink hover:text-emerald-ink">
                 #{topic.tag}
               </span>
-              <span className="mt-0.5 block text-xs text-ink-muted">
+              <span className="mt-0.5 block text-meta text-ink-muted">
                 {topic.count} {topic.count === 1 ? "post" : "posts"}
               </span>
             </Link>
@@ -121,10 +121,10 @@ export default function DiscoverTopicsGrid({
                 type="button"
                 onClick={() => toggleTopic(topic.tag)}
                 disabled={savingTag === topic.tag}
-                className={`h-8 rounded-full px-3 text-xs font-medium transition-colors disabled:opacity-60 ${
+                className={`min-h-11 rounded-full px-3 text-meta font-medium transition-colors disabled:opacity-60 ${
                   isFollowing
-                    ? "bg-emerald-50 text-emerald-brand"
-                    : "border border-gray-200 text-gray-600 hover:border-emerald-brand hover:text-emerald-brand"
+                    ? "bg-green-tint text-emerald-ink"
+                    : "border border-card-border text-ink-soft hover:border-emerald-brand hover:text-emerald-ink"
                 }`}
               >
                 {savingTag === topic.tag
