@@ -7,6 +7,7 @@ import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import FeedSkeleton from "@/components/post/FeedSkeleton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import PushPromptBanner from "@/components/push/PushPromptBanner";
+import BriefColumn from "@/components/ui/BriefColumn";
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import WelcomeBanner from "@/components/ui/WelcomeBanner";
 import type { LegacyPushPromptSeed } from "@/lib/pushPromptPolicy";
@@ -499,15 +500,17 @@ export default async function HomePage({ searchParams }: PageProps) {
           </Suspense>
         </div>
 
-        {/* The rail can stack five cards (draft or activation, featured today,
-            debate, people, topics), which runs past 800px -- taller than the
-            ~700px of usable height on a 1366x768 laptop. A plain sticky top
-            pins the first card and puts everything below the fold permanently
-            out of reach, rendered but unscrollable. Capping the height to what
-            is actually on screen and letting the column scroll inside itself
-            keeps the lower cards reachable; when the content is shorter than
-            the cap, which is the common case, nothing changes at all. */}
-        <aside className="hidden self-start lg:sticky lg:top-[var(--app-sticky-offset)] lg:block lg:max-h-[calc(100svh-var(--app-sticky-offset)-1rem)] lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden">
+        {/* This column can stack five cards (draft or activation, featured
+            today, debate, people, topics), which runs past 800px -- taller
+            than the ~700px of usable height on a 1366x768 laptop. It used to
+            cap its height and scroll inside itself, which made the lower cards
+            reachable but not findable: a second gesture, on a region whose
+            scrollbar was hidden, that also stole the wheel from the feed for
+            the quarter of the screen it covers. BriefColumn drops the inner
+            scroller and lets the column travel with the document instead,
+            pinning its last card against the bottom of the viewport rather
+            than its first against the nav. See the comment there. */}
+        <BriefColumn>
           <HomeSidebar
             activeDebate={homeDebate}
             recentDraft={recentDraft ?? null}
@@ -517,7 +520,7 @@ export default async function HomePage({ searchParams }: PageProps) {
             currentUserId={user?.id ?? null}
             topics={sidebarTopics}
           />
-        </aside>
+        </BriefColumn>
       </div>
     </div>
   );

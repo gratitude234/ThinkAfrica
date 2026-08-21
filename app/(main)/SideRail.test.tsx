@@ -140,4 +140,16 @@ describe("SideRail", () => {
     expect(rail).toHaveClass("xl:top-[var(--app-sticky-offset)]");
     expect(rail.className).not.toMatch(/transition-\[top\]/);
   });
+
+  // The rail scrolls inside itself on a short window so its last item stays
+  // reachable, but the gesture has to carry on into the page once it bottoms
+  // out. Containing it made the page stop dead under the pointer on exactly
+  // the windows where the rail became a scroller, so one wheel gesture meant
+  // two different things depending on how tall the browser was.
+  it("lets a wheel gesture chain from the rail into the page", () => {
+    const { container } = renderRail();
+    const rail = container.querySelector("aside");
+    expect(rail).toHaveClass("xl:overflow-y-auto");
+    expect(rail.className).not.toMatch(/overscroll/);
+  });
 });

@@ -519,7 +519,11 @@ describe("PostsFeedTabs -- scroll position on tab switch", () => {
       fireEvent.click(screen.getByRole("tab", { name: "Latest" }));
     });
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
+    // "instant", not "auto". globals.css sets `scroll-behavior: smooth` on
+    // html, and per CSSOM View "auto" defers to that, so asking for "auto"
+    // here animated the reader all the way back up through the cards they had
+    // just left. This assertion is the guard against that regressing.
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
   });
 
   it("leaves the viewport alone when the feed controls are already in view", async () => {
