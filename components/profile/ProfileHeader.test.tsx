@@ -27,39 +27,48 @@ function baseProfile(overrides: Partial<Parameters<typeof ProfileHeader>[0]["pro
   };
 }
 
-describe("ProfileHeader stats bar", () => {
-  it("foregrounds the Intellectual Record and its evidence-backed contribution signals", () => {
-    render(
-      <ProfileHeader
-        profile={baseProfile()}
-        isOwnProfile
-        currentUserId="user-1"
-        initialFollowing={false}
-        isOpenToOpportunities={false}
-        canContact={false}
-        talentProfileId={null}
-        writingSince="Jan 2026"
-        stats={{
-          postCount: 12,
-          citableCount: 2,
-          reviewedCount: 3,
-          coAuthoredCount: 1,
-          responseCount: 4,
-          sourceBackedCount: 5,
-          followerCount: 0,
-          followingCount: 0,
-          totalViews: 0,
-          totalLikes: 0,
-          debateContributionCount: 0,
-          topicCount: 0,
-          badgeCount: 0,
-          points: 0,
-        }}
-      />
-    );
+function renderHeader(
+  profileOverrides: Partial<Parameters<typeof ProfileHeader>[0]["profile"]> = {}
+) {
+  return render(
+    <ProfileHeader
+      profile={baseProfile(profileOverrides)}
+      isOwnProfile
+      currentUserId="user-1"
+      initialFollowing={false}
+      isOpenToOpportunities={false}
+      canContact={false}
+      talentProfileId={null}
+      writingSince="Jan 2026"
+    />
+  );
+}
 
-    expect(screen.getByText("Record")).toBeInTheDocument();
-    expect(screen.getByText("Responses")).toBeInTheDocument();
-    expect(screen.getByText("Source-backed")).toBeInTheDocument();
+describe("ProfileHeader", () => {
+  it("presents identity: name, handle and affiliation", () => {
+    renderHeader();
+
+    expect(screen.getByText("A Student")).toBeInTheDocument();
+    expect(screen.getByText("@student1")).toBeInTheDocument();
+    expect(
+      screen.getByText(/University of Somewhere/)
+    ).toBeInTheDocument();
+  });
+
+  it("states the verified type in text rather than by icon alone", () => {
+    renderHeader({ verified: true, verified_type: "student" });
+
+    expect(screen.getByText("Verified Student")).toBeInTheDocument();
+  });
+
+  // Contribution counts belong to RecordPanel. Repeating them in the header
+  // was how the same figure ended up stated four times on one page, which is
+  // what made a small record look padded.
+  it("does not restate contribution counts", () => {
+    renderHeader();
+
+    expect(screen.queryByText("Record")).not.toBeInTheDocument();
+    expect(screen.queryByText("Source-backed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Citable")).not.toBeInTheDocument();
   });
 });

@@ -109,17 +109,17 @@ export default function ContactInquiryModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="opportunity-inquiry-title"
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-card-border bg-card p-6 shadow-xl"
       >
         {sent ? (
           <div>
             <h3
               id="opportunity-inquiry-title"
-              className="text-lg font-semibold text-gray-900"
+              className="text-lg font-semibold text-ink"
             >
               Inquiry sent
             </h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-500">
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
               The contributor will see this in their dashboard and notifications.
               Your reply email is included so they can follow up directly.
             </p>
@@ -135,10 +135,10 @@ export default function ContactInquiryModal({
           </div>
         ) : (
           <>
-            <h3 id="opportunity-inquiry-title" className="font-semibold text-gray-900">
+            <h3 id="opportunity-inquiry-title" className="font-semibold text-ink">
               Contact about an opportunity
             </h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-ink-muted">
               Include the organization, role, reply email, and why this contributor
               is a relevant fit.
             </p>
@@ -149,7 +149,7 @@ export default function ContactInquiryModal({
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-ink-soft">
                 Organization *
               </label>
               <input
@@ -162,11 +162,11 @@ export default function ContactInquiryModal({
                     organization_name: event.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                className="w-full rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-ink-soft">
                 Reply email *
               </label>
               <input
@@ -179,14 +179,14 @@ export default function ContactInquiryModal({
                     contact_email: event.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                className="w-full rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
               />
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-ink-soft">
                 Role or opportunity *
               </label>
               <input
@@ -200,11 +200,11 @@ export default function ContactInquiryModal({
                   }))
                 }
                 placeholder="Research assistant, fellowship..."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                className="w-full rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-ink-soft">
                 Type *
               </label>
               <select
@@ -216,7 +216,7 @@ export default function ContactInquiryModal({
                     opportunity_type: event.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                className="w-full rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
               >
                 <option value="">Select a type</option>
                 {OPPORTUNITY_TYPES.map((type) => (
@@ -229,7 +229,7 @@ export default function ContactInquiryModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-ink-soft">
               Message *
             </label>
             <textarea
@@ -243,7 +243,7 @@ export default function ContactInquiryModal({
                 }))
               }
               placeholder="Describe the opportunity, timeline, commitment expected, and why this contributor's work caught your attention."
-              className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+              className="w-full resize-none rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
             />
           </div>
 
@@ -257,7 +257,7 @@ export default function ContactInquiryModal({
             <button
               type="button"
               onClick={closeModal}
-              className="px-3 py-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700"
+              className="px-3 py-1.5 text-sm text-ink-muted transition-colors hover:text-ink-soft"
             >
               Cancel
             </button>

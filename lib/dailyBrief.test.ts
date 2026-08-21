@@ -42,6 +42,22 @@ describe("getEngagementCounts", () => {
       ),
     };
 
+    // The aggregate table is unreadable here too, so this is the row-count
+    // fallback failing, and its own error is what surfaces. What matters is
+    // that a broken count reaches the caller rather than being rounded to zero
+    // and quietly changing which post the digest leads with.
+    await expect(
+      getEngagementCounts(supabase as never, ["post-1"])
+    ).rejects.toMatchObject({ operation: "count bookmarks" });
+  });
+
+  it("propagates a failed response query", async () => {
+    const supabase = {
+      from: vi.fn((table: string) =>
+        resultBuilder([], table === "posts" ? { message: "failed" } : null)
+      ),
+    };
+
     await expect(
       getEngagementCounts(supabase as never, ["post-1"])
     ).rejects.toThrow("Unable to load featured-post engagement counts");

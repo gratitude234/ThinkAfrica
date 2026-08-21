@@ -6,7 +6,11 @@ import { AdminAccessError, createAdminClient } from "@/lib/supabase/admin";
 import AnalyticsCharts from "./AnalyticsCharts";
 import ProfileReminderButton from "./ProfileReminderButton";
 import { getActionInboxSummary } from "@/lib/actionInbox";
-import { getFeedSurfaceReason, getQualityScore } from "@/lib/postQuality";
+import { getFeedSurfaceReason } from "@/lib/postQuality";
+import {
+  createAnonymousRankingContext,
+  scoreCandidate,
+} from "@/lib/feedRanking";
 import { getOpportunityShortLabel } from "@/lib/opportunities";
 
 interface ProfileRow {
@@ -953,6 +957,8 @@ export default async function AdminAnalyticsPage() {
     }
     return acc;
   }, {});
+  // No particular reader: this is an editorial view of the work itself.
+  const promisingScoringContext = createAnonymousRankingContext();
   const promisingPosts = ((promisingPostsRaw ?? []) as PromisingPostRow[])
     .map((post) => {
       const author = Array.isArray(post.profiles)
@@ -974,7 +980,26 @@ export default async function AdminAnalyticsPage() {
       return {
         ...post,
         author,
-        qualityScore: getQualityScore(qualityInput),
+        // The same scorer the feed ranks by, so this table shows what the feed
+        // actually believes rather than a second opinion from a retired
+        // formula.
+        qualityScore: scoreCandidate(
+          {
+            id: post.id,
+            type: post.type,
+            tags: post.tags,
+            published_at: post.published_at,
+            citation_id: post.citation_id,
+            published_version_id: post.published_version_id,
+            view_count: post.view_count,
+            impression_count: post.impression_count,
+            read_count: post.read_count,
+            reference_count: promisingReferenceCounts[post.id] ?? 0,
+            response_count: promisingResponseCounts[post.id] ?? 0,
+            bookmark_count: promisingBookmarkCounts[post.id] ?? 0,
+          },
+          promisingScoringContext
+        ),
         reason: getFeedSurfaceReason(qualityInput) ?? "Promising engagement",
         referenceCount: promisingReferenceCounts[post.id] ?? 0,
         responseCount: promisingResponseCounts[post.id] ?? 0,

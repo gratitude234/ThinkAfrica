@@ -549,6 +549,18 @@ const getCachedOpportunitySummary = unstable_cache(
   { revalidate: 300, tags: ["discover", "opportunities"] }
 );
 
+/**
+ * The bar for "worth calling a conversation" on a post with no replies and no
+ * bibliography yet.
+ *
+ * Recalibrated when the second scorer was retired. The old number, 35, was on
+ * an unbounded scale where a single citable post cleared it before anyone had
+ * read a word. On the shared 0..100 scale, freshness and the exploration lane
+ * alone are worth about 25 to a brand new post, so 40 is the first level that
+ * takes something more than being recent.
+ */
+const ACTIVE_CONVERSATION_SCORE = 40;
+
 function buildActiveConversations(posts: PostCardData[]): DiscoverConversation[] {
   const seen = new Set<string>();
 
@@ -559,9 +571,14 @@ function buildActiveConversations(posts: PostCardData[]): DiscoverConversation[]
       return (
         (post.response_count ?? 0) > 0 ||
         (post.reference_count ?? 0) > 0 ||
-        (post.quality_score ?? 0) >= 35
+        (post.quality_score ?? 0) >= ACTIVE_CONVERSATION_SCORE
       );
     })
+    // Responses and references are weighted here because this shelf is about
+    // conversation specifically, which the general score treats as one signal
+    // among several. The score is now the bounded 0..100 one every surface
+    // shares, so these weights sit on a comparable scale rather than being
+    // swamped by an unbounded total.
     .sort((left, right) => {
       const leftScore =
         (left.response_count ?? 0) * 4 +

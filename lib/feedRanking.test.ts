@@ -3,6 +3,7 @@ import {
   MAX_POSTS_PER_AUTHOR_PER_WINDOW,
   type RankablePost,
   type RankingContext,
+  type ViewerPostEngagement,
   rankPosts,
   scorePost,
 } from "./feedRanking";
@@ -169,6 +170,174 @@ describe("scorePost", () => {
 
     expect(score).toBeGreaterThan(0);
     expect(score).toBeLessThanOrEqual(100);
+  });
+
+  it("does not let one early save on an unseen post outweigh a bibliography", () => {
+    // The prior used to be 20, which let a single bookmark on a post with no
+    // impressions saturate the bookmark feature outright. Two friends quietly
+    // saving a post moved it about as far as real work did, and a private,
+    // free action is the last one that should carry that weight.
+    const baseline = scorePost(post(), anonymousContext);
+    const oneSave = scorePost(post({ bookmark_count: 1 }), anonymousContext);
+    const fourSources = scorePost(post({ reference_count: 4 }), anonymousContext);
+
+    expect(oneSave).toBeGreaterThan(baseline);
+    expect(oneSave - baseline).toBeLessThan((fourSources - baseline) / 3);
+  });
+});
+
+describe("scorePost -- what this reader has already seen", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function contextWithHistory(
+    history: Partial<ViewerPostEngagement>
+  ): RankingContext {
+    return {
+      ...anonymousContext,
+      userId: "reader-1",
+      viewerEngagement: new Map([
+        ["post-1", { impressions: 0, hasRead: false, ...history }],
+      ]),
+    };
+  }
+
+  it("leaves a reader we have no history for exactly where they were", () => {
+    const withEmptyHistory: RankingContext = {
+      ...anonymousContext,
+      userId: "reader-1",
+      viewerEngagement: new Map(),
+    };
+
+    expect(scorePost(post(), withEmptyHistory)).toBe(
+      scorePost(post(), anonymousContext)
+    );
+  });
+
+  it("demotes work this reader has already finished", () => {
+    const unread = scorePost(post(), contextWithHistory({}));
+    const read = scorePost(post(), contextWithHistory({ hasRead: true }));
+
+    expect(read).toBeLessThan(unread);
+  });
+
+  it("demotes work shown repeatedly and never opened", () => {
+    const shownOnce = scorePost(post(), contextWithHistory({ impressions: 1 }));
+    const shownFourTimes = scorePost(
+      post(),
+      contextWithHistory({ impressions: 4 })
+    );
+
+    expect(shownFourTimes).toBeLessThan(shownOnce);
+  });
+
+  it("demotes rather than disappears, however exhausted the post is", () => {
+    // On thin inventory a post the reader has exhausted belongs below fresh
+    // work, not below nothing at all.
+    const exhausted = scorePost(
+      post(),
+      contextWithHistory({ impressions: 40, hasRead: true })
+    );
+
+    expect(exhausted).toBeGreaterThan(0);
+  });
+
+  it("applies only to the post it has history for", () => {
+    const ctx = contextWithHistory({ impressions: 8, hasRead: true });
+
+    expect(scorePost(post({ id: "post-2" }), ctx)).toBe(
+      scorePost(post({ id: "post-2" }), anonymousContext)
+    );
+  });
+});
+
+describe("scorePost -- learned affinity", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function contextWithAffinity(affinity: {
+    authors?: Array<[string, number]>;
+    topics?: Array<[string, number]>;
+    userInterests?: string[];
+  }): RankingContext {
+    return {
+      ...anonymousContext,
+      userId: "reader-1",
+      userInterests: affinity.userInterests ?? [],
+      affinity: {
+        authors: new Map(affinity.authors ?? []),
+        topics: new Map(affinity.topics ?? []),
+      },
+    };
+  }
+
+  it("raises a topic this reader keeps finishing, with nothing declared", () => {
+    const candidate = post({ tags: ["Energy Policy"] });
+    const learned = contextWithAffinity({ topics: [["energy policy", 1]] });
+
+    expect(scorePost(candidate, learned)).toBeGreaterThan(
+      scorePost(candidate, anonymousContext)
+    );
+  });
+
+  it("raises an author this reader keeps finishing", () => {
+    const candidate = post({ author_id: "author-1" });
+    const learned = contextWithAffinity({ authors: [["author-1", 1]] });
+
+    expect(scorePost(candidate, learned)).toBeGreaterThan(
+      scorePost(candidate, anonymousContext)
+    );
+  });
+
+  it("counts a declared interest in full whatever the reading history says", () => {
+    // The declared list is the only part of this a reader can directly correct,
+    // so learning fills its gaps and never argues with it.
+    const candidate = post({ tags: ["Economics"] });
+    const declaredOnly = contextWithAffinity({ userInterests: ["economics"] });
+    const declaredAndLearned = contextWithAffinity({
+      userInterests: ["economics"],
+      topics: [["economics", 1]],
+    });
+
+    expect(scorePost(candidate, declaredAndLearned)).toBe(
+      scorePost(candidate, declaredOnly)
+    );
+  });
+
+  it("takes the strongest matching tag rather than summing them", () => {
+    const oneTag = post({ tags: ["Economics"] });
+    const manyTags = post({ tags: ["Economics", "Trade", "Health"] });
+    const learned = contextWithAffinity({
+      topics: [
+        ["economics", 1],
+        ["trade", 1],
+        ["health", 1],
+      ],
+    });
+
+    // Otherwise tagging a post with eight topics would manufacture relevance.
+    expect(scorePost(manyTags, learned)).toBe(scorePost(oneTag, learned));
+  });
+
+  it("normalizes tag casing and spacing the way the interest match does", () => {
+    const candidate = post({ tags: ["  Public Policy  "] });
+    const learned = contextWithAffinity({ topics: [["public policy", 1]] });
+
+    expect(scorePost(candidate, learned)).toBeGreaterThan(
+      scorePost(candidate, anonymousContext)
+    );
   });
 });
 

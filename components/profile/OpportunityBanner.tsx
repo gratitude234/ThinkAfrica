@@ -47,7 +47,7 @@ export default function OpportunityBanner({
           {isOwnProfile ? (
             <Link
               href={settingsHref}
-              className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-400"
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-card px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-400"
             >
               Edit availability
             </Link>

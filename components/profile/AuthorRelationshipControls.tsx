@@ -135,7 +135,7 @@ function LegacyAuthorRelationshipControls({
             compact ? "" : "flex-1"
           } border font-semibold transition-colors disabled:opacity-50 ${
             following
-              ? "border-gray-300 bg-white text-gray-700 hover:border-red-300 hover:text-red-600"
+              ? "border-card-border bg-card text-ink-soft hover:border-red-300 hover:text-red-600"
               : "border-emerald-brand bg-emerald-brand text-white hover:bg-[#0E4B37]"
           }`}
         >
@@ -154,7 +154,7 @@ function LegacyAuthorRelationshipControls({
             } border font-semibold transition-colors disabled:opacity-50 ${
               subscribed
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                : "border-gray-300 bg-white text-gray-700 hover:border-emerald-300 hover:text-emerald-700"
+                : "border-card-border bg-card text-ink-soft hover:border-emerald-300 hover:text-emerald-700"
             }`}
           >
             {subscribed ? "Subscribed" : "Subscribe"}

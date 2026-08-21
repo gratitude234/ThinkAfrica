@@ -2,7 +2,15 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import Link from "next/link";
-import { getCountsByPostId } from "@/lib/feedData";
+import {
+  createAnonymousRankingContext,
+  scoreCandidate,
+} from "@/lib/feedRanking";
+import {
+  getBookmarkCountsByPostId,
+  getReferenceCountsByPostId,
+  getVisibleCommentCountsByPostId,
+} from "@/lib/postCounts";
 import {
   getFeedSurfaceReason,
   getPublicQualitySignals,
@@ -62,9 +70,9 @@ export default async function TopicPage({ params }: PageProps) {
   const [bookmarkCounts, referenceCounts, commentCounts, responseRows] =
     postIds.length > 0
       ? await Promise.all([
-          getCountsByPostId(supabase, "bookmarks", postIds),
-          getCountsByPostId(supabase, "post_references", postIds),
-          getCountsByPostId(supabase, "comments", postIds),
+          getBookmarkCountsByPostId(supabase, postIds),
+          getReferenceCountsByPostId(supabase, postIds),
+          getVisibleCommentCountsByPostId(supabase, postIds),
           supabase.from("posts").select("in_response_to").in("in_response_to", postIds),
         ])
       : [
@@ -79,6 +87,11 @@ export default async function TopicPage({ params }: PageProps) {
     if (row.in_response_to) acc[row.in_response_to] = (acc[row.in_response_to] ?? 0) + 1;
     return acc;
   }, {});
+
+  // Every card on this page is already on-topic by definition, so there is no
+  // per-reader relevance left to express here. The neutral context scores what
+  // is true of the work itself, using the same function the feed ranks by.
+  const topicScoringContext = createAnonymousRankingContext();
 
   const posts = postsRaw.map((p) => {
     const profile = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
@@ -107,7 +120,29 @@ export default async function TopicPage({ params }: PageProps) {
     response_count: responseCounts[p.id] ?? 0,
     comment_count: commentCounts[p.id] ?? 0,
     quality_badges: qualitySignals.badges,
-    quality_score: qualitySignals.score,
+    quality_score: scoreCandidate(
+      {
+        id: p.id,
+        author_id: (p as { author_id?: string }).author_id,
+        type: p.type,
+        content_kind: (p as { content_kind?: string | null }).content_kind,
+        tags: p.tags,
+        published_at: p.published_at,
+        created_at: p.created_at,
+        citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
+        published_version_id:
+          (p as { published_version_id?: string | null }).published_version_id ??
+          null,
+        view_count: p.view_count,
+        impression_count: (p as { impression_count?: number | null })
+          .impression_count,
+        read_count: (p as { read_count?: number | null }).read_count,
+        bookmark_count: bookmarkCounts[p.id] ?? 0,
+        reference_count: referenceCounts[p.id] ?? 0,
+        response_count: responseCounts[p.id] ?? 0,
+      },
+      topicScoringContext
+    ),
     surface_reason: getFeedSurfaceReason(qualityInput),
     co_authors: Array.isArray((p as { post_authors?: unknown[] }).post_authors)
       ? ((p as { post_authors?: Array<Record<string, unknown>> }).post_authors ?? [])

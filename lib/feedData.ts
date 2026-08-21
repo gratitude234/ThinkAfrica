@@ -1,6 +1,21 @@
 import type { PostCardData } from "@/components/post/PostCard";
 import { unstable_cache } from "next/cache";
-import { rankPosts, type RankingContext } from "@/lib/feedRanking";
+import {
+  createAnonymousRankingContext,
+  rankPosts,
+  scorePost,
+  type RankingContext,
+} from "@/lib/feedRanking";
+import {
+  getBookmarkCountsByPostId,
+  getLikeCountsByPostId,
+  getReferenceCountsByPostId,
+  getVisibleCommentCountsByPostId,
+} from "@/lib/postCounts";
+import {
+  getReaderAffinity,
+  getViewerPostEngagement,
+} from "@/lib/readerSignals";
 import {
   getFeedSurfaceReason,
   getPublicQualitySignals,
@@ -48,6 +63,13 @@ export interface FeedPageResult {
 export interface FeedOptions {
   supabase: {
     from: (table: string) => any;
+    // Optional so the many test doubles and narrow call sites that only ever
+    // needed `from` keep working. The aggregate-count and reader-signal paths
+    // check for it and fall back when it is absent.
+    rpc?: (
+      fn: string,
+      params?: Record<string, unknown>
+    ) => PromiseLike<{ data: unknown; error?: unknown }>;
   };
   tab: FeedTabKey;
   page: number;
@@ -150,6 +172,40 @@ const POST_SELECT_WITH_TOPIC_KEYS = `${POST_SELECT}, topic_keys`;
 export const RANKED_FEED_WINDOW = 120;
 export const MAX_FEED_PAGE = 100;
 export const MAX_FEED_PAGE_SIZE = 30;
+
+// How far back the second candidate arm reaches, and how much of the pool it is
+// allowed to occupy. Kept deliberately smaller than the recent arm: the point
+// is that good work does not fall off a cliff at midnight, not that the feed
+// becomes an archive.
+export const EVERGREEN_CANDIDATE_DAYS = 90;
+export const EVERGREEN_WELL_READ_LIMIT = 40;
+export const EVERGREEN_REVIEWED_LIMIT = 20;
+
+/**
+ * Which arm of the For You pool a card came from. Recorded per card on the
+ * signed exposure, so "did the evergreen arm earn its place" is answerable from
+ * the logs rather than from argument.
+ */
+export type FeedCandidateArm =
+  | "for_you_ranked"
+  | "for_you_evergreen"
+  | "for_you_tail";
+
+function isoDaysAgo(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * The later of two ISO cutoffs, treating null as "no cutoff". The evergreen
+ * arms must never reach past the timeframe the reader selected: asking for
+ * "this week" and being handed something from March would be the filter
+ * quietly not working.
+ */
+function latestIsoDate(left: string | null, right: string | null): string | null {
+  if (!left) return right;
+  if (!right) return left;
+  return Date.parse(left) >= Date.parse(right) ? left : right;
+}
 
 type ChronologicalFeedTab = Exclude<FeedTabKey, "home">;
 
@@ -291,62 +347,6 @@ function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
   return null;
 }
 
-export async function getCountsByPostId(
-  supabase: {
-    from: (table: string) => any;
-  },
-  table: "likes" | "bookmarks" | "comments" | "post_references",
-  postIds: string[]
-): Promise<Record<string, number>> {
-  if (postIds.length === 0) return {};
-
-  const result = (await supabase
-    .from(table)
-    .select("post_id")
-    .in("post_id", postIds)) as SupabaseQueryResult<
-    Array<{ post_id?: string }>
-  >;
-  const data = expectRows(result, `count ${table}`);
-
-  return data.reduce(
-    (acc: Record<string, number>, row: { post_id?: string }) => {
-      const key = (row as { post_id?: string }).post_id;
-      if (!key) return acc;
-      acc[key] = (acc[key] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-}
-
-// post_like_counts stores an already-maintained aggregate per post (see
-// increment/decrement_post_like_count triggers), so it's a direct lookup rather
-// than a row-count like getCountsByPostId does for likes/bookmarks/comments.
-async function getLikeCountsByPostId(
-  supabase: {
-    from: (table: string) => any;
-  },
-  postIds: string[]
-): Promise<Record<string, number>> {
-  if (postIds.length === 0) return {};
-
-  const result = (await supabase
-    .from("post_like_counts")
-    .select("post_id, like_count")
-    .in("post_id", postIds)) as SupabaseQueryResult<
-    Array<{ post_id: string; like_count: number }>
-  >;
-  const data = expectRows(result, "load like aggregates");
-
-  return data.reduce(
-    (acc, row) => {
-      acc[row.post_id] = row.like_count;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-}
-
 async function getExcludedCreditedPostIds(
   reader: FeedSupabaseClient,
   excludedAuthorIds: string[]
@@ -375,9 +375,8 @@ async function applyViewerCommentCounts(
   posts: PostCardData[]
 ): Promise<PostCardData[]> {
   if (posts.length === 0) return posts;
-  const counts = await getCountsByPostId(
+  const counts = await getVisibleCommentCountsByPostId(
     viewerClient,
-    "comments",
     posts.map((post) => post.id)
   );
   return posts.map((post) => ({
@@ -414,14 +413,14 @@ async function enrichPosts(
     viewerBookmarksResult,
   ] = await Promise.all([
     getLikeCountsByPostId(reader, ids),
-    getCountsByPostId(reader, "bookmarks", ids),
-    getCountsByPostId(reader, "post_references", ids),
+    getBookmarkCountsByPostId(reader, ids),
+    getReferenceCountsByPostId(reader, ids),
     // Read with the caller's client, never the admin one: the RLS SELECT policy
     // on comments is what hides moderated rows, so a service-role count leaks
     // them. An author legitimately sees their own hidden comment, so this
     // number is per-viewer by design.
     viewerClient
-      ? getCountsByPostId(viewerClient, "comments", ids)
+      ? getVisibleCommentCountsByPostId(viewerClient, ids)
       : Promise.resolve({} as Record<string, number>),
     ids.length > 0
       ? reader
@@ -646,6 +645,11 @@ async function enrichPosts(
       }>
     >
   );
+  // Surfaces that hydrate cards without ranking them (the citable shelf, the
+  // responses list) still want a comparable quality number, so fall back to the
+  // no-particular-reader context rather than skipping the score.
+  const scoringContext = rankingContext ?? createAnonymousRankingContext();
+
   // Keep explanatory metadata aligned with feedRanking's relevance signal.
   // Raw profile interests and post tags are user-entered, so exact-string
   // comparison loses matches that differ only by surrounding space or case.
@@ -693,7 +697,7 @@ async function enrichPosts(
     const qualitySignals = getPublicQualitySignals(qualityInput);
     const inResponseTo = post.in_response_to as string | null | undefined;
 
-    return {
+    const card = {
       ...(post as object),
       profiles: profile,
       co_authors: coAuthors,
@@ -707,11 +711,16 @@ async function enrichPosts(
       comment_count: commentCounts[id] ?? 0,
       quality_badges: qualitySignals.badges,
       surface_reason: getFeedSurfaceReason(qualityInput),
-      quality_score: qualitySignals.score,
       viewer_liked: viewerLikedIds.has(id),
       viewer_bookmarked: viewerBookmarkedIds.has(id),
       response_to: inResponseTo ? (parentPostsById.get(inResponseTo) ?? null) : null,
     } as PostCardData;
+
+    // Scored from the finished card, with the same function the feed ranks by.
+    // This used to be a separate, unbounded formula in postQuality.ts that
+    // added raw counts together, so a surface sorting on quality_score and the
+    // feed itself could disagree about which post was better.
+    return { ...card, quality_score: scorePost(card, scoringContext) };
   });
 }
 
@@ -1397,62 +1406,86 @@ viewerClientOverride?: FeedSupabaseClient | null): Promise<FeedPageResult> {
   // so no page straddles the boundary and comes back short.
   const start = (safePage - 1) * safePageSize;
   const end = start + safePageSize;
-  const rankedWindow =
+  const recentWindow =
     Math.ceil(RANKED_FEED_WINDOW / safePageSize) * safePageSize;
-
-  const rankingContext: RankingContext = {
-    userId,
-    followedIds: new Set(followedIds),
-    userInterests,
-    userUniversity,
-    userCountry: null,
+  const candidateFilters = {
+    type,
+    cutoff,
+    excludedAuthorIds: excluded,
+    excludedPostIds,
   };
 
-  // Past the ranked window there is nothing left to rank against, so the tail
-  // falls back to plain reverse-chronological paging. It starts at date index
-  // `start`, which is at or beyond the window, and the window is exactly the
-  // newest `rankedWindow` posts -- so the tail can never repeat one of them.
-  if (start >= rankedWindow) {
-    const tailQuery = applyPostFilters(
-      reader.from("posts").select(POST_SELECT),
-      { type, cutoff, excludedAuthorIds: excluded, excludedPostIds }
-    );
-    const tailResult = (await tailQuery
-      .order("published_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(start, end)) as SupabaseQueryResult<unknown[]>;
+  // One row past the window, so the last ranked page knows whether there is a
+  // chronological tail rather than guessing, and so the boundary between the
+  // recent arm and everything older is an actual row rather than an estimate.
+  const viewerOptions = {
+    userId,
+    followedIds,
+    userInterests,
+    userUniversity,
+  };
 
-    const raw = expectRows(tailResult, "load chronological feed tail");
-    const posts = await enrichPosts(
+  // Past the ranked stream there is nothing left to rank against, so the tail
+  // falls back to plain reverse-chronological paging. It continues from the
+  // boundary row and skips the evergreen picks, which have already been served
+  // inside the ranking. The two streams therefore tile: everything newer than
+  // the boundary plus the evergreen set is the ranked stream, and everything
+  // else in date order is the tail. Both arms are whole page multiples, so
+  // every ranked page is full and the tail's first row really is the row after
+  // the ranked stream's last.
+  //
+  // A page can only be in the tail once it starts past the recent arm, so
+  // below that there is nothing to work out and the identity probe is skipped.
+  // Past it the probe reads ids and dates only: a tail page would otherwise
+  // pull the entire candidate pool as full rows purely to discover that it does
+  // not want any of them.
+  if (start >= recentWindow) {
+    const identities = await fetchCandidateArms(
       reader,
-      raw.slice(0, safePageSize),
-      rankingContext,
-      viewerClient,
-      enrichmentVisibility
+      candidateFilters,
+      recentWindow,
+      safePageSize,
+      CANDIDATE_IDENTITY_SELECT
     );
-    return { posts, hasMore: raw.length > safePageSize };
+    const rankedStreamLength =
+      identities.recentCandidates.length + identities.evergreen.length;
+
+    if (start >= rankedStreamLength) {
+      return fetchRankedTail(reader, {
+        filters: candidateFilters,
+        boundary: identities.boundary,
+        evergreenIds: identities.evergreen.map((row) => String(row.id)),
+        offset: start - rankedStreamLength,
+        pageSize: safePageSize,
+        viewer: viewerOptions,
+        viewerClient,
+        enrichmentVisibility,
+      });
+    }
   }
 
-  const query = applyPostFilters(
-    reader.from("posts").select(POST_SELECT),
-    {
-      type,
-      cutoff,
-      excludedAuthorIds: excluded,
-      excludedPostIds,
-    }
+  const arms = await fetchCandidateArms(
+    reader,
+    candidateFilters,
+    recentWindow,
+    safePageSize,
+    POST_SELECT
   );
 
-  // One row past the window, so the last ranked page knows whether the
-  // chronological tail has anything in it rather than guessing.
-  const result = (await query
-    .order("published_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(rankedWindow + 1)) as SupabaseQueryResult<unknown[]>;
-  const data = expectRows(result, "load ranked feed candidates");
+  const candidates = [...arms.recentCandidates, ...arms.evergreen];
+  const candidateSources = new Map<string, FeedCandidateArm>();
+  for (const row of arms.recentCandidates) {
+    candidateSources.set(String(row.id), "for_you_ranked");
+  }
+  for (const row of arms.evergreen) {
+    candidateSources.set(String(row.id), "for_you_evergreen");
+  }
 
-  const candidates = data.slice(0, rankedWindow);
-  const hasTail = data.length > rankedWindow;
+  const rankingContext = await buildRankedContext(reader, {
+    ...viewerOptions,
+    candidateIds: candidates.map((row) => String(row.id)),
+  });
+
   const enriched = await enrichPosts(
     reader,
     candidates,
@@ -1461,12 +1494,313 @@ viewerClientOverride?: FeedSupabaseClient | null): Promise<FeedPageResult> {
     enrichmentVisibility
   );
 
-  const ranked = rankPosts(enriched, rankingContext);
+  const ranked = rankPosts(enriched, rankingContext).map((post) => ({
+    ...post,
+    candidate_source: candidateSources.get(post.id) ?? "for_you_ranked",
+  }));
 
   return {
     posts: ranked.slice(start, end),
-    hasMore: ranked.length > end || hasTail,
+    hasMore: ranked.length > end || arms.hasTail,
   };
+}
+
+/**
+ * Enough of a candidate row to work out where the pool ends: which post is the
+ * boundary, and which ids the evergreen arms claimed. Used by the tail, which
+ * needs both facts and none of the content behind them.
+ */
+const CANDIDATE_IDENTITY_SELECT = "id, published_at, read_count, citation_id";
+
+interface CandidateArms {
+  recentCandidates: Array<Record<string, unknown>>;
+  evergreen: Array<Record<string, unknown>>;
+  boundary: FeedCursorPosition | null;
+  /** Whether anything exists past the recent arm, for `hasMore`. */
+  hasTail: boolean;
+}
+
+/**
+ * Both halves of the For You candidate pool, in one place so the ranked path
+ * and the tail's identity probe cannot drift apart. They have to agree exactly:
+ * the tail excludes the evergreen ids by id, so if the two computed different
+ * evergreen sets a post would either repeat or vanish.
+ */
+async function fetchCandidateArms(
+  reader: FeedSupabaseClient,
+  filters: {
+    type: FeedContentFilter | null;
+    cutoff: string | null;
+    excludedAuthorIds: string[];
+    excludedPostIds: string[];
+  },
+  recentWindow: number,
+  pageSize: number,
+  selectColumns: string
+): Promise<CandidateArms> {
+  // One row past the window, so the last ranked page knows whether there is a
+  // tail rather than guessing, and so the boundary is an actual row.
+  const recentResult = (await applyPostFilters(
+    reader.from("posts").select(selectColumns),
+    filters
+  )
+    .order("published_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(recentWindow + 1)) as SupabaseQueryResult<
+    Array<Record<string, unknown>>
+  >;
+  const recentRows = expectRows<Record<string, unknown>>(
+    recentResult,
+    "load ranked feed candidates"
+  );
+
+  const recentCandidates = recentRows.slice(0, recentWindow);
+  const boundary = getRankedBoundary(recentCandidates, recentWindow);
+
+  return {
+    recentCandidates,
+    evergreen: await fetchEvergreenCandidates(
+      reader,
+      filters,
+      boundary,
+      pageSize,
+      selectColumns
+    ),
+    boundary,
+    hasTail: recentRows.length > recentWindow,
+  };
+}
+
+/**
+ * The keyset position that separates the recent arm from everything older.
+ * Null when the site has not published a full window yet, which also means
+ * there is nothing older to reach for and no tail to page into.
+ */
+function getRankedBoundary(
+  recentCandidates: Array<Record<string, unknown>>,
+  recentWindow: number
+): FeedCursorPosition | null {
+  if (recentCandidates.length < recentWindow) return null;
+
+  const lastRow = recentCandidates[recentCandidates.length - 1];
+  const publishedAt = lastRow?.published_at;
+  const id = lastRow?.id;
+  if (
+    typeof publishedAt !== "string" ||
+    !Number.isFinite(Date.parse(publishedAt)) ||
+    typeof id !== "string"
+  ) {
+    return null;
+  }
+  return { publishedAt: new Date(publishedAt).toISOString(), id };
+}
+
+/**
+ * The best work of the last ninety days that the recent arm has already aged
+ * past.
+ *
+ * Ranking only the newest N posts is a candidate pool that quietly stops
+ * working as a site grows. At a handful of posts a day the newest 120 is the
+ * whole archive and the distinction does not exist. At 120 posts a day, "For
+ * You" silently becomes "the last 24 hours, reordered": a paper published two
+ * weeks ago is unreachable however good it is, and the evidence and
+ * satisfaction features go dead because nothing in the window has had time to
+ * accumulate either.
+ *
+ * Two arms, both cheap and both indexed, because "best" here has two different
+ * meanings on a network built around rigor. Reads answer "did people finish
+ * it"; a citation id answers "did it survive review". Raw read counts are a
+ * recall heuristic only, never a rank: what gets into the pool and what wins
+ * inside it are separate questions, and scorePost still judges on rates.
+ *
+ * Restricted to strictly older than the boundary, so the arms are disjoint from
+ * the recent arm by construction and no post can be scored, or served, twice.
+ */
+async function fetchEvergreenCandidates(
+  reader: FeedSupabaseClient,
+  filters: {
+    type: FeedContentFilter | null;
+    cutoff: string | null;
+    excludedAuthorIds: string[];
+    excludedPostIds: string[];
+  },
+  boundary: FeedCursorPosition | null,
+  pageSize: number,
+  selectColumns: string
+): Promise<Array<Record<string, unknown>>> {
+  if (!boundary) return [];
+
+  const evergreenFilters = {
+    ...filters,
+    cutoff: latestIsoDate(filters.cutoff, isoDaysAgo(EVERGREEN_CANDIDATE_DAYS)),
+  };
+
+  const reviewedQuery = applyKeysetCursor(
+    applyPostFilters(reader.from("posts").select(selectColumns), evergreenFilters),
+    boundary
+  )
+    .not("citation_id", "is", null)
+    .order("published_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(EVERGREEN_REVIEWED_LIMIT);
+
+  const wellReadQuery = applyKeysetCursor(
+    applyPostFilters(reader.from("posts").select(selectColumns), evergreenFilters),
+    boundary
+  )
+    .order("read_count", { ascending: false })
+    .order("published_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(EVERGREEN_WELL_READ_LIMIT);
+
+  const [reviewedResult, wellReadResult] = (await Promise.all([
+    reviewedQuery,
+    wellReadQuery,
+  ])) as Array<SupabaseQueryResult<Array<Record<string, unknown>>>>;
+
+  const reviewedRows = expectRows<Record<string, unknown>>(
+    reviewedResult,
+    "load reviewed evergreen candidates"
+  );
+  const wellReadRows = expectRows<Record<string, unknown>>(
+    wellReadResult,
+    "load well-read evergreen candidates"
+  );
+
+  // Reviewed first, so that when the trim below has to drop candidates it drops
+  // the least-read of the popular arm rather than work that survived review.
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const row of [...reviewedRows, ...wellReadRows]) {
+    const id = typeof row.id === "string" ? row.id : "";
+    if (id) byId.set(id, row);
+  }
+
+  // Trimmed to a whole number of pages, for the same reason the recent arm is
+  // snapped to one: a ranked stream that is not a page multiple ends in a short
+  // page, and every tail page after it is then offset by the shortfall, which
+  // silently skips posts. Trimming loses nothing, because the tail excludes
+  // only the candidates that were kept: a dropped one still arrives later, in
+  // its proper place in date order.
+  const evergreen = Array.from(byId.values());
+  return evergreen.slice(
+    0,
+    Math.floor(evergreen.length / pageSize) * pageSize
+  );
+}
+
+/**
+ * Reverse-chronological paging for readers who have exhausted the ranking.
+ * Excludes the evergreen picks by id because they sit in this stream's date
+ * range but were already served above it, and letting the query remove them
+ * (rather than filtering afterwards) is what keeps page offsets tiling.
+ */
+async function fetchRankedTail(
+  reader: FeedSupabaseClient,
+  options: {
+    filters: {
+      type: FeedContentFilter | null;
+      cutoff: string | null;
+      excludedAuthorIds: string[];
+      excludedPostIds: string[];
+    };
+    boundary: FeedCursorPosition | null;
+    evergreenIds: string[];
+    offset: number;
+    pageSize: number;
+    viewer: {
+      userId: string | null;
+      followedIds: string[];
+      userInterests: string[];
+      userUniversity: string | null;
+    };
+    viewerClient: FeedSupabaseClient | null;
+    enrichmentVisibility: FeedEnrichmentVisibility;
+  }
+): Promise<FeedPageResult> {
+  // No boundary means the recent arm never filled, so there is nothing older
+  // for a tail to contain.
+  if (!options.boundary) return { posts: [], hasMore: false };
+
+  const tailQuery = applyKeysetCursor(
+    applyPostFilters(reader.from("posts").select(POST_SELECT), {
+      ...options.filters,
+      excludedPostIds: [
+        ...options.filters.excludedPostIds,
+        ...options.evergreenIds,
+      ],
+    }),
+    options.boundary
+  );
+
+  const tailResult = (await tailQuery
+    .order("published_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(options.offset, options.offset + options.pageSize)) as
+    SupabaseQueryResult<unknown[]>;
+
+  const raw = expectRows(tailResult, "load chronological feed tail") as Array<
+    Record<string, unknown>
+  >;
+  const page = raw.slice(0, options.pageSize);
+
+  // Scoped to the rows this page actually serves. Asking about the ranked
+  // pool's candidates here would fetch a reader's history for posts that are
+  // not on this page and none of the ones that are.
+  const rankingContext = await buildRankedContext(reader, {
+    ...options.viewer,
+    candidateIds: page.map((row) => String(row.id)),
+  });
+
+  const posts = await enrichPosts(
+    reader,
+    page,
+    rankingContext,
+    options.viewerClient,
+    options.enrichmentVisibility
+  );
+
+  return {
+    posts: posts.map((post) => ({
+      ...post,
+      candidate_source: "for_you_tail" as const,
+    })),
+    hasMore: raw.length > options.pageSize,
+  };
+}
+
+/**
+ * The ranking context for the For You feed, including the two signals derived
+ * from what this reader has actually done: which authors and topics they finish
+ * reading, and which of these very candidates they have already been shown.
+ *
+ * Only the ranked tab asks for these. The chronological tabs are ordered by
+ * date and would pay for signals they cannot use.
+ */
+async function buildRankedContext(
+  reader: FeedSupabaseClient,
+  options: {
+    userId: string | null;
+    followedIds: string[];
+    userInterests: string[];
+    userUniversity: string | null;
+    candidateIds: string[];
+  }
+): Promise<RankingContext> {
+  const base: RankingContext = {
+    userId: options.userId,
+    followedIds: new Set(options.followedIds),
+    userInterests: options.userInterests,
+    userUniversity: options.userUniversity,
+    userCountry: null,
+  };
+  if (!options.userId) return base;
+
+  const [affinity, viewerEngagement] = await Promise.all([
+    getReaderAffinity(reader as never, options.userId),
+    getViewerPostEngagement(reader as never, options.userId, options.candidateIds),
+  ]);
+
+  return { ...base, affinity, viewerEngagement };
 }
 
 const fetchCachedPublicFeedPage = unstable_cache(

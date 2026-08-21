@@ -79,9 +79,19 @@ export interface PublicQualityBadge {
   tone: PublicQualityTone;
 }
 
+/**
+ * Badges only. This used to also carry a `score`, computed by a second,
+ * unbounded scorer that added raw counts together
+ * (`references * 18 + bookmarks * 14 + views * 0.6 + ...`) -- precisely the
+ * shape lib/feedRanking.ts was written to replace. Two scorers meant the daily
+ * digest could call something "today's best" that the feed then ranked sixth,
+ * and it meant tuning the ranking in one place changed nothing in the other.
+ *
+ * There is now one scorer, `scorePost`, and everything that needs a number asks
+ * it. See lib/feedRanking.ts.
+ */
 export interface PublicQualitySignals {
   badges: PublicQualityBadge[];
-  score: number;
 }
 
 export interface PublicQualityInput {
@@ -147,33 +157,6 @@ function hasReviewEvidence(input: PublicQualityInput) {
   });
 }
 
-export function getQualityScore(input: PublicQualityInput): number {
-  const referenceCount = input.referenceCount ?? 0;
-  const responseCount = input.responseCount ?? 0;
-  const bookmarkCount = input.bookmarkCount ?? 0;
-  const likeCount = input.likeCount ?? 0;
-  const viewCount = input.viewCount ?? 0;
-  const reviewed = hasReviewEvidence(input);
-  const citable = Boolean(input.citationId);
-  const publishedAt = input.publishedAt ?? input.createdAt;
-  const ageHours = publishedAt
-    ? Math.max(0, (Date.now() - new Date(publishedAt).getTime()) / (1000 * 60 * 60))
-    : 72;
-  const recencyBoost = Math.max(0, 18 - Math.log2(ageHours + 2));
-
-  return Math.round(
-    referenceCount * 18 +
-      responseCount * 16 +
-      bookmarkCount * 14 +
-      likeCount * 5 +
-      Math.min(viewCount, 500) * 0.6 +
-      (citable ? 45 : 0) +
-      (reviewed ? 28 : 0) +
-      (input.author?.verified ? 12 : 0) +
-      recencyBoost
-  );
-}
-
 export function getPublicQualitySignals(
   input: PublicQualityInput
 ): PublicQualitySignals {
@@ -201,10 +184,7 @@ export function getPublicQualitySignals(
     badges.push({ key: "verified_author", label: "Verified author", tone: "gray" });
   }
 
-  return {
-    badges,
-    score: getQualityScore(input),
-  };
+  return { badges };
 }
 
 /**

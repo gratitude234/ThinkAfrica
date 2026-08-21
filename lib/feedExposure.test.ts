@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  FEED_ALGORITHM_VERSION,
   prepareFeedPageForClient,
   verifyFeedExposureMetadata,
 } from "./feedExposure";
@@ -68,7 +69,7 @@ describe("prepareFeedPageForClient", () => {
       exposureId: "request-1:13:a",
       feedSessionId: "request-1",
       requestId: "request-1",
-      algorithmVersion: "feed-v2.0.0",
+      algorithmVersion: FEED_ALGORITHM_VERSION,
       experimentVariant: "ranking_v2",
       surface: "home",
       candidateSource: "for_you_ranked",

@@ -51,17 +51,17 @@ export default function FeaturedWork({
     return (
       <section
         id="featured-work"
-        className="min-w-0 scroll-mt-24 rounded-xl border border-dashed border-gray-300 bg-white p-6"
+        className="min-w-0 scroll-mt-24 rounded-xl border border-dashed border-card-border bg-card p-6"
       >
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
               Featured work
             </p>
-            <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
+            <h2 className="font-display mt-1 text-xl font-semibold text-ink">
               No portfolio pieces featured yet
             </h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-gray-500">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-ink-muted">
               {isOwnProfile
                 ? "Publish or feature your strongest work so selectors can understand your academic signal quickly."
                 : `${profileName} has not published public portfolio work yet.`}
@@ -90,10 +90,10 @@ export default function FeaturedWork({
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
             Featured work
           </p>
-          <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
+          <h2 className="font-display mt-1 text-xl font-semibold text-ink">
             Work worth reading first
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-ink-muted">
             {curated
               ? "Selected by this profile as their strongest public work."
               : "Automatically showing the strongest public pieces by reads."}
@@ -112,7 +112,7 @@ export default function FeaturedWork({
           return (
             <article
               key={post.id}
-              className="group min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)]"
+              className="group min-w-0 overflow-hidden rounded-xl border border-card-border bg-card transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)]"
             >
               <Link href={`/post/${post.slug}`} className="block">
                 <PostCover
@@ -154,11 +154,11 @@ export default function FeaturedWork({
                   </h3>
                 </Link>
                 {displayTitle && post.excerpt ? (
-                  <p className="line-clamp-2 text-sm leading-relaxed text-gray-500">
+                  <p className="line-clamp-2 text-sm leading-relaxed text-ink-muted">
                     {post.excerpt}
                   </p>
                 ) : null}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
                   <span>{readTime} min read</span>
                   {(post.read_count ?? 0) > 0 ? (
                     <span>{(post.read_count ?? 0).toLocaleString()} reads</span>

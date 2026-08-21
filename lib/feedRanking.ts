@@ -5,12 +5,40 @@ import {
   type ContentKind,
 } from "@/lib/contentModel";
 
+/**
+ * What a reader has actually finished reading, expressed as 0..1 weights
+ * relative to their own most-read author and topic. Built in
+ * lib/readerSignals.ts from qualified reads, never from clicks: a click says
+ * the headline worked, a qualified read says the piece was worth the time.
+ */
+export interface ReaderAffinity {
+  /** author id -> 0..1 */
+  authors: Map<string, number>;
+  /** normalized topic key -> 0..1 */
+  topics: Map<string, number>;
+}
+
+/** This viewer's own history with one specific candidate post. */
+export interface ViewerPostEngagement {
+  /** Impressions served to this viewer, deduped per day. */
+  impressions: number;
+  hasRead: boolean;
+}
+
 export interface RankingContext {
   userId: string | null;
   followedIds: Set<string>;
   userInterests: string[];
   userUniversity: string | null;
   userCountry: string | null;
+  /**
+   * Learned preferences. Optional throughout: signed-out readers have none,
+   * and a deployment where the reader-signal migration has not been applied
+   * yet must degrade to the declared-interest behaviour rather than fail.
+   */
+  affinity?: ReaderAffinity | null;
+  /** Per-candidate viewer history, keyed by post id. Same optionality. */
+  viewerEngagement?: Map<string, ViewerPostEngagement> | null;
 }
 
 /**
@@ -54,7 +82,46 @@ export interface RankablePost extends PostCardData {
 }
 
 const DEFAULT_HALF_LIFE_HOURS = FRESHNESS_HALF_LIFE_HOURS.article;
-const PRIOR_EXPOSURES = 20;
+
+/**
+ * How much exposure a post is assumed to have had before its observed action
+ * rate is taken at face value.
+ *
+ * This was 20, which is far too thin to stabilize a rate. A brand new post with
+ * a single bookmark and no impressions at all scored 1/20 against an expected
+ * rate of 0.025, saturating the bookmark feature to 0.87 and collecting 5.4 of
+ * the available 100 points -- more than half of what a properly cited
+ * bibliography earns. Two friends quietly saving and replying to a post moved
+ * it about as far as genuine quality did, and bookmarks are private and free,
+ * so nobody would ever be seen doing it.
+ *
+ * At 100 a post has to reach a real audience before its hit rate is treated as
+ * evidence of anything. Early engagement still counts, it just no longer
+ * arrives at full strength on a sample of one.
+ */
+export const PRIOR_EXPOSURES = 100;
+
+/**
+ * Relevance is the largest single feature, so its internal split is where
+ * "who wrote this" and "have you shown me you care about this" get balanced.
+ * The learned halves can only ever add: a reader who has never finished
+ * anything scores exactly as they did before these were introduced.
+ */
+export const RELEVANCE_WEIGHTS = {
+  followedAuthor: 0.45,
+  authorAffinity: 0.15,
+  topic: 0.3,
+  sameUniversity: 0.1,
+} as const;
+
+/**
+ * Per-viewer fatigue. Multiplied into the final score rather than subtracted
+ * from a feature, so it can never push a score below zero and never reorders
+ * anything for a reader we have no history for.
+ */
+export const REPEAT_IMPRESSION_DECAY = 0.75;
+export const ALREADY_READ_FATIGUE = 0.25;
+export const MIN_FATIGUE = 0.15;
 
 function nonNegativeFinite(value: number | null | undefined): number {
   return typeof value === "number" && Number.isFinite(value)
@@ -84,29 +151,93 @@ function normalizeTopic(value: string): string {
   return value.trim().toLocaleLowerCase("en");
 }
 
+function unitWeight(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * How strongly this reader's own reading history points at the post's topics.
+ * Takes the strongest matching tag rather than summing, so tagging a post with
+ * eight topics cannot manufacture relevance the way adding them up would.
+ */
+function getLearnedTopicWeight(
+  post: RankablePost,
+  affinity: ReaderAffinity | null | undefined
+): number {
+  if (!affinity || affinity.topics.size === 0) return 0;
+
+  let strongest = 0;
+  for (const tag of post.tags ?? []) {
+    const weight = unitWeight(affinity.topics.get(normalizeTopic(tag)));
+    if (weight > strongest) strongest = weight;
+  }
+  return strongest;
+}
+
 function getRelevance(post: RankablePost, ctx: RankingContext): number {
   const authorId = post.author_id ?? "";
   const authorUniversity = post.profiles?.university?.trim() ?? "";
   const interests = new Set(
     ctx.userInterests.map(normalizeTopic).filter(Boolean)
   );
-  const interestMatch = (post.tags ?? []).some((tag) =>
+  const declaredInterestMatch = (post.tags ?? []).some((tag) =>
     interests.has(normalizeTopic(tag))
   );
 
-  let relevance = 0;
-  if (authorId && ctx.followedIds.has(authorId)) relevance += 0.55;
-  if (interestMatch) relevance += 0.35;
+  // A topic someone explicitly chose counts in full; a topic they have merely
+  // been reading counts in proportion. `max` rather than a sum means the
+  // learned signal fills gaps in the declared one without ever contradicting
+  // it, which matters because the declared list is the only thing a reader can
+  // directly correct.
+  const topicWeight = Math.max(
+    declaredInterestMatch ? 1 : 0,
+    getLearnedTopicWeight(post, ctx.affinity)
+  );
+  const authorAffinity = authorId
+    ? unitWeight(ctx.affinity?.authors.get(authorId))
+    : 0;
+
+  let relevance = topicWeight * RELEVANCE_WEIGHTS.topic;
+  relevance += authorAffinity * RELEVANCE_WEIGHTS.authorAffinity;
+  if (authorId && ctx.followedIds.has(authorId)) {
+    relevance += RELEVANCE_WEIGHTS.followedAuthor;
+  }
   if (
     ctx.userUniversity?.trim() &&
     authorUniversity &&
     ctx.userUniversity.trim().toLocaleLowerCase("en") ===
       authorUniversity.toLocaleLowerCase("en")
   ) {
-    relevance += 0.1;
+    relevance += RELEVANCE_WEIGHTS.sameUniversity;
   }
 
   return Math.min(1, relevance);
+}
+
+/**
+ * The correction for having shown someone the same thing already.
+ *
+ * Without it the ranking is a pure function of the post, so the same cards sit
+ * at the top of the feed on Monday that sat there on Sunday, including the ones
+ * the reader looked at and decided against. A site that publishes every day
+ * still looks asleep.
+ *
+ * Returns 1 for anyone we have no history for, which is every signed-out
+ * reader and every post nobody has been shown yet.
+ */
+function getFatigue(post: RankablePost, ctx: RankingContext): number {
+  const history = ctx.viewerEngagement?.get(post.id);
+  if (!history) return 1;
+
+  const repeats = nonNegativeFinite(history.impressions);
+  const decay = Math.pow(REPEAT_IMPRESSION_DECAY, repeats);
+  const alreadyRead = history.hasRead ? ALREADY_READ_FATIGUE : 1;
+
+  // Floored rather than zeroed: on a feed with thin inventory, demoting is
+  // right and disappearing is not. A post the reader has exhausted should end
+  // up beneath fresh work, not beneath nothing.
+  return Math.max(MIN_FATIGUE, decay * alreadyRead);
 }
 
 function getSatisfaction(post: RankablePost, impressions: number): number {
@@ -161,6 +292,12 @@ function getDiscoveryValue(impressions: number): number {
 /**
  * Produces a bounded 0..100 score from independent feature groups. Raw
  * engagement counts and the derived quality_score are never added together.
+ *
+ * Fatigue applies as a multiplier on the finished sum rather than as a sixth
+ * feature. A feature would have to be weighted against the others and could
+ * drag a score negative; a multiplier in (0, 1] keeps the range intact and
+ * expresses the real relationship, which is that having already seen something
+ * discounts whatever it was otherwise worth to you.
  */
 export function scorePost(post: RankablePost, ctx: RankingContext): number {
   const impressions = nonNegativeFinite(post.impression_count);
@@ -170,13 +307,61 @@ export function scorePost(post: RankablePost, ctx: RankingContext): number {
   const freshness = getFreshness(post);
   const discovery = getDiscoveryValue(impressions);
 
-  return (
-    100 *
-    (relevance * 0.3 +
-      satisfaction * 0.25 +
-      evidence * 0.2 +
-      freshness * 0.15 +
-      discovery * 0.1)
+  const merit =
+    relevance * 0.3 +
+    satisfaction * 0.25 +
+    evidence * 0.2 +
+    freshness * 0.15 +
+    discovery * 0.1;
+
+  return 100 * merit * getFatigue(post, ctx);
+}
+
+/**
+ * A ranking context for surfaces with no particular reader: the daily digest,
+ * admin analytics, anything shared by everyone. Relevance and fatigue both come
+ * out at their neutral values, so what is left is the part of the score that is
+ * a property of the work rather than of the audience.
+ *
+ * A factory rather than a shared constant, because the context holds a Set and
+ * a module-level one could be mutated by any caller.
+ */
+export function createAnonymousRankingContext(): RankingContext {
+  return {
+    userId: null,
+    followedIds: new Set(),
+    userInterests: [],
+    userUniversity: null,
+    userCountry: null,
+  };
+}
+
+/**
+ * The same scorer, for callers holding a database row rather than a feed card.
+ * Everything a card requires but a row does not carry gets a neutral default,
+ * so no call site has to invent a title or an excerpt just to ask how good
+ * something is.
+ */
+export type ScorableCandidate = Partial<RankablePost> &
+  Pick<RankablePost, "id">;
+
+export function scoreCandidate(
+  candidate: ScorableCandidate,
+  ctx: RankingContext
+): number {
+  return scorePost(
+    {
+      title: null,
+      slug: "",
+      excerpt: null,
+      type: "blog",
+      tags: null,
+      created_at: candidate.published_at ?? new Date(0).toISOString(),
+      published_at: null,
+      ...candidate,
+      profiles: candidate.profiles ?? null,
+    },
+    ctx
   );
 }
 

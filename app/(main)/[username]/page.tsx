@@ -1,7 +1,5 @@
-﻿import Link from "next/link";
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import CredentialsCard from "@/components/profile/CredentialsCard";
 import FeaturedWork from "@/components/profile/FeaturedWork";
 import FeaturedWorkManager from "@/components/profile/FeaturedWorkManager";
 import OpportunityBanner from "@/components/profile/OpportunityBanner";
@@ -9,13 +7,13 @@ import OpportunityProfileEditor from "@/components/opportunities/OpportunityProf
 import OpportunityReadinessCard from "@/components/opportunities/OpportunityReadinessCard";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileContentTabs from "@/components/profile/ProfileContentTabs";
+import ProfileDetails from "@/components/profile/ProfileDetails";
+import RecordPanel from "@/components/profile/RecordPanel";
 import ResearchProfileCard, {
   type PublicResearchProfile,
   type PublicResearchProject,
 } from "@/components/profile/ResearchProfileCard";
-import TopArguments from "@/components/profile/TopArguments";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
-import TrackedActionLink from "@/components/retention/TrackedActionLink";
 import { getMessageEligibility } from "@/lib/messaging";
 import {
   getOpportunityReadinessSummary,
@@ -26,7 +24,7 @@ import {
   type ProfileCredibilitySummary,
 } from "@/lib/profileCredibility";
 import { createClient } from "@/lib/supabase/server";
-import { formatMonthYear, formatRelativeTime } from "@/lib/utils";
+import { formatMonthYear } from "@/lib/utils";
 import { isFormallyReviewed } from "@/lib/contentModel";
 import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
 import { getEngagementCounts } from "@/lib/dailyBrief";
@@ -115,18 +113,6 @@ type PortfolioPost = ProfilePost & {
   }>;
 };
 
-interface PortfolioSummaryStats {
-  contributionCount: number;
-  publishedCount: number;
-  responseCount: number;
-  sourceBackedCount: number;
-  citableCount: number;
-  reviewedCount: number;
-  coAuthoredCount: number;
-  debateContributionCount: number;
-  qualityLabelledCount: number;
-}
-
 interface ResearchMembershipRow {
   role: string;
   project:
@@ -155,12 +141,6 @@ interface TopArgumentRow extends Omit<TopArgumentRecord, "debates"> {
     | TopArgumentRecord["debates"]
     | NonNullable<TopArgumentRecord["debates"]>[];
 }
-
-const ACTIVITY_TYPE_ICONS: Record<string, string> = {
-  like: "Like",
-  response: "Response",
-  debate: "Debate",
-};
 
 function getDisplayName(profile: {
   full_name: string | null;
@@ -192,197 +172,6 @@ function clampText(value: string, maxLength: number) {
 // specific record actually completed it (see lib/contentModel.ts).
 function isReviewedWork(post: { citation_id?: string | null; published_version_id?: string | null }) {
   return isFormallyReviewed(post);
-}
-
-function PortfolioSummary({
-  stats,
-  profileUsername,
-  isOwnProfile,
-}: {
-  stats: PortfolioSummaryStats;
-  profileUsername: string;
-  isOwnProfile: boolean;
-}) {
-  const tiles = [
-    {
-      label: "Contributions",
-      value: stats.contributionCount.toLocaleString(),
-      detail: "Published work and public debate arguments",
-    },
-    {
-      label: "Published ideas",
-      value: stats.publishedCount.toLocaleString(),
-      detail: "Posts, Articles, Research, and Responses",
-    },
-    {
-      label: "Linked responses",
-      value: stats.responseCount.toLocaleString(),
-      detail: "Contributions connected directly to another idea",
-    },
-    {
-      label: "Quality-labelled",
-      value: stats.qualityLabelledCount.toLocaleString(),
-      detail: `${stats.sourceBackedCount.toLocaleString()} source-backed / ${stats.reviewedCount.toLocaleString()} reviewed / ${stats.citableCount.toLocaleString()} citable`,
-    },
-    {
-      label: "Debate arguments",
-      value: stats.debateContributionCount.toLocaleString(),
-      detail: "Arguments contributed to public debates",
-    },
-  ];
-
-  return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02]">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-            Intellectual Record
-          </p>
-          <h2 className="font-display mt-1 text-xl font-semibold text-gray-900">
-            The record at a glance
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
-            Every count below is tied to a public contribution or inspectable quality signal.
-          </p>
-        </div>
-
-        {isOwnProfile ? (
-          <Link
-            href="/create/post"
-            className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100"
-          >
-            Add contribution
-          </Link>
-        ) : (
-          <Link
-            href={`/${profileUsername}#intellectual-record`}
-            className="text-sm font-semibold text-emerald-brand transition-colors hover:text-emerald-700"
-          >
-            Browse the full record
-          </Link>
-        )}
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {tiles.map((tile) => (
-          <div key={tile.label} className="rounded-xl border border-gray-100 bg-canvas p-4">
-            <p className="text-2xl font-semibold text-gray-900">{tile.value}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
-              {tile.label}
-            </p>
-            <p className="mt-2 text-xs leading-5 text-gray-500">{tile.detail}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-const CREDIBILITY_BADGE_CLASSES = {
-  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  sky: "border-sky-200 bg-sky-50 text-sky-700",
-  purple: "border-purple-200 bg-purple-50 text-purple-700",
-  amber: "border-amber-200 bg-amber-50 text-amber-700",
-  gray: "border-gray-200 bg-gray-50 text-gray-600",
-};
-
-function CredibilityPanel({
-  summary,
-  isOwnProfile,
-}: {
-  summary: ProfileCredibilitySummary;
-  isOwnProfile: boolean;
-}) {
-  return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm shadow-black/[0.02]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-            Contribution quality
-          </p>
-          <h2 className="font-display mt-1 text-lg font-semibold text-gray-900">
-            {summary.strongestSignal ?? "Building a credible record"}
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-gray-500">
-            Based on published work, attached evidence, completed review, and collaboration records.
-          </p>
-        </div>
-        {isOwnProfile ? (
-          <span className="w-fit rounded-full bg-canvas px-3 py-1 text-xs font-semibold text-gray-600">
-            {summary.profileCompletionScore}% complete
-          </span>
-        ) : null}
-      </div>
-
-      {summary.credibilityBadges.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {summary.credibilityBadges.map((badge) => (
-            <span
-              key={badge.key}
-              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                CREDIBILITY_BADGE_CLASSES[badge.tone]
-              }`}
-            >
-              {badge.label}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-4 rounded-xl border border-dashed border-gray-200 bg-canvas px-4 py-3 text-sm text-gray-500">
-          Quality signals will appear as this profile publishes source-backed, reviewed, citable, or co-authored work.
-        </p>
-      )}
-    </section>
-  );
-}
-
-function ProfileCompletionPanel({
-  summary,
-}: {
-  summary: ProfileCredibilitySummary;
-}) {
-  if (summary.missingProfileItems.length === 0) return null;
-
-  return (
-    <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-            Complete your intellectual profile
-          </p>
-          <h2 className="mt-1 text-base font-semibold text-gray-900">
-            {summary.profileCompletionScore}% profile credibility
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-amber-900/75">
-            Stronger profiles help readers, collaborators, and opportunity partners understand your work.
-          </p>
-        </div>
-        <TrackedActionLink
-          href={summary.missingProfileItems[0].href}
-          actionKey="profile_completion"
-          label={summary.missingProfileItems[0].label}
-          source="profile_completion_panel"
-          className="inline-flex w-fit items-center justify-center rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700"
-        >
-          {summary.missingProfileItems[0].label}
-        </TrackedActionLink>
-      </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        {summary.missingProfileItems.slice(0, 6).map((item) => (
-          <TrackedActionLink
-            key={item.key}
-            href={item.href}
-            actionKey={`profile_completion_${item.key}`}
-            label={item.label}
-            source="profile_completion_panel"
-            className="rounded-lg border border-amber-200 bg-white/70 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-white"
-          >
-            {item.label}
-          </TrackedActionLink>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -471,8 +260,6 @@ export default async function UserProfilePage({ params }: PageProps) {
     { data: topArguments },
     { data: featuredRows },
     { count: debateContributionCount },
-    { count: reviewsCompletedCount },
-    activityData,
     followStatus,
     subscriptionStatus,
     blockStatus,
@@ -530,36 +317,6 @@ export default async function UserProfilePage({ params }: PageProps) {
       .from("debate_arguments")
       .select("id", { count: "exact", head: true })
       .eq("author_id", profile.id),
-    supabase
-      .from("post_reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("reviewer_id", profile.id)
-      .is("removed_at", null)
-      .not("submitted_at", "is", null),
-    isOwnProfile
-      ? Promise.all([
-          supabase
-            .from("likes")
-            .select("created_at, posts!likes_post_id_fkey(title, slug)")
-            .eq("user_id", profile.id)
-            .order("created_at", { ascending: false })
-            .limit(10),
-          supabase
-            .from("posts")
-            .select("created_at, title, slug")
-            .eq("author_id", profile.id)
-            .not("in_response_to", "is", null)
-            .eq("status", "published")
-            .order("created_at", { ascending: false })
-            .limit(10),
-          supabase
-            .from("debate_arguments")
-            .select("created_at, debates!debate_arguments_debate_id_fkey(id, title)")
-            .eq("author_id", profile.id)
-            .order("created_at", { ascending: false })
-            .limit(10),
-        ])
-      : Promise.resolve(null),
     user && user.id !== profile.id
       ? supabase
           .from("follows")
@@ -730,65 +487,11 @@ export default async function UserProfilePage({ params }: PageProps) {
         ? argument.debates[0]
         : argument.debates,
     }));
-  const topArgumentsForDisplay = [...normalizedTopArguments]
-    .sort(
-      (left, right) =>
-        (right.upvotes ?? 0) - (left.upvotes ?? 0) ||
-        new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-    )
-    .slice(0, 3);
-
   const opportunityVisible =
     !!talentProfile?.open_to_opportunities &&
     (isOwnProfile ||
       talentProfile.visibility === "public" ||
       (talentProfile.visibility === "partners_only" && !!user));
-
-  const recentActivity = isOwnProfile && activityData
-    ? (() => {
-        const [likesResult, responsesResult, debatesResult] = activityData;
-        const likeActivity = (likesResult.data ?? []).map((like) => {
-          const post = Array.isArray(like.posts) ? like.posts[0] : like.posts;
-          return {
-            type: "like" as const,
-            description: `Liked "${post?.title ?? "a post"}"`,
-            link: post ? `/post/${post.slug}` : "#",
-            created_at: like.created_at,
-          };
-        });
-
-        const responseActivity = (responsesResult.data ?? []).map((response) => {
-          return {
-            type: "response" as const,
-            description: response.title
-              ? `Responded with "${response.title}"`
-              : "Posted a response",
-            link: response.slug ? `/post/${response.slug}` : "#",
-            created_at: response.created_at,
-          };
-        });
-
-        const debateActivity = (debatesResult.data ?? []).map((argument) => {
-          const debate = Array.isArray(argument.debates)
-            ? argument.debates[0]
-            : argument.debates;
-          return {
-            type: "debate" as const,
-            description: `Argued in "${debate?.title ?? "a debate"}"`,
-            link: debate ? `/debates/${debate.id}` : "#",
-            created_at: argument.created_at,
-          };
-        });
-
-        return [...likeActivity, ...responseActivity, ...debateActivity]
-          .sort(
-            (left, right) =>
-              new Date(right.created_at).getTime() -
-              new Date(left.created_at).getTime()
-          )
-          .slice(0, 20);
-      })()
-    : [];
 
   const messagingEligibility =
     user && user.id !== profile.id
@@ -823,17 +526,6 @@ export default async function UserProfilePage({ params }: PageProps) {
     })),
     debateContributionCount,
   });
-  const portfolioSummary: PortfolioSummaryStats = {
-    contributionCount: recordSummary.contributionCount,
-    publishedCount: recordSummary.publishedCount,
-    responseCount: recordSummary.responseCount,
-    sourceBackedCount: recordSummary.sourceBackedCount,
-    citableCount: recordSummary.citableCount,
-    reviewedCount: recordSummary.reviewedCount,
-    coAuthoredCount: recordSummary.coAuthoredCount,
-    debateContributionCount: recordSummary.debateContributionCount,
-    qualityLabelledCount: recordSummary.qualityLabelledCount,
-  };
   const credibilitySummary = getProfileCredibilitySummary({
     profile,
     stats: {
@@ -862,6 +554,7 @@ export default async function UserProfilePage({ params }: PageProps) {
         />
       ) : null}
 
+      {/* 1. Identity -- who this is. Carries no contribution counts. */}
       <ProfileHeader
         profile={profile}
         isOwnProfile={isOwnProfile}
@@ -874,28 +567,36 @@ export default async function UserProfilePage({ params }: PageProps) {
         talentProfileId={talentProfile?.id ?? null}
         writingSince={formatMonthYear(profile.created_at)}
         messagingEligibility={messagingEligibility}
-        stats={{
-          postCount: mergedPosts.length,
-          citableCount: citableWorkCount,
-          reviewedCount: reviewedWorkCount,
-          coAuthoredCount: coAuthoredWorkCount,
-          responseCount: recordSummary.responseCount,
-          sourceBackedCount: recordSummary.sourceBackedCount,
-          followerCount: followerCount ?? 0,
-          followingCount: followingCount ?? 0,
-          totalViews,
-          totalLikes,
-          debateContributionCount: debateContributionCount ?? 0,
-          topicCount: topicStats.length,
-          badgeCount: badges.length,
-          points: profile.points,
-        }}
       />
 
-      <PortfolioSummary
-        stats={portfolioSummary}
-        profileUsername={profile.username}
+      {/* 2. The record -- the page's headline, and the only place that
+          states how much work exists and how much of it carries evidence. */}
+      <RecordPanel
+        stats={{
+          contributionCount: recordSummary.contributionCount,
+          sourceBackedCount: recordSummary.sourceBackedCount,
+          citableCount: recordSummary.citableCount,
+        }}
+        badges={credibilitySummary.credibilityBadges}
+        displayName={displayName}
         isOwnProfile={isOwnProfile}
+      />
+
+      {/* 3. The work -- the author's selection, then everything. */}
+      <FeaturedWork
+        posts={featuredPosts}
+        curated={curatedFeaturedPosts.length > 0}
+        isOwnProfile={isOwnProfile}
+        profileName={displayName}
+        currentUserId={user?.id ?? null}
+        action={
+          isOwnProfile ? (
+            <FeaturedWorkManager
+              options={mergedPosts}
+              initialPostIds={curatedFeaturedPosts.map((post) => post.id)}
+            />
+          ) : null
+        }
       />
 
       <ProfileContentTabs
@@ -910,10 +611,6 @@ export default async function UserProfilePage({ params }: PageProps) {
         projects={publicResearchProjects}
         isOwnProfile={isOwnProfile}
       />
-
-      <CredibilityPanel summary={credibilitySummary} isOwnProfile={isOwnProfile} />
-
-      {isOwnProfile ? <ProfileCompletionPanel summary={credibilitySummary} /> : null}
 
       <OpportunityBanner
         isOwnProfile={isOwnProfile}
@@ -939,110 +636,22 @@ export default async function UserProfilePage({ params }: PageProps) {
         </>
       ) : null}
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 space-y-6">
-          <FeaturedWork
-            posts={featuredPosts}
-            curated={curatedFeaturedPosts.length > 0}
-            isOwnProfile={isOwnProfile}
-            profileName={displayName}
-            currentUserId={user?.id ?? null}
-            action={
-              isOwnProfile ? (
-                <FeaturedWorkManager
-                  options={mergedPosts}
-                  initialPostIds={curatedFeaturedPosts.map((post) => post.id)}
-                />
-              ) : null
-            }
-          />
-
-          <div className="lg:hidden">
-            <CredentialsCard
-              profile={profile}
-              badges={badges}
-              postCount={mergedPosts.length}
-              totalViews={totalViews}
-              totalLikes={totalLikes}
-              citableWorkCount={citableWorkCount}
-              reviewedWorkCount={reviewedWorkCount}
-              coAuthoredWorkCount={coAuthoredWorkCount}
-              debateContributionCount={debateContributionCount ?? 0}
-              reviewsCompletedCount={reviewsCompletedCount ?? 0}
-              topicStats={topicStats}
-              followerCount={followerCount ?? 0}
-              followingCount={followingCount ?? 0}
-              isOpenToOpportunities={Boolean(talentProfile?.open_to_opportunities)}
-              opportunityVisible={opportunityVisible}
-              opportunityReadinessStatus={opportunityReadiness.statusLabel}
-            />
-          </div>
-
-          <TopArguments argumentsList={topArgumentsForDisplay} />
-
-          {isOwnProfile ? (
-            <section className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Your recent activity
-                </h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Private to you. Useful for tracking your latest engagement.
-                </p>
-              </div>
-
-              {recentActivity.length === 0 ? (
-                <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
-                  No recent activity yet.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {recentActivity.map((item, index) => (
-                    <Link
-                      key={`${item.type}-${item.created_at}-${index}`}
-                      href={item.link}
-                      className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
-                    >
-                      <span className="mt-0.5 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
-                        {ACTIVITY_TYPE_ICONS[item.type]}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-gray-700">
-                          {item.description}
-                        </p>
-                        <p className="mt-0.5 text-xs text-gray-500">
-                          {formatRelativeTime(item.created_at)}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-          ) : null}
-        </div>
-
-        <div className="hidden lg:block">
-          <CredentialsCard
-            profile={profile}
-            badges={badges}
-            postCount={mergedPosts.length}
-            totalViews={totalViews}
-            totalLikes={totalLikes}
-            citableWorkCount={citableWorkCount}
-            reviewedWorkCount={reviewedWorkCount}
-            coAuthoredWorkCount={coAuthoredWorkCount}
-            debateContributionCount={debateContributionCount ?? 0}
-            reviewsCompletedCount={reviewsCompletedCount ?? 0}
-            topicStats={topicStats}
-            followerCount={followerCount ?? 0}
-            followingCount={followingCount ?? 0}
-            isOpenToOpportunities={Boolean(talentProfile?.open_to_opportunities)}
-            opportunityVisible={opportunityVisible}
-            opportunityReadinessStatus={opportunityReadiness.statusLabel}
-          />
-        </div>
-      </div>
+      {/* 4. Details -- reach and platform recognition, kept below the record
+          and visually quieter so popularity never reads as credibility. */}
+      <ProfileDetails
+        username={profile.username}
+        points={profile.points}
+        badges={badges}
+        topicStats={topicStats}
+        totalViews={totalViews}
+        totalLikes={totalLikes}
+        followerCount={followerCount ?? 0}
+        followingCount={followingCount ?? 0}
+        isOpenToOpportunities={Boolean(talentProfile?.open_to_opportunities)}
+        opportunityVisible={opportunityVisible}
+        opportunityReadinessStatus={opportunityReadiness.statusLabel}
+        isOwnProfile={isOwnProfile}
+      />
     </div>
   );
 }

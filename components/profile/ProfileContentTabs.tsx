@@ -185,8 +185,8 @@ function ProfileCard({ item }: { item: ProfileContentItem }) {
 
   return (
     <article
-      className={`overflow-hidden rounded-xl border bg-white p-4 sm:p-[18px] ${
-        kind === "research" ? "border-purple-100" : "border-gray-200"
+      className={`overflow-hidden rounded-xl border bg-card p-4 sm:p-[18px] ${
+        kind === "research" ? "border-purple-100" : "border-card-border"
       }`}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -211,7 +211,7 @@ function ProfileCard({ item }: { item: ProfileContentItem }) {
       </div>
 
       {kind === "post" && !title ? (
-        <p className="mt-2 line-clamp-5 whitespace-pre-line text-[16px] leading-[1.62] text-gray-800">
+        <p className="mt-2 line-clamp-5 whitespace-pre-line text-[16px] leading-[1.62] text-ink">
           {excerpt || "View post"}
         </p>
       ) : (
@@ -220,19 +220,19 @@ function ProfileCard({ item }: { item: ProfileContentItem }) {
             {title ?? "Untitled"}
           </h3>
           {coauthors.length > 0 ? (
-            <p className="mt-1 text-[11.5px] text-gray-500">
+            <p className="mt-1 text-[11.5px] text-ink-muted">
               With {coauthors.join(", ")}
             </p>
           ) : null}
           {excerpt ? (
-            <p className="mt-2 line-clamp-2 text-[13.5px] leading-[1.58] text-gray-600">
+            <p className="mt-2 line-clamp-2 text-[13.5px] leading-[1.58] text-ink-soft">
               {excerpt}
             </p>
           ) : null}
         </>
       )}
 
-      <p className="mt-2 text-[11.5px] text-gray-500">
+      <p className="mt-2 text-[11.5px] text-ink-muted">
         {formatRelativeTime(date)}
         {(item.read_count ?? 0) > 0
           ? ` · ${item.read_count!.toLocaleString()} reads`
@@ -250,7 +250,7 @@ function ProfileCard({ item }: { item: ProfileContentItem }) {
           content_kind={item.content_kind}
           article_format={item.article_format}
           sizes="(max-width: 640px) calc(100vw - 56px), 680px"
-          className="mt-3 aspect-[16/9] w-full rounded-[10px] bg-gray-100"
+          className="mt-3 aspect-[16/9] w-full rounded-[10px] bg-canvas"
           imageClassName="object-cover"
         />
       ) : null}
@@ -273,7 +273,7 @@ function ProfileCard({ item }: { item: ProfileContentItem }) {
 
 function DebateCard({ contribution }: { contribution: ProfileDebateContribution }) {
   return (
-    <article className="rounded-xl border border-amber-100 bg-white p-4 sm:p-[18px]">
+    <article className="rounded-xl border border-amber-100 bg-card p-4 sm:p-[18px]">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-display text-[10.5px] font-bold uppercase tracking-[0.15em] text-amber-700">
           Debate argument
@@ -287,10 +287,10 @@ function DebateCard({ contribution }: { contribution: ProfileDebateContribution 
       <h3 className="mt-2 font-display text-[17px] font-semibold text-ink">
         {contribution.debates?.title ?? "Public debate"}
       </h3>
-      <p className="mt-2 line-clamp-4 whitespace-pre-line text-[14px] leading-6 text-gray-700">
+      <p className="mt-2 line-clamp-4 whitespace-pre-line text-[14px] leading-6 text-ink-soft">
         {contribution.content}
       </p>
-      <p className="mt-2 text-[11.5px] text-gray-500">
+      <p className="mt-2 text-[11.5px] text-ink-muted">
         {formatRelativeTime(contribution.created_at)}
         {(contribution.upvotes ?? 0) > 0
           ? ` · ${contribution.upvotes!.toLocaleString()} reader votes`
@@ -310,17 +310,17 @@ function DebateCard({ contribution }: { contribution: ProfileDebateContribution 
 
 function QualityLabelLegend() {
   return (
-    <details className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
-      <summary className="cursor-pointer font-semibold text-gray-700">
+    <details className="rounded-xl border border-card-border bg-card px-4 py-3 text-sm">
+      <summary className="cursor-pointer font-semibold text-ink-soft">
         How quality labels work
       </summary>
-      <p className="mt-2 text-xs leading-5 text-gray-500">
+      <p className="mt-2 text-xs leading-5 text-ink-muted">
         Labels describe evidence attached to a contribution. They are not popularity scores.
       </p>
       <ul className="mt-3 grid gap-2 sm:grid-cols-2">
         {Object.values(INTELLECTUAL_RECORD_LABEL_DEFINITIONS).map((label) => (
-          <li key={label.key} className="text-xs leading-5 text-gray-600">
-            <span className="font-semibold text-gray-800">{label.label}:</span>{" "}
+          <li key={label.key} className="text-xs leading-5 text-ink-soft">
+            <span className="font-semibold text-ink">{label.label}:</span>{" "}
             {label.description}
           </li>
         ))}
@@ -396,7 +396,7 @@ export default function ProfileContentTabs({
           >
             Contributions, in public
           </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-muted">
             A dated record of published ideas, linked responses, research, and debate arguments.
           </p>
         </div>
@@ -413,7 +413,7 @@ export default function ProfileContentTabs({
       <QualityLabelLegend />
 
       <div
-        className="mb-3 mt-4 flex overflow-x-auto border-b border-gray-200 bg-canvas [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mb-3 mt-4 flex overflow-x-auto border-b border-card-border bg-canvas [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="tablist"
         aria-label="Intellectual Record contribution types"
       >
@@ -428,11 +428,11 @@ export default function ProfileContentTabs({
             className={`-mb-px min-h-11 shrink-0 border-b-2 px-4 text-[13px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${
               activeTab === tab.value
                 ? "border-emerald-brand text-ink"
-                : "border-transparent text-gray-500 hover:text-ink"
+                : "border-transparent text-ink-muted hover:text-ink"
             }`}
           >
             {tab.label}{" "}
-            <span className="ml-1 text-[11px] text-gray-400">
+            <span className="ml-1 text-[11px] text-ink-muted">
               {counts[tab.value]}
             </span>
           </button>
@@ -459,9 +459,9 @@ export default function ProfileContentTabs({
             ))
           )
         ) : (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
+          <div className="rounded-xl border border-dashed border-card-border bg-card p-8 text-center">
             <h3 className="font-display text-xl font-semibold text-ink">{empty.title}</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-muted">
               {empty.description}
             </p>
             {isOwnProfile ? (

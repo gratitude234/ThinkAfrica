@@ -1,7 +1,14 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getQualityScore } from "@/lib/postQuality";
+import {
+  createAnonymousRankingContext,
+  scoreCandidate,
+} from "@/lib/feedRanking";
+import {
+  getBookmarkCountsByPostId,
+  getReferenceCountsByPostId,
+} from "@/lib/postCounts";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 
@@ -166,43 +173,32 @@ export async function getEngagementCounts(
     return { referenceCounts: {}, bookmarkCounts: {}, responseCounts: {} };
   }
 
-  const [referencesResult, bookmarksResult, responsesResult] =
-    await Promise.all([
-      supabase.from("post_references").select("post_id").in("post_id", featuredIds),
-      supabase.from("bookmarks").select("post_id").in("post_id", featuredIds),
-      supabase
-        .from("posts")
-        .select("in_response_to")
-        .eq("status", "published")
-        .in("in_response_to", featuredIds),
-    ]);
+  // References and bookmarks come from the maintained aggregates rather than by
+  // tallying rows, for the same reason the feed stopped doing it: the cost of
+  // the old shape rose with the popularity of the post being counted. Responses
+  // stay a row count because there is no aggregate for them and the number is
+  // bounded by how many people replied to a handful of featured posts.
+  const [referenceCounts, bookmarkCounts, responsesResult] = await Promise.all([
+    getReferenceCountsByPostId(supabase, featuredIds),
+    getBookmarkCountsByPostId(supabase, featuredIds),
+    supabase
+      .from("posts")
+      .select("in_response_to")
+      .eq("status", "published")
+      .in("in_response_to", featuredIds),
+  ]);
 
-  const failedResult = [
-    referencesResult,
-    bookmarksResult,
-    responsesResult,
-  ].find((result) => result.error);
-  if (failedResult?.error) {
+  if (responsesResult.error) {
     throw new Error("Unable to load featured-post engagement counts.", {
-      cause: failedResult.error,
+      cause: responsesResult.error,
     });
   }
 
-  const references = referencesResult.data;
-  const bookmarks = bookmarksResult.data;
-  const responses = responsesResult.data;
-
   return {
-    referenceCounts: countBy(
-      (references ?? []) as Array<Record<string, string | null>>,
-      "post_id"
-    ),
-    bookmarkCounts: countBy(
-      (bookmarks ?? []) as Array<Record<string, string | null>>,
-      "post_id"
-    ),
+    referenceCounts,
+    bookmarkCounts,
     responseCounts: countBy(
-      (responses ?? []) as Array<Record<string, string | null>>,
+      (responsesResult.data ?? []) as Array<Record<string, string | null>>,
       "in_response_to"
     ),
   };
@@ -247,21 +243,35 @@ export async function getDailyBriefContent(
   const featuredIds = featuredPostsRaw.map((post) => post.id);
   const engagementCounts = await getEngagementCounts(supabase, featuredIds);
 
+  // The digest ranks with the same scorer the feed ranks with, under the
+  // no-particular-reader context. It previously used a second formula that
+  // rewarded raw view and bookmark totals, so the email could lead with a post
+  // the feed then placed sixth, and the two disagreed more the busier the site
+  // got.
+  const digestContext = createAnonymousRankingContext();
   const ranked = featuredPostsRaw
     .map((post) => ({
       ...post,
-      quality_score: getQualityScore({
-        type: post.type,
-        citationId: post.citation_id,
-        publishedVersionId: post.published_version_id,
-        referenceCount: engagementCounts.referenceCounts[post.id] ?? 0,
-        responseCount: engagementCounts.responseCounts[post.id] ?? 0,
-        bookmarkCount: engagementCounts.bookmarkCounts[post.id] ?? 0,
-        viewCount: post.view_count,
-        publishedAt: post.published_at,
-        tags: post.tags,
-        author: post.profiles,
-      }),
+      quality_score: scoreCandidate(
+        {
+          id: post.id,
+          author_id: post.author_id,
+          type: post.type,
+          content_kind: post.content_kind,
+          article_format: post.article_format,
+          tags: post.tags,
+          published_at: post.published_at,
+          citation_id: post.citation_id,
+          published_version_id: post.published_version_id,
+          view_count: post.view_count,
+          impression_count: post.impression_count,
+          read_count: post.read_count,
+          reference_count: engagementCounts.referenceCounts[post.id] ?? 0,
+          response_count: engagementCounts.responseCounts[post.id] ?? 0,
+          bookmark_count: engagementCounts.bookmarkCounts[post.id] ?? 0,
+        },
+        digestContext
+      ),
     }))
     .sort((left, right) => right.quality_score - left.quality_score);
 

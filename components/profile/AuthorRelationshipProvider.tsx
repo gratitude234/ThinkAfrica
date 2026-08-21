@@ -496,17 +496,17 @@ export default function AuthorRelationshipProvider({
             aria-modal="true"
             aria-labelledby="unfollow-author-title"
             aria-describedby="unfollow-author-description"
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+            className="w-full max-w-sm rounded-2xl bg-card p-5 shadow-2xl"
           >
             <h2
               id="unfollow-author-title"
-              className="text-lg font-semibold text-gray-950"
+              className="text-lg font-semibold text-ink"
             >
               Unfollow {authorName}?
             </h2>
             <p
               id="unfollow-author-description"
-              className="mt-2 text-sm leading-6 text-gray-600"
+              className="mt-2 text-sm leading-6 text-ink-soft"
             >
               This also stops publication updates from this author.
             </p>
@@ -515,7 +515,7 @@ export default function AuthorRelationshipProvider({
                 ref={confirmButtonRef}
                 type="button"
                 onClick={() => setConfirmSource(null)}
-                className="min-h-11 rounded-lg border border-gray-200 px-4 text-sm font-semibold text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
+                className="min-h-11 rounded-lg border border-card-border px-4 text-sm font-semibold text-ink-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
               >
                 Cancel
               </button>

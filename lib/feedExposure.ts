@@ -2,13 +2,21 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { PostCardData } from "@/components/post/PostCard";
-import type { FeedPageResult, FeedTabKey } from "@/lib/feedData";
+import type {
+  FeedCandidateArm,
+  FeedPageResult,
+  FeedTabKey,
+} from "@/lib/feedData";
 
-export const FEED_ALGORITHM_VERSION = "feed-v2.0.0";
+// v2.1: the For You candidate pool gained an evergreen arm, the ranker gained
+// per-viewer fatigue and learned affinity, and impressions changed meaning
+// (deduped per actor per day rather than per surface). Exposures logged under
+// v2.0.0 are not comparable with these, which is the entire reason this string
+// exists.
+export const FEED_ALGORITHM_VERSION = "feed-v2.1.0";
 
 export type FeedCandidateSource =
-  | "for_you_ranked"
-  | "for_you_tail"
+  | FeedCandidateArm
   | "followed_author"
   | "subscription"
   | "subscribed_topic"
@@ -38,6 +46,7 @@ const SAFE_EXPOSURE_ID = /^[A-Za-z0-9:_-]{1,256}$/;
 const SAFE_POST_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const CANDIDATE_SOURCES = new Set<FeedExposure["candidateSource"]>([
   "for_you_ranked",
+  "for_you_evergreen",
   "for_you_tail",
   "followed_author",
   "subscription",
@@ -175,6 +184,16 @@ export function verifyFeedExposureMetadata(
   return { ...exposure, signature };
 }
 
+/**
+ * Where a card came from, when the card itself does not say.
+ *
+ * The For You feed now labels each row with the arm that supplied it, because
+ * page arithmetic can no longer tell: the evergreen arm sits inside the ranked
+ * stream rather than after it, and the ranked stream's length varies with how
+ * much evergreen inventory exists. This remains the answer for the
+ * chronological tabs, where the surface and the source are the same fact, and
+ * the fallback for a ranked page whose rows predate the label.
+ */
 function getCandidateSource(
   tab: FeedTabKey,
   page: number,
@@ -192,6 +211,16 @@ function getCandidateSource(
   return "latest";
 }
 
+function resolveCandidateSource(
+  post: PostCardData,
+  fallback: FeedCandidateSource
+): FeedCandidateSource {
+  const labelled = post.candidate_source;
+  return labelled && CANDIDATE_SOURCES.has(labelled as FeedCandidateSource)
+    ? (labelled as FeedCandidateSource)
+    : fallback;
+}
+
 function stripRankingInternals(post: PostCardData): PostCardData {
   const {
     score: _score,
@@ -201,6 +230,10 @@ function stripRankingInternals(post: PostCardData): PostCardData {
     view_count: _views,
     reference_count: _references,
     bookmark_count: _bookmarks,
+    // Which arm supplied the card is server bookkeeping. It travels on the
+    // signed exposure, where it cannot be edited, not as a loose field on the
+    // card, where it could be.
+    candidate_source: _candidateSource,
     ...card
   } = post;
 
@@ -222,7 +255,7 @@ export function prepareFeedPageForClient(
   const requestId = options.requestId ?? crypto.randomUUID();
   const feedSessionId = options.feedSessionId ?? requestId;
   const servedAt = options.servedAt ?? new Date().toISOString();
-  const candidateSource = getCandidateSource(
+  const fallbackCandidateSource = getCandidateSource(
     options.tab,
     options.page,
     options.pageSize,
@@ -242,7 +275,7 @@ export function prepareFeedPageForClient(
         algorithmVersion: FEED_ALGORITHM_VERSION,
         experimentVariant: "ranking_v2",
         surface: options.tab,
-        candidateSource,
+        candidateSource: resolveCandidateSource(post, fallbackCandidateSource),
         position,
         page: options.page,
         servedAt,

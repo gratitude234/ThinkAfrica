@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "./route";
 import { FeedCursorError } from "@/lib/feedData";
+import { FEED_ALGORITHM_VERSION } from "@/lib/feedExposure";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -110,7 +111,7 @@ describe("GET /api/feed", () => {
     expect(body.posts[0]).not.toHaveProperty("score");
     expect(body.posts[0]).not.toHaveProperty("impression_count");
     expect(body.posts[0].feed_exposure).toMatchObject({
-      algorithmVersion: "feed-v2.0.0",
+      algorithmVersion: FEED_ALGORITHM_VERSION,
       surface: "home",
       candidateSource: "for_you_ranked",
       position: 1,

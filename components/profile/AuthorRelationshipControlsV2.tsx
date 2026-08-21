@@ -86,7 +86,7 @@ function RelationshipButtons({
             variant === "full" ? "flex-1" : ""
           } ${
             relationship.following
-              ? "border-gray-300 bg-white text-gray-700 hover:border-red-300 hover:text-red-700"
+              ? "border-card-border bg-card text-ink-soft hover:border-red-300 hover:text-red-700"
               : "border-emerald-brand bg-emerald-brand text-white hover:bg-[#0E4B37]"
           }`}
         >
@@ -121,7 +121,7 @@ function RelationshipButtons({
             } ${variant === "full" ? "flex-1" : ""} ${
               relationship.subscribed
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                : "border-gray-300 bg-white text-gray-700 hover:border-emerald-300 hover:text-emerald-700"
+                : "border-card-border bg-card text-ink-soft hover:border-emerald-300 hover:text-emerald-700"
             }`}
           >
             <BellIcon active={relationship.subscribed} />

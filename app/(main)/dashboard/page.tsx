@@ -17,6 +17,9 @@ import RetentionEventTracker from "@/components/retention/RetentionEventTracker"
 import RetentionThisWeek from "@/components/retention/RetentionThisWeek";
 import TrackedActionLink from "@/components/retention/TrackedActionLink";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
+import RecentActivity, {
+  type RecentActivityItem,
+} from "@/components/profile/RecentActivity";
 import Button from "@/components/ui/Button";
 import { getActivationState } from "@/lib/activation";
 import { isFormallyReviewed } from "@/lib/contentModel";
@@ -400,6 +403,7 @@ export default async function DashboardPage() {
     { data: recentResponsesRaw },
     { data: conversationParticipantsRaw },
     collaborationSuggestions,
+    activityData,
   ] = await Promise.all([
     supabase
       .from("post_authors")
@@ -433,7 +437,69 @@ export default async function DashboardPage() {
       tags: collaborationTags,
       limit: 3,
     }),
+    // Private engagement history. Moved here from the public profile, where
+    // it was fetched for every owner view but visible to nobody else.
+    Promise.all([
+      supabase
+        .from("likes")
+        .select("created_at, posts!likes_post_id_fkey(title, slug)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("posts")
+        .select("created_at, title, slug")
+        .eq("author_id", user.id)
+        .not("in_response_to", "is", null)
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("debate_arguments")
+        .select("created_at, debates!debate_arguments_debate_id_fkey(id, title)")
+        .eq("author_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]),
   ]);
+
+  const [likesResult, responsesResult, debatesResult] = activityData;
+  const recentActivity: RecentActivityItem[] = [
+    ...(likesResult.data ?? []).map((like) => {
+      const post = Array.isArray(like.posts) ? like.posts[0] : like.posts;
+      return {
+        type: "like" as const,
+        description: `Liked "${post?.title ?? "a post"}"`,
+        link: post ? `/post/${post.slug}` : "#",
+        created_at: like.created_at,
+      };
+    }),
+    ...(responsesResult.data ?? []).map((response) => ({
+      type: "response" as const,
+      description: response.title
+        ? `Responded with "${response.title}"`
+        : "Posted a response",
+      link: response.slug ? `/post/${response.slug}` : "#",
+      created_at: response.created_at,
+    })),
+    ...(debatesResult.data ?? []).map((argument) => {
+      const debate = Array.isArray(argument.debates)
+        ? argument.debates[0]
+        : argument.debates;
+      return {
+        type: "debate" as const,
+        description: `Argued in "${debate?.title ?? "a debate"}"`,
+        link: debate ? `/debates/${debate.id}` : "#",
+        created_at: argument.created_at,
+      };
+    }),
+  ]
+    .sort(
+      (left, right) =>
+        new Date(right.created_at).getTime() -
+        new Date(left.created_at).getTime()
+    )
+    .slice(0, 20);
 
   const pendingInvites = (pendingInvitesRaw ?? []).map((invite) => {
     const post = Array.isArray(invite.posts) ? invite.posts[0] : invite.posts;
@@ -1180,6 +1246,8 @@ export default async function DashboardPage() {
           </div>
         </div>
       )}
+
+      <RecentActivity items={recentActivity} />
     </div>
   );
 }

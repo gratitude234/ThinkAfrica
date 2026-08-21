@@ -94,7 +94,7 @@ export default function FeaturedWorkManager({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:text-gray-900"
+        className="inline-flex items-center justify-center rounded-lg border border-card-border bg-card px-3 py-1.5 text-xs font-semibold text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink"
       >
         Manage featured work
       </button>
@@ -105,24 +105,24 @@ export default function FeaturedWorkManager({
             role="dialog"
             aria-modal="true"
             aria-labelledby="featured-work-manager-title"
-            className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-xl"
+            className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-card-border bg-card p-6 shadow-xl"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3
                   id="featured-work-manager-title"
-                  className="text-lg font-semibold text-gray-900"
+                  className="text-lg font-semibold text-ink"
                 >
                   Manage featured work
                 </h3>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-ink-muted">
                   Choose up to three published pieces for the top of your profile.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-2 py-1 text-xl leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                className="rounded-lg px-2 py-1 text-xl leading-none text-ink-muted hover:bg-canvas hover:text-ink-soft"
                 aria-label="Close featured work manager"
               >
                 x
@@ -138,13 +138,13 @@ export default function FeaturedWorkManager({
                   {selectedPosts.map((post, index) => (
                     <div
                       key={post.id}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"
+                      className="flex items-center justify-between gap-3 rounded-lg bg-card px-3 py-2 text-sm"
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-gray-900">
+                        <p className="truncate font-medium text-ink">
                           {index + 1}. {getPostMetadataTitle(post)}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-ink-muted">
                           {(post.read_count ?? 0).toLocaleString()} reads
                         </p>
                       </div>
@@ -153,7 +153,7 @@ export default function FeaturedWorkManager({
                           type="button"
                           onClick={() => movePost(post.id, -1)}
                           disabled={index === 0}
-                          className="rounded border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                          className="rounded border border-card-border px-2 py-1 text-xs font-medium text-ink-soft hover:bg-canvas disabled:opacity-40"
                         >
                           Up
                         </button>
@@ -161,7 +161,7 @@ export default function FeaturedWorkManager({
                           type="button"
                           onClick={() => movePost(post.id, 1)}
                           disabled={index === selectedPosts.length - 1}
-                          className="rounded border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                          className="rounded border border-card-border px-2 py-1 text-xs font-medium text-ink-soft hover:bg-canvas disabled:opacity-40"
                         >
                           Down
                         </button>
@@ -187,14 +187,14 @@ export default function FeaturedWorkManager({
                     className={`flex w-full items-start justify-between gap-4 rounded-xl border p-4 text-left transition-colors ${
                       selected
                         ? "border-emerald-300 bg-emerald-50"
-                        : "border-gray-200 bg-white hover:border-gray-300"
+                        : "border-card-border bg-card hover:border-card-border"
                     } ${disabled ? "opacity-50" : ""}`}
                   >
                     <div className="min-w-0">
-                      <p className="line-clamp-2 text-sm font-semibold text-gray-900">
+                      <p className="line-clamp-2 text-sm font-semibold text-ink">
                         {getPostMetadataTitle(post)}
                       </p>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-ink-muted">
                         {formatDate(displayDate)} / {(post.read_count ?? 0).toLocaleString()} reads
                         {post.isCoAuthor ? " / Co-author" : ""}
                       </p>
@@ -203,7 +203,7 @@ export default function FeaturedWorkManager({
                       className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
                         selected
                           ? "bg-emerald-600 text-white"
-                          : "bg-gray-100 text-gray-500"
+                          : "bg-canvas text-ink-muted"
                       }`}
                     >
                       {selected ? "Selected" : "Add"}
@@ -214,18 +214,18 @@ export default function FeaturedWorkManager({
             </div>
 
             {options.length === 0 ? (
-              <div className="mt-5 rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
+              <div className="mt-5 rounded-xl border border-dashed border-card-border p-6 text-center text-sm text-ink-muted">
                 Publish a post before choosing featured work.
               </div>
             ) : null}
 
             {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
 
-            <div className="mt-6 flex justify-end gap-2 border-t border-gray-100 pt-4">
+            <div className="mt-6 flex justify-end gap-2 border-t border-divider pt-4">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink"
               >
                 Cancel
               </button>

@@ -53,6 +53,14 @@ export interface PostCardData {
   cover_image_url?: string | null;
   score?: number;
   quality_score?: number;
+  /**
+   * Which arm of the For You candidate pool supplied this card. Set on the
+   * server and removed again before the card is sent, so it only ever reaches
+   * the client inside the signed exposure. Typed loosely on purpose: the
+   * authoritative list lives in lib/feedExposure.ts, and importing it here
+   * would tie the card component to the server-only exposure module.
+   */
+  candidate_source?: string;
   viewer_liked?: boolean;
   viewer_bookmarked?: boolean;
   quality_badges?: Array<{

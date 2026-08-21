@@ -6,6 +6,8 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  EVERGREEN_REVIEWED_LIMIT,
+  EVERGREEN_WELL_READ_LIMIT,
   FeedCursorError,
   FeedDataError,
   MAX_FEED_PAGE,
@@ -285,6 +287,7 @@ function feedSupabase(
     excludedCreditsError = null as { code: string; message: string } | null,
     parentRows = [] as Array<Record<string, unknown>>,
     parentError = null as { code: string; message: string } | null,
+    rpcResults = null as Record<string, unknown> | null,
   } = {}
 ) {
   const postQueries: Array<{
@@ -409,7 +412,13 @@ function feedSupabase(
 
     const builder: Record<string, unknown> = {
       select: vi.fn((columns?: string) => {
-        if (typeof columns === "string" && columns.startsWith("id, title, slug")) {
+        if (
+          typeof columns === "string" &&
+          // The full candidate select, and the narrow one the tail's identity
+          // probe uses to find the pool's boundary without pulling content.
+          (columns.startsWith("id, title, slug") ||
+            columns.startsWith("id, published_at"))
+        ) {
           queryKind = "feed";
           call.select = columns;
           postQueries.push(call);
@@ -491,6 +500,16 @@ function feedSupabase(
       }
       return makeBuilder({ data: [], error: null });
     }),
+    // Omitted entirely unless a test asks for it, so the default double keeps
+    // exercising the no-reader-signals path the way an unmigrated database
+    // would.
+    ...(rpcResults
+      ? {
+          rpc: vi.fn((fn: string) =>
+            Promise.resolve({ data: rpcResults[fn] ?? [], error: null })
+          ),
+        }
+      : {}),
   };
 
   return { supabase, postQueries, parentPostQueries };
@@ -1177,21 +1196,142 @@ describe("fetchFeedPage -- ranked home feed paging", () => {
     expect(second.postQueries[0].limit).toBe(RANKED_FEED_WINDOW + 1);
   });
 
-  it("pages the tail past the ranked window chronologically", async () => {
-    // The window is the newest RANKED_FEED_WINDOW posts by date, so the tail
-    // starting at that same date offset cannot repeat one of them.
+  it("reaches past the newest window for older work once the window is full", async () => {
+    // Ranking only the newest N is a candidate pool that stops working as the
+    // site grows: at a post a day it is the whole archive, at 120 a day it is
+    // the last 24 hours. Once the recent arm fills, two evergreen arms continue
+    // from its boundary row so good older work stays reachable.
     const deep = Array.from({ length: RANKED_FEED_WINDOW + 20 }, (_, index) =>
       rankedRow(index, 0)
     );
     const { supabase, postQueries } = feedSupabase(deep);
-    const page = RANKED_FEED_WINDOW / 12 + 1;
 
-    const result = await fetchFeedPage({ ...rankedOptions, supabase: supabase as never, page });
+    await fetchFeedPage({ ...rankedOptions, supabase: supabase as never, page: 1 });
 
-    expect(postQueries[0].range).toEqual([RANKED_FEED_WINDOW, RANKED_FEED_WINDOW + 12]);
+    const [recentQuery, ...evergreenQueries] = postQueries;
+    expect(recentQuery.limit).toBe(RANKED_FEED_WINDOW + 1);
+    expect(evergreenQueries.map((query) => query.limit)).toEqual([
+      EVERGREEN_REVIEWED_LIMIT,
+      EVERGREEN_WELL_READ_LIMIT,
+    ]);
+    // Both arms continue strictly past the last row of the recent arm, which is
+    // what makes the two pools disjoint and stops a post being scored twice.
+    for (const query of evergreenQueries) {
+      expect(query.keysetFilters).toHaveLength(1);
+      expect(query.keysetFilters[0]).toContain(
+        `id.lt.p${RANKED_FEED_WINDOW - 1}`
+      );
+    }
+  });
+
+  it("pages the tail past the ranked stream without repeating an evergreen pick", async () => {
+    // 180 posts. The recent arm takes p0..p119; the evergreen arms reach
+    // p120..p159 and are then trimmed to a whole number of pages, so the ranked
+    // stream is p0..p155 and the tail begins at p156.
+    const deep = Array.from({ length: 180 }, (_, index) => rankedRow(index, 0));
+    const { supabase } = feedSupabase(deep);
+    const evergreenServed =
+      Math.floor(EVERGREEN_WELL_READ_LIMIT / 12) * 12;
+    const rankedStreamLength = RANKED_FEED_WINDOW + evergreenServed;
+    const firstTailPage = rankedStreamLength / 12 + 1;
+
+    const result = await fetchFeedPage({
+      ...rankedOptions,
+      supabase: supabase as never,
+      page: firstTailPage,
+    });
+
+    // The tail continues from the recent arm's boundary with the evergreen ids
+    // removed, so it resumes exactly where the ranked stream stopped rather
+    // than at a raw date offset that would repeat what was already served.
     expect(result.posts.map((post) => post.id)).toEqual(
-      Array.from({ length: 12 }, (_, index) => `p${RANKED_FEED_WINDOW + index}`)
+      Array.from({ length: 12 }, (_, index) => `p${rankedStreamLength + index}`)
     );
     expect(result.hasMore).toBe(true);
+  });
+
+  it("demotes what this reader has already been shown", async () => {
+    // The engagement diary has always been written. Until it was read back, the
+    // ranking was a pure function of the post, so the same cards led the feed on
+    // Monday that led it on Sunday, including the ones the reader had already
+    // looked at and passed over.
+    const rows = Array.from({ length: 3 }, (_, index) => rankedRow(index, 0));
+    const { supabase } = feedSupabase(rows, {
+      rpcResults: {
+        get_viewer_post_engagement: [
+          { post_id: "p0", impressions: 6, has_read: true },
+        ],
+      },
+    });
+
+    const result = await fetchFeedPage({
+      ...rankedOptions,
+      supabase: supabase as never,
+      page: 1,
+    });
+
+    // p0 is the newest and would otherwise lead on freshness alone.
+    expect(result.posts.map((post) => post.id)).toEqual(["p1", "p2", "p0"]);
+  });
+
+  it("labels each card with the arm that supplied it", async () => {
+    const deep = Array.from({ length: RANKED_FEED_WINDOW + 20 }, (_, index) =>
+      rankedRow(index, 0)
+    );
+    const { supabase } = feedSupabase(deep);
+
+    const result = await fetchFeedPage({
+      ...rankedOptions,
+      supabase: supabase as never,
+      page: 1,
+    });
+
+    for (const post of result.posts) {
+      expect(post.candidate_source).toBe("for_you_ranked");
+    }
+  });
+
+  it("finds the pool's edge without pulling the pool's content", async () => {
+    // A tail page wants none of the candidate rows. Reading them in full purely
+    // to discover where the ranked stream ended would be 160 rows of article
+    // metadata fetched and dropped on every page past the ranking.
+    const deep = Array.from({ length: 180 }, (_, index) => rankedRow(index, 0));
+    const { supabase, postQueries } = feedSupabase(deep);
+    const rankedStreamLength =
+      RANKED_FEED_WINDOW + Math.floor(EVERGREEN_WELL_READ_LIMIT / 12) * 12;
+
+    await fetchFeedPage({
+      ...rankedOptions,
+      supabase: supabase as never,
+      page: rankedStreamLength / 12 + 1,
+    });
+
+    const probeQueries = postQueries.slice(0, 3);
+    for (const query of probeQueries) {
+      expect(query.select).not.toContain("excerpt");
+    }
+    // Only the query that actually serves rows asks for the whole card.
+    expect(postQueries[3].select).toContain("excerpt");
+  });
+
+  it("serves every post exactly once across the ranked stream and the tail", async () => {
+    const deep = Array.from({ length: 180 }, (_, index) => rankedRow(index, 0));
+    const served: string[] = [];
+
+    for (let page = 1; page <= 180 / 12; page += 1) {
+      const { supabase } = feedSupabase(deep);
+      const result = await fetchFeedPage({
+        ...rankedOptions,
+        supabase: supabase as never,
+        page,
+      });
+      served.push(...result.posts.map((post) => post.id));
+    }
+
+    // No repeats is the visible half of the contract. No gaps is the half that
+    // fails silently: a post shoved past the ranked window and then skipped by
+    // the tail's offset never arrives at all, and nobody reports it.
+    expect(new Set(served).size).toBe(served.length);
+    expect(new Set(served)).toEqual(new Set(deep.map((row) => row.id)));
   });
 });

@@ -253,16 +253,17 @@ describe("public quality signals are evidence-based, not name-based", () => {
     expect(reason).toBe("Reviewed or citable work");
   });
 
-  it("gives an unreviewed policy_brief a lower quality score than an equivalent reviewed one", () => {
-    const unreviewed = getPublicQualitySignals({ type: "policy_brief", citationId: null, publishedVersionId: null })
-      .score;
-    const reviewed = getPublicQualitySignals({
+  // Scoring moved out of this module entirely: there is one scorer now, and it
+  // lives in lib/feedRanking.ts. The equivalent assertion is
+  // "rewards formally reviewed work over an unreviewed equivalent" there.
+  it("carries badges only, with no second score to disagree with the ranker", () => {
+    const signals = getPublicQualitySignals({
       type: "policy_brief",
       citationId: null,
       publishedVersionId: "11111111-1111-1111-1111-111111111111",
-    }).score;
+    });
 
-    expect(reviewed).toBeGreaterThan(unreviewed);
+    expect(Object.keys(signals)).toEqual(["badges"]);
   });
 });
 

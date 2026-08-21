@@ -53,29 +53,6 @@ interface ProfileHeaderProps {
   talentProfileId: string | null;
   writingSince: string;
   messagingEligibility?: { eligible: boolean; reason: string | null } | null;
-  stats: {
-    postCount: number;
-    citableCount: number;
-    reviewedCount: number;
-    coAuthoredCount: number;
-    responseCount: number;
-    sourceBackedCount: number;
-    followerCount: number;
-    followingCount: number;
-    totalViews: number;
-    totalLikes: number;
-    debateContributionCount: number;
-    topicCount: number;
-    badgeCount: number;
-    points: number;
-  };
-}
-
-function formatStat(value: number) {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
-  if (value >= 10_000) return `${Math.round(value / 1_000)}k`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return value.toLocaleString();
 }
 
 export default function ProfileHeader({
@@ -90,7 +67,6 @@ export default function ProfileHeader({
   talentProfileId,
   writingSince,
   messagingEligibility,
-  stats,
 }: ProfileHeaderProps) {
   const router = useRouter();
   const [showInquiry, setShowInquiry] = useState(false);
@@ -103,21 +79,9 @@ export default function ProfileHeader({
       ? `Graduated ${profile.graduation_year}`
       : `Writing since ${writingSince}`,
   ].filter(Boolean);
-  const statsItems = [
-    // Renamed from "Publications" -- this count includes every published
-    // work (short Posts included, not just formal Article/Research
-    // publications), so calling it "Publications" overclaimed. See
-    // PublicationsSection, which correctly scopes "Publications" to
-    // Article/Research only.
-    {
-      label: "Record",
-      value: stats.postCount + stats.debateContributionCount,
-    },
-    { label: "Responses", value: stats.responseCount },
-    { label: "Source-backed", value: stats.sourceBackedCount },
-    { label: "Reviewed", value: stats.reviewedCount },
-    { label: "Citable", value: stats.citableCount },
-  ];
+  // The header carries identity only. Contribution counts live in exactly one
+  // place -- RecordPanel -- so the same figure is never stated twice on the
+  // page in two different vocabularies.
   const verifiedLabel = profile.verified_type
     ? profile.verified_type.charAt(0).toUpperCase() +
       profile.verified_type.slice(1)
@@ -126,7 +90,7 @@ export default function ProfileHeader({
 
   return (
     <>
-      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm shadow-black/[0.02]">
+      <section className="overflow-hidden rounded-xl border border-card-border bg-card">
         {profile.cover_image_url ? (
           <div className="h-20 overflow-hidden bg-canvas sm:h-24 lg:h-32">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -156,7 +120,7 @@ export default function ProfileHeader({
                 name={displayName}
                 src={profile.avatar_url}
                 size={88}
-                className="border-4 border-white shadow-md"
+                className="border-4 border-card shadow-md"
               />
             </button>
           ) : null}
@@ -203,13 +167,11 @@ export default function ProfileHeader({
 
             <h1 className="font-display flex flex-wrap items-center gap-2 text-3xl font-semibold leading-tight text-ink">
               <span>{displayName}</span>
+              {/* Decorative: the chip above already states the verified type
+                  in text, so announcing the mark too would repeat it. */}
               {profile.verified ? (
                 <span
-                  title={
-                    profile.verified_type
-                      ? `Verified ${profile.verified_type}`
-                      : "Verified"
-                  }
+                  aria-hidden="true"
                   className={`text-sm font-bold ${
                     VERIFIED_COLORS[verifiedType] ??
                     "text-emerald-600"
@@ -220,16 +182,16 @@ export default function ProfileHeader({
               ) : null}
             </h1>
 
-            <p className="mt-1 text-sm text-gray-500">@{profile.username}</p>
+            <p className="mt-1 text-sm text-ink-muted">@{profile.username}</p>
 
             {profile.bio ? (
-              <p className="mt-3 max-w-prose text-[15px] leading-6 text-gray-700">
+              <p className="mt-3 max-w-prose text-[15px] leading-6 text-ink-soft">
                 {profile.bio}
               </p>
             ) : null}
 
             {affiliationBits.length > 0 ? (
-              <p className="mt-3 text-sm text-gray-500">
+              <p className="mt-3 text-sm text-ink-muted">
                 {affiliationBits.join(" / ")}
               </p>
             ) : null}
@@ -277,7 +239,7 @@ export default function ProfileHeader({
                         className="flex-1"
                       />
                     ) : (
-                      <div className="flex-1 rounded-lg border border-dashed border-gray-200 px-3 py-2 text-center text-xs text-gray-400">
+                      <div className="flex-1 rounded-lg border border-dashed border-card-border px-3 py-2 text-center text-xs text-ink-muted">
                         {messagingEligibility?.reason ?? "Messaging unavailable"}
                       </div>
                     )
@@ -292,7 +254,7 @@ export default function ProfileHeader({
                       targetLabel={displayName}
                       variant="text"
                     />
-                    <span className="text-gray-200">|</span>
+                    <span className="text-divider">|</span>
                     <BlockUserButton
                       targetUserId={profile.id}
                       targetName={displayName}
@@ -307,17 +269,6 @@ export default function ProfileHeader({
           </div>
         </div>
 
-        <div className="flex divide-x divide-gray-100 overflow-x-auto border-t border-gray-100 bg-white px-2 pb-4 pt-3 sm:px-4">
-          {statsItems.map((item) => (
-            <div
-              key={item.label}
-              className="flex min-w-[72px] flex-1 flex-col items-center px-3 py-1.5"
-            >
-              <span className="text-base font-semibold text-ink">{formatStat(item.value)}</span>
-              <span className="mt-0.5 text-[11px] text-ink-muted">{item.label}</span>
-            </div>
-          ))}
-        </div>
       </section>
 
       {talentProfileId ? (
@@ -344,10 +295,10 @@ export default function ProfileHeader({
             <button
               type="button"
               onClick={() => setShowAvatarLightbox(false)}
-              className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100"
+              className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-card shadow-md hover:bg-canvas"
               aria-label="Close"
             >
-              <svg className="h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4 text-ink-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -413,14 +364,14 @@ function MessageButton({
   return (
     <div className={className}>
       {reason ? (
-        <p className="mb-1 text-center text-[10px] text-gray-400">{reason}</p>
+        <p className="mb-1 text-center text-[10px] text-ink-muted">{reason}</p>
       ) : null}
       <button
         type="button"
         onClick={handleMessage}
         disabled={isBusy}
         aria-busy={isBusy || undefined}
-        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:text-gray-900 disabled:opacity-50"
+        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-card-border bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink disabled:opacity-50"
       >
         {isBusy ? "Opening..." : "Message"}
       </button>

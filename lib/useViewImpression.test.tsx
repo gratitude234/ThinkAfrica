@@ -2,7 +2,7 @@ import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useRef } from "react";
 import { useViewImpression } from "./useViewImpression";
-import type { FeedExposure } from "./feedExposure";
+import { FEED_ALGORITHM_VERSION, type FeedExposure } from "./feedExposure";
 
 let observers: MockIntersectionObserver[] = [];
 
@@ -33,7 +33,7 @@ const exposure: FeedExposure = {
   exposureId: "request-1:1:post-1",
   feedSessionId: "request-1",
   requestId: "request-1",
-  algorithmVersion: "feed-v2.0.0",
+  algorithmVersion: FEED_ALGORITHM_VERSION,
   experimentVariant: "ranking_v2",
   surface: "home",
   candidateSource: "for_you_ranked",
@@ -80,7 +80,7 @@ describe("useViewImpression", () => {
     expect(firstBody.metadata).toMatchObject({
       exposureId: "request-1:1:post-1",
       requestId: "request-1",
-      algorithmVersion: "feed-v2.0.0",
+      algorithmVersion: FEED_ALGORITHM_VERSION,
       candidateSource: "for_you_ranked",
       position: 1,
     });
