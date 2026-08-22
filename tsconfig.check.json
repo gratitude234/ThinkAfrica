@@ -27,6 +27,7 @@
     "lib/actionInbox.ts",
     "lib/useHasScrolled.ts",
     "app/(main)/AppChromeProvider.tsx",
+    "components/ui/BriefColumn.tsx",
     "lib/notificationRead.ts",
     "lib/notificationCatalog.ts",
     "lib/notificationPreferences.ts",

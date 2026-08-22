@@ -460,7 +460,14 @@ export default function PostsFeedTabs({
     if (window.scrollY <= target) return;
     // Instant, not smooth: a tab switch should already be at the top by the
     // time the new cards paint, not animating past the old ones.
-    window.scrollTo({ top: target, behavior: "auto" });
+    //
+    // "instant", not "auto". Per CSSOM View, "auto" does not mean "no
+    // animation" -- it means "defer to the computed scroll-behavior", and
+    // globals.css sets `html { scroll-behavior: smooth }` for everyone who
+    // has not asked for reduced motion. So this call was animating the whole
+    // way back up, past every card the reader was trying to leave, which is
+    // exactly what the line above says it must not do.
+    window.scrollTo({ top: target, behavior: "instant" });
   }, [navHeight, revealChrome]);
 
   const updateState = useCallback(
