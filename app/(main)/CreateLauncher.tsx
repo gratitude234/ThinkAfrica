@@ -1,8 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
+import { useCallback, useId, useRef, useState } from "react";
+import ContributionChooser from "./ContributionChooser";
 
 interface CreateLauncherProps {
   userId: string | null;
@@ -21,31 +20,6 @@ function PlusIcon({ className = "h-4 w-4" }: { className?: string }) {
       aria-hidden="true"
     >
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function SpinnerIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg
-      className={`animate-spin motion-reduce:animate-none ${className}`}
-      fill="none"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth={4}
-      />
-      <path
-        className="opacity-90"
-        fill="currentColor"
-        d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
-      />
     </svg>
   );
 }
@@ -81,29 +55,28 @@ function ComposeIcon({ className = "h-6 w-6" }: { className?: string }) {
 // desktop trigger appeared from `sm` (640px) while the mobile FAB only
 // disappeared at `md` (768px), so both were visible in the 640-767px gap.
 //
-// Both controls go straight to the Post composer -- the composer itself
-// offers the longer-form Article/Research paths, so no chooser interstitial.
 export default function CreateLauncher({
   userId,
   variant = "desktop",
   isActive = false,
 }: CreateLauncherProps) {
-  const router = useRouter();
-  const { requestAuth } = useGuestAuthGate();
-  // The composer is a server route (auth + optional parent-post lookup), so
-  // there's a real gap between the tap and the new screen. Track it so both
-  // controls can show they're working instead of appearing dead.
-  const [isNavigating, startNavigation] = useTransition();
-  const handleTrigger = userId
-    ? () => startNavigation(() => router.push("/create/post"))
-    : () => requestAuth("create");
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const chooserId = useId();
+  const titleId = useId();
+  const descriptionId = useId();
+  const close = useCallback(() => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }, []);
 
   if (variant === "mobileFab") {
     return (
       <div className="md:hidden">
         <button
+          ref={triggerRef}
           type="button"
-          onClick={handleTrigger}
+          onClick={() => setOpen((current) => !current)}
           data-app-compose-fab=""
           data-app-chrome-motion=""
           className="group fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition-[background-color,box-shadow,transform] duration-200 hover:bg-[#0E4B37] hover:shadow-[0_10px_24px_-7px_rgb(7_57_41/0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 active:scale-[0.96] motion-reduce:transition-none"
@@ -114,16 +87,22 @@ export default function CreateLauncher({
             bottom:
               "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))",
           }}
-          aria-label={isNavigating ? "Opening the composer" : "Publish a contribution"}
-          disabled={isNavigating}
-          aria-busy={isNavigating || undefined}
+          aria-label="Create a contribution"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={open ? chooserId : undefined}
         >
-          {isNavigating ? (
-            <SpinnerIcon className="h-[25px] w-[25px]" />
-          ) : (
-            <ComposeIcon className="h-[25px] w-[25px] transition-transform duration-200 group-active:scale-95 motion-reduce:transition-none" />
-          )}
+          <ComposeIcon className="h-[25px] w-[25px] transition-transform duration-200 group-active:scale-95 motion-reduce:transition-none" />
         </button>
+        <ContributionChooser
+          open={open}
+          onClose={close}
+          triggerRef={triggerRef}
+          userId={userId}
+          id={chooserId}
+          titleId={titleId}
+          descriptionId={descriptionId}
+        />
       </div>
     );
   }
@@ -131,21 +110,28 @@ export default function CreateLauncher({
   return (
     <div className="relative hidden md:inline-flex">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={handleTrigger}
-        disabled={isNavigating}
-        aria-busy={isNavigating || undefined}
+        onClick={() => setOpen((current) => !current)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? chooserId : undefined}
         className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
           isActive ? "bg-ink" : "bg-emerald-brand hover:bg-[#0E4B37]"
         }`}
       >
-        {isNavigating ? (
-          <SpinnerIcon className="h-3.5 w-3.5" />
-        ) : (
-          <PlusIcon className="h-3.5 w-3.5" />
-        )}
-        Publish
+        <PlusIcon className="h-3.5 w-3.5" />
+        Contribute
       </button>
+      <ContributionChooser
+        open={open}
+        onClose={close}
+        triggerRef={triggerRef}
+        userId={userId}
+        id={chooserId}
+        titleId={titleId}
+        descriptionId={descriptionId}
+      />
     </div>
   );
 }

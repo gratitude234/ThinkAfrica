@@ -264,6 +264,17 @@ describe("promoteToArticle", () => {
     expect(ensureDraftMock.mock.calls[0][0].excerpt).toBe("");
   });
 
+  it("preserves a verified response parent in the promoted Article draft", async () => {
+    await promoteToArticle({
+      body: "This counter-argument needs more room.",
+      imageUrl: null,
+      topics: [],
+      inResponseTo: "parent-1",
+    });
+
+    expect(ensureDraftMock.mock.calls[0][0].inResponseTo).toBe("parent-1");
+  });
+
   it("drops a cover image that is not this user's own upload", async () => {
     await promoteToArticle({
       body: "Buses run late every morning.",

@@ -6,6 +6,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useTransition,
 } from "react";
@@ -18,13 +19,14 @@ import type { PostReferenceRecord } from "@/lib/types";
 import { type PostType } from "@/lib/utils";
 import type { ArticleFormat } from "@/lib/contentModel";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import { useDraftManager, readDraftBackupRaw } from "./DraftManager";
+import { useDraftManager } from "./DraftManager";
 import PublishDrawer from "./PublishDrawer";
 import CoverImageDialog from "./CoverImageDialog";
 import WriteCanvasSkeleton from "./WriteCanvasSkeleton";
 import DraftSignalBar from "./DraftSignalBar";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
-import { ensureDraft, savePostReferences } from "./actions";
+import type { CoAuthorProfile } from "@/components/collaboration/CoAuthorPicker";
+import { savePostReferences } from "./actions";
 import {
   WRITE_FORMATS,
   getPublishGateCopy,
@@ -55,11 +57,18 @@ interface DraftPayload {
   inResponseToId: string | null;
 }
 
+interface WriterProfile {
+  full_name: string | null;
+  username: string | null;
+  university: string | null;
+}
+
 type EditorToolbarAction =
   | "bold"
   | "italic"
   | "heading"
   | "list"
+  | "orderedList"
   | "quote"
   | "image"
   | "link"
@@ -73,7 +82,7 @@ interface ToolbarButtonDefinition {
   icon: ReactNode;
 }
 
-const MOBILE_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
+const CORE_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
   {
     title: "Bold",
     action: "bold",
@@ -116,7 +125,7 @@ const MOBILE_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
 ];
 
 const DESKTOP_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
-  MOBILE_TOOLBAR_BUTTONS[0],
+  CORE_TOOLBAR_BUTTONS[0],
   {
     title: "Italic",
     action: "italic",
@@ -129,7 +138,17 @@ const DESKTOP_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
     markKey: "heading",
     icon: <span className="text-xs font-semibold leading-none">H2</span>,
   },
-  MOBILE_TOOLBAR_BUTTONS[1],
+  CORE_TOOLBAR_BUTTONS[1],
+  {
+    title: "Numbered list",
+    action: "orderedList",
+    markKey: "orderedList",
+    icon: (
+      <span className="text-xs font-semibold leading-none" aria-hidden="true">
+        1.
+      </span>
+    ),
+  },
   {
     title: "Quote",
     action: "quote",
@@ -140,8 +159,8 @@ const DESKTOP_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
       </svg>
     ),
   },
-  MOBILE_TOOLBAR_BUTTONS[2],
-  MOBILE_TOOLBAR_BUTTONS[3],
+  CORE_TOOLBAR_BUTTONS[2],
+  CORE_TOOLBAR_BUTTONS[3],
   {
     title: "Undo",
     action: "undo",
@@ -161,6 +180,10 @@ const DESKTOP_TOOLBAR_BUTTONS: ToolbarButtonDefinition[] = [
     ),
   },
 ];
+
+// Long-form writing keeps the same capabilities on touch devices. The
+// toolbar scrolls horizontally, so parity does not crowd the canvas.
+const MOBILE_TOOLBAR_BUTTONS = DESKTOP_TOOLBAR_BUTTONS;
 
 function countWords(value: string) {
   return value
@@ -196,23 +219,33 @@ export default function WritePage() {
   const starterParam = searchParams.get("starter");
   const responseIntentParam = searchParams.get("responseIntent");
   const starterTag = normalizeStarterTag(searchParams.get("tag"));
+  const returnToParam = searchParams.get("returnTo");
+  const returnDestination =
+    returnToParam?.startsWith("/") && !returnToParam.startsWith("//")
+      ? returnToParam
+      : responseToSlug
+        ? `/post/${encodeURIComponent(responseToSlug)}`
+        : "/";
   const {
     draftId,
     saveStatus,
+    saveError,
+    loadError,
     saveDraft,
+    flushDraft,
+    editorSessionKey,
+    loadedDraftId,
     initialData,
     loadingDraft,
+    loadingBackup,
     localBackup,
     restoreFromBackup,
     dismissBackup,
+    clearLocalBackup,
   } = useDraftManager();
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [profileInfo, setProfileInfo] = useState<{
-    full_name: string | null;
-    username: string | null;
-    university: string | null;
-  } | null>(null);
+  const [profileInfo, setProfileInfo] = useState<WriterProfile | null>(null);
   const [loadingProfileInfo, setLoadingProfileInfo] = useState(true);
   // Never seeded from a URL param -- a legacy `type=`/`kind=` value must not
   // drive this composer's displayed classification (word-count target,
@@ -227,13 +260,12 @@ export default function WritePage() {
   // Like postType, only ever set from initialData once a real draft has
   // loaded, never from a URL param.
   const [articleFormat, setArticleFormat] = useState<ArticleFormat | null>(null);
-  const [selectedResponseIntent] = useState(() =>
+  const selectedResponseIntent =
     isResponseIntent(responseIntentParam)
       ? responseIntentParam
       : starterParam === "response"
         ? "extend"
-        : null
-  );
+        : null;
   const editorRef = useRef<EditorHandle>(null);
   const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
@@ -250,16 +282,29 @@ export default function WritePage() {
   const [inResponseToAuthor, setInResponseToAuthor] = useState<string | null>(null);
   const [responseQuote, setResponseQuote] = useState<string | null>(null);
   const [references, setReferences] = useState<PostReferenceRecord[]>([]);
+  const [coAuthors, setCoAuthors] = useState<CoAuthorProfile[]>([]);
+  const [metadataStatus, setMetadataStatus] = useState<
+    "loading" | "ready" | "error"
+  >(draftParam ? "loading" : "ready");
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [metadataReloadKey, setMetadataReloadKey] = useState(0);
+  const [referenceSaveStatus, setReferenceSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [reviewPreparing, setReviewPreparing] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [citationNotice, setCitationNotice] = useState("");
   const [wordCount, setWordCount] = useState(0);
   const [isPublishDrawerOpen, setIsPublishDrawerOpen] = useState(false);
   const [isCoverDialogOpen, setIsCoverDialogOpen] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [isProfileGateOpen, setIsProfileGateOpen] = useState(false);
-  const [publishDraftId, setPublishDraftId] = useState<string | null>(null);
   const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
   const [showLinkPopover, setShowLinkPopover] = useState(false);
   const [linkPopoverUrl, setLinkPopoverUrl] = useState("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [exitSaving, setExitSaving] = useState(false);
+  const [exitError, setExitError] = useState<string | null>(null);
   // Leaving the canvas loads the home feed, which is server-rendered. Track
   // it so the exit controls can show they're working instead of sitting
   // inert while the feed is fetched.
@@ -268,6 +313,77 @@ export default function WritePage() {
   const responseStarterAppliedRef = useRef(false);
   const topicStarterAppliedRef = useRef(false);
   const reviewPublishInFlightRef = useRef(false);
+  const referenceSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const referenceSaveVersionRef = useRef(0);
+  const referenceSavePromiseRef = useRef<
+    Promise<{ error: string | null }> | null
+  >(null);
+  const latestReferencesRef = useRef<PostReferenceRecord[]>([]);
+  const referencesDirtyRef = useRef(false);
+  const previousEditorSessionKeyRef = useRef(editorSessionKey);
+  const activeEditorSessionKeyRef = useRef(editorSessionKey);
+  const exitDialogRef = useRef<HTMLDivElement>(null);
+  const exitKeepWritingRef = useRef<HTMLButtonElement>(null);
+  const exitTriggerRef = useRef<HTMLElement | null>(null);
+  const exitBusyRef = useRef(false);
+
+  useEffect(() => {
+    exitBusyRef.current = exitSaving || isLeaving;
+  }, [exitSaving, isLeaving]);
+
+  useEffect(() => {
+    if (!showCancelConfirm) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusFrame = window.requestAnimationFrame(() => {
+      exitKeepWritingRef.current?.focus();
+    });
+
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      const dialog = exitDialogRef.current;
+      if (!dialog) return;
+
+      if (event.key === "Escape") {
+        if (exitBusyRef.current) return;
+        event.preventDefault();
+        setShowCancelConfirm(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((element) => !element.hasAttribute("hidden"));
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      document.body.style.overflow = previousOverflow;
+      const trigger = exitTriggerRef.current;
+      if (trigger?.isConnected) trigger.focus();
+    };
+  }, [showCancelConfirm]);
 
   useEffect(() => {
     const redirectPath = resolveWriteRedirectPath({ typeParam, kindParam, draftParam });
@@ -275,6 +391,57 @@ export default function WritePage() {
       router.replace(redirectPath);
     }
   }, [draftParam, kindParam, router, typeParam]);
+
+  useLayoutEffect(() => {
+    activeEditorSessionKeyRef.current = editorSessionKey;
+    if (previousEditorSessionKeyRef.current === editorSessionKey) return;
+    previousEditorSessionKeyRef.current = editorSessionKey;
+
+    if (referenceSaveTimerRef.current) {
+      clearTimeout(referenceSaveTimerRef.current);
+      referenceSaveTimerRef.current = null;
+    }
+    referenceSaveVersionRef.current += 1;
+    referenceSavePromiseRef.current = null;
+    latestReferencesRef.current = [];
+    referencesDirtyRef.current = false;
+    responseStarterAppliedRef.current = false;
+    topicStarterAppliedRef.current = false;
+    reviewPublishInFlightRef.current = false;
+
+    setPostType("essay");
+    setArticleFormat(null);
+    setTitle("");
+    setExcerpt("");
+    setTags([]);
+    setContent("");
+    setCoverImageUrl("");
+    setInResponseToId(responseToIdParam);
+    setInResponseToTitle(null);
+    setParentHasOwnTitle(true);
+    setInResponseToAuthor(null);
+    setResponseQuote(null);
+    setReferences([]);
+    setCoAuthors([]);
+    setMetadataStatus(draftParam ? "loading" : "ready");
+    setMetadataError(null);
+    setReferenceSaveStatus("idle");
+    setReviewPreparing(false);
+    setReviewError(null);
+    setCitationNotice("");
+    setWordCount(0);
+    setIsPublishDrawerOpen(false);
+    setIsCoverDialogOpen(false);
+    setCoverUploading(false);
+    setIsProfileGateOpen(false);
+    setActiveMarks({});
+    setShowLinkPopover(false);
+    setLinkPopoverUrl("");
+    setShowCancelConfirm(false);
+    setExitSaving(false);
+    setExitError(null);
+    setShowMobileMenu(false);
+  }, [draftParam, editorSessionKey, responseToIdParam]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -320,6 +487,7 @@ export default function WritePage() {
 
   useEffect(() => {
     const supabase = createClient();
+    let cancelled = false;
 
     async function loadParentPost() {
       if (responseToIdParam) {
@@ -329,6 +497,8 @@ export default function WritePage() {
           .eq("id", responseToIdParam)
           .eq("status", "published")
           .single();
+
+        if (cancelled) return;
 
         if (parentPost) {
           const authorProfile = Array.isArray(parentPost.profiles)
@@ -355,6 +525,8 @@ export default function WritePage() {
           .eq("status", "published")
           .single();
 
+        if (cancelled) return;
+
         if (parentPost) {
           const authorProfile = Array.isArray(parentPost.profiles)
             ? parentPost.profiles[0]
@@ -379,6 +551,8 @@ export default function WritePage() {
           .eq("id", inResponseToId)
           .single();
 
+        if (cancelled) return;
+
         if (parentPost) {
           const authorProfile = Array.isArray(parentPost.profiles)
             ? parentPost.profiles[0]
@@ -398,28 +572,102 @@ export default function WritePage() {
     }
 
     void loadParentPost();
+    return () => {
+      cancelled = true;
+    };
   }, [inResponseToId, responseToIdParam, responseToSlug]);
 
   useEffect(() => {
-    setPublishDraftId(draftId);
-  }, [draftId]);
-
-  useEffect(() => {
     if (!draftId) {
-      setReferences([]);
+      if (!loadingDraft) {
+        setReferences([]);
+        setCoAuthors([]);
+        setMetadataStatus("ready");
+        setMetadataError(null);
+      }
       return;
     }
 
+    if (loadingDraft) {
+      setMetadataStatus("loading");
+      return;
+    }
+
+    // A draft first created in the current editor session has no server
+    // metadata to hydrate; its local source/collaborator state is authoritative.
+    if (loadedDraftId !== draftId) {
+      setMetadataStatus("ready");
+      setMetadataError(null);
+      return;
+    }
+
+    if (!currentUserId) {
+      setMetadataStatus("loading");
+      return;
+    }
+
+    let cancelled = false;
+    setMetadataStatus("loading");
+    setMetadataError(null);
     const supabase = createClient();
-    supabase
-      .from("post_references")
-      .select("*")
-      .eq("post_id", draftId)
-      .order("display_order", { ascending: true })
-      .then(({ data }) => {
-        setReferences((data as PostReferenceRecord[] | null) ?? []);
-      });
-  }, [draftId]);
+    void Promise.all([
+      supabase
+        .from("post_references")
+        .select("*")
+        .eq("post_id", draftId)
+        .order("display_order", { ascending: true }),
+      supabase
+        .from("post_authors")
+        .select(
+          "user_id, display_order, profile:profiles!post_authors_user_id_fkey(id, username, full_name, university, field_of_study)"
+        )
+        .eq("post_id", draftId)
+        .order("display_order", { ascending: true }),
+    ]).then(([referenceResult, authorResult]) => {
+      if (cancelled) return;
+      if (referenceResult.error || authorResult.error) {
+        setMetadataStatus("error");
+        setMetadataError(
+          "We couldn't load this draft's sources and collaborators. Nothing was changed."
+        );
+        return;
+      }
+
+      setReferences(
+        (referenceResult.data as PostReferenceRecord[] | null) ?? []
+      );
+      latestReferencesRef.current =
+        (referenceResult.data as PostReferenceRecord[] | null) ?? [];
+      referencesDirtyRef.current = false;
+      const normalizedAuthors: CoAuthorProfile[] = (
+        (authorResult.data as Array<Record<string, unknown>> | null) ?? []
+      )
+        .filter((row) => row.user_id !== currentUserId)
+        .flatMap((row): CoAuthorProfile[] => {
+          const rawProfile = Array.isArray(row.profile)
+            ? row.profile[0]
+            : row.profile;
+          const profile = rawProfile as Partial<CoAuthorProfile> | null;
+          if (!profile?.username) return [];
+          return [
+            {
+              id: String(row.user_id),
+              username: profile.username,
+              full_name: profile.full_name ?? null,
+              university: profile.university ?? null,
+              field_of_study: profile.field_of_study ?? null,
+            },
+          ];
+        });
+      setCoAuthors(normalizedAuthors);
+      setMetadataStatus("ready");
+      setReferenceSaveStatus("saved");
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId, draftId, loadedDraftId, loadingDraft, metadataReloadKey]);
 
   const getCurrentData = useCallback(
     (overrides: Partial<DraftPayload> = {}): DraftPayload => ({
@@ -437,29 +685,11 @@ export default function WritePage() {
 
   useEffect(() => {
     if (responseStarterAppliedRef.current) return;
+    if (loadingBackup) return;
     if (starterParam !== "response") return;
     if (!selectedResponseIntent) return;
     if (!inResponseToId || !inResponseToTitle) return;
     if (draftParam || initialData || localBackup) return;
-
-    if (typeof window !== "undefined") {
-      try {
-        const savedBackup = readDraftBackupRaw();
-
-        if (savedBackup) {
-          const parsedBackup = JSON.parse(savedBackup) as Partial<DraftPayload>;
-          const hasBackupContent =
-            (parsedBackup.title ?? "").trim().length > 0 ||
-            (parsedBackup.content ?? "")
-              .replace(/<[^>]*>/g, " ")
-              .trim().length > 0;
-
-          if (hasBackupContent) return;
-        }
-      } catch {
-        return;
-      }
-    }
 
     const hasManualContent =
       title.trim().length > 0 ||
@@ -497,6 +727,7 @@ export default function WritePage() {
     inResponseToTitle,
     initialData,
     localBackup,
+    loadingBackup,
     saveDraft,
     selectedResponseIntent,
     starterParam,
@@ -506,27 +737,9 @@ export default function WritePage() {
 
   useEffect(() => {
     if (topicStarterAppliedRef.current) return;
+    if (loadingBackup) return;
     if (starterParam !== "1" || !starterTag) return;
     if (draftParam || initialData || localBackup) return;
-
-    if (typeof window !== "undefined") {
-      try {
-        const savedBackup = readDraftBackupRaw();
-
-        if (savedBackup) {
-          const parsedBackup = JSON.parse(savedBackup) as Partial<DraftPayload>;
-          const hasBackupContent =
-            (parsedBackup.title ?? "").trim().length > 0 ||
-            (parsedBackup.content ?? "")
-              .replace(/<[^>]*>/g, " ")
-              .trim().length > 0;
-
-          if (hasBackupContent) return;
-        }
-      } catch {
-        return;
-      }
-    }
 
     const hasManualContent =
       title.trim().length > 0 ||
@@ -545,6 +758,7 @@ export default function WritePage() {
     getCurrentData,
     initialData,
     localBackup,
+    loadingBackup,
     saveDraft,
     starterParam,
     starterTag,
@@ -559,6 +773,7 @@ export default function WritePage() {
       italic: editorRef.current.isActive("italic"),
       heading: editorRef.current.isActive("heading", { level: 2 }),
       bulletList: editorRef.current.isActive("bulletList"),
+      orderedList: editorRef.current.isActive("orderedList"),
       blockquote: editorRef.current.isActive("blockquote"),
       link: editorRef.current.isActive("link"),
     });
@@ -573,14 +788,82 @@ export default function WritePage() {
     [getCurrentData, saveDraft]
   );
 
+  const runReferenceSave = useCallback(
+    async (
+      postId: string,
+      nextReferences: PostReferenceRecord[],
+      version: number
+    ) => {
+      const operation = savePostReferences({
+        postId,
+        references: nextReferences,
+      });
+      referenceSavePromiseRef.current = operation;
+      const result = await operation;
+      if (referenceSavePromiseRef.current === operation) {
+        referenceSavePromiseRef.current = null;
+      }
+      if (version === referenceSaveVersionRef.current) {
+        setReferenceSaveStatus(result.error ? "error" : "saved");
+        if (result.error) {
+          setReviewError(`Sources were not saved: ${result.error}`);
+        } else {
+          referencesDirtyRef.current = false;
+        }
+      }
+      return result;
+    },
+    [setReferenceSaveStatus, setReviewError]
+  );
+
+  const flushPendingReferences = useCallback(
+    async (postId: string) => {
+      if (referenceSaveTimerRef.current) {
+        clearTimeout(referenceSaveTimerRef.current);
+        referenceSaveTimerRef.current = null;
+      }
+
+      const pendingSave = referenceSavePromiseRef.current;
+      if (pendingSave) await pendingSave;
+      if (!referencesDirtyRef.current) return { error: null as string | null };
+
+      const version = ++referenceSaveVersionRef.current;
+      setReferenceSaveStatus("saving");
+      return runReferenceSave(postId, latestReferencesRef.current, version);
+    },
+    [runReferenceSave, setReferenceSaveStatus]
+  );
+
   const handleReferencesChange = useCallback(
     (nextReferences: PostReferenceRecord[]) => {
       setReferences(nextReferences);
-      if (publishDraftId) {
-        void savePostReferences({ postId: publishDraftId, references: nextReferences });
+      latestReferencesRef.current = nextReferences;
+      referencesDirtyRef.current = true;
+      setReviewError(null);
+      referenceSaveVersionRef.current += 1;
+      if (referenceSaveTimerRef.current) {
+        clearTimeout(referenceSaveTimerRef.current);
+        referenceSaveTimerRef.current = null;
+      }
+      if (!draftId || metadataStatus !== "ready") return;
+
+      setReferenceSaveStatus("saving");
+      referenceSaveTimerRef.current = setTimeout(() => {
+        referenceSaveTimerRef.current = null;
+        void flushPendingReferences(draftId);
+      }, 900);
+    },
+    [draftId, flushPendingReferences, metadataStatus]
+  );
+
+  useEffect(
+    () => () => {
+      if (referenceSaveTimerRef.current) {
+        clearTimeout(referenceSaveTimerRef.current);
+        referenceSaveTimerRef.current = null;
       }
     },
-    [publishDraftId]
+    []
   );
 
   const handleMetadataChange = useCallback(
@@ -591,6 +874,7 @@ export default function WritePage() {
       coverImageUrl?: string;
       excerpt?: string;
       references?: PostReferenceRecord[];
+      coAuthors?: CoAuthorProfile[];
       inResponseToId?: string | null;
     }) => {
       if (changes.postType) setPostType(changes.postType);
@@ -606,7 +890,10 @@ export default function WritePage() {
         setExcerpt(changes.excerpt);
       }
       if (changes.references) {
-        setReferences(changes.references);
+        handleReferencesChange(changes.references);
+      }
+      if (changes.coAuthors) {
+        setCoAuthors(changes.coAuthors);
       }
       if ("inResponseToId" in changes) {
         setInResponseToId(changes.inResponseToId ?? null);
@@ -623,7 +910,18 @@ export default function WritePage() {
         })
       );
     },
-    [getCurrentData, saveDraft]
+    [
+      getCurrentData,
+      handleReferencesChange,
+      saveDraft,
+      setArticleFormat,
+      setCoAuthors,
+      setCoverImageUrl,
+      setExcerpt,
+      setInResponseToId,
+      setPostType,
+      setTags,
+    ]
   );
 
   const closeCoverDialog = useCallback(() => setIsCoverDialogOpen(false), []);
@@ -656,7 +954,7 @@ export default function WritePage() {
       sessionStorage.removeItem("write_response_quote");
       setResponseQuote(quote);
     }
-  }, [loadingDraft]);
+  }, [editorSessionKey, loadingDraft]);
 
   useEffect(() => {
     if (!showMobileMenu) return;
@@ -667,16 +965,30 @@ export default function WritePage() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [showMobileMenu]);
 
+  useEffect(() => {
+    if (!citationNotice) return;
+    const timer = setTimeout(() => setCitationNotice(""), 2500);
+    return () => clearTimeout(timer);
+  }, [citationNotice]);
+
   const canOpenPublish =
     title.trim().length > 0 &&
     wordCount > 0 &&
     !!currentUserId &&
-    !loadingProfileInfo;
+    !loadingProfileInfo &&
+    metadataStatus === "ready" &&
+    !reviewPreparing;
 
   const publishBlockReason = !currentUserId
     ? "Sign in to publish"
     : loadingProfileInfo
       ? "Loading..."
+      : metadataStatus === "loading"
+        ? "Loading sources and collaborators..."
+        : metadataStatus === "error"
+          ? "Reload sources and collaborators first"
+          : reviewPreparing
+            ? "Preparing publication review..."
       : !title.trim()
         ? "Add a title first"
         : wordCount === 0
@@ -701,38 +1013,41 @@ export default function WritePage() {
           ? "Extend this idea"
           : null;
 
-  const handleReadyToPublish = async () => {
-    if (!canOpenPublish) return;
+  const handleReadyToPublish = async (completedProfile?: WriterProfile) => {
+    if (!canOpenPublish || reviewPreparing) return;
+    const requestedSessionKey = activeEditorSessionKeyRef.current;
+    const publishingProfile = completedProfile ?? profileInfo;
 
-    if (!profileInfo?.username) {
+    if (!publishingProfile?.username) {
       setIsProfileGateOpen(true);
       return;
     }
 
-    if (!publishDraftId) {
-      const { draftId: ensuredDraftId } = await ensureDraft({
-        draftId,
-        title,
-        excerpt,
-        content,
-        tags,
-        postType,
-        coverImageUrl,
-        inResponseTo: inResponseToId,
-      });
+    setReviewPreparing(true);
+    setReviewError(null);
+    try {
+      const ensuredDraftId = await flushDraft(getCurrentData());
+      if (requestedSessionKey !== activeEditorSessionKeyRef.current) return;
+      if (!ensuredDraftId) {
+        setReviewError(saveError || "We couldn't save this Article. Try again before publishing.");
+        return;
+      }
 
-      if (ensuredDraftId) {
-        setPublishDraftId(ensuredDraftId);
-        if (references.length > 0) {
-          void savePostReferences({
-            postId: ensuredDraftId,
-            references,
-          });
-        }
+      const referenceResult = await flushPendingReferences(ensuredDraftId);
+      if (requestedSessionKey !== activeEditorSessionKeyRef.current) return;
+      if (referenceResult.error) {
+        setReferenceSaveStatus("error");
+        setReviewError(`Sources were not saved: ${referenceResult.error}`);
+        return;
+      }
+
+      setReferenceSaveStatus("saved");
+      setIsPublishDrawerOpen(true);
+    } finally {
+      if (requestedSessionKey === activeEditorSessionKeyRef.current) {
+        setReviewPreparing(false);
       }
     }
-
-    setIsPublishDrawerOpen(true);
   };
 
   const handleReviewPublishFromCover = () => {
@@ -749,6 +1064,7 @@ export default function WritePage() {
     if (action === "italic") editorRef.current?.toggleItalic();
     if (action === "heading") editorRef.current?.toggleH2();
     if (action === "list")  editorRef.current?.toggleBulletList();
+    if (action === "orderedList") editorRef.current?.toggleOrderedList();
     if (action === "quote") editorRef.current?.toggleBlockquote();
     if (action === "image") editorRef.current?.triggerImageUpload();
     if (action === "undo") editorRef.current?.undo();
@@ -767,30 +1083,107 @@ export default function WritePage() {
     return <WriteCanvasSkeleton />;
   }
 
+  if (loadError && draftParam) {
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-xl items-center px-5 py-12">
+        <div className="w-full rounded-2xl border border-amber-200 bg-white p-6 shadow-sm sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+            Draft unavailable
+          </p>
+          <h1 className="mt-2 font-display text-2xl font-semibold text-ink">
+            We did not open a blank editor over your draft
+          </h1>
+          <p role="alert" className="mt-3 text-sm leading-6 text-gray-600">
+            {loadError}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/dashboard"
+              className="inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-4 text-sm font-semibold text-white"
+            >
+              View your drafts
+            </Link>
+            <Link
+              href="/write"
+              className="inline-flex min-h-11 items-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+            >
+              Start a new Article
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const hasContent =
-    title.trim().length > 0 || wordCount > 0 || references.length > 0;
+    title.trim().length > 0 ||
+    wordCount > 0 ||
+    excerpt.trim().length > 0 ||
+    tags.length > 0 ||
+    references.length > 0 ||
+    coAuthors.length > 0 ||
+    Boolean(coverImageUrl);
   const handleCloseCanvas = () => {
     if (hasContent) {
+      if (document.activeElement instanceof HTMLElement) {
+        exitTriggerRef.current = document.activeElement;
+      }
+      setExitError(null);
       setShowCancelConfirm(true);
       return;
     }
     startLeaving(() => {
-      router.push("/");
+      router.push(returnDestination);
     });
   };
-  const uploadResearchLink = (
-    <Link
-      href="/submit/research"
-      className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-xs font-medium text-gray-500 transition-colors hover:bg-white hover:text-gray-800"
-      aria-label="Upload a research paper"
-      title="Upload a research paper"
-    >
-      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5V4M7 9l5-5 5 5M4.5 19.5h15" />
-      </svg>
-      <span>Research PDF</span>
-    </Link>
-  );
+  const leaveWithDeviceBackup = () => {
+    startLeaving(() => router.push(returnDestination));
+  };
+  const handleSaveAndLeave = async () => {
+    if (exitSaving) return;
+    const requestedSessionKey = activeEditorSessionKeyRef.current;
+    setExitSaving(true);
+    setExitError(null);
+    try {
+      const ensuredDraftId = title.trim()
+        ? await flushDraft(getCurrentData())
+        : draftId;
+      if (requestedSessionKey !== activeEditorSessionKeyRef.current) return;
+
+      if (title.trim() && !ensuredDraftId) {
+        setExitError(
+          "Cloud save failed. Your scoped device backup is safe; retry or leave with that backup."
+        );
+        return;
+      }
+
+      if (!ensuredDraftId && referencesDirtyRef.current) {
+        setExitError("Add a title before leaving so your sources can be saved with this Article.");
+        return;
+      }
+
+      if (ensuredDraftId) {
+        const referenceResult = await flushPendingReferences(ensuredDraftId);
+        if (requestedSessionKey !== activeEditorSessionKeyRef.current) return;
+        if (referenceResult.error) {
+          setExitError(`Sources were not saved: ${referenceResult.error}`);
+          return;
+        }
+      }
+
+      leaveWithDeviceBackup();
+    } catch {
+      if (requestedSessionKey === activeEditorSessionKeyRef.current) {
+        setExitError(
+          "We couldn't finish saving this Article. Your writing remains protected on this device."
+        );
+      }
+    } finally {
+      if (requestedSessionKey === activeEditorSessionKeyRef.current) {
+        setExitSaving(false);
+      }
+    }
+  };
 
   return (
     <div className="mx-auto min-h-screen max-w-[1240px] px-5 pb-28 sm:px-8 lg:px-8 lg:pb-12 xl:px-10">
@@ -837,7 +1230,6 @@ export default function WritePage() {
           </div>
 
           <div className="hidden shrink-0 items-center gap-2.5 lg:flex">
-            {uploadResearchLink}
             <Button
               type="button"
               variant="secondary"
@@ -856,8 +1248,9 @@ export default function WritePage() {
               type="button"
               size="sm"
               disabled={!canOpenPublish}
-              onClick={handleReadyToPublish}
-              title={publishBlockReason ?? undefined}
+              loading={reviewPreparing}
+              onClick={() => void handleReadyToPublish()}
+              aria-describedby={publishBlockReason ? "publish-readiness" : undefined}
               style={
                 !canOpenPublish
                   ? {
@@ -903,17 +1296,6 @@ export default function WritePage() {
                     aria-label="More editor actions"
                     className="absolute right-0 top-full z-40 mt-2 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg shadow-black/10"
                   >
-                    <Link
-                      href="/submit/research"
-                      role="menuitem"
-                      onClick={() => setShowMobileMenu(false)}
-                      className="flex items-center gap-2.5 rounded-lg px-3 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5V4M7 9l5-5 5 5M4.5 19.5h15" />
-                      </svg>
-                      Upload research PDF
-                    </Link>
                     <button
                       type="button"
                       role="menuitem"
@@ -939,9 +1321,10 @@ export default function WritePage() {
               type="button"
               size="sm"
               disabled={!canOpenPublish}
-              onClick={handleReadyToPublish}
-              title={publishBlockReason ?? undefined}
+              loading={reviewPreparing}
+              onClick={() => void handleReadyToPublish()}
               aria-label={publishGateCopy.ariaLabel}
+              aria-describedby={publishBlockReason ? "publish-readiness" : undefined}
               className="h-11 px-4"
               style={
                 !canOpenPublish
@@ -959,6 +1342,54 @@ export default function WritePage() {
         </div>
       </header>
 
+      <div className="sr-only" aria-live="polite">
+        {citationNotice}
+      </div>
+
+      {publishBlockReason ? (
+        <p
+          id="publish-readiness"
+          className="mb-3 text-right text-xs font-medium text-gray-500"
+        >
+          Before review: {publishBlockReason}
+        </p>
+      ) : null}
+
+      {metadataStatus === "error" ? (
+        <div
+          role="alert"
+          className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span className="text-amber-900">{metadataError}</span>
+          <button
+            type="button"
+            onClick={() => setMetadataReloadKey((value) => value + 1)}
+            className="min-h-10 shrink-0 rounded-lg border border-amber-300 bg-white px-3 text-xs font-semibold text-amber-900"
+          >
+            Reload details
+          </button>
+        </div>
+      ) : null}
+
+      {saveError || reviewError ? (
+        <div
+          role="alert"
+          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {reviewError || saveError}
+        </div>
+      ) : null}
+
+      {referenceSaveStatus === "saving" ? (
+        <p className="mb-3 text-right text-xs text-gray-500" aria-live="polite">
+          Saving sources…
+        </p>
+      ) : referenceSaveStatus === "error" ? (
+        <p className="mb-3 text-right text-xs font-medium text-red-600" aria-live="polite">
+          Sources need attention before publishing.
+        </p>
+      ) : null}
+
       {!loadingProfileInfo && currentUserId && !profileInfo?.username ? (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
           <span className="text-amber-800">
@@ -973,25 +1404,35 @@ export default function WritePage() {
         </div>
       ) : null}
 
-      {localBackup && !hasContent ? (
-        <div className="mb-5 flex animate-slide-up items-center justify-between gap-3 rounded-xl border border-green-wash-border bg-green-wash px-4 py-3.5 text-sm">
-          <span className="min-w-0 text-[13.5px] leading-5 text-ink">
-            We found an unsaved draft: &quot;{localBackup.title || "Untitled"}&quot;
-          </span>
+      {localBackup ? (
+        <div
+          className="mb-5 flex animate-slide-up flex-col gap-3 rounded-xl border border-green-wash-border bg-green-wash px-4 py-3.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+          role="status"
+        >
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-semibold leading-5 text-ink">
+              {hasContent ? "Device recovery available" : "Unsaved Article found"}
+            </p>
+            <p className="mt-0.5 text-xs leading-5 text-gray-600">
+              {hasContent
+                ? "This device has a different version. Restore it, or keep the server copy currently open."
+                : `Restore “${localBackup.title || "Untitled"}” and continue where you stopped.`}
+            </p>
+          </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={dismissBackup}
               className="rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-gray-500 hover:bg-white/70 hover:text-gray-700"
             >
-              Dismiss
+              {hasContent ? "Keep server copy" : "Dismiss"}
             </button>
             <button
               type="button"
               onClick={restoreFromBackup}
               className="rounded-lg bg-emerald-brand px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-[#0E4B37]"
             >
-              Restore
+              Restore device copy
             </button>
           </div>
         </div>
@@ -1152,18 +1593,26 @@ export default function WritePage() {
           <div className="mt-2 lg:mt-4">
             <Editor
               ref={editorRef}
-              key={publishDraftId ?? draftId ?? (initialData ? "draft" : "empty")}
+              key={`article-editor-${editorSessionKey}`}
               content={content}
               placeholder={getBodyPlaceholder()}
               minWords={selectedPostType.minWords}
               onUpdate={handleEditorUpdate}
               onSelectionUpdate={handleSelectionUpdate}
               canvasMode
+              ariaLabel="Article body"
             />
           </div>
 
           <div className="mt-10 border-t border-gray-100 pt-6 lg:hidden">
-            <ReferencesPanel references={references} onChange={handleReferencesChange} />
+            <ReferencesPanel
+              references={references}
+              onChange={handleReferencesChange}
+              onInsertCitation={(referenceId) => {
+                editorRef.current?.insertCitation(referenceId);
+                setCitationNotice("Source marker inserted at the cursor.");
+              }}
+            />
           </div>
         </main>
 
@@ -1171,6 +1620,10 @@ export default function WritePage() {
           <ReferencesPanel
             references={references}
             onChange={handleReferencesChange}
+            onInsertCitation={(referenceId) => {
+              editorRef.current?.insertCitation(referenceId);
+              setCitationNotice("Source marker inserted at the cursor.");
+            }}
             alwaysExpanded
           />
         </aside>
@@ -1262,36 +1715,63 @@ export default function WritePage() {
       {showCancelConfirm ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
           <div
+            ref={exitDialogRef}
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="cancel-confirm-title"
+            aria-describedby="cancel-confirm-description"
+            aria-busy={exitSaving || isLeaving}
+            tabIndex={-1}
             className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
           >
             <h2 id="cancel-confirm-title" className="text-base font-semibold text-gray-900">
               Leave the editor?
             </h2>
-            <p className="mt-2 text-sm text-gray-500">
-              Your draft is saved automatically. Any changes since the last save may be lost.
+            <p id="cancel-confirm-description" className="mt-2 text-sm leading-6 text-gray-500">
+              We&apos;ll save the latest cloud draft before leaving. If this Article
+              does not have a title yet, its writing stays in this account&apos;s
+              device backup until you restore it.
             </p>
+            {coAuthors.length > 0 ? (
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                Co-author selections aren&apos;t saved when you leave. Invitations are
+                finalized only when you publish.
+              </p>
+            ) : null}
+            {exitError ? (
+              <p role="alert" className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                {exitError}
+              </p>
+            ) : null}
             <div className="mt-5 flex gap-3">
               <Button
+                ref={exitKeepWritingRef}
                 variant="ghost"
                 type="button"
                 className="flex-1"
+                disabled={exitSaving || isLeaving}
                 onClick={() => setShowCancelConfirm(false)}
               >
                 Keep writing
               </Button>
               <Button
-                variant="danger"
                 type="button"
                 className="flex-1"
-                loading={isLeaving}
-                onClick={() => startLeaving(() => router.push("/"))}
+                loading={exitSaving || isLeaving}
+                onClick={() => void handleSaveAndLeave()}
               >
-                Leave
+                Save &amp; leave
               </Button>
             </div>
+            {exitError ? (
+              <button
+                type="button"
+                onClick={leaveWithDeviceBackup}
+                className="mt-3 min-h-10 w-full text-xs font-semibold text-gray-600 hover:text-gray-900"
+              >
+                Leave with device backup
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -1314,7 +1794,7 @@ export default function WritePage() {
           <PublishDrawer
             open={isPublishDrawerOpen}
             onClose={() => setIsPublishDrawerOpen(false)}
-            draftId={publishDraftId}
+            draftId={draftId}
             title={title}
             content={content}
             wordCount={wordCount}
@@ -1324,8 +1804,24 @@ export default function WritePage() {
             initialPostType={postType}
             initialArticleFormat={articleFormat}
             initialReferences={references}
+            initialCoAuthors={coAuthors}
+            currentUserId={currentUserId}
+            author={profileInfo}
             inResponseTo={inResponseToId}
+            responseContext={
+              inResponseToTitle
+                ? { title: inResponseToTitle, author: inResponseToAuthor }
+                : null
+            }
+            metadataReady={metadataStatus === "ready"}
             onMetadataChange={handleMetadataChange}
+            onPublished={() => {
+              clearLocalBackup();
+              if (referenceSaveTimerRef.current) {
+                clearTimeout(referenceSaveTimerRef.current);
+                referenceSaveTimerRef.current = null;
+              }
+            }}
             coverUploading={coverUploading}
             onCoverUploadingChange={setCoverUploading}
           />
@@ -1337,7 +1833,7 @@ export default function WritePage() {
             onComplete={(profile) => {
               setProfileInfo(profile);
               setIsProfileGateOpen(false);
-              void handleReadyToPublish();
+              void handleReadyToPublish(profile);
             }}
           />
         </>

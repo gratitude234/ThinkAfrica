@@ -1,8 +1,26 @@
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CreateLauncher from "./CreateLauncher";
 
 const mocks = vi.hoisted(() => ({ requestAuth: vi.fn(), push: vi.fn() }));
+
+// Defaults to "no resumable draft" so the format-only assertions below are
+// unaffected; the resume tests set rows explicitly.
+const draftRows = vi.hoisted(() => ({ current: [] as Array<Record<string, unknown>> }));
+
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => {
+    const builder = {
+      select: () => builder,
+      eq: () => builder,
+      order: () => builder,
+      limit: () => builder,
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve({ data: draftRows.current, error: null }).then(resolve),
+    };
+    return { from: () => builder };
+  },
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
@@ -12,43 +30,127 @@ vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
   useGuestAuthGate: () => ({ requestAuth: mocks.requestAuth }),
 }));
 
-describe("CreateLauncher -- direct-to-composer", () => {
+describe("CreateLauncher -- contribution chooser", () => {
   beforeEach(() => {
     mocks.requestAuth.mockReset();
     mocks.push.mockReset();
+    draftRows.current = [];
   });
 
   afterEach(() => cleanup());
 
-  it("navigates the mobile FAB straight to the Post composer, with no chooser dialog", () => {
+  it("opens the mobile contribution chooser with all three canonical formats", () => {
     render(<CreateLauncher userId="user-1" variant="mobileFab" />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Publish a contribution" })
+      screen.getByRole("button", { name: "Create a contribution" })
     );
 
-    expect(mocks.push).toHaveBeenCalledWith("/create/post");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Create a contribution" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Post/ })).toHaveAttribute("href", "/create/post");
+    expect(screen.getByRole("link", { name: /^Article/ })).toHaveAttribute(
+      "href",
+      "/write?kind=article"
+    );
+    expect(screen.getByRole("link", { name: /^Research/ })).toHaveAttribute(
+      "href",
+      "/submit/research"
+    );
   });
 
-  it("navigates the desktop Publish button straight to the Post composer", () => {
+  it("opens the chooser from the desktop Contribute button", () => {
     render(<CreateLauncher userId="user-1" variant="desktop" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Contribute" }));
 
-    expect(mocks.push).toHaveBeenCalledWith("/create/post");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Create a contribution" })).toBeInTheDocument();
   });
 
-  it("opens the contextual sign-in gate for a guest instead of navigating", () => {
+  it("lets a guest choose first and preserves that exact destination for sign-in", () => {
     render(<CreateLauncher userId={null} variant="mobileFab" />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Publish a contribution" })
+      screen.getByRole("button", { name: "Create a contribution" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Article/ }));
+
+    expect(mocks.requestAuth).toHaveBeenCalledWith("create", {
+      contentKind: "article",
+      destination: "/write?kind=article",
+    });
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+
+  it("offers the latest draft above the formats, so resuming beats starting over", async () => {
+    draftRows.current = [
+      {
+        id: "draft-1",
+        title: "Land tenure reform",
+        type: "essay",
+        content_kind: "article",
+        updated_at: new Date().toISOString(),
+      },
+    ];
+
+    render(<CreateLauncher userId="user-1" variant="desktop" />);
+    fireEvent.click(screen.getByRole("button", { name: "Contribute" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole("link", { name: /Continue latest draft/ })
+      ).toBeInTheDocument()
     );
 
-    expect(mocks.requestAuth).toHaveBeenCalledWith("create");
-    expect(mocks.push).not.toHaveBeenCalled();
+    // Order is the point: the resume row has to precede the three formats.
+    const hrefs = within(dialog)
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+    expect(hrefs).toEqual([
+      "/write?draft=draft-1",
+      "/create/post",
+      "/write?kind=article",
+      "/submit/research",
+    ]);
+  });
+
+  it("shows only the three formats when there is nothing worth resuming", async () => {
+    render(<CreateLauncher userId="user-1" variant="desktop" />);
+    fireEvent.click(screen.getByRole("button", { name: "Contribute" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
+    await waitFor(() =>
+      expect(within(dialog).getAllByRole("link")).toHaveLength(3)
+    );
+    expect(
+      within(dialog).queryByText(/Continue latest draft/)
+    ).not.toBeInTheDocument();
+  });
+
+  it("never offers a guest someone else's draft", async () => {
+    draftRows.current = [
+      {
+        id: "draft-1",
+        title: "Land tenure reform",
+        type: "essay",
+        content_kind: "article",
+        updated_at: new Date().toISOString(),
+      },
+    ];
+
+    render(<CreateLauncher userId={null} variant="mobileFab" />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create a contribution" })
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
+    await waitFor(() =>
+      expect(within(dialog).getAllByRole("button")).not.toHaveLength(0)
+    );
+    expect(
+      within(dialog).queryByText(/Continue latest draft/)
+    ).not.toBeInTheDocument();
   });
 
   it("gives the desktop trigger and mobile trigger distinct accessible names", () => {
@@ -59,9 +161,9 @@ describe("CreateLauncher -- direct-to-composer", () => {
       </>
     );
 
-    expect(screen.getByRole("button", { name: "Publish" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Contribute" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Publish a contribution" })
+      screen.getByRole("button", { name: "Create a contribution" })
     ).toBeInTheDocument();
   });
 
@@ -80,9 +182,9 @@ describe("CreateLauncher -- direct-to-composer", () => {
       </>
     );
 
-    const desktopWrapper = screen.getByRole("button", { name: "Publish" }).parentElement;
+    const desktopWrapper = screen.getByRole("button", { name: "Contribute" }).parentElement;
     const mobileWrapper = screen.getByRole("button", {
-      name: "Publish a contribution",
+      name: "Create a contribution",
     }).parentElement;
 
     // Desktop control: hidden by default, appears only from `md` up.
@@ -96,7 +198,7 @@ describe("CreateLauncher -- direct-to-composer", () => {
 
   it("clears the mobile tab bar, with no post-page special case left to keep in step", () => {
     render(<CreateLauncher userId="user-1" variant="mobileFab" />);
-    const fab = screen.getByRole("button", { name: "Publish a contribution" });
+    const fab = screen.getByRole("button", { name: "Create a contribution" });
 
     expect(fab).toHaveAttribute("data-app-compose-fab");
     expect(fab).toHaveAttribute("data-app-chrome-motion");

@@ -7,6 +7,9 @@
   },
   "include": [],
   "files": [
+    "app/(main)/ContributionChooser.tsx",
+    "app/(main)/CreateTrigger.tsx",
+    "app/(main)/CreateLauncher.tsx",
     "lib/blocking.ts",
     "lib/suspension.ts",
     "lib/messaging.ts",

@@ -213,7 +213,10 @@ describe("ResponseStartLink -- guest gating", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Write a response" }));
 
-    expect(mocks.requestAuth).toHaveBeenCalledWith("respond");
+    expect(mocks.requestAuth).toHaveBeenCalledWith("respond", {
+      contentKind: "post",
+      destination: "/create/post?inResponseTo=parent-post-id",
+    });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -232,6 +235,9 @@ describe("ResponseStartLink -- guest gating", () => {
     expect(screen.queryByRole("link", { name: "Write a response" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Write a response" }));
 
-    expect(mocks.requestAuth).toHaveBeenCalledWith("respond");
+    expect(mocks.requestAuth).toHaveBeenCalledWith("respond", {
+      contentKind: "article",
+      destination: "/write?inResponseTo=post-2&kind=article&starter=response",
+    });
   });
 });

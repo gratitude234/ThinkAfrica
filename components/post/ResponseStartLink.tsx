@@ -71,7 +71,10 @@ export default function ResponseStartLink({
           type="button"
           onClick={() => {
             onTriggerClick?.();
-            requestAuth("respond");
+            requestAuth("respond", {
+              contentKind: "article",
+              destination: `/write?${params.toString()}`,
+            });
           }}
           className={className}
         >
@@ -111,7 +114,10 @@ export default function ResponseStartLink({
         onClick={() => {
           onTriggerClick?.();
           if (isGuest) {
-            requestAuth("respond");
+            requestAuth("respond", {
+              contentKind: "post",
+              destination: quickHref,
+            });
             return;
           }
           chooser.toggle();

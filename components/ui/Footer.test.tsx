@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes } from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import Footer from "./Footer";
 
 const mocks = vi.hoisted(() => ({ requestAuth: vi.fn() }));
@@ -28,16 +28,34 @@ vi.mock("next/link", () => ({
 }));
 
 describe("Footer 'Write' link (generic creation CTA)", () => {
-  it("opens the contextual sign-in gate instead of the chooser, since Footer's only caller (landing) is guest-only", () => {
+  beforeEach(() => mocks.requestAuth.mockReset());
+
+  it("opens the shared contribution chooser rather than assuming a format", () => {
     render(<Footer landing />);
 
     const trigger = screen.getByRole("button", { name: "Write" });
-    expect(trigger).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     fireEvent.click(trigger);
 
-    expect(mocks.requestAuth).toHaveBeenCalledWith("create");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Create a contribution" })
+    ).toBeInTheDocument();
+    expect(mocks.requestAuth).not.toHaveBeenCalled();
+  });
+
+  it("records the format a guest picked so sign-in can return them to it", () => {
+    render(<Footer landing />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Article/ }));
+
+    expect(mocks.requestAuth).toHaveBeenCalledWith("create", {
+      contentKind: "article",
+      destination: "/write?kind=article",
+    });
   });
 
   it("does not render a plain link straight to /write", () => {

@@ -21,15 +21,15 @@ describe("getPublishGateCopy (Article composer publish-gate wording)", () => {
   it("uses 'Preview & publish' for a Post/Article draft -- not 'Review', which implies a formal review step it doesn't have", () => {
     expect(getPublishGateCopy("blog").desktopLabel).toBe("Preview & publish");
     expect(getPublishGateCopy("essay").desktopLabel).toBe("Preview & publish");
-    expect(getPublishGateCopy("blog").mobileLabel).toBe("Publish");
-    expect(getPublishGateCopy("essay").mobileLabel).toBe("Publish");
+    expect(getPublishGateCopy("blog").mobileLabel).toBe("Preview");
+    expect(getPublishGateCopy("essay").mobileLabel).toBe("Preview");
   });
 
-  it("preserves 'Review & publish' for a legacy Policy Brief draft still in the editorial workflow", () => {
+  it("uses publication preview wording for a legacy Policy Brief draft converted to an Article", () => {
     const copy = getPublishGateCopy("policy_brief");
-    expect(copy.desktopLabel).toBe("Review & publish");
-    expect(copy.mobileLabel).toBe("Review");
-    expect(copy.ariaLabel).toBe("Review and publish");
+    expect(copy.desktopLabel).toBe("Preview & publish");
+    expect(copy.mobileLabel).toBe("Preview");
+    expect(copy.ariaLabel).toBe("Preview and publish");
   });
 
   it("never uses raw 'Review' alone for a plain Article/Post -- only 'Publish' or 'Preview & publish'", () => {

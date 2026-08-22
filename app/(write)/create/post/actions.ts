@@ -434,6 +434,7 @@ export async function promoteToArticle(input: {
   body: string;
   imageUrl?: string | null;
   topics: string[];
+  inResponseTo?: string | null;
 }) {
   const supabase = await createClient();
   const {
@@ -470,5 +471,6 @@ export async function promoteToArticle(input: {
     tags: input.topics,
     postType: "essay",
     coverImageUrl,
+    inResponseTo: input.inResponseTo ?? null,
   });
 }

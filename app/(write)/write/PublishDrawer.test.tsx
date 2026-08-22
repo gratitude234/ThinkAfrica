@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ArticleFormat } from "@/lib/contentModel";
@@ -6,7 +6,7 @@ import PublishDrawer from "./PublishDrawer";
 import { publishPost } from "./actions";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -50,6 +50,8 @@ function renderDrawer(overrides: Partial<React.ComponentProps<typeof PublishDraw
     title: overrides.title ?? "A real title",
     content: overrides.content ?? "<p>Enough words to pass validation here easily.</p>",
     wordCount: overrides.wordCount ?? 60,
+    initialTags: overrides.initialTags ?? [],
+    initialReferences: overrides.initialReferences ?? [],
     initialPostType: overrides.initialPostType ?? "essay",
     initialArticleFormat: overrides.initialArticleFormat ?? null,
     onMetadataChange,
@@ -116,10 +118,11 @@ describe("PublishDrawer genre picker", () => {
     expect(genreButton("Policy Brief")).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("does not render the genre picker for a legacy Policy Brief draft's own unmodified publish flow", () => {
+  it("treats a legacy Policy Brief draft as an immediately-published Article genre", () => {
     renderDrawer({ initialPostType: "policy_brief" });
 
-    expect(screen.queryByText("Genre (optional)")).not.toBeInTheDocument();
+    expect(genreButton("Policy Brief")).toBeInTheDocument();
+    expect(screen.getByText("Public immediately")).toBeInTheDocument();
   });
 
   it("requires one explicit confirmation but still allows publishing an Article without topics", async () => {
@@ -132,7 +135,7 @@ describe("PublishDrawer genre picker", () => {
       content: `<p>${Array.from({ length: 100 }, () => "word").join(" ")}</p>`,
     });
 
-    await user.click(screen.getByRole("button", { name: "Publish Article" }));
+    await user.click(screen.getByRole("button", { name: "Publish now" }));
 
     expect(mockedPublishPost).not.toHaveBeenCalled();
     expect(screen.getByText("Publish without topics?")).toBeInTheDocument();
@@ -141,5 +144,68 @@ describe("PublishDrawer genre picker", () => {
       screen.getByRole("button", { name: "Publish without topics" })
     );
     expect(mockedPublishPost).toHaveBeenCalledOnce();
+  });
+
+  it("supports arrow-key navigation across the publication preview tabs", () => {
+    renderDrawer();
+
+    const feedTab = screen.getByRole("tab", { name: "Feed" });
+    feedTab.focus();
+    fireEvent.keyDown(feedTab, { key: "ArrowRight" });
+
+    const articleTab = screen.getByRole("tab", { name: "Article" });
+    expect(articleTab).toHaveAttribute("aria-selected", "true");
+    expect(articleTab).toHaveFocus();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      articleTab.id
+    );
+  });
+
+  it("blocks publication until a partially-entered source is completed or removed", () => {
+    renderDrawer({
+      initialReferences: [
+        {
+          id: "source-1",
+          post_id: "draft-1",
+          display_order: 0,
+          ref_type: "other",
+          authors: null,
+          title: "A source without verification details",
+          year: null,
+          source: null,
+          url: null,
+          doi: null,
+          raw: null,
+        },
+      ],
+    });
+
+    expect(screen.getByText(/Complete or remove 1 incomplete source/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish now" })).toBeDisabled();
+  });
+
+  it("blocks publication when the body cites a source that was removed", () => {
+    renderDrawer({
+      content:
+        '<p>A claim <a href="#ref-id-11111111-1111-4111-8111-111111111111">[source]</a></p>',
+      initialReferences: [],
+    });
+
+    expect(screen.getByText(/citation marker.*no longer has a source/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish now" })).toBeDisabled();
+  });
+
+  it("recovers from a rejected publish request instead of leaving the drawer stuck", async () => {
+    const user = userEvent.setup();
+    vi.mocked(publishPost).mockRejectedValueOnce(new Error("offline"));
+    renderDrawer({ initialTags: ["Education"] });
+
+    await user.click(screen.getByRole("button", { name: "Publish now" }));
+
+    expect(
+      await screen.findByText(/check your connection and try again/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish now" })).toBeEnabled();
   });
 });

@@ -147,14 +147,6 @@ const RESPONSE_INTENT_COPY: Record<
   },
 };
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 export function getResponseStarterTemplate({
   parentTitle,
   intent,
@@ -163,17 +155,14 @@ export function getResponseStarterTemplate({
   intent: ResponseIntent;
 }) {
   const copy = RESPONSE_INTENT_COPY[intent];
-  const safeTitle = escapeHtml(parentTitle);
 
   return {
     title: `${copy.titlePrefix} "${parentTitle}"`,
     excerpt: copy.excerpt,
     tags: copy.tags,
-    content:
-      `<h2>My response</h2><p>${copy.claimPrompt}</p>` +
-      `<h2>Connection to the original idea</h2><p>${copy.connectionPrompt} Original post: <strong>${safeTitle}</strong>.</p>` +
-      `<h2>Evidence or example</h2><p>${copy.evidencePrompt}</p>` +
-      `<h2>Question for readers</h2><p>${copy.questionPrompt}</p>`,
+    // Guidance is rendered beside the canvas by page.tsx. It must never be
+    // inserted as authored body copy that can be published untouched.
+    content: "",
     hint: copy.hint,
   };
 }
@@ -200,29 +189,14 @@ export interface PublishGateCopy {
 /**
  * Wording for the composer's "open the publish step" button (page.tsx and
  * CoverImageDialog.tsx) -- distinct from PublishDrawer's own final publish
- * button, which already has its own postType-aware label. This gate only
- * *advances* to that drawer, so "Review & publish" over-promised a formal
- * review step that a Post/Article never has (see docs/content-model.md).
- *
- * The one exception is a legacy Policy Brief draft (postType ===
- * "policy_brief") still inside the pre-Phase-4A editorial workflow -- for
- * that draft, review is real, so the wording is preserved. A brand-new
- * Article always dual-writes postType "essay" regardless of genre (see
- * legacyTypeForNewContent() in lib/contentModel.ts), so this check can
- * never misfire on new content.
+ * button. The active drawer contains a real multi-surface preview, while the
+ * final action inside it is the unambiguous "Publish now". We avoid the bare
+ * word "Review" because Research uses it for an actual editorial state.
  */
-export function getPublishGateCopy(postType: PostType): PublishGateCopy {
-  if (postType === "policy_brief") {
-    return {
-      desktopLabel: "Review & publish",
-      mobileLabel: "Review",
-      ariaLabel: "Review and publish",
-    };
-  }
-
+export function getPublishGateCopy(_postType: PostType): PublishGateCopy {
   return {
     desktopLabel: "Preview & publish",
-    mobileLabel: "Publish",
+    mobileLabel: "Preview",
     ariaLabel: "Preview and publish",
   };
 }

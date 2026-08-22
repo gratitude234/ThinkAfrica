@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BottomNav from "./BottomNav";
 
@@ -30,19 +30,26 @@ describe("BottomNav compose access", () => {
 
   afterEach(() => cleanup());
 
-  it("shows the compose FAB to guests and opens the contextual sign-in gate instead of the create chooser", () => {
+  it("shows the compose FAB to guests and gates sign-in on the format they picked", () => {
     render(
       <BottomNav username={null} userId={null} hasActiveDebate={false} />
     );
 
-    const trigger = screen.getByRole("button", { name: "Publish a contribution" });
-    expect(screen.queryByRole("link", { name: "Publish a contribution" })).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Create a contribution" });
+    expect(screen.queryByRole("link", { name: "Create a contribution" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     fireEvent.click(trigger);
 
-    expect(mocks.requestAuth).toHaveBeenCalledWith("create");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
+    expect(mocks.requestAuth).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Research/ }));
+
+    expect(mocks.requestAuth).toHaveBeenCalledWith("create", {
+      contentKind: "research",
+      destination: "/submit/research",
+    });
   });
 
   it("renders no mobile chrome on post pages, FAB included", () => {
@@ -57,7 +64,7 @@ describe("BottomNav compose access", () => {
     // 40px away, so the corner offered two writing controls and the more
     // prominent one led away from the article.
     expect(
-      screen.queryByRole("button", { name: "Publish a contribution" })
+      screen.queryByRole("button", { name: "Create a contribution" })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("navigation", { name: "Primary navigation" })
@@ -71,7 +78,7 @@ describe("BottomNav compose access", () => {
       <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
     );
 
-    expect(screen.queryByRole("button", { name: "Publish a contribution" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create a contribution" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Primary navigation" })).not.toBeInTheDocument();
   });
 });

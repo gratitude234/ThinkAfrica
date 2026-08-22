@@ -1,8 +1,14 @@
 "use client";
 
-import { useTransition, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
+import {
+  useCallback,
+  useId,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from "react";
+import ContributionChooser from "./ContributionChooser";
 
 interface CreateTriggerProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type" | "children"> {
@@ -13,11 +19,8 @@ interface CreateTriggerProps
 /**
  * Reusable Create trigger, decoupled from NavClient/BottomNav. Any CTA
  * (Footer "Write", a dashboard "Start writing" button, ...) can render this
- * to get the shared create behavior: guests are routed through the
- * contextual sign-in gate, signed-in users go straight to the Post composer.
- *
- * The composer itself offers the longer-form paths (Article, Research), so
- * ambiguous "Write"/"Create" entry points no longer open a chooser first.
+ * to get the shared contribution chooser. Guests choose their intended
+ * format first, so sign-in can return them to the exact composer they chose.
  * Content-specific CTAs (e.g. "Write an article") should keep linking
  * directly to their destination instead of using this.
  */
@@ -28,30 +31,40 @@ export default function CreateTrigger({
   disabled,
   ...rest
 }: CreateTriggerProps) {
-  const router = useRouter();
-  const { requestAuth } = useGuestAuthGate();
-  // /create/post is a server route that authenticates and may resolve a
-  // parent post before it can render, so the click isn't instant. Without a
-  // pending state the button looks inert for that whole window and people
-  // click it again. useTransition keeps the current page interactive while
-  // marking this control busy.
-  const [isNavigating, startNavigation] = useTransition();
-
-  const handleClick = userId
-    ? () => startNavigation(() => router.push("/create/post"))
-    : () => requestAuth("create");
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const chooserId = useId();
+  const titleId = useId();
+  const descriptionId = useId();
+  const close = useCallback(() => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }, []);
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className={className}
-      disabled={disabled || isNavigating}
-      aria-busy={isNavigating || undefined}
-      data-pending={isNavigating ? "" : undefined}
-      {...rest}
-    >
-      {children}
-    </button>
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className={className}
+        disabled={disabled}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? chooserId : undefined}
+        {...rest}
+      >
+        {children}
+      </button>
+      <ContributionChooser
+        open={open}
+        onClose={close}
+        triggerRef={triggerRef}
+        userId={userId}
+        id={chooserId}
+        titleId={titleId}
+        descriptionId={descriptionId}
+      />
+    </>
   );
 }

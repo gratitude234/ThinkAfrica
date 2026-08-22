@@ -15,8 +15,8 @@ vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
 // These tests stand in for an ad-hoc CTA (Footer "Write", a dashboard
 // "Start writing" button, ...) that has nothing to do with NavClient or
 // BottomNav -- proving every ambiguous Create entry point shares the same
-// direct-to-composer behavior without re-implementing it.
-describe("CreateTrigger -- reusable outside navigation", () => {
+// contribution-format behavior without re-implementing it.
+describe("CreateTrigger -- reusable contribution chooser", () => {
   beforeEach(() => {
     mocks.requestAuth.mockReset();
     mocks.push.mockReset();
@@ -24,7 +24,7 @@ describe("CreateTrigger -- reusable outside navigation", () => {
 
   afterEach(() => cleanup());
 
-  it("navigates a signed-in user straight to the Post composer with no chooser dialog", () => {
+  it("opens the same chooser for a signed-in user", () => {
     render(
       <CreateTrigger userId="user-1" className="footer-write-cta">
         Write
@@ -33,16 +33,20 @@ describe("CreateTrigger -- reusable outside navigation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Write" }));
 
-    expect(mocks.push).toHaveBeenCalledWith("/create/post");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Create a contribution" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Post/ })).toHaveAttribute("href", "/create/post");
   });
 
-  it("opens the contextual sign-in gate for a guest instead of navigating", () => {
+  it("preserves a guest's selected format through sign-in", () => {
     render(<CreateTrigger userId={null}>Write</CreateTrigger>);
 
     fireEvent.click(screen.getByRole("button", { name: "Write" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Research/ }));
 
-    expect(mocks.requestAuth).toHaveBeenCalledWith("create");
+    expect(mocks.requestAuth).toHaveBeenCalledWith("create", {
+      contentKind: "research",
+      destination: "/submit/research",
+    });
     expect(mocks.push).not.toHaveBeenCalled();
   });
 

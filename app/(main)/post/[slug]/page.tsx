@@ -237,9 +237,13 @@ function injectHeadingIds(content: string): { html: string; headings: BodyHeadin
 
 function renderReferenceShortcodes(content: string): string {
   return content.replace(
-    /\[ref:(\d+)\]/g,
-    (_match, refNumber) =>
-      `<sup><a href="#ref-${refNumber}" class="no-underline">[${refNumber}]</a></sup>`
+    /\[ref:([a-zA-Z0-9-]+)\]/g,
+    (_match, referenceKey: string) => {
+      if (/^\d+$/.test(referenceKey)) {
+        return `<sup><a href="#ref-${referenceKey}" class="no-underline">[${referenceKey}]</a></sup>`;
+      }
+      return `<sup><a href="#ref-id-${referenceKey}" class="no-underline" aria-label="Jump to cited source">[source]</a></sup>`;
+    }
   );
 }
 
@@ -931,6 +935,11 @@ async function PostReferencesAndCitation({
                 id={`ref-${index + 1}`}
                 className="flex gap-3 border-t border-divider py-3 text-meta leading-relaxed text-ink-soft first:border-t-0"
               >
+                <span
+                  id={`ref-id-${reference.id}`}
+                  className="sr-only"
+                  aria-hidden="true"
+                />
                 <span className="min-w-[2rem] shrink-0 font-bold text-emerald-ink">
                   [{index + 1}]
                 </span>

@@ -132,6 +132,21 @@ describe("ensureDraft", () => {
     expect(result.draftId).toBeNull();
   });
 
+  it("refuses to edit a short Post draft through the Article draft action", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults({
+        data: { type: "blog", content_kind: "post", status: "draft", author_id: "user-1" },
+        error: null,
+      }),
+    });
+
+    const result = await ensureDraft(baseDraftInput({ draftId: "post-draft-1" }));
+
+    expect(result.error).toMatch(/Post composer/i);
+    expect(result.draftId).toBeNull();
+    expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+  });
+
   it("preserves an existing policy_brief draft's classification even when the client sends a spoofed postType", async () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
@@ -288,6 +303,34 @@ describe("publishPost", () => {
     expect(result.slug).toBeNull();
   });
 
+  it("rejects empty editor markup before touching the database", async () => {
+    fakeSupabase.current = makeFakeSupabase({});
+
+    const result = await publishPost(
+      basePublishInput({ content: "<p><br></p><p>&nbsp;&#160;</p>" })
+    );
+
+    expect(result.error).toMatch(/write something/i);
+    expect(result.slug).toBeNull();
+    expect(fakeSupabase.current!.from).not.toHaveBeenCalled();
+  });
+
+  it("rejects an orphaned stable citation before publishing", async () => {
+    fakeSupabase.current = makeFakeSupabase({});
+
+    const result = await publishPost(
+      basePublishInput({
+        content:
+          '<p>A claim <a href="#ref-id-11111111-1111-4111-8111-111111111111">[source]</a></p>',
+        references: [],
+      })
+    );
+
+    expect(result.error).toMatch(/source that was removed/i);
+    expect(result.slug).toBeNull();
+    expect(fakeSupabase.current!.from).not.toHaveBeenCalled();
+  });
+
   it.each(["policy_brief", "blog", "research_paper_fake"])(
     "publishes a brand-new submission as a generic Article immediately, ignoring spoofed postType=%s",
     async (spoofedType) => {
@@ -309,8 +352,12 @@ describe("publishPost", () => {
       expect(insertedWith.type).toBe("essay");
       expect(insertedWith.content_kind).toBe("article");
       expect(insertedWith.article_format).toBeNull();
-      expect(insertedWith.status).toBe("published");
-      expect(insertedWith.published_at).not.toBeNull();
+      expect(insertedWith.status).toBe("draft");
+      expect(insertedWith.published_at).toBeNull();
+      const transitionedWith = fakeSupabase.current!.builders.posts[1]
+        .updatedWith as Record<string, unknown>;
+      expect(transitionedWith.status).toBe("published");
+      expect(transitionedWith.published_at).not.toBeNull();
     }
   );
 
@@ -330,8 +377,9 @@ describe("publishPost", () => {
     expect(result.error).toBeNull();
     const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
     expect(updatedWith.type).toBe("essay");
-    expect(updatedWith.status).toBe("published");
     expect(updatedWith.content_kind).toBe("article");
+    const transitionedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
+    expect(transitionedWith.status).toBe("published");
   });
 
   it("preserves an existing Article draft's stored genre when the client omits articleFormat entirely", async () => {
@@ -348,7 +396,10 @@ describe("publishPost", () => {
     expect(result.error).toBeNull();
     const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
     expect(updatedWith.article_format).toBe("policy_brief");
-    expect(updatedWith.status).toBe("published");
+    expect(
+      (fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>)
+        .status
+    ).toBe("published");
   });
 
   it("clears an existing genre when the client explicitly picks General (articleFormat: null)", async () => {
@@ -390,8 +441,9 @@ describe("publishPost", () => {
     expect(updatedWith.type).toBe("essay");
     expect(updatedWith.content_kind).toBe("article");
     expect(updatedWith.article_format).toBe("policy_brief");
-    expect(updatedWith.status).toBe("published");
-    expect(updatedWith.published_at).not.toBeNull();
+    const transitionedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
+    expect(transitionedWith.status).toBe("published");
+    expect(transitionedWith.published_at).not.toBeNull();
   });
 
   it("refuses to publish an existing research draft through the Article action, regardless of requested postType", async () => {
@@ -404,6 +456,23 @@ describe("publishPost", () => {
     );
 
     expect(result.error).toMatch(/research submission flow/i);
+    expect(result.slug).toBeNull();
+    expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+  });
+
+  it("refuses to publish a short Post draft through the Article action", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults({
+        data: { status: "draft", type: "blog", content_kind: "post", article_format: null },
+        error: null,
+      }),
+    });
+
+    const result = await publishPost(
+      basePublishInput({ draftId: "post-draft-1", postType: "essay" })
+    );
+
+    expect(result.error).toMatch(/Post composer/i);
     expect(result.slug).toBeNull();
     expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
   });
@@ -516,8 +585,53 @@ describe("publishPost", () => {
       const result = await publishPost(basePublishInput({ draftId: null, inResponseTo: null }));
 
       expect(result.error).toBeNull();
-      expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+      expect(fakeSupabase.current!.builders.posts).toHaveLength(2);
     });
+  });
+
+  it("keeps a new Article private when source synchronization fails", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults({ data: { id: "new-post-id" }, error: null }),
+      profiles: queueResults({ data: { full_name: "Test Author" }, error: null }),
+      post_references: queueResults({
+        data: null,
+        error: { message: "source write failed" },
+      }),
+    });
+
+    const result = await publishPost(basePublishInput());
+
+    expect(result.error).toMatch(/source write failed/i);
+    expect(result.slug).toBeNull();
+    expect(fakeSupabase.current!.builders.posts).toHaveLength(1);
+    expect(
+      (fakeSupabase.current!.builders.posts[0].insertedWith as Record<string, unknown>)
+        .status
+    ).toBe("draft");
+  });
+
+  it("preserves existing co-authors when an older caller omits coAuthors", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults(
+        { data: { status: "draft", type: "essay" }, error: null },
+        { data: [{ id: "draft-1" }], error: null }
+      ),
+      profiles: queueResults({ data: { full_name: "Test Author" }, error: null }),
+      post_references: queueResults({ data: [], error: null }),
+      post_authors: queueResults({
+        data: [{ user_id: "existing-coauthor", accepted_at: "2026-01-01" }],
+        error: null,
+      }),
+    });
+
+    const result = await publishPost(
+      basePublishInput({ draftId: "draft-1", coAuthors: undefined })
+    );
+
+    expect(result.error).toBeNull();
+    expect(
+      fakeSupabase.current!.from.mock.calls.filter(([table]) => table === "post_authors")
+    ).toHaveLength(0);
   });
 });
 
@@ -536,6 +650,43 @@ describe("savePostReferences", () => {
     expect(result.error).toBeNull();
   });
 
+  it("persists the generated citation UUID when a new source is first saved", async () => {
+    const citationId = "11111111-1111-4111-8111-111111111111";
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults({
+        data: { author_id: "user-1", type: "essay", status: "draft" },
+        error: null,
+      }),
+      post_references: queueResults(
+        { data: [], error: null },
+        { data: null, error: null }
+      ),
+    });
+
+    const result = await savePostReferences({
+      postId: "draft-1",
+      references: [
+        {
+          id: `temp-${citationId}`,
+          display_order: 0,
+          ref_type: "other",
+          authors: null,
+          title: "A verifiable source",
+          year: null,
+          source: "Journal",
+          url: null,
+          doi: null,
+          raw: null,
+        },
+      ],
+    });
+
+    expect(result.error).toBeNull();
+    expect(
+      fakeSupabase.current!.builders.post_references[1].insertedWith
+    ).toMatchObject({ id: citationId, post_id: "draft-1" });
+  });
+
   it("refuses to edit references on a post owned by a different user", async () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults({
@@ -547,6 +698,28 @@ describe("savePostReferences", () => {
     const result = await savePostReferences({ postId: "draft-1", references: [] });
 
     expect(result.error).toMatch(/permission/i);
+  });
+
+  it("refuses to attach Article references to a short Post draft", async () => {
+    fakeSupabase.current = makeFakeSupabase({
+      posts: queueResults({
+        data: {
+          author_id: "user-1",
+          type: "blog",
+          content_kind: "post",
+          status: "draft",
+        },
+        error: null,
+      }),
+    });
+
+    const result = await savePostReferences({
+      postId: "post-draft-1",
+      references: [],
+    });
+
+    expect(result.error).toMatch(/Article draft/i);
+    expect(fakeSupabase.current!.builders.post_references ?? []).toHaveLength(0);
   });
 
   it.each(["published", "pending", "pending_revision", "removed"])(

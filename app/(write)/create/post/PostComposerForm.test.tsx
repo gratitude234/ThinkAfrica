@@ -44,7 +44,7 @@ function renderComposer() {
   render(<PostComposerForm userId="user-1" />);
   return {
     postButton: screen.getByRole("button", { name: "Post" }),
-    textarea: screen.getByRole("textbox", { name: "Quick take text" }),
+    textarea: screen.getByRole("textbox", { name: "Post text" }),
   };
 }
 
@@ -170,6 +170,7 @@ describe("PostComposerForm", () => {
         body: "This deserves more room than a quick take.",
         imageUrl: null,
         topics: [],
+        inResponseTo: null,
       })
     );
     await waitFor(() =>
@@ -191,7 +192,9 @@ describe("PostComposerForm", () => {
     // or returning here would offer to restore a draft that now lives
     // in the Article composer.
     await new Promise((resolve) => setTimeout(resolve, 750));
-    expect(window.localStorage.getItem("indegenius:post-draft:user-1")).toBeNull();
+    expect(
+      window.localStorage.getItem("indegenius:post-draft:user-1:standalone")
+    ).toBeNull();
   });
 
   it("keeps the local backup and stays put when the handoff fails", async () => {
@@ -220,7 +223,7 @@ describe("PostComposerForm", () => {
     );
 
     expect(screen.getByText("The cost of getting to class")).toBeInTheDocument();
-    const textarea = screen.getByRole("textbox", { name: "Quick take text" });
+    const textarea = screen.getByRole("textbox", { name: "Post text" });
     expect(textarea).toHaveValue("");
 
     fireEvent.change(textarea, { target: { value: "A shuttle schedule should be published." } });
@@ -251,5 +254,48 @@ describe("PostComposerForm", () => {
     expect(footer).toHaveClass("md:flex", "md:items-center", "md:justify-between");
     expect(screen.getAllByRole("button", { name: /Add image/ })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: /Add topics/ })).toHaveLength(1);
+  });
+
+  it("scopes response backups and preserves the parent when expanding to an Article", async () => {
+    render(
+      <PostComposerForm
+        userId="user-1"
+        parentPost={{ id: "parent-9", displayTitle: "A public argument" }}
+      />
+    );
+
+    expect(screen.getByRole("heading", { name: "New Response" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Submit research" })).not.toBeInTheDocument();
+
+    const textarea = screen.getByRole("textbox", { name: "Response text" });
+    fireEvent.change(textarea, { target: { value: "This needs a fuller answer." } });
+    fireEvent.click(screen.getByRole("button", { name: "Write an article" }));
+
+    await waitFor(() =>
+      expect(mocks.promoteToArticle).toHaveBeenCalledWith({
+        body: "This needs a fuller answer.",
+        imageUrl: null,
+        topics: [],
+        inResponseTo: "parent-9",
+      })
+    );
+  });
+
+  it("keeps unrelated standalone and response drafts separate", async () => {
+    window.localStorage.setItem(
+      "indegenius:post-draft:user-1:standalone",
+      JSON.stringify({ body: "Standalone idea", imageUrl: null, topics: [] })
+    );
+
+    render(
+      <PostComposerForm
+        userId="user-1"
+        parentPost={{ id: "parent-1", displayTitle: "Parent" }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText(/unfinished Post/)).not.toBeInTheDocument();
+    });
   });
 });

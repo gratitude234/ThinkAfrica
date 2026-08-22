@@ -8,15 +8,20 @@ import type { ContentKind } from "@/lib/contentModel";
 function Trigger({
   intent,
   contentKind,
+  destination,
   label = "Do the thing",
 }: {
   intent: GuestAuthIntent;
   contentKind?: ContentKind | null;
+  destination?: string;
   label?: string;
 }) {
   const { requestAuth } = useGuestAuthGate();
   return (
-    <button type="button" onClick={() => requestAuth(intent, { contentKind })}>
+    <button
+      type="button"
+      onClick={() => requestAuth(intent, { contentKind, destination })}
+    >
       {label}
     </button>
   );
@@ -139,6 +144,19 @@ describe("GuestAuthGateProvider -- dialog behavior", () => {
     expect(document.activeElement).toBe(controls[0]);
   });
 
+  it("keeps reverse-Tab inside the dialog when focus starts on the dialog container", () => {
+    renderWithGate(<Trigger intent="respond" />);
+    fireEvent.click(screen.getByRole("button", { name: "Do the thing" }));
+
+    const dialog = screen.getByRole("dialog");
+    const controls = dialog.querySelectorAll<HTMLElement>('a[href], button');
+    dialog.focus();
+
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+
+    expect(document.activeElement).toBe(controls[controls.length - 1]);
+  });
+
   it("builds a same-origin redirectTo containing the complete relative URL (path + query + hash), URL-encoded", () => {
     renderWithGate(<Trigger intent="respond" />);
     fireEvent.click(screen.getByRole("button", { name: "Do the thing" }));
@@ -147,6 +165,22 @@ describe("GuestAuthGateProvider -- dialog behavior", () => {
     expect(signInLink).toHaveAttribute(
       "href",
       "/login?redirectTo=%2F%3Ftab%3Dhome%26type%3Darticle%23responses"
+    );
+  });
+
+  it("uses an explicit safe destination when the attempted action has its own route", () => {
+    renderWithGate(
+      <Trigger
+        intent="respond"
+        contentKind="article"
+        destination="/write?inResponseTo=parent-1&kind=article"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Do the thing" }));
+
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "/login?redirectTo=%2Fwrite%3FinResponseTo%3Dparent-1%26kind%3Darticle"
     );
   });
 

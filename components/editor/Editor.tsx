@@ -13,12 +13,14 @@ export interface EditorHandle {
   toggleItalic: () => void;
   toggleH2: () => void;
   toggleBulletList: () => void;
+  toggleOrderedList: () => void;
   toggleBlockquote: () => void;
   isActive: (name: string, attrs?: Record<string, unknown>) => boolean;
   undo: () => void;
   redo: () => void;
   triggerImageUpload: () => void;
   insertLink: (url: string) => void;
+  insertCitation: (referenceId: string) => void;
 }
 
 interface EditorProps {
@@ -28,6 +30,7 @@ interface EditorProps {
   onUpdate?: (html: string, wordCount: number) => void;
   onSelectionUpdate?: () => void;
   canvasMode?: boolean;
+  ariaLabel?: string;
 }
 
 function countWordsFromHtml(value: string) {
@@ -54,6 +57,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   onUpdate,
   onSelectionUpdate,
   canvasMode = false,
+  ariaLabel = "Article body",
 }, ref) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -91,6 +95,9 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         class: canvasMode
           ? "tiptap write-canvas-editor prose max-w-none focus:outline-none"
           : "tiptap prose max-w-none focus:outline-none p-4",
+        "aria-label": ariaLabel,
+        "aria-multiline": "true",
+        role: "textbox",
       },
     },
     onUpdate({ editor }) {
@@ -112,6 +119,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     toggleItalic: () => editor?.chain().focus().toggleItalic().run(),
     toggleH2: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
     toggleBulletList: () => editor?.chain().focus().toggleBulletList().run(),
+    toggleOrderedList: () => editor?.chain().focus().toggleOrderedList().run(),
     toggleBlockquote: () => editor?.chain().focus().toggleBlockquote().run(),
     isActive: (name, attrs) => editor?.isActive(name, attrs) ?? false,
     undo: () => editor?.chain().focus().undo().run(),
@@ -123,6 +131,15 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         return;
       }
       editor?.chain().focus().setLink({ href: url.trim() }).run();
+    },
+    insertCitation: (referenceId: string) => {
+      const stableId = referenceId.replace(/^temp-/, "").trim();
+      if (!stableId || !/^[a-zA-Z0-9-]+$/.test(stableId)) return;
+      editor
+        ?.chain()
+        .focus()
+        .insertContent(`<a href="#ref-id-${stableId}">[source]</a>`)
+        .run();
     },
   }));
 

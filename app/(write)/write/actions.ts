@@ -100,6 +100,64 @@ function validateReferences(postType: PostType, references: ReferenceInput[]) {
   return null;
 }
 
+function hasMeaningfulArticleContent(content: string) {
+  return content
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(?:nbsp|#160|#x0*a0);/gi, " ")
+    .replace(/[\s\u200b-\u200d\ufeff]/g, "")
+    .length > 0;
+}
+
+function getPersistedReferenceId(referenceId?: string) {
+  if (!referenceId) return null;
+  const candidate = referenceId.startsWith("temp-")
+    ? referenceId.slice("temp-".length)
+    : referenceId;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    candidate
+  )
+    ? candidate
+    : referenceId.startsWith("temp-")
+      ? null
+      : candidate;
+}
+
+function validateCitationReferences(
+  content: string,
+  references: ReferenceInput[]
+) {
+  const citationKeys = new Set<string>();
+  const shortcodePattern = /\[ref:([a-zA-Z0-9-]+)\]/g;
+  const anchorPattern = /href=["']#ref-id-([a-zA-Z0-9-]+)["']/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = shortcodePattern.exec(content)) !== null) {
+    citationKeys.add(match[1]);
+  }
+  while ((match = anchorPattern.exec(content)) !== null) {
+    citationKeys.add(match[1]);
+  }
+  if (citationKeys.size === 0) return null;
+
+  const normalized = normalizeReferences(references);
+  const referenceIds = new Set(
+    normalized
+      .map((reference) => getPersistedReferenceId(reference.id))
+      .filter((id): id is string => Boolean(id))
+  );
+  const hasOrphan = Array.from(citationKeys).some((key) => {
+    if (/^\d+$/.test(key)) {
+      const position = Number.parseInt(key, 10);
+      return position < 1 || position > normalized.length;
+    }
+    return !referenceIds.has(key);
+  });
+
+  return hasOrphan
+    ? "A citation points to a source that was removed. Restore the source or remove its marker before publishing."
+    : null;
+}
+
 async function syncReferences(
   supabase: Awaited<ReturnType<typeof createClient>>,
   postId: string,
@@ -117,7 +175,9 @@ async function syncReferences(
 
   const existingIds = new Set((existingRows ?? []).map((row) => row.id));
   const incomingIds = new Set(
-    normalized.map((reference) => reference.id).filter(Boolean) as string[]
+    normalized
+      .map((reference) => getPersistedReferenceId(reference.id))
+      .filter(Boolean) as string[]
   );
 
   const idsToDelete = Array.from(existingIds).filter((id) => !incomingIds.has(id));
@@ -149,18 +209,21 @@ async function syncReferences(
       raw: reference.raw,
     };
 
-    if (reference.id && !reference.id.startsWith("temp-")) {
+    const persistedId = getPersistedReferenceId(reference.id);
+    if (persistedId && existingIds.has(persistedId)) {
       const { error } = await supabase
         .from("post_references")
         .update(payload)
-        .eq("id", reference.id)
+        .eq("id", persistedId)
         .eq("post_id", postId);
 
       if (error) {
         throw new Error(error.message);
       }
     } else {
-      const { error } = await supabase.from("post_references").insert(payload);
+      const { error } = await supabase.from("post_references").insert(
+        persistedId ? { ...payload, id: persistedId } : payload
+      );
 
       if (error) {
         throw new Error(error.message);
@@ -398,6 +461,13 @@ export async function ensureDraft(input: {
       };
     }
 
+    if (resolveContentKind(existing) !== "article") {
+      return {
+        error: "This draft belongs in the Post composer, not the Article editor.",
+        draftId: null as string | null,
+      };
+    }
+
     // /write (and its autosave) may only ever touch a row that is still an
     // unpublished draft. Once a post has been submitted/published, it moves
     // to /edit's own workflow-aware action -- without this check, a stale
@@ -500,12 +570,16 @@ export async function savePostReferences(input: {
 
   const { data: post } = await supabase
     .from("posts")
-    .select("author_id, type, status")
+    .select("author_id, type, content_kind, status")
     .eq("id", input.postId)
     .single();
 
   if (!post || post.author_id !== user.id) {
     return { error: "You do not have permission to edit these references." };
+  }
+
+  if (resolveContentKind(post) !== "article") {
+    return { error: "These sources do not belong to an Article draft." };
   }
 
   // This action is only ever meant to touch an in-progress draft (it is
@@ -588,6 +662,14 @@ export async function publishPost(input: {
     };
   }
 
+  const sanitizedContent = sanitizePostHtml(input.content);
+  if (!hasMeaningfulArticleContent(sanitizedContent)) {
+    return {
+      error: "Write something in your Article before publishing.",
+      slug: null as string | null,
+    };
+  }
+
   // As in ensureDraft(): a modified request must not be able to publish a
   // draft as a *different* classification than what it actually is (e.g.
   // spoofing `postType: "essay"` to force an existing policy_brief draft
@@ -627,6 +709,13 @@ export async function publishPost(input: {
     if (existingPost.type === "research") {
       return {
         error: "Research papers must be published through the research submission flow.",
+        slug: null as string | null,
+      };
+    }
+
+    if (resolveContentKind(existingPost) !== "article") {
+      return {
+        error: "This draft belongs in the Post composer, not the Article editor.",
         slug: null as string | null,
       };
     }
@@ -693,9 +782,22 @@ export async function publishPost(input: {
     return { error: "Submission track is not configured for this format.", slug: null as string | null };
   }
 
-  const validationError = validateReferences(effectiveType, input.references ?? []);
-  if (validationError) {
-    return { error: validationError, slug: null as string | null };
+  // An omitted collection means the caller has not hydrated it and must not
+  // be interpreted as an instruction to clear it. The active Article client
+  // always sends the fully-hydrated collection; older callers can safely omit
+  // it without destroying metadata already attached to the draft.
+  if (input.references !== undefined) {
+    const validationError = validateReferences(effectiveType, input.references);
+    if (validationError) {
+      return { error: validationError, slug: null as string | null };
+    }
+    const citationError = validateCitationReferences(
+      sanitizedContent,
+      input.references
+    );
+    if (citationError) {
+      return { error: citationError, slug: null as string | null };
+    }
   }
 
   const { data: ownerProfile } = await supabase
@@ -734,7 +836,6 @@ export async function publishPost(input: {
     input.tags,
     MAX_LONG_FORM_TOPICS
   );
-  const sanitizedContent = sanitizePostHtml(input.content);
 
   // Re-validated here (not just trusted from an earlier ensureDraft() call)
   // so a parent that became unavailable between opening the composer and
@@ -758,11 +859,10 @@ export async function publishPost(input: {
   let responseParentPath: string | null = null;
 
   if (postId) {
-    // As in ensureDraft(): `status = "draft"` is part of the WHERE clause,
-    // not just a pre-check, so a concurrent publish/autosave race can't
-    // slip a write through between the earlier select and this update --
-    // if the row is no longer a draft by the time this runs, zero rows are
-    // affected instead of silently republishing/overwriting it.
+    // Persist the final content while the row is still a draft. Sources and
+    // attribution are synchronized below before the public status transition,
+    // so a metadata failure never leaves an Article live while the UI reports
+    // that publishing failed.
     const { data: updatedRows, error } = await supabase
       .from("posts")
       .update({
@@ -775,12 +875,9 @@ export async function publishPost(input: {
         article_format: effectiveArticleFormat,
         cover_image_url: input.coverImageUrl || null,
         in_response_to: responseParent?.id ?? null,
-        status: submitStatus,
-        published_at: publishedAt,
         slug,
         current_round: 1,
         revision_due_at: null,
-        published_version_id: submitStatus === "published" ? undefined : null,
       })
       .eq("id", postId)
       .eq("author_id", user.id)
@@ -798,6 +895,8 @@ export async function publishPost(input: {
       };
     }
   } else {
+    // New work is also created as a private draft first. Publication is a
+    // separate guarded transition after references/authors have succeeded.
     const { data, error } = await supabase
       .from("posts")
       .insert({
@@ -811,8 +910,8 @@ export async function publishPost(input: {
         article_format: effectiveArticleFormat,
         tags: normalizedTags,
         in_response_to: responseParent?.id ?? null,
-        status: submitStatus,
-        published_at: publishedAt,
+        status: "draft",
+        published_at: null,
         current_round: 1,
         cover_image_url: input.coverImageUrl || null,
       })
@@ -830,29 +929,23 @@ export async function publishPost(input: {
     return { error: "Unable to resolve the draft.", slug: null as string | null };
   }
 
-  if (responseParent) {
-    responseParentPath = `/post/${responseParent.slug}`;
-    await notifyResponseParentAuthor({
-      parent: responseParent,
-      responderId: user.id,
-      responderName: ownerProfile?.full_name ?? "An Indegenius author",
-      responsePostId: postId,
-      responseSlug: slug,
-    });
-  }
-
   try {
-    await syncReferences(supabase, postId, input.references ?? []);
-    await syncAuthors(
-      supabase,
-      postId,
-      slug,
-      user.id,
-      input.coAuthors ?? [],
-      ownerProfile?.full_name ?? "An Indegenius author"
-    );
+    if (input.references !== undefined) {
+      await syncReferences(supabase, postId, input.references);
+    }
 
-    if (input.correspondingAuthorId) {
+    if (input.coAuthors !== undefined) {
+      await syncAuthors(
+        supabase,
+        postId,
+        slug,
+        user.id,
+        input.coAuthors,
+        ownerProfile?.full_name ?? "An Indegenius author"
+      );
+    }
+
+    if (input.coAuthors !== undefined && input.correspondingAuthorId) {
       const { error: clearCorrespondingError } = await supabase
         .from("post_authors")
         .update({ corresponding_author: false })
@@ -878,6 +971,46 @@ export async function publishPost(input: {
       error: error instanceof Error ? error.message : "Failed to save editorial metadata.",
       slug: null as string | null,
     };
+  }
+
+  // This is the only operation that makes the contribution public or sends
+  // it into review. Keeping the status predicate in the write closes the
+  // autosave/double-submit race: exactly one request can transition a draft.
+  const finalTransition = {
+    status: submitStatus,
+    published_at: publishedAt,
+    current_round: 1,
+    revision_due_at: null,
+    ...(submitStatus === "published" ? {} : { published_version_id: null }),
+  };
+  const { data: transitionedRows, error: transitionError } = await supabase
+    .from("posts")
+    .update(finalTransition)
+    .eq("id", postId)
+    .eq("author_id", user.id)
+    .eq("status", "draft")
+    .select("id");
+
+  if (transitionError) {
+    return { error: transitionError.message, slug: null as string | null };
+  }
+
+  if (!transitionedRows || transitionedRows.length === 0) {
+    return {
+      error: "This draft was already published or changed in another window.",
+      slug: null as string | null,
+    };
+  }
+
+  if (responseParent) {
+    responseParentPath = `/post/${responseParent.slug}`;
+    await notifyResponseParentAuthor({
+      parent: responseParent,
+      responderId: user.id,
+      responderName: ownerProfile?.full_name ?? "An Indegenius author",
+      responsePostId: postId,
+      responseSlug: slug,
+    });
   }
 
   if (requiresEditorialWorkflow(effectiveType)) {

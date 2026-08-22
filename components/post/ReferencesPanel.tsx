@@ -10,11 +10,38 @@ interface ReferencesPanelProps {
   onChange: (references: PostReferenceRecord[]) => void;
   alwaysExpanded?: boolean;
   className?: string;
+  onInsertCitation?: (referenceId: string) => void;
+}
+
+function createStableReferenceId() {
+  const cryptoApi =
+    typeof globalThis.crypto === "undefined"
+      ? null
+      : (globalThis.crypto as unknown as {
+          randomUUID?: () => string;
+          getRandomValues?: (values: Uint8Array) => Uint8Array;
+        });
+  if (cryptoApi?.randomUUID) {
+    return cryptoApi.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (cryptoApi?.getRandomValues) {
+    cryptoApi.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
 }
 
 function emptyReference(nextIndex: number): PostReferenceRecord {
   return {
-    id: `temp-${Date.now()}-${nextIndex}`,
+    id: `temp-${createStableReferenceId()}`,
     post_id: "",
     display_order: nextIndex,
     ref_type: "other",
@@ -33,15 +60,18 @@ export default function ReferencesPanel({
   onChange,
   alwaysExpanded = false,
   className = "",
+  onInsertCitation,
 }: ReferencesPanelProps) {
   const [open, setOpen] = useState(false);
   const [addingReference, setAddingReference] = useState(false);
   const [draftReference, setDraftReference] = useState<PostReferenceRecord | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const expanded = alwaysExpanded || open;
 
   const startAddReference = () => {
     setDraftReference(emptyReference(references.length));
+    setAddError(null);
     setAddingReference(true);
     setOpen(true);
   };
@@ -49,18 +79,30 @@ export default function ReferencesPanel({
   const cancelAddReference = () => {
     setAddingReference(false);
     setDraftReference(null);
+    setAddError(null);
   };
 
   const saveReference = () => {
     if (!draftReference) return;
     if (!draftReference.title.trim()) {
-      setAddingReference(false);
-      setDraftReference(null);
+      setAddError("Add a source title before saving.");
+      return;
+    }
+    if (
+      ![
+        draftReference.source,
+        draftReference.url,
+        draftReference.doi,
+        draftReference.raw,
+      ].some((value) => value?.trim())
+    ) {
+      setAddError("Add a publication, URL, DOI, or source note so readers can verify it.");
       return;
     }
     onChange([...references, draftReference]);
     setAddingReference(false);
     setDraftReference(null);
+    setAddError(null);
   };
 
   return (
@@ -114,7 +156,7 @@ export default function ReferencesPanel({
       {expanded ? (
         <div className="space-y-3 px-4 pb-4">
           <p className="-mt-1 text-xs text-gray-500">
-            Use structured source data here and cite it inline with `[ref:1]`, `[ref:2]`, and so on in the body.
+            Add structured source details, then use Cite to place a stable source marker at your cursor.
           </p>
 
           {references.length === 0 && !addingReference ? (
@@ -149,6 +191,11 @@ export default function ReferencesPanel({
                       .map((row, rowIndex) => ({ ...row, display_order: rowIndex }))
                   );
                 }}
+                onCite={
+                  onInsertCitation
+                    ? () => onInsertCitation(reference.id)
+                    : undefined
+                }
               />
             ))
           )}
@@ -158,8 +205,16 @@ export default function ReferencesPanel({
               <p className="mb-3 text-sm font-medium text-gray-900">New reference</p>
               <ReferenceFields
                 reference={draftReference}
-                onChange={(next) => setDraftReference(next)}
+                onChange={(next) => {
+                  setDraftReference(next);
+                  setAddError(null);
+                }}
               />
+              {addError ? (
+                <p role="alert" className="mt-2 text-xs font-medium text-red-600">
+                  {addError}
+                </p>
+              ) : null}
               <div className="mt-3 flex justify-end gap-2">
                 <button
                   type="button"

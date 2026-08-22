@@ -262,7 +262,7 @@ export default function CoverImageUploader({
             </>
           )}
         </button>
-        {error ? <p className="mt-1 text-xs text-red-500">{error}</p> : null}
+        {error ? <p role="alert" className="mt-1 text-xs text-red-500">{error}</p> : null}
         <input
           ref={inputRef}
           type="file"
@@ -276,7 +276,9 @@ export default function CoverImageUploader({
 
   return (
     <div>
-      <div
+      <button
+        type="button"
+        disabled={uploading}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
@@ -284,6 +286,7 @@ export default function CoverImageUploader({
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
+        aria-label={`${emptyTitle}. ${emptyHint}`}
         className={`flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
           dragOver
             ? "border-emerald-brand bg-emerald-50"
@@ -314,8 +317,8 @@ export default function CoverImageUploader({
             <p className="mt-1 text-xs text-gray-400">{emptyHint}</p>
           </>
         )}
-      </div>
-      {error ? <p className="mt-1 text-xs text-red-500">{error}</p> : null}
+      </button>
+      {error ? <p role="alert" className="mt-1 text-xs text-red-500">{error}</p> : null}
       <input
         ref={inputRef}
         type="file"

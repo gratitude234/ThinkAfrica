@@ -1,5 +1,5 @@
 import type { AnchorHTMLAttributes, ReactNode } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PostsFeedTabs from "./PostsFeedTabs";
 import type { PostCardData } from "@/components/post/PostCard";
@@ -379,7 +379,7 @@ describe("PostsFeedTabs -- empty states", () => {
     mocks.push.mockReset();
   });
 
-  it("shows the default empty state with a Create CTA that gates a guest", () => {
+  it("shows the default empty state with a Create CTA that gates a guest on the format they picked", () => {
     render(<PostsFeedTabs {...common} showFollowingTab={false} currentUserId={null} />);
 
     expect(screen.getByText("No content yet.")).toBeInTheDocument();
@@ -388,16 +388,37 @@ describe("PostsFeedTabs -- empty states", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
-    expect(mocks.requestAuth).toHaveBeenCalledWith("create");
+    expect(mocks.requestAuth).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Post/ }));
+
+    expect(mocks.requestAuth).toHaveBeenCalledWith("create", {
+      contentKind: "post",
+      destination: "/create/post",
+    });
   });
 
-  it("navigates an authenticated viewer straight to the Post composer", () => {
+  it("offers an authenticated viewer every format instead of assuming a Post", () => {
     render(<PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
+    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
+    expect(within(dialog).getByRole("link", { name: /^Post/ })).toHaveAttribute(
+      "href",
+      "/create/post"
+    );
+    expect(within(dialog).getByRole("link", { name: /^Article/ })).toHaveAttribute(
+      "href",
+      "/write?kind=article"
+    );
+    expect(within(dialog).getByRole("link", { name: /^Research/ })).toHaveAttribute(
+      "href",
+      "/submit/research"
+    );
     expect(mocks.requestAuth).not.toHaveBeenCalled();
-    expect(mocks.push).toHaveBeenCalledWith("/create/post");
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 
   it("shows the Following-specific empty state with an Explore writers CTA", () => {

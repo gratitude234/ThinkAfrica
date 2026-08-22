@@ -4,13 +4,16 @@ import { COMMENT_PROMOTION_THRESHOLD } from "@/lib/commentContent";
 import InlineResponseComposer from "./InlineResponseComposer";
 
 const refresh = vi.fn();
+const push = vi.fn();
 const createPost = vi.fn();
+const promoteToArticle = vi.fn();
 const submitComment = vi.fn();
 const requestAuth = vi.fn();
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push }) }));
 vi.mock("@/app/(write)/create/post/actions", () => ({
   createPost: (input: unknown) => createPost(input),
+  promoteToArticle: (input: unknown) => promoteToArticle(input),
 }));
 vi.mock("./commentActions", () => ({
   submitComment: (input: unknown) => submitComment(input),
@@ -21,7 +24,9 @@ vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
 
 beforeEach(() => {
   refresh.mockClear();
+  push.mockClear();
   createPost.mockReset().mockResolvedValue({ error: null, slug: "post-abc" });
+  promoteToArticle.mockReset().mockResolvedValue({ error: null, draftId: "draft-22" });
   submitComment.mockReset().mockResolvedValue({ error: null, comment: { id: "c1" } });
   requestAuth.mockClear();
 });
@@ -36,7 +41,10 @@ describe("InlineResponseComposer", () => {
 
     expect(screen.queryByLabelText("Write a comment")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Sign in to reply" }));
-    expect(requestAuth).toHaveBeenCalledWith("respond", { contentKind: "post" });
+    expect(requestAuth).toHaveBeenCalledWith("respond", {
+      contentKind: "post",
+      destination: "/create/post?inResponseTo=parent-1",
+    });
   });
 
   it("won't submit an empty reply", () => {
@@ -74,6 +82,9 @@ describe("InlineResponseComposer", () => {
       })
     );
     expect(submitComment).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/post/post-abc?justPublished=1&live=1")
+    );
   });
 
   it("suggests promotion past the threshold without switching on its own", async () => {
@@ -114,12 +125,30 @@ describe("InlineResponseComposer", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("offers the long-form editor as the third path", () => {
+  it("opens an empty long-form response with the parent context intact", () => {
     render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
 
-    expect(
-      screen.getByRole("link", { name: "Open the full editor" }).getAttribute("href")
-    ).toBe("/write?inResponseTo=parent-1&kind=article");
+    fireEvent.click(screen.getByRole("button", { name: "Continue as Article" }));
+
+    expect(push).toHaveBeenCalledWith("/write?inResponseTo=parent-1&kind=article");
+    expect(promoteToArticle).not.toHaveBeenCalled();
+  });
+
+  it("moves typed reply text and its parent into an Article draft", async () => {
+    render(<InlineResponseComposer parentPostId="parent-1" userId="user-1" />);
+
+    typeReply("This argument needs sources and more room.");
+    fireEvent.click(screen.getByRole("button", { name: "Continue as Article" }));
+
+    await waitFor(() =>
+      expect(promoteToArticle).toHaveBeenCalledWith({
+        body: "This argument needs sources and more room.",
+        imageUrl: null,
+        topics: [],
+        inResponseTo: "parent-1",
+      })
+    );
+    expect(push).toHaveBeenCalledWith("/write?draft=draft-22");
   });
 
   it("gives Response the same weight as Comment rather than a text link", () => {

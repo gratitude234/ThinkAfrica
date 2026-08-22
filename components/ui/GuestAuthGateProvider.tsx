@@ -21,6 +21,8 @@ import {
 
 interface RequestAuthOptions {
   contentKind?: ContentKind | null;
+  /** Exact same-origin destination to resume after sign-in. */
+  destination?: string;
 }
 
 interface GuestAuthGateContextValue {
@@ -56,6 +58,7 @@ export default function GuestAuthGateProvider({
   const [pending, setPending] = useState<{
     intent: GuestAuthIntent;
     contentKind: ContentKind | null;
+    destination: string;
   } | null>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -71,7 +74,11 @@ export default function GuestAuthGateProvider({
     (intent: GuestAuthIntent, options?: RequestAuthOptions) => {
       triggerRef.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setPending({ intent, contentKind: options?.contentKind ?? null });
+      setPending({
+        intent,
+        contentKind: options?.contentKind ?? null,
+        destination: options?.destination ?? getCurrentRelativePath(),
+      });
     },
     []
   );
@@ -101,7 +108,10 @@ export default function GuestAuthGateProvider({
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
 
-      if (event.shiftKey && document.activeElement === first) {
+      if (
+        event.shiftKey &&
+        (document.activeElement === first || document.activeElement === container)
+      ) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -120,7 +130,7 @@ export default function GuestAuthGateProvider({
   const value = useMemo<GuestAuthGateContextValue>(() => ({ requestAuth }), [requestAuth]);
 
   const copy = pending ? getGuestAuthCopy(pending.intent, pending.contentKind) : null;
-  const loginHref = pending ? buildLoginHref(getCurrentRelativePath()) : "#";
+  const loginHref = pending ? buildLoginHref(pending.destination) : "#";
 
   const modal =
     pending && copy ? (
