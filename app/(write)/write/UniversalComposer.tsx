@@ -21,6 +21,7 @@ import type { EditorHandle } from "@/components/editor/Editor";
 import {
   contributionText,
   deriveContributionExcerpt,
+  deservesCloudDraft,
   hasMeaningfulContribution,
   type ComposerMode,
   type ContributionSnapshot,
@@ -345,7 +346,10 @@ export default function UniversalComposer({
       try {
         const raw = JSON.parse(localStorage.getItem(key) ?? "null") as { savedAt?: unknown } | null;
         const parsed = safeSnapshot(raw, initialSnapshot);
-        if (!parsed || snapshotsMatch(parsed, initialSnapshot)) {
+        // A copy too small to have earned a draft is too small to interrupt
+        // for, so a stray keystroke cannot leave a banner waiting on every
+        // future visit.
+        if (!parsed || snapshotsMatch(parsed, initialSnapshot) || !deservesCloudDraft(parsed)) {
           // Nothing this copy could add back, so it stops asking. Keys written
           // by the composers this one replaced are otherwise permanent: they
           // are never rewritten, so they would offer the same stale writing on
@@ -441,7 +445,7 @@ export default function UniversalComposer({
       }
     }, LOCAL_DELAY);
 
-    if (hasMeaningfulContribution(snapshot)) {
+    if (deservesCloudDraft(snapshot)) {
       cloudTimerRef.current = setTimeout(() => void persist(snapshot, revision), CLOUD_DELAY);
     }
     return () => {
@@ -454,7 +458,10 @@ export default function UniversalComposer({
     if (localTimerRef.current) clearTimeout(localTimerRef.current);
     if (cloudTimerRef.current) clearTimeout(cloudTimerRef.current);
     const current = latestRef.current;
-    if (!hasMeaningfulContribution(current) || snapshotsMatch(current, lastPersistedRef.current)) {
+    // Below the cloud bar there is nothing to flush, and reporting that as a
+    // failed save would raise the "didn't save" dialog over three characters.
+    // The device copy still holds them.
+    if (!deservesCloudDraft(current) || snapshotsMatch(current, lastPersistedRef.current)) {
       return true;
     }
     const revision = ++revisionRef.current;
@@ -676,8 +683,10 @@ export default function UniversalComposer({
         {/* Resuming another piece is offered only while this canvas is still
             empty. Once there is writing here, switching drafts mid-sentence is
             a hazard rather than a convenience. */}
+        {/* mb-24 keeps the last row clear of the sticky toolbar, which
+            otherwise floats over the bottom of an expanded list. */}
         {canResumeOtherDrafts ? (
-          <div className="mt-10">
+          <div className="mb-24 mt-10">
             <MyDrafts activeDraftId={draftId} variant="panel" />
           </div>
         ) : null}

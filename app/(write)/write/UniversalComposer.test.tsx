@@ -78,7 +78,7 @@ describe("UniversalComposer", () => {
 
   it("cloud-saves untitled body text and opens one compact publish preview", async () => {
     render(<UniversalComposer mode="new" userId="user-1" profile={{ full_name: "Ada", username: "ada", university: null }} initialSnapshot={empty} returnTo="/" />);
-    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>A body-first idea.</p>" } });
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>A body-first idea that deserves keeping.</p>" } });
 
     await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
     expect(mocks.ensure).toHaveBeenCalled();
@@ -139,7 +139,7 @@ describe("UniversalComposer autosave and recovery", () => {
     const { rerender } = render(
       <UniversalComposer mode="new" userId="user-1" profile={profile} initialSnapshot={empty} draftId={null} returnTo="/" />
     );
-    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>Still going</p>" } });
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>Still going and still writing here.</p>" } });
     await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
 
     rerender(
@@ -147,7 +147,7 @@ describe("UniversalComposer autosave and recovery", () => {
     );
 
     expect(mocks.editorMounts.count).toBe(1);
-    expect(screen.getByLabelText("Publication body")).toHaveValue("<p>Still going</p>");
+    expect(screen.getByLabelText("Publication body")).toHaveValue("<p>Still going and still writing here.</p>");
   });
 
   it("rebuilds the canvas around a genuinely different draft", async () => {
@@ -177,7 +177,7 @@ describe("UniversalComposer autosave and recovery", () => {
       <UniversalComposer mode="draft" userId="user-1" profile={profile} initialSnapshot={second} draftId="draft-2" returnTo="/" />
     );
 
-    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>An addition.</p>" } });
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>An addition worth saving to the draft.</p>" } });
     await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
 
     expect(mocks.ensure).toHaveBeenCalledWith(expect.objectContaining({ draftId: "draft-2" }));
@@ -304,7 +304,7 @@ describe("UniversalComposer canvas polish", () => {
 
   it("rests on a one-word save status and elaborates only for a device-only copy", async () => {
     open();
-    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>Something.</p>" } });
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>Something worth saving to the account.</p>" } });
 
     await act(async () => { await vi.advanceTimersByTimeAsync(400); });
     expect(screen.getByText("Saved on this device")).toBeInTheDocument();
@@ -367,5 +367,71 @@ describe("UniversalComposer canvas polish", () => {
     fireEvent.keyDown(screen.getByRole("dialog", { name: "Preview" }), { key: "Enter" });
 
     expect(mocks.publish).not.toHaveBeenCalled();
+  });
+});
+
+describe("UniversalComposer draft hygiene", () => {
+  const profile = { full_name: "Ada", username: "ada", university: null };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mocks.ensure.mockReset().mockResolvedValue({ error: null, draftId: "draft-1" });
+    mocks.publish.mockReset().mockResolvedValue({ error: null, slug: "hello" });
+    localStorage.clear();
+    window.history.replaceState(null, "", "/write");
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  async function type(value: string) {
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+  }
+
+  it("does not mint a database row for a stray keystroke", async () => {
+    render(<UniversalComposer mode="new" userId="user-1" profile={profile} initialSnapshot={empty} returnTo="/" />);
+    await type("<p>Ghhbh</p>");
+
+    expect(mocks.ensure).not.toHaveBeenCalled();
+    // The device still holds it, so nothing typed is ever lost.
+    expect(localStorage.getItem("indegenius:contribution-draft:v1:user-1:new:new")).not.toBeNull();
+  });
+
+  it("saves to the account once there is about a sentence", async () => {
+    render(<UniversalComposer mode="new" userId="user-1" profile={profile} initialSnapshot={empty} returnTo="/" />);
+    await type("<p>Solar microgrids are changing Jos.</p>");
+
+    expect(mocks.ensure).toHaveBeenCalled();
+  });
+
+  it("saves immediately once a title exists, however short the body", async () => {
+    render(<UniversalComposer mode="new" userId="user-1" profile={profile} initialSnapshot={empty} returnTo="/" />);
+    fireEvent.click(screen.getByRole("button", { name: "Add title" }));
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "A real intent" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+
+    expect(mocks.ensure).toHaveBeenCalled();
+  });
+
+  it("leaves without a save warning when the writing never earned a row", async () => {
+    render(<UniversalComposer mode="new" userId="user-1" profile={profile} initialSnapshot={empty} returnTo="/" />);
+    await type("<p>Gh</p>");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close editor" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    expect(screen.queryByText(/didn’t save/)).not.toBeInTheDocument();
+    expect(mocks.push).toHaveBeenCalledWith("/");
+  });
+
+  it("does not interrupt a later visit over a device copy too small to matter", () => {
+    localStorage.setItem(
+      "indegenius:post-draft:user-1",
+      JSON.stringify({ data: { content: "<p>Gh</p>" } })
+    );
+    render(<UniversalComposer mode="new" userId="user-1" profile={profile} initialSnapshot={empty} returnTo="/" />);
+
+    expect(screen.queryByText(/unsaved copy/i)).not.toBeInTheDocument();
+    expect(localStorage.getItem("indegenius:post-draft:user-1")).toBeNull();
   });
 });
