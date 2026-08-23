@@ -133,9 +133,9 @@ BEGIN
   WHERE ref.post_id = post_row.id
     AND NOT EXISTS (
       SELECT 1
-      FROM jsonb_array_elements(draft_row.reference_snapshot) AS kept
-      WHERE kept.value->>'id' ~* uuid_pattern
-        AND (kept.value->>'id')::uuid = ref.id
+      FROM jsonb_array_elements(draft_row.reference_snapshot) AS kept(entry)
+      WHERE kept.entry->>'id' ~* uuid_pattern
+        AND (kept.entry->>'id')::uuid = ref.id
     );
 
   FOR reference_row IN SELECT * FROM jsonb_array_elements(draft_row.reference_snapshot)
