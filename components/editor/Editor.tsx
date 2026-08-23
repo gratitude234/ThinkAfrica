@@ -32,6 +32,8 @@ interface EditorProps {
   canvasMode?: boolean;
   ariaLabel?: string;
   showWordCount?: boolean;
+  /** Places the caret in the body on mount, for a canvas that opens body-first. */
+  autoFocus?: boolean;
 }
 
 function countWordsFromHtml(value: string) {
@@ -60,6 +62,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   canvasMode = false,
   ariaLabel = "Article body",
   showWordCount = true,
+  autoFocus = false,
 }, ref) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -92,6 +95,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
       }),
     ],
     content,
+    autofocus: autoFocus ? "end" : false,
     editorProps: {
       attributes: {
         class: canvasMode

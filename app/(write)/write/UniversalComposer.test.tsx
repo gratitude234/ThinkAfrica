@@ -71,7 +71,7 @@ describe("UniversalComposer", () => {
   it("starts body-first with an optional title and no format choice", () => {
     render(<UniversalComposer mode="new" userId="user-1" profile={{ full_name: "Ada", username: "ada", university: null }} initialSnapshot={empty} returnTo="/" />);
     expect(screen.getByPlaceholderText("Start writing…")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "+ Add title" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add title" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
     expect(screen.queryByText(/Posts are public|Write an article|Article composer/i)).not.toBeInTheDocument();
   });
@@ -93,7 +93,7 @@ describe("UniversalComposer", () => {
 
   it("adds a title without leaving the same canvas", () => {
     render(<UniversalComposer mode="new" userId="user-1" profile={{ full_name: "Ada", username: "ada", university: null }} initialSnapshot={empty} returnTo="/" />);
-    fireEvent.click(screen.getByRole("button", { name: "+ Add title" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add title" }));
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "One continuous workflow" } });
     expect(screen.getByDisplayValue("One continuous workflow")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Start writing…")).toBeInTheDocument();
@@ -253,5 +253,119 @@ describe("UniversalComposer autosave and recovery", () => {
     );
 
     expect(screen.getByText(/unsaved copy/i)).toBeInTheDocument();
+  });
+});
+
+describe("UniversalComposer canvas polish", () => {
+  const profile = { full_name: "Ada", username: "ada", university: null };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mocks.ensure.mockReset().mockResolvedValue({ error: null, draftId: "draft-1" });
+    mocks.publish.mockReset().mockResolvedValue({ error: null, slug: "hello" });
+    localStorage.clear();
+    window.history.replaceState(null, "", "/write");
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  function open(snapshot: ContributionSnapshot = empty, props: Record<string, unknown> = {}) {
+    return render(
+      <UniversalComposer mode="new" userId="user-1" profile={profile} initialSnapshot={snapshot} returnTo="/" {...props} />
+    );
+  }
+
+  it("offers other drafts only while this canvas is still empty", () => {
+    open();
+    expect(screen.getByText("Drafts panel")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>Now writing.</p>" } });
+
+    // Switching drafts mid-sentence is a hazard, so the door closes.
+    expect(screen.queryByText("Drafts panel")).not.toBeInTheDocument();
+  });
+
+  it("names each drawer section rather than stacking them", () => {
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "More writing options" }));
+
+    expect(screen.getByRole("heading", { name: "Sources" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Co-authors" })).toBeInTheDocument();
+  });
+
+  it("labels the format row for screen readers now that it is icons", () => {
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "Formatting" }));
+
+    for (const label of ["Bold", "Italic", "Heading", "Bullets", "Numbers", "Quote"]) {
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it("rests on a one-word save status and elaborates only for a device-only copy", async () => {
+    open();
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>Something.</p>" } });
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    expect(screen.getByText("Saved on this device")).toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+  });
+
+  it("gives one context treatment to a response and a campus prompt", () => {
+    const { unmount } = open(empty, {
+      parent: { id: "p1", displayTitle: "The original piece", slug: "original" },
+    });
+    expect(screen.getByText("Responding to")).toBeInTheDocument();
+    expect(screen.getByText("The original piece")).toBeInTheDocument();
+    unmount();
+
+    open(empty, {
+      prompt: { id: "q1", title: "Campus prompt", promptText: "Write about water.", responseQuestion: null },
+    });
+    expect(screen.getByText("Campus prompt")).toBeInTheDocument();
+    expect(screen.getByText("Write about water.")).toBeInTheDocument();
+  });
+
+  it("counts words in the publish sheet, never on the canvas", () => {
+    open();
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>One two three four five.</p>" } });
+    expect(screen.queryByText(/\bwords\b/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    expect(screen.getByText(/5 words · compact presentation/)).toBeInTheDocument();
+  });
+
+  it("calls a titled piece a full article in the publish sheet", () => {
+    open({ ...empty, title: "A title", content: "<p>Two words.</p>" });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    expect(screen.getByText(/full article presentation/)).toBeInTheDocument();
+  });
+
+  it("renames the feed summary field away from developer language", () => {
+    open({ ...empty, content: "<p>Body.</p>" });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(screen.getByLabelText("Summary")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Preview text")).not.toBeInTheDocument();
+  });
+
+  it("publishes on Cmd+Enter from the publish sheet", () => {
+    open({ ...empty, content: "<p>Ready to go.</p>" });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Preview" }), { key: "Enter", metaKey: true });
+
+    expect(mocks.publish).toHaveBeenCalled();
+  });
+
+  it("does not publish on a bare Enter, which belongs to the fields", () => {
+    open({ ...empty, content: "<p>Ready to go.</p>" });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Preview" }), { key: "Enter" });
+
+    expect(mocks.publish).not.toHaveBeenCalled();
   });
 });
