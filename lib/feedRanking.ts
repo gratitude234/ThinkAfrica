@@ -59,7 +59,7 @@ export const AFFINITY_CAP = 4.0;
 
 export const FRESHNESS_HALF_LIFE_HOURS: Record<ContentKind, number> = {
   post: 36,
-  article: 24 * 7,
+  article: 36,
   research: 24 * 30,
 };
 

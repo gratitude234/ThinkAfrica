@@ -42,7 +42,7 @@ describe("campus contribution loop", () => {
       })
     ).toMatchObject({
       key: "first_publication",
-      href: "/create/post?prompt=prompt-1",
+      href: "/write?prompt=prompt-1",
     });
 
     expect(

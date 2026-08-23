@@ -41,10 +41,10 @@ describe("ProfileContentTabs", () => {
   it("shows the matching creation action in an owner's empty tab", () => {
     render(<ProfileContentTabs items={[]} isOwnProfile />);
     expect(
-      screen.getByRole("link", { name: "Add your first contribution" })
-    ).toHaveAttribute("href", "/create/post");
+      screen.getByRole("link", { name: "Add contribution" })
+    ).toHaveAttribute("href", "/write");
     fireEvent.click(screen.getByRole("tab", { name: /Posts/ }));
-    expect(screen.getByRole("link", { name: "Write a post" })).toHaveAttribute("href", "/create/post");
+    expect(screen.getByRole("link", { name: "Start writing" })).toHaveAttribute("href", "/write");
     expect(screen.queryByRole("tab", { name: /Research/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Submit research" })).not.toBeInTheDocument();
   });

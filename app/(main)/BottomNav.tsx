@@ -52,7 +52,7 @@ export default function BottomNav({
   const showPrimaryNav = shouldShowMobilePrimaryNav(pathname);
   // Post pages get no mobile chrome from here. They used to keep the compose
   // FAB alone, which put a second floating writing control 40px from the
-  // ReadingBar's Respond -- and the FAB opens a blank /create/post, so it led
+  // ReadingBar's Respond -- and the FAB opens a blank /write canvas, so it led
   // away from the piece being read rather than into a reply to it.
   if (!showPrimaryNav) {
     return null;

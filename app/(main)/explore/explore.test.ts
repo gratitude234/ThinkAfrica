@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { PostCardData } from "@/components/post/PostCard";
+
+vi.mock("@/lib/featureFlags", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/featureFlags")>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, research: true },
+  };
+});
 import {
   filterPostsByExplore,
   getExploreFilters,

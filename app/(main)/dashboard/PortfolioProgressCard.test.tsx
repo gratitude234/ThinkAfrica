@@ -1,5 +1,5 @@
 import type { AnchorHTMLAttributes } from "react";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import PortfolioProgressCard from "./PortfolioProgressCard";
 
@@ -32,7 +32,7 @@ const items = [
 ];
 
 describe("PortfolioProgressCard next-action CTA", () => {
-  it("opens the contribution chooser from the generic 'Write next piece' nudge", () => {
+  it("opens the universal composer from the generic 'Write next piece' nudge", () => {
     render(
       <PortfolioProgressCard
         items={items}
@@ -49,20 +49,7 @@ describe("PortfolioProgressCard next-action CTA", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Write next piece" }));
 
-    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
-    expect(within(dialog).getByRole("link", { name: /^Post/ })).toHaveAttribute(
-      "href",
-      "/create/post"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Article/ })).toHaveAttribute(
-      "href",
-      "/write?kind=article"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Research/ })).toHaveAttribute(
-      "href",
-      "/submit/research"
-    );
-    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith("/write");
   });
 
   it("keeps a content-specific next action (e.g. 'Manage profile') as a direct link, bypassing the chooser", () => {

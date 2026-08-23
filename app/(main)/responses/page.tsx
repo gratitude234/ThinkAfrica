@@ -77,7 +77,7 @@ export default async function ResponsesPage({ searchParams }: PageProps) {
             Find an idea to respond to
           </Link>
           <Link
-            href="/create/post"
+            href="/write"
             className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-300 hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
           >
             Publish a new idea

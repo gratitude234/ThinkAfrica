@@ -20,6 +20,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/featureFlags", () => ({
   isAuthorSubscriptionsUxV2Enabled: () => false,
   isTopicSubscriptionsEnabled: () => false,
+  RESEARCH_TYPE_QUERY_EXCLUSION: "research",
 }));
 
 vi.mock("next/cache", () => ({

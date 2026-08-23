@@ -225,7 +225,7 @@ function campusPromptDigest(
     | null
 ) {
   if (!prompt) return { html: "", text: [] as string[] };
-  const promptUrl = absoluteUrl(`/create/post?prompt=${encodeURIComponent(prompt.id)}`);
+  const promptUrl = absoluteUrl(`/write?prompt=${encodeURIComponent(prompt.id)}`);
   return {
     html: `
       <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Your campus prompt</h2>

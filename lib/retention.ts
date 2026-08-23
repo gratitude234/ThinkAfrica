@@ -410,7 +410,7 @@ export async function getRetentionSummary(
         publishedContributions === 1
           ? `Use the current campus prompt, “${activeCampusPrompt.title},” to build continuity after your first contribution.`
           : activeCampusPrompt.prompt_text,
-      href: `/create/post?prompt=${encodeURIComponent(activeCampusPrompt.id)}`,
+      href: `/write?prompt=${encodeURIComponent(activeCampusPrompt.id)}`,
       cta: publishedContributions === 1 ? "Publish again" : "Use campus prompt",
     });
   } else if (publishedContributions === 1) {
@@ -419,7 +419,7 @@ export async function getRetentionSummary(
       label: "Make your second publication",
       description:
         "Your Intellectual Record has begun. Publish a second contribution while the first is still fresh.",
-      href: "/create/post",
+      href: "/write",
       cta: "Publish again",
     });
   }

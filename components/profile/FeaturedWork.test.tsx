@@ -1,5 +1,5 @@
 import type { AnchorHTMLAttributes } from "react";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import FeaturedWork from "./FeaturedWork";
 
@@ -28,25 +28,12 @@ vi.mock("next/link", () => ({
 }));
 
 describe("FeaturedWork 'Publish work' CTA (generic, empty-state, own profile)", () => {
-  it("opens the contribution chooser instead of linking to /write", () => {
+  it("opens the universal composer directly", () => {
     render(<FeaturedWork posts={[]} isOwnProfile currentUserId="user-1" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Publish work" }));
 
-    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
-    expect(within(dialog).getByRole("link", { name: /^Post/ })).toHaveAttribute(
-      "href",
-      "/create/post"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Article/ })).toHaveAttribute(
-      "href",
-      "/write?kind=article"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Research/ })).toHaveAttribute(
-      "href",
-      "/submit/research"
-    );
-    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith("/write");
   });
 
   it("does not render a plain link straight to /write", () => {

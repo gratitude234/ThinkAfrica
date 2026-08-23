@@ -17,7 +17,7 @@ describe("IntellectualRecordWelcome", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Publish an idea" })).toHaveAttribute(
       "href",
-      "/create/post"
+      "/write"
     );
     expect(screen.getByRole("link", { name: "Read responses" })).toHaveAttribute(
       "href",

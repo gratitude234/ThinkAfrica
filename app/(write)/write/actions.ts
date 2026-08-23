@@ -32,6 +32,12 @@ import {
   MAX_LONG_FORM_TOPICS,
   normalizeAndDedupeTopicValues,
 } from "@/lib/tags";
+import {
+  contributionText,
+  deriveContributionExcerpt,
+  derivePresentationClassification,
+  type ContributionSnapshot,
+} from "@/lib/contribution";
 
 type ReferenceInput = Omit<PostReferenceRecord, "post_id"> & {
   id?: string;
@@ -329,7 +335,7 @@ async function syncAuthors(
       throw new Error(error.message);
     }
 
-    if (!existingByUserId.has(coAuthor.user_id)) {
+    if (!existingByUserId.has(coAuthor.user_id) || existingAcceptedAt === null) {
       const { error: notificationError } = await admin.from("notifications").insert({
         user_id: coAuthor.user_id,
         type: "co_author_invite",
@@ -368,12 +374,282 @@ async function syncAuthors(
   }
 }
 
+async function syncDraftAuthors(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  postId: string,
+  ownerId: string,
+  collaborators: ContributionSnapshot["collaborators"]
+) {
+  const ids = Array.from(
+    new Set(collaborators.map((collaborator) => collaborator.id).filter((id) => id && id !== ownerId))
+  ).slice(0, 5);
+  const { data: existing, error: existingError } = await supabase
+    .from("post_authors")
+    .select("user_id")
+    .eq("post_id", postId);
+  if (existingError) throw new Error(existingError.message);
+
+  const removed = (existing ?? [])
+    .map((row) => row.user_id as string)
+    .filter((id) => id !== ownerId && !ids.includes(id));
+  if (removed.length) {
+    const { error } = await supabase.from("post_authors").delete().eq("post_id", postId).in("user_id", removed);
+    if (error) throw new Error(error.message);
+  }
+  const { error: ownerError } = await supabase.from("post_authors").upsert(
+    { post_id: postId, user_id: ownerId, display_order: 0, corresponding_author: true, accepted_at: new Date().toISOString() },
+    { onConflict: "post_id,user_id" }
+  );
+  if (ownerError) throw new Error(ownerError.message);
+
+  for (let index = 0; index < ids.length; index += 1) {
+    const { error } = await supabase.from("post_authors").upsert(
+      { post_id: postId, user_id: ids[index], display_order: index + 1, corresponding_author: false, accepted_at: null },
+      { onConflict: "post_id,user_id" }
+    );
+    if (error) throw new Error(error.message);
+  }
+}
+
 // /write is the Article composer (Phase 3, see docs/content-model.md):
 // every NEW draft/post it creates is a generic Article, no matter what a
 // client sends as `postType` -- that field is legacy plumbing (word-count
 // targets, reference requirements for an *existing* draft) and must never
 // be trusted to decide a NEW row's classification.
 const NEW_ARTICLE_TYPE: PostType = (legacyTypeForNewContent("article") ?? "essay") as PostType;
+
+function universalSlug(snapshot: ContributionSnapshot) {
+  const seed = snapshot.title.trim() || contributionText(snapshot.content).split(/\s+/).slice(0, 7).join(" ");
+  return buildSlugFromTitle(
+    seed,
+    "publication",
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  );
+}
+
+async function validateCampusPrompt(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  promptId: string | null
+) {
+  if (!promptId) return { error: null, promptId: null as string | null };
+  const [{ data: membership }, { data: ambassador }, { data: prompt }] = await Promise.all([
+    supabase.from("campus_cohort_memberships").select("cohort_id").eq("user_id", userId).maybeSingle(),
+    supabase.from("campus_ambassadors").select("campus_cohort_id").eq("user_id", userId).eq("status", "active").maybeSingle(),
+    supabase.from("campus_editorial_prompts").select("id, cohort_id, starts_at, ends_at, active, campus_cohorts!inner(status)").eq("id", promptId).maybeSingle(),
+  ]);
+  const cohort = prompt ? (Array.isArray(prompt.campus_cohorts) ? prompt.campus_cohorts[0] ?? null : prompt.campus_cohorts) : null;
+  const startsAt = prompt?.starts_at ? Date.parse(prompt.starts_at) : Number.NaN;
+  const endsAt = prompt?.ends_at ? Date.parse(prompt.ends_at) : null;
+  const now = Date.now();
+  const valid = Boolean(
+    prompt?.active && cohort && ["selected", "active"].includes(cohort.status) &&
+    (membership?.cohort_id === prompt.cohort_id || ambassador?.campus_cohort_id === prompt.cohort_id) &&
+    Number.isFinite(startsAt) && startsAt <= now && (endsAt === null || endsAt > now)
+  );
+  return valid
+    ? { error: null, promptId: prompt?.id ?? null }
+    : { error: "This campus prompt is no longer available to your cohort.", promptId: null as string | null };
+}
+
+/** Neutral cloud autosave for titled or untitled direct publications. */
+export async function ensureContributionDraft(input: {
+  draftId: string | null;
+  snapshot: ContributionSnapshot;
+}) {
+  const { supabase, user } = await getCurrentUser();
+  if (!user) return { error: "You must be signed in.", draftId: null as string | null };
+  const suspensionError = await requireNotSuspended(user.id);
+  if (suspensionError) return { error: suspensionError, draftId: null as string | null };
+
+  const tagError = getTopicValuesValidationError(input.snapshot.tags);
+  if (tagError) return { error: tagError, draftId: null as string | null };
+  const tags = normalizeAndDedupeTopicValues(input.snapshot.tags, MAX_LONG_FORM_TOPICS);
+  const content = sanitizePostHtml(input.snapshot.content);
+  const classification = derivePresentationClassification(input.snapshot.title);
+
+  if (input.snapshot.inResponseToId) {
+    const parent = await validateResponseParent(supabase, input.snapshot.inResponseToId, input.draftId);
+    if (parent.error) return { error: parent.error, draftId: null as string | null };
+  }
+
+  let draftId = input.draftId;
+  if (draftId) {
+    const { data: existing } = await supabase
+      .from("posts")
+      .select("id, author_id, status, type, content_kind")
+      .eq("id", draftId)
+      .maybeSingle();
+    if (!existing || existing.author_id !== user.id) {
+      return { error: "You do not have permission to edit this draft.", draftId: null as string | null };
+    }
+    if (existing.type === "research" || resolveContentKind(existing) === "research") {
+      return { error: "Research must be edited through the research submission flow.", draftId: null as string | null };
+    }
+    if (existing.status !== "draft") {
+      return { error: "This publication is no longer an editable draft.", draftId: null as string | null };
+    }
+    const { data: updated, error } = await supabase
+      .from("posts")
+      .update({
+        ...classification,
+        excerpt: input.snapshot.excerpt,
+        content,
+        tags,
+        cover_image_url: input.snapshot.coverImageUrl || null,
+        in_response_to: input.snapshot.inResponseToId,
+      })
+      .eq("id", draftId)
+      .eq("author_id", user.id)
+      .eq("status", "draft")
+      .select("id");
+    if (error || !updated?.length) {
+      return { error: error?.message ?? "This draft changed in another window.", draftId: null as string | null };
+    }
+  } else {
+    const { data, error } = await supabase
+      .from("posts")
+      .insert({
+        author_id: user.id,
+        ...classification,
+        slug: universalSlug(input.snapshot),
+        excerpt: input.snapshot.excerpt,
+        content,
+        tags,
+        cover_image_url: input.snapshot.coverImageUrl || null,
+        in_response_to: input.snapshot.inResponseToId,
+        status: "draft",
+        published_at: null,
+        current_round: 1,
+      })
+      .select("id")
+      .single();
+    if (error || !data) return { error: error?.message ?? "We couldn't save this draft.", draftId: null as string | null };
+    draftId = data.id;
+  }
+
+  if (!draftId) {
+    return { error: "We couldn't resolve this draft.", draftId: null as string | null };
+  }
+
+  try {
+    await syncReferences(supabase, draftId, input.snapshot.references);
+    await syncDraftAuthors(supabase, draftId, user.id, input.snapshot.collaborators);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "We couldn't save the publication details.", draftId };
+  }
+  return { error: null, draftId };
+}
+
+/** Publishes every non-Research contribution immediately. */
+export async function publishContribution(input: {
+  draftId: string | null;
+  snapshot: ContributionSnapshot;
+}) {
+  const { supabase, user } = await getCurrentUser();
+  if (!user) return { error: "You must be signed in.", slug: null as string | null };
+
+  const content = sanitizePostHtml(input.snapshot.content);
+  if (!hasMeaningfulArticleContent(content)) {
+    return { error: "Write something before publishing.", slug: null as string | null };
+  }
+  const referenceError = validateReferences("blog", input.snapshot.references);
+  if (referenceError) return { error: referenceError, slug: null as string | null };
+  const citationError = validateCitationReferences(content, input.snapshot.references);
+  if (citationError) return { error: citationError, slug: null as string | null };
+
+  const prompt = await validateCampusPrompt(supabase, user.id, input.snapshot.promptId);
+  if (prompt.error) return { error: prompt.error, slug: null as string | null };
+
+  const snapshot = {
+    ...input.snapshot,
+    content,
+    excerpt: input.snapshot.excerpt.trim() || deriveContributionExcerpt(content),
+  };
+  const ensured = await ensureContributionDraft({ draftId: input.draftId, snapshot });
+  if (ensured.error || !ensured.draftId) {
+    return { error: ensured.error ?? "We couldn't prepare this publication.", slug: null as string | null };
+  }
+
+  const { data: draft } = await supabase
+    .from("posts")
+    .select("id, slug, status")
+    .eq("id", ensured.draftId)
+    .eq("author_id", user.id)
+    .maybeSingle();
+  if (!draft || draft.status !== "draft") {
+    return { error: "This draft was already published or changed in another window.", slug: null as string | null };
+  }
+
+  const { data: ownerProfile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .single();
+  try {
+    await syncAuthors(
+      supabase,
+      draft.id,
+      draft.slug,
+      user.id,
+      snapshot.collaborators.map((collaborator, index) => ({
+        user_id: collaborator.id,
+        display_order: index + 1,
+      })),
+      ownerProfile?.full_name ?? "An Indegenius author"
+    );
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "We couldn't save the collaborators.", slug: null as string | null };
+  }
+
+  const { data: published, error } = await supabase
+    .from("posts")
+    .update({ status: "published", published_at: new Date().toISOString() })
+    .eq("id", draft.id)
+    .eq("author_id", user.id)
+    .eq("status", "draft")
+    .select("id");
+  if (error || !published?.length) {
+    return { error: error?.message ?? "This draft changed in another window.", slug: null as string | null };
+  }
+
+  if (prompt.promptId) {
+    const { error: promptError } = await supabase.from("campus_prompt_submissions").insert({
+      prompt_id: prompt.promptId,
+      post_id: draft.id,
+      author_id: user.id,
+    });
+    if (!promptError) revalidatePath("/campus");
+  }
+
+  if (snapshot.inResponseToId) {
+    const parentValidation = await validateResponseParent(supabase, snapshot.inResponseToId, draft.id);
+    if (parentValidation.parent) {
+      await notifyResponseParentAuthor({
+        parent: parentValidation.parent,
+        responderId: user.id,
+        responderName: ownerProfile?.full_name ?? "An Indegenius author",
+        responsePostId: draft.id,
+        responseSlug: draft.slug,
+      });
+      revalidatePath(`/post/${parentValidation.parent.slug}`);
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/dashboard");
+  revalidatePath(`/post/${draft.slug}`);
+  schedulePublicationDistribution(draft.id, "Publication");
+  await recordActivationEvent({
+    supabase,
+    event: "post_submitted",
+    userId: user.id,
+    metadata: { postId: draft.id, status: "published", hasTitle: Boolean(snapshot.title.trim()) },
+    source: "server_action",
+    route: "/write",
+  });
+  return { error: null, slug: draft.slug };
+}
 
 export async function ensureDraft(input: {
   draftId: string | null;

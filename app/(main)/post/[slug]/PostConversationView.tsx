@@ -39,6 +39,19 @@ interface ConversationSecondary {
   responseCards: PostCardData[];
   responsesHasMore: boolean;
   commentCount: number;
+  references: Array<{
+    id: string;
+    title: string | null;
+    authors: string | null;
+    year: number | null;
+    source: string | null;
+    doi: string | null;
+    url: string | null;
+  }>;
+  coAuthors: Array<{
+    user_id: string;
+    profile: { username: string; full_name: string | null } | null;
+  }>;
   relatedPosts: Array<{
     id: string;
     title: string | null;
@@ -184,6 +197,11 @@ export default async function PostConversationView({
               <p className="text-meta leading-5 text-ink-muted">
                 {formatRelativeTime(post.published_at ?? post.created_at)}
               </p>
+              {secondary.coAuthors.length > 0 ? (
+                <p className="mt-0.5 text-meta leading-5 text-ink-muted">
+                  With {secondary.coAuthors.map((item) => item.profile?.full_name || `@${item.profile?.username}`).filter(Boolean).join(", ")}
+                </p>
+              ) : null}
             </div>
           </div>
           {isOwnPost ? null : (
@@ -227,6 +245,29 @@ export default async function PostConversationView({
             wrapperClassName="mt-5"
             className="w-full overflow-hidden rounded-xl bg-canvas"
           />
+        ) : null}
+        {secondary.references.length > 0 ? (
+          <section className="mt-8 border-t border-divider pt-6" aria-labelledby="conversation-sources">
+            <h2 id="conversation-sources" className="font-display text-lg font-semibold text-ink">Sources</h2>
+            <ol className="mt-3 space-y-3 text-sm text-ink-soft">
+              {secondary.references.map((reference, index) => (
+                <li key={reference.id} id={`ref-${index + 1}`} className="flex gap-3">
+                  <span id={`ref-id-${reference.id}`} className="sr-only" aria-hidden="true" />
+                  <span className="text-ink-muted">{index + 1}.</span>
+                  <span>
+                    {reference.url ? (
+                      <a href={reference.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-emerald-brand underline-offset-2 hover:underline">{reference.title || reference.source || reference.url}</a>
+                    ) : (
+                      <span className="font-semibold text-ink">{reference.title || reference.source}</span>
+                    )}
+                    {[reference.authors, reference.source, reference.year].filter(Boolean).length > 0 ? (
+                      <span className="block text-ink-muted">{[reference.authors, reference.source, reference.year].filter(Boolean).join(" · ")}</span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
         ) : null}
       </div>
 

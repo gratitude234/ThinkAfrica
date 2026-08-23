@@ -106,7 +106,7 @@ describe("ContinueDraftRow", () => {
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
-  it("falls past a kind with no resume route to the next usable draft", async () => {
+  it("resumes a legacy post draft in the universal composer", async () => {
     queryResult.current = {
       data: [
         draftRow({ id: "draft-post", type: "blog", content_kind: "post" }),
@@ -118,7 +118,7 @@ describe("ContinueDraftRow", () => {
     renderRow();
 
     const link = await screen.findByRole("link", { name: /Continue latest draft/ });
-    expect(link).toHaveAttribute("href", "/write?draft=draft-article");
+    expect(link).toHaveAttribute("href", "/write?draft=draft-post");
   });
 
   it("shows nothing to a signed-out visitor", async () => {

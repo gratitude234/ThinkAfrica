@@ -76,7 +76,7 @@ export function getCollaborationSummary({
     canMessage: Boolean(viewerId && authorId && viewerId !== authorId && messageEligible),
     messageReason,
     signInHref,
-    responseHref: `/write?inResponseTo=${postId}&kind=article`,
+    responseHref: `/write?inResponseTo=${postId}`,
     responsesHref: "#responses",
   };
 }

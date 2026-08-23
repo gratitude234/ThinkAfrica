@@ -379,7 +379,7 @@ describe("PostsFeedTabs -- empty states", () => {
     mocks.push.mockReset();
   });
 
-  it("shows the default empty state with a Create CTA that gates a guest on the format they picked", () => {
+  it("shows the default empty state with a Create CTA that gates the universal composer", () => {
     render(<PostsFeedTabs {...common} showFollowingTab={false} currentUserId={null} />);
 
     expect(screen.getByText("No content yet.")).toBeInTheDocument();
@@ -388,34 +388,18 @@ describe("PostsFeedTabs -- empty states", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
-    expect(mocks.requestAuth).not.toHaveBeenCalled();
-
-    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
-    fireEvent.click(within(dialog).getByRole("button", { name: /^Post/ }));
-
     expect(mocks.requestAuth).toHaveBeenCalledWith("create", {
-      contentKind: "post",
-      destination: "/create/post",
+      destination: "/write",
     });
   });
 
-  it("offers an authenticated viewer every enabled format", () => {
+  it("opens the universal composer for an authenticated viewer", () => {
     render(<PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
-    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
-    expect(within(dialog).getByRole("link", { name: /^Post/ })).toHaveAttribute(
-      "href",
-      "/create/post"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Article/ })).toHaveAttribute(
-      "href",
-      "/write?kind=article"
-    );
-    expect(within(dialog).queryByRole("link", { name: /^Research/ })).not.toBeInTheDocument();
     expect(mocks.requestAuth).not.toHaveBeenCalled();
-    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith("/write");
   });
 
   it("shows the Following-specific empty state with an Explore writers CTA", () => {

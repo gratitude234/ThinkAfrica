@@ -1,5 +1,5 @@
 import type { AnchorHTMLAttributes } from "react";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import CollaborationDashboardCard from "./CollaborationDashboardCard";
 
@@ -28,7 +28,7 @@ vi.mock("next/link", () => ({
 }));
 
 describe("CollaborationDashboardCard 'Start writing' CTA (generic, empty-state)", () => {
-  it("opens the contribution chooser instead of linking to /write", () => {
+  it("opens the universal composer directly", () => {
     render(
       <CollaborationDashboardCard
         userId="user-1"
@@ -41,20 +41,7 @@ describe("CollaborationDashboardCard 'Start writing' CTA (generic, empty-state)"
 
     fireEvent.click(screen.getByRole("button", { name: "Start writing" }));
 
-    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
-    expect(within(dialog).getByRole("link", { name: /^Post/ })).toHaveAttribute(
-      "href",
-      "/create/post"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Article/ })).toHaveAttribute(
-      "href",
-      "/write?kind=article"
-    );
-    expect(within(dialog).getByRole("link", { name: /^Research/ })).toHaveAttribute(
-      "href",
-      "/submit/research"
-    );
-    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith("/write");
   });
 
   it("does not render a plain link straight to /write", () => {

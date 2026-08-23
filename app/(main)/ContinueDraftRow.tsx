@@ -25,12 +25,11 @@ interface ResumableDraft {
 const RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Only kinds with a real resume route can be offered. A Post publishes
- * immediately and has no server draft to return to, so a stray post-kind
- * draft row is skipped rather than pointed at a composer that cannot load it.
+ * Research retains its existing authoring route. Every other draft resumes in
+ * the universal composer, independent of its legacy database classification.
  */
 function getResumeHref(kind: ContentKind | null, draftId: string) {
-  if (kind === "article") return `/write?draft=${draftId}`;
+  if (kind === "article" || kind === "post") return `/write?draft=${draftId}`;
   if (kind === "research" && FEATURE_FLAGS.research) {
     return `/submit/research?draft=${draftId}`;
   }
@@ -90,7 +89,7 @@ export default function ContinueDraftRow({
         return {
           id: String(row.id),
           title: typeof row.title === "string" ? row.title : null,
-          kindLabel: kind === "research" ? "Research" : "Article",
+          kindLabel: kind === "research" ? "Research" : "Draft",
           href,
           updatedAt,
         };

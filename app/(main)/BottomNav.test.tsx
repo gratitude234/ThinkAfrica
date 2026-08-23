@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BottomNav from "./BottomNav";
 
@@ -30,26 +30,18 @@ describe("BottomNav compose access", () => {
 
   afterEach(() => cleanup());
 
-  it("shows the compose FAB to guests and gates sign-in on the format they picked", () => {
+  it("shows the compose FAB to guests and gates the universal composer", () => {
     render(
       <BottomNav username={null} userId={null} hasActiveDebate={false} />
     );
 
-    const trigger = screen.getByRole("button", { name: "Create a contribution" });
-    expect(screen.queryByRole("link", { name: "Create a contribution" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Contribute" });
+    expect(screen.queryByRole("link", { name: "Contribute" })).not.toBeInTheDocument();
 
     fireEvent.click(trigger);
 
-    const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
-    expect(mocks.requestAuth).not.toHaveBeenCalled();
-
-    expect(within(dialog).queryByRole("button", { name: /^Research/ })).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: /^Article/ }));
-
     expect(mocks.requestAuth).toHaveBeenCalledWith("create", {
-      contentKind: "article",
-      destination: "/write?kind=article",
+      destination: "/write",
     });
   });
 
@@ -65,7 +57,7 @@ describe("BottomNav compose access", () => {
     // 40px away, so the corner offered two writing controls and the more
     // prominent one led away from the article.
     expect(
-      screen.queryByRole("button", { name: "Create a contribution" })
+      screen.queryByRole("button", { name: "Contribute" })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("navigation", { name: "Primary navigation" })
@@ -79,7 +71,7 @@ describe("BottomNav compose access", () => {
       <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
     );
 
-    expect(screen.queryByRole("button", { name: "Create a contribution" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Contribute" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Primary navigation" })).not.toBeInTheDocument();
   });
 });

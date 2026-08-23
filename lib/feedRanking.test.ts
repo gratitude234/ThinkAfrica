@@ -123,7 +123,7 @@ describe("scorePost", () => {
     );
   });
 
-  it("decays older work with longer half-lives for Articles and Research", () => {
+  it("gives titled and untitled direct publications equal freshness", () => {
     const sevenDaysAgo = new Date(
       NOW.getTime() - 7 * 24 * 60 * 60 * 1000
     ).toISOString();
@@ -143,7 +143,7 @@ describe("scorePost", () => {
     );
 
     expect(oldPost).toBeLessThan(freshPost);
-    expect(oldArticle).toBeGreaterThan(oldPost);
+    expect(oldArticle).toBe(oldPost);
     expect(oldResearch).toBeGreaterThan(oldArticle);
   });
 

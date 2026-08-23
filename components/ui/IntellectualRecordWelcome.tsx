@@ -42,7 +42,7 @@ export default function IntellectualRecordWelcome() {
       </div>
       <div className="mt-5 flex flex-wrap gap-2.5">
         <Link
-          href="/create/post"
+          href="/write"
           className="inline-flex min-h-11 items-center rounded-lg bg-white px-4 text-sm font-semibold text-emerald-900 transition-colors hover:bg-emerald-50"
         >
           Publish an idea

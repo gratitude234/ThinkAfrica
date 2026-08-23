@@ -22,7 +22,7 @@ function mockSupabaseWithDrafts(drafts: Array<Record<string, unknown>>) {
 }
 
 describe("MyDrafts", () => {
-  it("labels a brand-new generic Article draft as 'Article', not 'Essay'", async () => {
+  it("lists a draft without exposing a format label", async () => {
     vi.resetModules();
     mockSupabaseWithDrafts([
       {
@@ -41,12 +41,12 @@ describe("MyDrafts", () => {
     await userEvent.click(await screen.findByText("My Drafts"));
 
     await waitFor(() => {
-      expect(screen.getByText(/^Article ·/)).toBeInTheDocument();
+      expect(screen.getByText(/^Saved /)).toBeInTheDocument();
     });
     expect(screen.queryByText(/^Essay ·/)).not.toBeInTheDocument();
   });
 
-  it("still labels a legacy Essay draft as 'Article · Essay'", async () => {
+  it("keeps legacy drafts resumable with neutral copy", async () => {
     vi.resetModules();
     mockSupabaseWithDrafts([
       {
@@ -65,7 +65,7 @@ describe("MyDrafts", () => {
     await userEvent.click(await screen.findByText("My Drafts"));
 
     await waitFor(() => {
-      expect(screen.getByText(/^Article · Essay ·/)).toBeInTheDocument();
+      expect(screen.getByText(/^Saved /)).toBeInTheDocument();
     });
   });
 });

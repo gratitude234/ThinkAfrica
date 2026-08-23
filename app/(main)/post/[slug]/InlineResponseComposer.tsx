@@ -2,11 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { createPost, promoteToArticle } from "@/app/(write)/create/post/actions";
+import { ensureContributionDraft } from "@/app/(write)/write/actions";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 import {
   COMMENT_MAX_CHARACTERS,
-  COMMENT_PROMOTION_THRESHOLD,
   countCommentCharacters,
 } from "@/lib/commentContent";
 import { submitComment } from "./commentActions";
@@ -22,19 +21,19 @@ interface InlineResponseComposerProps {
   label?: string;
 }
 
-const LONG_FORM_HREF = (postId: string) =>
-  `/write?${new URLSearchParams({ inResponseTo: postId, kind: "article" }).toString()}`;
+const EDITOR_HREF = (postId: string) =>
+  `/write?${new URLSearchParams({ inResponseTo: postId }).toString()}`;
+
+function bodyToHtml(value: string) {
+  return value
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
 
 /**
- * The single reply box. It writes a **comment** by default -- lightweight, on
- * the parent, worth no points -- and offers promotion to a Response, which is a
- * published post with its own page, feed presence and score.
- *
- * The choice is deliberately made *after* writing rather than before: asking
- * someone to classify a reply they haven't written yet is a question they can't
- * answer, which is what the old Quick/Long-form chooser asked. Past
- * COMMENT_PROMOTION_THRESHOLD the box suggests the upgrade, but never takes it
- * on its own.
+ * Comments stay inline. A public response opens the same universal publishing
+ * canvas used everywhere else, carrying any text already written with it.
  */
 export default function InlineResponseComposer({
   parentPostId,
@@ -55,7 +54,6 @@ export default function InlineResponseComposer({
   const overLimit = characters > COMMENT_MAX_CHARACTERS;
   const busy = submitting || promoting || refreshing;
   const canSubmit = characters > 0 && !overLimit && !busy;
-  const suggestResponse = characters >= COMMENT_PROMOTION_THRESHOLD;
 
   if (!userId) {
     return (
@@ -65,10 +63,7 @@ export default function InlineResponseComposer({
           type="button"
           onClick={() =>
             requestAuth("respond", {
-              contentKind: "post",
-              destination: `/create/post?${new URLSearchParams({
-                inResponseTo: parentPostId,
-              }).toString()}`,
+              destination: EDITOR_HREF(parentPostId),
             })
           }
           className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
@@ -110,26 +105,34 @@ export default function InlineResponseComposer({
     if (busy) return;
 
     // An empty box can open the contextual editor directly. Once someone has
-    // written anything, create the Article draft first so the format change
+    // written anything, create the contribution draft first so navigation
     // carries both their words and the response relationship across.
     if (characters === 0) {
-      router.push(LONG_FORM_HREF(parentPostId));
+      router.push(EDITOR_HREF(parentPostId));
       return;
     }
 
     setPromoting(true);
     setError(null);
     try {
-      const result = await promoteToArticle({
-        body,
-        imageUrl: null,
-        topics: [],
-        inResponseTo: parentPostId,
+      const result = await ensureContributionDraft({
+        draftId: null,
+        snapshot: {
+          title: "",
+          content: bodyToHtml(body),
+          excerpt: "",
+          tags: [],
+          coverImageUrl: "",
+          references: [],
+          collaborators: [],
+          inResponseToId: parentPostId,
+          promptId: null,
+        },
       });
 
       if (result.error || !result.draftId) {
         setPromoting(false);
-        setError(result.error ?? "Could not open the Article editor. Try again.");
+        setError(result.error ?? "Could not open the editor. Try again.");
         return;
       }
 
@@ -137,29 +140,7 @@ export default function InlineResponseComposer({
       router.push(`/write?draft=${result.draftId}`);
     } catch {
       setPromoting(false);
-      setError("Could not open the Article editor. Check your connection and try again.");
-    }
-  };
-
-  const postAsResponse = async () => {
-    if (characters === 0 || busy) return;
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const result = await createPost({ body, topics: [], inResponseTo: parentPostId });
-      setSubmitting(false);
-
-      if (result.error || !result.slug) {
-        setError(result.error ?? "Could not publish this Response. Try again.");
-        return;
-      }
-
-      reset();
-      router.push(`/post/${result.slug}?justPublished=1&live=1`);
-    } catch {
-      setSubmitting(false);
-      setError("Could not publish this Response. Check your connection and try again.");
+      setError("Could not open the editor. Check your connection and try again.");
     }
   };
 
@@ -191,27 +172,12 @@ export default function InlineResponseComposer({
         className="w-full resize-none bg-transparent text-lede text-ink outline-none placeholder:text-ink-muted disabled:opacity-60"
       />
 
-      {suggestResponse ? (
-        <p className="mt-1 rounded-lg bg-green-tint px-3 py-2 text-meta text-emerald-brand">
-          This is long enough to stand on its own. Publishing it as a{" "}
-          <strong className="font-semibold">Response</strong> gives it its own page and
-          puts it in the feed, on your profile, and on the leaderboard.
-        </p>
-      ) : null}
-
       {error ? (
         <p id={`${composerId}-error`} role="alert" className="mt-1 text-meta text-red-600">
           {error}
         </p>
       ) : null}
 
-      {/* "Publish as a Response" creates a post with its own page, feed
-          presence, profile placement and leaderboard score. It used to be a
-          13px grey text link sitting beside a filled Comment button, so the
-          consequential action was styled as the throwaway one. It is a
-          full-size button now. Comment stays the filled default: elevating
-          Response to the primary would push people into publishing a permanent
-          public artifact they only meant to reply with. */}
       <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-divider pt-2">
         <button
           type="button"
@@ -220,7 +186,7 @@ export default function InlineResponseComposer({
           aria-busy={promoting || undefined}
           className="inline-flex min-h-11 items-center rounded-lg px-2 text-meta font-semibold text-ink-muted underline-offset-2 hover:bg-canvas hover:text-emerald-brand hover:underline disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
         >
-          {promoting ? "Moving to Article..." : "Continue as Article"}
+          {promoting ? "Opening editor…" : "Open editor"}
         </button>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {characters >= COMMENT_MAX_CHARACTERS - 200 ? (
@@ -228,14 +194,6 @@ export default function InlineResponseComposer({
               {COMMENT_MAX_CHARACTERS - characters}
             </span>
           ) : null}
-          <button
-            type="button"
-            onClick={() => void postAsResponse()}
-            disabled={characters === 0 || overLimit || busy}
-            className="inline-flex min-h-11 items-center rounded-lg border border-card-border bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:border-emerald-brand/40 hover:text-emerald-brand disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-          >
-            Publish as a Response
-          </button>
           <button
             type="button"
             onClick={() => void postComment()}

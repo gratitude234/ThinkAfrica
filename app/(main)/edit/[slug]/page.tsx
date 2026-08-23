@@ -1,9 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import EditForm from "./EditForm";
-import PostEditForm from "./PostEditForm";
-import { isLightweightPost } from "@/lib/postDisplay";
-import { shortPostHtmlToText } from "@/lib/shortPostContent";
+import UniversalComposer from "@/app/(write)/write/UniversalComposer";
+import type { ContributionSnapshot } from "@/lib/contribution";
 import type {
   PostEditorDecisionRecord,
   PostReferenceRecord,
@@ -30,7 +29,7 @@ export default async function EditPage({ params }: PageProps) {
   const { data: post } = await supabase
     .from("posts")
     .select(
-      "id, title, slug, excerpt, content, type, content_kind, article_format, status, tags, cover_image_url, author_id, current_round, revision_due_at, citation_id, published_version_id"
+      "id, title, slug, excerpt, content, type, content_kind, article_format, status, tags, cover_image_url, author_id, current_round, revision_due_at, citation_id, published_version_id, in_response_to"
     )
     .eq("slug", slug)
     .single();
@@ -59,18 +58,57 @@ export default async function EditPage({ params }: PageProps) {
     notFound();
   }
 
-  // Lightweight Posts (resolved kind = post, no title) get the plain
-  // text-first editor instead of the full Article editor -- a legacy
-  // titled Blog stays on the existing EditForm path below until a later
-  // migration moves it over.
-  if (isLightweightPost(post)) {
+  if (post.status === "draft") {
+    redirect(`/write?draft=${encodeURIComponent(post.id)}`);
+  }
+
+  const reviewedPublicationLocked =
+    post.status === "published" &&
+    (post.type === "research" ||
+      post.type === "policy_brief" ||
+      Boolean(post.citation_id) ||
+      Boolean(post.published_version_id));
+
+  if (reviewedPublicationLocked) {
     return (
-      <PostEditForm
-        postId={post.id}
-        slug={post.slug}
-        initialBody={shortPostHtmlToText(post.content ?? "")}
-        initialImageUrl={post.cover_image_url ?? null}
-        initialTopics={(post.tags as string[] | null) ?? []}
+      <div className="mx-auto max-w-xl rounded-2xl border border-sky-200 bg-sky-50 p-6 text-sky-950">
+        <h1 className="font-display text-xl font-semibold">This publication is locked</h1>
+        <p className="mt-2 text-sm leading-6">Reviewed publications stay unchanged after acceptance so their citation record remains stable.</p>
+      </div>
+    );
+  }
+
+  if (post.status === "published") {
+    const [{ data: referenceRows }, { data: editDraft }, { data: profile }] = await Promise.all([
+      supabase.from("post_references").select("*").eq("post_id", post.id).order("display_order"),
+      supabase.from("post_edit_drafts").select("*").eq("post_id", post.id).eq("author_id", user.id).maybeSingle(),
+      supabase.from("profiles").select("full_name, username, university").eq("id", user.id).maybeSingle(),
+    ]);
+    const draftReferences = Array.isArray(editDraft?.reference_snapshot)
+      ? (editDraft.reference_snapshot as PostReferenceRecord[])
+      : ((referenceRows ?? []) as PostReferenceRecord[]);
+    const initialSnapshot: ContributionSnapshot = {
+      title: editDraft?.title ?? post.title ?? "",
+      excerpt: editDraft?.excerpt ?? post.excerpt ?? "",
+      content: editDraft?.content ?? post.content ?? "",
+      tags: (editDraft?.tags as string[] | null) ?? (post.tags as string[] | null) ?? [],
+      coverImageUrl: editDraft?.cover_image_url ?? post.cover_image_url ?? "",
+      references: draftReferences,
+      collaborators: [],
+      inResponseToId: post.in_response_to ?? null,
+      promptId: null,
+    };
+
+    return (
+      <UniversalComposer
+        mode="published-edit"
+        userId={user.id}
+        profile={profile}
+        initialSnapshot={initialSnapshot}
+        editDraftId={editDraft?.id ?? null}
+        publishedPostId={post.id}
+        publishedSlug={post.slug}
+        returnTo={`/post/${post.slug}`}
       />
     );
   }

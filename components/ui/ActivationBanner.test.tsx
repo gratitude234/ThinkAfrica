@@ -21,7 +21,7 @@ describe("ActivationBanner -- Post CTA bypasses the generic Create chooser", () 
 
     expect(screen.getByRole("link", { name: "Write your first post →" })).toHaveAttribute(
       "href",
-      "/create/post"
+      "/write"
     );
   });
 

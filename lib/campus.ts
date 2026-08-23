@@ -83,8 +83,8 @@ export function getCampusContributionNextAction(input: {
       description:
         "Use this week’s prompt to turn one clear observation into a public contribution.",
       href: input.promptId
-        ? `/create/post?prompt=${encodeURIComponent(input.promptId)}`
-        : "/create/post",
+        ? `/write?prompt=${encodeURIComponent(input.promptId)}`
+        : "/write",
       cta: "Start a contribution",
     };
   }
@@ -96,8 +96,8 @@ export function getCampusContributionNextAction(input: {
       description:
         "Your record has begun. Build continuity by publishing a second contribution while the first is still fresh.",
       href: input.promptId
-        ? `/create/post?prompt=${encodeURIComponent(input.promptId)}`
-        : "/create/post",
+        ? `/write?prompt=${encodeURIComponent(input.promptId)}`
+        : "/write",
       cta: "Publish again",
     };
   }

@@ -17,7 +17,7 @@ export default function CampusPromptLink({
 }) {
   return (
     <Link
-      href={`/create/post?prompt=${encodeURIComponent(promptId)}`}
+      href={`/write?prompt=${encodeURIComponent(promptId)}`}
       className={className}
       onClick={() =>
         trackActivationEvent({

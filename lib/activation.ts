@@ -214,7 +214,7 @@ export async function getActivationState(
       description: firstContributionLabel
         ? `${firstContributionLabel}. Keep shaping it into a public idea.`
         : "Turn one clear idea from your studies, work, community, or the news into a Post.",
-      href: "/create/post",
+      href: "/write",
       done: firstContributionStarted,
     },
   ];

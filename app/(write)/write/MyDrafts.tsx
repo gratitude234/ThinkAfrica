@@ -3,17 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { POST_TYPE_LABELS } from "@/lib/utils";
-import {
-  getArticleFormatLabel,
-  getContentKindLabel,
-  resolveArticleFormat,
-  resolveContentKind,
-} from "@/lib/contentModel";
+import { resolveContentKind } from "@/lib/contentModel";
 
 interface Draft {
   id: string;
-  title: string;
+  title: string | null;
   type: string;
   content_kind?: string | null;
   article_format?: string | null;
@@ -94,15 +88,6 @@ export default function MyDrafts({
       {open && (
         <ul className="divide-y divide-gray-200 border-t border-gray-200">
           {filtered.map((draft) => {
-            const resolvedKind = resolveContentKind(draft);
-            const formatLabel = getArticleFormatLabel(resolveArticleFormat(draft));
-            const draftTypeLabel =
-              resolvedKind === "article"
-                ? formatLabel
-                  ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
-                  : getContentKindLabel(resolvedKind)
-                : (POST_TYPE_LABELS[draft.type as keyof typeof POST_TYPE_LABELS] ?? draft.type);
-
             return (
               <li key={draft.id}>
                 <Link
@@ -116,7 +101,7 @@ export default function MyDrafts({
                       {draft.title || "Untitled draft"}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {draftTypeLabel} · saved {timeAgo(draft.updated_at)}
+                      Saved {timeAgo(draft.updated_at)}
                     </p>
                   </div>
                   <span className="ml-3 text-xs text-emerald-600 font-medium flex-shrink-0">

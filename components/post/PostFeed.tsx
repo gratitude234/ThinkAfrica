@@ -161,7 +161,7 @@ export default function PostFeed({
                 View latest
               </Link>
               <Link
-                href="/create/post"
+                href="/write"
                 className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
               >
                 Share a post

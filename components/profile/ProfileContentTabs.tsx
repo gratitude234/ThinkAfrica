@@ -85,13 +85,13 @@ const EMPTY_COPY: Record<
     description:
       "Published ideas, responses, and debate arguments will form this Intellectual Record.",
     action: "Add your first contribution",
-    href: "/create/post",
+    href: "/write",
   },
   post: {
     title: "No posts yet",
     description: "Short thoughts and questions will appear here.",
-    action: "Write a post",
-    href: "/create/post",
+    action: "Start writing",
+    href: "/write",
   },
   response: {
     title: "No responses yet",
@@ -103,8 +103,8 @@ const EMPTY_COPY: Record<
   article: {
     title: "No articles yet",
     description: "Essays, opinions, and policy briefs will appear here.",
-    action: "Write an article",
-    href: "/write?kind=article",
+    action: "Start writing",
+    href: "/write",
   },
   research: {
     title: "No published research yet",
@@ -412,7 +412,7 @@ export default function ProfileContentTabs({
         </div>
         {isOwnProfile ? (
           <Link
-            href="/create/post"
+            href="/write"
             className="inline-flex min-h-11 w-fit items-center rounded-lg bg-emerald-brand px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
           >
             Add contribution

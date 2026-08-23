@@ -17,7 +17,7 @@ describe("CampusPromptLink", () => {
     );
 
     const link = screen.getByRole("link", { name: "Use prompt" });
-    expect(link).toHaveAttribute("href", "/create/post?prompt=prompt%201");
+    expect(link).toHaveAttribute("href", "/write?prompt=prompt%201");
     fireEvent.click(link);
     expect(mocks.track).toHaveBeenCalledWith({
       event: "campus_prompt_opened",

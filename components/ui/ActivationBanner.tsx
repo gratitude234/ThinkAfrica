@@ -30,7 +30,7 @@ export default function ActivationBanner({
         // Explicitly "post" -- goes straight to the Post composer and
         // bypasses the generic Create chooser, unlike an ambiguous "Write"
         // entry point.
-        href: "/create/post",
+        href: "/write",
         done: hasPublished,
       },
       {

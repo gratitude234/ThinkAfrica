@@ -31,6 +31,7 @@ interface EditorProps {
   onSelectionUpdate?: () => void;
   canvasMode?: boolean;
   ariaLabel?: string;
+  showWordCount?: boolean;
 }
 
 function countWordsFromHtml(value: string) {
@@ -52,12 +53,13 @@ function wordCountMessage(count: number, minWords: number) {
 
 const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   content = "",
-  placeholder = "Start writing your piece...",
+  placeholder = "Start writing…",
   minWords = 0,
   onUpdate,
   onSelectionUpdate,
   canvasMode = false,
   ariaLabel = "Article body",
+  showWordCount = true,
 }, ref) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -459,7 +461,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         }
       />
 
-      {canvasMode && displayWordCount > 0 ? (
+      {canvasMode && showWordCount && displayWordCount > 0 ? (
         <div className="pb-1 text-right text-xs text-gray-400">
           {displayWordCount.toLocaleString()} word{displayWordCount === 1 ? "" : "s"}
         </div>

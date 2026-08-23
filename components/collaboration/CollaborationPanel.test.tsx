@@ -1,5 +1,5 @@
 import type { AnchorHTMLAttributes } from "react";
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import CollaborationPanel from "./CollaborationPanel";
 import type { CollaborationSummary } from "@/lib/collaboration";
@@ -44,30 +44,25 @@ function baseSummary(overrides: Partial<CollaborationSummary> = {}): Collaborati
     canMessage: false,
     messageReason: null,
     signInHref: "/login?redirectTo=/post/some-post",
-    responseHref: "/write?inResponseTo=post-1&kind=article",
+    responseHref: "/write?inResponseTo=post-1",
     responsesHref: "#responses",
     ...overrides,
   };
 }
 
 describe("CollaborationPanel 'Write a response' CTA (Pass 3: Response Creation UX)", () => {
-  it("opens the shared response chooser instead of linking straight to the Article composer", () => {
+  it("links straight to the universal composer with parent context", () => {
     render(<CollaborationPanel summary={baseSummary()} authorName="Jane" />);
 
-    const trigger = screen.getByRole("button", { name: "Write a response" });
-    fireEvent.click(trigger);
-
-    const dialog = screen.getByRole("dialog", { name: "Respond" });
-    const links = within(dialog).getAllByRole("link");
-    expect(links).toHaveLength(2);
-    expect(links[0]).toHaveAccessibleName(/^Quick response/);
-    expect(links[1]).toHaveAccessibleName(/^Long-form response/);
-    expect(links[0]).toHaveAttribute("href", expect.stringContaining("inResponseTo=post-1"));
+    expect(screen.getByRole("link", { name: "Write a response" })).toHaveAttribute(
+      "href",
+      "/write?inResponseTo=post-1"
+    );
   });
 
-  it("does not render a plain link straight to /write", () => {
+  it("does not render a mode chooser", () => {
     render(<CollaborationPanel summary={baseSummary()} authorName="Jane" />);
 
-    expect(screen.queryByRole("link", { name: "Write a response" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Respond" })).not.toBeInTheDocument();
   });
 });

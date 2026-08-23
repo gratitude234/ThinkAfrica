@@ -92,7 +92,7 @@ export const POST_TYPE_INTENTS: Record<PostType, string> = {
 
 export const POST_POINTS: Record<PostType, number> = {
   blog: 10,
-  essay: 20,
+  essay: 10,
   policy_brief: 30,
   research: 50,
 };

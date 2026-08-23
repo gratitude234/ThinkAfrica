@@ -824,7 +824,7 @@ export default async function DashboardPage() {
       ? {
           label: "Publish your first portfolio piece",
           body: "Write your first Article and build your public record.",
-          href: "/write?kind=article",
+          href: "/write",
           cta: "Start writing",
         }
       : reviewedDraftMissingReferences
