@@ -7,7 +7,7 @@ import Link from "next/link";
  * The composer routes get their own boundary rather than inheriting a
  * generic one: a crash here happens while someone has unsaved writing on
  * screen, so the copy has to answer "did I lose my work?" first.
- * DraftManager keeps a periodic localStorage backup, so retrying in place
+ * The composer keeps a periodic localStorage backup, so retrying in place
  * (reset) recovers the draft — that's why "Try again" leads, and navigating
  * away is the secondary action.
  */

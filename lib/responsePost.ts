@@ -88,11 +88,10 @@ export async function validateResponseParent(
 /**
  * Notifies + emails a response's parent-post author. Mirrors the single
  * `response_post` notification path that previously lived inline in
- * write/actions.ts's publishPost(), factored out so a Quick response
- * (create/post/actions.ts) and a Long-form response (write/actions.ts)
- * share one implementation instead of two copies that can drift apart.
- * No-ops for a self-response. Callers must invoke this exactly once, at
- * first publish, to avoid duplicate notifications/emails.
+ * write/actions.ts's publishPost(), factored out so every publish path in
+ * write/actions.ts shares one implementation instead of copies that can
+ * drift apart. No-ops for a self-response. Callers must invoke this exactly
+ * once, at first publish, to avoid duplicate notifications/emails.
  */
 export async function notifyResponseParentAuthor({
   parent,

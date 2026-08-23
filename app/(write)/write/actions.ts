@@ -1012,7 +1012,7 @@ export async function publishPost(input: {
     }
   }
 
-  // Phase 4A genre picker (PublishDrawer): only ever honored for a brand-
+  // Phase 4A genre picker: only ever honored for a brand-
   // new generic Article -- effectiveType is NEW_ARTICLE_TYPE ("essay") for
   // every new Article regardless of chosen genre, and is never itself set
   // from input.articleFormat, so this cannot reach a legacy Policy Brief

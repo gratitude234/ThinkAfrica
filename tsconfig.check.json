@@ -7,7 +7,6 @@
   },
   "include": [],
   "files": [
-    "app/(main)/ContributionChooser.tsx",
     "app/(main)/CreateTrigger.tsx",
     "app/(main)/CreateLauncher.tsx",
     "lib/blocking.ts",
@@ -60,10 +59,6 @@
     "lib/contribution.ts",
     "lib/postReferences.ts",
     "lib/postSlug.ts",
-    "app/(write)/write/DraftSignalBar.tsx",
-    "app/(write)/write/draftCoaching.ts",
-    "app/(write)/create/post/PostComposerForm.tsx",
-    "app/(write)/create/post/actions.ts",
     "app/(main)/post/[slug]/AuthorBioCard.tsx",
     "app/(main)/settings/NotificationsForm.tsx",
     "app/(main)/settings/SubscribedAuthorsManager.tsx",
