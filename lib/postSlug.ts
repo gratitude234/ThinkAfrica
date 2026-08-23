@@ -15,8 +15,15 @@ export function stripUrlFragments(value: string): string {
     .trim();
 }
 
+/**
+ * The readable stem a title contributes to a slug, with no unique suffix. Split
+ * out so callers can ask "does this slug already come from this title?" without
+ * minting a throwaway slug to compare against.
+ */
+export function slugBaseFromTitle(rawTitle: string) {
+  return slugify(stripUrlFragments(rawTitle || ""), { lower: true, strict: true });
+}
+
 export function buildSlugFromTitle(rawTitle: string, fallback: string, uniqueSuffix: string) {
-  const cleanedTitle = stripUrlFragments(rawTitle || "");
-  const base = slugify(cleanedTitle, { lower: true, strict: true });
-  return `${base || fallback}-${uniqueSuffix}`;
+  return `${slugBaseFromTitle(rawTitle) || fallback}-${uniqueSuffix}`;
 }

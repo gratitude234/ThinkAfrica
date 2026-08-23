@@ -6,10 +6,22 @@ import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { getTopicValuesValidationError, MAX_LONG_FORM_TOPICS, normalizeAndDedupeTopicValues } from "@/lib/tags";
 import { resolveContentKind } from "@/lib/contentModel";
 import type { ContributionSnapshot } from "@/lib/contribution";
+import {
+  getPersistedReferenceId,
+  hasReferenceContent,
+  validateCitationReferences,
+  type ReferenceLike,
+} from "@/lib/postReferences";
 
+/**
+ * Carries `id` through into the snapshot. The body's inline citations anchor to
+ * these ids, so a source that already exists on the live post has to come back
+ * out of the edit draft as the same row rather than as a lookalike copy.
+ */
 function normalizeReferences(references: ContributionSnapshot["references"]) {
   return references
     .map((reference, index) => ({
+      id: getPersistedReferenceId(reference.id),
       display_order: index,
       ref_type: reference.ref_type ?? "other",
       authors: reference.authors?.trim() || null,
@@ -20,9 +32,7 @@ function normalizeReferences(references: ContributionSnapshot["references"]) {
       doi: reference.doi?.trim() || null,
       raw: reference.raw?.trim() || null,
     }))
-    .filter((reference) =>
-      Boolean(reference.title || reference.authors || reference.source || reference.url || reference.doi || reference.raw)
-    );
+    .filter(hasReferenceContent);
 }
 
 async function editablePublishedPost(postId: string, userId: string) {
@@ -92,6 +102,22 @@ export async function applyPublishedEditDraft(input: { editDraftId: string }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "You must be signed in.", slug: null as string | null };
+
+  // Publishing checks this; updating a live publication has to check it too, or
+  // an edit that drops a cited source leaves a dead [source] link in public.
+  const { data: draft } = await supabase
+    .from("post_edit_drafts")
+    .select("content, reference_snapshot")
+    .eq("id", input.editDraftId)
+    .eq("author_id", user.id)
+    .maybeSingle();
+  if (!draft) return { error: "This edit draft is unavailable.", slug: null as string | null };
+
+  const citationError = validateCitationReferences(
+    draft.content ?? "",
+    Array.isArray(draft.reference_snapshot) ? (draft.reference_snapshot as ReferenceLike[]) : []
+  );
+  if (citationError) return { error: citationError, slug: null as string | null };
 
   const { data, error } = await supabase.rpc("apply_post_edit_draft", {
     target_draft_id: input.editDraftId,

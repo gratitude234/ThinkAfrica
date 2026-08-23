@@ -108,6 +108,7 @@ export default async function EditPage({ params }: PageProps) {
         editDraftId={editDraft?.id ?? null}
         publishedPostId={post.id}
         publishedSlug={post.slug}
+        draftUpdatedAt={(editDraft?.updated_at as string | null | undefined) ?? null}
         returnTo={`/post/${post.slug}`}
       />
     );

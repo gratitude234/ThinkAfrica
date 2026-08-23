@@ -66,6 +66,8 @@ interface UniversalComposerProps {
   editDraftId?: string | null;
   publishedPostId?: string | null;
   publishedSlug?: string | null;
+  /** When the account copy was last written, so a stale device copy can be told apart from a newer one. */
+  draftUpdatedAt?: string | null;
   returnTo: string;
   parent?: { id: string; displayTitle: string; slug: string } | null;
   prompt?: { id: string; title: string; promptText: string; responseQuestion: string | null } | null;
@@ -184,6 +186,7 @@ export default function UniversalComposer({
   editDraftId: initialEditDraftId = null,
   publishedPostId = null,
   publishedSlug = null,
+  draftUpdatedAt = null,
   returnTo,
   parent = null,
   prompt = null,
@@ -201,7 +204,7 @@ export default function UniversalComposer({
   const editDraftIdRef = useRef(initialEditDraftId);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [recovery, setRecovery] = useState<ContributionSnapshot | null>(null);
+  const [recovery, setRecovery] = useState<{ snapshot: ContributionSnapshot; key: string } | null>(null);
   const [showTitle, setShowTitle] = useState(Boolean(initialSnapshot.title.trim()));
   const [showMore, setShowMore] = useState(false);
   const [showFormat, setShowFormat] = useState(false);
@@ -224,6 +227,12 @@ export default function UniversalComposer({
   const localKeyRef = useRef(
     `${LOCAL_PREFIX}:${userId}:${mode}:${publishedPostId ?? initialDraftId ?? snapshot.inResponseToId ?? "new"}`
   );
+  // The document this canvas is currently editing. It picks up an id when the
+  // first autosave mints a draft, so a later arrival of that same id reads as
+  // "still the same piece" rather than as a switch to a different one.
+  const documentIdRef = useRef(publishedPostId ?? initialDraftId ?? null);
+  const [documentKey, setDocumentKey] = useState(publishedPostId ?? initialDraftId ?? "new");
+  const scannedRef = useRef(false);
 
   const closePublish = useCallback(() => setShowPublish(false), []);
   const closeLeave = useCallback(() => setShowLeave(false), []);
@@ -241,7 +250,35 @@ export default function UniversalComposer({
     };
   }, []);
 
+  // Resuming another draft from the drafts panel is a client-side navigation
+  // into this same component instance, so none of the state below re-derives on
+  // its own. Without this the canvas would keep the previous draft's text and
+  // keep autosaving it to the previous draft, under the new draft's address.
   useEffect(() => {
+    const incoming = publishedPostId ?? initialDraftId ?? null;
+    if (!incoming || incoming === documentIdRef.current) return;
+    documentIdRef.current = incoming;
+    draftIdRef.current = initialDraftId;
+    editDraftIdRef.current = initialEditDraftId;
+    revisionRef.current += 1;
+    latestRef.current = initialSnapshot;
+    lastPersistedRef.current = initialSnapshot;
+    localKeyRef.current = `${LOCAL_PREFIX}:${userId}:${mode}:${incoming}`;
+    scannedRef.current = false;
+    setSnapshot(initialSnapshot);
+    setDraftId(initialDraftId);
+    setEditDraftId(initialEditDraftId);
+    setShowTitle(Boolean(initialSnapshot.title.trim()));
+    setRecovery(null);
+    setSaveState("idle");
+    setSaveError(null);
+    setShowPublish(false);
+    setDocumentKey(incoming);
+  }, [initialDraftId, initialEditDraftId, initialSnapshot, mode, publishedPostId, userId]);
+
+  useEffect(() => {
+    if (scannedRef.current) return;
+    scannedRef.current = true;
     const candidates = [localKeyRef.current, `indegenius:post-draft:${userId}`];
     for (let index = 0; index < localStorage.length; index += 1) {
       const key = localStorage.key(index);
@@ -249,18 +286,39 @@ export default function UniversalComposer({
         candidates.push(key);
       }
     }
+    const accountSavedAt = draftUpdatedAt ? Date.parse(draftUpdatedAt) : Number.NaN;
     for (const key of candidates) {
+      if (localStorage.getItem(key) === null) continue;
       try {
-        const parsed = safeSnapshot(JSON.parse(localStorage.getItem(key) ?? "null"), initialSnapshot);
-        if (parsed && !snapshotsMatch(parsed, initialSnapshot)) {
-          setRecovery(parsed);
-          return;
+        const raw = JSON.parse(localStorage.getItem(key) ?? "null") as { savedAt?: unknown } | null;
+        const parsed = safeSnapshot(raw, initialSnapshot);
+        if (!parsed || snapshotsMatch(parsed, initialSnapshot)) {
+          // Nothing this copy could add back, so it stops asking. Keys written
+          // by the composers this one replaced are otherwise permanent: they
+          // are never rewritten, so they would offer the same stale writing on
+          // every visit forever.
+          localStorage.removeItem(key);
+          continue;
         }
+        const deviceSavedAt = typeof raw?.savedAt === "string" ? Date.parse(raw.savedAt) : Number.NaN;
+        if (
+          Number.isFinite(accountSavedAt) &&
+          Number.isFinite(deviceSavedAt) &&
+          deviceSavedAt <= accountSavedAt
+        ) {
+          // The account copy is provably the newer one, so restoring this would
+          // be a downgrade, not a recovery.
+          localStorage.removeItem(key);
+          continue;
+        }
+        setRecovery({ snapshot: parsed, key });
+        return;
       } catch {
         // A damaged device copy should never block the account copy.
+        localStorage.removeItem(key);
       }
     }
-  }, [initialSnapshot, userId]);
+  }, [draftUpdatedAt, initialSnapshot, userId]);
 
   const persist = useCallback(
     (next: ContributionSnapshot, revision: number) => {
@@ -280,11 +338,17 @@ export default function UniversalComposer({
             const result = await ensureContributionDraft({ draftId: targetDraftId, snapshot: next });
             if (result.error || !result.draftId) throw new Error(result.error ?? "We couldn't save this draft.");
             draftIdRef.current = result.draftId;
+            documentIdRef.current = result.draftId;
             if (!targetDraftId && mountedRef.current) {
               setDraftId(result.draftId);
               const url = new URL(window.location.href);
               url.searchParams.set("draft", result.draftId);
-              router.replace(`${url.pathname}${url.search}`);
+              // Deliberately a shallow URL update rather than router.replace.
+              // Re-rendering the server page here would flip `mode` from "new"
+              // to "draft" and hand the canvas a draft id, remounting the
+              // editor under the writer's cursor about two seconds into every
+              // new piece. The address still survives a refresh or a back.
+              window.history.replaceState(null, "", `${url.pathname}${url.search}`);
             }
           }
           if (!mountedRef.current) return;
@@ -302,7 +366,7 @@ export default function UniversalComposer({
       saveQueueRef.current = operation;
       return operation;
     },
-    [mode, publishedPostId, router]
+    [mode, publishedPostId]
   );
 
   useEffect(() => {
@@ -474,10 +538,12 @@ export default function UniversalComposer({
       <main className="mx-auto max-w-3xl px-5 pb-32 pt-7 sm:px-8 sm:pt-11">
         {recovery ? (
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
-            <p className="text-amber-950">There’s a newer device copy of your writing.</p>
+            <p className="text-amber-950">This device has an unsaved copy of your writing.</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => { setSnapshot(recovery); setShowTitle(Boolean(recovery.title.trim())); setRecovery(null); }} className="min-h-11 rounded-lg bg-amber-900 px-4 font-semibold text-white">Restore</button>
-              <button type="button" onClick={() => { localStorage.removeItem(localKeyRef.current); setRecovery(null); }} className="min-h-11 rounded-lg px-3 font-semibold text-amber-900">Discard</button>
+              {/* Both actions clear the key the copy actually came from, which
+                  is not always this canvas's own key. */}
+              <button type="button" onClick={() => { localStorage.removeItem(recovery.key); setSnapshot(recovery.snapshot); setShowTitle(Boolean(recovery.snapshot.title.trim())); setRecovery(null); }} className="min-h-11 rounded-lg bg-amber-900 px-4 font-semibold text-white">Restore</button>
+              <button type="button" onClick={() => { localStorage.removeItem(recovery.key); setRecovery(null); }} className="min-h-11 rounded-lg px-3 font-semibold text-amber-900">Discard</button>
             </div>
           </div>
         ) : null}
@@ -524,7 +590,7 @@ export default function UniversalComposer({
         )}
 
         <Editor
-          key={`${mode}:${publishedPostId ?? initialDraftId ?? "new"}`}
+          key={documentKey}
           ref={editorRef}
           content={snapshot.content}
           placeholder="Start writing…"

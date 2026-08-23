@@ -6,7 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
-import { buildSlugFromTitle, looksLikeUrl } from "@/lib/postSlug";
+import { buildSlugFromTitle, looksLikeUrl, slugBaseFromTitle } from "@/lib/postSlug";
+import {
+  getPersistedReferenceId,
+  hasReferenceContent,
+  validateCitationReferences,
+} from "@/lib/postReferences";
 import { isLowQualityTitle } from "@/lib/postQuality";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { requireNotSuspended } from "@/lib/suspension";
@@ -74,16 +79,7 @@ function normalizeReferences(references: ReferenceInput[]) {
       raw: reference.raw?.trim() || null,
       ref_type: reference.ref_type ?? "other",
     }))
-    .filter((reference) => {
-      return Boolean(
-        reference.title ||
-          reference.authors ||
-          reference.source ||
-          reference.url ||
-          reference.doi ||
-          reference.raw
-      );
-    });
+    .filter(hasReferenceContent);
 }
 
 function validateReferences(postType: PostType, references: ReferenceInput[]) {
@@ -112,56 +108,6 @@ function hasMeaningfulArticleContent(content: string) {
     .replace(/&(?:nbsp|#160|#x0*a0);/gi, " ")
     .replace(/[\s\u200b-\u200d\ufeff]/g, "")
     .length > 0;
-}
-
-function getPersistedReferenceId(referenceId?: string) {
-  if (!referenceId) return null;
-  const candidate = referenceId.startsWith("temp-")
-    ? referenceId.slice("temp-".length)
-    : referenceId;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    candidate
-  )
-    ? candidate
-    : referenceId.startsWith("temp-")
-      ? null
-      : candidate;
-}
-
-function validateCitationReferences(
-  content: string,
-  references: ReferenceInput[]
-) {
-  const citationKeys = new Set<string>();
-  const shortcodePattern = /\[ref:([a-zA-Z0-9-]+)\]/g;
-  const anchorPattern = /href=["']#ref-id-([a-zA-Z0-9-]+)["']/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = shortcodePattern.exec(content)) !== null) {
-    citationKeys.add(match[1]);
-  }
-  while ((match = anchorPattern.exec(content)) !== null) {
-    citationKeys.add(match[1]);
-  }
-  if (citationKeys.size === 0) return null;
-
-  const normalized = normalizeReferences(references);
-  const referenceIds = new Set(
-    normalized
-      .map((reference) => getPersistedReferenceId(reference.id))
-      .filter((id): id is string => Boolean(id))
-  );
-  const hasOrphan = Array.from(citationKeys).some((key) => {
-    if (/^\d+$/.test(key)) {
-      const position = Number.parseInt(key, 10);
-      return position < 1 || position > normalized.length;
-    }
-    return !referenceIds.has(key);
-  });
-
-  return hasOrphan
-    ? "A citation points to a source that was removed. Restore the source or remove its marker before publishing."
-    : null;
 }
 
 async function syncReferences(
@@ -418,13 +364,43 @@ async function syncDraftAuthors(
 // be trusted to decide a NEW row's classification.
 const NEW_ARTICLE_TYPE: PostType = (legacyTypeForNewContent("article") ?? "essay") as PostType;
 
+function uniqueSlugSuffix() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function universalSlug(snapshot: ContributionSnapshot) {
   const seed = snapshot.title.trim() || contributionText(snapshot.content).split(/\s+/).slice(0, 7).join(" ");
-  return buildSlugFromTitle(
-    seed,
-    "publication",
-    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-  );
+  return buildSlugFromTitle(seed, "publication", uniqueSlugSuffix());
+}
+
+/**
+ * A draft's slug is minted on its first autosave, roughly two seconds into
+ * writing, when a body-first draft usually has no title yet. That leaves the
+ * URL named after whichever half-sentence existed at that moment. Once a title
+ * exists at publish time it should name the URL instead. Drafts are private, so
+ * there is no earlier address to keep working.
+ */
+async function slugForPublication(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  draft: { id: string; slug: string },
+  authorId: string,
+  title: string
+) {
+  const base = slugBaseFromTitle(title);
+  if (!base || draft.slug.startsWith(`${base}-`)) return draft.slug;
+
+  const { data: renamed } = await supabase
+    .from("posts")
+    .update({ slug: `${base}-${uniqueSlugSuffix()}` })
+    .eq("id", draft.id)
+    .eq("author_id", authorId)
+    .eq("status", "draft")
+    .select("slug")
+    .maybeSingle();
+
+  // A rename is a courtesy, not a gate: keep publishing on the original slug
+  // rather than failing the publish over a cosmetic URL.
+  return renamed?.slug ?? draft.slug;
 }
 
 async function validateCampusPrompt(
@@ -581,6 +557,8 @@ export async function publishContribution(input: {
     return { error: "This draft was already published or changed in another window.", slug: null as string | null };
   }
 
+  const slug = await slugForPublication(supabase, draft, user.id, snapshot.title);
+
   const { data: ownerProfile } = await supabase
     .from("profiles")
     .select("full_name")
@@ -590,7 +568,7 @@ export async function publishContribution(input: {
     await syncAuthors(
       supabase,
       draft.id,
-      draft.slug,
+      slug,
       user.id,
       snapshot.collaborators.map((collaborator, index) => ({
         user_id: collaborator.id,
@@ -630,7 +608,7 @@ export async function publishContribution(input: {
         responderId: user.id,
         responderName: ownerProfile?.full_name ?? "An Indegenius author",
         responsePostId: draft.id,
-        responseSlug: draft.slug,
+        responseSlug: slug,
       });
       revalidatePath(`/post/${parentValidation.parent.slug}`);
     }
@@ -638,7 +616,7 @@ export async function publishContribution(input: {
 
   revalidatePath("/");
   revalidatePath("/dashboard");
-  revalidatePath(`/post/${draft.slug}`);
+  revalidatePath(`/post/${slug}`);
   schedulePublicationDistribution(draft.id, "Publication");
   await recordActivationEvent({
     supabase,
@@ -648,7 +626,7 @@ export async function publishContribution(input: {
     source: "server_action",
     route: "/write",
   });
-  return { error: null, slug: draft.slug };
+  return { error: null, slug };
 }
 
 export async function ensureDraft(input: {

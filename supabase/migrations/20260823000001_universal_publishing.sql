@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS public.post_edit_drafts (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+COMMENT ON COLUMN public.post_edit_drafts.reference_snapshot IS
+  'Ordered source list. Each element keeps its post_references.id where one exists, because inline citations anchor to that id.';
+
 ALTER TABLE public.post_edit_drafts ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Authors manage their private edit drafts" ON public.post_edit_drafts;
@@ -71,6 +74,8 @@ DECLARE
   post_row public.posts%ROWTYPE;
   normalized_title text;
   reference_row jsonb;
+  existing_reference_id uuid;
+  uuid_pattern constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'You must be signed in.';
@@ -118,10 +123,50 @@ BEGIN
     editorial_updated_at = now()
   WHERE id = post_row.id;
 
-  DELETE FROM public.post_references WHERE post_id = post_row.id;
+  -- Inline citations in the body are anchors to #ref-id-<post_references.id>,
+  -- and the rendered bibliography emits matching id attributes, so these row
+  -- ids are part of the published document. Delete only what the edit dropped,
+  -- update what it kept, and insert only what is new. A blanket delete and
+  -- re-insert would hand every source a fresh id and break every citation in
+  -- the post.
+  DELETE FROM public.post_references ref
+  WHERE ref.post_id = post_row.id
+    AND NOT EXISTS (
+      SELECT 1
+      FROM jsonb_array_elements(draft_row.reference_snapshot) AS kept
+      WHERE kept.value->>'id' ~* uuid_pattern
+        AND (kept.value->>'id')::uuid = ref.id
+    );
 
   FOR reference_row IN SELECT * FROM jsonb_array_elements(draft_row.reference_snapshot)
   LOOP
+    IF reference_row->>'id' ~* uuid_pattern THEN
+      existing_reference_id := (reference_row->>'id')::uuid;
+    ELSE
+      existing_reference_id := NULL;
+    END IF;
+
+    IF existing_reference_id IS NOT NULL THEN
+      UPDATE public.post_references
+      SET
+        display_order = COALESCE((reference_row->>'display_order')::int, 0),
+        ref_type = COALESCE(NULLIF(reference_row->>'ref_type', ''), 'other'),
+        authors = NULLIF(reference_row->>'authors', ''),
+        title = COALESCE(reference_row->>'title', ''),
+        year = NULLIF(reference_row->>'year', '')::int,
+        source = NULLIF(reference_row->>'source', ''),
+        url = NULLIF(reference_row->>'url', ''),
+        doi = NULLIF(reference_row->>'doi', ''),
+        raw = NULLIF(reference_row->>'raw', '')
+      WHERE id = existing_reference_id AND post_id = post_row.id;
+
+      -- A snapshot id that belongs to some other post matches nothing here, so
+      -- it falls through and is stored as a genuinely new source instead.
+      IF FOUND THEN
+        CONTINUE;
+      END IF;
+    END IF;
+
     INSERT INTO public.post_references (
       post_id, display_order, ref_type, authors, title, year, source, url, doi, raw
     ) VALUES (

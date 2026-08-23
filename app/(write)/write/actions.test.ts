@@ -43,7 +43,14 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-import { ensureDraft, publishPost, savePostReferences, withdrawSubmission } from "./actions";
+import {
+  ensureDraft,
+  publishContribution,
+  publishPost,
+  savePostReferences,
+  withdrawSubmission,
+} from "./actions";
+import type { ContributionSnapshot } from "@/lib/contribution";
 
 function baseDraftInput(overrides: Partial<Parameters<typeof ensureDraft>[0]> = {}) {
   return {
@@ -788,5 +795,132 @@ describe("withdrawSubmission", () => {
 
     expect(result.error).toMatch(/signed in/i);
     expect(fakeSupabase.current!.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("publishContribution", () => {
+  function contribution(overrides: Partial<ContributionSnapshot> = {}): ContributionSnapshot {
+    return {
+      title: "",
+      content: "<p>A body-first idea that keeps going.</p>",
+      excerpt: "",
+      tags: [],
+      coverImageUrl: "",
+      references: [],
+      collaborators: [],
+      inResponseToId: null,
+      promptId: null,
+      ...overrides,
+    };
+  }
+
+  // The slug is minted on the first autosave, before a body-first writer has
+  // usually reached for a title, so it is seeded from the opening words.
+  const BODY_SEEDED_SLUG = "a-body-first-idea-that-keeps-mabc-1z2y3x";
+
+  function publishRoutes(posts: ReturnType<typeof queueResults>) {
+    return { posts, ...standardPublishRoutes() };
+  }
+
+  it("renames a body-seeded slug after the title the writer settled on", async () => {
+    fakeSupabase.current = makeFakeSupabase(
+      publishRoutes(
+        queueResults(
+          { data: { id: "draft-1" }, error: null },
+          { data: { id: "draft-1", slug: BODY_SEEDED_SLUG, status: "draft" }, error: null },
+          { data: { slug: "one-continuous-workflow-mdef-4a5b6c" }, error: null },
+          { data: [{ id: "draft-1" }], error: null }
+        )
+      )
+    );
+
+    const result = await publishContribution({
+      draftId: null,
+      snapshot: contribution({ title: "One continuous workflow" }),
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.slug).toBe("one-continuous-workflow-mdef-4a5b6c");
+    const rename = fakeSupabase.current!.builders.posts[2].updatedWith as { slug: string };
+    expect(rename.slug).toMatch(/^one-continuous-workflow-/);
+  });
+
+  it("keeps the body-seeded slug when the writer never adds a title", async () => {
+    fakeSupabase.current = makeFakeSupabase(
+      publishRoutes(
+        queueResults(
+          { data: { id: "draft-1" }, error: null },
+          { data: { id: "draft-1", slug: BODY_SEEDED_SLUG, status: "draft" }, error: null },
+          { data: [{ id: "draft-1" }], error: null }
+        )
+      )
+    );
+
+    const result = await publishContribution({ draftId: null, snapshot: contribution() });
+
+    expect(result.error).toBeNull();
+    expect(result.slug).toBe(BODY_SEEDED_SLUG);
+    // Insert, read back, publish. No rename in between.
+    expect(fakeSupabase.current!.builders.posts).toHaveLength(3);
+  });
+
+  it("leaves a slug alone when it already comes from the title", async () => {
+    fakeSupabase.current = makeFakeSupabase(
+      publishRoutes(
+        queueResults(
+          { data: { id: "draft-1" }, error: null },
+          {
+            data: { id: "draft-1", slug: "one-continuous-workflow-mabc-1z2y3x", status: "draft" },
+            error: null,
+          },
+          { data: [{ id: "draft-1" }], error: null }
+        )
+      )
+    );
+
+    const result = await publishContribution({
+      draftId: null,
+      snapshot: contribution({ title: "One continuous workflow" }),
+    });
+
+    expect(result.slug).toBe("one-continuous-workflow-mabc-1z2y3x");
+    expect(fakeSupabase.current!.builders.posts).toHaveLength(3);
+  });
+
+  it("publishes on the original slug when the rename cannot be written", async () => {
+    fakeSupabase.current = makeFakeSupabase(
+      publishRoutes(
+        queueResults(
+          { data: { id: "draft-1" }, error: null },
+          { data: { id: "draft-1", slug: BODY_SEEDED_SLUG, status: "draft" }, error: null },
+          { data: null, error: { message: "slug already taken" } },
+          { data: [{ id: "draft-1" }], error: null }
+        )
+      )
+    );
+
+    const result = await publishContribution({
+      draftId: null,
+      snapshot: contribution({ title: "One continuous workflow" }),
+    });
+
+    // A cosmetic URL is never worth failing a publish over.
+    expect(result.error).toBeNull();
+    expect(result.slug).toBe(BODY_SEEDED_SLUG);
+  });
+
+  it("rejects an orphaned citation before creating anything", async () => {
+    fakeSupabase.current = makeFakeSupabase({});
+
+    const result = await publishContribution({
+      draftId: null,
+      snapshot: contribution({
+        content:
+          '<p>A claim <a href="#ref-id-11111111-1111-4111-8111-111111111111">[source]</a></p>',
+      }),
+    });
+
+    expect(result.error).toMatch(/source that was removed/i);
+    expect(fakeSupabase.current!.from).not.toHaveBeenCalled();
   });
 });

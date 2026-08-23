@@ -17,6 +17,15 @@ describe("universal publishing migration", () => {
     expect(sql).toContain("FOR UPDATE");
   });
 
+  it("keeps reference row ids across an applied edit, because citations anchor to them", () => {
+    // A blanket "DELETE ... WHERE post_id = ..." would re-mint every id and
+    // break every #ref-id- anchor in the body.
+    expect(sql).not.toMatch(/DELETE FROM public\.post_references\s+WHERE post_id = post_row\.id;/);
+    expect(sql).toMatch(/DELETE FROM public\.post_references ref[\s\S]*?NOT EXISTS/);
+    expect(sql).toContain("UPDATE public.post_references");
+    expect(sql).toContain("IF FOUND THEN");
+  });
+
   it("awards the same points to titled and untitled direct publications", () => {
     expect(sql).toContain("v_points := 10");
     expect(sql).toContain("new.in_response_to IS NOT NULL");

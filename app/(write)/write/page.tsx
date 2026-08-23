@@ -48,7 +48,7 @@ export default async function WritePage({ searchParams }: PageProps) {
   if (draftParam) {
     const { data } = await supabase
       .from("posts")
-      .select("id, title, excerpt, content, tags, cover_image_url, in_response_to, type, content_kind, status, author_id")
+      .select("id, title, excerpt, content, tags, cover_image_url, in_response_to, type, content_kind, status, author_id, updated_at")
       .eq("id", draftParam)
       .eq("author_id", user.id)
       .eq("status", "draft")
@@ -145,6 +145,7 @@ export default async function WritePage({ searchParams }: PageProps) {
       profile={profile}
       initialSnapshot={initialSnapshot}
       draftId={draftParam}
+      draftUpdatedAt={(draft?.updated_at as string | null | undefined) ?? null}
       returnTo={safeReturnTo(value(params, "returnTo"), fallback)}
       parent={parent}
       prompt={prompt}
