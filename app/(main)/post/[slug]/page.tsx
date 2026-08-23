@@ -53,7 +53,7 @@ import {
   resolveArticleFormat,
   resolveContentKind,
 } from "@/lib/contentModel";
-import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
+import { isAuthorSubscriptionsEnabled, isResearchEnabled } from "@/lib/featureFlags";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -1579,6 +1579,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   if (!post) return { title: "Post not found - Indegenius" };
+  if (!isResearchEnabled() && post.type === "research") {
+    return { title: "Post not found - Indegenius" };
+  }
   if (
     (post.status === "draft" ||
       post.status === "pending" ||
@@ -1660,6 +1663,8 @@ export default async function PostPage({ params, searchParams }: PageProps) {
 
   if (!postRaw) notFound();
   const post = postRaw as PostRecord;
+
+  if (!isResearchEnabled() && resolveContentKind(post) === "research") notFound();
 
   if (post.status === "draft" && user?.id !== post.author_id) notFound();
 

@@ -7,9 +7,8 @@ export default function EditorialStandardsPage() {
         <h1 className="mb-3 text-3xl font-bold text-gray-900">Editorial Standards</h1>
         <p className="leading-relaxed text-gray-500">
           Indegenius is committed to publishing high-quality, original intellectual work from
-          young people who actively engage with ideas. Posts and Articles publish directly. Research
-          follows a formal editorial workflow with reviewer recommendations and a final editor
-          decision before publication.
+          young people who actively engage with ideas. Posts and Articles publish directly and
+          should meet the standards below.
         </p>
       </div>
 
@@ -47,12 +46,6 @@ export default function EditorialStandardsPage() {
                   publication: "Publishes directly",
                   desc: "Long-form argument, analysis, or commentary. Essay and Policy Brief are optional genres, not review claims.",
                 },
-                {
-                  type: "Research",
-                  requirements: "PDF, title, abstract, keywords, authors, and references",
-                  publication: "Formal editorial review",
-                  desc: "A research-paper record that becomes reviewed and citable only after an editor accepts it.",
-                },
               ].map((row) => (
                 <tr key={row.type} className="hover:bg-canvas">
                   <td className="border border-gray-200 px-4 py-3 font-medium text-gray-900">
@@ -82,7 +75,7 @@ export default function EditorialStandardsPage() {
             },
             {
               title: "Evidence and Sources",
-              desc: "Claims should be supported with evidence. Research requires structured references; Articles should cite sources where relevant.",
+              desc: "Claims should be supported with evidence. Articles should cite sources where relevant.",
             },
             {
               title: "Clarity and Structure",
@@ -102,56 +95,6 @@ export default function EditorialStandardsPage() {
               <p className="text-sm text-gray-500">{item.desc}</p>
             </div>
           ))}
-        </div>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="mb-4 text-xl font-bold text-gray-900">Editorial Review Process</h2>
-        <ol className="space-y-4">
-          {[
-            {
-              step: "1",
-              title: "Submit Research",
-              desc: "The author submits a Research paper through the dedicated Research flow. It enters the editorial queue instead of publishing immediately.",
-            },
-            {
-              step: "2",
-              title: "Reviewer Assignment",
-              desc: "Editors assign the required reviewers for the submission track and wait for all assigned recommendations to be completed.",
-            },
-            {
-              step: "3",
-              title: "Editor Decision",
-              desc: "Once the round is complete, the editor records one of three outcomes for reviewed submissions: accept for publication, request revision, or reject.",
-            },
-            {
-              step: "4",
-              title: "Revision Rounds",
-              desc: "If revision is requested, the author submits a response note and a new version for the next editorial round.",
-            },
-            {
-              step: "5",
-              title: "Publication",
-              desc: "Accepted Research is published with an archived citation version. Posts and Articles publish directly and do not become reviewed or citable because of their type or genre.",
-            },
-          ].map((item) => (
-            <li key={item.step} className="flex gap-4">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
-                {item.step}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                <p className="text-sm text-gray-500">{item.desc}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-          Indegenius currently calls this process formal editorial review, not peer review.
-          “Peer Reviewed” will be used only if a separate, rigorous peer-review system is
-          implemented and verified. Older Policy Brief submissions that entered review before the
-          current content model may complete that legacy workflow; new Policy Briefs are Article
-          genres and publish directly.
         </div>
       </section>
 

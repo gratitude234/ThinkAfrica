@@ -84,7 +84,7 @@ const EMAIL_ROWS: { key: keyof NotificationPrefs; label: string; description: st
   { key: "email_co_author_accepted", label: "Co-author invitation accepted", description: "When someone accepts your co-author invitation" },
   { key: "email_co_author_declined", label: "Co-author invitation declined", description: "When someone declines your co-author invitation" },
   { key: "email_opportunity_inquiry", label: "Opportunity inquiries", description: "When an organization sends you an opportunity inquiry" },
-  { key: "email_author_publications", label: "Subscribed author publications", description: "Articles and Research from authors you explicitly subscribe to" },
+  { key: "email_author_publications", label: "Subscribed author publications", description: "Articles from authors you explicitly subscribe to" },
   { key: "email_debate_updates", label: "Debate updates", description: "Invitations, participant responses, stage openings, and cancellations" },
 ];
 
@@ -95,7 +95,7 @@ const PUSH_ROWS: { key: keyof NotificationPrefs; label: string; description: str
   { key: "push_likes", label: "Likes", description: "Browser push when someone likes your post" },
   { key: "push_follows", label: "New followers", description: "Browser push when someone follows you" },
   { key: "push_daily_brief", label: "Daily brief", description: "One browser push a day with today's top post and live debate" },
-  { key: "push_author_publications", label: "Subscribed author publications", description: "Browser push for Articles and Research from subscribed authors" },
+  { key: "push_author_publications", label: "Subscribed author publications", description: "Browser push for Articles from subscribed authors" },
   { key: "push_debate_updates", label: "Debate updates", description: "Browser push for important debate invitations and lifecycle changes" },
 ];
 
@@ -360,7 +360,7 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
               <div className="rounded-xl border border-emerald-100 bg-white px-4 py-3">
                 <p className="text-sm font-medium text-gray-800">In-app</p>
                 <p className="mt-0.5 text-xs text-gray-500">
-                  Always on for Posts, Articles, and Research from your
+                  Always on for Posts and Articles from your
                   subscriptions.
                 </p>
               </div>
@@ -368,7 +368,7 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
                 {
                   key: "email_author_publications",
                   label: "Email",
-                  description: "Articles and Research from subscribed writers",
+                  description: "Articles from subscribed writers",
                 },
                 "Email"
               )}
@@ -376,7 +376,7 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
                 {
                   key: "push_author_publications",
                   label: "Push",
-                  description: `Articles and Research · ${
+                  description: `Articles · ${
                     pushState === "active"
                       ? "enabled on this device"
                       : pushState === "unsupported"

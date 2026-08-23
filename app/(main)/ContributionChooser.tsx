@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import type { ContentKind } from "@/lib/contentModel";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 import ContinueDraftRow from "./ContinueDraftRow";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 interface ContributionChooserProps {
   open: boolean;
@@ -67,7 +68,7 @@ const OPTIONS: ContributionOption[] = [
       </svg>
     ),
   },
-  {
+  ...(FEATURE_FLAGS.research ? [{
     kind: "research",
     title: "Research",
     description: "Submit a completed scholarly paper and its publication details.",
@@ -80,7 +81,7 @@ const OPTIONS: ContributionOption[] = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 15h9" />
       </svg>
     ),
-  },
+  } satisfies ContributionOption] : []),
 ];
 
 type PositionedStyle = CSSProperties & {

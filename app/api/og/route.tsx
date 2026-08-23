@@ -1,6 +1,7 @@
 ﻿import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 import { BRAND_PROMISE, BRAND_TAGLINE } from "@/lib/brand";
+import { isResearchEnabled } from "@/lib/featureFlags";
 
 export const runtime = "edge";
 
@@ -10,6 +11,10 @@ export async function GET(request: NextRequest) {
   const author = searchParams.get("author") ?? "";
   const university = searchParams.get("university") ?? "";
   const type = searchParams.get("type") ?? "brand";
+
+  if (type === "research" && !isResearchEnabled()) {
+    return new Response("Not found.", { status: 404 });
+  }
 
   const typeLabel: Record<string, string> = {
     brand: BRAND_TAGLINE,

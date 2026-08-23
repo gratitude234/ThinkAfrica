@@ -75,7 +75,7 @@ function ResearchSkeletonCard() {
 
 type SkeletonVariant = "post" | "article" | "article-cover" | "research";
 
-const SEQUENCE: SkeletonVariant[] = ["post", "article-cover", "research", "post"];
+const SEQUENCE: SkeletonVariant[] = ["post", "article-cover", "article", "post"];
 
 /**
  * A restrained mix of Post/Article/Research skeletons (never one repeated

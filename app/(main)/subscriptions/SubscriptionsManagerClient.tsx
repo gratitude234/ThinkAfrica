@@ -214,7 +214,7 @@ export default function SubscriptionsManagerClient({
           </p>
           <p>
             <span className="font-semibold">Email:</span>{" "}
-            {emailEnabled ? "On" : "Off"} for Articles &amp; Research
+            {emailEnabled ? "On" : "Off"} for Articles
           </p>
           <p>
             <span className="font-semibold">Push:</span>{" "}

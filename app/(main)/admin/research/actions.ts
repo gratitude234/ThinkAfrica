@@ -5,6 +5,10 @@ import {
   createAdminActionClient,
   recordAdminAuditEvent,
 } from "@/lib/adminAccess";
+import {
+  isResearchEnabled,
+  RESEARCH_UNAVAILABLE_MESSAGE,
+} from "@/lib/featureFlags";
 
 type TargetInput = number | string | null | undefined;
 type ActionResult = { error: string | null };
@@ -29,6 +33,8 @@ export async function updateResearchExpansionTargets(input: {
   publicUpdates: TargetInput;
   multimediaAssets: TargetInput;
 }): Promise<ActionResult> {
+  if (!isResearchEnabled()) return { error: RESEARCH_UNAVAILABLE_MESSAGE };
+
   try {
     const windowDays = Number(input.windowDays);
     if (!Number.isInteger(windowDays) || windowDays < 30 || windowDays > 365) {

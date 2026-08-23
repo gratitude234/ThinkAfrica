@@ -45,7 +45,7 @@ export default function SubscribedAuthorsManager({
     <section className="mb-6 border-b border-gray-100 pb-6">
       <h2 className="text-base font-semibold text-gray-900">Subscribed authors</h2>
       <p className="mt-1 text-xs leading-5 text-gray-500">
-        Every publication is delivered in-app. Articles and Research may also use the enabled email and push preferences below.
+        Every publication is delivered in-app. Articles may also use the enabled email and push preferences below.
       </p>
 
       {authors.length > 0 ? (

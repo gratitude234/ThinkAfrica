@@ -16,6 +16,7 @@ import {
 } from "@/lib/intellectualRecord";
 import { getPostDisplayTitle } from "@/lib/postDisplay";
 import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 export interface ProfileContentItem {
   id: string;
@@ -69,7 +70,9 @@ const TABS: Array<{ value: Tab; label: string }> = [
   { value: "post", label: "Posts" },
   { value: "response", label: "Responses" },
   { value: "article", label: "Articles" },
-  { value: "research", label: "Research" },
+  ...(FEATURE_FLAGS.research
+    ? [{ value: "research" as const, label: "Research" }]
+    : []),
   { value: "debate", label: "Debates" },
 ];
 
@@ -80,7 +83,7 @@ const EMPTY_COPY: Record<
   record: {
     title: "No contributions yet",
     description:
-      "Published ideas, responses, research, and debate arguments will form this Intellectual Record.",
+      "Published ideas, responses, and debate arguments will form this Intellectual Record.",
     action: "Add your first contribution",
     href: "/create/post",
   },
@@ -339,17 +342,24 @@ export default function ProfileContentTabs({
   isOwnProfile: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("record");
+  const visibleItems = useMemo(
+    () =>
+      FEATURE_FLAGS.research
+        ? items
+        : items.filter((item) => resolveContentKind(item) !== "research"),
+    [items]
+  );
   const grouped = useMemo(() => {
     const publications = {
-      post: items.filter(
+      post: visibleItems.filter(
         (item) => resolveContentKind(item) === "post" && !item.in_response_to
       ),
-      response: items.filter((item) => Boolean(item.in_response_to)),
-      article: items.filter((item) => resolveContentKind(item) === "article"),
-      research: items.filter((item) => resolveContentKind(item) === "research"),
+      response: visibleItems.filter((item) => Boolean(item.in_response_to)),
+      article: visibleItems.filter((item) => resolveContentKind(item) === "article"),
+      research: visibleItems.filter((item) => resolveContentKind(item) === "research"),
     };
     const record: RecordEntry[] = [
-      ...items.map((item) => ({
+      ...visibleItems.map((item) => ({
         key: `publication-${item.id}`,
         date: item.published_at ?? item.created_at,
         kind: "publication" as const,
@@ -367,7 +377,7 @@ export default function ProfileContentTabs({
     );
 
     return { ...publications, debate: debateContributions, record };
-  }, [debateContributions, items]);
+  }, [debateContributions, visibleItems]);
 
   const counts: Record<Tab, number> = {
     record: grouped.record.length,
@@ -397,7 +407,7 @@ export default function ProfileContentTabs({
             Contributions, in public
           </h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-muted">
-            A dated record of published ideas, linked responses, research, and debate arguments.
+            A dated record of published ideas, linked responses, and debate arguments.
           </p>
         </div>
         {isOwnProfile ? (

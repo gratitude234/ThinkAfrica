@@ -1,5 +1,6 @@
 import type { PostCardData } from "@/components/post/PostCard";
 import { resolveArticleFormat, resolveContentKind } from "@/lib/contentModel";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 // Primary Explore filters are the three top-level content kinds (plus
 // "All"). Essay and Policy Brief are refinements of Articles, not
@@ -14,7 +15,9 @@ export const PRIMARY_FILTERS: Array<{
   { value: "all", label: "All" },
   { value: "post", label: "Posts" },
   { value: "article", label: "Articles" },
-  { value: "research", label: "Research" },
+  ...(FEATURE_FLAGS.research
+    ? [{ value: "research" as const, label: "Research" }]
+    : []),
 ];
 
 export const GENRE_FILTERS: Array<{
@@ -52,6 +55,9 @@ export function getExploreFilters(
   }
 
   const mapped = LEGACY_TYPE_PARAM[typeParam];
+  if (mapped.primary === "research" && !FEATURE_FLAGS.research) {
+    return { primary: "all", genre: "all" };
+  }
   if (mapped.primary === "article" && genreParam && isExploreGenreFilter(genreParam)) {
     return { primary: "article", genre: genreParam };
   }
@@ -81,7 +87,9 @@ export function filterPostsByExplore(
     }
     return articles;
   }
-  return posts;
+  return FEATURE_FLAGS.research
+    ? posts
+    : posts.filter((post) => resolveContentKind(post) !== "research");
 }
 
 /**

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isResearchEnabled } from "@/lib/featureFlags";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -7,6 +8,10 @@ interface RouteProps {
 }
 
 export async function GET(_request: Request, { params }: RouteProps) {
+  if (!isResearchEnabled()) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
   const { assetId } = await params;
   const admin = createAdminClient();
   const { data: asset } = await admin

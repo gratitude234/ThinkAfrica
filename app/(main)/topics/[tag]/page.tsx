@@ -17,7 +17,10 @@ import {
 } from "@/lib/postQuality";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 import TopicSubscribeButton from "@/components/topic/TopicSubscribeButton";
-import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
+import {
+  isTopicSubscriptionsEnabled,
+  RESEARCH_TYPE_QUERY_EXCLUSION,
+} from "@/lib/featureFlags";
 import { normalizeTagValue } from "@/lib/tags";
 
 interface PageProps {
@@ -38,7 +41,8 @@ export default async function TopicPage({ params }: PageProps) {
       profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
       post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
     `)
-    .eq("status", "published");
+    .eq("status", "published")
+    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION);
   postsQuery = subscriptionsEnabled
     ? postsQuery.contains("topic_keys", [topicKey])
     : postsQuery.contains("tags", [decodedTag]);

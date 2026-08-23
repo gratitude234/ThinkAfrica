@@ -23,7 +23,7 @@ const ACCOUNT_LINKS: HubLink[] = [
   },
   {
     label: "Bookmarks",
-    description: "Return to the posts and research you saved.",
+    description: "Return to the posts and articles you saved.",
     href: "/bookmarks",
     icon: "bookmarks",
   },

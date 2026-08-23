@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { resolveContentKind, type ContentKind } from "@/lib/contentModel";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -30,7 +31,9 @@ const RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
  */
 function getResumeHref(kind: ContentKind | null, draftId: string) {
   if (kind === "article") return `/write?draft=${draftId}`;
-  if (kind === "research") return `/submit/research?draft=${draftId}`;
+  if (kind === "research" && FEATURE_FLAGS.research) {
+    return `/submit/research?draft=${draftId}`;
+  }
   return null;
 }
 

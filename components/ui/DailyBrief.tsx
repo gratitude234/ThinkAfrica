@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getPointTier, getNextTier } from "@/lib/utils";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
+import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 
 interface Props {
   userId: string;
@@ -22,6 +23,7 @@ export default async function DailyBrief({ userId: _userId, points }: Props) {
         "title, slug, view_count, profiles!posts_author_id_fkey(full_name)"
       )
       .eq("status", "published")
+      .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
       .gte("published_at", todayStartStr)
       .order("view_count", { ascending: false })
       .limit(1)

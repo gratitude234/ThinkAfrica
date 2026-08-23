@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeFakeSupabase, queueResults } from "@/lib/testUtils/supabaseMock";
 
+vi.mock("@/lib/featureFlags", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/featureFlags")>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, research: true },
+    isResearchEnabled: () => true,
+  };
+});
+
 const fakeSupabase = { current: null as ReturnType<typeof makeFakeSupabase> | null };
 
 vi.mock("@/lib/supabase/server", () => ({

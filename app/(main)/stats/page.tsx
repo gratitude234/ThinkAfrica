@@ -9,6 +9,7 @@ import {
   isAuthorSubscriptionsEnabled,
   isAuthorSubscriptionsUxV2Enabled,
   isTopicSubscriptionsEnabled,
+  RESEARCH_TYPE_QUERY_EXCLUSION,
 } from "@/lib/featureFlags";
 import {
   getAuthorPublicationFunnel,
@@ -91,6 +92,7 @@ export default async function StatsPage() {
       .select("id, title, slug, type, content_kind, article_format, view_count, read_count, created_at, published_at")
       .eq("author_id", profile.id)
       .eq("status", "published")
+      .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
       .order("read_count", { ascending: false }),
     getAuthorPublicationFunnel(profile.id),
     getAuthorSubscriberGrowth(profile.id),

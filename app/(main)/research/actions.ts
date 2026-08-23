@@ -19,6 +19,10 @@ import {
   type ResearchUpdateType,
 } from "@/lib/research";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isResearchEnabled,
+  RESEARCH_UNAVAILABLE_MESSAGE,
+} from "@/lib/featureFlags";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -35,6 +39,8 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 async function authenticatedClient() {
+  if (!isResearchEnabled()) throw new Error(RESEARCH_UNAVAILABLE_MESSAGE);
+
   const supabase = await createClient();
   const {
     data: { user },

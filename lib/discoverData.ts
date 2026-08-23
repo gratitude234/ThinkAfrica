@@ -16,6 +16,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   isAuthorSubscriptionsUxV2Enabled,
   isTopicSubscriptionsEnabled,
+  RESEARCH_TYPE_QUERY_EXCLUSION,
 } from "@/lib/featureFlags";
 import { normalizeTagValue } from "@/lib/tags";
 
@@ -315,6 +316,7 @@ async function getTopicCountsUncached(
     .from("posts")
     .select("tags")
     .eq("status", "published")
+    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
     .order("published_at", { ascending: false })
     .limit(250);
 

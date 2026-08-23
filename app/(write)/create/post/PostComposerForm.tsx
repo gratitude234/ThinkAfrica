@@ -7,6 +7,7 @@ import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import PublishingTopicSelector from "@/components/topic/PublishingTopicSelector";
 import { countShortPostCharacters, SHORT_POST_MAX_CHARACTERS } from "@/lib/shortPostContent";
 import { MAX_SHORT_POST_TOPICS } from "@/lib/tags";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { createPost, promoteToArticle } from "./actions";
 
 interface PostComposerFormProps {
@@ -649,7 +650,7 @@ export default function PostComposerForm({
             )}
             {promoting ? "Moving your draft" : "Write an article"}
           </button>
-          {!parentPost ? (
+          {!parentPost && FEATURE_FLAGS.research ? (
             <Link
               href="/submit/research"
               className="inline-flex min-h-10 items-center gap-2 rounded-full bg-purple-tint px-4 py-2 text-sm font-semibold text-purple-accent transition-colors hover:bg-[#E2DAEC] md:rounded-lg md:bg-transparent md:px-2.5 md:hover:bg-purple-tint"

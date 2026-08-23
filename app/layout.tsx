@@ -37,7 +37,6 @@ export const metadata: Metadata = {
     "intellectual identity",
     "ideas",
     "publishing",
-    "research",
     "debates",
     "African intellectual network",
   ],

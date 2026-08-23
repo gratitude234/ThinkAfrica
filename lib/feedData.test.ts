@@ -32,7 +32,7 @@ afterEach(() => {
 function makeQuerySpy() {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   const query: Record<string, unknown> = {};
-  for (const method of ["eq", "gte", "not"]) {
+  for (const method of ["eq", "neq", "gte", "not"]) {
     query[method] = vi.fn((...args: unknown[]) => {
       calls.push({ method, args });
       return query;
@@ -57,6 +57,14 @@ describe("normalizeFeedContentFilter", () => {
 });
 
 describe("applyPostFilters", () => {
+  it("excludes Research from every feed", () => {
+    const { query, calls } = makeQuerySpy();
+
+    applyPostFilters(query, { type: null, cutoff: null });
+
+    expect(calls).toContainEqual({ method: "neq", args: ["type", "research"] });
+  });
+
   it("filters Articles by resolved content_kind", () => {
     const { query, calls } = makeQuerySpy();
 

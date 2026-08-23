@@ -11,6 +11,7 @@ import {
 } from "@/lib/postCounts";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 import type { DebateInterludeData } from "@/components/post/DebateInterlude";
+import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 
 export interface DailyBriefProfile {
   username: string | null;
@@ -89,6 +90,7 @@ export async function getFeaturedPostCandidates(supabase: SupabaseClient) {
         .from("posts")
         .select(FEATURED_POST_SELECT)
         .eq("status", "published")
+        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
         .eq("featured", true)
         .order("published_at", { ascending: false })
         .limit(1)
@@ -98,6 +100,7 @@ export async function getFeaturedPostCandidates(supabase: SupabaseClient) {
         .from("posts")
         .select(FEATURED_POST_SELECT)
         .eq("status", "published")
+        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
         .gte("published_at", featuredFallbackCutoff)
         .order("published_at", { ascending: false })
         .order("id", { ascending: false })
@@ -107,6 +110,7 @@ export async function getFeaturedPostCandidates(supabase: SupabaseClient) {
         .from("posts")
         .select(FEATURED_POST_SELECT)
         .eq("status", "published")
+        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
         .order("published_at", { ascending: false })
         .limit(1)
         .maybeSingle(),

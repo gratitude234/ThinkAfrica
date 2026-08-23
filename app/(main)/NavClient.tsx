@@ -171,13 +171,15 @@ export default function NavClient({
               >
                 Campus
               </Link>
-              <Link
-                href="/research"
-                className={navItemClass(isResearchActive)}
-                aria-current={isResearchActive ? "page" : undefined}
-              >
-                Research
-              </Link>
+              {FEATURE_FLAGS.research ? (
+                <Link
+                  href="/research"
+                  className={navItemClass(isResearchActive)}
+                  aria-current={isResearchActive ? "page" : undefined}
+                >
+                  Research
+                </Link>
+              ) : null}
               {FEATURE_FLAGS.debates ? (
                 <Link
                   href="/debates"

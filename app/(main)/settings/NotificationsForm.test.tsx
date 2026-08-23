@@ -88,7 +88,7 @@ describe("NotificationsForm", () => {
     render(<NotificationsForm profileId="user-a" notificationPrefs={prefs} />);
 
     expect(
-      screen.getByText(/Always on for Posts, Articles, and Research/)
+      screen.getByText(/Always on for Posts and Articles/)
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("switch", { name: "In-app: New publications" })

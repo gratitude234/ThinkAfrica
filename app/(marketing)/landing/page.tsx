@@ -12,6 +12,10 @@ import {
   resolveArticleFormat,
   resolveContentKind,
 } from "@/lib/contentModel";
+import {
+  FEATURE_FLAGS,
+  RESEARCH_TYPE_QUERY_EXCLUSION,
+} from "@/lib/featureFlags";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
@@ -86,7 +90,7 @@ const VALUE_PROPS = [
     num: "01",
     numStyle: "bg-emerald-100 text-emerald-600",
     title: "Discover ideas worth engaging with",
-    desc: "Read Posts, Articles, and Research from people developing ideas through evidence, argument, and public contribution.",
+    desc: "Read Posts and Articles from people developing ideas through evidence, argument, and public contribution.",
   },
   {
     num: "02",
@@ -166,11 +170,16 @@ async function fetchLandingData(
            profiles!posts_author_id_fkey (username, full_name, university)`
         )
         .eq("status", "published")
+        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
         .order("featured", { ascending: false })
         .order("view_count", { ascending: false })
         .order("published_at", { ascending: false })
         .limit(7),
-      supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", "published"),
+      supabase
+        .from("posts")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "published")
+        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       getPublicTopicCounts(supabase),
     ]);
@@ -199,10 +208,16 @@ export default async function LandingPage() {
       ? await getCachedLandingData()
       : await fetchLandingData(await createClient());
 
-  const posts: LandingPost[] = postsRaw.map((p) => ({
-    ...p,
-    profiles: Array.isArray(p.profiles) ? (p.profiles[0] ?? null) : p.profiles,
-  }));
+  const posts: LandingPost[] = postsRaw
+    .filter(
+      (post) =>
+        FEATURE_FLAGS.research ||
+        (post.type !== "research" && post.content_kind !== "research")
+    )
+    .map((p) => ({
+      ...p,
+      profiles: Array.isArray(p.profiles) ? (p.profiles[0] ?? null) : p.profiles,
+    }));
 
   const [leadPost = null, ...rest] = posts;
   const railPosts  = rest.slice(0, 3);
@@ -332,7 +347,7 @@ export default async function LandingPage() {
                       registered profiles on Indegenius
                     </>
                   ) : (
-                    "Explore Posts, Articles, and Research already live on Indegenius"
+                    "Explore Posts and Articles already live on Indegenius"
                   )}
                 </p>
               </div>
@@ -703,7 +718,7 @@ export default async function LandingPage() {
               Explore ideas worth engaging with
             </h2>
             <p className="mb-7 text-[15px] leading-relaxed opacity-80">
-              No account needed to read. Browse Posts, Articles, and Research from
+              No account needed to read. Browse Posts and Articles from
               young people who actively engage with ideas.
             </p>
             <LandingTrackedLink

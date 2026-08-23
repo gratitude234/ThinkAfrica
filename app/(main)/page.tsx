@@ -33,6 +33,7 @@ import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/s
 import {
   isAuthorSubscriptionsUxV2Enabled,
   isTopicSubscriptionsEnabled,
+  RESEARCH_TYPE_QUERY_EXCLUSION,
 } from "@/lib/featureFlags";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
@@ -202,6 +203,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           .select("id, title, updated_at, type, content_kind")
           .eq("author_id", user.id)
           .eq("status", "draft")
+          .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
           .gte("updated_at", draftCutoff)
           .order("updated_at", { ascending: false })
           .limit(1)

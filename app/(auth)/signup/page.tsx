@@ -21,7 +21,7 @@ import { BRAND_PROMISE } from "@/lib/brand";
 
 const PROOF_ITEMS = [
   "Build a public record of your ideas",
-  "Publish Posts, Articles, and Research",
+  "Publish Posts and Articles",
   "Respond, debate, and collaborate",
 ];
 

@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient, AdminAccessError } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/lib/types";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 export type AdminCapability =
   | "admin.full"
@@ -89,12 +90,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     description: "Review platform activity and growth signals.",
     capability: "analytics.view",
   },
-  {
+  ...(FEATURE_FLAGS.research ? [{
     href: "/admin/research",
     title: "Research Expansion",
     description: "Measure structured inquiry, collaboration, outputs, and the Phase 4 exit gate.",
-    capability: "analytics.view",
-  },
+    capability: "analytics.view" as const,
+  }] : []),
   {
     href: "/admin/digest",
     title: "Digest",

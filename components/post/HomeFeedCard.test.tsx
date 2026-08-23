@@ -7,6 +7,10 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
   useGuestAuthGate: () => ({ requestAuth: vi.fn() }),
 }));
+vi.mock("@/lib/featureFlags", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/featureFlags")>();
+  return { ...actual, FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, research: true } };
+});
 
 function post(overrides: Partial<PostCardData> = {}): PostCardData {
   return {

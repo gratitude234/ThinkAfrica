@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isResearchEnabled } from "@/lib/featureFlags";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -68,6 +69,10 @@ async function canAccessDocument({
 }
 
 export async function GET(_request: NextRequest, { params }: RouteProps) {
+  if (!isResearchEnabled()) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
   const { postId } = await params;
   const supabase = await createClient();
   const {

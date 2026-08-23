@@ -24,6 +24,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   isAuthorSubscriptionsUxV2Enabled,
   isTopicSubscriptionsEnabled,
+  RESEARCH_TYPE_QUERY_EXCLUSION,
 } from "@/lib/featureFlags";
 import type {
   SubscriptionFeedSource,
@@ -783,6 +784,7 @@ export async function fetchResponseCards(
     .select(POST_SELECT)
     .eq("in_response_to", postId)
     .eq("status", "published")
+    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
     .order("published_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(safeLimit)) as SupabaseQueryResult<unknown[]>;
@@ -824,6 +826,7 @@ export async function fetchRecentResponsePage(
     .select(POST_SELECT)
     .not("in_response_to", "is", null)
     .eq("status", "published")
+    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
     .order("published_at", { ascending: false })
     .order("id", { ascending: false })
     .range(offset, offset + safePageSize)) as SupabaseQueryResult<unknown[]>;
@@ -878,6 +881,7 @@ async function fetchCitableFeedUncached(
     .from("posts")
     .select(POST_SELECT)
     .eq("status", "published")
+    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
     .not("citation_id", "is", null)
     .order("published_at", { ascending: false })
     .order("id", { ascending: false })
@@ -933,7 +937,9 @@ export function applyPostFilters(
     excludedPostIds?: string[];
   }
 ) {
-  let nextQuery = query.eq("status", "published");
+  let nextQuery = query
+    .eq("status", "published")
+    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION);
   if (type && type !== "all") {
     // Home filters use the three top-level content kinds. Article genres
     // remain descriptive metadata and are deliberately not peer filters.

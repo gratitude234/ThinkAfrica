@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import Badge from "@/components/ui/Badge";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { trackActivationEvent } from "@/lib/activationEvents";
@@ -200,6 +201,7 @@ function SearchPageContent() {
             "id, title, slug, excerpt, type, content_kind, article_format, citation_id, published_version_id, published_at, profiles!posts_author_id_fkey(username, full_name, university)"
           )
           .eq("status", "published")
+          .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
           .or(`title.ilike.%${trimmed}%,excerpt.ilike.%${trimmed}%`)
           .order("published_at", { ascending: false })
           .limit(15),

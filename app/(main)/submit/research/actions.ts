@@ -16,7 +16,11 @@ import {
   normalizeAndDedupeTopicValues,
   normalizeResearchKeywords,
 } from "@/lib/tags";
-import { isAiTopicSuggestionsEnabled } from "@/lib/featureFlags";
+import {
+  isAiTopicSuggestionsEnabled,
+  isResearchEnabled,
+  RESEARCH_UNAVAILABLE_MESSAGE,
+} from "@/lib/featureFlags";
 
 type ReferenceInput = Omit<PostReferenceRecord, "post_id"> & {
   id?: string;
@@ -323,6 +327,10 @@ async function syncAuthors(
 }
 
 async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pending") {
+  if (!isResearchEnabled()) {
+    return { error: RESEARCH_UNAVAILABLE_MESSAGE, postId: null, slug: null };
+  }
+
   const { supabase, user } = await getCurrentUser();
 
   if (!user) {
@@ -601,6 +609,10 @@ export async function submitResearchPaper(input: ResearchPayload) {
 }
 
 export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInput) {
+  if (!isResearchEnabled()) {
+    return { error: RESEARCH_UNAVAILABLE_MESSAGE, postId: null, slug: null };
+  }
+
   const { supabase, user } = await getCurrentUser();
 
   if (!user) {

@@ -39,7 +39,7 @@ describe("SideRail", () => {
     expect(hrefFor("For you")).toBe("/");
     expect(hrefFor("Discover")).toBe("/explore");
     expect(hrefFor("Campus")).toBe("/campus");
-    expect(hrefFor("Research")).toBe("/research");
+    expect(screen.queryByRole("link", { name: "Research" })).not.toBeInTheDocument();
     expect(hrefFor("Debates")).toBe("/debates");
     expect(hrefFor("Responses")).toBe("/responses");
     expect(hrefFor("Opportunities")).toBe("/opportunities");
@@ -75,12 +75,9 @@ describe("SideRail", () => {
     );
   });
 
-  it("marks research projects as their own section", () => {
+  it("keeps Research hidden even on a former Research URL", () => {
     renderRail({}, "/research/projects/urban-water-access");
-    expect(screen.getByRole("link", { name: "Research" })).toHaveAttribute(
-      "aria-current",
-      "page"
-    );
+    expect(screen.queryByRole("link", { name: "Research" })).not.toBeInTheDocument();
   });
 
   it("keeps My record lit across the account surfaces", () => {

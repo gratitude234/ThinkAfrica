@@ -31,7 +31,7 @@ import { formatDate } from "@/lib/utils";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
 
 const EXPLORE_DESCRIPTION =
-  "Discover posts, articles, research, debates, topics, and people building evidence-backed Intellectual Records on Indegenius.";
+  "Discover posts, articles, debates, topics, and people building evidence-backed Intellectual Records on Indegenius.";
 
 /**
  * No `revalidate` here. This route reads the session through
@@ -752,12 +752,6 @@ function MoreDestinationsCard() {
       body: "Work grouped by university.",
       item: "campus",
     },
-    {
-      href: "/research",
-      label: "Research projects",
-      body: "Open projects looking for collaborators.",
-      item: "research_project",
-    },
   ];
 
   return (
@@ -879,7 +873,7 @@ function CitableSection({ data }: { data: DiscoverData }) {
     <>
       <SectionHeading
         title="Citable works"
-        subtitle="Archived research and articles carrying a citation record."
+        subtitle="Archived articles carrying a citation record."
       />
       {data.citablePosts.length === 0 ? (
         <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-10 text-center">
@@ -1050,7 +1044,7 @@ export default async function ExplorePage({ searchParams }: PageProps) {
           Find ideas worth engaging with
         </h1>
         <p className="mt-1.5 max-w-measure text-byline text-ink-muted sm:mt-2">
-          Posts, articles, research, debates, and people across Indegenius.
+          Posts, articles, debates, and people across Indegenius.
         </p>
         <SearchEntry />
       </div>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Badge from "@/components/ui/Badge";
 import { isFormallyReviewed } from "@/lib/contentModel";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 interface SearchResult {
   id: string;
@@ -69,11 +70,17 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       .ilike("title", `%${q}%`)
       .limit(6);
 
-    const mapped: SearchResult[] = (data ?? []).map((post) => ({
-      ...post,
-      url: `/post/${post.slug}`,
-      profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
-    }));
+    const mapped: SearchResult[] = (data ?? [])
+      .filter(
+        (post) =>
+          FEATURE_FLAGS.research ||
+          (post.type !== "research" && post.content_kind !== "research")
+      )
+      .map((post) => ({
+        ...post,
+        url: `/post/${post.slug}`,
+        profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
+      }));
     setResults(mapped);
     setFocusedIndex(mapped.length > 0 ? 0 : null);
     setLoading(false);
@@ -167,7 +174,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               value={query}
               onChange={handleChange}
               onKeyDown={handleInputKeyDown}
-              placeholder="Search posts, articles, research, writers…"
+              placeholder="Search posts, articles, writers…"
               className="flex-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
               aria-label="Search Indegenius"
             />
@@ -202,7 +209,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
         <div className="max-h-80 overflow-y-auto">
           {!query ? (
             <div className="px-4 py-8 text-center text-sm text-gray-400">
-              Search posts, articles, research, writers…
+              Search posts, articles, writers…
             </div>
           ) : null}
           {query && loading ? (

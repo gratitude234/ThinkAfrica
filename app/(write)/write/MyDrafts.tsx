@@ -53,7 +53,9 @@ export default function MyDrafts({
     });
   }, []);
 
-  const filtered = drafts.filter((d) => d.id !== activeDraftId);
+  const filtered = drafts.filter(
+    (draft) => draft.id !== activeDraftId && resolveContentKind(draft) !== "research"
+  );
   if (filtered.length === 0) return null;
   const compact = variant === "panel";
 

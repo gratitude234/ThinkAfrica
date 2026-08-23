@@ -26,7 +26,11 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { formatMonthYear } from "@/lib/utils";
 import { isFormallyReviewed } from "@/lib/contentModel";
-import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
+import {
+  FEATURE_FLAGS,
+  isAuthorSubscriptionsEnabled,
+  RESEARCH_TYPE_QUERY_EXCLUSION,
+} from "@/lib/featureFlags";
 import { getEngagementCounts } from "@/lib/dailyBrief";
 import { getIntellectualRecordSummary } from "@/lib/intellectualRecord";
 
@@ -273,6 +277,7 @@ export default async function UserProfilePage({ params }: PageProps) {
       )
       .eq("author_id", profile.id)
       .eq("status", "published")
+      .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
       .order("published_at", { ascending: false }),
     supabase
       .from("post_authors")
@@ -396,6 +401,8 @@ export default async function UserProfilePage({ params }: PageProps) {
       const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
       if (
         !post ||
+        (!FEATURE_FLAGS.research &&
+          (post as { type?: string }).type === "research") ||
         (post as { author_id?: string }).author_id === profile.id ||
         (post as { status?: string }).status !== "published"
       ) {
@@ -605,12 +612,14 @@ export default async function UserProfilePage({ params }: PageProps) {
         isOwnProfile={isOwnProfile}
       />
 
-      <ResearchProfileCard
-        displayName={displayName}
-        profile={(researcherProfile as PublicResearchProfile | null) ?? null}
-        projects={publicResearchProjects}
-        isOwnProfile={isOwnProfile}
-      />
+      {FEATURE_FLAGS.research ? (
+        <ResearchProfileCard
+          displayName={displayName}
+          profile={(researcherProfile as PublicResearchProfile | null) ?? null}
+          projects={publicResearchProjects}
+          isOwnProfile={isOwnProfile}
+        />
+      ) : null}
 
       <OpportunityBanner
         isOwnProfile={isOwnProfile}

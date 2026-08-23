@@ -48,7 +48,7 @@ export default async function AdminIndexPage() {
       .from("posts")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending")
-      .in("type", ["research", "policy_brief"]),
+      .eq("type", "policy_brief"),
     admin
       .from("fellowship_applications")
       .select("id", { count: "exact", head: true })
@@ -102,7 +102,7 @@ export default async function AdminIndexPage() {
           href="/admin/review"
           label="Editorial queue"
           value={pendingEditorialCount ?? 0}
-          helper="Research and policy briefs awaiting action"
+          helper="Policy briefs awaiting action"
         />
         <StatCard
           href="/admin/fellowships"

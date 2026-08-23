@@ -154,12 +154,14 @@ export default function SideRail({
           icon={CampusIcon}
           isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.campus)}
         />
-        <RailLink
-          href="/research"
-          label="Research"
-          icon={ResearchIcon}
-          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.research)}
-        />
+        {FEATURE_FLAGS.research ? (
+          <RailLink
+            href="/research"
+            label="Research"
+            icon={ResearchIcon}
+            isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.research)}
+          />
+        ) : null}
         <RailLink
           href={userId ? "/me" : "/signup"}
           label={userId ? "My record" : "Join"}

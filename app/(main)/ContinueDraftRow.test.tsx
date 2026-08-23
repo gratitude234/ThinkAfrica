@@ -78,16 +78,15 @@ describe("ContinueDraftRow", () => {
     expect(screen.getByText("Land tenure reform")).toBeInTheDocument();
   });
 
-  it("sends a Research draft to the submission flow, not the Article editor", async () => {
+  it("does not offer a Research draft while Research is switched off", async () => {
     queryResult.current = {
       data: [draftRow({ id: "draft-9", type: "research", content_kind: "research" })],
       error: null,
     };
 
-    renderRow();
+    const { container } = renderRow();
 
-    const link = await screen.findByRole("link", { name: /Continue latest draft/ });
-    expect(link).toHaveAttribute("href", "/submit/research?draft=draft-9");
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
   it("names an untitled draft rather than showing a blank row", async () => {

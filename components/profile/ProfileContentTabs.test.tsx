@@ -18,7 +18,7 @@ function item(overrides: Partial<ProfileContentItem>): ProfileContentItem {
 }
 
 describe("ProfileContentTabs", () => {
-  it("separates Posts, Articles, and Research by the resolved content model", () => {
+  it("separates enabled content and omits Research records", () => {
     render(
       <ProfileContentTabs
         isOwnProfile={false}
@@ -34,9 +34,8 @@ describe("ProfileContentTabs", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Articles/ }));
     expect(screen.getByRole("heading", { name: "A public argument" })).toBeInTheDocument();
     expect(screen.getByText("Article · Essay")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: /Research/ }));
-    expect(screen.getByRole("heading", { name: "A field study" })).toBeInTheDocument();
-    expect(screen.getByText("Citable")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Research/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "A field study" })).not.toBeInTheDocument();
   });
 
   it("shows the matching creation action in an owner's empty tab", () => {
@@ -46,8 +45,8 @@ describe("ProfileContentTabs", () => {
     ).toHaveAttribute("href", "/create/post");
     fireEvent.click(screen.getByRole("tab", { name: /Posts/ }));
     expect(screen.getByRole("link", { name: "Write a post" })).toHaveAttribute("href", "/create/post");
-    fireEvent.click(screen.getByRole("tab", { name: /Research/ }));
-    expect(screen.getByRole("link", { name: "Submit research" })).toHaveAttribute("href", "/submit/research");
+    expect(screen.queryByRole("tab", { name: /Research/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Submit research" })).not.toBeInTheDocument();
   });
 
   it("shows responses and debates inside the unified record with factual quality labels", () => {

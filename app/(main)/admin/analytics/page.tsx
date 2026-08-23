@@ -434,7 +434,7 @@ export default async function AdminAnalyticsPage() {
   const { data: editorialPostsRaw } = await supabase
     .from("posts")
     .select("id, type, status, created_at, published_at, citation_id, published_version_id")
-    .in("type", ["research", "policy_brief"])
+    .eq("type", "policy_brief")
     .limit(10000);
   const editorialPosts = (editorialPostsRaw ?? []) as EditorialAnalyticsPostRow[];
   const editorialPostIds = editorialPosts.map((post) => post.id);
@@ -1280,7 +1280,7 @@ export default async function AdminAnalyticsPage() {
             label="In Review"
             value={editorialStatusCounts.pending ?? 0}
             trend="neutral"
-            trendLabel="research and policy submissions"
+            trendLabel="policy submissions"
           />
           <HealthCard
             label="Pending Revisions"
@@ -1311,12 +1311,6 @@ export default async function AdminAnalyticsPage() {
             value={decisionDurations.length > 0 ? `${avgEditorialDecisionDays}d` : "-"}
             trend="neutral"
             trendLabel={`${decisionDurations.length.toLocaleString()} completed publication paths`}
-          />
-          <HealthCard
-            label="Research Submissions"
-            value={editorialPosts.filter((post) => post.type === "research").length}
-            trend="neutral"
-            trendLabel="all statuses"
           />
           <HealthCard
             label="Policy Brief Submissions"

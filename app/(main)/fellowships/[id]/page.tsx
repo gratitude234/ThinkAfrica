@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import {
   getOpportunityShortLabel,
   getOpportunityStyle,
@@ -79,6 +80,7 @@ export default async function FellowshipPage({ params }: PageProps) {
         .from("posts")
         .select("id, title, slug, type, content_kind, article_format, status, citation_id, tags")
         .eq("author_id", user.id)
+        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
         .order("published_at", { ascending: false, nullsFirst: false }),
       supabase
         .from("saved_opportunities")

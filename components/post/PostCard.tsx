@@ -15,6 +15,7 @@ import {
   resolveArticleFormat,
   resolveContentKind,
 } from "@/lib/contentModel";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import type { SubscriptionMatchReason } from "@/lib/publicationDelivery";
 import type { FeedExposure } from "@/lib/feedExposure";
 
@@ -270,6 +271,7 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
   // "Article" -- the historical format, if any, is a secondary suffix, not
   // a replacement for the primary identity (see docs/content-model.md).
   const resolvedKind = resolveContentKind(post);
+  if (!FEATURE_FLAGS.research && resolvedKind === "research") return null;
   const resolvedFormat = resolveArticleFormat(post);
   const formatLabel = getArticleFormatLabel(resolvedFormat);
   const typeLabel = isLightweight

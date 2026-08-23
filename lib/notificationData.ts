@@ -1,3 +1,5 @@
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
+
 export interface NotificationData {
   id: string;
   type: string;
@@ -63,7 +65,7 @@ export function sectionsFromNotifications(
 const NOTIFICATIONS_SELECT = `
   id, type, read, created_at, actor_id, post_id, message, link, dismissed_at,
   actor:profiles!notifications_actor_id_fkey(full_name, username, avatar_url),
-  post:posts!notifications_post_id_fkey(title, slug, content_kind)
+  post:posts!notifications_post_id_fkey(title, slug, type, content_kind)
 `;
 
 type NotificationsQueryClient = {
@@ -111,19 +113,26 @@ export async function fetchNotificationRows(
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  const rows = ((raw ?? []) as Array<Record<string, unknown>>).map((notification) => {
+  const rows = ((raw ?? []) as Array<Record<string, unknown>>).flatMap((notification) => {
     const rawActor = notification.actor as
       | NotificationData["actor"]
       | NotificationData["actor"][]
       | null;
     const rawPost = notification.post as
-      | { title: string; slug: string; content_kind: string | null }
-      | { title: string; slug: string; content_kind: string | null }[]
+      | { title: string; slug: string; type: string; content_kind: string | null }
+      | { title: string; slug: string; type: string; content_kind: string | null }[]
       | null;
     const actor = Array.isArray(rawActor) ? rawActor[0] ?? null : rawActor;
     const post = Array.isArray(rawPost) ? rawPost[0] ?? null : rawPost;
 
-    return {
+    if (
+      !FEATURE_FLAGS.research &&
+      (post?.type === "research" || post?.content_kind === "research")
+    ) {
+      return [];
+    }
+
+    return [{
       id: notification.id as string,
       type: notification.type as string,
       read: notification.read as boolean,
@@ -136,7 +145,7 @@ export async function fetchNotificationRows(
       post_title: post?.title ?? null,
       post_slug: post?.slug ?? null,
       post_content_kind: post?.content_kind ?? null,
-    };
+    }];
   });
 
   return { rows, error: error?.message ?? null };

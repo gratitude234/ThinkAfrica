@@ -1,6 +1,7 @@
 ﻿import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import StatsBar from "./StatsBar";
 import PostsTable from "./PostsTable";
 import type { DashboardPost } from "./PostsTable";
@@ -210,6 +211,7 @@ export default async function DashboardPage() {
       `
     )
     .eq("author_id", user.id)
+    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
     .order("created_at", { ascending: false });
 
   const postIds = (postsRaw ?? []).map((p) => p.id);
@@ -783,7 +785,7 @@ export default async function DashboardPage() {
       key: "reviewed",
       label: "Reviewed/citable",
       value: reviewedOrCitableCount,
-      helper: "Research, policy, or archived work.",
+      helper: "Policy or archived work.",
       done: reviewedOrCitableCount > 0,
     },
     {
@@ -821,14 +823,14 @@ export default async function DashboardPage() {
     : publishedPosts.length === 0
       ? {
           label: "Publish your first portfolio piece",
-          body: "Write your first Article, then build toward Research.",
+          body: "Write your first Article and build your public record.",
           href: "/write?kind=article",
           cta: "Start writing",
         }
       : reviewedDraftMissingReferences
         ? {
             label: "Add references to reviewed-format draft",
-            body: "Research and policy briefs need sources before they can enter review.",
+            body: "Policy briefs need sources before they can enter review.",
             href: `/write?draft=${reviewedDraftMissingReferences.id}`,
             cta: "Add sources",
           }

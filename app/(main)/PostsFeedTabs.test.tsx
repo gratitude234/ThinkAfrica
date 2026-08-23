@@ -399,7 +399,7 @@ describe("PostsFeedTabs -- empty states", () => {
     });
   });
 
-  it("offers an authenticated viewer every format instead of assuming a Post", () => {
+  it("offers an authenticated viewer every enabled format", () => {
     render(<PostsFeedTabs {...common} showFollowingTab currentUserId="user-1" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
@@ -413,10 +413,7 @@ describe("PostsFeedTabs -- empty states", () => {
       "href",
       "/write?kind=article"
     );
-    expect(within(dialog).getByRole("link", { name: /^Research/ })).toHaveAttribute(
-      "href",
-      "/submit/research"
-    );
+    expect(within(dialog).queryByRole("link", { name: /^Research/ })).not.toBeInTheDocument();
     expect(mocks.requestAuth).not.toHaveBeenCalled();
     expect(mocks.push).not.toHaveBeenCalled();
   });

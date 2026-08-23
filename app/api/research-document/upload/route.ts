@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { isResearchEnabled } from "@/lib/featureFlags";
 
 const MAX_RESEARCH_PDF_BYTES = 20 * 1024 * 1024;
 const SETUP_ERROR =
@@ -12,6 +13,10 @@ function isPdf(buffer: Buffer) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isResearchEnabled()) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

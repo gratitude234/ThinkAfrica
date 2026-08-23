@@ -33,7 +33,6 @@ export const metadata: Metadata = {
 const STATS = [
   { value: "Post", label: "Lightweight publishing" },
   { value: "Article", label: "Long-form publishing" },
-  { value: "Research", label: "Formal editorial review" },
   { value: "Response", label: "Linked publication" },
 ];
 

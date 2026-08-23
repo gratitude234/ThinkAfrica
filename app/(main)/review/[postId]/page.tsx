@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canReview } from "@/lib/roles";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
+import { isResearchEnabled } from "@/lib/featureFlags";
 import Badge from "@/components/ui/Badge";
 import SubmitReviewForm from "../SubmitReviewForm";
 
@@ -88,7 +89,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       .order("version_number", { ascending: false }),
   ]);
 
-  if (!post) notFound();
+  if (!post || (!isResearchEnabled() && post.type === "research")) notFound();
 
   const sanitizedContent = sanitizePostHtml(post.content);
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;

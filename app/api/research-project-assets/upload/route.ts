@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { isResearchEnabled } from "@/lib/featureFlags";
 
 const BUCKET = "research-project-assets";
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -123,6 +124,10 @@ async function readFileHeader(admin: AdminClient, storagePath: string) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isResearchEnabled()) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
   const { user } = await authenticatedUser();
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
 
@@ -239,6 +244,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  if (!isResearchEnabled()) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
   const { supabase, user } = await authenticatedUser();
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { assetId?: string } | null;
@@ -309,6 +318,10 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  if (!isResearchEnabled()) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
   const { user } = await authenticatedUser();
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { assetId?: string } | null;

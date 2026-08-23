@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { absoluteUrl } from "@/lib/site";
 import { isLowQualityTitle } from "@/lib/postQuality";
 import { isLightweightPost } from "@/lib/postDisplay";
+import { FEATURE_FLAGS, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 
 export const revalidate = 3600;
 
@@ -47,7 +48,9 @@ const staticRoutes: SitemapRow[] = [
   { url: absoluteUrl("/explore"), changeFrequency: "hourly", priority: 0.9 },
   { url: absoluteUrl("/debates"), changeFrequency: "daily", priority: 0.8 },
   { url: absoluteUrl("/campus"), changeFrequency: "daily", priority: 0.75 },
-  { url: absoluteUrl("/research"), changeFrequency: "daily", priority: 0.8 },
+  ...(FEATURE_FLAGS.research
+    ? [{ url: absoluteUrl("/research"), changeFrequency: "daily" as const, priority: 0.8 }]
+    : []),
   { url: absoluteUrl("/opportunities"), changeFrequency: "daily", priority: 0.8 },
   { url: absoluteUrl("/about"), changeFrequency: "monthly", priority: 0.6 },
   { url: absoluteUrl("/topics"), changeFrequency: "weekly", priority: 0.7 },
@@ -121,6 +124,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           .from("posts")
           .select("slug, title, type, content_kind, published_at, created_at, updated_at")
           .eq("status", "published")
+          .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
           .not("slug", "is", null)
           .order("published_at", { ascending: false, nullsFirst: false })
           .limit(1000)
@@ -158,11 +162,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           .from("posts")
           .select("author_id")
           .eq("status", "published")
+          .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
           .limit(5000)
           .abortSignal(signal),
         deadline
       ),
-      collect<ResearchProjectRow>(
+      FEATURE_FLAGS.research ? collect<ResearchProjectRow>(
         "research projects",
         supabase
           .from("research_projects")
@@ -173,12 +178,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           .limit(1000)
           .abortSignal(signal),
         deadline
-      ),
-      collect<ResearcherProfileRow>(
+      ) : Promise.resolve([] as ResearchProjectRow[]),
+      FEATURE_FLAGS.research ? collect<ResearcherProfileRow>(
         "researcher profiles",
         supabase.from("researcher_profiles").select("user_id").limit(5000).abortSignal(signal),
         deadline
-      ),
+      ) : Promise.resolve([] as ResearcherProfileRow[]),
     ]);
 
     const authorsWithPublishedPosts = new Set(publishedAuthors.map((row) => row.author_id));

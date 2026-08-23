@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createAdminActionClient } from "@/lib/adminAccess";
+import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import { AdminAccessError, createAdminClient } from "@/lib/supabase/admin";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
@@ -102,6 +103,7 @@ export default async function AdminReviewPage() {
       `
       )
       .eq("status", "pending")
+      .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
       .order("created_at", { ascending: false })
       .limit(50),
     admin
@@ -111,6 +113,7 @@ export default async function AdminReviewPage() {
         profiles!posts_author_id_fkey (full_name, university)`
       )
       .eq("status", "published")
+      .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
       .order("published_at", { ascending: false })
       .limit(20),
     admin.from("policy_briefs_featured").select("post_id"),
@@ -191,7 +194,7 @@ export default async function AdminReviewPage() {
         <div className="py-16 text-center text-gray-400">
           <p className="text-lg font-medium">No submissions waiting in the editorial queue.</p>
           <p className="mt-1 text-sm text-gray-400">
-            Research and policy briefs will appear here once submitted.
+            Policy briefs will appear here once submitted.
           </p>
         </div>
       ) : (

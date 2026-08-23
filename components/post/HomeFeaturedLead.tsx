@@ -4,6 +4,7 @@ import { getArticleFormatLabel, resolveArticleFormat, resolveContentKind } from 
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { sanitizePostExcerpt } from "@/lib/utils";
 import type { FeedExposure } from "@/lib/feedExposure";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 export interface HomeFeaturedPost {
   id: string;
@@ -36,6 +37,7 @@ function readTime(wordCount: number | null | undefined) {
 
 export default function HomeFeaturedLead({ post }: { post: HomeFeaturedPost }) {
   const kind = resolveContentKind(post);
+  if (!FEATURE_FLAGS.research && kind === "research") return null;
   const format = kind === "article" ? getArticleFormatLabel(resolveArticleFormat(post)) : null;
   const title = getPostMetadataTitle(post, post.profiles);
   const excerpt = sanitizePostExcerpt(post.excerpt);

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createAdminActionClient } from "@/lib/adminAccess";
 import {
   RESEARCH_EXIT_METRICS,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/research";
 import { AdminAccessError } from "@/lib/supabase/admin";
 import ResearchTargetsForm from "./ResearchTargetsForm";
+import { isResearchEnabled } from "@/lib/featureFlags";
 
 interface ResearchMetrics {
   windowDays: number;
@@ -82,6 +83,8 @@ const STATE_CLASS: Record<ResearchMetricState, string> = {
 };
 
 export default async function AdminResearchPage() {
+  if (!isResearchEnabled()) notFound();
+
   let admin;
   try {
     ({ admin } = await createAdminActionClient("analytics.view"));

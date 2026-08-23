@@ -44,11 +44,12 @@ describe("BottomNav compose access", () => {
     const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
     expect(mocks.requestAuth).not.toHaveBeenCalled();
 
-    fireEvent.click(within(dialog).getByRole("button", { name: /^Research/ }));
+    expect(within(dialog).queryByRole("button", { name: /^Research/ })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Article/ }));
 
     expect(mocks.requestAuth).toHaveBeenCalledWith("create", {
-      contentKind: "research",
-      destination: "/submit/research",
+      contentKind: "article",
+      destination: "/write?kind=article",
     });
   });
 

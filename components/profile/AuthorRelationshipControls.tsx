@@ -111,7 +111,7 @@ function LegacyAuthorRelationshipControls({
       setSubscribed(result.subscribed);
       setConfirmation(
         result.subscribed
-          ? "Subscribed. All work will appear in-app; Articles and Research may also arrive by enabled email or push."
+          ? "Subscribed. All work will appear in-app; Articles may also arrive by enabled email or push."
           : "Unsubscribed. You are still following this author."
       );
       router.refresh();

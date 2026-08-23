@@ -138,14 +138,11 @@ describe("PostComposerForm", () => {
     );
   });
 
-  it("keeps the longer-form destinations available as secondary actions", () => {
+  it("keeps Article available while Research is switched off", () => {
     renderComposer();
 
     expect(screen.getByRole("button", { name: "Write an article" })).toBeEnabled();
-    expect(screen.getByRole("link", { name: "Submit research" })).toHaveAttribute(
-      "href",
-      "/submit/research"
-    );
+    expect(screen.queryByRole("link", { name: "Submit research" })).not.toBeInTheDocument();
   });
 
   it("opens a blank article composer when nothing has been typed yet", () => {

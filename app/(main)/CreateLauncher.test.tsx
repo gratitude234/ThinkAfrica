@@ -39,7 +39,7 @@ describe("CreateLauncher -- contribution chooser", () => {
 
   afterEach(() => cleanup());
 
-  it("opens the mobile contribution chooser with all three canonical formats", () => {
+  it("opens the mobile contribution chooser with the enabled formats", () => {
     render(<CreateLauncher userId="user-1" variant="mobileFab" />);
 
     fireEvent.click(
@@ -52,10 +52,7 @@ describe("CreateLauncher -- contribution chooser", () => {
       "href",
       "/write?kind=article"
     );
-    expect(screen.getByRole("link", { name: /^Research/ })).toHaveAttribute(
-      "href",
-      "/submit/research"
-    );
+    expect(screen.queryByRole("link", { name: /^Research/ })).not.toBeInTheDocument();
   });
 
   it("opens the chooser from the desktop Contribute button", () => {
@@ -103,7 +100,7 @@ describe("CreateLauncher -- contribution chooser", () => {
       ).toBeInTheDocument()
     );
 
-    // Order is the point: the resume row has to precede the three formats.
+    // Order is the point: the resume row has to precede the enabled formats.
     const hrefs = within(dialog)
       .getAllByRole("link")
       .map((link) => link.getAttribute("href"));
@@ -111,17 +108,16 @@ describe("CreateLauncher -- contribution chooser", () => {
       "/write?draft=draft-1",
       "/create/post",
       "/write?kind=article",
-      "/submit/research",
     ]);
   });
 
-  it("shows only the three formats when there is nothing worth resuming", async () => {
+  it("shows only the enabled formats when there is nothing worth resuming", async () => {
     render(<CreateLauncher userId="user-1" variant="desktop" />);
     fireEvent.click(screen.getByRole("button", { name: "Contribute" }));
 
     const dialog = screen.getByRole("dialog", { name: "Create a contribution" });
     await waitFor(() =>
-      expect(within(dialog).getAllByRole("link")).toHaveLength(3)
+      expect(within(dialog).getAllByRole("link")).toHaveLength(2)
     );
     expect(
       within(dialog).queryByText(/Continue latest draft/)

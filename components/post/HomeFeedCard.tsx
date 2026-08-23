@@ -10,6 +10,7 @@ import {
   resolveArticleFormat,
   resolveContentKind,
 } from "@/lib/contentModel";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import { formatTagLabel } from "@/lib/tags";
 import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
@@ -738,6 +739,7 @@ function ResearchFeedCard({
 
 export default function HomeFeedCard(props: Props) {
   const kind = resolveContentKind(props.post);
+  if (!FEATURE_FLAGS.research && kind === "research") return null;
   if (kind === "research") return <ResearchFeedCard {...props} />;
   if (kind === "article") return <ArticleFeedCard {...props} />;
   return <PostFeedCard {...props} />;

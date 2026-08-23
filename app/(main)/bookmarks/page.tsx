@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import type { PostCardData } from "@/components/post/PostCard";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import { createClient } from "@/lib/supabase/client";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 const POST_TYPE_FILTERS = [
   { label: "All", value: "all" },
   { label: "Blog", value: "blog" },
   { label: "Essay", value: "essay" },
-  { label: "Research", value: "research" },
   { label: "Policy", value: "policy_brief" },
 ];
 
@@ -76,7 +76,7 @@ export default function BookmarksPage() {
           const post = Array.isArray(bookmark.posts)
             ? bookmark.posts[0]
             : bookmark.posts;
-          if (!post) return null;
+          if (!post || (!FEATURE_FLAGS.research && post.type === "research")) return null;
           return {
             ...post,
             profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,

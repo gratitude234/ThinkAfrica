@@ -5,6 +5,7 @@ import Badge from "@/components/ui/Badge";
 import type { PostReferenceRecord, VersionAuthorRecord } from "@/lib/types";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import CiteThis from "../../post/[slug]/CiteThis";
+import { isResearchEnabled } from "@/lib/featureFlags";
 
 interface PageProps {
   params: Promise<{ citationId: string }>;
@@ -49,7 +50,11 @@ export default async function PublicationArchivePage({ params }: PageProps) {
     .eq("status", "published")
     .single();
 
-  if (!post || !post.published_version_id) {
+  if (
+    !post ||
+    (!isResearchEnabled() && post.type === "research") ||
+    !post.published_version_id
+  ) {
     notFound();
   }
 

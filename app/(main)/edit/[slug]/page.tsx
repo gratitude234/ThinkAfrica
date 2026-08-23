@@ -11,6 +11,7 @@ import type {
   PostVersionRecord,
   VersionAuthorRecord,
 } from "@/lib/types";
+import { isResearchEnabled } from "@/lib/featureFlags";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -54,10 +55,8 @@ export default async function EditPage({ params }: PageProps) {
     );
   }
 
-  if (post.type === "research") {
-    redirect(
-      post.status === "published" ? `/post/${post.slug}` : `/submit/research?draft=${post.id}`
-    );
+  if (!isResearchEnabled() && post.type === "research") {
+    notFound();
   }
 
   // Lightweight Posts (resolved kind = post, no title) get the plain

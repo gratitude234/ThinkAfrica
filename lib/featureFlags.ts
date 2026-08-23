@@ -3,11 +3,27 @@
 // explicitly reads its flag. Toggle only when the section has enough verified
 // volume and operational support to feel alive.
 export const FEATURE_FLAGS = {
+  // Temporary product kill switch. Keep every Research surface and mutation
+  // behind this value so the feature can be restored in one place.
+  research: false,
   debates: true,
   fellowshipsSection: false,
   ambassadors: false,
   talentMarketplace: false,
 } as const;
+
+export const RESEARCH_UNAVAILABLE_MESSAGE =
+  "Research is temporarily unavailable.";
+
+export function isResearchEnabled(): boolean {
+  return FEATURE_FLAGS.research;
+}
+
+// Post.type is constrained to known content types, so this sentinel matches
+// nothing when Research is enabled and lets shared query chains stay intact.
+export const RESEARCH_TYPE_QUERY_EXCLUSION = FEATURE_FLAGS.research
+  ? "__research_feature_enabled__"
+  : "research";
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;
 

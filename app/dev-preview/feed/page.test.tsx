@@ -19,6 +19,10 @@ vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
 // these mocks let the test prove that never happens.
 vi.mock("@/app/(main)/post/[slug]/likeActions", () => ({ togglePostLike: mocks.like }));
 vi.mock("@/app/(main)/post/[slug]/bookmarkActions", () => ({ toggleBookmark: mocks.bookmark }));
+vi.mock("@/lib/featureFlags", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/featureFlags")>();
+  return { ...actual, FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, research: true } };
+});
 
 describe("FeedPreviewPage (dev-only visual fixture harness)", () => {
   afterEach(() => {

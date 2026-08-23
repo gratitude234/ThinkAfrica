@@ -44,7 +44,7 @@ export default function SubscribedTopicsManager({
     <section className="mb-6 border-b border-gray-100 pb-6">
       <h2 className="text-base font-semibold text-gray-900">Subscribed topics</h2>
       <p className="mt-1 text-xs leading-5 text-gray-500">
-        Matching Posts, Articles, and Research are delivered in-app and appear
+        Matching Posts and Articles are delivered in-app and appear
         in your Topics feed.
       </p>
 

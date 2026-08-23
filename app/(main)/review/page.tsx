@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canReview } from "@/lib/roles";
 import { formatDate } from "@/lib/utils";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 export default async function ReviewerQueuePage() {
   const supabase = await createClient();
@@ -36,10 +37,15 @@ export default async function ReviewerQueuePage() {
     .is("removed_at", null)
     .order("assigned_at", { ascending: false });
 
-  const rows = (assignments ?? []).map((assignment) => ({
-    ...assignment,
-    post: Array.isArray(assignment.posts) ? assignment.posts[0] : assignment.posts,
-  }));
+  const rows = (assignments ?? [])
+    .map((assignment) => ({
+      ...assignment,
+      post: Array.isArray(assignment.posts) ? assignment.posts[0] : assignment.posts,
+    }))
+    .filter(
+      (assignment) =>
+        FEATURE_FLAGS.research || assignment.post?.type !== "research"
+    );
 
   return (
     <div className="mx-auto max-w-3xl">
