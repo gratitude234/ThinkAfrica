@@ -98,6 +98,12 @@ interface EditorProps {
   minWords?: number;
   onUpdate?: (html: string, wordCount: number) => void;
   onSelectionUpdate?: () => void;
+  /**
+   * Reported so a host that hides this component's own chrome can still say
+   * something is happening. Pasting a large photo otherwise looks like nothing
+   * happened until it suddenly appears.
+   */
+  onImageUploadingChange?: (uploading: boolean) => void;
   canvasMode?: boolean;
   ariaLabel?: string;
   showWordCount?: boolean;
@@ -133,6 +139,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   minWords = 0,
   onUpdate,
   onSelectionUpdate,
+  onImageUploadingChange,
   canvasMode = false,
   ariaLabel = "Article body",
   showWordCount = true,
@@ -166,7 +173,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
 
   const uploadImageFile = useCallback(
     async (file: File): Promise<string | null> => {
-      setImageUploading(true);
       const formData = new FormData();
       formData.append("file", file);
 
@@ -194,8 +200,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
       } catch {
         showUploadError("Couldn't upload image. Check your connection and try again.");
         return null;
-      } finally {
-        setImageUploading(false);
       }
     },
     [showUploadError]
@@ -209,20 +213,31 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
    */
   const insertImageFiles = useCallback(
     async (view: EditorView, files: File[], at: number | null) => {
-      let position = at;
-      for (const file of files) {
-        const url = await uploadImageFile(file);
-        if (!url) continue;
-        const { state } = view;
-        const node = state.schema.nodes.image?.create({ src: url });
-        if (!node) continue;
-        const insertAt = Math.min(position ?? state.selection.to, state.doc.content.size);
-        view.dispatch(state.tr.insert(insertAt, node));
-        position = insertAt + node.nodeSize;
+      // Held across the whole batch rather than per file, so a run of images
+      // reads as one upload instead of flickering the indicator between each.
+      setImageUploading(true);
+      try {
+        let position = at;
+        for (const file of files) {
+          const url = await uploadImageFile(file);
+          if (!url) continue;
+          const { state } = view;
+          const node = state.schema.nodes.image?.create({ src: url });
+          if (!node) continue;
+          const insertAt = Math.min(position ?? state.selection.to, state.doc.content.size);
+          view.dispatch(state.tr.insert(insertAt, node));
+          position = insertAt + node.nodeSize;
+        }
+      } finally {
+        setImageUploading(false);
       }
     },
     [uploadImageFile]
   );
+
+  useEffect(() => {
+    onImageUploadingChange?.(imageUploading);
+  }, [imageUploading, onImageUploadingChange]);
 
   const editor = useEditor({
     extensions: [

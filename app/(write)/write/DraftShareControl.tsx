@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createDraftShareLink, getDraftShareLink, revokeDraftShareLink } from "./shareActions";
+import { createDraftShareLink, revokeDraftShareLink } from "./shareActions";
 
 /**
  * "Can you read this before I post it?" is how most serious writing gets
@@ -9,10 +9,20 @@ import { createDraftShareLink, getDraftShareLink, revokeDraftShareLink } from ".
  * The link needs no account on the other end, because the person a student
  * most wants to read a draft is usually their supervisor, who does not have
  * one.
+ *
+ * Controlled by the composer rather than holding its own token. The composer
+ * needs to know a link is live in order to say so in the header, and that has
+ * to be true before this drawer has ever been opened.
  */
-export default function DraftShareControl({ postId }: { postId: string }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function DraftShareControl({
+  postId,
+  token,
+  onTokenChange,
+}: {
+  postId: string;
+  token: string | null;
+  onTokenChange: (token: string | null) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,18 +33,6 @@ export default function DraftShareControl({ postId }: { postId: string }) {
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
-
-  useEffect(() => {
-    let active = true;
-    getDraftShareLink({ postId }).then((result) => {
-      if (!active) return;
-      setToken(result.token);
-      setLoading(false);
-    });
-    return () => {
-      active = false;
-    };
-  }, [postId]);
 
   const url = token && origin ? `${origin}/draft/${token}` : null;
 
@@ -47,7 +45,7 @@ export default function DraftShareControl({ postId }: { postId: string }) {
       setError(result.error ?? "We couldn't create a link.");
       return;
     }
-    setToken(result.token);
+    onTokenChange(result.token);
   };
 
   const revoke = async () => {
@@ -59,7 +57,7 @@ export default function DraftShareControl({ postId }: { postId: string }) {
       setError(result.error);
       return;
     }
-    setToken(null);
+    onTokenChange(null);
     setCopied(false);
   };
 
@@ -73,10 +71,6 @@ export default function DraftShareControl({ postId }: { postId: string }) {
       setError("Couldn't copy. Select the link and copy it by hand.");
     }
   };
-
-  if (loading) {
-    return <p className="text-sm text-ink-muted">Checking for a link…</p>;
-  }
 
   return (
     <div>

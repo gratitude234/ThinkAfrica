@@ -35,6 +35,7 @@ import MyDrafts from "./MyDrafts";
 import ArticlePreview, { readingMinutes } from "./ArticlePreview";
 import RevisionHistory, { type RestoredRevision } from "./RevisionHistory";
 import DraftShareControl from "./DraftShareControl";
+import { getDraftShareLink } from "./shareActions";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
@@ -44,6 +45,7 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
 });
 
 type SaveState = "idle" | "saving" | "cloud" | "device" | "error";
+type PanelName = "format" | "link" | "sources" | "more";
 type FormatAction =
   | "bold"
   | "italic"
@@ -287,6 +289,7 @@ export default function UniversalComposer({
   const leaveDialogRef = useRef<HTMLDivElement>(null);
   const discardDialogRef = useRef<HTMLDivElement>(null);
   const previewDialogRef = useRef<HTMLDivElement>(null);
+  const imagePanelRef = useRef<HTMLDivElement>(null);
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [profile, setProfile] = useState(initialProfile);
   const [draftId, setDraftId] = useState(initialDraftId);
@@ -298,13 +301,15 @@ export default function UniversalComposer({
   const [recovery, setRecovery] = useState<{ snapshot: ContributionSnapshot; key: string } | null>(null);
   const [showTitle, setShowTitle] = useState(Boolean(initialSnapshot.title.trim()));
   const [showSubtitle, setShowSubtitle] = useState(Boolean(initialSnapshot.excerpt.trim()));
-  const [showMore, setShowMore] = useState(false);
-  const [showSources, setShowSources] = useState(false);
+  // One drawer at a time. Independent toggles let a writer stack the format
+  // row, the link field, the source list and the drawer all at once, which
+  // pushes the canvas off screen behind its own controls.
+  const [panel, setPanel] = useState<PanelName | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [showFormat, setShowFormat] = useState(false);
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
   const [history, setHistory] = useState({ canUndo: false, canRedo: false });
-  const [showLink, setShowLink] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
   const [showPublish, setShowPublish] = useState(false);
@@ -334,6 +339,10 @@ export default function UniversalComposer({
   const closeLeave = useCallback(() => setShowLeave(false), []);
   const closeDiscard = useCallback(() => setShowDiscard(false), []);
   const closePreview = useCallback(() => setShowPreview(false), []);
+  const togglePanel = useCallback(
+    (next: PanelName) => setPanel((current) => (current === next ? null : next)),
+    []
+  );
   useModalFocus(showPublish, publishDialogRef, closePublish, publishing);
   useModalFocus(showLeave, leaveDialogRef, closeLeave);
   useModalFocus(showDiscard, discardDialogRef, closeDiscard);
@@ -373,8 +382,9 @@ export default function UniversalComposer({
     setSaveError(null);
     setShowPublish(false);
     setShowPreview(false);
-    setShowSources(false);
+    setPanel(null);
     setSelectedImage(null);
+    setImageUploading(false);
     setHistory({ canUndo: false, canRedo: false });
     setDocumentKey(incoming);
   }, [initialDraftId, initialEditDraftId, initialSnapshot, mode, publishedPostId, userId]);
@@ -646,7 +656,7 @@ export default function UniversalComposer({
     }));
     setShowTitle(Boolean(revision.title.trim()));
     setShowSubtitle(Boolean(revision.excerpt.trim()));
-    setShowMore(false);
+    setPanel(null);
   }, []);
 
   // A one-line textarea with overflow hidden clips its second line, and a
@@ -665,10 +675,40 @@ export default function UniversalComposer({
     field.style.height = `${field.scrollHeight}px`;
   }, [showSubtitle, snapshot.excerpt]);
 
+  // The composer, not the drawer, owns whether a share link is live. The
+  // indicator has to be visible without opening the drawer first, since the
+  // case worth catching is a writer who has forgotten the link exists.
+  useEffect(() => {
+    if (mode === "published-edit" || !draftId) {
+      setShareToken(null);
+      return;
+    }
+    let active = true;
+    void getDraftShareLink({ postId: draftId }).then((result) => {
+      if (active) setShareToken(result.token);
+    });
+    return () => {
+      active = false;
+    };
+  }, [draftId, mode]);
+
+  // The caption panel renders below the toolbar, which on a long piece is well
+  // past the image that opened it. Keyed on presence rather than contents, so
+  // it fires when the panel appears and not on every keystroke inside it.
+  const hasSelectedImage = Boolean(selectedImage);
+  useEffect(() => {
+    if (!hasSelectedImage) return;
+    imagePanelRef.current?.scrollIntoView({ block: "nearest" });
+  }, [hasSelectedImage]);
+
   // "Saved" is the resting state. Only the device-only case earns more words,
   // because it is the only one that carries a consequence for the writer.
-  const saveLabel =
-    saveState === "saving"
+  // An upload outranks the save state here. It is the only one of the two the
+  // writer just started by hand, and a pasted photo gives no other sign that
+  // anything is happening until it lands.
+  const saveLabel = imageUploading
+    ? "Adding image…"
+    : saveState === "saving"
       ? "Saving…"
       : saveState === "cloud"
         ? "Saved"
@@ -704,6 +744,20 @@ export default function UniversalComposer({
           <p aria-live="polite" className={`min-w-0 flex-1 truncate text-xs ${saveState === "error" ? "text-red-600" : "text-ink-muted"}`}>
             {saveLabel}
           </p>
+          {/* A live share link is easy to create and then forget, and the
+              consequence of forgetting is a draft anyone can read. It says so
+              where the writer already looks for save state. */}
+          {shareToken ? (
+            <button
+              type="button"
+              onClick={() => setPanel("more")}
+              aria-label="A share link for this draft is live. Open sharing options."
+              className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-gold-tint px-2.5 text-xs font-semibold text-gold-ink transition-opacity hover:opacity-80"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-gold-ink" aria-hidden="true" />
+              Link live
+            </button>
+          ) : null}
           <Button
             type="button"
             onClick={openPublishSheet}
@@ -755,7 +809,18 @@ export default function UniversalComposer({
             />
             <button
               type="button"
-              onClick={() => { setSnapshot((current) => ({ ...current, title: "" })); setShowTitle(false); }}
+              onClick={() => {
+                // The subtitle belongs to the title and its field is drawn only
+                // when a title exists, so it has to go too. Left behind it would
+                // sit in `excerpt`, invisible on the canvas and unreachable, and
+                // still ship as the feed summary.
+                setSnapshot((current) => ({ ...current, title: "", excerpt: "" }));
+                setShowTitle(false);
+                setShowSubtitle(false);
+              }}
+              // The subtitle carries an identical button. Screen reader users
+              // hear these as a list, where two bare "Remove"s are a coin toss.
+              aria-label="Remove title"
               className="mt-1 min-h-11 rounded-lg px-2 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink"
             >
               Remove
@@ -796,6 +861,7 @@ export default function UniversalComposer({
                   setSnapshot((current) => ({ ...current, excerpt: "" }));
                   setShowSubtitle(false);
                 }}
+                aria-label="Remove subtitle"
                 className="mt-1 min-h-11 rounded-lg px-2 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink"
               >
                 Remove
@@ -829,6 +895,7 @@ export default function UniversalComposer({
           autoFocus={mode !== "published-edit" && !initialSnapshot.title}
           onUpdate={(content) => setSnapshot((current) => current.content === content ? current : { ...current, content })}
           onSelectionUpdate={handleSelectionUpdate}
+          onImageUploadingChange={setImageUploading}
         />
 
         {/* Resuming another piece is offered only while this canvas is still
@@ -842,6 +909,11 @@ export default function UniversalComposer({
           </div>
         ) : null}
 
+        {/* Six controls, which is what fits at a 44px touch target inside the
+            canvas measure on the narrowest phone still in common use. Anything
+            that does not earn a place here sits one tap deeper: link goes with
+            the other text marks under Aa, and Preview goes in the drawer. A bar
+            wider than the screen is a bar whose last button does not exist. */}
         <div
           className="sticky z-20 mt-8 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-card-border bg-surface p-1.5 shadow-lg shadow-ink/10"
           style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem + var(--mobile-visual-viewport-bottom, 0px))" }}
@@ -856,17 +928,14 @@ export default function UniversalComposer({
             <Icon path={REDO_ICON} />
           </button>
           <span className="mx-0.5 h-6 w-px shrink-0 bg-divider" aria-hidden="true" />
-          <button type="button" onClick={() => setShowFormat((value) => !value)} aria-expanded={showFormat} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-3 text-sm font-semibold transition-colors ${showFormat ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="Formatting">Aa</button>
+          <button type="button" onClick={() => togglePanel("format")} aria-expanded={panel === "format"} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-3 text-sm font-semibold transition-colors ${panel === "format" ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="Formatting">Aa</button>
           <button type="button" onClick={() => editorRef.current?.triggerImageUpload()} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink" aria-label="Insert image">
             <Icon path={IMAGE_ICON} />
-          </button>
-          <button type="button" onClick={() => setShowLink((value) => !value)} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${activeMarks.link ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="Add link">
-            <Icon path={LINK_ICON} />
           </button>
           {/* Citing a source is the one thing this editor does that a general
               blogging tool does not. It gets a place in the bar rather than a
               line inside an overflow menu. */}
-          <button type="button" onClick={() => setShowSources((value) => !value)} aria-expanded={showSources} className={`relative flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${showSources ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label={snapshot.references.length ? `Sources, ${snapshot.references.length} added` : "Sources"}>
+          <button type="button" onClick={() => togglePanel("sources")} aria-expanded={panel === "sources"} className={`relative flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${panel === "sources" ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label={snapshot.references.length ? `Sources, ${snapshot.references.length} added` : "Sources"}>
             <Icon path={SOURCES_ICON} />
             {snapshot.references.length ? (
               <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-brand px-1 text-[10px] font-semibold leading-none text-white">
@@ -874,16 +943,12 @@ export default function UniversalComposer({
               </span>
             ) : null}
           </button>
-          <span className="mx-0.5 h-6 w-px shrink-0 bg-divider" aria-hidden="true" />
-          <button type="button" onClick={() => setShowPreview(true)} disabled={!bodyText} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink disabled:pointer-events-none disabled:opacity-30" aria-label="Preview as a reader">
-            <Icon path={PREVIEW_ICON} />
-          </button>
-          <button type="button" onClick={() => setShowMore((value) => !value)} aria-expanded={showMore} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${showMore ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="More writing options">
+          <button type="button" onClick={() => togglePanel("more")} aria-expanded={panel === "more"} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${panel === "more" ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="More writing options">
             <Icon path={MORE_ICON} />
           </button>
         </div>
 
-        {showFormat ? (
+        {panel === "format" ? (
           <div className="mt-3 flex flex-wrap gap-1 rounded-xl border border-card-border bg-surface p-2">
             {FORMAT_ACTIONS.map(({ label, mark, path, text }) => (
               <button
@@ -895,17 +960,29 @@ export default function UniversalComposer({
                 // pressed state to announce.
                 aria-pressed={mark === "divider" ? undefined : Boolean(activeMarks[mark])}
                 title={label}
-                className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg text-xs font-bold transition-colors ${activeMarks[mark] ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`}
+                className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors ${text ? "text-xs font-bold" : ""} ${activeMarks[mark] ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`}
               >
                 {text ? text : <Icon path={path} />}
               </button>
             ))}
+            {/* A link is a text mark like the rest of this row, and moving it
+                here is what keeps the bar above down to one screen's width. */}
+            <button
+              type="button"
+              onClick={() => setPanel("link")}
+              aria-label="Add link"
+              aria-pressed={Boolean(activeMarks.link)}
+              title="Link"
+              className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors ${activeMarks.link ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`}
+            >
+              <Icon path={LINK_ICON} />
+            </button>
           </div>
         ) : null}
-        {showLink ? (
+        {panel === "link" ? (
           <div className="mt-3 flex gap-2 rounded-xl border border-card-border bg-surface p-2">
-            <input autoFocus type="url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { editorRef.current?.insertLink(linkUrl); setShowLink(false); setLinkUrl(""); } if (event.key === "Escape") setShowLink(false); }} placeholder="https://…" className="min-h-11 min-w-0 flex-1 rounded-lg border border-card-border bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-brand" />
-            <Button type="button" onClick={() => { editorRef.current?.insertLink(linkUrl); setShowLink(false); setLinkUrl(""); }}>Apply</Button>
+            <input autoFocus type="url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { editorRef.current?.insertLink(linkUrl); setPanel(null); setLinkUrl(""); } if (event.key === "Escape") setPanel("format"); }} placeholder="https://…" className="min-h-11 min-w-0 flex-1 rounded-lg border border-card-border bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-brand" />
+            <Button type="button" onClick={() => { editorRef.current?.insertLink(linkUrl); setPanel(null); setLinkUrl(""); }}>Apply</Button>
           </div>
         ) : null}
 
@@ -913,7 +990,7 @@ export default function UniversalComposer({
             none of that survives in a bare picture. The panel appears on
             selection rather than living permanently on screen. */}
         {selectedImage ? (
-          <div className="mt-3 space-y-3 rounded-xl border border-card-border bg-surface p-3">
+          <div ref={imagePanelRef} className="mt-3 space-y-3 rounded-xl border border-card-border bg-surface p-3">
             <p className="text-kicker font-semibold uppercase text-ink-muted">Selected image</p>
             <div>
               <label htmlFor="image-caption" className="mb-1.5 block text-sm font-semibold text-ink">
@@ -947,7 +1024,7 @@ export default function UniversalComposer({
           </div>
         ) : null}
 
-        {showSources ? (
+        {panel === "sources" ? (
           <section className="mt-6 border-t border-divider pt-6">
             <h2 className="mb-1.5 text-kicker font-semibold uppercase text-ink-muted">Sources</h2>
             <p className="mb-3 text-meta text-ink-muted">
@@ -957,8 +1034,17 @@ export default function UniversalComposer({
           </section>
         ) : null}
 
-        {showMore ? (
+        {panel === "more" ? (
           <section className="mt-6 space-y-7 border-t border-divider pt-6">
+            <button
+              type="button"
+              onClick={() => setShowPreview(true)}
+              disabled={!bodyText}
+              className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-ink transition-colors hover:bg-canvas disabled:opacity-40"
+            >
+              <Icon path={PREVIEW_ICON} className="h-4 w-4" />
+              Preview as a reader
+            </button>
             {mode !== "published-edit" ? (
               <div>
                 <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Co-authors</h2>
@@ -971,7 +1057,7 @@ export default function UniversalComposer({
             {mode !== "published-edit" && draftId ? (
               <div>
                 <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Share this draft</h2>
-                <DraftShareControl postId={draftId} />
+                <DraftShareControl postId={draftId} token={shareToken} onTokenChange={setShareToken} />
               </div>
             ) : null}
             {mode !== "published-edit" && draftId ? (

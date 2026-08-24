@@ -55,6 +55,10 @@ export default function RevisionHistory({
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  // Restoring replaces everything on the canvas. The work it replaces is kept,
+  // but a writer cannot see that from the button, so it takes two taps and says
+  // so in between.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -104,6 +108,7 @@ export default function RevisionHistory({
       content: revision.content,
     });
     setRestoringId(null);
+    setConfirmingId(null);
     void load();
   };
 
@@ -148,15 +153,42 @@ export default function RevisionHistory({
                       : `${revision.word_count.toLocaleString()} words`}
                   </p>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void restore(revision)}
-                  disabled={restoringId !== null}
-                  className="min-h-9 shrink-0 rounded-lg px-2.5 text-xs font-semibold text-emerald-ink transition-colors hover:bg-green-tint disabled:opacity-50"
-                >
-                  {restoringId === revision.id ? "Restoring…" : "Restore"}
-                </button>
+                {confirmingId === revision.id ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingId(null)}
+                      disabled={restoringId !== null}
+                      className="min-h-9 rounded-lg px-2 text-xs font-semibold text-ink-muted disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void restore(revision)}
+                      disabled={restoringId !== null}
+                      className="min-h-9 rounded-lg bg-emerald-brand px-3 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                      {restoringId === revision.id ? "Restoring…" : "Confirm"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingId(revision.id)}
+                    disabled={restoringId !== null}
+                    className="min-h-9 shrink-0 rounded-lg px-2.5 text-xs font-semibold text-emerald-ink transition-colors hover:bg-green-tint disabled:opacity-50"
+                  >
+                    Restore
+                  </button>
+                )}
               </div>
+              {confirmingId === revision.id ? (
+                <p className="border-t border-divider bg-gold-tint px-3 py-2 text-xs text-gold-ink">
+                  This replaces what is on the canvas. Your current draft is saved to history first,
+                  so you can come back to it.
+                </p>
+              ) : null}
               {expanded ? (
                 <p className="border-t border-divider bg-canvas px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
                   {opening(revision)}

@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   updateSelectedImage: vi.fn(),
   historyState: { canUndo: false, canRedo: false },
   selectedImage: null as { src: string; alt: string; caption: string } | null,
+  shareToken: null as string | null,
+  uploadingHandler: null as ((uploading: boolean) => void) | null,
   editorMounts: { count: 0 },
 }));
 
@@ -30,6 +32,7 @@ vi.mock("next/dynamic", () => ({
         ariaLabel: string;
         onUpdate: (value: string) => void;
         onSelectionUpdate?: () => void;
+        onImageUploadingChange?: (uploading: boolean) => void;
       },
       ref
     ) {
@@ -45,6 +48,10 @@ vi.mock("next/dynamic", () => ({
       // A remount is what costs the writer their caret, focus and undo history,
       // so the tests below count mounts rather than renders.
       useEffect(() => { mocks.editorMounts.count += 1; }, []);
+      // Held so a test can report an upload the way the real editor does.
+      useEffect(() => {
+        mocks.uploadingHandler = props.onImageUploadingChange ?? null;
+      }, [props.onImageUploadingChange]);
       // The real editor reports a selection change alongside every update, which
       // is what keeps the toolbar's undo state and caption panel current.
       return <textarea aria-label={props.ariaLabel} placeholder={props.placeholder} value={props.content} onChange={(event) => { props.onUpdate(event.target.value); props.onSelectionUpdate?.(); }} />;
@@ -64,6 +71,11 @@ vi.mock("@/components/post/ReferencesPanel", () => ({ default: () => <div>Source
 vi.mock("@/components/collaboration/CoAuthorPicker", () => ({ default: () => <div>Collaborators panel</div> }));
 vi.mock("./MyDrafts", () => ({ default: () => <div>Drafts panel</div> }));
 vi.mock("./DraftShareControl", () => ({ default: () => <div>Share control</div> }));
+vi.mock("./shareActions", () => ({
+  getDraftShareLink: async () => ({ token: mocks.shareToken }),
+  createDraftShareLink: vi.fn(),
+  revokeDraftShareLink: vi.fn(),
+}));
 vi.mock("./RevisionHistory", () => ({ default: () => <div>History panel</div> }));
 vi.mock("@/components/ui/ProfileGate", () => ({ default: () => null }));
 vi.mock("next/image", () => ({ default: (props: { alt: string }) => <div role="img" aria-label={props.alt} /> }));
@@ -287,6 +299,7 @@ describe("UniversalComposer canvas polish", () => {
     mocks.updateSelectedImage.mockReset();
     mocks.historyState = { canUndo: false, canRedo: false };
     mocks.selectedImage = null;
+    mocks.shareToken = null;
     localStorage.clear();
     window.history.replaceState(null, "", "/write");
   });
@@ -344,9 +357,64 @@ describe("UniversalComposer canvas polish", () => {
 
   it("previews the piece as it reads, not as it will be listed", () => {
     open({ ...empty, title: "A title", content: "<p>The body.</p>" });
+    fireEvent.click(screen.getByRole("button", { name: "More writing options" }));
     fireEvent.click(screen.getByRole("button", { name: "Preview as a reader" }));
 
     expect(screen.getByRole("dialog", { name: "Reader preview" })).toBeInTheDocument();
+  });
+
+  it("keeps the bottom bar to six controls so none of it runs off a phone", () => {
+    open();
+    const bar = screen.getByRole("button", { name: "Formatting" }).parentElement!;
+
+    expect(bar.querySelectorAll("button")).toHaveLength(6);
+    // Link moved in with the other text marks, which is what made room.
+    expect(screen.queryByRole("button", { name: "Add link" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Formatting" }));
+    expect(screen.getByRole("button", { name: "Add link" })).toBeInTheDocument();
+  });
+
+  it("opens one drawer at a time rather than stacking them down the page", () => {
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "Formatting" }));
+    expect(screen.getByRole("button", { name: "Bold" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
+    expect(screen.getByRole("heading", { name: "Sources" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Bold" })).not.toBeInTheDocument();
+
+    // Tapping the open one closes it.
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
+    expect(screen.queryByRole("heading", { name: "Sources" })).not.toBeInTheDocument();
+  });
+
+  it("takes the subtitle with the title, rather than leaving it invisible", () => {
+    open({ ...empty, title: "A title", excerpt: "The angle", content: "<p>Body.</p>" });
+    expect(screen.getByLabelText("Subtitle")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove title" }));
+
+    // The field is gated on having a title, so a subtitle left in place would
+    // be unreachable text that still ships as the feed summary.
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    expect(screen.queryByText(/In the feed: The angle/)).not.toBeInTheDocument();
+  });
+
+  it("says so in the header while a share link is live", async () => {
+    mocks.shareToken = "live-token";
+    open({ ...empty, content: "<p>Body.</p>" }, { draftId: "draft-1" });
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+    expect(screen.getByRole("button", { name: /share link for this draft is live/i })).toBeInTheDocument();
+  });
+
+  it("reports an image upload where the writer already looks for save state", async () => {
+    open();
+    const editor = screen.getByLabelText("Publication body");
+    await act(async () => { mocks.uploadingHandler?.(true); });
+
+    expect(screen.getByText("Adding image…")).toBeInTheDocument();
+    expect(editor).toBeInTheDocument();
   });
 
   it("labels the format row for screen readers now that it is icons", () => {
