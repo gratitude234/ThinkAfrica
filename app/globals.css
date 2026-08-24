@@ -234,6 +234,38 @@
 .tiptap strong { @apply font-bold; }
 .tiptap em { @apply italic; }
 
+/* Captioned images.
+   The canvas and the published article share one treatment, so the placement a
+   writer approves is the placement a reader gets. */
+.tiptap figure,
+.article-journal-body figure {
+  margin: 2rem 0;
+}
+
+.tiptap figure img,
+.article-journal-body figure img {
+  width: 100%;
+  border-radius: 10px;
+}
+
+.tiptap figcaption,
+.article-journal-body figcaption {
+  margin-top: 0.6rem;
+  color: var(--ta-ink-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* The caption panel opens against a selected image, so the selection has to be
+   visible on the canvas or the panel appears to belong to nothing. */
+.tiptap img.ProseMirror-selectednode,
+.tiptap figure.ProseMirror-selectednode {
+  outline: 2px solid rgba(7, 57, 41, 0.45);
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+
 /* Distraction-free writing canvas */
 .write-canvas-editor {
   min-height: 430px;

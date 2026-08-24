@@ -44,6 +44,7 @@ vi.mock("next/cache", () => ({
 }));
 
 import {
+  ensureContributionDraft,
   ensureDraft,
   publishContribution,
   publishPost,
@@ -922,5 +923,66 @@ describe("publishContribution", () => {
 
     expect(result.error).toMatch(/source that was removed/i);
     expect(fakeSupabase.current!.from).not.toHaveBeenCalled();
+  });
+});
+
+describe("ensureContributionDraft revision history", () => {
+  function snapshot(overrides: Partial<ContributionSnapshot> = {}): ContributionSnapshot {
+    return {
+      title: "",
+      content: "<p>A body-first idea that keeps going.</p>",
+      excerpt: "",
+      tags: [],
+      coverImageUrl: "",
+      references: [],
+      collaborators: [],
+      inResponseToId: null,
+      promptId: null,
+      ...overrides,
+    };
+  }
+
+  function draftRoutes() {
+    return {
+      posts: queueResults({ data: { id: "draft-1" }, error: null }),
+      post_references: queueResults({ data: [], error: null }),
+      post_authors: queueResults({ data: [], error: null }),
+    };
+  }
+
+  it("records a restore point alongside the save", async () => {
+    fakeSupabase.current = makeFakeSupabase(draftRoutes());
+
+    const result = await ensureContributionDraft({ draftId: null, snapshot: snapshot() });
+
+    expect(result.error).toBeNull();
+    const call = fakeSupabase.current!.rpcCalls.find((entry) => entry.fn === "record_post_revision");
+    expect(call).toBeDefined();
+    expect(call!.params).toMatchObject({ target_post_id: "draft-1", p_word_count: 6 });
+  });
+
+  it("snapshots the sanitized body, not the raw editor output", async () => {
+    fakeSupabase.current = makeFakeSupabase(draftRoutes());
+
+    await ensureContributionDraft({
+      draftId: null,
+      snapshot: snapshot({ content: "<p>Keep this.</p><script>alert(1)</script>" }),
+    });
+
+    const call = fakeSupabase.current!.rpcCalls.find((entry) => entry.fn === "record_post_revision");
+    expect((call!.params as { p_content: string }).p_content).not.toContain("script");
+  });
+
+  // A history write is a courtesy. Failing one must never be reported to the
+  // writer as "we couldn't save your draft", because the draft did save.
+  it("still reports success when the history write fails", async () => {
+    fakeSupabase.current = makeFakeSupabase(draftRoutes(), "user-1", {
+      record_post_revision: () => ({ data: null, error: { message: "history unavailable" } }),
+    });
+
+    const result = await ensureContributionDraft({ draftId: null, snapshot: snapshot() });
+
+    expect(result.error).toBeNull();
+    expect(result.draftId).toBe("draft-1");
   });
 });

@@ -514,6 +514,20 @@ export async function ensureContributionDraft(input: {
   } catch (error) {
     return { error: error instanceof Error ? error.message : "We couldn't save the publication details.", draftId };
   }
+
+  // A restore point for the writer. record_post_revision() throttles and
+  // prunes, so calling it on every autosave is cheap and produces a readable
+  // list rather than a row every two seconds. Deliberately best-effort: a
+  // history write must never be the reason a save reports failure.
+  const bodyText = contributionText(content);
+  await supabase.rpc("record_post_revision", {
+    target_post_id: draftId,
+    p_title: input.snapshot.title,
+    p_excerpt: input.snapshot.excerpt,
+    p_content: content,
+    p_word_count: bodyText ? bodyText.split(/\s+/).filter(Boolean).length : 0,
+  });
+
   return { error: null, draftId };
 }
 

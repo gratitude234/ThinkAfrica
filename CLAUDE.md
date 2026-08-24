@@ -47,9 +47,11 @@ Optional:
 ```
 app/
 ├── (auth)/          # Login, signup, forgot/reset-password (standalone AuthShell layout)
+├── (write)/         # Composer, no app chrome
+│   └── write/       # UniversalComposer: the one canvas for posts and articles
+├── draft/[token]/   # Public read-only view of a shared draft (no route group, no auth)
 ├── (main)/          # Full app shell with NavigationShell
 │   ├── page.tsx     # Home feed (tabs: home/following/latest)
-│   ├── write/       # Post creation (blog, essay, research, policy_brief)
 │   ├── submit/research/  # Research-specific submission form
 │   ├── post/[slug]/ # Post detail, comments, reviews
 │   ├── edit/[slug]/ # Edit published posts
@@ -139,7 +141,21 @@ components/
 └── ui/              # Button, Badge, Toast, SearchOverlay, Footer, etc.
 ```
 
-The `Editor.tsx` component exposes an `EditorHandle` ref (`toggleBold`, `toggleItalic`, `toggleH2`, `toggleBulletList`, `toggleBlockquote`, `isActive`) for toolbar integration, and fires `onUpdate` / `onAutoSave` callbacks.
+The `Editor.tsx` component exposes an `EditorHandle` ref for toolbar
+integration (`toggleBold`, `toggleItalic`, `toggleH2`, `toggleH3`,
+`toggleBulletList`, `toggleOrderedList`, `toggleBlockquote`, `insertDivider`,
+`isActive`, `undo`/`redo` with `canUndo`/`canRedo`, `triggerImageUpload`,
+`insertLink`, `insertCitation`, `getSelectedImage`/`updateSelectedImage`), and
+fires `onUpdate` / `onSelectionUpdate` callbacks.
+
+Images use a `CaptionedImage` extension over Tiptap's `Image`: with a caption
+it serializes to `<figure><img><figcaption>`, without one to a bare `<img>`, so
+images published before captions existed keep round-tripping unchanged. Files
+can be pasted or dropped into the body (`handlePaste` / `handleDrop`), except
+when the clipboard also carries `text/html`, which means the writer is pasting
+from a word processor and wants the markup. `sanitizePostHtml` already allows
+`figure`, `figcaption`, `pre`, `hr`, and tables, so the pipeline supports more
+than the toolbar currently exposes.
 
 ### UI Conventions
 
@@ -171,6 +187,13 @@ into the next string someone writes.
 
 ### Database
 
-Key tables: `profiles`, `posts`, `post_versions`, `post_authors` (co-authors), `post_references`, `post_likes`, `post_comments`, `post_reviews`, `post_editor_decisions`, `debates`, `debate_rounds`, `debate_arguments`, `follows`, `messages`, `notifications`, `badges`, `user_badges`, `opportunities`, `opportunity_applications`, `ambassador_applications`, `editor_assignments`.
+Key tables: `profiles`, `posts`, `post_versions`, `post_authors` (co-authors), `post_references`, `post_likes`, `post_comments`, `post_reviews`, `post_editor_decisions`, `post_edit_drafts`, `post_draft_shares`, `post_revisions`, `debates`, `debate_rounds`, `debate_arguments`, `follows`, `messages`, `notifications`, `badges`, `user_badges`, `opportunities`, `opportunity_applications`, `ambassador_applications`, `editor_assignments`.
+
+Two draft-only tables back the composer and are separate from the editorial
+workflow. `post_draft_shares` holds one unlisted read token per draft, revoked
+by stamping `revoked_at` rather than deleting. `post_revisions` holds periodic
+snapshots written only by the `record_post_revision()` function, which throttles
+to one snapshot per three minutes and prunes to the most recent 40. Neither ever
+touches a published or reviewed post: `post_versions` still owns those.
 
 Schema: `supabase/schema.sql` (base) + `supabase/schema_phase2-5.sql` (incremental). Timestamped migrations in `supabase/migrations/`. Apply via Supabase dashboard or CLI. There is no local migration runner configured.

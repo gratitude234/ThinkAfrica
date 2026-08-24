@@ -1,26 +1,95 @@
 "use client";
 
 import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
+import { mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import Typography from "@tiptap/extension-typography";
+import type { EditorView } from "@tiptap/pm/view";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+
+/**
+ * An image on a publication is rarely just a picture. It has a source, a
+ * photographer, or a chart it came from, and none of that survives in a bare
+ * <img>. This renders as <figure><img><figcaption> when a caption exists and
+ * as a plain <img> when it does not, so the many images already published
+ * without one keep parsing and re-serializing unchanged.
+ */
+const CaptionedImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      caption: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-caption"),
+        // The caption is rendered as figcaption text below, never as an
+        // attribute on the img itself.
+        renderHTML: () => ({}),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: "figure",
+        getAttrs: (element) => {
+          const image = (element as HTMLElement).querySelector("img");
+          if (!image?.getAttribute("src")) return false;
+          return {
+            src: image.getAttribute("src"),
+            alt: image.getAttribute("alt"),
+            title: image.getAttribute("title"),
+            caption:
+              (element as HTMLElement).querySelector("figcaption")?.textContent?.trim() || null,
+          };
+        },
+      },
+      { tag: "img[src]" },
+    ];
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    const image = [
+      "img",
+      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+    ] as DOMOutputSpec;
+    const caption = typeof node.attrs.caption === "string" ? node.attrs.caption.trim() : "";
+    return (
+      caption ? ["figure", {}, image, ["figcaption", {}, caption]] : image
+    ) as DOMOutputSpec;
+  },
+});
+
+export interface SelectedImage {
+  src: string;
+  alt: string;
+  caption: string;
+}
 
 export interface EditorHandle {
   toggleBold: () => void;
   toggleItalic: () => void;
   toggleH2: () => void;
+  toggleH3: () => void;
   toggleBulletList: () => void;
   toggleOrderedList: () => void;
   toggleBlockquote: () => void;
+  insertDivider: () => void;
   isActive: (name: string, attrs?: Record<string, unknown>) => boolean;
   undo: () => void;
   redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
   triggerImageUpload: () => void;
   insertLink: (url: string) => void;
   insertCitation: (referenceId: string) => void;
+  getSelectedImage: () => SelectedImage | null;
+  updateSelectedImage: (attrs: { alt?: string; caption?: string }) => void;
 }
 
 interface EditorProps {
@@ -34,6 +103,11 @@ interface EditorProps {
   showWordCount?: boolean;
   /** Places the caret in the body on mount, for a canvas that opens body-first. */
   autoFocus?: boolean;
+}
+
+function imageFilesFrom(data: DataTransfer | null) {
+  if (!data) return [];
+  return Array.from(data.files).filter((file) => file.type.startsWith("image/"));
 }
 
 function countWordsFromHtml(value: string) {
@@ -82,13 +156,83 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     countWordsFromHtml(content)
   );
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showUploadError = useCallback((message: string) => {
+    setImageUploadError(message);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setImageUploadError(null), 6000);
+  }, []);
+
+  const uploadImageFile = useCallback(
+    async (file: File): Promise<string | null> => {
+      setImageUploading(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        const response = await fetch("/api/upload-image", {
+          method: "POST",
+          headers: session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {},
+          body: formData,
+        });
+        const json = await response.json();
+        if (json.url) {
+          setImageUploadError(null);
+          return json.url as string;
+        }
+        showUploadError(json.error ?? "Upload failed. Check the file type and size.");
+        return null;
+      } catch {
+        showUploadError("Couldn't upload image. Check your connection and try again.");
+        return null;
+      } finally {
+        setImageUploading(false);
+      }
+    },
+    [showUploadError]
+  );
+
+  /**
+   * Dropping onto a position and pasting at the caret are the same operation
+   * once the file is uploaded, so both land here. Files upload one at a time
+   * and each lands after the one before it, which is the order they were
+   * dropped in.
+   */
+  const insertImageFiles = useCallback(
+    async (view: EditorView, files: File[], at: number | null) => {
+      let position = at;
+      for (const file of files) {
+        const url = await uploadImageFile(file);
+        if (!url) continue;
+        const { state } = view;
+        const node = state.schema.nodes.image?.create({ src: url });
+        if (!node) continue;
+        const insertAt = Math.min(position ?? state.selection.to, state.doc.content.size);
+        view.dispatch(state.tr.insert(insertAt, node));
+        position = insertAt + node.nodeSize;
+      }
+    },
+    [uploadImageFile]
+  );
 
   const editor = useEditor({
     extensions: [
       StarterKit,
       Placeholder.configure({ placeholder }),
       CharacterCount,
-      Image.configure({ inline: false, allowBase64: false }),
+      // Curly quotes, real ellipses and proper dashes, applied as the writer
+      // types. A publication set in Bodoni should not ship typewriter quotes.
+      Typography,
+      CaptionedImage.configure({ inline: false, allowBase64: false }),
       Link.configure({
         openOnClick: false,
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
@@ -104,6 +248,31 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         "aria-label": ariaLabel,
         "aria-multiline": "true",
         role: "textbox",
+      },
+      handlePaste: (view, event) => {
+        // Copying from a word processor puts both markup and an image on the
+        // clipboard. The markup is the thing the writer meant to paste.
+        if (event.clipboardData?.getData("text/html")) return false;
+        const files = imageFilesFrom(event.clipboardData);
+        if (!files.length) return false;
+        event.preventDefault();
+        void insertImageFiles(view, files, null);
+        return true;
+      },
+      handleDrop: (view, event, _slice, moved) => {
+        // `moved` is an image already in the document being dragged to a new
+        // position, which ProseMirror handles correctly on its own.
+        if (moved) return false;
+        const dragEvent = event as DragEvent;
+        const files = imageFilesFrom(dragEvent.dataTransfer);
+        if (!files.length) return false;
+        event.preventDefault();
+        const coords = view.posAtCoords({
+          left: dragEvent.clientX,
+          top: dragEvent.clientY,
+        });
+        void insertImageFiles(view, files, coords?.pos ?? null);
+        return true;
       },
     },
     onUpdate({ editor }) {
@@ -124,13 +293,42 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
     toggleBold: () => editor?.chain().focus().toggleBold().run(),
     toggleItalic: () => editor?.chain().focus().toggleItalic().run(),
     toggleH2: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
+    toggleH3: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(),
     toggleBulletList: () => editor?.chain().focus().toggleBulletList().run(),
     toggleOrderedList: () => editor?.chain().focus().toggleOrderedList().run(),
     toggleBlockquote: () => editor?.chain().focus().toggleBlockquote().run(),
+    insertDivider: () => editor?.chain().focus().setHorizontalRule().run(),
     isActive: (name, attrs) => editor?.isActive(name, attrs) ?? false,
     undo: () => editor?.chain().focus().undo().run(),
     redo: () => editor?.chain().focus().redo().run(),
+    canUndo: () => editor?.can().undo() ?? false,
+    canRedo: () => editor?.can().redo() ?? false,
     triggerImageUpload: () => imageInputRef.current?.click(),
+    getSelectedImage: () => {
+      if (!editor?.isActive("image")) return null;
+      const attrs = editor.getAttributes("image");
+      return {
+        src: typeof attrs.src === "string" ? attrs.src : "",
+        alt: typeof attrs.alt === "string" ? attrs.alt : "",
+        caption: typeof attrs.caption === "string" ? attrs.caption : "",
+      };
+    },
+    // Deliberately not chained through .focus(): the writer is typing in the
+    // caption field at this moment, and pulling focus back into the body after
+    // every keystroke would make the field unusable. ProseMirror keeps its
+    // selection while the DOM focus is elsewhere, so the node still resolves.
+    updateSelectedImage: ({ alt, caption }) => {
+      if (!editor?.isActive("image")) return;
+      // Stored exactly as typed. Trimming here would delete the space the
+      // writer just typed between two words, because the trimmed value echoes
+      // straight back into the field on the next selection update. The trim
+      // that matters happens once, in renderHTML.
+      const kept = (value: string) => (value.trim() ? value : null);
+      editor.commands.updateAttributes("image", {
+        ...(alt !== undefined ? { alt: kept(alt) } : {}),
+        ...(caption !== undefined ? { caption: kept(caption) } : {}),
+      });
+    },
     insertLink: (url: string) => {
       if (!url.trim()) {
         editor?.chain().focus().unsetLink().run();
@@ -151,6 +349,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
 
   useEffect(() => {
     return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
       editor?.destroy();
     };
   }, [editor]);
@@ -182,41 +381,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
   const handleImageFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0];
-    if (!file || !editor) return;
-
-    setImageUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length || !editor) return;
 
     try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const response = await fetch("/api/upload-image", {
-        method: "POST",
-        headers: session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : {},
-        body: formData,
-      });
-      const json = await response.json();
-      if (json.url) {
-        editor.chain().focus().setImage({ src: json.url }).run();
-        setImageUploadError(null);
-      } else {
-        const msg = json.error ?? "Upload failed. Check the file type and size.";
-        setImageUploadError(msg);
-        setTimeout(() => setImageUploadError(null), 6000);
-      }
-    } catch {
-      setImageUploadError("Couldn't upload image. Check your connection and try again.");
-      setTimeout(() => setImageUploadError(null), 6000);
+      await insertImageFiles(editor.view, files, null);
     } finally {
-      setImageUploading(false);
       if (imageInputRef.current) imageInputRef.current.value = "";
     }
   };
@@ -338,6 +508,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({
         ref={imageInputRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
         onChange={handleImageFileChange}
       />

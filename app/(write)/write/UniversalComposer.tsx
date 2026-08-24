@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -17,7 +16,7 @@ import ProfileGate from "@/components/ui/ProfileGate";
 import TagInput from "@/components/ui/TagInput";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
 import CoAuthorPicker from "@/components/collaboration/CoAuthorPicker";
-import type { EditorHandle } from "@/components/editor/Editor";
+import type { EditorHandle, SelectedImage } from "@/components/editor/Editor";
 import {
   contributionText,
   deriveContributionExcerpt,
@@ -33,6 +32,9 @@ import {
   savePublishedEditDraft,
 } from "./editActions";
 import MyDrafts from "./MyDrafts";
+import ArticlePreview, { readingMinutes } from "./ArticlePreview";
+import RevisionHistory, { type RestoredRevision } from "./RevisionHistory";
+import DraftShareControl from "./DraftShareControl";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
@@ -42,7 +44,15 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
 });
 
 type SaveState = "idle" | "saving" | "cloud" | "device" | "error";
-type FormatAction = "bold" | "italic" | "heading" | "bulletList" | "orderedList" | "blockquote";
+type FormatAction =
+  | "bold"
+  | "italic"
+  | "heading"
+  | "heading3"
+  | "bulletList"
+  | "orderedList"
+  | "blockquote"
+  | "divider";
 
 function Icon({ path, className = "h-5 w-5" }: { path: ReactNode; className?: string }) {
   return (
@@ -67,10 +77,19 @@ function Icon({ path, className = "h-5 w-5" }: { path: ReactNode; className?: st
  * bubble needs a selection, while this row also works from a collapsed caret,
  * which is how someone turns on bold and then types.
  */
-const FORMAT_ACTIONS: ReadonlyArray<{ label: string; mark: FormatAction; path: ReactNode }> = [
+const FORMAT_ACTIONS: ReadonlyArray<{
+  label: string;
+  mark: FormatAction;
+  path?: ReactNode;
+  /** Headings are drawn as text, because two sizes of the same "H" glyph are
+      indistinguishable at toolbar size and a writer needs to know which
+      level they are about to apply. */
+  text?: string;
+}> = [
   { label: "Bold", mark: "bold", path: <path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zm0 7h7a3.5 3.5 0 0 1 0 7H7z" /> },
   { label: "Italic", mark: "italic", path: <path d="M15 5h-5m4 14H9M14 5l-4 14" /> },
-  { label: "Heading", mark: "heading", path: <path d="M6 5v14M18 5v14M6 12h12" /> },
+  { label: "Heading", mark: "heading", text: "H2" },
+  { label: "Subheading", mark: "heading3", text: "H3" },
   {
     label: "Bullets",
     mark: "bulletList",
@@ -82,7 +101,23 @@ const FORMAT_ACTIONS: ReadonlyArray<{ label: string; mark: FormatAction; path: R
     path: <><path d="M10 6h10M10 12h10M10 18h10" /><path d="M4 5.5h1V9M3.6 15.2a1.2 1.2 0 1 1 1.9 1.4L3.6 18.6H5.6" /></>,
   },
   { label: "Quote", mark: "blockquote", path: <path d="M5 5v14M10 8h9M10 12h9M10 16h6" /> },
+  { label: "Divider", mark: "divider", path: <path d="M4 12h16" /> },
 ];
+
+const UNDO_ICON = <path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" />;
+const REDO_ICON = <path d="m15 14 5-5-5-5M20 9H10a6 6 0 0 0 0 12h3" />;
+const SOURCES_ICON = (
+  <>
+    <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 1 4 15.5z" />
+    <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h4.5a1.5 1.5 0 0 0 1.5-1.5z" />
+  </>
+);
+const PREVIEW_ICON = (
+  <>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12" />
+    <circle cx="12" cy="12" r="2.75" />
+  </>
+);
 
 const CLOSE_ICON = <path d="M6 6l12 12M18 6 6 18" />;
 const PLUS_ICON = <path d="M12 5v14M5 12h14" />;
@@ -247,9 +282,11 @@ export default function UniversalComposer({
   const router = useRouter();
   const editorRef = useRef<EditorHandle>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const subtitleRef = useRef<HTMLTextAreaElement>(null);
   const publishDialogRef = useRef<HTMLDivElement>(null);
   const leaveDialogRef = useRef<HTMLDivElement>(null);
   const discardDialogRef = useRef<HTMLDivElement>(null);
+  const previewDialogRef = useRef<HTMLDivElement>(null);
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [profile, setProfile] = useState(initialProfile);
   const [draftId, setDraftId] = useState(initialDraftId);
@@ -260,8 +297,13 @@ export default function UniversalComposer({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [recovery, setRecovery] = useState<{ snapshot: ContributionSnapshot; key: string } | null>(null);
   const [showTitle, setShowTitle] = useState(Boolean(initialSnapshot.title.trim()));
+  const [showSubtitle, setShowSubtitle] = useState(Boolean(initialSnapshot.excerpt.trim()));
   const [showMore, setShowMore] = useState(false);
+  const [showSources, setShowSources] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [showFormat, setShowFormat] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const [history, setHistory] = useState({ canUndo: false, canRedo: false });
   const [showLink, setShowLink] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
@@ -291,9 +333,11 @@ export default function UniversalComposer({
   const closePublish = useCallback(() => setShowPublish(false), []);
   const closeLeave = useCallback(() => setShowLeave(false), []);
   const closeDiscard = useCallback(() => setShowDiscard(false), []);
+  const closePreview = useCallback(() => setShowPreview(false), []);
   useModalFocus(showPublish, publishDialogRef, closePublish, publishing);
   useModalFocus(showLeave, leaveDialogRef, closeLeave);
   useModalFocus(showDiscard, discardDialogRef, closeDiscard);
+  useModalFocus(showPreview, previewDialogRef, closePreview);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -323,10 +367,15 @@ export default function UniversalComposer({
     setDraftId(initialDraftId);
     setEditDraftId(initialEditDraftId);
     setShowTitle(Boolean(initialSnapshot.title.trim()));
+    setShowSubtitle(Boolean(initialSnapshot.excerpt.trim()));
     setRecovery(null);
     setSaveState("idle");
     setSaveError(null);
     setShowPublish(false);
+    setShowPreview(false);
+    setShowSources(false);
+    setSelectedImage(null);
+    setHistory({ canUndo: false, canRedo: false });
     setDocumentKey(incoming);
   }, [initialDraftId, initialEditDraftId, initialSnapshot, mode, publishedPostId, userId]);
 
@@ -486,10 +535,10 @@ export default function UniversalComposer({
       setShowProfileGate(true);
       return;
     }
-    setSnapshot((current) => ({
-      ...current,
-      excerpt: current.excerpt.trim() || deriveContributionExcerpt(current.content),
-    }));
+    // The subtitle is written on the canvas now, so nothing is auto-filled
+    // into it here. An empty one still becomes a feed summary, derived from
+    // the opening on the server at publish time, which is why the sheet shows
+    // that derived line rather than writing it into the writer's own field.
     setShowPublish(true);
   };
 
@@ -529,6 +578,9 @@ export default function UniversalComposer({
     }
   };
 
+  // This runs on every keystroke, so each piece of derived state is compared
+  // before it is set. Returning the previous value keeps a typing session from
+  // re-rendering the toolbar and the caption panel on every character.
   const handleSelectionUpdate = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -536,10 +588,33 @@ export default function UniversalComposer({
       bold: editor.isActive("bold"),
       italic: editor.isActive("italic"),
       heading: editor.isActive("heading", { level: 2 }),
+      heading3: editor.isActive("heading", { level: 3 }),
       bulletList: editor.isActive("bulletList"),
       orderedList: editor.isActive("orderedList"),
       blockquote: editor.isActive("blockquote"),
       link: editor.isActive("link"),
+    });
+
+    const canUndo = editor.canUndo();
+    const canRedo = editor.canRedo();
+    setHistory((current) =>
+      current.canUndo === canUndo && current.canRedo === canRedo
+        ? current
+        : { canUndo, canRedo }
+    );
+
+    const image = editor.getSelectedImage();
+    setSelectedImage((current) => {
+      if (!image) return current === null ? current : null;
+      if (
+        current &&
+        current.src === image.src &&
+        current.alt === image.alt &&
+        current.caption === image.caption
+      ) {
+        return current;
+      }
+      return image;
     });
   }, []);
 
@@ -550,9 +625,28 @@ export default function UniversalComposer({
     if (format === "bold") editor.toggleBold();
     else if (format === "italic") editor.toggleItalic();
     else if (format === "heading") editor.toggleH2();
+    else if (format === "heading3") editor.toggleH3();
     else if (format === "bulletList") editor.toggleBulletList();
     else if (format === "orderedList") editor.toggleOrderedList();
+    else if (format === "divider") editor.insertDivider();
     else editor.toggleBlockquote();
+  }, []);
+
+  const applyImageAttribute = useCallback((attrs: { alt?: string; caption?: string }) => {
+    editorRef.current?.updateSelectedImage(attrs);
+    setSelectedImage((current) => (current ? { ...current, ...attrs } : current));
+  }, []);
+
+  const restoreRevision = useCallback((revision: RestoredRevision) => {
+    setSnapshot((current) => ({
+      ...current,
+      title: revision.title,
+      excerpt: revision.excerpt,
+      content: revision.content,
+    }));
+    setShowTitle(Boolean(revision.title.trim()));
+    setShowSubtitle(Boolean(revision.excerpt.trim()));
+    setShowMore(false);
   }, []);
 
   // A one-line textarea with overflow hidden clips its second line, and a
@@ -563,6 +657,13 @@ export default function UniversalComposer({
     field.style.height = "auto";
     field.style.height = `${field.scrollHeight}px`;
   }, [showTitle, snapshot.title]);
+
+  useEffect(() => {
+    const field = subtitleRef.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight}px`;
+  }, [showSubtitle, snapshot.excerpt]);
 
   // "Saved" is the resting state. Only the device-only case earns more words,
   // because it is the only one that carries a consequence for the writer.
@@ -580,6 +681,12 @@ export default function UniversalComposer({
               : "";
   const bodyText = contributionText(snapshot.content);
   const wordCount = bodyText ? bodyText.split(/\s+/).filter(Boolean).length : 0;
+  const authorName = profile?.full_name?.trim() || profile?.username?.trim() || "You";
+  // What the feed will carry. An unwritten subtitle still becomes one, derived
+  // from the opening on the server, so the sheet shows the result either way
+  // rather than leaving the writer to guess.
+  const feedSummary = snapshot.excerpt.trim() || deriveContributionExcerpt(snapshot.content);
+  const minutes = readingMinutes(wordCount);
   const canResumeOtherDrafts = mode !== "published-edit" && !hasMeaningfulContribution(snapshot);
 
   return (
@@ -665,6 +772,50 @@ export default function UniversalComposer({
           </button>
         )}
 
+        {/* A subtitle only means something under a headline, so it is offered
+            only once there is one. It is the same field the feed reads as the
+            summary: one value, written where the writer can see it against the
+            title instead of buried in the publish step. */}
+        {showTitle ? (
+          showSubtitle ? (
+            <div className="mb-5 flex items-start gap-2">
+              <textarea
+                ref={subtitleRef}
+                rows={1}
+                value={snapshot.excerpt}
+                onChange={(event) =>
+                  setSnapshot((current) => ({ ...current, excerpt: event.target.value }))
+                }
+                placeholder="Add a subtitle"
+                aria-label="Subtitle"
+                className="min-h-11 flex-1 resize-none overflow-hidden border-0 bg-transparent text-lg leading-relaxed text-ink-muted outline-none placeholder:text-ink-muted/40 sm:text-xl"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setSnapshot((current) => ({ ...current, excerpt: "" }));
+                  setShowSubtitle(false);
+                }}
+                className="mt-1 min-h-11 rounded-lg px-2 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setShowSubtitle(true);
+                requestAnimationFrame(() => subtitleRef.current?.focus());
+              }}
+              className="mb-5 -ml-1 flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-semibold text-ink-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
+            >
+              <Icon path={PLUS_ICON} className="h-4 w-4" />
+              Add subtitle
+            </button>
+          )
+        ) : null}
+
         <Editor
           key={documentKey}
           ref={editorRef}
@@ -695,31 +846,58 @@ export default function UniversalComposer({
           className="sticky z-20 mt-8 flex w-fit max-w-full items-center gap-1 rounded-2xl border border-card-border bg-surface p-1.5 shadow-lg shadow-ink/10"
           style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem + var(--mobile-visual-viewport-bottom, 0px))" }}
         >
-          <button type="button" onClick={() => setShowFormat((value) => !value)} aria-expanded={showFormat} className={`flex min-h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-semibold transition-colors ${showFormat ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="Formatting">Aa</button>
-          <button type="button" onClick={() => editorRef.current?.triggerImageUpload()} className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink" aria-label="Insert image">
+          {/* Undo belongs in the bar, not only on the keyboard. A phone has no
+              Cmd+Z, and a paragraph lost to a stray gesture is otherwise gone
+              for good. */}
+          <button type="button" onClick={() => editorRef.current?.undo()} disabled={!history.canUndo} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink disabled:pointer-events-none disabled:opacity-30" aria-label="Undo">
+            <Icon path={UNDO_ICON} />
+          </button>
+          <button type="button" onClick={() => editorRef.current?.redo()} disabled={!history.canRedo} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink disabled:pointer-events-none disabled:opacity-30" aria-label="Redo">
+            <Icon path={REDO_ICON} />
+          </button>
+          <span className="mx-0.5 h-6 w-px shrink-0 bg-divider" aria-hidden="true" />
+          <button type="button" onClick={() => setShowFormat((value) => !value)} aria-expanded={showFormat} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-3 text-sm font-semibold transition-colors ${showFormat ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="Formatting">Aa</button>
+          <button type="button" onClick={() => editorRef.current?.triggerImageUpload()} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink" aria-label="Insert image">
             <Icon path={IMAGE_ICON} />
           </button>
-          <button type="button" onClick={() => setShowLink((value) => !value)} className={`flex min-h-11 min-w-11 items-center justify-center rounded-xl transition-colors ${activeMarks.link ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="Add link">
+          <button type="button" onClick={() => setShowLink((value) => !value)} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${activeMarks.link ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="Add link">
             <Icon path={LINK_ICON} />
           </button>
-          <button type="button" onClick={() => setShowMore((value) => !value)} aria-expanded={showMore} className={`flex min-h-11 min-w-11 items-center justify-center rounded-xl transition-colors ${showMore ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="More writing options">
+          {/* Citing a source is the one thing this editor does that a general
+              blogging tool does not. It gets a place in the bar rather than a
+              line inside an overflow menu. */}
+          <button type="button" onClick={() => setShowSources((value) => !value)} aria-expanded={showSources} className={`relative flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${showSources ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label={snapshot.references.length ? `Sources, ${snapshot.references.length} added` : "Sources"}>
+            <Icon path={SOURCES_ICON} />
+            {snapshot.references.length ? (
+              <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-brand px-1 text-[10px] font-semibold leading-none text-white">
+                {snapshot.references.length}
+              </span>
+            ) : null}
+          </button>
+          <span className="mx-0.5 h-6 w-px shrink-0 bg-divider" aria-hidden="true" />
+          <button type="button" onClick={() => setShowPreview(true)} disabled={!bodyText} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-canvas hover:text-ink disabled:pointer-events-none disabled:opacity-30" aria-label="Preview as a reader">
+            <Icon path={PREVIEW_ICON} />
+          </button>
+          <button type="button" onClick={() => setShowMore((value) => !value)} aria-expanded={showMore} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${showMore ? "bg-canvas text-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`} aria-label="More writing options">
             <Icon path={MORE_ICON} />
           </button>
         </div>
 
         {showFormat ? (
           <div className="mt-3 flex flex-wrap gap-1 rounded-xl border border-card-border bg-surface p-2">
-            {FORMAT_ACTIONS.map(({ label, mark, path }) => (
+            {FORMAT_ACTIONS.map(({ label, mark, path, text }) => (
               <button
                 key={mark}
                 type="button"
                 onClick={() => handleFormat(mark)}
                 aria-label={label}
-                aria-pressed={Boolean(activeMarks[mark])}
+                // A divider is inserted, not toggled on, so it carries no
+                // pressed state to announce.
+                aria-pressed={mark === "divider" ? undefined : Boolean(activeMarks[mark])}
                 title={label}
-                className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors ${activeMarks[mark] ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`}
+                className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg text-xs font-bold transition-colors ${activeMarks[mark] ? "bg-green-tint text-emerald-ink" : "text-ink-muted hover:bg-canvas hover:text-ink"}`}
               >
-                <Icon path={path} />
+                {text ? text : <Icon path={path} />}
               </button>
             ))}
           </div>
@@ -731,19 +909,83 @@ export default function UniversalComposer({
           </div>
         ) : null}
 
+        {/* An image carries a credit, a source, or a chart it came from, and
+            none of that survives in a bare picture. The panel appears on
+            selection rather than living permanently on screen. */}
+        {selectedImage ? (
+          <div className="mt-3 space-y-3 rounded-xl border border-card-border bg-surface p-3">
+            <p className="text-kicker font-semibold uppercase text-ink-muted">Selected image</p>
+            <div>
+              <label htmlFor="image-caption" className="mb-1.5 block text-sm font-semibold text-ink">
+                Caption
+              </label>
+              <input
+                id="image-caption"
+                type="text"
+                value={selectedImage.caption}
+                onChange={(event) => applyImageAttribute({ caption: event.target.value })}
+                placeholder="What this shows, and who it is by"
+                className="min-h-11 w-full rounded-lg border border-card-border bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-brand"
+              />
+            </div>
+            <div>
+              <label htmlFor="image-alt" className="mb-1.5 block text-sm font-semibold text-ink">
+                Alt text
+              </label>
+              <input
+                id="image-alt"
+                type="text"
+                value={selectedImage.alt}
+                onChange={(event) => applyImageAttribute({ alt: event.target.value })}
+                placeholder="Describe the image"
+                className="min-h-11 w-full rounded-lg border border-card-border bg-surface px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-brand"
+              />
+              <p className="mt-1.5 text-meta text-ink-muted">
+                Read aloud by screen readers, and shown when the image cannot load.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {showSources ? (
+          <section className="mt-6 border-t border-divider pt-6">
+            <h2 className="mb-1.5 text-kicker font-semibold uppercase text-ink-muted">Sources</h2>
+            <p className="mb-3 text-meta text-ink-muted">
+              Add a source, then place a citation in the body where it belongs.
+            </p>
+            <ReferencesPanel references={snapshot.references} onChange={(references) => setSnapshot((current) => ({ ...current, references }))} onInsertCitation={(id) => editorRef.current?.insertCitation(id)} />
+          </section>
+        ) : null}
+
         {showMore ? (
           <section className="mt-6 space-y-7 border-t border-divider pt-6">
-            {/* Sources and co-authors are different jobs, citation and
-                attribution, so each says which it is rather than stacking
-                into one undifferentiated pile. */}
-            <div>
-              <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Sources</h2>
-              <ReferencesPanel references={snapshot.references} onChange={(references) => setSnapshot((current) => ({ ...current, references }))} onInsertCitation={(id) => editorRef.current?.insertCitation(id)} />
-            </div>
             {mode !== "published-edit" ? (
               <div>
                 <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Co-authors</h2>
                 <CoAuthorPicker userId={userId} value={snapshot.collaborators} onChange={(collaborators) => setSnapshot((current) => ({ ...current, collaborators }))} source="write" />
+              </div>
+            ) : null}
+            {/* Both of these describe a draft that exists on the account, so
+                neither is offered until the first autosave has minted one, and
+                neither applies to editing something already published. */}
+            {mode !== "published-edit" && draftId ? (
+              <div>
+                <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Share this draft</h2>
+                <DraftShareControl postId={draftId} />
+              </div>
+            ) : null}
+            {mode !== "published-edit" && draftId ? (
+              <div>
+                <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Version history</h2>
+                <RevisionHistory
+                  postId={draftId}
+                  currentSnapshot={{
+                    title: snapshot.title,
+                    excerpt: snapshot.excerpt,
+                    content: snapshot.content,
+                  }}
+                  onRestore={restoreRevision}
+                />
               </div>
             ) : null}
             {mode === "published-edit" && editDraftId ? (
@@ -778,32 +1020,42 @@ export default function UniversalComposer({
               </button>
             </div>
 
-            <article className="mt-5 overflow-hidden rounded-2xl border border-card-border bg-card">
-              {snapshot.coverImageUrl ? (
-                <div className="relative aspect-[16/8] w-full bg-canvas">
-                  <Image src={snapshot.coverImageUrl} alt="Cover preview" fill sizes="(max-width: 640px) 100vw, 576px" className="object-cover" />
-                </div>
-              ) : null}
-              <div className="p-5">
-                {snapshot.title.trim() ? <h3 className="font-display text-2xl font-semibold leading-tight">{snapshot.title.trim()}</h3> : null}
-                <p className={`${snapshot.title.trim() ? "mt-3 text-sm text-ink-muted" : "text-base text-ink"} line-clamp-5 whitespace-pre-line`}>{bodyText}</p>
-                <p className="mt-4 text-xs font-medium text-ink-muted">{profile?.full_name || profile?.username}</p>
-              </div>
-            </article>
+            {/* The piece as it will actually read, not as it will be listed.
+                The card told a writer how the feed would summarise them, which
+                is not the question anyone opens a preview to answer. */}
+            <div className="mt-5 max-h-[46dvh] overflow-y-auto rounded-2xl border border-card-border bg-card p-5">
+              <ArticlePreview
+                snapshot={snapshot}
+                authorName={authorName}
+                wordCount={wordCount}
+                variant="compact"
+              />
+            </div>
 
-            {/* The canvas stays free of a running count. Here, at the moment of
-                committing, the length is information rather than pressure. */}
-            <p className="mt-3 text-meta text-ink-muted">
-              {wordCount === 1 ? "1 word" : `${wordCount.toLocaleString()} words`}
-              {snapshot.title.trim() ? " · full article presentation" : " · compact presentation"}
-            </p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              {/* The canvas stays free of a running count. Here, at the moment
+                  of committing, the length is information rather than pressure. */}
+              <p className="text-meta text-ink-muted">
+                {wordCount === 1 ? "1 word" : `${wordCount.toLocaleString()} words`}
+                {snapshot.title.trim() ? " · full article presentation" : " · compact presentation"}
+                {minutes ? ` · ${minutes} min read` : ""}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowPreview(true)}
+                className="min-h-9 rounded-lg px-2 text-xs font-semibold text-emerald-ink underline underline-offset-2"
+              >
+                Read full preview
+              </button>
+            </div>
+
+            {feedSummary ? (
+              <p className="mt-2 line-clamp-2 text-meta text-ink-muted">
+                In the feed: {feedSummary}
+              </p>
+            ) : null}
 
             <div className="mt-6 space-y-5">
-              <div>
-                <label htmlFor="publication-summary" className="mb-2 block text-sm font-semibold text-ink">Summary</label>
-                <textarea id="publication-summary" rows={3} value={snapshot.excerpt} onChange={(event) => setSnapshot((current) => ({ ...current, excerpt: event.target.value }))} placeholder="A short summary is created from your opening." className="w-full resize-none rounded-xl border border-card-border bg-surface px-3 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-emerald-brand" />
-                <p className="mt-1.5 text-meta text-ink-muted">This is what readers see in the feed.</p>
-              </div>
               <div>
                 <p className="mb-2 text-sm font-semibold text-ink">Topics <span className="font-normal text-ink-muted">(optional)</span></p>
                 <TagInput value={snapshot.tags} onChange={(tags) => setSnapshot((current) => ({ ...current, tags }))} showLabel={false} maxTags={5} placeholder="Add a topic" disabled={publishing} />
@@ -819,6 +1071,34 @@ export default function UniversalComposer({
               {mode === "published-edit" ? "Update now" : "Publish now"}
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {/* Reading the piece back at full size, in the type it will actually be
+          set in. Sits above the publish sheet so it can be opened from there
+          without losing the sheet underneath. */}
+      {showPreview ? (
+        <div
+          ref={previewDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Reader preview"
+          className="fixed inset-0 z-[75] overflow-y-auto overscroll-contain bg-surface"
+        >
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-divider bg-surface/95 px-4 py-3 backdrop-blur sm:px-6">
+            <p className="text-kicker font-semibold uppercase text-ink-muted">
+              How this reads
+            </p>
+            <button
+              type="button"
+              onClick={closePreview}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
+              aria-label="Close preview"
+            >
+              <Icon path={CLOSE_ICON} />
+            </button>
+          </div>
+          <ArticlePreview snapshot={snapshot} authorName={authorName} wordCount={wordCount} />
         </div>
       ) : null}
 
