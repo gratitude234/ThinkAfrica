@@ -9,6 +9,13 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   ensure: vi.fn(),
   publish: vi.fn(),
+  undo: vi.fn(),
+  redo: vi.fn(),
+  updateSelectedImage: vi.fn(),
+  historyState: { canUndo: false, canRedo: false },
+  selectedImage: null as { src: string; alt: string; caption: string } | null,
+  shareToken: null as string | null,
+  uploadingHandler: null as ((uploading: boolean) => void) | null,
   editorMounts: { count: 0 },
 }));
 
@@ -19,18 +26,35 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/dynamic", () => ({
   default: () =>
     forwardRef(function MockEditor(
-      props: { content: string; placeholder: string; ariaLabel: string; onUpdate: (value: string) => void },
+      props: {
+        content: string;
+        placeholder: string;
+        ariaLabel: string;
+        onUpdate: (value: string) => void;
+        onSelectionUpdate?: () => void;
+        onImageUploadingChange?: (uploading: boolean) => void;
+      },
       ref
     ) {
       useImperativeHandle(ref, () => ({
-        toggleBold: vi.fn(), toggleItalic: vi.fn(), toggleH2: vi.fn(), toggleBulletList: vi.fn(),
-        toggleOrderedList: vi.fn(), toggleBlockquote: vi.fn(), isActive: () => false,
-        undo: vi.fn(), redo: vi.fn(), triggerImageUpload: vi.fn(), insertLink: vi.fn(), insertCitation: vi.fn(),
+        toggleBold: vi.fn(), toggleItalic: vi.fn(), toggleH2: vi.fn(), toggleH3: vi.fn(),
+        toggleBulletList: vi.fn(), toggleOrderedList: vi.fn(), toggleBlockquote: vi.fn(),
+        insertDivider: vi.fn(), isActive: () => false,
+        undo: mocks.undo, redo: mocks.redo,
+        canUndo: () => mocks.historyState.canUndo, canRedo: () => mocks.historyState.canRedo,
+        triggerImageUpload: vi.fn(), insertLink: vi.fn(), insertCitation: vi.fn(),
+        getSelectedImage: () => mocks.selectedImage, updateSelectedImage: mocks.updateSelectedImage,
       }));
       // A remount is what costs the writer their caret, focus and undo history,
       // so the tests below count mounts rather than renders.
       useEffect(() => { mocks.editorMounts.count += 1; }, []);
-      return <textarea aria-label={props.ariaLabel} placeholder={props.placeholder} value={props.content} onChange={(event) => props.onUpdate(event.target.value)} />;
+      // Held so a test can report an upload the way the real editor does.
+      useEffect(() => {
+        mocks.uploadingHandler = props.onImageUploadingChange ?? null;
+      }, [props.onImageUploadingChange]);
+      // The real editor reports a selection change alongside every update, which
+      // is what keeps the toolbar's undo state and caption panel current.
+      return <textarea aria-label={props.ariaLabel} placeholder={props.placeholder} value={props.content} onChange={(event) => { props.onUpdate(event.target.value); props.onSelectionUpdate?.(); }} />;
     }),
 }));
 
@@ -46,6 +70,13 @@ vi.mock("@/components/ui/TagInput", () => ({ default: () => <input aria-label="T
 vi.mock("@/components/post/ReferencesPanel", () => ({ default: () => <div>Sources panel</div> }));
 vi.mock("@/components/collaboration/CoAuthorPicker", () => ({ default: () => <div>Collaborators panel</div> }));
 vi.mock("./MyDrafts", () => ({ default: () => <div>Drafts panel</div> }));
+vi.mock("./DraftShareControl", () => ({ default: () => <div>Share control</div> }));
+vi.mock("./shareActions", () => ({
+  getDraftShareLink: async () => ({ token: mocks.shareToken }),
+  createDraftShareLink: vi.fn(),
+  revokeDraftShareLink: vi.fn(),
+}));
+vi.mock("./RevisionHistory", () => ({ default: () => <div>History panel</div> }));
 vi.mock("@/components/ui/ProfileGate", () => ({ default: () => null }));
 vi.mock("next/image", () => ({ default: (props: { alt: string }) => <div role="img" aria-label={props.alt} /> }));
 
@@ -263,6 +294,12 @@ describe("UniversalComposer canvas polish", () => {
     vi.useFakeTimers();
     mocks.ensure.mockReset().mockResolvedValue({ error: null, draftId: "draft-1" });
     mocks.publish.mockReset().mockResolvedValue({ error: null, slug: "hello" });
+    mocks.undo.mockReset();
+    mocks.redo.mockReset();
+    mocks.updateSelectedImage.mockReset();
+    mocks.historyState = { canUndo: false, canRedo: false };
+    mocks.selectedImage = null;
+    mocks.shareToken = null;
     localStorage.clear();
     window.history.replaceState(null, "", "/write");
   });
@@ -285,12 +322,99 @@ describe("UniversalComposer canvas polish", () => {
     expect(screen.queryByText("Drafts panel")).not.toBeInTheDocument();
   });
 
-  it("names each drawer section rather than stacking them", () => {
+  it("gives sources a place in the toolbar rather than a line in the drawer", () => {
     open();
-    fireEvent.click(screen.getByRole("button", { name: "More writing options" }));
-
+    // Citing a source is the thing this editor does that a general blogging
+    // tool does not, so it is reachable without opening an overflow menu.
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
     expect(screen.getByRole("heading", { name: "Sources" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "More writing options" }));
     expect(screen.getByRole("heading", { name: "Co-authors" })).toBeInTheDocument();
+  });
+
+  it("offers undo in the toolbar, which is the only place a phone can reach it", () => {
+    mocks.historyState = { canUndo: true, canRedo: false };
+    open();
+    expect(screen.getByRole("button", { name: "Redo" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>A sentence.</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(mocks.undo).toHaveBeenCalled();
+  });
+
+  it("asks for a caption and alt text once an image is selected", () => {
+    mocks.selectedImage = { src: "https://example.com/chart.png", alt: "", caption: "" };
+    open();
+    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>Body.</p>" } });
+
+    fireEvent.change(screen.getByLabelText("Caption"), { target: { value: "Lagos, 2026" } });
+    expect(mocks.updateSelectedImage).toHaveBeenCalledWith({ caption: "Lagos, 2026" });
+
+    fireEvent.change(screen.getByLabelText("Alt text"), { target: { value: "A bar chart" } });
+    expect(mocks.updateSelectedImage).toHaveBeenCalledWith({ alt: "A bar chart" });
+  });
+
+  it("previews the piece as it reads, not as it will be listed", () => {
+    open({ ...empty, title: "A title", content: "<p>The body.</p>" });
+    fireEvent.click(screen.getByRole("button", { name: "More writing options" }));
+    fireEvent.click(screen.getByRole("button", { name: "Preview as a reader" }));
+
+    expect(screen.getByRole("dialog", { name: "Reader preview" })).toBeInTheDocument();
+  });
+
+  it("keeps the bottom bar to six controls so none of it runs off a phone", () => {
+    open();
+    const bar = screen.getByRole("button", { name: "Formatting" }).parentElement!;
+
+    expect(bar.querySelectorAll("button")).toHaveLength(6);
+    // Link moved in with the other text marks, which is what made room.
+    expect(screen.queryByRole("button", { name: "Add link" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Formatting" }));
+    expect(screen.getByRole("button", { name: "Add link" })).toBeInTheDocument();
+  });
+
+  it("opens one drawer at a time rather than stacking them down the page", () => {
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "Formatting" }));
+    expect(screen.getByRole("button", { name: "Bold" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
+    expect(screen.getByRole("heading", { name: "Sources" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Bold" })).not.toBeInTheDocument();
+
+    // Tapping the open one closes it.
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
+    expect(screen.queryByRole("heading", { name: "Sources" })).not.toBeInTheDocument();
+  });
+
+  it("takes the subtitle with the title, rather than leaving it invisible", () => {
+    open({ ...empty, title: "A title", excerpt: "The angle", content: "<p>Body.</p>" });
+    expect(screen.getByLabelText("Subtitle")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove title" }));
+
+    // The field is gated on having a title, so a subtitle left in place would
+    // be unreachable text that still ships as the feed summary.
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    expect(screen.queryByText(/In the feed: The angle/)).not.toBeInTheDocument();
+  });
+
+  it("says so in the header while a share link is live", async () => {
+    mocks.shareToken = "live-token";
+    open({ ...empty, content: "<p>Body.</p>" }, { draftId: "draft-1" });
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+    expect(screen.getByRole("button", { name: /share link for this draft is live/i })).toBeInTheDocument();
+  });
+
+  it("reports an image upload where the writer already looks for save state", async () => {
+    open();
+    const editor = screen.getByLabelText("Publication body");
+    await act(async () => { mocks.uploadingHandler?.(true); });
+
+    expect(screen.getByText("Adding image…")).toBeInTheDocument();
+    expect(editor).toBeInTheDocument();
   });
 
   it("labels the format row for screen readers now that it is icons", () => {
@@ -343,12 +467,25 @@ describe("UniversalComposer canvas polish", () => {
     expect(screen.getByText(/full article presentation/)).toBeInTheDocument();
   });
 
-  it("renames the feed summary field away from developer language", () => {
-    open({ ...empty, content: "<p>Body.</p>" });
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+  it("writes the subtitle on the canvas, beside the title it belongs to", () => {
+    open({ ...empty, title: "A title", content: "<p>Body.</p>" });
 
-    expect(screen.getByLabelText("Summary")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Preview text")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add subtitle" }));
+    fireEvent.change(screen.getByLabelText("Subtitle"), { target: { value: "The angle in one line" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    // One value, written where the writer can see it against the title. The
+    // sheet reports what the feed will carry instead of asking a second time.
+    expect(screen.queryByLabelText("Summary")).not.toBeInTheDocument();
+    expect(screen.getByText(/In the feed: The angle in one line/)).toBeInTheDocument();
+  });
+
+  it("offers no subtitle until there is a title for it to sit under", () => {
+    open({ ...empty, content: "<p>Body.</p>" });
+    expect(screen.queryByRole("button", { name: "Add subtitle" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add title" }));
+    expect(screen.getByRole("button", { name: "Add subtitle" })).toBeInTheDocument();
   });
 
   it("publishes on Cmd+Enter from the publish sheet", () => {
