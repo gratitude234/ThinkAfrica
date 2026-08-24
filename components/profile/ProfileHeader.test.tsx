@@ -1,28 +1,35 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { getProfileIdentityLines } from "@/lib/profileIdentity";
 import ProfileHeader from "./ProfileHeader";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-  usePathname: () => "/someone",
+  usePathname: () => "/student1",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
-function baseProfile(overrides: Partial<Parameters<typeof ProfileHeader>[0]["profile"]> = {}) {
+function baseProfile(
+  overrides: Partial<Parameters<typeof ProfileHeader>[0]["profile"]> = {}
+) {
   return {
     id: "user-1",
     username: "student1",
     full_name: "A Student",
-    university: "University of Somewhere",
-    field_of_study: "Economics",
-    graduation_year: null,
+    country: "Nigeria",
+    university: "University of Lagos",
+    field_of_study: "Political Science",
+    graduation_year: 2028,
     is_alumni: false,
-    bio: null,
+    bio: "Writes about governance and institutions.",
     avatar_url: null,
     cover_image_url: null,
     verified: false,
     verified_type: null,
-    points: 0,
-    created_at: "2026-01-01T00:00:00.000Z",
+    profile_type: "student",
+    professional_title: null,
+    organization_name: null,
+    organization_website: null,
     ...overrides,
   };
 }
@@ -33,42 +40,87 @@ function renderHeader(
   return render(
     <ProfileHeader
       profile={baseProfile(profileOverrides)}
+      topics={["Governance", "History", "Policy", "Economics"]}
+      recordSummary={{
+        publicationCount: 5,
+        sourceBackedCount: 3,
+        citableCount: 1,
+        responseCount: 4,
+        debateCount: 2,
+        researchCount: 0,
+      }}
+      followerCount={12}
       isOwnProfile
       currentUserId="user-1"
       initialFollowing={false}
       isOpenToOpportunities={false}
       canContact={false}
       talentProfileId={null}
-      writingSince="Jan 2026"
     />
   );
 }
 
 describe("ProfileHeader", () => {
-  it("presents identity: name, handle and affiliation", () => {
+  it("derives a student identity without showing a persona label", () => {
     renderHeader();
 
-    expect(screen.getByText("A Student")).toBeInTheDocument();
-    expect(screen.getByText("@student1")).toBeInTheDocument();
-    expect(
-      screen.getByText(/University of Somewhere/)
-    ).toBeInTheDocument();
+    expect(screen.getByText("Political Science student")).toBeInTheDocument();
+    expect(screen.getByText("University of Lagos · Nigeria")).toBeInTheDocument();
+    expect(screen.queryByText("Student", { exact: true })).not.toBeInTheDocument();
   });
 
-  it("states the verified type in text rather than by icon alone", () => {
+  it("uses professional identity fields for non-students", () => {
+    expect(
+      getProfileIdentityLines(
+        baseProfile({
+          profile_type: "professional",
+          university: null,
+          field_of_study: null,
+          professional_title: "Climate policy researcher",
+          organization_name: "Civic Lab",
+        })
+      )
+    ).toEqual({
+      headline: "Climate policy researcher",
+      affiliation: "Civic Lab · Nigeria",
+    });
+  });
+
+  it("falls back to affiliation and Writer on Indegenius for incomplete legacy profiles", () => {
+    expect(
+      getProfileIdentityLines(
+        baseProfile({
+          profile_type: null,
+          professional_title: null,
+          field_of_study: "Economics",
+        })
+      )
+    ).toEqual({
+      headline: "Writer on Indegenius",
+      affiliation: "University of Lagos · Nigeria",
+    });
+  });
+
+  it("exposes verification and the compact record accessibly", () => {
     renderHeader({ verified: true, verified_type: "student" });
 
-    expect(screen.getByText("Verified Student")).toBeInTheDocument();
+    expect(screen.getByLabelText("Verified student")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: /5 Publications\. Original published work/i,
+      })
+    ).toHaveAttribute("href", "/student1/record?type=publications");
+    expect(screen.getByText("Source-backed")).toBeInTheDocument();
+    expect(screen.getByText("Citable")).toBeInTheDocument();
+    expect(screen.queryByText(/point/i)).not.toBeInTheDocument();
   });
 
-  // Contribution counts belong to RecordPanel. Repeating them in the header
-  // was how the same figure ended up stated four times on one page, which is
-  // what made a small record look padded.
-  it("does not restate contribution counts", () => {
+  it("limits the visible topic chips to three", () => {
     renderHeader();
 
-    expect(screen.queryByText("Record")).not.toBeInTheDocument();
-    expect(screen.queryByText("Source-backed")).not.toBeInTheDocument();
-    expect(screen.queryByText("Citable")).not.toBeInTheDocument();
+    expect(screen.getByText("Governance")).toBeInTheDocument();
+    expect(screen.getByText("History")).toBeInTheDocument();
+    expect(screen.getByText("Policy")).toBeInTheDocument();
+    expect(screen.queryByText("Economics")).not.toBeInTheDocument();
   });
 });

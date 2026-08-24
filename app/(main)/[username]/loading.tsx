@@ -1,44 +1,52 @@
 export default function Loading() {
   return (
-    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 animate-pulse motion-reduce:animate-none"
+    <div
+      className="mx-auto max-w-[900px] animate-pulse space-y-6 motion-reduce:animate-none"
       role="status"
       aria-label="Loading this profile"
     >
-      {/* Profile sidebar */}
-      <div className="lg:col-span-1 space-y-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
-          <div className="w-20 h-20 rounded-full bg-gray-200 mx-auto" />
-          <div className="h-5 w-36 bg-gray-200 rounded mx-auto" />
-          <div className="h-3 w-24 bg-gray-100 rounded mx-auto" />
-          <div className="h-3 w-full bg-gray-100 rounded" />
-          <div className="h-3 w-5/6 bg-gray-100 rounded" />
-          <div className="h-8 w-full bg-gray-200 rounded-lg mt-2" />
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="grid grid-cols-2 gap-3">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-canvas rounded-lg p-3 space-y-2">
-                <div className="h-6 w-12 bg-gray-200 rounded mx-auto" />
-                <div className="h-3 w-10 bg-gray-100 rounded mx-auto" />
-              </div>
-            ))}
+      <section className="overflow-hidden rounded-xl border border-card-border bg-card">
+        <div className="h-20 bg-gray-100 sm:h-24" />
+        <div className="space-y-5 p-5 sm:p-7">
+          <div className="flex flex-col gap-5 sm:flex-row">
+            <div className="-mt-12 h-[88px] w-[88px] shrink-0 rounded-full border-4 border-card bg-gray-200" />
+            <div className="flex-1 space-y-3">
+              <div className="h-8 w-48 rounded bg-gray-200" />
+              <div className="h-4 w-28 rounded bg-gray-100" />
+              <div className="h-4 w-64 max-w-full rounded bg-gray-100" />
+              <div className="h-4 w-52 max-w-full rounded bg-gray-100" />
+            </div>
+            <div className="h-11 w-32 rounded-lg bg-gray-200" />
+          </div>
+          <div className="space-y-2 border-t border-card-border pt-5">
+            <div className="h-4 w-16 rounded bg-gray-100" />
+            <div className="h-4 w-full rounded bg-gray-100" />
+            <div className="h-4 w-4/5 rounded bg-gray-100" />
           </div>
         </div>
-      </div>
+        <div className="grid grid-cols-3 gap-4 border-t border-card-border bg-canvas/70 px-5 py-4">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="space-y-2">
+              <div className="h-3 w-20 max-w-full rounded bg-gray-100" />
+              <div className="h-8 w-12 rounded bg-gray-200" />
+            </div>
+          ))}
+        </div>
+      </section>
 
-      {/* Posts content */}
-      <div className="lg:col-span-2 space-y-4">
-        <div className="h-9 w-64 bg-gray-200 rounded-lg mb-6" />
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-            <div className="h-4 w-3/4 bg-gray-200 rounded" />
-            <div className="h-3 w-full bg-gray-100 rounded" />
-            <div className="h-3 w-2/3 bg-gray-100 rounded" />
+      <section className="space-y-4">
+        <div className="h-7 w-64 rounded bg-gray-200" />
+        {[0, 1, 2].map((item) => (
+          <div key={item} className="space-y-3 rounded-xl border border-card-border bg-card p-5">
+            <div className="h-3 w-24 rounded bg-gray-100" />
+            <div className="h-6 w-3/4 rounded bg-gray-200" />
+            <div className="h-4 w-full rounded bg-gray-100" />
+            <div className="h-4 w-2/3 rounded bg-gray-100" />
           </div>
         ))}
-      </div>
+      </section>
 
-      <span className="sr-only">Loading this profile…</span>
+      <span className="sr-only">Loading this profile...</span>
     </div>
   );
 }

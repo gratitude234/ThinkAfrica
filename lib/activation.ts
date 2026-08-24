@@ -1,5 +1,6 @@
 ﻿export type ActivationTaskKey =
   | "profile"
+  | "polish"
   | "follow"
   | "read"
   | "start"
@@ -122,7 +123,7 @@ export async function getActivationState(
     supabase
       .from("profiles")
       .select(
-        "full_name, username, country, university, field_of_study, interests, profile_type, professional_title"
+        "full_name, username, country, university, field_of_study, interests, profile_type, professional_title, avatar_url, bio"
       )
       .eq("id", userId)
       .single(),
@@ -206,6 +207,9 @@ export async function getActivationState(
   const hasMeaningfulEngagement = meaningfulEngagementCount >= 2;
   const hasSubmittedContribution =
     submittedPostCount > 0 || debateArgumentCount > 0;
+  // Onboarding deliberately stops asking for a photo and a bio, so this is where
+  // they get picked back up. Optional, because neither one blocks publishing.
+  const profilePolished = hasText(profile?.avatar_url) && hasText(profile?.bio);
 
   const tasks: ActivationTask[] = [
     {
@@ -214,6 +218,16 @@ export async function getActivationState(
       description: "Add context that helps readers understand the person behind the work.",
       href: "/settings",
       done: profileComplete,
+    },
+    {
+      key: "polish",
+      label: "Add a photo and a short bio",
+      description: profilePolished
+        ? "Readers can see who is behind your work."
+        : "Two quick details that make your record easier to trust.",
+      href: "/settings",
+      done: profilePolished,
+      optional: true,
     },
     {
       key: "follow",
@@ -241,12 +255,18 @@ export async function getActivationState(
     },
   ];
 
-  const orderedTasks: ActivationTask[] = [
-    tasks[0],
-    tasks[3],
-    tasks[2],
-    tasks[1],
+  // Ordered by key rather than by index so adding a task cannot silently
+  // reshuffle the checklist. Required work first, optional polish last.
+  const taskOrder: ActivationTaskKey[] = [
+    "profile",
+    "start",
+    "read",
+    "follow",
+    "polish",
   ];
+  const orderedTasks: ActivationTask[] = taskOrder
+    .map((key) => tasks.find((task) => task.key === key))
+    .filter((task): task is ActivationTask => Boolean(task));
 
   const nextTask =
     orderedTasks.find((task) => !task.done && !task.optional) ?? null;

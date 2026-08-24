@@ -72,3 +72,22 @@ describe("isProfileComplete", () => {
     ).toBe(false);
   });
 });
+
+describe("progressive profile completion", () => {
+  it("keeps the photo and bio nudge separate from profile completeness", () => {
+    // Onboarding no longer asks for either, and isProfileComplete must not start
+    // requiring them, or the profile task could never be checked off. The photo
+    // and bio live on their own optional task instead.
+    expect(
+      isProfileComplete(
+        {
+          ...sharedProfile,
+          interests: ["Governance & Policy", "Education", "Public Health"],
+          profile_type: "policy_government",
+          professional_title: "Policy researcher",
+        },
+        { currentPath: "non_student", workCategory: "policy_community" }
+      )
+    ).toBe(true);
+  });
+});

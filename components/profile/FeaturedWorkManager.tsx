@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateProfileFeaturedPosts } from "@/app/(main)/[username]/actions";
+import {
+  loadMyFeaturedWorkOptions,
+  updateProfileFeaturedPosts,
+} from "@/app/(main)/[username]/actions";
 import { formatDate } from "@/lib/utils";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 
@@ -13,25 +16,26 @@ interface FeaturedWorkOption {
   type: string;
   published_at: string | null;
   created_at: string;
-  view_count?: number | null;
-  read_count?: number | null;
   isCoAuthor?: boolean;
 }
 
 interface FeaturedWorkManagerProps {
-  options: FeaturedWorkOption[];
   initialPostIds: string[];
 }
 
 export default function FeaturedWorkManager({
-  options,
   initialPostIds,
 }: FeaturedWorkManagerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<FeaturedWorkOption[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(initialPostIds.slice(0, 3));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const optionsById = useMemo(
     () => new Map(options.map((option) => [option.id, option])),
@@ -42,6 +46,50 @@ export default function FeaturedWorkManager({
     .map((postId) => optionsById.get(postId))
     .filter((post): post is FeaturedWorkOption => Boolean(post));
 
+  useEffect(() => {
+    if (!open) return;
+    dialogRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
+  function closeDialog() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
   function togglePost(postId: string) {
     setError(null);
     setSelectedIds((current) => {
@@ -50,7 +98,7 @@ export default function FeaturedWorkManager({
       }
 
       if (current.length >= 3) {
-        setError("You can feature up to three posts.");
+        setError("You can feature up to three publications.");
         return current;
       }
 
@@ -72,6 +120,22 @@ export default function FeaturedWorkManager({
     });
   }
 
+  async function handleOpen() {
+    setOpen(true);
+    if (loaded || loading) return;
+
+    setLoading(true);
+    setError(null);
+    const result = await loadMyFeaturedWorkOptions();
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setOptions(result.options);
+      setLoaded(true);
+    }
+    setLoading(false);
+  }
+
   async function handleSave() {
     setSaving(true);
     setError(null);
@@ -85,26 +149,29 @@ export default function FeaturedWorkManager({
     }
 
     setSaving(false);
-    setOpen(false);
+    closeDialog();
     router.refresh();
   }
 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center justify-center rounded-lg border border-card-border bg-card px-3 py-1.5 text-xs font-semibold text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink"
+        onClick={() => void handleOpen()}
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-card-border bg-card px-3 text-xs font-semibold text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink"
       >
-        Manage featured work
+        {initialPostIds.length > 0 ? "Manage featured work" : "Add featured work"}
       </button>
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="featured-work-manager-title"
+            tabIndex={-1}
             className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-card-border bg-card p-6 shadow-xl"
           >
             <div className="flex items-start justify-between gap-4">
@@ -116,13 +183,13 @@ export default function FeaturedWorkManager({
                   Manage featured work
                 </h3>
                 <p className="mt-1 text-sm text-ink-muted">
-                  Choose up to three published pieces for the top of your profile.
+                  Choose and order up to three published pieces for the top of your profile.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-lg px-2 py-1 text-xl leading-none text-ink-muted hover:bg-canvas hover:text-ink-soft"
+                onClick={closeDialog}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-ink-muted hover:bg-canvas hover:text-ink-soft"
                 aria-label="Close featured work manager"
               >
                 x
@@ -144,16 +211,14 @@ export default function FeaturedWorkManager({
                         <p className="truncate font-medium text-ink">
                           {index + 1}. {getPostMetadataTitle(post)}
                         </p>
-                        <p className="text-xs text-ink-muted">
-                          {(post.read_count ?? 0).toLocaleString()} reads
-                        </p>
+                        <p className="text-xs text-ink-muted">Selected work</p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         <button
                           type="button"
                           onClick={() => movePost(post.id, -1)}
                           disabled={index === 0}
-                          className="rounded border border-card-border px-2 py-1 text-xs font-medium text-ink-soft hover:bg-canvas disabled:opacity-40"
+                          className="min-h-11 rounded border border-card-border px-3 text-xs font-medium text-ink-soft hover:bg-canvas disabled:opacity-40"
                         >
                           Up
                         </button>
@@ -161,7 +226,7 @@ export default function FeaturedWorkManager({
                           type="button"
                           onClick={() => movePost(post.id, 1)}
                           disabled={index === selectedPosts.length - 1}
-                          className="rounded border border-card-border px-2 py-1 text-xs font-medium text-ink-soft hover:bg-canvas disabled:opacity-40"
+                          className="min-h-11 rounded border border-card-border px-3 text-xs font-medium text-ink-soft hover:bg-canvas disabled:opacity-40"
                         >
                           Down
                         </button>
@@ -172,7 +237,12 @@ export default function FeaturedWorkManager({
               </div>
             ) : null}
 
-            <div className="mt-5 space-y-2">
+            <div className="mt-5 space-y-2" aria-busy={loading}>
+              {loading ? (
+                <p role="status" className="rounded-xl border border-dashed border-card-border p-6 text-center text-sm text-ink-muted">
+                  Loading your published work...
+                </p>
+              ) : null}
               {options.map((post) => {
                 const selected = selectedIds.includes(post.id);
                 const disabled = !selected && selectedIds.length >= 3;
@@ -195,8 +265,8 @@ export default function FeaturedWorkManager({
                         {getPostMetadataTitle(post)}
                       </p>
                       <p className="mt-1 text-xs text-ink-muted">
-                        {formatDate(displayDate)} / {(post.read_count ?? 0).toLocaleString()} reads
-                        {post.isCoAuthor ? " / Co-author" : ""}
+                        {formatDate(displayDate)}
+                        {post.isCoAuthor ? " · Co-author" : ""}
                       </p>
                     </div>
                     <span
@@ -213,19 +283,19 @@ export default function FeaturedWorkManager({
               })}
             </div>
 
-            {options.length === 0 ? (
+            {loaded && options.length === 0 ? (
               <div className="mt-5 rounded-xl border border-dashed border-card-border p-6 text-center text-sm text-ink-muted">
-                Publish a post before choosing featured work.
+                Publish your first idea before choosing featured work.
               </div>
             ) : null}
 
-            {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+            {error ? <p className="mt-4 text-sm text-red-600" role="alert">{error}</p> : null}
 
             <div className="mt-6 flex justify-end gap-2 border-t border-divider pt-4">
               <button
                 type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink"
+                onClick={closeDialog}
+                className="min-h-11 rounded-lg px-4 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink"
               >
                 Cancel
               </button>
@@ -233,7 +303,7 @@ export default function FeaturedWorkManager({
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={saving}
-                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-50"
+                className="min-h-11 rounded-lg bg-emerald-brand px-4 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save featured work"}
               </button>

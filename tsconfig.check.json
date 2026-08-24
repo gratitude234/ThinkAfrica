@@ -90,10 +90,9 @@
     "app/(main)/post/[slug]/PostConversationView.tsx",
     "app/(main)/post/[slug]/PostActionsRow.tsx",
     "app/(main)/[username]/page.tsx",
+    "app/(main)/[username]/record/page.tsx",
     "app/(main)/dashboard/page.tsx",
     "components/profile/ProfileHeader.tsx",
-    "components/profile/RecordPanel.tsx",
-    "components/profile/ProfileDetails.tsx",
     "components/profile/RecentActivity.tsx",
     "app/api/feed/route.ts",
     "app/(main)/explore/page.tsx",
@@ -103,6 +102,11 @@
     "app/(main)/explore/MobileOpportunitiesBanner.tsx",
     "app/(main)/explore/exploreFilters.ts",
     "app/(main)/explore/loading.tsx",
-    "app/(main)/discover/page.tsx"
+    "app/(main)/discover/page.tsx",
+    "lib/onboarding.ts",
+    "lib/activation.ts",
+    "app/(onboarding)/onboarding/page.tsx",
+    "app/(onboarding)/onboarding/OnboardingClient.tsx",
+    "app/(main)/settings/ProfileForm.tsx"
   ]
 }

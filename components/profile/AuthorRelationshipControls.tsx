@@ -26,12 +26,32 @@ interface Props {
   className?: string;
 }
 
+function BellIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-[18px] w-[18px]"
+      viewBox="0 0 24 24"
+      fill={active ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M18 8a6 6 0 10-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"
+      />
+    </svg>
+  );
+}
+
 function LegacyAuthorRelationshipControls({
   authorId,
   currentUserId,
   initialFollowing,
   initialSubscribed = false,
   compact = false,
+  variant,
   className = "",
 }: Props) {
   const router = useRouter();
@@ -42,7 +62,9 @@ function LegacyAuthorRelationshipControls({
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const enabled = isAuthorSubscriptionsEnabled();
+  const enabled =
+    isAuthorSubscriptionsEnabled() && variant !== "follow_only";
+  const iconOnlySubscription = variant === "icon";
 
   if (currentUserId === authorId) return null;
 
@@ -120,7 +142,7 @@ function LegacyAuthorRelationshipControls({
 
   const sizeClass = compact
     ? "min-h-8 rounded-full px-3 py-1.5 text-[11px]"
-    : "min-h-10 rounded-lg px-4 py-2 text-sm";
+    : "min-h-11 rounded-lg px-4 py-2 text-sm";
 
   return (
     <div className={className}>
@@ -149,15 +171,22 @@ function LegacyAuthorRelationshipControls({
             disabled={isPending}
             aria-busy={isPending || undefined}
             aria-label={subscribed ? "Unsubscribe from author publications" : "Subscribe to author publications"}
-            className={`${sizeClass} ${
-              compact ? "" : "flex-1"
+            title={subscribed ? "Subscribed to every new publication" : "Get every new publication"}
+            className={`${iconOnlySubscription ? "h-11 w-11 rounded-lg p-0" : sizeClass} ${
+              compact || iconOnlySubscription ? "" : "flex-1"
             } border font-semibold transition-colors disabled:opacity-50 ${
               subscribed
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
                 : "border-card-border bg-card text-ink-soft hover:border-emerald-300 hover:text-emerald-700"
             }`}
           >
-            {subscribed ? "Subscribed" : "Subscribe"}
+            {iconOnlySubscription ? (
+              <BellIcon active={subscribed} />
+            ) : subscribed ? (
+              "Subscribed"
+            ) : (
+              "Subscribe"
+            )}
           </button>
         ) : null}
       </div>

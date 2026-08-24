@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import UniversitySelect from "@/components/ui/UniversitySelect";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { AFRICAN_COUNTRIES } from "@/lib/academicIdentity";
-import { BRAND_PROMISE } from "@/lib/brand";
+import { BRAND_NAME, BRAND_PROMISE } from "@/lib/brand";
 import { INTEREST_OPTIONS } from "@/lib/interests";
 import {
   deriveLegacyOnboardingPreference,
@@ -26,6 +26,7 @@ import {
   type WorkCategory,
 } from "@/lib/onboarding";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
+import { normalizeProfileRecordSummary } from "@/lib/profileRecord";
 import { isProfileType, type ProfileType } from "@/lib/profileTypes";
 import { createClient } from "@/lib/supabase/client";
 
@@ -45,19 +46,14 @@ interface ProfileSnapshot {
   interests: string[] | null;
 }
 
-interface PublicationRecordRow {
-  citation_id: string | null;
-  reference_count: number | null;
-}
-
 interface RecordStats {
-  contributionCount: number;
+  publicationCount: number;
   sourceBackedCount: number;
   citableCount: number;
 }
 
 const EMPTY_RECORD: RecordStats = {
-  contributionCount: 0,
+  publicationCount: 0,
   sourceBackedCount: 0,
   citableCount: 0,
 };
@@ -133,6 +129,11 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
   const router = useRouter();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const trackedStartRef = useRef(false);
+  // Read once. Every step change calls router.replace, which would otherwise
+  // feed a new requestedStep into the loader and refetch the whole profile
+  // mid-flow, wiping anything typed but not yet saved. replace adds no history
+  // entry, so this prop only changes as a result of our own navigation.
+  const requestedStepRef = useRef(requestedStep);
   const [isEnteringApp, startEnteringApp] = useTransition();
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
@@ -191,8 +192,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
         profileResult,
         privateProfileResult,
         preferenceResult,
-        publicationsResult,
-        debateResult,
+        recordResult,
       ] = await Promise.all([
         supabase
           .from("profiles")
@@ -203,27 +203,32 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
           .single(),
         supabase.rpc("get_my_profile_private"),
         supabase.rpc("get_my_onboarding_state"),
-        supabase
-          .from("posts")
-          .select("citation_id, reference_count")
-          .eq("author_id", user.id)
-          .eq("status", "published"),
-        supabase
-          .from("debate_arguments")
-          .select("id", { count: "exact", head: true })
-          .eq("author_id", user.id),
+        supabase.rpc("get_public_profile_record_summary", {
+          p_profile_id: user.id,
+          p_include_research: false,
+        }),
       ]);
 
       if (cancelled) return;
 
       const privateProfile = normalizeMyPrivateProfile(privateProfileResult.data);
       if (privateProfile?.onboarding_completed) {
-        router.replace(requestedStep === "follow" ? "/explore?tab=people" : "/");
+        router.replace(
+          requestedStepRef.current === "follow" ? "/explore?tab=people" : "/"
+        );
         return;
       }
 
       if (profileResult.error || !profileResult.data) {
         setError("We couldn't load your profile. Please refresh and try again.");
+        setReady(true);
+        return;
+      }
+
+      if (recordResult.error) {
+        setError(
+          "We couldn't load your Intellectual Record. Please refresh and try again."
+        );
         setReady(true);
         return;
       }
@@ -252,13 +257,11 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
       setOrganizationName(profile.organization_name ?? "");
       setInterests(nextInterests.slice(0, ONBOARDING_MAX_TOPICS));
 
-      const publications = (publicationsResult.data as PublicationRecordRow[] | null) ?? [];
+      const summary = normalizeProfileRecordSummary(recordResult.data);
       setRecordStats({
-        contributionCount: publications.length + (debateResult.count ?? 0),
-        sourceBackedCount: publications.filter(
-          (publication) => (publication.reference_count ?? 0) > 0
-        ).length,
-        citableCount: publications.filter((publication) => publication.citation_id).length,
+        publicationCount: summary.publicationCount,
+        sourceBackedCount: summary.sourceBackedCount,
+        citableCount: summary.citableCount,
       });
 
       const furthestStep = getFurthestStep({
@@ -270,7 +273,8 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
         professionalTitle: profile.professional_title ?? "",
         interests: nextInterests,
       });
-      const requested = parseOnboardingStep(requestedStep);
+      const initialRequestedStep = requestedStepRef.current;
+      const requested = parseOnboardingStep(initialRequestedStep);
       const requestedIndex = requested
         ? ONBOARDING_STEPS.indexOf(requested)
         : ONBOARDING_STEPS.indexOf(furthestStep);
@@ -279,7 +283,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
       ];
 
       setStep(resolvedStep);
-      if (requestedStep !== resolvedStep) {
+      if (initialRequestedStep !== resolvedStep) {
         router.replace(`/onboarding?step=${resolvedStep}`);
       }
       setReady(true);
@@ -289,7 +293,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
     return () => {
       cancelled = true;
     };
-  }, [requestedStep, router]);
+  }, [router]);
 
   const selectPath = (nextPath: OnboardingPath) => {
     if (nextPath !== currentPath) setWorkCategory(null);
@@ -556,7 +560,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
           <div className="pb-2 pt-3">
             {step === "path" ? (
               <div className="mb-5">
-                <p className="font-display text-lg font-bold text-emerald-brand">Indegenius</p>
+                <p className="font-display text-lg font-bold text-emerald-brand">{BRAND_NAME}</p>
                 <p className="mt-0.5 text-xs font-medium text-ink-muted">{BRAND_PROMISE}</p>
               </div>
             ) : null}
@@ -783,7 +787,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
 
                   <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-card-border bg-divider">
                     {[
-                      [recordStats.contributionCount, "Publications"],
+                      [recordStats.publicationCount, "Publications"],
                       [recordStats.sourceBackedCount, "Source-backed"],
                       [recordStats.citableCount, "Citable"],
                     ].map(([value, label]) => (

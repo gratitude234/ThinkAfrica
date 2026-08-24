@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
@@ -21,7 +21,10 @@ import {
   getProfileUsernameError,
   normalizeProfileUsername,
 } from "@/lib/profileUsername";
-import { deriveLegacyOnboardingPreference } from "@/lib/onboarding";
+import {
+  deriveLegacyOnboardingPreference,
+  type OnboardingPreference,
+} from "@/lib/onboarding";
 
 const COMMON_INTERESTS = [
   "economics",
@@ -73,7 +76,13 @@ interface Profile {
 const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
-export default function ProfileForm({ profile }: { profile: Profile }) {
+export default function ProfileForm({
+  profile,
+  onboardingPreference,
+}: {
+  profile: Profile;
+  onboardingPreference?: OnboardingPreference | null;
+}) {
   const router = useRouter();
   const [fullName, setFullName] = useState(profile.full_name ?? "");
   const [username, setUsername] = useState(profile.username);
@@ -84,6 +93,11 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const [profileType, setProfileType] = useState<ProfileType | null>(
     initialProfileType
   );
+  // The private work category is only re-derived when the user actually picks a
+  // different profile type here, or when they have no stored category at all.
+  // Deriving on every save used to overwrite a category the onboarding identity
+  // step had set, because several categories share one profile type.
+  const savedProfileTypeRef = useRef<ProfileType | null>(initialProfileType);
   const [secondaryProfileTypes, setSecondaryProfileTypes] = useState<ProfileType[]>(
     normalizeSecondaryProfileTypes(profile.secondary_profile_types, initialProfileType)
   );
@@ -114,7 +128,14 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const isAcademicProfile = isAcademicProfileType(profileType);
+  // Whether this profile is school-based follows the onboarding path, not the
+  // profile type. A non-student in the research or education category carries
+  // profile_type "researcher", and reading the type alone would hide the
+  // headline and organisation fields they filled in during onboarding. Legacy
+  // profiles with no stored path still fall back to the type.
+  const isAcademicProfile = onboardingPreference?.currentPath
+    ? onboardingPreference.currentPath === "student"
+    : isAcademicProfileType(profileType);
   const hasNonAcademicProfile = Boolean(profileType && !isAcademicProfile);
 
   const checkUsername = useCallback(async () => {
@@ -237,14 +258,12 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
       setSaving(false);
       return;
     }
-    if (profileType && !isAcademicProfileType(profileType)) {
+    // Organisation stays optional here because the onboarding identity step
+    // asks for it that way. Requiring it would lock out anyone who finished
+    // onboarding without one.
+    if (hasNonAcademicProfile) {
       if (!professionalTitle.trim()) {
         setToast("Add a title or short description for your profile.");
-        setSaving(false);
-        return;
-      }
-      if (profileType !== "other" && !organizationName.trim()) {
-        setToast("Add your organization name.");
         setSaving(false);
         return;
       }
@@ -285,7 +304,9 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
     }
 
     const nextPreference = deriveLegacyOnboardingPreference(profileType);
-    if (nextPreference.currentPath) {
+    const profileTypeChanged = profileType !== savedProfileTypeRef.current;
+    const hasStoredPreference = Boolean(onboardingPreference?.currentPath);
+    if (nextPreference.currentPath && (profileTypeChanged || !hasStoredPreference)) {
       const { error: preferenceError } = await supabase.rpc(
         "save_onboarding_preferences",
         {
@@ -303,6 +324,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
 
     setSaving(false);
 
+    savedProfileTypeRef.current = profileType;
     setSecondaryProfileTypes(nextSecondaryProfileTypes);
     setToast("Profile saved successfully!");
     if (username !== profile.username) {
@@ -359,7 +381,10 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
           </div>
         ) : null}
 
-        <div className="space-y-4 border-b border-gray-100 pb-6">
+        <div
+          id="profile-identity"
+          className="scroll-mt-24 space-y-4 border-b border-gray-100 pb-6"
+        >
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
               Profile type
@@ -516,9 +541,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Organization{" "}
-                {profileType === "other" || !profileType ? (
-                  <span className="text-xs font-normal text-gray-400">(optional)</span>
-                ) : null}
+                <span className="text-xs font-normal text-gray-400">(optional)</span>
               </label>
               <input
                 type="text"
@@ -590,7 +613,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
           </div>
         ) : null}
 
-        <div>
+        <div id="profile-about" className="scroll-mt-24">
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Bio
           </label>

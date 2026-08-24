@@ -119,6 +119,25 @@ export function deriveLegacyOnboardingPreference(
   };
 }
 
+// The public profile type a work category writes. Every category maps to a
+// distinct type, and each of those types derives back to the same category
+// through deriveLegacyOnboardingPreference, so a later settings save cannot
+// flatten a stored category. Each value also appears in that category's match
+// list below, which is what makes the suggestion signal reachable.
+export const CATEGORY_PRIMARY_PROFILE_TYPE: Record<WorkCategory, ProfileType> = {
+  research_education: "researcher",
+  business_technology: "professional",
+  policy_community: "policy_government",
+  media_creative: "journalist_media",
+  independent: "other",
+};
+
+export function getCategoryPrimaryProfileType(
+  category: WorkCategory | null | undefined
+): ProfileType | null {
+  return category ? CATEGORY_PRIMARY_PROFILE_TYPE[category] : null;
+}
+
 export function getCategoryProfileTypes(
   category: WorkCategory | null | undefined
 ): ProfileType[] {

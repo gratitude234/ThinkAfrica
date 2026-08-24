@@ -19,6 +19,7 @@ import {
   isTopicSubscriptionsEnabled,
 } from "@/lib/featureFlags";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
+import { normalizeOnboardingPreference } from "@/lib/onboarding";
 
 const VALID_TABS = ["profile", "account", "notifications", "privacy"] as const;
 type SettingsTab = (typeof VALID_TABS)[number];
@@ -47,7 +48,11 @@ export default async function SettingsPage({ searchParams }: PageProps) {
 
   if (!user) redirect("/login?redirectTo=/settings");
 
-  const [{ data: profile }, { data: privateProfileRaw }] = await Promise.all([
+  const [
+    { data: profile },
+    { data: privateProfileRaw },
+    { data: onboardingStateRaw },
+  ] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -56,10 +61,12 @@ export default async function SettingsPage({ searchParams }: PageProps) {
       .eq("id", user.id)
       .single(),
     supabase.rpc("get_my_profile_private"),
+    supabase.rpc("get_my_onboarding_state"),
   ]);
 
   if (!profile) redirect("/login");
   const privateProfile = normalizeMyPrivateProfile(privateProfileRaw);
+  const onboardingPreference = normalizeOnboardingPreference(onboardingStateRaw);
 
   let subscribedAuthors: SubscribedAuthor[] = [];
   if (tab === "notifications" && isAuthorSubscriptionsEnabled()) {
@@ -243,6 +250,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
               professional_title: profile.professional_title ?? null,
               organization_website: profile.organization_website ?? null,
             }}
+            onboardingPreference={onboardingPreference}
           />
         )}
         {tab === "account" && <AccountForm email={user.email!} />}

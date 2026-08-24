@@ -20,7 +20,9 @@ const ownerReadCallsites = [
   "app/(main)/subscriptions/page.tsx",
   "components/ui/NotificationBell.tsx",
   "app/(main)/page.tsx",
-  "app/(onboarding)/onboarding/page.tsx",
+  // The onboarding owner read moved into the client when the identity-first
+  // flow landed. The route file is now a thin wrapper that reads nothing.
+  "app/(onboarding)/onboarding/OnboardingClient.tsx",
 ].map((path) => readFileSync(resolve(process.cwd(), path), "utf8"));
 
 describe("Phase 0 profile-security migration", () => {

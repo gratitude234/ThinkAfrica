@@ -1,50 +1,56 @@
-import type { AnchorHTMLAttributes } from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import FeaturedWork from "./FeaturedWork";
 
-const mocks = vi.hoisted(() => ({ push: vi.fn() }));
+describe("FeaturedWork", () => {
+  it("is hidden from visitors when the author has not selected work", () => {
+    const { container } = render(
+      <FeaturedWork posts={[]} isOwnProfile={false} />
+    );
 
-vi.mock("next/navigation", () => ({
-  usePathname: () => "/someone",
-  useRouter: () => ({ push: mocks.push }),
-}));
-
-vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
-  useGuestAuthGate: () => ({ requestAuth: vi.fn() }),
-}));
-
-vi.mock("next/link", () => ({
-  default: ({
-    href,
-    children,
-    onClick,
-    ...rest
-  }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
-    <a href={href} onClick={onClick} {...rest}>
-      {children}
-    </a>
-  ),
-}));
-
-describe("FeaturedWork 'Publish work' CTA (generic, empty-state, own profile)", () => {
-  it("opens the universal composer directly", () => {
-    render(<FeaturedWork posts={[]} isOwnProfile currentUserId="user-1" />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Publish work" }));
-
-    expect(mocks.push).toHaveBeenCalledWith("/write");
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it("does not render a plain link straight to /write", () => {
-    render(<FeaturedWork posts={[]} isOwnProfile currentUserId="user-1" />);
+  it("shows owners a quiet manual-selection empty state", () => {
+    render(
+      <FeaturedWork
+        posts={[]}
+        isOwnProfile
+        action={<button type="button">Add featured work</button>}
+      />
+    );
 
-    expect(screen.queryByRole("link", { name: "Publish work" })).not.toBeInTheDocument();
+    expect(screen.getByText("Choose the work readers should see first")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add featured work" })).toBeInTheDocument();
+    expect(screen.queryByText(/most read/i)).not.toBeInTheDocument();
   });
 
-  it("does not show the Publish CTA on someone else's profile", () => {
-    render(<FeaturedWork posts={[]} isOwnProfile={false} profileName="Jane" />);
+  it("preserves the supplied manual order and never labels work Post or Article", () => {
+    render(
+      <FeaturedWork
+        posts={[
+          {
+            id: "first",
+            title: "First selected idea",
+            slug: "first",
+            excerpt: "First excerpt",
+            type: "essay",
+          },
+          {
+            id: "second",
+            title: null,
+            slug: "second",
+            excerpt: "Second selected idea",
+            type: "blog",
+          },
+        ]}
+      />
+    );
 
-    expect(screen.queryByRole("button", { name: "Publish work" })).not.toBeInTheDocument();
+    const links = screen.getAllByRole("link");
+    expect(links[0]).toHaveTextContent("First selected idea");
+    expect(links[1]).toHaveTextContent("Second selected idea");
+    expect(screen.queryByText("Post", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText("Article", { exact: true })).not.toBeInTheDocument();
   });
 });

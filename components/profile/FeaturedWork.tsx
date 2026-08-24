@@ -1,170 +1,171 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import PostCover from "@/components/post/PostCover";
-import Badge from "@/components/ui/Badge";
-import CreateTrigger from "@/app/(main)/CreateTrigger";
-import { formatDate } from "@/lib/utils";
+import { resolveContentKind } from "@/lib/contentModel";
+import {
+  getContributionQualityLabels,
+  type IntellectualRecordLabel,
+} from "@/lib/intellectualRecord";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
+import { formatDate } from "@/lib/utils";
 
 interface FeaturedPost {
   id: string;
+  author_id?: string;
   title: string | null;
   slug: string;
   excerpt: string | null;
   type: string;
   content_kind?: string | null;
   article_format?: string | null;
-  view_count?: number | null;
-  read_count?: number | null;
+  in_response_to?: string | null;
   citation_id?: string | null;
+  published_version_id?: string | null;
   created_at?: string;
   published_at?: string | null;
   cover_image_url?: string | null;
   isCoAuthor?: boolean;
+  post_reference_counts?:
+    | { reference_count: number | null }
+    | Array<{ reference_count: number | null }>
+    | null;
+  post_authors?: Array<{ user_id: string; accepted_at: string | null }>;
+}
+
+const QUALITY_LABEL_CLASSES: Record<IntellectualRecordLabel["tone"], string> = {
+  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  sky: "border-sky-200 bg-sky-50 text-sky-700",
+  purple: "border-purple-200 bg-purple-50 text-purple-700",
+  amber: "border-amber-200 bg-amber-50 text-amber-800",
+};
+
+function referenceCount(post: FeaturedPost) {
+  const aggregate = Array.isArray(post.post_reference_counts)
+    ? post.post_reference_counts[0]
+    : post.post_reference_counts;
+  return aggregate?.reference_count ?? 0;
 }
 
 interface FeaturedWorkProps {
   posts: FeaturedPost[];
   action?: ReactNode;
-  curated?: boolean;
   isOwnProfile?: boolean;
-  profileName?: string;
-  currentUserId?: string | null;
-}
-
-function estimateReadTime(excerpt: string | null): number {
-  return Math.max(
-    1,
-    Math.ceil((excerpt?.trim().split(/\s+/).filter(Boolean).length ?? 0) / 200)
-  );
 }
 
 export default function FeaturedWork({
   posts,
   action,
-  curated = false,
   isOwnProfile = false,
-  profileName = "This profile",
-  currentUserId = null,
 }: FeaturedWorkProps) {
   if (posts.length === 0) {
+    if (!isOwnProfile) return null;
+
     return (
       <section
         id="featured-work"
-        className="min-w-0 scroll-mt-24 rounded-xl border border-dashed border-card-border bg-card p-6"
+        className="rounded-xl border border-dashed border-card-border bg-card p-5 sm:p-6"
       >
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-              Featured work
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+              Featured
             </p>
             <h2 className="font-display mt-1 text-xl font-semibold text-ink">
-              No portfolio pieces featured yet
+              Choose the work readers should see first
             </h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-ink-muted">
-              {isOwnProfile
-                ? "Publish or feature your strongest work so selectors can understand your academic signal quickly."
-                : `${profileName} has not published public portfolio work yet.`}
+            <p className="mt-1 text-sm text-ink-muted">
+              Select up to three published pieces.
             </p>
           </div>
-          {isOwnProfile ? (
-            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-              <CreateTrigger
-                userId={currentUserId}
-                className="inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-              >
-                Publish work
-              </CreateTrigger>
-              {action}
-            </div>
-          ) : null}
+          {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       </section>
     );
   }
 
   return (
-    <section id="featured-work" className="min-w-0 scroll-mt-24 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section id="featured-work" className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-            Featured work
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+            Featured
           </p>
           <h2 className="font-display mt-1 text-xl font-semibold text-ink">
-            Work worth reading first
+            Selected work
           </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            {curated
-              ? "Selected by this profile as their strongest public work."
-              : "Automatically showing the strongest public pieces by reads."}
-          </p>
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
-      <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {posts.map((post) => {
-          const readTime = estimateReadTime(post.excerpt);
-          const publishedDate = post.published_at ?? post.created_at ?? null;
+      <div className="grid gap-4 md:grid-cols-3">
+        {posts.slice(0, 3).map((post) => {
           const displayTitle = getPostDisplayTitle(post);
           const headline = displayTitle ?? post.excerpt ?? getPostMetadataTitle(post);
+          const kind = resolveContentKind(post);
+          const label = post.in_response_to
+            ? "Response"
+            : kind === "research"
+              ? "Research"
+              : null;
+          const publishedDate = post.published_at ?? post.created_at ?? null;
+          const acceptedCoauthorCount = (post.post_authors ?? []).filter(
+            (author) =>
+              author.accepted_at && author.user_id !== post.author_id
+          ).length;
+          const evidence = getContributionQualityLabels({
+            citationId: post.citation_id,
+            publishedVersionId: post.published_version_id,
+            referenceCount: referenceCount(post),
+            coAuthorCount: acceptedCoauthorCount,
+            isCoAuthor: post.isCoAuthor,
+          });
 
           return (
-            <article
-              key={post.id}
-              className="group min-w-0 overflow-hidden rounded-xl border border-card-border bg-card transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-4px_rgb(0_0_0/0.08)]"
-            >
-              <Link href={`/post/${post.slug}`} className="block">
-                <PostCover
-                  src={post.cover_image_url}
-                  alt={displayTitle}
-                  type={post.type}
-                  content_kind={post.content_kind}
-                  article_format={post.article_format}
-                  sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                  className="aspect-video"
-                  imageClassName="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                />
-              </Link>
-
-              <div className="space-y-3 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge
+            <article key={post.id} className="overflow-hidden rounded-xl border border-card-border bg-card">
+              {post.cover_image_url ? (
+                <Link href={`/post/${post.slug}`} className="block">
+                  <PostCover
+                    src={post.cover_image_url}
+                    alt={displayTitle}
                     type={post.type}
                     content_kind={post.content_kind}
                     article_format={post.article_format}
+                    sizes="(max-width: 768px) 100vw, 300px"
+                    className="aspect-video border-b border-card-border"
+                    imageClassName="object-cover"
                   />
-                  {post.isCoAuthor ? (
-                    <span className="rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
-                      Co-author
+                </Link>
+              ) : null}
+              <div className="p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  {label ? (
+                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-brand">
+                      {label}
                     </span>
                   ) : null}
-                  {post.citation_id ? (
-                    <Link
-                      href={`/publication/${post.citation_id}`}
-                      className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 transition-colors hover:border-sky-300 hover:text-sky-800"
+                  {evidence.map((evidenceLabel) => (
+                    <span
+                      key={evidenceLabel.key}
+                      title={evidenceLabel.description}
+                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${QUALITY_LABEL_CLASSES[evidenceLabel.tone]}`}
                     >
-                      Citable
-                    </Link>
-                  ) : null}
+                      {evidenceLabel.label}
+                    </span>
+                  ))}
                 </div>
-                <Link href={`/post/${post.slug}`} className="block">
-                  <h3 className="font-display line-clamp-2 text-[17px] font-semibold leading-snug text-ink transition-colors hover:text-emerald-brand">
+                <h3 className="font-display mt-2 line-clamp-3 text-[17px] font-semibold leading-snug text-ink">
+                  <Link href={`/post/${post.slug}`} className="hover:text-emerald-brand">
                     {headline}
-                  </h3>
-                </Link>
+                  </Link>
+                </h3>
                 {displayTitle && post.excerpt ? (
-                  <p className="line-clamp-2 text-sm leading-relaxed text-ink-muted">
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-muted">
                     {post.excerpt}
                   </p>
                 ) : null}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
-                  <span>{readTime} min read</span>
-                  {(post.read_count ?? 0) > 0 ? (
-                    <span>{(post.read_count ?? 0).toLocaleString()} reads</span>
-                  ) : null}
-                  {publishedDate ? <span>{formatDate(publishedDate)}</span> : null}
-                </div>
+                {publishedDate ? (
+                  <p className="mt-3 text-xs text-ink-muted">{formatDate(publishedDate)}</p>
+                ) : null}
               </div>
             </article>
           );

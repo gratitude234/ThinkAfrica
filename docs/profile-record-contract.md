@@ -1,98 +1,94 @@
-# The profile record contract
+# Intellectual Profile V2 contract
 
-Last updated: 2026-08-20
+Last updated: 2026-08-24
 
-## What the profile answers
+## Purpose
 
-A profile exists to answer three questions in about three seconds:
+An author profile is a minimal public introduction to a person and their
+published thinking. It answers, in order:
 
-1. Who is this?
-2. What do they think about?
-3. Is any of it real?
+1. Who is this person?
+2. What work do they want readers to see first?
+3. What have they published recently?
+4. What background helps readers understand their work?
 
-Everything on the page serves one of those. Anything that serves none of them
-belongs on the dashboard, in settings, or nowhere.
+The page is not an analytics dashboard, a points ledger, or a complete archive.
 
-## The four sections
+## Page hierarchy
 
-The page renders exactly four sections, in this order, at four deliberately
-different visual weights:
+The public profile renders these surfaces in this order:
 
-| Section | Component | Answers | Weight |
-|---------|-----------|---------|--------|
-| Identity | `ProfileHeader` | Who is this | Cover, avatar, largest type on the page |
-| The record | `RecordPanel` | Is any of it real | The headline claim: three figures and evidence badges |
-| The work | `FeaturedWork` + `ProfileContentTabs` + `ResearchProfileCard` | What do they think about | Reading surface |
-| Details | `ProfileDetails` | Context only | Quietest: sits on canvas, not on a card |
+| Surface | Responsibility |
+| --- | --- |
+| Identity and About | Name, public identity, affiliation, topics, relationship actions, and a short biography |
+| Intellectual Record overview | Publications, Source-backed, and Citable counts |
+| Featured | Up to three manually selected eligible publications, in the author's chosen order |
+| Latest from the Intellectual Record | The latest three mixed public entries |
+| Background | Applicable education, professional context, topics, enabled Research context, and durable recognition |
 
-Adding a fifth top-level section requires deciding which of the three questions
-it answers and which existing section it belongs inside instead.
+The full archive lives at `/:username/record`. The profile never renders the
+complete publication history.
 
-## The three figures
+## Publication count semantics
 
-`RecordPanel` shows exactly three numbers:
+`Publications` counts original published work by the profile owner plus
+published work for which they are an accepted co-author. It includes enabled
+Research. It excludes responses and debate arguments.
 
-| Figure | Source | Means |
-|--------|--------|-------|
-| **Contributions** | `recordSummary.contributionCount` | Volume. Published work plus public debate arguments. |
-| **Source-backed** | `recordSummary.sourceBackedCount` | Rigour. Carries at least one structured reference. |
-| **Citable** | `recordSummary.citableCount` | Permanence. Has a stable citation ID and an archived record. |
+`Source-backed` and `Citable` are subsets of Publications:
 
-One for volume, one for rigour, one for permanence. All three derive from
-`lib/intellectualRecord.ts`, which derives them from inspectable evidence and
-never from a content type, a popularity number, or an author's identity.
+- Source-backed means at least one structured reference exists.
+- Citable means a stable `citation_id` exists.
 
-Changing which three is a product decision, not a display one. A fourth figure
-is not a small addition: four equally weighted numbers is what the page had
-before, and it is why no reader could find the claim.
+The same summary operation powers onboarding and the public profile. Public
+points, likes, reads, reach, contribution tiers, and transient platform badges
+are not record evidence and do not appear in these figures.
 
-## The rule that keeps the record honest
+## Entry classification
 
-**A figure appears in exactly one place on the page.**
+Application surfaces use only these neutral kinds:
 
-Before this contract, "reviewed work" appeared four times in four vocabularies:
-a header stat, a summary detail line, a credibility badge, and a sidebar tile.
-A record with two real items was displayed eight times. Repetition reads as
-padding, and padding is the opposite of what the record is for.
+- `publication`
+- `response`
+- `debate`
+- `research`
 
-Concretely:
+A publication title changes its presentation, not its kind or value. Titled
+work renders editorially; untitled work renders compactly. Public UI must not
+label either presentation Post or Article.
 
-- `ProfileHeader` carries identity only, and no contribution counts.
-- `RecordPanel` is the only place contribution figures appear.
-- `ProfileDetails` carries reach and platform recognition, never record figures.
+## Featured eligibility
 
-## Evidence versus reach
+Featured contains only manually selected on-platform work. A selection must:
 
-These are different claims and must not share a surface.
+- be published;
+- be authored by the owner or list them as an accepted co-author;
+- contain no duplicates; and
+- contain no more than three entries.
 
-**Evidence** is what `RecordPanel` shows: sourced, reviewed, citable,
-co-authored. It comes from the editorial workflow and from structured data
-attached to a contribution.
+Replacement is atomic. If validation or insertion fails, the existing Featured
+selection remains unchanged. There is no automatic most-read fallback.
 
-**Reach and recognition** are what `ProfileDetails` shows: reads, likes,
-followers, badges, points tier. None of it is evidence that any contribution
-was sourced, reviewed, or cited.
+## Full-record query contract
 
-Keeping them in separate sections at different visual weights is what stops
-popularity from reading as credibility. A points tier next to a citable count,
-at the same size, silently claims they mean the same kind of thing.
+The record route accepts:
 
-## Known gaps
+- `type=all|publications|responses|debates|research`
+- `quality=all|source_backed|citable`
+- `page=<positive integer>`
 
-These are deliberate, and tracked as later phases:
+Quality applies only to Publications and Research. An incompatible quality
+combination normalizes to Publications. Invalid pages normalize to page 1.
+When Research is disabled, its filter is hidden and normalized away. Each page
+contains at most 20 entries and filter state is preserved by pagination links.
 
-- **Identity fields are collected and not rendered.** `profile_type`,
-  `professional_title`, `organization_name`, `organization_website` and
-  `secondary_profile_types` are all written by settings and displayed nowhere.
-  Non-academic profile types currently show only a join date as affiliation.
-- **The record cannot leave the page.** Profile Open Graph is a 400px avatar
-  rather than the branded card at `app/api/og/route.tsx`, and there is no
-  export, print stylesheet, or citation block.
-- **No time dimension.** Every figure is a lifetime total, so an active
-  contributor and a dormant one present identically.
-- **`profileCompletionScore` measures form completion, not credibility.** Six
-  of its seven checks are text fields. It must be renamed before it is shown
-  next to evidence again.
-- **The talent marketplace still renders on the profile** even though
-  `talentMarketplace` is `false`, because that flag gates navigation rather
-  than routes.
+## Privacy and security
+
+`profile_record_entries` contains identifiers, timestamps, authorship state,
+and evidence flags only. It uses invoker security and the source tables' RLS;
+content is hydrated from its protected source table.
+
+Private onboarding path and work category never appear in profile queries or
+public profile projections. Opportunity readiness details remain private; the
+public profile may show only the existing visibility-controlled availability
+badge and contact path.
