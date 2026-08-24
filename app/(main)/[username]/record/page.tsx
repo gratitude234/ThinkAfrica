@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import EvidenceLegend from "@/components/profile/EvidenceLegend";
 import ProfileRecordCard from "@/components/profile/ProfileRecordCard";
+import ScrollActiveIntoView from "@/components/profile/ScrollActiveIntoView";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { getProfileIdentityLines } from "@/lib/profileIdentity";
@@ -12,6 +14,7 @@ import {
   profileRecordFilterLabel,
   type ProfileRecordFilter,
 } from "@/lib/profileRecord";
+import { RECORD_SHELL } from "@/lib/profileLayout";
 import { loadProfileRecordPage, loadProfileRecordSummary } from "@/lib/profileRecordData";
 import { createClient } from "@/lib/supabase/server";
 
@@ -169,11 +172,11 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
   const showQuality = query.filter === "publications" || query.filter === "research";
 
   return (
-    <div className="mx-auto max-w-[820px] space-y-6">
+    <div className={`${RECORD_SHELL} space-y-6`}>
       <header className="rounded-xl border border-card-border bg-card p-5 sm:p-6">
         <Link
           href={`/${profile.username}`}
-          className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-brand hover:underline"
+          className="tap-target focus-ring text-sm font-semibold text-emerald-ink hover:underline"
         >
           ← Back to profile
         </Link>
@@ -189,7 +192,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
       </header>
 
       <section aria-label="Record filters" className="space-y-3">
-        <nav className="flex overflow-x-auto border-b border-card-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ScrollActiveIntoView className="scroll-hint-x flex overflow-x-auto border-b border-card-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {filters.map((filter) => {
             const active = query.filter === filter;
             return (
@@ -197,7 +200,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                 key={filter}
                 href={buildProfileRecordHref({ username: profile.username, filter })}
                 aria-current={active ? "page" : undefined}
-                className={`-mb-px inline-flex min-h-11 shrink-0 items-center border-b-2 px-4 text-sm font-semibold ${
+                className={`focus-ring -mb-px inline-flex min-h-11 shrink-0 items-center border-b-2 px-4 text-sm font-semibold ${
                   active
                     ? "border-emerald-brand text-ink"
                     : "border-transparent text-ink-muted hover:text-ink"
@@ -210,48 +213,45 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
               </Link>
             );
           })}
-        </nav>
+        </ScrollActiveIntoView>
 
-        {showQuality ? (
-          <div className="flex flex-wrap gap-2" aria-label="Evidence filters">
-            {([
-              ["all", "All evidence"],
-              ["source_backed", "Source-backed"],
-              ["citable", "Citable"],
-            ] as const).map(([quality, label]) => (
-              <Link
-                key={quality}
-                href={buildProfileRecordHref({
-                  username: profile.username,
-                  filter: query.filter,
-                  quality,
-                })}
-                aria-current={query.quality === quality ? "page" : undefined}
-                className={`inline-flex min-h-11 items-center rounded-full border px-3 text-xs font-semibold ${
-                  query.quality === quality
-                    ? "border-emerald-brand bg-green-tint text-emerald-brand"
-                    : "border-card-border bg-card text-ink-muted hover:text-ink"
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        ) : null}
+        {/* The row keeps its height on every tab. It used to appear only for
+            Publications and Research, so moving between filters inserted or
+            removed 40px and jumped every card below it, arriving after a route
+            transition where it read as a rendering fault. */}
+        <div className="flex min-h-[40px] flex-wrap items-center gap-2" aria-label="Evidence filters">
+          {showQuality
+            ? ([
+                ["all", "All evidence"],
+                ["source_backed", "Source-backed"],
+                ["citable", "Citable"],
+              ] as const).map(([quality, label]) => (
+                <Link
+                  key={quality}
+                  href={buildProfileRecordHref({
+                    username: profile.username,
+                    filter: query.filter,
+                    quality,
+                  })}
+                  aria-current={query.quality === quality ? "page" : undefined}
+                  className={`tap-target focus-ring inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                    query.quality === quality
+                      ? "border-emerald-brand bg-green-tint text-emerald-brand"
+                      : "border-card-border bg-card text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </Link>
+              ))
+            : null}
+        </div>
       </section>
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-ink-muted">
           {record.totalCount.toLocaleString()} result{record.totalCount === 1 ? "" : "s"}
         </p>
-        <details className="relative text-xs text-ink-muted">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-ink-soft">
-            Evidence labels
-          </summary>
-          <p className="absolute right-0 z-20 w-72 rounded-lg border border-card-border bg-card p-3 leading-5 shadow-lg">
-            Labels describe inspectable sources, review, citation records, or accepted co-authorship. They are not popularity scores.
-          </p>
-        </details>
+        <EvidenceLegend />
       </div>
 
       {record.items.length > 0 ? (
@@ -279,7 +279,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                 quality: query.quality,
                 page: query.page - 1,
               })}
-              className="inline-flex min-h-11 items-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft"
+              className="focus-ring inline-flex min-h-11 items-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink"
             >
               ← Previous
             </Link>
@@ -293,7 +293,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                 quality: query.quality,
                 page: query.page + 1,
               })}
-              className="inline-flex min-h-11 items-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft"
+              className="focus-ring inline-flex min-h-11 items-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink"
             >
               Next →
             </Link>

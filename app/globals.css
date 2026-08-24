@@ -795,3 +795,134 @@ font-family: var(--font-inter), system-ui, sans-serif;
     transition: none !important;
   }
 }
+
+/* Profile surface utilities.
+
+   A 44px touch target should not become a 44px painted box. `min-h-11` on a
+   chip or an inline link inflates the element itself, so the vertical rhythm
+   of the page ends up being set by an accessibility constant rather than by
+   its type. `tap-target` grows only the hit area, leaving the painted box at
+   whatever size the design called for and leaving neighbours where they were.
+
+   The horizontal default is deliberately small: chip rows sit on `gap-2`, so
+   4px a side fills the gap exactly without one chip stealing the next one's
+   taps. Override per site with --tap-x / --tap-y where a row is looser. */
+.tap-target {
+  position: relative;
+}
+
+.tap-target::after {
+  content: "";
+  position: absolute;
+  inset: calc(0px - var(--tap-y, 10px)) calc(0px - var(--tap-x, 4px));
+}
+
+/* One focus treatment, applied through a class rather than repeated per
+   element, so the next control added to a profile cannot ship without it. */
+.focus-ring:focus-visible {
+  outline: 2px solid theme("colors.gold");
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+
+/* Stretches a link over its nearest positioned ancestor so a whole card is
+   clickable. Anything that must stay independently clickable inside that card
+   needs `relative` to sit above the overlay. */
+.stretch-target::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+/* Profile identity block.
+
+   The header used to be a plain flex row that collapsed to `flex-col` on a
+   phone and inherited the desktop DOM order, which put Follow eighth on the
+   page, below the topic chips. Areas let the phone and the desktop each get
+   the order they need from one DOM, so the controls are never duplicated.
+
+   Phone:   avatar + name, then the actions, then the meta row.
+   640px +: the familiar three-column row, meta tucked under the name. */
+.profile-identity {
+  display: grid;
+  gap: 12px 18px;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "avatar name"
+    "actions actions"
+    "meta meta";
+  align-items: start;
+}
+
+@media (min-width: 640px) {
+  .profile-identity {
+    gap: 14px 20px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "avatar name actions"
+      "avatar meta actions";
+  }
+}
+
+.profile-identity-avatar { grid-area: avatar; }
+.profile-identity-name { grid-area: name; }
+.profile-identity-actions { grid-area: actions; }
+.profile-identity-meta { grid-area: meta; }
+
+/* Featured is a swipeable rail on a phone, where three stacked cards with 16:9
+   covers ran to roughly 900px of scroll, and a grid from 768px up. */
+.featured-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 84%;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+/* Full-bleed only at the phone gutter, so the second card peeks past the edge
+   and the row reads as scrollable without needing a scrollbar. AppShell widens
+   its gutter at 640px, and by 768px this is a grid anyway. */
+@media (max-width: 639px) {
+  .featured-rail {
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+  }
+}
+
+.featured-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.featured-rail > * {
+  scroll-snap-align: start;
+}
+
+/* Deliberately stops at two across. A third column would put the author's own
+   curated selection back at roughly 255px once the 320px Background rail is
+   out, rendering Featured smaller than the record cards beneath it, which is
+   the inversion this section exists to correct. */
+@media (min-width: 768px) {
+  .featured-rail {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+}
+
+/* Signals that a filter row continues past the right edge, replacing the
+   scrollbar that is deliberately hidden there. */
+.scroll-hint-x {
+  -webkit-mask-image: linear-gradient(to right, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 86%, transparent 100%);
+}
+
+@media (min-width: 640px) {
+  .scroll-hint-x {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}

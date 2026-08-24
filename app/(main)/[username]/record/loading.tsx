@@ -1,6 +1,6 @@
 export default function LoadingProfileRecord() {
   return (
-    <div className="mx-auto max-w-[820px] animate-pulse space-y-6 motion-reduce:animate-none" role="status" aria-label="Loading Intellectual Record">
+    <div className="mx-auto max-w-[900px] animate-pulse space-y-6 motion-reduce:animate-none" role="status" aria-label="Loading Intellectual Record">
       <div className="rounded-xl border border-card-border bg-card p-6">
         <div className="h-4 w-28 rounded bg-gray-200" />
         <div className="mt-5 flex items-center gap-3">

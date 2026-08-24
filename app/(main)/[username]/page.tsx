@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import EvidenceLegend from "@/components/profile/EvidenceLegend";
 import FeaturedWork from "@/components/profile/FeaturedWork";
 import FeaturedWorkManager from "@/components/profile/FeaturedWorkManager";
-import ProfileBackground from "@/components/profile/ProfileBackground";
+import ProfileBackground, { hasBackgroundContent } from "@/components/profile/ProfileBackground";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileRecordCard from "@/components/profile/ProfileRecordCard";
+import ProfileSectionNav from "@/components/profile/ProfileSectionNav";
+import ProfileStickyBar from "@/components/profile/ProfileStickyBar";
 import { FEATURE_FLAGS, isAuthorSubscriptionsEnabled, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import { getMessageEligibility } from "@/lib/messaging";
 import { getProfileIdentityLines } from "@/lib/profileIdentity";
+import { PROFILE_COLUMNS, PROFILE_SHELL } from "@/lib/profileLayout";
 import { buildProfileRecordHref } from "@/lib/profileRecord";
 import { loadProfileRecordPage, loadProfileRecordSummary } from "@/lib/profileRecordData";
 import { createClient } from "@/lib/supabase/server";
@@ -257,8 +261,14 @@ export default async function UserProfilePage({ params }: PageProps) {
     ? await getMessageEligibility(supabase, user.id, profile.id)
     : null;
 
+  const isBlocked = Boolean(blockResult.data);
+  const hasPublishedWork = recordSummary.publicationCount > 0;
+  const showBackground =
+    isOwnProfile ||
+    hasBackgroundContent({ profile, topics, research: researcherResult.data });
+
   return (
-    <div className="mx-auto max-w-[900px] space-y-6">
+    <div className={PROFILE_SHELL}>
       <ProfileHeader
         profile={profile}
         topics={topics}
@@ -268,71 +278,90 @@ export default async function UserProfilePage({ params }: PageProps) {
         currentUserId={user?.id ?? null}
         initialFollowing={Boolean(followResult.data)}
         initialSubscribed={Boolean(subscriptionResult.data)}
-        initialBlocked={Boolean(blockResult.data)}
+        initialBlocked={isBlocked}
         isOpenToOpportunities={opportunityVisible}
         canContact={opportunityVisible && !isOwnProfile}
         talentProfileId={talentProfile?.id ?? null}
         messagingEligibility={messagingEligibility}
       />
 
-      <FeaturedWork
-        posts={featuredPosts}
-        isOwnProfile={isOwnProfile}
-        action={isOwnProfile ? <FeaturedWorkManager initialPostIds={featuredIds} /> : null}
+      {/* Renders its own sentinel, so it has to sit directly after the header. */}
+      {!isOwnProfile && !isBlocked ? (
+        <ProfileStickyBar
+          authorId={profile.id}
+          authorName={displayName(profile)}
+          avatarUrl={profile.avatar_url}
+          currentUserId={user?.id ?? null}
+          initialFollowing={Boolean(followResult.data)}
+        />
+      ) : null}
+
+      <ProfileSectionNav
+        showFeatured={featuredPosts.length > 0}
+        showBackground={showBackground}
       />
 
-      <section aria-labelledby="latest-record-title" className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-brand">
-              Intellectual Record
-            </p>
-            <h2 id="latest-record-title" className="font-display mt-1 text-xl font-semibold text-ink">
-              Latest from their record
-            </h2>
-          </div>
-          <div className="flex items-center gap-4">
-            <details className="relative text-xs text-ink-muted">
-              <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-ink-soft">
-                Evidence labels
-              </summary>
-              <p className="absolute right-0 z-20 w-72 rounded-lg border border-card-border bg-card p-3 leading-5 shadow-lg">
-                Labels describe inspectable sources, review, citation records, or accepted co-authorship. They are not popularity scores.
-              </p>
-            </details>
-            <Link
-              href={buildProfileRecordHref({ username: profile.username })}
-              className="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-brand hover:underline"
-            >
-              View full record →
-            </Link>
-          </div>
+      {/* Work on the left, standing context in a rail. Background is short,
+          factual and consulted while reading, so on a wide screen it belongs
+          beside the record rather than below all of it. */}
+      <div className={`mt-6 ${PROFILE_COLUMNS}`}>
+        <div className="min-w-0 space-y-8">
+          <FeaturedWork
+            posts={featuredPosts}
+            isOwnProfile={isOwnProfile}
+            hasPublishedWork={hasPublishedWork}
+            action={isOwnProfile ? <FeaturedWorkManager initialPostIds={featuredIds} /> : null}
+          />
+
+          <section id="latest-record" aria-labelledby="latest-record-title" className="space-y-4">
+            <div className="flex flex-col gap-3 border-b border-card-border pb-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-ink">
+                  Intellectual Record
+                </p>
+                <h2 id="latest-record-title" className="font-display mt-1 text-xl font-semibold text-ink">
+                  Latest from their record
+                </h2>
+              </div>
+              <div className="flex items-center gap-4">
+                <EvidenceLegend />
+                <Link
+                  href={buildProfileRecordHref({ username: profile.username })}
+                  className="tap-target focus-ring text-sm font-semibold text-emerald-ink hover:underline"
+                >
+                  View full record →
+                </Link>
+              </div>
+            </div>
+
+            {latestRecord.items.length > 0 ? (
+              <div className="space-y-3">
+                {latestRecord.items.map((item) => <ProfileRecordCard key={`${item.kind}-${item.id}`} item={item} />)}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-card-border bg-card p-7 text-center">
+                <p className="text-sm text-ink-muted">
+                  {isOwnProfile ? "Your Intellectual Record starts with your first published idea." : `${displayName(profile)} has not published any work yet.`}
+                </p>
+                {isOwnProfile ? (
+                  <Link href="/write" className="tap-target focus-ring mt-3 inline-block font-semibold text-emerald-ink">
+                    Publish your first idea →
+                  </Link>
+                ) : null}
+              </div>
+            )}
+          </section>
         </div>
 
-        {latestRecord.items.length > 0 ? (
-          <div className="space-y-3">
-            {latestRecord.items.map((item) => <ProfileRecordCard key={`${item.kind}-${item.id}`} item={item} />)}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-card-border bg-card p-7 text-center">
-            <p className="text-sm text-ink-muted">
-              {isOwnProfile ? "Your Intellectual Record starts with your first published idea." : `${displayName(profile)} has not published any work yet.`}
-            </p>
-            {isOwnProfile ? (
-              <Link href="/write" className="mt-3 inline-flex min-h-11 items-center font-semibold text-emerald-brand">
-                Publish your first idea →
-              </Link>
-            ) : null}
-          </div>
-        )}
-      </section>
-
-      <ProfileBackground
-        profile={profile}
-        topics={topics}
-        research={researcherResult.data}
-        isOwnProfile={isOwnProfile}
-      />
+        <aside id="background" className="mt-8 lg:mt-0">
+          <ProfileBackground
+            profile={profile}
+            topics={topics}
+            research={researcherResult.data}
+            isOwnProfile={isOwnProfile}
+          />
+        </aside>
+      </div>
     </div>
   );
 }

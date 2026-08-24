@@ -44,15 +44,48 @@ function BackgroundField({
   );
 }
 
+interface BackgroundInput {
+  profile: PublicProfileIdentity;
+  topics: string[];
+  research?: ResearchBackground | null;
+}
+
+/**
+ * Whether this section will render anything for a visitor. The page needs the
+ * same answer to decide if its anchor nav should advertise a Background link,
+ * and a new profile should not be pointed at an empty section.
+ */
+export function hasBackgroundContent({ profile, topics, research }: BackgroundInput) {
+  const hasEducation = Boolean(
+    (profile.profile_type === "student" || profile.is_alumni) &&
+      (value(profile.university) || value(profile.field_of_study) || profile.graduation_year)
+  );
+  const hasRole = Boolean(value(profile.professional_title) || value(profile.organization_name));
+  const hasResearch = Boolean(
+    research?.headline ||
+      research?.research_interests?.length ||
+      research?.methods?.length ||
+      safeExternalUrl(research?.orcid_url) ||
+      safeExternalUrl(research?.website_url)
+  );
+
+  return Boolean(
+    hasEducation ||
+      hasRole ||
+      value(profile.country) ||
+      topics.length > 0 ||
+      hasResearch ||
+      profile.verified ||
+      profile.is_alumni
+  );
+}
+
 export default function ProfileBackground({
   profile,
   topics,
   research,
   isOwnProfile,
-}: {
-  profile: PublicProfileIdentity;
-  topics: string[];
-  research?: ResearchBackground | null;
+}: BackgroundInput & {
   isOwnProfile: boolean;
 }) {
   const university = value(profile.university);
@@ -76,8 +109,7 @@ export default function ProfileBackground({
       researchWebsite
   );
   const hasRecognition = profile.verified || profile.is_alumni;
-  const hasContent =
-    hasEducation || hasRole || country || topics.length > 0 || hasResearch || hasRecognition;
+  const hasContent = hasBackgroundContent({ profile, topics, research });
 
   if (!hasContent && !isOwnProfile) return null;
 
@@ -93,7 +125,7 @@ export default function ProfileBackground({
         {isOwnProfile ? (
           <Link
             href="/settings?tab=profile#profile-identity"
-            className="inline-flex min-h-11 items-center text-xs font-semibold text-emerald-brand"
+            className="tap-target focus-ring text-xs font-semibold text-emerald-ink"
           >
             Edit
           </Link>
@@ -101,7 +133,7 @@ export default function ProfileBackground({
       </div>
 
       {hasContent ? (
-        <div className="mt-5 grid gap-6 sm:grid-cols-2">
+        <div className="mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-1">
           {hasEducation ? (
             <BackgroundField label="Education">
               {field ? <p className="font-medium text-ink">{field}</p> : null}
@@ -123,7 +155,7 @@ export default function ProfileBackground({
                   href={organizationWebsite}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex min-h-11 items-center text-xs font-semibold text-emerald-brand hover:underline"
+                  className="tap-target focus-ring text-xs font-semibold text-emerald-ink hover:underline"
                 >
                   Organisation website ↗
                 </a>
@@ -144,7 +176,7 @@ export default function ProfileBackground({
                   <li key={topic}>
                     <Link
                       href={`/topics/${encodeURIComponent(topic)}`}
-                      className="inline-flex min-h-11 items-center rounded-full bg-green-tint px-3 text-xs font-medium text-emerald-brand hover:opacity-80"
+                      className="tap-target focus-ring inline-flex items-center rounded-full bg-green-tint px-3 py-1.5 text-xs font-medium text-emerald-brand hover:opacity-80"
                     >
                       {topic}
                     </Link>
@@ -165,12 +197,12 @@ export default function ProfileBackground({
               ) : null}
               <div className="flex flex-wrap gap-3">
                 {orcidUrl ? (
-                  <a href={orcidUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-xs font-semibold text-emerald-brand">
+                  <a href={orcidUrl} target="_blank" rel="noreferrer" className="tap-target focus-ring text-xs font-semibold text-emerald-ink">
                     ORCID ↗
                   </a>
                 ) : null}
                 {researchWebsite ? (
-                  <a href={researchWebsite} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-xs font-semibold text-emerald-brand">
+                  <a href={researchWebsite} target="_blank" rel="noreferrer" className="tap-target focus-ring text-xs font-semibold text-emerald-ink">
                     Research website ↗
                   </a>
                 ) : null}

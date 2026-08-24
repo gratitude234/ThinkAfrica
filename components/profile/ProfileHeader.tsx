@@ -77,7 +77,7 @@ function MoreMenu({
         aria-expanded={open}
         aria-haspopup="true"
         aria-label="More profile actions"
-        className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-card-border bg-card text-xl text-ink-soft hover:border-card-border-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+        className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-lg border border-card-border bg-card text-xl text-ink-soft hover:border-card-border-hover hover:text-ink"
       >
         <span aria-hidden="true">•••</span>
       </button>
@@ -116,7 +116,20 @@ function MoreMenu({
   );
 }
 
-function RecordOverview({ username, summary }: { username: string; summary: ProfileRecordSummary }) {
+/**
+ * The three numbers that distinguish this product from every other profile.
+ * The whole cell is the link: the label is the obvious thing to reach for, and
+ * it previously sat outside the anchor doing nothing.
+ */
+function RecordOverview({
+  username,
+  summary,
+  className = "",
+}: {
+  username: string;
+  summary: ProfileRecordSummary;
+  className?: string;
+}) {
   const metrics = [
     {
       label: "Publications",
@@ -139,26 +152,27 @@ function RecordOverview({ username, summary }: { username: string; summary: Prof
   ];
 
   return (
-    <div className="border-t border-card-border bg-canvas/70 px-5 py-4 sm:px-7">
-      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-ink">
+    <div className={`border-t border-card-border bg-canvas/70 px-5 py-4 sm:px-7 ${className}`}>
+      <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-ink">
         Intellectual Record
       </p>
-      <dl className="grid grid-cols-3 divide-x divide-card-border">
+      <div className="grid grid-cols-3 divide-x divide-card-border">
         {metrics.map((metric) => (
-          <div key={metric.label} className="px-3 first:pl-0 last:pr-0 sm:px-5">
-            <dt className="text-[11px] text-ink-muted sm:text-xs">{metric.label}</dt>
-            <dd>
-              <Link
-                href={metric.href}
-                aria-label={`${metric.value} ${metric.label}. ${metric.description}`}
-                className="mt-1 inline-flex min-h-11 items-center font-display text-2xl font-semibold tabular-nums text-ink hover:text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-              >
-                {metric.value.toLocaleString()}
-              </Link>
-            </dd>
-          </div>
+          <Link
+            key={metric.label}
+            href={metric.href}
+            aria-label={`${metric.value} ${metric.label}. ${metric.description}`}
+            className="focus-ring group flex min-w-0 flex-col gap-0.5 px-3 py-1 first:pl-0 last:pr-0 sm:px-5"
+          >
+            <span className="truncate text-[10.5px] text-ink-muted sm:text-xs">
+              {metric.label}
+            </span>
+            <span className="font-display text-xl font-semibold tabular-nums text-ink group-hover:text-emerald-brand sm:text-2xl">
+              {metric.value.toLocaleString()}
+            </span>
+          </Link>
         ))}
-      </dl>
+      </div>
     </div>
   );
 }
@@ -181,23 +195,50 @@ export default function ProfileHeader({
   const router = useRouter();
   const [showInquiry, setShowInquiry] = useState(false);
   const [aboutExpanded, setAboutExpanded] = useState(false);
+  const [bioOverflows, setBioOverflows] = useState(false);
+  const bioRef = useRef<HTMLParagraphElement>(null);
   const displayName = profile.full_name ?? profile.username;
   const identity = getProfileIdentityLines(profile);
   const verifiedLabel = profile.verified_type
     ? `Verified ${profile.verified_type}`
     : "Verified profile";
-  const showAboutToggle = (profile.bio?.trim().length ?? 0) > 180;
+  const bio = profile.bio?.trim() || null;
+  const showAboutBlock = Boolean(bio) || isOwnProfile;
+
+  /**
+   * Whether the bio is actually clipped, measured rather than guessed. The
+   * previous character-count threshold only agreed with `line-clamp-3` at
+   * desktop width: on a 360px phone three lines hold roughly 125 characters,
+   * so every bio between there and the hardcoded 180 was truncated with no
+   * control rendered and no way to read the rest.
+   */
+  useEffect(() => {
+    const node = bioRef.current;
+    // Measuring while expanded is meaningless: the clamp is off, so the two
+    // heights always agree and the control would remove itself mid-read.
+    if (!node || aboutExpanded) return;
+
+    const measure = () => setBioOverflows(node.scrollHeight > node.clientHeight + 1);
+    measure();
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [bio, aboutExpanded]);
+
+  const showAboutToggle = bioOverflows || aboutExpanded;
 
   return (
     <>
-      <section className="overflow-hidden rounded-xl border border-card-border bg-card">
+      <section className="flex flex-col overflow-hidden rounded-xl border border-card-border bg-card">
         {profile.cover_image_url ? (
           <div className="relative h-20 overflow-hidden bg-canvas sm:h-24 lg:h-28">
             <Image
               src={profile.cover_image_url}
               alt=""
               fill
-              sizes="(max-width: 960px) 100vw, 900px"
+              sizes="(max-width: 1180px) 100vw, 1180px"
               className="object-cover"
             />
           </div>
@@ -205,170 +246,195 @@ export default function ProfileHeader({
           <div className="h-14 bg-[radial-gradient(circle_at_18%_0%,rgba(16,185,129,0.14),transparent_38%),linear-gradient(135deg,#FFFFFF,#FAF8F5)] sm:h-16" />
         )}
 
-        <div className="p-5 sm:p-7">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-            <UserAvatar
-              name={displayName}
-              src={profile.avatar_url}
-              size={88}
-              className="-mt-12 shrink-0 border-4 border-card shadow-sm sm:-mt-14"
-            />
+        <div className="profile-identity p-5 sm:p-7">
+          <UserAvatar
+            name={displayName}
+            src={profile.avatar_url}
+            size={88}
+            className="profile-identity-avatar -mt-12 shrink-0 border-4 border-card shadow-sm sm:-mt-14"
+          />
 
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-display text-3xl font-semibold leading-tight text-ink">{displayName}</h1>
-                {profile.verified ? (
-                  <span
-                    role="img"
-                    aria-label={verifiedLabel}
-                    title={verifiedLabel}
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-brand text-xs font-bold text-white"
-                  >
-                    ✓
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-1 text-sm text-ink-muted">@{profile.username}</p>
-              <p className="mt-3 text-[15px] font-medium text-ink-soft">{identity.headline}</p>
-              {identity.affiliation ? (
-                <p className="mt-1 text-sm text-ink-muted">{identity.affiliation}</p>
-              ) : null}
-
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-                <Link href={`/${profile.username}/followers`} className="inline-flex min-h-11 items-center font-medium text-ink-soft hover:text-ink">
-                  {followerCount.toLocaleString()} follower{followerCount === 1 ? "" : "s"}
-                </Link>
-                {isOpenToOpportunities ? (
-                  isOwnProfile ? (
-                    <Link
-                      href="/opportunities#opportunity-profile"
-                      className="inline-flex min-h-11 items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700"
-                    >
-                      Open to opportunities
-                    </Link>
-                  ) : canContact ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!currentUserId) {
-                          router.push(`/login?redirectTo=/${profile.username}`);
-                          return;
-                        }
-                        setShowInquiry(true);
-                      }}
-                      className="min-h-11 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                    >
-                      Open to opportunities
-                    </button>
-                  ) : (
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                      Open to opportunities
-                    </span>
-                  )
-                ) : null}
-              </div>
-
-              {topics.length > 0 ? (
-                <ul className="mt-4 flex flex-wrap gap-2" aria-label="Topics">
-                  {topics.slice(0, 3).map((topic) => (
-                    <li key={topic}>
-                      <Link
-                        href={`/topics/${encodeURIComponent(topic)}`}
-                        className="inline-flex min-h-11 items-center rounded-full bg-green-tint px-3 text-xs font-medium text-emerald-brand hover:opacity-80"
-                      >
-                        {topic}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+          <div className="profile-identity-name min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-display text-3xl font-semibold leading-tight text-ink">{displayName}</h1>
+              {profile.verified ? (
+                <span
+                  role="img"
+                  aria-label={verifiedLabel}
+                  title={verifiedLabel}
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-brand text-xs font-bold text-white"
+                >
+                  ✓
+                </span>
               ) : null}
             </div>
-
-            <div className="flex shrink-0 flex-wrap items-start gap-2 sm:max-w-[290px] sm:justify-end">
-              {isOwnProfile ? (
-                <>
-                  <Link
-                    href="/settings?tab=profile#profile-identity"
-                    className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 text-sm font-semibold text-white hover:bg-[#0E4B37]"
-                  >
-                    Edit profile
-                  </Link>
-                  <ShareButton className="min-h-11" />
-                </>
-              ) : initialBlocked ? null : (
-                <>
-                  <AuthorRelationshipControls
-                    authorId={profile.id}
-                    authorName={displayName}
-                    currentUserId={currentUserId}
-                    initialFollowing={initialFollowing}
-                    initialSubscribed={initialSubscribed}
-                    source="profile"
-                    variant="icon"
-                  />
-                  {!currentUserId ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.push(
-                          `/login?redirectTo=${encodeURIComponent(`/${profile.username}`)}`
-                        )
-                      }
-                      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink"
-                    >
-                      Message
-                    </button>
-                  ) : messagingEligibility?.eligible ? (
-                    <MessageButton
-                      currentUserId={currentUserId}
-                      targetUserId={profile.id}
-                      reason={messagingEligibility.reason}
-                    />
-                  ) : null}
-                </>
-              )}
-              {!isOwnProfile ? (
-                <MoreMenu
-                  profile={profile}
-                  currentUserId={currentUserId}
-                  initialBlocked={initialBlocked}
-                />
-              ) : null}
-            </div>
+            <p className="mt-1 text-sm text-ink-muted">@{profile.username}</p>
+            <p className="mt-3 text-[15px] font-medium text-ink-soft">{identity.headline}</p>
+            {identity.affiliation ? (
+              <p className="mt-1 text-sm text-ink-muted">{identity.affiliation}</p>
+            ) : null}
           </div>
 
-          {profile.bio ? (
-            <div className="mt-5 border-t border-card-border pt-5">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-ink">About</h2>
-                {isOwnProfile ? (
-                  <Link href="/settings?tab=profile#profile-about" className="inline-flex min-h-11 items-center text-xs font-semibold text-emerald-brand">
-                    Edit
-                  </Link>
-                ) : null}
-              </div>
-              <p className={`max-w-[72ch] whitespace-pre-line text-sm leading-6 text-ink-soft ${aboutExpanded ? "" : "line-clamp-3"}`}>
-                {profile.bio}
-              </p>
-              {showAboutToggle ? (
-                <button
-                  type="button"
-                  onClick={() => setAboutExpanded((current) => !current)}
-                  aria-expanded={aboutExpanded}
-                  className="mt-1 inline-flex min-h-11 items-center text-xs font-semibold text-emerald-brand"
+          <div className="profile-identity-actions flex flex-wrap items-start gap-2 sm:max-w-[290px] sm:justify-end">
+            {isOwnProfile ? (
+              <>
+                <Link
+                  href="/settings?tab=profile#profile-identity"
+                  className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 text-sm font-semibold text-white hover:bg-[#0E4B37]"
                 >
-                  {aboutExpanded ? "Show less" : "See more"}
-                </button>
+                  Edit profile
+                </Link>
+                <ShareButton className="min-h-11" />
+              </>
+            ) : initialBlocked ? null : (
+              <>
+                <AuthorRelationshipControls
+                  authorId={profile.id}
+                  authorName={displayName}
+                  currentUserId={currentUserId}
+                  initialFollowing={initialFollowing}
+                  initialSubscribed={initialSubscribed}
+                  source="profile"
+                  variant="icon"
+                />
+                {!currentUserId ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(
+                        `/login?redirectTo=${encodeURIComponent(`/${profile.username}`)}`
+                      )
+                    }
+                    className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink"
+                  >
+                    Message
+                  </button>
+                ) : messagingEligibility?.eligible ? (
+                  <MessageButton
+                    currentUserId={currentUserId}
+                    targetUserId={profile.id}
+                    reason={messagingEligibility.reason}
+                  />
+                ) : null}
+              </>
+            )}
+            {!isOwnProfile ? (
+              <MoreMenu
+                profile={profile}
+                currentUserId={currentUserId}
+                initialBlocked={initialBlocked}
+              />
+            ) : null}
+          </div>
+
+          <div className="profile-identity-meta min-w-0">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              <Link
+                href={`/${profile.username}/followers`}
+                className="tap-target focus-ring font-medium text-ink-soft hover:text-ink"
+              >
+                {followerCount.toLocaleString()} follower{followerCount === 1 ? "" : "s"}
+              </Link>
+              {isOpenToOpportunities ? (
+                isOwnProfile ? (
+                  <Link
+                    href="/opportunities#opportunity-profile"
+                    className="tap-target focus-ring inline-flex items-center rounded-full border border-green-wash-border bg-green-tint px-3 py-1 text-xs font-semibold text-emerald-ink"
+                  >
+                    Open to opportunities
+                  </Link>
+                ) : canContact ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!currentUserId) {
+                        router.push(`/login?redirectTo=/${profile.username}`);
+                        return;
+                      }
+                      setShowInquiry(true);
+                    }}
+                    className="tap-target focus-ring inline-flex items-center rounded-full border border-green-wash-border bg-green-tint px-3 py-1 text-xs font-semibold text-emerald-ink hover:bg-green-wash"
+                  >
+                    Open to opportunities
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center rounded-full border border-green-wash-border bg-green-tint px-3 py-1 text-xs font-semibold text-emerald-ink">
+                    Open to opportunities
+                  </span>
+                )
               ) : null}
             </div>
-          ) : isOwnProfile ? (
-            <Link href="/settings?tab=profile#profile-about" className="mt-5 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-brand">
-              Add an About section
-            </Link>
-          ) : null}
+
+            {topics.length > 0 ? (
+              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Topics">
+                {topics.slice(0, 3).map((topic) => (
+                  <li key={topic}>
+                    <Link
+                      href={`/topics/${encodeURIComponent(topic)}`}
+                      className="tap-target focus-ring inline-flex items-center rounded-full bg-green-tint px-3 py-1.5 text-xs font-medium text-emerald-brand hover:opacity-80"
+                    >
+                      {topic}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         </div>
 
-        <RecordOverview username={profile.username} summary={recordSummary} />
+        {/* On a phone the three numbers come before About: they are the reason
+            the page exists, and they were previously the eleventh block down.
+            From 640px they return to the foot of the card. */}
+        <RecordOverview
+          username={profile.username}
+          summary={recordSummary}
+          className="order-2 sm:order-3"
+        />
+
+        {showAboutBlock ? (
+          <div className="order-3 px-5 pb-5 sm:order-2 sm:px-7 sm:pb-7">
+            {bio ? (
+              <div className="border-t border-card-border pt-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-ink">About</h2>
+                  {isOwnProfile ? (
+                    <Link
+                      href="/settings?tab=profile#profile-about"
+                      className="tap-target focus-ring text-xs font-semibold text-emerald-ink"
+                    >
+                      Edit
+                    </Link>
+                  ) : null}
+                </div>
+                <p
+                  ref={bioRef}
+                  className={`mt-2 max-w-[72ch] whitespace-pre-line text-sm leading-6 text-ink-soft ${aboutExpanded ? "" : "line-clamp-3"}`}
+                >
+                  {bio}
+                </p>
+                {showAboutToggle ? (
+                  <button
+                    type="button"
+                    onClick={() => setAboutExpanded((current) => !current)}
+                    aria-expanded={aboutExpanded}
+                    className="tap-target focus-ring mt-2 text-xs font-semibold text-emerald-ink"
+                  >
+                    {aboutExpanded ? "Show less" : "See more"}
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="border-t border-card-border pt-5">
+                <Link
+                  href="/settings?tab=profile#profile-about"
+                  className="tap-target focus-ring text-sm font-semibold text-emerald-ink"
+                >
+                  Add an About section
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : null}
       </section>
 
       {talentProfileId ? (
@@ -416,7 +482,7 @@ function MessageButton({ currentUserId, targetUserId, reason }: { currentUserId:
         disabled={isBusy}
         aria-busy={isBusy || undefined}
         title={reason ?? undefined}
-        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink disabled:opacity-50"
+        className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink disabled:opacity-50"
       >
         {isBusy ? "Opening…" : "Message"}
       </button>

@@ -1,11 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import PostCover from "@/components/post/PostCover";
+import EvidenceLabels from "@/components/profile/EvidenceLabels";
 import { resolveContentKind } from "@/lib/contentModel";
-import {
-  getContributionQualityLabels,
-  type IntellectualRecordLabel,
-} from "@/lib/intellectualRecord";
+import { getContributionQualityLabels } from "@/lib/intellectualRecord";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import { formatDate } from "@/lib/utils";
 
@@ -32,13 +30,6 @@ interface FeaturedPost {
   post_authors?: Array<{ user_id: string; accepted_at: string | null }>;
 }
 
-const QUALITY_LABEL_CLASSES: Record<IntellectualRecordLabel["tone"], string> = {
-  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  sky: "border-sky-200 bg-sky-50 text-sky-700",
-  purple: "border-purple-200 bg-purple-50 text-purple-700",
-  amber: "border-amber-200 bg-amber-50 text-amber-800",
-};
-
 function referenceCount(post: FeaturedPost) {
   const aggregate = Array.isArray(post.post_reference_counts)
     ? post.post_reference_counts[0]
@@ -50,15 +41,24 @@ interface FeaturedWorkProps {
   posts: FeaturedPost[];
   action?: ReactNode;
   isOwnProfile?: boolean;
+  /**
+   * Whether this author has published anything at all. A brand new profile
+   * previously showed "Choose the work readers should see first" above an
+   * empty record, asking the author to select from nothing, and it sat above
+   * the message that actually told them what to do. Defaults to true so a
+   * caller that cannot tell keeps the prompt.
+   */
+  hasPublishedWork?: boolean;
 }
 
 export default function FeaturedWork({
   posts,
   action,
   isOwnProfile = false,
+  hasPublishedWork = true,
 }: FeaturedWorkProps) {
   if (posts.length === 0) {
-    if (!isOwnProfile) return null;
+    if (!isOwnProfile || !hasPublishedWork) return null;
 
     return (
       <section
@@ -85,9 +85,9 @@ export default function FeaturedWork({
 
   return (
     <section id="featured-work" className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 border-b border-card-border pb-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-ink">
             Featured
           </p>
           <h2 className="font-display mt-1 text-xl font-semibold text-ink">
@@ -97,7 +97,7 @@ export default function FeaturedWork({
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="featured-rail">
         {posts.slice(0, 3).map((post) => {
           const displayTitle = getPostDisplayTitle(post);
           const headline = displayTitle ?? post.excerpt ?? getPostMetadataTitle(post);
@@ -121,40 +121,38 @@ export default function FeaturedWork({
           });
 
           return (
-            <article key={post.id} className="overflow-hidden rounded-xl border border-card-border bg-card">
+            <article
+              key={post.id}
+              className="group relative flex flex-col overflow-hidden rounded-xl border border-card-border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-card-border-hover hover:shadow-[0_8px_20px_-4px_rgb(0_0_0/0.08),0_2px_6px_-2px_rgb(0_0_0/0.04)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+            >
               {post.cover_image_url ? (
-                <Link href={`/post/${post.slug}`} className="block">
-                  <PostCover
-                    src={post.cover_image_url}
-                    alt={displayTitle}
-                    type={post.type}
-                    content_kind={post.content_kind}
-                    article_format={post.article_format}
-                    sizes="(max-width: 768px) 100vw, 300px"
-                    className="aspect-video border-b border-card-border"
-                    imageClassName="object-cover"
-                  />
-                </Link>
+                <PostCover
+                  src={post.cover_image_url}
+                  alt={displayTitle}
+                  type={post.type}
+                  content_kind={post.content_kind}
+                  article_format={post.article_format}
+                  sizes="(max-width: 768px) 84vw, (max-width: 1280px) 420px, 300px"
+                  className="aspect-video border-b border-card-border"
+                  imageClassName="object-cover"
+                />
               ) : null}
-              <div className="p-4">
+              <div className="flex flex-1 flex-col p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   {label ? (
-                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-brand">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-ink">
                       {label}
                     </span>
                   ) : null}
-                  {evidence.map((evidenceLabel) => (
-                    <span
-                      key={evidenceLabel.key}
-                      title={evidenceLabel.description}
-                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${QUALITY_LABEL_CLASSES[evidenceLabel.tone]}`}
-                    >
-                      {evidenceLabel.label}
-                    </span>
-                  ))}
+                  <EvidenceLabels labels={evidence} />
                 </div>
                 <h3 className="font-display mt-2 line-clamp-3 text-[17px] font-semibold leading-snug text-ink">
-                  <Link href={`/post/${post.slug}`} className="hover:text-emerald-brand">
+                  {/* Stretched so the whole card is the target, which is what
+                      the hover treatment above promises. */}
+                  <Link
+                    href={`/post/${post.slug}`}
+                    className="stretch-target focus-ring group-hover:text-emerald-brand"
+                  >
                     {headline}
                   </Link>
                 </h3>
@@ -164,7 +162,7 @@ export default function FeaturedWork({
                   </p>
                 ) : null}
                 {publishedDate ? (
-                  <p className="mt-3 text-xs text-ink-muted">{formatDate(publishedDate)}</p>
+                  <p className="mt-3 pt-1 text-xs text-ink-muted">{formatDate(publishedDate)}</p>
                 ) : null}
               </div>
             </article>
