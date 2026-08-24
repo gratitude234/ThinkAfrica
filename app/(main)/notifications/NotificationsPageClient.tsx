@@ -485,7 +485,7 @@ export default function NotificationsPageClient({
               Read latest
             </Link>
             <Link
-              href="/onboarding?step=follow"
+              href="/explore?tab=people"
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-canvas"
             >
               Follow writers

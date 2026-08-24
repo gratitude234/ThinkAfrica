@@ -758,7 +758,7 @@ export default function PostsFeedTabs({
     emptyTitle = "No posts from writers you follow yet.";
     emptyBody = "Follow writers to build a feed around the ideas you care about.";
     emptyCta = (
-      <Link href="/onboarding?step=follow" className={CREATE_CTA_CLASS}>
+      <Link href="/explore?tab=people" className={CREATE_CTA_CLASS}>
         Explore writers
       </Link>
     );

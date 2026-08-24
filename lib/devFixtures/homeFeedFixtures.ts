@@ -622,7 +622,7 @@ export const ACTIVATION_FALLBACK_FIXTURE: ActivationState = {
   activated: false,
   tasks: [
     { key: "profile", label: "Add your university", description: "Readers verify credibility from your profile basics.", href: "/settings", done: false },
-    { key: "follow", label: "Follow 3 writers", description: "Your Following feed needs at least a few writers to be useful.", href: "/onboarding?step=follow", done: true },
+    { key: "follow", label: "Follow 3 writers", description: "Your Following feed needs at least a few writers to be useful.", href: "/explore?tab=people", done: true, optional: true },
     { key: "read", label: "Read your first post", description: "See how the review and response system works before you publish.", href: "/", done: false },
     { key: "start", label: "Start a response", description: "Reply to a post you agree or disagree with.", href: "/", done: false },
     { key: "submit", label: "Submit your first Post", description: "Posts publish immediately -- no review required.", href: "/write", done: false },

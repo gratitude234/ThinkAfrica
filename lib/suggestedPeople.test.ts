@@ -9,6 +9,8 @@ interface ProfileRow {
   field_of_study: string | null;
   avatar_url: string | null;
   points: number | null;
+  interests: string[] | null;
+  profile_type: string | null;
 }
 
 function profile(id: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -20,6 +22,8 @@ function profile(id: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
     field_of_study: "Economics",
     avatar_url: null,
     points: 120,
+    interests: [],
+    profile_type: "professional",
     ...overrides,
   };
 }
@@ -39,6 +43,12 @@ function createSupabase(profiles: ProfileRow[]) {
           return builder;
         },
         eq() {
+          return builder;
+        },
+        in() {
+          return builder;
+        },
+        overlaps() {
           return builder;
         },
         order() {
@@ -190,5 +200,54 @@ describe("getSuggestedPeople result shape", () => {
     });
 
     expect(reason).toBe("From your university and field");
+  });
+
+  it("puts topic relevance ahead of points", async () => {
+    const { supabase } = createSupabase([
+      profile("popular", { points: 5000, interests: ["Agriculture & Food Systems"] }),
+      profile("relevant", { points: 25, interests: ["Governance & Policy"] }),
+    ]);
+
+    const { suggestions, reason } = await getSuggestedPeople(supabase, {
+      currentUserId: "me",
+      university: null,
+      fieldOfStudy: null,
+      interests: ["Governance & Policy"],
+      currentPath: "non_student",
+      workCategory: "policy_community",
+      followedIds: [],
+      excludedUserIds: [],
+      limit: 2,
+    });
+
+    expect(suggestions[0].id).toBe("relevant");
+    expect(reason).toBe("Writing about your topics");
+  });
+
+  it("combines school and topic relevance for students", async () => {
+    const { supabase } = createSupabase([
+      profile("topic-only", {
+        university: "Lagos",
+        interests: ["Economics & Development"],
+      }),
+      profile("school-topic", {
+        university: "Ibadan",
+        interests: ["Economics & Development"],
+      }),
+    ]);
+
+    const { suggestions, reason } = await getSuggestedPeople(supabase, {
+      currentUserId: "me",
+      university: "Ibadan",
+      fieldOfStudy: "Economics",
+      interests: ["Economics & Development"],
+      currentPath: "student",
+      followedIds: [],
+      excludedUserIds: [],
+      limit: 2,
+    });
+
+    expect(suggestions[0].id).toBe("school-topic");
+    expect(reason).toBe("From your school and topics");
   });
 });

@@ -37,6 +37,7 @@ import {
 } from "@/lib/featureFlags";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
+import { normalizeOnboardingPreference } from "@/lib/onboarding";
 import { BRAND_PROMISE, BRAND_SEO_DESCRIPTION } from "@/lib/brand";
 
 export const revalidate = 60;
@@ -176,6 +177,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     { data: topicSubscriptions },
     { data: authorSubscriptions },
     { data: privateProfileRaw },
+    { data: onboardingPreferenceRaw },
     excludedAuthorIds,
   ] = await Promise.all([
     user
@@ -229,6 +231,9 @@ export default async function HomePage({ searchParams }: PageProps) {
     user
       ? supabase.rpc("get_my_profile_private")
       : Promise.resolve({ data: null, error: null }),
+    user
+      ? supabase.rpc("get_my_onboarding_state")
+      : Promise.resolve({ data: null, error: null }),
     getFeedExcludedUserIds(user?.id ?? null, { strict: true }),
   ]);
 
@@ -241,6 +246,7 @@ export default async function HomePage({ searchParams }: PageProps) {
     ? getProfileTypeLabel(profileData.profile_type)
     : null;
   const privateProfile = normalizeMyPrivateProfile(privateProfileRaw);
+  const onboardingPreference = normalizeOnboardingPreference(onboardingPreferenceRaw);
   const legacyPushSeed: LegacyPushPromptSeed = {
     attemptCount: privateProfile?.push_prompt_attempt_count ?? 0,
     lastShownAt: privateProfile?.push_prompt_last_shown_at ?? null,
@@ -254,6 +260,9 @@ export default async function HomePage({ searchParams }: PageProps) {
           currentUserId: user.id,
           university: userUniversity,
           fieldOfStudy: userFieldOfStudy,
+          interests: userInterests,
+          currentPath: onboardingPreference.currentPath,
+          workCategory: onboardingPreference.workCategory,
           excludedUserIds: excludedAuthorIds,
           limit: 3,
         }),

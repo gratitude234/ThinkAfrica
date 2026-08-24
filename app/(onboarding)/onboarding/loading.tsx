@@ -19,10 +19,10 @@ export default function Loading() {
           <div className="mt-2 h-4 w-4/5 rounded bg-gray-100" />
         </div>
 
-        <div className="flex-1 overflow-hidden px-5 py-3">
-          <div className="grid grid-cols-3 gap-2.5">
-            {[...Array(9)].map((_, index) => (
-              <div key={index} className="h-[104px] rounded-2xl border border-gray-200 bg-white" />
+        <div className="flex-1 overflow-hidden px-5 py-4 sm:px-8">
+          <div className="grid gap-3">
+            {[...Array(2)].map((_, index) => (
+              <div key={index} className="h-[92px] rounded-2xl border border-gray-200 bg-white" />
             ))}
           </div>
         </div>

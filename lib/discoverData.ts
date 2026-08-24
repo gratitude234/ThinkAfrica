@@ -19,6 +19,7 @@ import {
   RESEARCH_TYPE_QUERY_EXCLUSION,
 } from "@/lib/featureFlags";
 import { normalizeTagValue } from "@/lib/tags";
+import { normalizeOnboardingPreference, type OnboardingPath, type WorkCategory } from "@/lib/onboarding";
 
 export type DiscoverTab = "for-you" | "trending" | "citable" | "topics" | "people";
 
@@ -103,6 +104,7 @@ export interface DiscoverData {
 
 interface SupabaseLike {
   from: (table: string) => any;
+  rpc?: (functionName: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown }>;
 }
 
 interface ProfileRow {
@@ -169,6 +171,8 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
       interests: [] as string[],
       university: null as string | null,
       fieldOfStudy: null as string | null,
+      currentPath: null as OnboardingPath | null,
+      workCategory: null as WorkCategory | null,
       followedIds: [] as string[],
       blockedIds: [] as string[],
       topicSubscriptionKeys: [] as string[],
@@ -197,6 +201,7 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
     { data: blocks },
     { data: topicSubscriptions },
     { data: authorSubscriptions },
+    { data: onboardingPreferenceRaw },
   ] =
     await Promise.all([
       supabase
@@ -216,16 +221,22 @@ async function getUserContext(supabase: SupabaseLike, userId: string | null) {
         .limit(1000),
       topicSubscriptionsPromise,
       authorSubscriptionsPromise,
+      supabase.rpc
+        ? supabase.rpc("get_my_onboarding_state")
+        : Promise.resolve({ data: null }),
     ]);
 
   const profileRow = profile as ProfileRow | null;
   const followRows = (follows ?? []) as FollowRow[];
   const blockRows = (blocks ?? []) as Array<{ blocked_id: string }>;
+  const onboardingPreference = normalizeOnboardingPreference(onboardingPreferenceRaw);
 
   return {
     interests: normalizeInterests(profileRow?.interests),
     university: profileRow?.university ?? null,
     fieldOfStudy: profileRow?.field_of_study ?? null,
+    currentPath: onboardingPreference.currentPath,
+    workCategory: onboardingPreference.workCategory,
     followedIds: followRows.map((row) => row.following_id),
     blockedIds: blockRows.map((row) => row.blocked_id),
     topicSubscriptionKeys: (
@@ -354,6 +365,9 @@ async function getPeople(
     userId,
     userUniversity,
     fieldOfStudy,
+    interests,
+    currentPath,
+    workCategory,
     followedIds,
     blockedIds,
     authorSubscriptionIds,
@@ -361,6 +375,9 @@ async function getPeople(
     userId: string | null;
     userUniversity: string | null;
     fieldOfStudy: string | null;
+    interests: string[];
+    currentPath: OnboardingPath | null;
+    workCategory: WorkCategory | null;
     followedIds: string[];
     blockedIds: string[];
     authorSubscriptionIds: string[];
@@ -374,6 +391,9 @@ async function getPeople(
       currentUserId: userId,
       university: userUniversity,
       fieldOfStudy,
+      interests,
+      currentPath,
+      workCategory,
       // Both graphs are already loaded by getUserContext. Passing them in
       // stops getSuggestedPeople re-querying follows and user_blocks for rows
       // this request is already holding.
@@ -681,6 +701,9 @@ export async function getDiscoverData(
       userId,
       userUniversity: userContext.university,
       fieldOfStudy: userContext.fieldOfStudy,
+      interests: userContext.interests,
+      currentPath: userContext.currentPath,
+      workCategory: userContext.workCategory,
       followedIds: userContext.followedIds,
       blockedIds: userContext.blockedIds,
       authorSubscriptionIds: userContext.authorSubscriptionIds,

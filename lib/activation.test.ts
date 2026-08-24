@@ -39,4 +39,36 @@ describe("isProfileComplete", () => {
       })
     ).toBe(true);
   });
+
+  it("uses the private onboarding path for the new identity rules", () => {
+    expect(
+      isProfileComplete(
+        {
+          ...sharedProfile,
+          interests: ["Governance & Policy", "Education", "Public Health"],
+          profile_type: "professional",
+          professional_title: "Policy researcher",
+        },
+        {
+          currentPath: "non_student",
+          workCategory: "policy_community",
+        }
+      )
+    ).toBe(true);
+
+    expect(
+      isProfileComplete(
+        {
+          ...sharedProfile,
+          interests: ["Governance & Policy", "Education", "Public Health"],
+          profile_type: "professional",
+          professional_title: null,
+        },
+        {
+          currentPath: "non_student",
+          workCategory: "policy_community",
+        }
+      )
+    ).toBe(false);
+  });
 });

@@ -418,7 +418,7 @@ describe("PostsFeedTabs -- empty states", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Explore writers" })).toHaveAttribute(
       "href",
-      "/onboarding?step=follow"
+      "/explore?tab=people"
     );
   });
 

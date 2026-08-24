@@ -6,6 +6,10 @@
   | "submit";
 
 import { isAcademicProfileType, isProfileType } from "@/lib/profileTypes";
+import {
+  normalizeOnboardingPreference,
+  type OnboardingPreference,
+} from "@/lib/onboarding";
 
 export interface ActivationTask {
   key: ActivationTaskKey;
@@ -13,6 +17,7 @@ export interface ActivationTask {
   description: string;
   href: string;
   done: boolean;
+  optional?: boolean;
 }
 
 export interface ActivationState {
@@ -38,13 +43,17 @@ export type ProfileCompletionSnapshot = {
   university?: unknown;
   field_of_study?: unknown;
   interests?: unknown;
+  professional_title?: unknown;
 };
 
 function hasText(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-export function isProfileComplete(profile: ProfileCompletionSnapshot | null) {
+export function isProfileComplete(
+  profile: ProfileCompletionSnapshot | null,
+  onboardingPreference?: OnboardingPreference | null
+) {
   const interests = profile?.interests;
   const rawProfileType =
     typeof profile?.profile_type === "string" ? profile.profile_type : null;
@@ -61,13 +70,22 @@ export function isProfileComplete(profile: ProfileCompletionSnapshot | null) {
     !profileType ||
     !hasText(profile?.country) ||
     !Array.isArray(interests) ||
-    interests.length === 0
+    interests.length < (onboardingPreference?.currentPath ? 3 : 1)
   ) {
     return false;
   }
 
-  if (isAcademicProfileType(profileType)) {
+  if (
+    onboardingPreference?.currentPath === "student" ||
+    (!onboardingPreference?.currentPath && isAcademicProfileType(profileType))
+  ) {
     return hasText(profile?.university) && hasText(profile?.field_of_study);
+  }
+
+  if (onboardingPreference?.currentPath === "non_student") {
+    return Boolean(
+      onboardingPreference.workCategory && hasText(profile?.professional_title)
+    );
   }
 
   return true;
@@ -99,6 +117,7 @@ export async function getActivationState(
     submittedPostCount,
     draftCount,
     debateArgumentCount,
+    { data: onboardingPreferenceRaw },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -168,9 +187,11 @@ export async function getActivationState(
         .eq("author_id", userId)
         .limit(1) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
+    supabase.rpc("get_my_onboarding_state"),
   ]);
 
-  const profileComplete = isProfileComplete(profile);
+  const onboardingPreference = normalizeOnboardingPreference(onboardingPreferenceRaw);
+  const profileComplete = isProfileComplete(profile, onboardingPreference);
   const firstContributionStarted =
     draftCount > 0 || debateArgumentCount > 0 || responseStartedCount > 0;
   const firstContributionLabel =
@@ -197,9 +218,10 @@ export async function getActivationState(
     {
       key: "follow",
       label: "Follow 3 people you want to read",
-      description: `${Math.min(followCount, 3)} of 3 followed. This makes your feed useful from day one.`,
-      href: "/onboarding?step=follow",
+      description: `${Math.min(followCount, 3)} of 3 followed. Optional, but useful for shaping your reading feed.`,
+      href: "/explore?tab=people",
       done: followCount >= 3,
+      optional: true,
     },
     {
       key: "read",
@@ -213,7 +235,7 @@ export async function getActivationState(
       label: "Start your first contribution",
       description: firstContributionLabel
         ? `${firstContributionLabel}. Keep shaping it into a public idea.`
-        : "Turn one clear idea from your studies, work, community, or the news into a Post.",
+        : "Turn one clear idea from your studies, work, community, or the news into a publication.",
       href: "/write",
       done: firstContributionStarted,
     },
@@ -221,12 +243,13 @@ export async function getActivationState(
 
   const orderedTasks: ActivationTask[] = [
     tasks[0],
-    tasks[1],
     tasks[3],
     tasks[2],
+    tasks[1],
   ];
 
-  const nextTask = orderedTasks.find((task) => !task.done) ?? null;
+  const nextTask =
+    orderedTasks.find((task) => !task.done && !task.optional) ?? null;
 
   return {
     profileComplete,
@@ -239,9 +262,7 @@ export async function getActivationState(
     draftCount,
     debateArgumentCount,
     activated:
-      profileComplete &&
-      followCount >= 3 &&
-      (firstContributionStarted || hasSubmittedContribution),
+      profileComplete && (firstContributionStarted || hasSubmittedContribution),
     tasks: orderedTasks,
     nextTask,
   };

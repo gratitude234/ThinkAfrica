@@ -470,7 +470,7 @@ export async function getRetentionSummary(
       key: "follow",
       label: "Follow more credible writers",
       description: "A stronger network gives you better reading prompts when you return.",
-      href: "/onboarding?step=follow",
+      href: "/explore?tab=people",
       cta: "Find writers",
     });
   }

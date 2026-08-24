@@ -10,7 +10,7 @@ const migration = readFileSync(
   "utf8"
 );
 const onboardingPage = readFileSync(
-  resolve(process.cwd(), "app/(onboarding)/onboarding/page.tsx"),
+  resolve(process.cwd(), "app/(onboarding)/onboarding/OnboardingClient.tsx"),
   "utf8"
 );
 const mainLayout = readFileSync(
@@ -40,7 +40,7 @@ describe("Phase 0 measurement foundation", () => {
     expect(migration).toContain("coalesce(cardinality(v_interests), 0) < 1");
     expect(migration).toContain("v_profile_type IN ('student', 'researcher', 'educator')");
     expect(migration).toContain("'complete_onboarding_rpc'");
-    expect(onboardingPage).toContain('supabase.rpc("complete_onboarding")');
+    expect(onboardingPage).toContain('createClient().rpc("complete_onboarding")');
     expect(onboardingPage).not.toContain(
       'trackActivationEvent({ event: "onboarding_completed" })'
     );

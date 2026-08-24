@@ -115,7 +115,7 @@ export default function PostFeed({
               You&apos;re not following anyone yet.
             </p>
             <Link
-              href="/onboarding?step=follow"
+              href="/explore?tab=people"
               className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
             >
               Find writers to follow

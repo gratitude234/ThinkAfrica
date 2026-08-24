@@ -99,7 +99,7 @@ export default async function CampusPage() {
     user
       ? supabase
           .from("profiles")
-          .select("university, country")
+          .select("university, country, interests")
           .eq("id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -236,7 +236,23 @@ export default async function CampusPage() {
         .limit(100),
     ]);
 
-  const prompts = (promptsResult.data ?? []) as CampusPrompt[];
+  const interestKeys = new Set(
+    ((profile?.interests as string[] | null) ?? []).map((interest) =>
+      interest.trim().toLocaleLowerCase("en")
+    )
+  );
+  const prompts = ((promptsResult.data ?? []) as CampusPrompt[])
+    .map((prompt, originalIndex) => ({ prompt, originalIndex }))
+    .sort((left, right) => {
+      const leftMatch = left.prompt.topic
+        ? Number(interestKeys.has(left.prompt.topic.trim().toLocaleLowerCase("en")))
+        : 0;
+      const rightMatch = right.prompt.topic
+        ? Number(interestKeys.has(right.prompt.topic.trim().toLocaleLowerCase("en")))
+        : 0;
+      return rightMatch - leftMatch || left.originalIndex - right.originalIndex;
+    })
+    .map(({ prompt }) => prompt);
   const programs = (programsResult.data ?? []) as CampusProgram[];
   const contributors = (contributorsResult.data ?? []) as CampusContributor[];
   const posts = (postsResult.data ?? []) as CampusPost[];

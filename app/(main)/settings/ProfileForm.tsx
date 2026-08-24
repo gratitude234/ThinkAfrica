@@ -21,6 +21,7 @@ import {
   getProfileUsernameError,
   normalizeProfileUsername,
 } from "@/lib/profileUsername";
+import { deriveLegacyOnboardingPreference } from "@/lib/onboarding";
 
 const COMMON_INTERESTS = [
   "economics",
@@ -277,12 +278,30 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
       })
       .eq("id", profile.id);
 
-    setSaving(false);
-
     if (error) {
+      setSaving(false);
       setToast(`Failed to save: ${error.message}`);
       return;
     }
+
+    const nextPreference = deriveLegacyOnboardingPreference(profileType);
+    if (nextPreference.currentPath) {
+      const { error: preferenceError } = await supabase.rpc(
+        "save_onboarding_preferences",
+        {
+          p_current_path: nextPreference.currentPath,
+          p_work_category: nextPreference.workCategory,
+        }
+      );
+      if (preferenceError) {
+        setSaving(false);
+        setToast("Profile saved, but recommendation settings could not be updated.");
+        router.refresh();
+        return;
+      }
+    }
+
+    setSaving(false);
 
     setSecondaryProfileTypes(nextSecondaryProfileTypes);
     setToast("Profile saved successfully!");
