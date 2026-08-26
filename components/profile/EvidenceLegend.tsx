@@ -1,16 +1,36 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import {
+  PROFILE_RECORD_METRIC_DISCLAIMER,
+  PROFILE_RECORD_METRIC_LIST,
+} from "@/lib/profileRecordMetrics";
 
 /**
- * The one place that explains what the evidence chips mean, so it has to
- * actually close. This was previously a bare `<details>` duplicated in the
- * profile and the record page: no outside-click handling, no Escape, and a
- * fixed 288px panel that ran to the edge of a 360px screen and covered the
- * cards underneath it.
+ * The one place the record explains itself, so it has to actually close.
+ *
+ * This was a bare `<details>` duplicated in the profile and the record page:
+ * no outside-click handling, no Escape, and a fixed 288px panel that ran to
+ * the edge of a 360px screen and covered the cards underneath it.
+ *
+ * It now backs two explanations that used to live in different mechanisms.
+ * The evidence chips kept their sentence here; the three record metrics had
+ * theirs in a `title` attribute, which is hover-only: no touch, no keyboard,
+ * and no screen reader on most combinations. Both are disclosures now, and
+ * both read their text from one module, so the profile, the full record and
+ * any later surface cannot drift.
  */
-export default function EvidenceLegend() {
+function LegendDisclosure({
+  triggerLabel,
+  panelLabel,
+  children,
+}: {
+  triggerLabel: string;
+  panelLabel: string;
+  children: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -23,6 +43,10 @@ export default function EvidenceLegend() {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setOpen(false);
+      // Escape is a keyboard dismissal, so focus goes back where it came
+      // from. An outside click does not restore focus: the pointer has
+      // already chosen what to focus next, and stealing it back would undo
+      // the click that closed the panel.
       triggerRef.current?.focus();
     };
 
@@ -39,21 +63,68 @@ export default function EvidenceLegend() {
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setOpen((current) => {
+            if (current) triggerRef.current?.focus();
+            return !current;
+          });
+        }}
         aria-expanded={open}
+        aria-controls={panelId}
         className="tap-target focus-ring inline-flex items-center py-1 text-xs font-semibold text-ink-soft hover:text-ink"
       >
-        Evidence labels
+        {triggerLabel}
       </button>
       {open ? (
         <div
+          id={panelId}
           role="group"
-          aria-label="What the evidence labels mean"
-          className="absolute right-0 z-30 mt-2 w-[min(18rem,calc(100vw-2.5rem))] rounded-lg border border-card-border bg-card p-3 text-xs leading-5 text-ink-muted shadow-lg"
+          aria-label={panelLabel}
+          /* Right-anchored and capped against the viewport rather than the
+             container, so the panel stays on screen at 390px however far
+             right its trigger sits. */
+          className="absolute right-0 z-30 mt-2 w-[min(20rem,calc(100vw-2.5rem))] rounded-lg border border-card-border bg-card p-3 text-xs leading-5 text-ink-muted shadow-lg"
         >
-          Labels describe inspectable sources, review, citation records, or accepted co-authorship. They are not popularity scores.
+          {children}
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function EvidenceLegend() {
+  return (
+    <LegendDisclosure
+      triggerLabel="Evidence labels"
+      panelLabel="What the evidence labels mean"
+    >
+      Labels describe inspectable sources, review, citation records, or accepted
+      co-authorship. They are not popularity scores.
+    </LegendDisclosure>
+  );
+}
+
+/**
+ * Explains the three numbers at the top of a profile. Available on desktop,
+ * touch and keyboard, which the `title` attribute it replaces was not.
+ */
+export function RecordMetricLegend() {
+  return (
+    <LegendDisclosure
+      triggerLabel="What these mean"
+      panelLabel="What the Intellectual Record metrics mean"
+    >
+      <dl className="space-y-2">
+        {PROFILE_RECORD_METRIC_LIST.map((metric) => (
+          <div key={metric.key}>
+            <dt className="font-semibold text-ink">{metric.label}</dt>
+            <dd>{metric.description}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 border-t border-card-border pt-2">
+        {PROFILE_RECORD_METRIC_DISCLAIMER}
+      </p>
+    </LegendDisclosure>
   );
 }

@@ -32,6 +32,27 @@ export type ActivationEventName =
   | "landing_viewed"
   | "landing_read_clicked"
   | "landing_signup_clicked"
+  | "profile_viewed"
+  | "profile_work_opened"
+  | "profile_follow_completed"
+  | "profile_inquiry_opened"
+  | "profile_inquiry_submitted"
+  | "profile_command_center_viewed"
+  | "profile_section_saved"
+  | "profile_preview_opened"
+  | "profile_next_action_clicked"
+  | "profile_feature_note_saved"
+  | "profile_recognition_opened"
+  | "profile_recognition_source_opened"
+  | "profile_expertise_topic_opened"
+  | "opportunity_outcome_submitted"
+  | "opportunity_outcome_verified"
+  | "opportunity_outcome_visibility_changed"
+  | "profile_brief_viewed"
+  | "profile_brief_work_opened"
+  | "profile_brief_contact_started"
+  | "profile_brief_created"
+  | "profile_brief_revoked"
   | "opportunity_profile_viewed"
   | "opportunity_profile_updated"
   | "opportunity_readiness_viewed"
@@ -90,6 +111,9 @@ interface ActivationEventPayload {
 
 const VIEW_EVENT_DEDUPE_MS = 10 * 60 * 1000;
 const VIEW_EVENTS = new Set<ActivationEventName>([
+  "profile_viewed",
+  "profile_brief_viewed",
+  "profile_command_center_viewed",
   "post_opened",
   "discover_viewed",
   "home_viewed",

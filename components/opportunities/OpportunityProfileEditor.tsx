@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TagInput from "@/components/ui/TagInput";
 import { trackActivationEvent } from "@/lib/activationEvents";
@@ -117,6 +118,18 @@ export default function OpportunityProfileEditor({
             Choose the work you want, add scan-friendly skills, and control who
             can find your profile.
           </p>
+          {source !== "profile" ? (
+            <p className="mt-2 text-sm text-gray-500">
+              These fields also live in{" "}
+              <Link
+                href="/settings/profile#opportunities"
+                className="font-semibold text-emerald-700 hover:underline"
+              >
+                Manage your profile
+              </Link>
+              , beside everything else a visitor sees.
+            </p>
+          ) : null}
         </div>
         {saved ? (
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">

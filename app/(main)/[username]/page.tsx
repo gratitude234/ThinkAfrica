@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import DemonstratedExpertise from "@/components/profile/DemonstratedExpertise";
 import EvidenceLegend from "@/components/profile/EvidenceLegend";
+import ProfileRecognition from "@/components/profile/ProfileRecognition";
 import FeaturedWork from "@/components/profile/FeaturedWork";
 import FeaturedWorkManager from "@/components/profile/FeaturedWorkManager";
 import ProfileBackground, { hasBackgroundContent } from "@/components/profile/ProfileBackground";
@@ -9,10 +11,24 @@ import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileRecordCard, { PROFILE_RECORD_LIST } from "@/components/profile/ProfileRecordCard";
 import ProfileSectionNav from "@/components/profile/ProfileSectionNav";
 import ProfileStickyBar from "@/components/profile/ProfileStickyBar";
-import { FEATURE_FLAGS, isAuthorSubscriptionsEnabled, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
+import {
+  FEATURE_FLAGS,
+  isAuthorSubscriptionsEnabled,
+  isFeaturedWorkNotesEnabled,
+  isProfilePositioningEnabled,
+  RESEARCH_TYPE_QUERY_EXCLUSION,
+} from "@/lib/featureFlags";
 import { getMessageEligibility } from "@/lib/messaging";
-import { getProfileIdentityLines } from "@/lib/profileIdentity";
-import { deriveProfileTopics } from "@/lib/profileTopics";
+import {
+  getProfileIdentityLines,
+  getProfileMetaDescription,
+} from "@/lib/profileIdentity";
+import { getProfileViewerState } from "@/lib/profileFunnel";
+import { loadProfileCredibilityGraph } from "@/lib/credibilityGraphData";
+import {
+  deriveDeclaredInterests,
+  deriveDemonstratedTopics,
+} from "@/lib/profileTopics";
 import { PROFILE_COLUMNS, PROFILE_SHELL } from "@/lib/profileLayout";
 import { buildProfileRecordHref } from "@/lib/profileRecord";
 import { loadProfileRecordPage, loadProfileRecordSummary } from "@/lib/profileRecordData";
@@ -41,6 +57,7 @@ interface ProfileRecord {
   professional_title: string | null;
   organization_name: string | null;
   organization_website: string | null;
+  positioning_statement?: string | null;
 }
 
 interface TalentProfile {
@@ -78,8 +95,19 @@ interface CoAuthorPortfolioRow {
   posts: PortfolioPost | PortfolioPost[] | null;
 }
 
-const PROFILE_SELECT =
+const PROFILE_BASE_SELECT =
   "id, username, full_name, country, university, field_of_study, graduation_year, is_alumni, bio, avatar_url, cover_image_url, verified, verified_type, interests, profile_type, professional_title, organization_name, organization_website";
+
+/**
+ * The positioning column is named only once its migration has been applied.
+ * See isProfilePositioningEnabled for why an unconditional select would take
+ * every profile page down until then.
+ */
+function profileSelect() {
+  return isProfilePositioningEnabled()
+    ? `${PROFILE_BASE_SELECT}, positioning_statement`
+    : PROFILE_BASE_SELECT;
+}
 
 const PORTFOLIO_SELECT =
   "id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, citation_id, published_version_id, created_at, published_at, cover_image_url, post_reference_counts(reference_count), post_authors(user_id, accepted_at)";
@@ -96,6 +124,14 @@ function displayName(profile: Pick<ProfileRecord, "full_name" | "username">) {
   return profile.full_name?.trim() || profile.username;
 }
 
+/** The aggregate arrives as a row or a one-element array, depending on join shape. */
+function referenceCountOf(post: PortfolioPost) {
+  const aggregate = Array.isArray(post.post_reference_counts)
+    ? post.post_reference_counts[0]
+    : post.post_reference_counts;
+  return aggregate?.reference_count ?? 0;
+}
+
 function normalizeCoAuthoredPosts(rows: unknown, profileId: string) {
   return ((rows ?? []) as CoAuthorPortfolioRow[]).flatMap((row) => {
     const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
@@ -110,7 +146,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select(PROFILE_SELECT)
+    .select(profileSelect())
     .eq("username", username)
     .maybeSingle();
   const profile = data as ProfileRecord | null;
@@ -119,7 +155,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const name = displayName(profile);
   const identity = getProfileIdentityLines(profile);
   const title = `${name}: ${identity.headline}`;
-  const description = profile.bio?.trim() || `${identity.headline}${identity.affiliation ? ` at ${identity.affiliation}` : ""}. View ${name}'s Intellectual Record on Indegenius.`;
+  // An author's own statement of what they are working on is the best
+  // description of their page when they wrote one. It falls back to the bio,
+  // then to the derived identity line.
+  const description = getProfileMetaDescription(profile, name);
 
   return {
     title,
@@ -139,7 +178,7 @@ export default async function UserProfilePage({ params }: PageProps) {
   const { username } = await params;
   const supabase = await createClient();
   const [{ data: profileData }, { data: userData }] = await Promise.all([
-    supabase.from("profiles").select(PROFILE_SELECT).eq("username", username).maybeSingle(),
+    supabase.from("profiles").select(profileSelect()).eq("username", username).maybeSingle(),
     supabase.auth.getUser(),
   ]);
   const profile = profileData as ProfileRecord | null;
@@ -174,7 +213,17 @@ export default async function UserProfilePage({ params }: PageProps) {
     latestRecordPromise,
     supabase.from("follows").select("following_id", { count: "exact", head: true }).eq("following_id", profile.id),
     supabase.from("talent_profiles").select("id, open_to_opportunities, visibility").eq("user_id", profile.id).maybeSingle<TalentProfile>(),
-    supabase.from("profile_featured_posts").select("post_id, position").eq("user_id", profile.id).order("position", { ascending: true }),
+    supabase
+      .from("profile_featured_posts")
+      // feature_note is named only once its migration is applied. See
+      // isFeaturedWorkNotesEnabled.
+      .select(
+        isFeaturedWorkNotesEnabled()
+          ? "post_id, position, feature_note"
+          : "post_id, position"
+      )
+      .eq("user_id", profile.id)
+      .order("position", { ascending: true }),
     user && !isOwnProfile
       ? supabase.from("follows").select("follower_id").eq("follower_id", user.id).eq("following_id", profile.id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -189,7 +238,15 @@ export default async function UserProfilePage({ params }: PageProps) {
       : Promise.resolve({ data: null }),
   ]);
 
-  const featuredIds = (featuredResult.data ?? []).map((row) => row.post_id as string);
+  const featuredRows = (featuredResult.data ?? []) as unknown as Array<{
+    post_id: string;
+    position: number;
+    feature_note?: string | null;
+  }>;
+  const featuredIds = featuredRows.map((row) => row.post_id);
+  const featureNoteById = new Map(
+    featuredRows.map((row) => [row.post_id, row.feature_note ?? null])
+  );
   const topicSelect = "id, author_id, in_response_to, tags, type";
   const [ownedTopicsResult, coauthoredTopicsResult, featuredPostsResult] = await Promise.all([
     supabase
@@ -222,7 +279,12 @@ export default async function UserProfilePage({ params }: PageProps) {
       (post) => !ownedTopics.some((owned) => owned.id === post.id)
     ),
   ];
-  const topics = deriveProfileTopics(topicPosts, profile.interests);
+  // Two lists, kept apart from here down. Demonstrated topics come only from
+  // tags on published work, so every chip built from them resolves to at
+  // least one record entry. Interests are what the author declared, and they
+  // never seed a record filter.
+  const demonstratedTopics = deriveDemonstratedTopics(topicPosts);
+  const interests = deriveDeclaredInterests(profile.interests, demonstratedTopics);
   const coauthoredIds = new Set(coauthoredTopics.map((post) => post.id));
   const featuredPool = (
     (featuredPostsResult.data ?? []) as unknown as PortfolioPost[]
@@ -232,7 +294,9 @@ export default async function UserProfilePage({ params }: PageProps) {
   const featuredById = new Map(featuredPool.map((post) => [post.id, post]));
   const featuredPosts = featuredIds.flatMap((postId) => {
     const post = featuredById.get(postId);
-    return post ? [post] : [];
+    return post
+      ? [{ ...post, feature_note: featureNoteById.get(postId) ?? null }]
+      : [];
   });
 
   const talentProfile = talentResult.data;
@@ -248,13 +312,43 @@ export default async function UserProfilePage({ params }: PageProps) {
   const hasPublishedWork = recordSummary.publicationCount > 0;
   const showBackground =
     isOwnProfile ||
-    hasBackgroundContent({ profile, topics, research: researcherResult.data });
+    hasBackgroundContent({
+      profile,
+      demonstratedTopics,
+      interests,
+      research: researcherResult.data,
+    });
+  const viewerState = getProfileViewerState({
+    viewerId: user?.id ?? null,
+    profileId: profile.id,
+  });
+
+  /**
+   * Credibility signals derive from work this page has already loaded, so the
+   * graph costs a bounded number of extra round trips rather than one per
+   * topic or per signal. It returns empty when the Phase 3 migrations are not
+   * applied, which keeps the section absent rather than broken.
+   */
+  const credibility = await loadProfileCredibilityGraph({
+    supabase,
+    profileId: profile.id,
+    publishedWork: topicPosts.map((post) => ({
+      postId: post.id,
+      slug: post.slug,
+      title: post.title?.trim() || "Untitled work",
+      occurredAt: post.published_at ?? post.created_at,
+      tags: post.tags ?? [],
+      isCoAuthor: Boolean(post.isCoAuthor),
+      sourceBacked: referenceCountOf(post) > 0,
+      citable: Boolean(post.citation_id),
+    })),
+  });
 
   return (
     <div className={PROFILE_SHELL}>
       <ProfileHeader
         profile={profile}
-        topics={topics}
+        demonstratedTopics={demonstratedTopics}
         recordSummary={recordSummary}
         followerCount={followerResult.count ?? 0}
         isOwnProfile={isOwnProfile}
@@ -276,6 +370,7 @@ export default async function UserProfilePage({ params }: PageProps) {
           avatarUrl={profile.avatar_url}
           currentUserId={user?.id ?? null}
           initialFollowing={Boolean(followResult.data)}
+          viewerState={viewerState}
         />
       ) : null}
 
@@ -293,6 +388,11 @@ export default async function UserProfilePage({ params }: PageProps) {
             posts={featuredPosts}
             isOwnProfile={isOwnProfile}
             hasPublishedWork={hasPublishedWork}
+            tracking={{
+              profileId: profile.id,
+              viewerState,
+              surface: "featured_work",
+            }}
             action={isOwnProfile ? <FeaturedWorkManager initialPostIds={featuredIds} /> : null}
           />
 
@@ -308,38 +408,70 @@ export default async function UserProfilePage({ params }: PageProps) {
               </div>
               <div className="flex items-center gap-4">
                 <EvidenceLegend />
-                <Link
-                  href={buildProfileRecordHref({ username: profile.username })}
-                  className="tap-target focus-ring text-sm font-semibold text-emerald-ink hover:underline"
-                >
-                  View full record →
-                </Link>
+                {/* Offered only when there is something behind it. It used to
+                    print beside an empty record, promising a fuller version of
+                    nothing. */}
+                {latestRecord.items.length > 0 ? (
+                  <Link
+                    href={buildProfileRecordHref({ username: profile.username })}
+                    className="tap-target focus-ring text-sm font-semibold text-emerald-ink hover:underline"
+                  >
+                    View full record →
+                  </Link>
+                ) : null}
               </div>
             </div>
 
             {latestRecord.items.length > 0 ? (
               <div className={PROFILE_RECORD_LIST}>
-                {latestRecord.items.map((item) => <ProfileRecordCard key={`${item.kind}-${item.id}`} item={item} />)}
+                {latestRecord.items.map((item) => (
+                  <ProfileRecordCard
+                    key={`${item.kind}-${item.id}`}
+                    item={item}
+                    tracking={{
+                      profileId: profile.id,
+                      viewerState,
+                      surface: "latest_record",
+                    }}
+                  />
+                ))}
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-card-border bg-card p-7 text-center">
                 <p className="text-sm text-ink-muted">
-                  {isOwnProfile ? "Your Intellectual Record starts with your first published idea." : `${displayName(profile)} has not published any work yet.`}
+                  {isOwnProfile ? "Your Intellectual Record starts with your first published contribution." : `${displayName(profile)} has not published any work yet.`}
                 </p>
                 {isOwnProfile ? (
                   <Link href="/write" className="tap-target focus-ring mt-3 inline-block font-semibold text-emerald-ink">
-                    Publish your first idea →
+                    Publish your first contribution →
                   </Link>
                 ) : null}
               </div>
             )}
           </section>
+
+          {/* Evidence about the work sits below the work, and recognition
+              below that. The hierarchy is deliberate: what this person wrote
+              comes before what can be counted about it. */}
+          <DemonstratedExpertise
+            username={profile.username}
+            topics={credibility.expertise}
+            isOwnProfile={isOwnProfile}
+          />
+
+          <ProfileRecognition
+            signals={credibility.signals}
+            profileId={profile.id}
+            viewerState={viewerState}
+            isOwnProfile={isOwnProfile}
+          />
         </div>
 
         <aside id="background" className="mt-8 lg:mt-0">
           <ProfileBackground
             profile={profile}
-            topics={topics}
+            demonstratedTopics={demonstratedTopics}
+            interests={interests}
             research={researcherResult.data}
             isOwnProfile={isOwnProfile}
           />

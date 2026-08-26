@@ -5,7 +5,8 @@ import EvidenceLegend from "@/components/profile/EvidenceLegend";
 import ProfileRecordCard, { PROFILE_RECORD_LIST } from "@/components/profile/ProfileRecordCard";
 import ScrollActiveIntoView from "@/components/profile/ScrollActiveIntoView";
 import UserAvatar from "@/components/ui/UserAvatar";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { FEATURE_FLAGS, isProfilePositioningEnabled } from "@/lib/featureFlags";
+import { getProfileViewerState } from "@/lib/profileFunnel";
 import { getProfileIdentityLines } from "@/lib/profileIdentity";
 import {
   PROFILE_RECORD_FILTERS,
@@ -20,7 +21,6 @@ import {
   loadProfileRecordSummary,
   loadProfileTopicIndex,
 } from "@/lib/profileRecordData";
-import { profileTopicKey } from "@/lib/profileTopics";
 import { createClient } from "@/lib/supabase/server";
 
 interface PageProps {
@@ -41,13 +41,21 @@ interface RecordProfile {
   organization_name: string | null;
   bio: string | null;
   interests: string[] | null;
+  positioning_statement?: string | null;
   verified: boolean;
   verified_type: string | null;
   is_alumni: boolean;
 }
 
-const PROFILE_SELECT =
+const PROFILE_BASE_SELECT =
   "id, username, full_name, avatar_url, professional_title, university, field_of_study, country, profile_type, organization_name, bio, interests, verified, verified_type, is_alumni";
+
+/** See the same helper on the profile page. */
+function profileSelect() {
+  return isProfilePositioningEnabled()
+    ? `${PROFILE_BASE_SELECT}, positioning_statement`
+    : PROFILE_BASE_SELECT;
+}
 
 function name(profile: RecordProfile) {
   return profile.full_name?.trim() || profile.username;
@@ -80,7 +88,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select(PROFILE_SELECT)
+    .select(profileSelect())
     .eq("username", username)
     .maybeSingle();
   const profile = data as RecordProfile | null;
@@ -98,9 +106,12 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const recordKinds = FEATURE_FLAGS.research
     ? "Publications, responses, research, and debate arguments"
     : "Publications, responses, and debate arguments";
+  const positioning = getProfileIdentityLines(profile).positioning;
   return {
     title,
-    description: `${recordKinds} by ${name(profile)}.`,
+    description: positioning
+      ? `${recordKinds} by ${name(profile)}. ${positioning}`
+      : `${recordKinds} by ${name(profile)}.`,
     alternates: {
       canonical: buildProfileRecordHref({
         username: profile.username,
@@ -127,11 +138,10 @@ function filterCount(
 export default async function ProfileRecordPage({ params, searchParams }: PageProps) {
   const [{ username }, rawQuery] = await Promise.all([params, searchParams]);
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("profiles")
-    .select(PROFILE_SELECT)
-    .eq("username", username)
-    .maybeSingle();
+  const [{ data }, { data: userData }] = await Promise.all([
+    supabase.from("profiles").select(profileSelect()).eq("username", username).maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
   const profile = data as RecordProfile | null;
   if (!profile) notFound();
 
@@ -198,6 +208,14 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
     );
   }
 
+  const viewerState = getProfileViewerState({
+    viewerId: userData.user?.id ?? null,
+    profileId: profile.id,
+  });
+  // Every filter stays reachable by URL. A tab with nothing behind it is
+  // still rendered and still navigable; it just does not advertise a zero in
+  // display type next to its name, which read as a scoreboard of what this
+  // author has not done.
   const filters = PROFILE_RECORD_FILTERS.filter(
     (filter) => FEATURE_FLAGS.research || filter !== "research"
   );
@@ -205,16 +223,19 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
   // Tab counts describe the whole record. With a topic active they would
   // contradict the result count directly beneath them, so they come off.
   const showFilterCounts = !query.topic;
-  const activeTopicLabel =
-    topicIndex.topics.find((topic) => profileTopicKey(topic) === query.topic) ??
-    query.topic;
+  const activeTopic = topicIndex.demonstratedTopics.find(
+    (topic) => topic.key === query.topic
+  );
+  const activeTopicLabel = activeTopic?.label ?? query.topic;
   // A topic typed straight into the URL still gets a chip, so the row always
   // shows what is filtering the list rather than looking unfiltered.
   const topicChips =
-    activeTopicLabel &&
-    !topicIndex.topics.some((topic) => profileTopicKey(topic) === query.topic)
-      ? [activeTopicLabel, ...topicIndex.topics]
-      : topicIndex.topics;
+    query.topic && !activeTopic
+      ? [
+          { key: query.topic, label: activeTopicLabel ?? query.topic, count: 0 },
+          ...topicIndex.demonstratedTopics,
+        ]
+      : topicIndex.demonstratedTopics;
 
   return (
     <div className={`${RECORD_SHELL} space-y-6`}>
@@ -252,7 +273,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                 }`}
               >
                 {profileRecordFilterLabel(filter)}
-                {showFilterCounts ? (
+                {showFilterCounts && filterCount(filter, summary) > 0 ? (
                   <span className="ml-1.5 text-xs font-normal text-ink-muted">
                     {filterCount(filter, summary).toLocaleString()}
                   </span>
@@ -318,25 +339,29 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
               All topics
             </Link>
             {topicChips.map((topic) => {
-              const key = profileTopicKey(topic);
-              const active = key === query.topic;
+              const active = topic.key === query.topic;
               return (
                 <Link
-                  key={key}
+                  key={topic.key}
                   href={buildProfileRecordHref({
                     username: profile.username,
                     filter: query.filter,
                     quality: query.quality,
-                    topic,
+                    topic: topic.key,
                   })}
                   aria-current={active ? "page" : undefined}
-                  className={`tap-target focus-ring inline-flex shrink-0 items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  className={`tap-target focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
                     active
                       ? "border-emerald-brand bg-green-tint text-emerald-brand"
                       : "border-card-border bg-card text-ink-muted hover:text-ink"
                   }`}
                 >
-                  {topic}
+                  {topic.label}
+                  {topic.count > 0 ? (
+                    <span className="font-normal tabular-nums opacity-70">
+                      {topic.count}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
@@ -354,7 +379,15 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
       {record.items.length > 0 ? (
         <div className={PROFILE_RECORD_LIST}>
           {record.items.map((item) => (
-            <ProfileRecordCard key={`${item.kind}-${item.id}`} item={item} />
+            <ProfileRecordCard
+              key={`${item.kind}-${item.id}`}
+              item={item}
+              tracking={{
+                profileId: profile.id,
+                viewerState,
+                surface: "full_record",
+              }}
+            />
           ))}
         </div>
       ) : (

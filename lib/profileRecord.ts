@@ -56,7 +56,7 @@ export interface ProfileRecordQuery {
 
 /**
  * Topics come from author-entered post tags, so a URL value is untrusted and
- * of unbounded length. Keys are lowercased because `deriveProfileTopics`
+ * of unbounded length. Keys are lowercased because `deriveDemonstratedTopics`
  * groups case-insensitively: an author who wrote "Poetry" once and "poetry"
  * twice has one topic, and one filter has to find all three.
  */

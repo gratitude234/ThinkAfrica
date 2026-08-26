@@ -95,6 +95,7 @@ export default function AuthorRelationshipProvider({
   initialFollowing,
   initialSubscribed,
   postId = null,
+  onFollowCompleted,
   children,
 }: {
   authorId: string;
@@ -103,6 +104,8 @@ export default function AuthorRelationshipProvider({
   initialFollowing: boolean;
   initialSubscribed: boolean;
   postId?: string | null;
+  /** See the same prop on AuthorRelationshipControls. */
+  onFollowCompleted?: () => void;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -350,6 +353,7 @@ export default function AuthorRelationshipProvider({
             source,
             metadata: { authorId, postId },
           });
+          onFollowCompleted?.();
           showSubscriptionNudge("follow_nudge", true);
         }
         router.refresh();
@@ -366,6 +370,7 @@ export default function AuthorRelationshipProvider({
       currentUserId,
       following,
       pathname,
+      onFollowCompleted,
       pending,
       postId,
       requireLogin,

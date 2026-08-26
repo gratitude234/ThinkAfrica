@@ -1,7 +1,7 @@
 ﻿import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
+import { FEATURE_FLAGS, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import StatsBar from "./StatsBar";
 import PostsTable from "./PostsTable";
 import type { DashboardPost } from "./PostsTable";
@@ -30,6 +30,8 @@ import {
   getOpportunityStyle,
 } from "@/lib/opportunities";
 import { getOpportunityReadinessSummary } from "@/lib/opportunityReadiness";
+import { getProfileNextAction } from "@/lib/profileNextAction";
+import { deriveDemonstratedTopics } from "@/lib/profileTopics";
 import { getOpportunityMatchSummary } from "@/lib/opportunityMatch";
 import { getRetentionSummary } from "@/lib/retention";
 import { getPostQualitySummary } from "@/lib/postQuality";
@@ -274,11 +276,15 @@ export default async function DashboardPage() {
     );
   }
 
-  const [{ data: authorProfile }, { data: talentProfile }] = await Promise.all([
+  const [
+    { data: authorProfile },
+    { data: talentProfile },
+    { count: featuredWorkCount },
+  ] = await Promise.all([
     supabase
       .from("profiles")
       .select(
-        "username, full_name, country, university, field_of_study, bio, interests, verified, verified_type, profile_type"
+        "username, full_name, country, university, field_of_study, professional_title, bio, interests, verified, verified_type, profile_type"
       )
       .eq("id", user.id)
       .single(),
@@ -289,6 +295,12 @@ export default async function DashboardPage() {
       )
       .eq("user_id", user.id)
       .maybeSingle(),
+    // Head-only count: the shared recommendation engine needs to know whether
+    // any Featured Work exists, not what it is.
+    supabase
+      .from("profile_featured_posts")
+      .select("post_id", { count: "exact", head: true })
+      .eq("user_id", user.id),
   ]);
 
   const { data: opportunityInquiriesRaw } = talentProfile?.id
@@ -702,6 +714,65 @@ export default async function DashboardPage() {
       referenceCount: referenceCounts[post.id] ?? 0,
     })),
   });
+  /**
+   * The same recommendation engine the Profile Command Center uses.
+   *
+   * The dashboard used to derive its own profile advice, so the two surfaces
+   * could tell one author to do different things on the same day. Draft-level
+   * nudges below stay local, because they are about one unpublished piece
+   * rather than about the profile.
+   */
+  const profileAction = getProfileNextAction({
+    username: authorProfile?.username ?? "",
+    identity: {
+      fullName: authorProfile?.full_name ?? null,
+      profileType: authorProfile?.profile_type ?? null,
+      country: authorProfile?.country ?? null,
+      isStudentPath: authorIsAcademic,
+      university: authorProfile?.university ?? null,
+      fieldOfStudy: authorProfile?.field_of_study ?? null,
+      professionalTitle:
+        (authorProfile as { professional_title?: string | null } | null)
+          ?.professional_title ?? null,
+    },
+    positioningStatement:
+      (authorProfile as { positioning_statement?: string | null } | null)
+        ?.positioning_statement ?? null,
+    interestCount: (authorProfile?.interests as string[] | null)?.length ?? 0,
+    demonstratedTopicCount: deriveDemonstratedTopics(
+      publishedPosts.map((post) => ({
+        in_response_to:
+          (post as { in_response_to?: string | null }).in_response_to ?? null,
+        tags: (post as { tags?: string[] | null }).tags ?? [],
+      }))
+    ).length,
+    record: {
+      publicationCount: publishedPosts.length,
+      sourceBackedCount,
+      eligibleFeaturedCount: publishedPosts.length,
+    },
+    // Presence only. The dashboard does not load note text, so it passes a
+    // placeholder note for each selection: that is enough for the engine to
+    // stop recommending "Choose your strongest work", and it deliberately
+    // never triggers "Explain your selection", which the Command Center owns
+    // because only it knows which notes are actually missing.
+    featured: Array.from({ length: featuredWorkCount ?? 0 }, () => ({
+      note: "present",
+    })),
+    research: {
+      enabled: FEATURE_FLAGS.research,
+      headline: null,
+      interestCount: 0,
+      methodCount: 0,
+    },
+    opportunities: {
+      openToOpportunities: Boolean(talentProfile?.open_to_opportunities),
+      skillCount: (talentProfile?.skills ?? []).length,
+      opportunityTypeCount: (talentProfile?.opportunity_types ?? []).length,
+      hasContactLink: Boolean(talentProfile?.cv_url || talentProfile?.linkedin_url),
+    },
+  }).primary;
+
   const opportunityMatchPosts = (postsRaw ?? []).map((post) => ({
     type: post.type,
     status: post.status,
@@ -813,19 +884,17 @@ export default async function DashboardPage() {
   ];
   const portfolioNextAction: PortfolioNextAction = !profileBasicsComplete
     ? {
-        label: "Complete your profile basics",
-        body: authorIsAcademic
-          ? "Add your name, username, and university so every publication has a credible author line."
-          : "Add your name and username so every publication has a credible author line.",
-        href: "/settings",
-        cta: "Complete profile",
+        label: profileAction.title,
+        body: profileAction.explanation,
+        href: profileAction.href,
+        cta: profileAction.ctaLabel,
       }
     : publishedPosts.length === 0
       ? {
-          label: "Publish your first portfolio piece",
-          body: "Write your first Article and build your public record.",
-          href: "/write",
-          cta: "Start writing",
+          label: profileAction.title,
+          body: profileAction.explanation,
+          href: profileAction.href,
+          cta: profileAction.ctaLabel,
         }
       : reviewedDraftMissingReferences
         ? {
@@ -841,12 +910,12 @@ export default async function DashboardPage() {
               href: `/write?draft=${reviewedDraftReady.id}`,
               cta: "Continue draft",
             }
-          : citablePost
+          : profileAction.key !== "review_profile"
             ? {
-                label: "Feature your citable work",
-                body: "Put your strongest archived or citable piece near the top of your profile.",
-                href: profileHref,
-                cta: "Manage profile",
+                label: profileAction.title,
+                body: profileAction.explanation,
+                href: profileAction.href,
+                cta: profileAction.ctaLabel,
               }
             : opportunityReadiness.nextAction
               ? {

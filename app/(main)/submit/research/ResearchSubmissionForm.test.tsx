@@ -56,7 +56,10 @@ function editableMetadataDraft(): ResearchDraft {
 
 describe("ResearchSubmissionForm topic encouragement", () => {
   it("requires keywords but allows one explicit continuation without topics", async () => {
-    const user = userEvent.setup();
+    // No inter-keystroke delay. This test types about ninety characters, and
+    // at the real-time default it sat close enough to the 5s budget to time
+    // out whenever the suite ran under load.
+    const user = userEvent.setup({ delay: null });
     render(
       <ResearchSubmissionForm
         userId="writer-1"

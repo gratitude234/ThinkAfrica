@@ -20,6 +20,7 @@ interface Props {
   source?: AuthorRelationshipSurface;
   postId?: string | null;
   className?: string;
+  onFollowCompleted?: () => void;
 }
 
 function BellIcon({ active }: { active: boolean }) {
@@ -168,6 +169,7 @@ export default function AuthorRelationshipControlsV2(props: Props) {
       initialFollowing={props.initialFollowing}
       initialSubscribed={props.initialSubscribed ?? false}
       postId={props.postId}
+      onFollowCompleted={props.onFollowCompleted}
     >
       {buttons}
     </AuthorRelationshipProvider>

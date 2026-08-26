@@ -4,6 +4,29 @@ import { type ActivationEventName } from "@/lib/activationEvents";
 import { recordActivationEvent } from "@/lib/activationServer";
 
 const ALLOWED_EVENTS = new Set<ActivationEventName>([
+  "profile_viewed",
+  "profile_work_opened",
+  "profile_brief_viewed",
+  "profile_brief_work_opened",
+  "profile_follow_completed",
+  "profile_inquiry_opened",
+  "profile_inquiry_submitted",
+  "profile_command_center_viewed",
+  "profile_section_saved",
+  "profile_preview_opened",
+  "profile_next_action_clicked",
+  "profile_feature_note_saved",
+  "profile_recognition_opened",
+  "profile_recognition_source_opened",
+  "profile_expertise_topic_opened",
+  "opportunity_outcome_submitted",
+  "opportunity_outcome_verified",
+  "opportunity_outcome_visibility_changed",
+  "profile_brief_viewed",
+  "profile_brief_work_opened",
+  "profile_brief_contact_started",
+  "profile_brief_created",
+  "profile_brief_revoked",
   "signup_completed",
   "onboarding_started",
   "onboarding_completed",
@@ -74,6 +97,8 @@ const ALLOWED_EVENTS = new Set<ActivationEventName>([
 ]);
 
 const ANONYMOUS_VIEW_EVENTS = new Set<ActivationEventName>([
+  "profile_viewed",
+  "profile_work_opened",
   "post_opened",
   "discover_viewed",
   "home_viewed",

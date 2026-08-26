@@ -50,6 +50,7 @@ GRANT SELECT (
   professional_title,
   organization_website,
   bio,
+  positioning_statement,
   avatar_url,
   cover_image_url,
   interests,

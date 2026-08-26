@@ -72,3 +72,42 @@ export function isTopicSubscriptionsEnabled(): boolean {
 export function isAiTopicSuggestionsEnabled(): boolean {
   return process.env.NEXT_PUBLIC_AI_TOPIC_SUGGESTIONS_ENABLED === "1";
 }
+
+/**
+ * Gates reads and writes of the additive profiles.positioning_statement
+ * column so this code can be deployed before its migration is applied.
+ *
+ * Without the gate the ordering is unforgiving: PostgREST rejects a select
+ * naming a column that does not exist, and the profile page treats that
+ * rejection as a missing profile, so deploying ahead of the migration would
+ * turn every public profile into a 404. Set to 1 only after
+ * 20260826000001_profile_positioning_statement.sql is applied and verified.
+ */
+export function isProfilePositioningEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED === "1";
+}
+
+/**
+ * Gates reads and writes of profile_featured_posts.feature_note and the v2
+ * replacement RPC, for the same reason as the positioning gate above: a
+ * select naming a column PostgREST does not know about fails outright, and
+ * this one is on the public profile query. Set to 1 only after
+ * 20260826000002_featured_work_notes.sql is applied and verified.
+ */
+export function isFeaturedWorkNotesEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_FEATURED_WORK_NOTES_ENABLED === "1";
+}
+
+/**
+ * Gates the Phase 3 credibility graph: citation edges, the public recognition
+ * and demonstrated-expertise sections, and verified opportunity outcomes.
+ *
+ * Same reason as the gates above. The credibility migrations add a column to
+ * post_references and two new tables; a select naming any of them before
+ * 20260827000001 to 20260827000003 are applied fails outright, and one of
+ * those selects sits on the public profile. Set to 1 only after all three are
+ * applied and verified.
+ */
+export function isCredibilityGraphEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_CREDIBILITY_GRAPH_ENABLED === "1";
+}

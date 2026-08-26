@@ -24,6 +24,13 @@ interface Props {
   source?: AuthorRelationshipSurface;
   postId?: string | null;
   className?: string;
+  /**
+   * Called once the server confirms a new follow, never on the click that
+   * requested it. A surface measuring conversion needs the completed state:
+   * a failed write, or an anonymous click that becomes a redirect to sign
+   * in, is not a follow.
+   */
+  onFollowCompleted?: () => void;
 }
 
 function BellIcon({ active }: { active: boolean }) {
@@ -53,6 +60,7 @@ function LegacyAuthorRelationshipControls({
   compact = false,
   variant,
   className = "",
+  onFollowCompleted,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -100,6 +108,7 @@ function LegacyAuthorRelationshipControls({
       }
       setFollowing(result.following);
       setSubscribed(result.subscribed);
+      if (nextFollowing && result.following) onFollowCompleted?.();
       router.refresh();
     });
   };

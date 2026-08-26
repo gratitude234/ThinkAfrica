@@ -64,11 +64,16 @@ export async function submitOpportunityInquiry(
     return { ok: false, error: "Choose an opportunity type." };
   }
 
-  if (!timeline) {
+  // Timeline and commitment are optional on the input type and nullable in
+  // the table, but were validated as required. The profile modal is the only
+  // caller and asks for them inside one free-text message, so every profile
+  // inquiry ever sent was rejected with "Add the expected timeline." for a
+  // field the form does not have. They are checked only when supplied.
+  if (input.timeline !== undefined && !timeline) {
     return { ok: false, error: "Add the expected timeline." };
   }
 
-  if (!commitment) {
+  if (input.commitment !== undefined && !commitment) {
     return { ok: false, error: "Add the expected commitment." };
   }
 
@@ -122,8 +127,8 @@ export async function submitOpportunityInquiry(
       contact_email: contactEmail,
       opportunity_type: opportunityType,
       role_title: roleTitle,
-      timeline,
-      commitment,
+      timeline: timeline || null,
+      commitment: commitment || null,
       fit_reason: fitReason,
       message,
       status: "new",

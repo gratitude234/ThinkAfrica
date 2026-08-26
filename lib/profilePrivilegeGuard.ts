@@ -20,6 +20,7 @@ export const PROFILE_DIRECT_UPDATE_ALLOWED_COLUMNS = [
   "professional_title",
   "organization_website",
   "bio",
+  "positioning_statement",
   "avatar_url",
   "cover_image_url",
   "interests",

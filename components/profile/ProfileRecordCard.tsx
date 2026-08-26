@@ -1,6 +1,8 @@
-import Link from "next/link";
 import PostCover from "@/components/post/PostCover";
 import EvidenceLabels from "@/components/profile/EvidenceLabels";
+import ProfileWorkLink, {
+  type ProfileWorkTracking,
+} from "@/components/profile/ProfileWorkLink";
 import { getContributionQualityLabels } from "@/lib/intellectualRecord";
 import type { ProfileRecordItem } from "@/lib/profileRecordData";
 import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
@@ -50,8 +52,10 @@ function Separator() {
 
 function PublicationRow({
   item,
+  tracking,
 }: {
   item: Extract<ProfileRecordItem, { publication: unknown }>;
+  tracking?: ProfileWorkTracking | null;
 }) {
   const publication = item.publication;
   const title = publication.title?.trim() || null;
@@ -82,12 +86,15 @@ function PublicationRow({
           {/* Stretched, so the row is the target that the hover tint promises.
               The thumbnail is a positioned element later in the DOM, so the
               overlay needs a z-index to stay above it and keep it clickable. */}
-          <Link
+          <ProfileWorkLink
             href={href}
+            workId={publication.id}
+            workKind={item.kind}
+            tracking={tracking}
             className="stretch-target focus-ring after:z-10 group-hover:text-emerald-brand"
           >
             {headline}
-          </Link>
+          </ProfileWorkLink>
         </h3>
 
         {title && excerpt ? (
@@ -132,7 +139,13 @@ function PublicationRow({
   );
 }
 
-function DebateRow({ item }: { item: Extract<ProfileRecordItem, { kind: "debate" }> }) {
+function DebateRow({
+  item,
+  tracking,
+}: {
+  item: Extract<ProfileRecordItem, { kind: "debate" }>;
+  tracking?: ProfileWorkTracking | null;
+}) {
   const debate = item.debate;
   const title = debate.debate?.title ?? "Public debate";
   const href = debate.debate ? `/debates/${debate.debate.id}` : null;
@@ -142,12 +155,15 @@ function DebateRow({ item }: { item: Extract<ProfileRecordItem, { kind: "debate"
       <div className="min-w-0 flex-1">
         <h3 className="font-display text-[17px] font-semibold leading-snug text-ink sm:text-[19px]">
           {href ? (
-            <Link
+            <ProfileWorkLink
               href={href}
+              workId={item.id}
+              workKind="debate"
+              tracking={tracking}
               className="stretch-target focus-ring after:z-10 group-hover:text-emerald-brand"
             >
               {title}
-            </Link>
+            </ProfileWorkLink>
           ) : (
             title
           )}
@@ -174,10 +190,20 @@ function DebateRow({ item }: { item: Extract<ProfileRecordItem, { kind: "debate"
   );
 }
 
-export default function ProfileRecordCard({ item }: { item: ProfileRecordItem }) {
+export default function ProfileRecordCard({
+  item,
+  tracking = null,
+}: {
+  item: ProfileRecordItem;
+  /**
+   * Funnel context from the page rendering this run of entries. Omitted where
+   * there is none, in which case the entry links exactly as it did before.
+   */
+  tracking?: ProfileWorkTracking | null;
+}) {
   return item.kind === "debate" ? (
-    <DebateRow item={item} />
+    <DebateRow item={item} tracking={tracking} />
   ) : (
-    <PublicationRow item={item} />
+    <PublicationRow item={item} tracking={tracking} />
   );
 }

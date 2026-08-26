@@ -3,7 +3,19 @@
 import { useEffect, useState } from "react";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { OPPORTUNITY_TYPES, OPPORTUNITY_LABELS } from "@/lib/opportunities";
+import {
+  trackProfileFunnelEvent,
+  type ProfileFunnelSurface,
+  type ProfileViewerState,
+} from "@/lib/profileFunnel";
 import { submitOpportunityInquiry } from "./opportunityInquiryActions";
+
+/**
+ * The shortest message the server action will accept. Stated here so the form
+ * rejects a too-short message where the writer can still see the field,
+ * rather than after a round trip.
+ */
+const MIN_INQUIRY_MESSAGE_LENGTH = 40;
 
 interface ContactInquiryModalProps {
   talentProfileId: string;
@@ -11,6 +23,16 @@ interface ContactInquiryModalProps {
   onClose: () => void;
   onSent?: () => void;
   source?: string;
+  /**
+   * Present when this modal was opened from a public profile, which makes it
+   * the terminal step of the profile funnel. Absent elsewhere, so no other
+   * caller starts emitting profile events.
+   */
+  funnel?: {
+    profileId: string;
+    viewerState: ProfileViewerState;
+    surface: ProfileFunnelSurface;
+  } | null;
 }
 
 export default function ContactInquiryModal({
@@ -19,6 +41,7 @@ export default function ContactInquiryModal({
   onClose,
   onSent,
   source = "profile",
+  funnel = null,
 }: ContactInquiryModalProps) {
   const [inquiry, setInquiry] = useState({
     organization_name: "",
@@ -31,6 +54,14 @@ export default function ContactInquiryModal({
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
+  // Read as three primitives rather than as the object, which callers build
+  // inline: an object literal is a new identity on every parent render, so
+  // depending on it would re-announce the same opened modal on every keystroke
+  // the parent re-rendered through.
+  const funnelProfileId = funnel?.profileId ?? null;
+  const funnelViewerState = funnel?.viewerState ?? null;
+  const funnelSurface = funnel?.surface ?? null;
+
   useEffect(() => {
     if (!open) return;
     trackActivationEvent({
@@ -40,7 +71,22 @@ export default function ContactInquiryModal({
         source,
       },
     });
-  }, [open, source, talentProfileId]);
+    if (funnelProfileId && funnelViewerState && funnelSurface) {
+      trackProfileFunnelEvent({
+        event: "profile_inquiry_opened",
+        profileId: funnelProfileId,
+        viewerState: funnelViewerState,
+        surface: funnelSurface,
+      });
+    }
+  }, [
+    funnelProfileId,
+    funnelSurface,
+    funnelViewerState,
+    open,
+    source,
+    talentProfileId,
+  ]);
 
   if (!open) return null;
 
@@ -49,8 +95,10 @@ export default function ContactInquiryModal({
     setError(null);
 
     const message = inquiry.message.trim();
-    if (message.length < 20) {
-      setError("Add a brief message describing the opportunity and why you're reaching out.");
+    if (message.length < MIN_INQUIRY_MESSAGE_LENGTH) {
+      setError(
+        `Describe the opportunity and why you are reaching out, in at least ${MIN_INQUIRY_MESSAGE_LENGTH} characters.`
+      );
       return;
     }
 
@@ -62,8 +110,8 @@ export default function ContactInquiryModal({
       contactEmail: inquiry.contact_email,
       opportunityType: inquiry.opportunity_type,
       roleTitle: inquiry.role_title,
-      timeline: "",
-      commitment: "",
+      // This form asks for one message rather than separate timeline and
+      // commitment fields, so they are omitted rather than sent empty.
       fitReason: message,
       message,
     });
@@ -85,6 +133,17 @@ export default function ContactInquiryModal({
         messageLength: message.length,
       },
     });
+
+    // After the server confirmed the insert, so the funnel's last step counts
+    // inquiries the author will actually receive rather than send attempts.
+    if (funnelProfileId && funnelViewerState && funnelSurface) {
+      trackProfileFunnelEvent({
+        event: "profile_inquiry_submitted",
+        profileId: funnelProfileId,
+        viewerState: funnelViewerState,
+        surface: funnelSurface,
+      });
+    }
 
     setSent(true);
     setInquiry({
@@ -149,10 +208,14 @@ export default function ContactInquiryModal({
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-ink-soft">
+              <label
+                htmlFor="inquiry-organization"
+                className="mb-1 block text-sm font-medium text-ink-soft"
+              >
                 Organization *
               </label>
               <input
+                id="inquiry-organization"
                 required
                 type="text"
                 value={inquiry.organization_name}
@@ -166,10 +229,14 @@ export default function ContactInquiryModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-ink-soft">
+              <label
+                htmlFor="inquiry-email"
+                className="mb-1 block text-sm font-medium text-ink-soft"
+              >
                 Reply email *
               </label>
               <input
+                id="inquiry-email"
                 required
                 type="email"
                 value={inquiry.contact_email}
@@ -186,10 +253,14 @@ export default function ContactInquiryModal({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-ink-soft">
+              <label
+                htmlFor="inquiry-role"
+                className="mb-1 block text-sm font-medium text-ink-soft"
+              >
                 Role or opportunity *
               </label>
               <input
+                id="inquiry-role"
                 required
                 type="text"
                 value={inquiry.role_title}
@@ -204,10 +275,14 @@ export default function ContactInquiryModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-ink-soft">
+              <label
+                htmlFor="inquiry-type"
+                className="mb-1 block text-sm font-medium text-ink-soft"
+              >
                 Type *
               </label>
               <select
+                id="inquiry-type"
                 required
                 value={inquiry.opportunity_type}
                 onChange={(event) =>
@@ -229,10 +304,14 @@ export default function ContactInquiryModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-soft">
+            <label
+              htmlFor="inquiry-message"
+              className="mb-1 block text-sm font-medium text-ink-soft"
+            >
               Message *
             </label>
             <textarea
+              id="inquiry-message"
               required
               rows={5}
               value={inquiry.message}

@@ -13,6 +13,8 @@ import {
   validateCitationReferences,
 } from "@/lib/postReferences";
 import { isLowQualityTitle } from "@/lib/postQuality";
+import { resolveReferenceCitations } from "@/lib/citationResolution";
+import { isCredibilityGraphEnabled } from "@/lib/featureFlags";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { requireNotSuspended } from "@/lib/suspension";
 import {
@@ -116,6 +118,15 @@ async function syncReferences(
   references: ReferenceInput[]
 ) {
   const normalized = normalizeReferences(references);
+  // Resolve internal reference URLs to the works they point at, so a citation
+  // edge exists the moment the author saves rather than waiting for a
+  // backfill. Gated: the column is added by 20260827000001.
+  const resolved = isCredibilityGraphEnabled()
+    ? await resolveReferenceCitations(supabase, normalized, {
+        appUrl: process.env.NEXT_PUBLIC_APP_URL,
+        citingPostId: postId,
+      })
+    : normalized.map((reference) => ({ ...reference, referenced_post_id: null }));
   const { data: existingRows, error: existingError } = await supabase
     .from("post_references")
     .select("id")
@@ -127,7 +138,7 @@ async function syncReferences(
 
   const existingIds = new Set((existingRows ?? []).map((row) => row.id));
   const incomingIds = new Set(
-    normalized
+    resolved
       .map((reference) => getPersistedReferenceId(reference.id))
       .filter(Boolean) as string[]
   );
@@ -146,8 +157,8 @@ async function syncReferences(
     }
   }
 
-  for (let index = 0; index < normalized.length; index += 1) {
-    const reference = normalized[index];
+  for (let index = 0; index < resolved.length; index += 1) {
+    const reference = resolved[index];
     const payload = {
       post_id: postId,
       display_order: index,
@@ -159,6 +170,10 @@ async function syncReferences(
       url: reference.url,
       doi: reference.doi,
       raw: reference.raw,
+      // The original url is preserved above; this is the resolved relation.
+      ...(isCredibilityGraphEnabled()
+        ? { referenced_post_id: reference.referenced_post_id }
+        : {}),
     };
 
     const persistedId = getPersistedReferenceId(reference.id);

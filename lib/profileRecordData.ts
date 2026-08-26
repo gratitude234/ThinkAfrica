@@ -10,7 +10,13 @@ import {
   type ProfileRecordQuality,
   type ProfileRecordSummary,
 } from "@/lib/profileRecord";
-import { deriveProfileTopics, profileTopicKey } from "@/lib/profileTopics";
+import {
+  deriveDeclaredInterests,
+  deriveDemonstratedTopics,
+  profileTopicKey,
+  type DemonstratedTopic,
+} from "@/lib/profileTopics";
+import { sanitizePostExcerpt } from "@/lib/utils";
 
 export interface ProfileRecordPublication {
   id: string;
@@ -143,7 +149,10 @@ function normalizePost(
     title: post.title,
     slug: post.slug,
     inResponseTo: post.in_response_to,
-    excerpt: post.excerpt,
+    // Normalized here rather than in each row component, so every record
+    // surface (and anything that reads a record item later) gets prose
+    // instead of the editor HTML the excerpt was cut from.
+    excerpt: sanitizePostExcerpt(post.excerpt),
     type: post.type,
     contentKind: post.content_kind,
     articleFormat: post.article_format,
@@ -341,8 +350,15 @@ interface CoAuthoredTopicRow {
 }
 
 export interface ProfileTopicIndex {
-  /** Ordered topic labels, as the profile and the record both display them. */
-  topics: string[];
+  /**
+   * Topics with published work behind them, ordered as the profile and the
+   * record both display them. Declared interests are deliberately absent:
+   * every entry here resolves to at least one record entry, which is what
+   * makes the record's topic filter row safe to render.
+   */
+  demonstratedTopics: DemonstratedTopic[];
+  /** What the author declared, minus anything their work already covers. */
+  interests: string[];
   /** Post ids per `profileTopicKey`, for restricting a record page. */
   postIdsByTopic: Map<string, string[]>;
 }
@@ -425,8 +441,11 @@ export async function loadProfileTopicIndex({
     }
   }
 
+  const demonstratedTopics = deriveDemonstratedTopics(posts);
+
   return {
-    topics: deriveProfileTopics(posts, declaredInterests),
+    demonstratedTopics,
+    interests: deriveDeclaredInterests(declaredInterests, demonstratedTopics),
     postIdsByTopic,
   };
 }

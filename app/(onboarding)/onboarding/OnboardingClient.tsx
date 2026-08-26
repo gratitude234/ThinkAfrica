@@ -27,6 +27,10 @@ import {
 } from "@/lib/onboarding";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
 import { normalizeProfileRecordSummary } from "@/lib/profileRecord";
+import {
+  getVisibleProfileRecordMetrics,
+  profileRecordMetricGridClass,
+} from "@/lib/profileRecordMetrics";
 import { isProfileType, type ProfileType } from "@/lib/profileTypes";
 import { createClient } from "@/lib/supabase/client";
 
@@ -496,6 +500,11 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
     record: "This is the public body of work you will build over time.",
   };
 
+  // One rule decides which metrics are worth showing, on every surface. The
+  // preview is a picture of a profile rather than a profile, so it takes the
+  // unlinked form.
+  const previewMetrics = getVisibleProfileRecordMetrics(recordStats);
+
   const canContinue =
     step === "path"
       ? Boolean(currentPath)
@@ -785,18 +794,35 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
                   )}
                   <p className="mt-4 text-sm leading-6 text-ink-soft">Interested in {formatInterests(interests)}</p>
 
-                  <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-card-border bg-divider">
-                    {[
-                      [recordStats.publicationCount, "Publications"],
-                      [recordStats.sourceBackedCount, "Source-backed"],
-                      [recordStats.citableCount, "Citable"],
-                    ].map(([value, label]) => (
-                      <div key={label} className="bg-canvas px-2 py-4 text-center">
-                        <p className="font-display text-xl font-semibold tabular-nums text-ink">{value}</p>
-                        <p className="mt-1 text-[11px] font-medium leading-4 text-ink-muted">{label}</p>
-                      </div>
-                    ))}
-                  </div>
+                  {/* A brand new account has nothing in its record, and the
+                      preview used to say so three times over in display type:
+                      the last thing someone saw before entering the product
+                      was 0, 0, 0 under their own name. Someone arriving with
+                      published work still sees the numbers they have. */}
+                  {previewMetrics.length > 0 ? (
+                    <div
+                      className={`mt-5 grid gap-px overflow-hidden rounded-xl border border-card-border bg-divider ${profileRecordMetricGridClass(previewMetrics.length)}`}
+                    >
+                      {previewMetrics.map((metric) => (
+                        <div key={metric.key} className="bg-canvas px-2 py-4 text-center">
+                          <p className="font-display text-xl font-semibold tabular-nums text-ink">
+                            {metric.value.toLocaleString()}
+                          </p>
+                          <p className="mt-1 text-[11px] font-medium leading-4 text-ink-muted">
+                            {metric.label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-5 rounded-xl border border-dashed border-card-border bg-canvas px-4 py-4">
+                      <p className="text-sm leading-6 text-ink-soft">
+                        Publish your first contribution and this becomes a record:
+                        what you published, which pieces carry sources, and which
+                        have a citation others can point to.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </section>
               <p className="mt-5 text-sm leading-6 text-ink-muted">

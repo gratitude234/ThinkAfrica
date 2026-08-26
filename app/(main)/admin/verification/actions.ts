@@ -74,7 +74,7 @@ export async function updateVerificationStatus(input: {
             }. This trust signal now appears on your public profile and byline.`
           : "Your Indegenius profile verification was revoked or changed. Review your profile or supporting credentials if you need to update them.",
         ctaLabel: "Open profile settings",
-        ctaPath: "/settings?tab=profile",
+        ctaPath: "/settings/profile",
         preferenceKey: "email_account_security",
         idempotencyKey: `verification-status:${input.userId}:${input.verified}:${nextVerifiedType ?? "none"}`,
       });
@@ -87,7 +87,7 @@ export async function updateVerificationStatus(input: {
         title: "Verification type updated",
         intro: `Your Indegenius verification type is now ${nextVerifiedType ?? "updated"}.`,
         ctaLabel: "Open profile settings",
-        ctaPath: "/settings?tab=profile",
+        ctaPath: "/settings/profile",
         preferenceKey: "email_account_security",
         idempotencyKey: `verification-type:${input.userId}:${nextVerifiedType ?? "none"}`,
       });
@@ -96,7 +96,7 @@ export async function updateVerificationStatus(input: {
 
     if (previousProfile && previousProfile.role !== nextRole) {
       const roleCtaPath =
-        nextRole === "admin" ? "/admin" : nextRole === "editor" || nextRole === "reviewer" ? "/review" : "/settings?tab=profile";
+        nextRole === "admin" ? "/admin" : nextRole === "editor" || nextRole === "reviewer" ? "/review" : "/settings/profile";
       const result = await sendUserEmail({
         recipientId: input.userId,
         subject: "Your Indegenius account role changed",

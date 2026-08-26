@@ -33,6 +33,9 @@ Optional:
 - `GEMINI_RECAP_MODEL`: Optional Gemini recap model override; defaults to `gemini-3.6-flash`
 - `GEMINI_TOPIC_MODEL`: Optional Gemini topic-classification model override; defaults to `gemini-3.6-flash`
 - `NEXT_PUBLIC_AI_TOPIC_SUGGESTIONS_ENABLED`: Set to `1` only after the AI topic pending migration is applied and verified
+- `NEXT_PUBLIC_CREDIBILITY_GRAPH_ENABLED`: Set to `1` only after `20260827000001`, `20260827000002` and `20260827000003` are applied and verified. Gates citation edges, the public Demonstrated expertise and Recognition sections, and verified opportunity outcomes
+- `NEXT_PUBLIC_FEATURED_WORK_NOTES_ENABLED`: Set to `1` only after `20260826000002_featured_work_notes.sql` is applied and verified. Until then Featured Work notes are neither read nor written, and `replace_my_featured_posts` v1 is used
+- `NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED`: Set to `1` only after `20260826000001_profile_positioning_statement.sql` is applied and verified. Until then the public profile, the full record and settings leave the `positioning_statement` column out of their projections, because PostgREST rejects a select naming a column that does not exist
 - `GOOGLE_TTS_API_KEY`: Text-to-speech
 - `CRON_SECRET`: Authenticates Vercel Cron requests to `/api/cron/*` routes (Vercel sends it automatically as `Authorization: Bearer <value>` when set)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_MAILTO`: Web push (VAPID keypair + contact address for `lib/push.ts`)

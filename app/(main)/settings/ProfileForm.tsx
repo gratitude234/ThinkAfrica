@@ -18,6 +18,15 @@ import {
   normalizeSecondaryProfileTypes,
 } from "@/lib/profileTypes";
 import {
+  getPositioningStatementError,
+  normalizePositioningStatement,
+  POSITIONING_STATEMENT_EXAMPLE,
+  POSITIONING_STATEMENT_HELPER,
+  POSITIONING_STATEMENT_LABEL,
+  POSITIONING_STATEMENT_MAX_LENGTH,
+  POSITIONING_STATEMENT_PROMPT,
+} from "@/lib/profileIdentity";
+import {
   getProfileUsernameError,
   normalizeProfileUsername,
 } from "@/lib/profileUsername";
@@ -54,6 +63,7 @@ interface Profile {
   username: string;
   full_name: string | null;
   bio: string | null;
+  positioning_statement: string | null;
   country: string | null;
   university: string | null;
   field_of_study: string | null;
@@ -79,14 +89,24 @@ const INPUT_STYLES =
 export default function ProfileForm({
   profile,
   onboardingPreference,
+  positioningEnabled = false,
 }: {
   profile: Profile;
   onboardingPreference?: OnboardingPreference | null;
+  /**
+   * Whether profiles.positioning_statement exists yet. The field is hidden and
+   * left out of the update until its migration is applied, because writing a
+   * column PostgREST does not know about fails the whole profile save.
+   */
+  positioningEnabled?: boolean;
 }) {
   const router = useRouter();
   const [fullName, setFullName] = useState(profile.full_name ?? "");
   const [username, setUsername] = useState(profile.username);
   const [bio, setBio] = useState(profile.bio ?? "");
+  const [positioningStatement, setPositioningStatement] = useState(
+    profile.positioning_statement ?? ""
+  );
   const initialProfileType = isProfileType(profile.profile_type)
     ? profile.profile_type
     : null;
@@ -126,6 +146,7 @@ export default function ProfileForm({
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
   const [coverImageUrl, setCoverImageUrl] = useState(profile.cover_image_url);
   const [usernameError, setUsernameError] = useState<string | null>(null);
+  const positioningError = getPositioningStatementError(positioningStatement);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   // Whether this profile is school-based follows the onboarding path, not the
@@ -258,6 +279,11 @@ export default function ProfileForm({
       setSaving(false);
       return;
     }
+    if (positioningError) {
+      setToast(positioningError);
+      setSaving(false);
+      return;
+    }
     // Organisation stays optional here because the onboarding identity step
     // asks for it that way. Requiring it would lock out anyone who finished
     // onboarding without one.
@@ -281,6 +307,16 @@ export default function ProfileForm({
         full_name: fullName,
         username,
         bio,
+        // Normalized on the way in, so a pasted line break does not open a
+        // gap under the author's name on their public profile. Empty saves as
+        // NULL: the column's CHECK rejects a whitespace-only value, and a
+        // reader should not have to tell blank from absent.
+        ...(positioningEnabled
+          ? {
+              positioning_statement:
+                normalizePositioningStatement(positioningStatement),
+            }
+          : {}),
         profile_type: profileType,
         secondary_profile_types: nextSecondaryProfileTypes,
         country,
@@ -326,6 +362,7 @@ export default function ProfileForm({
 
     savedProfileTypeRef.current = profileType;
     setSecondaryProfileTypes(nextSecondaryProfileTypes);
+    setPositioningStatement(normalizePositioningStatement(positioningStatement) ?? "");
     setToast("Profile saved successfully!");
     if (username !== profile.username) {
       // Hard redirect forces the server layout to re-fetch the profile,
@@ -613,6 +650,61 @@ export default function ProfileForm({
           </div>
         ) : null}
 
+        {/* Sits with identity and directly above the bio, because it answers
+            a narrower question than the bio does and a reader meets it first
+            on the public page. */}
+        {positioningEnabled ? (
+        <div id="profile-focus" className="scroll-mt-24">
+          <label
+            htmlFor="positioning_statement"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            {POSITIONING_STATEMENT_LABEL}{" "}
+            <span className="text-xs font-normal text-gray-400">(optional)</span>
+          </label>
+          <p className="mb-2 text-xs leading-5 text-gray-500">
+            {POSITIONING_STATEMENT_HELPER} It appears under your name on your
+            public profile.
+          </p>
+          <div className="relative">
+            <textarea
+              id="positioning_statement"
+              value={positioningStatement}
+              onChange={(e) => setPositioningStatement(e.target.value)}
+              rows={2}
+              placeholder={POSITIONING_STATEMENT_PROMPT}
+              aria-describedby="positioning_statement_help"
+              aria-invalid={positioningError ? true : undefined}
+              className={`${INPUT_STYLES} resize-none pb-7 ${
+                positioningError ? "border-red-400" : ""
+              }`}
+            />
+            {/* Not maxLength: a hard stop silently truncates a paste and the
+                writer never learns why their sentence lost its end. The
+                counter turns red and the save is blocked instead. */}
+            <span
+              aria-label={`${positioningStatement.length} of ${POSITIONING_STATEMENT_MAX_LENGTH} characters used`}
+              className={`absolute bottom-2 right-2 text-xs ${
+                positioningStatement.length > POSITIONING_STATEMENT_MAX_LENGTH
+                  ? "font-semibold text-red-500"
+                  : "text-gray-500"
+              }`}
+            >
+              {positioningStatement.length}/{POSITIONING_STATEMENT_MAX_LENGTH}
+            </span>
+          </div>
+          <p id="positioning_statement_help" className="mt-1 text-xs leading-5 text-gray-500">
+            {positioningError ? (
+              <span className="font-medium text-red-500" role="alert">
+                {positioningError}
+              </span>
+            ) : (
+              <>For example: {POSITIONING_STATEMENT_EXAMPLE}</>
+            )}
+          </p>
+        </div>
+        ) : null}
+
         <div id="profile-about" className="scroll-mt-24">
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Bio
@@ -662,7 +754,11 @@ export default function ProfileForm({
         </div>
 
         <div className="flex justify-end pt-2">
-          <Button type="submit" loading={saving} disabled={!!usernameError}>
+          <Button
+            type="submit"
+            loading={saving}
+            disabled={!!usernameError || !!positioningError}
+          >
             Save changes
           </Button>
         </div>

@@ -20,6 +20,7 @@ const profile: ProfilePrivilegeFields = {
   professional_title: null,
   organization_website: null,
   bio: "Ideas and history.",
+  positioning_statement: "How colonial land records still shape rural disputes.",
   avatar_url: null,
   cover_image_url: null,
   interests: ["history"],

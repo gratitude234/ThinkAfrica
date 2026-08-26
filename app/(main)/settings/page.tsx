@@ -2,8 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { IN_APP_PREF_DEFAULTS } from "@/lib/notificationPreferences";
-import { getProfileCredibilitySummary } from "@/lib/profileCredibility";
-import ProfileForm from "./ProfileForm";
 import AccountForm from "./AccountForm";
 import NotificationsForm, { type NotificationPrefs } from "./NotificationsForm";
 import SubscribedAuthorsManager, {
@@ -16,16 +14,48 @@ import PrivacyForm, { type PrivacySettings } from "./PrivacyForm";
 import {
   isAuthorSubscriptionsEnabled,
   isAuthorSubscriptionsUxV2Enabled,
+  isProfilePositioningEnabled,
   isTopicSubscriptionsEnabled,
 } from "@/lib/featureFlags";
 import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
 import { normalizeOnboardingPreference } from "@/lib/onboarding";
 
-const VALID_TABS = ["profile", "account", "notifications", "privacy"] as const;
+/**
+ * The settings profile row. Named explicitly because the select string is
+ * chosen at runtime (see isProfilePositioningEnabled), and a non-literal
+ * select gives PostgREST's generated types nothing to infer from.
+ */
+interface SettingsProfile {
+  id: string;
+  username: string;
+  full_name: string | null;
+  bio: string | null;
+  positioning_statement?: string | null;
+  country: string | null;
+  university: string | null;
+  field_of_study: string | null;
+  graduation_year: number | null;
+  is_alumni: boolean | null;
+  open_to_mentoring: boolean | null;
+  verified: boolean | null;
+  verified_type: string | null;
+  avatar_url: string | null;
+  interests: string[] | null;
+  cover_image_url: string | null;
+  profile_type: string | null;
+  secondary_profile_types: string[] | null;
+  organization_name: string | null;
+  professional_title: string | null;
+  organization_website: string | null;
+}
+
+const SETTINGS_PROFILE_BASE_SELECT =
+  "id, username, full_name, bio, country, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, avatar_url, interests, cover_image_url, profile_type, secondary_profile_types, organization_name, professional_title, organization_website";
+
+const VALID_TABS = ["account", "notifications", "privacy"] as const;
 type SettingsTab = (typeof VALID_TABS)[number];
 
 const TABS: { value: SettingsTab; label: string }[] = [
-  { value: "profile", label: "Profile" },
   { value: "account", label: "Account & Security" },
   { value: "notifications", label: "Notifications" },
   { value: "privacy", label: "Privacy" },
@@ -37,9 +67,19 @@ interface PageProps {
 
 export default async function SettingsPage({ searchParams }: PageProps) {
   const { tab: rawTab } = await searchParams;
+  // Profile editing moved to its own canonical route. The old tab value is
+  // still a live link everywhere it was bookmarked, in old notification
+  // emails, and in admin verification messages, so it redirects rather than
+  // 404s. The fragment survives the redirect, so #profile-identity and
+  // #profile-about still reach their sections.
+  // Bare /settings stays on this page and opens Account, so the Command
+  // Center can link back here without bouncing straight out again.
+  if (rawTab === "profile") {
+    redirect("/settings/profile");
+  }
   const tab: SettingsTab = VALID_TABS.includes(rawTab as SettingsTab)
     ? (rawTab as SettingsTab)
-    : "profile";
+    : "account";
 
   const supabase = await createClient();
   const {
@@ -48,15 +88,18 @@ export default async function SettingsPage({ searchParams }: PageProps) {
 
   if (!user) redirect("/login?redirectTo=/settings");
 
+  const positioningEnabled = isProfilePositioningEnabled();
   const [
-    { data: profile },
+    { data: profileData },
     { data: privateProfileRaw },
     { data: onboardingStateRaw },
   ] = await Promise.all([
     supabase
       .from("profiles")
       .select(
-        "id, username, full_name, bio, country, university, field_of_study, graduation_year, is_alumni, open_to_mentoring, verified, verified_type, avatar_url, interests, cover_image_url, profile_type, secondary_profile_types, organization_name, professional_title, organization_website"
+        positioningEnabled
+          ? `${SETTINGS_PROFILE_BASE_SELECT}, positioning_statement`
+          : SETTINGS_PROFILE_BASE_SELECT
       )
       .eq("id", user.id)
       .single(),
@@ -64,6 +107,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     supabase.rpc("get_my_onboarding_state"),
   ]);
 
+  const profile = profileData as unknown as SettingsProfile | null;
   if (!profile) redirect("/login");
   const privateProfile = normalizeMyPrivateProfile(privateProfileRaw);
   const onboardingPreference = normalizeOnboardingPreference(onboardingStateRaw);
@@ -109,26 +153,6 @@ export default async function SettingsPage({ searchParams }: PageProps) {
       displayLabel: row.display_label as string,
     }));
   }
-
-  const credibilitySummary = getProfileCredibilitySummary({
-    profile: {
-      full_name: profile.full_name,
-      username: profile.username,
-      bio: profile.bio,
-      country: profile.country,
-      university: profile.university,
-      field_of_study: profile.field_of_study,
-      avatar_url: profile.avatar_url,
-      verified: profile.verified,
-      verified_type: profile.verified_type,
-      interests: (profile.interests as string[] | null) ?? [],
-    },
-    stats: {
-      featuredWorkCount: 1,
-      opportunityReadinessScore: 100,
-      isOpenToOpportunities: true,
-    },
-  });
 
   const notifPrefs: NotificationPrefs = {
     email_comments: true,
@@ -193,66 +217,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      {/* Credibility banner — profile tab only */}
-      {tab === "profile" && credibilitySummary.missingProfileItems.length > 0 && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
-            Profile credibility
-          </p>
-          <div className="mt-1 flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-gray-900">
-              {credibilitySummary.profileCompletionScore}% complete
-            </h2>
-            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-amber-700">
-              {credibilitySummary.missingProfileItems.length} left
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-amber-800">
-            Complete these public signals so readers and opportunity partners can trust your profile faster.
-          </p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {credibilitySummary.missingProfileItems.slice(0, 6).map((item) => (
-              <div
-                key={item.key}
-                className="rounded-lg border border-amber-200 bg-white/70 px-3 py-2 text-sm font-medium text-amber-900"
-              >
-                {item.label}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        {tab === "profile" && (
-          <ProfileForm
-            profile={{
-              id: profile.id,
-              username: profile.username,
-              full_name: profile.full_name ?? null,
-              bio: profile.bio ?? null,
-              country: profile.country ?? null,
-              university: profile.university ?? null,
-              field_of_study: profile.field_of_study ?? null,
-              graduation_year: profile.graduation_year ?? null,
-              is_alumni: profile.is_alumni ?? false,
-              open_to_mentoring: profile.open_to_mentoring ?? false,
-              verified: profile.verified ?? false,
-              verified_type: profile.verified_type ?? null,
-              signup_email: privateProfile?.signup_email ?? user.email ?? null,
-              avatar_url: profile.avatar_url ?? null,
-              interests: (profile.interests as string[] | null) ?? null,
-              cover_image_url: (profile.cover_image_url as string | null) ?? null,
-              profile_type: profile.profile_type ?? null,
-              secondary_profile_types:
-                (profile.secondary_profile_types as string[] | null) ?? [],
-              organization_name: profile.organization_name ?? null,
-              professional_title: profile.professional_title ?? null,
-              organization_website: profile.organization_website ?? null,
-            }}
-            onboardingPreference={onboardingPreference}
-          />
-        )}
         {tab === "account" && <AccountForm email={user.email!} />}
         {tab === "notifications" && (
           <>

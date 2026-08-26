@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
 import UserAvatar from "@/components/ui/UserAvatar";
+import {
+  trackProfileFunnelEvent,
+  type ProfileViewerState,
+} from "@/lib/profileFunnel";
 
 interface ProfileStickyBarProps {
   authorId: string;
@@ -10,6 +14,11 @@ interface ProfileStickyBarProps {
   avatarUrl: string | null;
   currentUserId: string | null;
   initialFollowing: boolean;
+  /**
+   * The bar carries the same Follow as the header, so a conversion completed
+   * here has to be attributable to here rather than folded into the header's.
+   */
+  viewerState: ProfileViewerState;
 }
 
 /**
@@ -27,6 +36,7 @@ export default function ProfileStickyBar({
   avatarUrl,
   currentUserId,
   initialFollowing,
+  viewerState,
 }: ProfileStickyBarProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [showBar, setShowBar] = useState(false);
@@ -76,6 +86,14 @@ export default function ProfileStickyBar({
             initialFollowing={initialFollowing}
             variant="follow_only"
             source="profile"
+            onFollowCompleted={() =>
+              trackProfileFunnelEvent({
+                event: "profile_follow_completed",
+                profileId: authorId,
+                viewerState,
+                surface: "sticky_bar",
+              })
+            }
             className="w-[116px] shrink-0"
           />
         </div>

@@ -1,11 +1,14 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import PostCover from "@/components/post/PostCover";
 import EvidenceLabels from "@/components/profile/EvidenceLabels";
+import ProfileWorkLink, {
+  type ProfileWorkTracking,
+} from "@/components/profile/ProfileWorkLink";
 import { resolveContentKind } from "@/lib/contentModel";
+import { normalizeFeatureNote } from "@/lib/featuredWork";
 import { getContributionQualityLabels } from "@/lib/intellectualRecord";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import { formatDate } from "@/lib/utils";
+import { formatDate, sanitizePostExcerpt } from "@/lib/utils";
 
 interface FeaturedPost {
   id: string;
@@ -23,6 +26,8 @@ interface FeaturedPost {
   published_at?: string | null;
   cover_image_url?: string | null;
   isCoAuthor?: boolean;
+  /** The author's own explanation of why this piece is featured. */
+  feature_note?: string | null;
   post_reference_counts?:
     | { reference_count: number | null }
     | Array<{ reference_count: number | null }>
@@ -49,6 +54,8 @@ interface FeaturedWorkProps {
    * caller that cannot tell keeps the prompt.
    */
   hasPublishedWork?: boolean;
+  /** Funnel context from the profile page. Omitted, the cards link plainly. */
+  tracking?: ProfileWorkTracking | null;
 }
 
 export default function FeaturedWork({
@@ -56,6 +63,7 @@ export default function FeaturedWork({
   action,
   isOwnProfile = false,
   hasPublishedWork = true,
+  tracking = null,
 }: FeaturedWorkProps) {
   if (posts.length === 0) {
     if (!isOwnProfile || !hasPublishedWork) return null;
@@ -104,7 +112,13 @@ export default function FeaturedWork({
       <div className="featured-rail" data-count={selected.length}>
         {selected.map((post) => {
           const displayTitle = getPostDisplayTitle(post);
-          const headline = displayTitle ?? post.excerpt ?? getPostMetadataTitle(post);
+          // Featured printed the stored excerpt straight from the database,
+          // so an editor's "&nbsp;" and "&amp;" reached the reader verbatim on
+          // the most prominent cards an author has. Same normalization the
+          // record rows use.
+          const excerpt = sanitizePostExcerpt(post.excerpt);
+          const note = normalizeFeatureNote(post.feature_note);
+          const headline = displayTitle ?? excerpt ?? getPostMetadataTitle(post);
           const kind = resolveContentKind(post);
           const label = post.in_response_to
             ? "Response"
@@ -153,17 +167,42 @@ export default function FeaturedWork({
                 <h3 className="font-display mt-2 line-clamp-3 text-[17px] font-semibold leading-snug text-ink">
                   {/* Stretched so the whole card is the target, which is what
                       the hover treatment above promises. */}
-                  <Link
+                  <ProfileWorkLink
                     href={`/post/${post.slug}`}
+                    workId={post.id}
+                    workKind={
+                      post.in_response_to
+                        ? "response"
+                        : kind === "research"
+                          ? "research"
+                          : "publication"
+                    }
+                    tracking={tracking}
                     className="stretch-target focus-ring group-hover:text-emerald-brand"
                   >
                     {headline}
-                  </Link>
+                  </ProfileWorkLink>
                 </h3>
-                {displayTitle && post.excerpt ? (
+                {displayTitle && excerpt ? (
                   <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-muted">
-                    {post.excerpt}
+                    {excerpt}
                   </p>
+                ) : null}
+                {/* Subordinate to the title and distinguished from the
+                    excerpt by a rule and a label, because the two are
+                    different voices: the excerpt is the piece talking, this
+                    is the author talking about the piece. Rendered as a text
+                    node, never as markup. Omitted entirely when absent, so a
+                    rail of three cards does not carry three empty captions. */}
+                {note ? (
+                  <div className="mt-3 border-l-2 border-gold-tint pl-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-ink">
+                      Why I featured this
+                    </p>
+                    <p className="mt-1 line-clamp-3 text-sm leading-6 text-ink-soft">
+                      {note}
+                    </p>
+                  </div>
                 ) : null}
                 {publishedDate ? (
                   <p className="mt-auto pt-3 text-xs text-ink-muted">{formatDate(publishedDate)}</p>

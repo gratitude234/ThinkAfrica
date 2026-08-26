@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { PublicProfileIdentity } from "@/lib/profileIdentity";
 import { buildProfileRecordHref } from "@/lib/profileRecord";
+import { PROFILE_TOPIC_LIMIT, type DemonstratedTopic } from "@/lib/profileTopics";
+import { getExactCanonicalTag, normalizeTagValue } from "@/lib/tags";
 
 interface ResearchBackground {
   headline?: string | null;
@@ -47,8 +49,26 @@ function BackgroundField({
 
 interface BackgroundInput {
   profile: PublicProfileIdentity;
-  topics: string[];
+  /** Topics with published work behind them. Each one links into the record. */
+  demonstratedTopics: DemonstratedTopic[];
+  /** Topics the author declared. Never presented as work, never a filter. */
+  interests: string[];
   research?: ResearchBackground | null;
+}
+
+/**
+ * An interest links out only when it names a real platform topic.
+ *
+ * Interests are free text plus a curated onboarding list, and the topic route
+ * queries by tag, so linking every one of them would send readers to a page
+ * with nothing on it. An exact canonical tag is a topic the platform actually
+ * runs, with a feed and a subscribe control; anything else stays a plain chip
+ * that says what the author is interested in and promises nothing more.
+ */
+function interestTopicHref(interest: string) {
+  const canonical = getExactCanonicalTag(interest);
+  if (!canonical) return null;
+  return `/topics/${encodeURIComponent(normalizeTagValue(canonical))}`;
 }
 
 /**
@@ -61,7 +81,12 @@ interface BackgroundInput {
  * Location field here restated it on the same screen. With the field gone, a
  * country-only profile would otherwise open an empty section.
  */
-export function hasBackgroundContent({ profile, topics, research }: BackgroundInput) {
+export function hasBackgroundContent({
+  profile,
+  demonstratedTopics,
+  interests,
+  research,
+}: BackgroundInput) {
   const hasEducation = Boolean(
     (profile.profile_type === "student" || profile.is_alumni) &&
       (value(profile.university) || value(profile.field_of_study) || profile.graduation_year)
@@ -78,7 +103,8 @@ export function hasBackgroundContent({ profile, topics, research }: BackgroundIn
   return Boolean(
     hasEducation ||
       hasRole ||
-      topics.length > 0 ||
+      demonstratedTopics.length > 0 ||
+      interests.length > 0 ||
       hasResearch ||
       profile.verified ||
       profile.is_alumni
@@ -87,7 +113,8 @@ export function hasBackgroundContent({ profile, topics, research }: BackgroundIn
 
 export default function ProfileBackground({
   profile,
-  topics,
+  demonstratedTopics,
+  interests,
   research,
   isOwnProfile,
 }: BackgroundInput & {
@@ -114,7 +141,12 @@ export default function ProfileBackground({
       researchWebsite
   );
   const hasRecognition = profile.verified || profile.is_alumni;
-  const hasContent = hasBackgroundContent({ profile, topics, research });
+  const hasContent = hasBackgroundContent({
+    profile,
+    demonstratedTopics,
+    interests,
+    research,
+  });
 
   if (!hasContent && !isOwnProfile) return null;
 
@@ -129,7 +161,7 @@ export default function ProfileBackground({
         </h2>
         {isOwnProfile ? (
           <Link
-            href="/settings?tab=profile#profile-identity"
+            href="/settings/profile#background"
             className="tap-target focus-ring text-xs font-semibold text-emerald-ink"
           >
             Edit
@@ -168,19 +200,55 @@ export default function ProfileBackground({
             </BackgroundField>
           ) : null}
 
-          {topics.length > 0 ? (
-            <BackgroundField label="Topics and expertise">
+          {/* Two fields, because they are two different claims. This was one
+              list labelled "Topics and expertise", which called a checkbox
+              expertise and sent readers to record filters with nothing behind
+              them. Every chip here leads to at least one entry. */}
+          {demonstratedTopics.length > 0 ? (
+            <BackgroundField label="Demonstrated topics">
               <ul className="flex flex-wrap gap-2">
-                {topics.slice(0, 8).map((topic) => (
-                  <li key={topic}>
+                {demonstratedTopics.slice(0, PROFILE_TOPIC_LIMIT).map((topic) => (
+                  <li key={topic.key}>
                     <Link
-                      href={buildProfileRecordHref({ username: profile.username, topic })}
-                      className="tap-target focus-ring inline-flex items-center rounded-full bg-green-tint px-3 py-1.5 text-xs font-medium text-emerald-brand hover:opacity-80"
+                      href={buildProfileRecordHref({
+                        username: profile.username,
+                        topic: topic.key,
+                      })}
+                      className="tap-target focus-ring inline-flex items-center gap-1.5 rounded-full bg-green-tint px-3 py-1.5 text-xs font-medium text-emerald-brand hover:opacity-80"
                     >
-                      {topic}
+                      {topic.label}
+                      <span className="tabular-nums text-emerald-brand/70">
+                        {topic.count}
+                      </span>
                     </Link>
                   </li>
                 ))}
+              </ul>
+            </BackgroundField>
+          ) : null}
+
+          {interests.length > 0 ? (
+            <BackgroundField label="Interested in">
+              <ul className="flex flex-wrap gap-2">
+                {interests.slice(0, PROFILE_TOPIC_LIMIT).map((interest) => {
+                  const href = interestTopicHref(interest);
+                  return (
+                    <li key={interest}>
+                      {href ? (
+                        <Link
+                          href={href}
+                          className="tap-target focus-ring inline-flex items-center rounded-full border border-card-border bg-canvas px-3 py-1.5 text-xs font-medium text-ink-soft hover:text-ink"
+                        >
+                          {interest}
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full border border-card-border bg-canvas px-3 py-1.5 text-xs font-medium text-ink-soft">
+                          {interest}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </BackgroundField>
           ) : null}
