@@ -900,16 +900,29 @@ font-family: var(--font-inter), system-ui, sans-serif;
   scroll-snap-align: start;
 }
 
-/* Deliberately stops at two across. A third column would put the author's own
-   curated selection back at roughly 255px once the 320px Background rail is
-   out, rendering Featured smaller than the record cards beneath it, which is
-   the inversion this section exists to correct. */
+/* One row, always. A fixed two-column grid orphaned the third selection on a
+   row of its own, where it sat half-width beside empty space and read as a
+   rendering fault rather than as curation. Columns now follow the count, so
+   one, two or three selections each fill the row exactly.
+
+   Three across is roughly 255px per card once the 320px Background rail is
+   out. That used to be the objection to a third column, because it rendered
+   Featured smaller than the record cards beneath it. The record is a list of
+   thumbnail rows now, so a cover-led card at 255px still leads it. */
 @media (min-width: 768px) {
   .featured-rail {
     grid-auto-flow: row;
     grid-auto-columns: auto;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     overflow-x: visible;
+  }
+
+  .featured-rail[data-count="1"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .featured-rail[data-count="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

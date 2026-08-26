@@ -6,7 +6,7 @@ import FeaturedWork from "@/components/profile/FeaturedWork";
 import FeaturedWorkManager from "@/components/profile/FeaturedWorkManager";
 import ProfileBackground, { hasBackgroundContent } from "@/components/profile/ProfileBackground";
 import ProfileHeader from "@/components/profile/ProfileHeader";
-import ProfileRecordCard from "@/components/profile/ProfileRecordCard";
+import ProfileRecordCard, { PROFILE_RECORD_LIST } from "@/components/profile/ProfileRecordCard";
 import ProfileSectionNav from "@/components/profile/ProfileSectionNav";
 import ProfileStickyBar from "@/components/profile/ProfileStickyBar";
 import { FEATURE_FLAGS, isAuthorSubscriptionsEnabled, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
@@ -335,7 +335,7 @@ export default async function UserProfilePage({ params }: PageProps) {
             </div>
 
             {latestRecord.items.length > 0 ? (
-              <div className="space-y-3">
+              <div className={PROFILE_RECORD_LIST}>
                 {latestRecord.items.map((item) => <ProfileRecordCard key={`${item.kind}-${item.id}`} item={item} />)}
               </div>
             ) : (

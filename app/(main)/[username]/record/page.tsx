@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import EvidenceLegend from "@/components/profile/EvidenceLegend";
-import ProfileRecordCard from "@/components/profile/ProfileRecordCard";
+import ProfileRecordCard, { PROFILE_RECORD_LIST } from "@/components/profile/ProfileRecordCard";
 import ScrollActiveIntoView from "@/components/profile/ScrollActiveIntoView";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
@@ -255,7 +255,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
       </div>
 
       {record.items.length > 0 ? (
-        <div className="space-y-3">
+        <div className={PROFILE_RECORD_LIST}>
           {record.items.map((item) => (
             <ProfileRecordCard key={`${item.kind}-${item.id}`} item={item} />
           ))}

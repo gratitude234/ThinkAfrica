@@ -83,6 +83,10 @@ export default function FeaturedWork({
     );
   }
 
+  // Drives the column count in `.featured-rail`, so one, two or three
+  // selections each fill the row exactly instead of orphaning the last one.
+  const selected = posts.slice(0, 3);
+
   return (
     <section id="featured-work" className="space-y-4">
       <div className="flex items-center justify-between gap-4 border-b border-card-border pb-3">
@@ -97,8 +101,8 @@ export default function FeaturedWork({
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
-      <div className="featured-rail">
-        {posts.slice(0, 3).map((post) => {
+      <div className="featured-rail" data-count={selected.length}>
+        {selected.map((post) => {
           const displayTitle = getPostDisplayTitle(post);
           const headline = displayTitle ?? post.excerpt ?? getPostMetadataTitle(post);
           const kind = resolveContentKind(post);
@@ -123,7 +127,7 @@ export default function FeaturedWork({
           return (
             <article
               key={post.id}
-              className="group relative flex flex-col overflow-hidden rounded-xl border border-card-border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-card-border-hover hover:shadow-[0_8px_20px_-4px_rgb(0_0_0/0.08),0_2px_6px_-2px_rgb(0_0_0/0.04)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-card-border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-card-border-hover hover:shadow-[0_8px_20px_-4px_rgb(0_0_0/0.08),0_2px_6px_-2px_rgb(0_0_0/0.04)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               {post.cover_image_url ? (
                 <PostCover
@@ -132,7 +136,7 @@ export default function FeaturedWork({
                   type={post.type}
                   content_kind={post.content_kind}
                   article_format={post.article_format}
-                  sizes="(max-width: 768px) 84vw, (max-width: 1280px) 420px, 300px"
+                  sizes="(max-width: 768px) 84vw, (max-width: 1280px) 300px, 260px"
                   className="aspect-video border-b border-card-border"
                   imageClassName="object-cover"
                 />
@@ -162,7 +166,7 @@ export default function FeaturedWork({
                   </p>
                 ) : null}
                 {publishedDate ? (
-                  <p className="mt-3 pt-1 text-xs text-ink-muted">{formatDate(publishedDate)}</p>
+                  <p className="mt-auto pt-3 text-xs text-ink-muted">{formatDate(publishedDate)}</p>
                 ) : null}
               </div>
             </article>

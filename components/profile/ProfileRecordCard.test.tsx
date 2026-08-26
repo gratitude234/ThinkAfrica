@@ -64,10 +64,12 @@ describe("ProfileRecordCard", () => {
 
     expect(screen.getByText("Response")).toBeInTheDocument();
     expect(screen.getByText("A concise public response.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Read response/ })).toHaveAttribute(
-      "href",
-      "/post/response-1"
-    );
+    // The row itself is the link now, so an untitled response leads with its
+    // own text rather than a separate "Read response" call to action.
+    expect(
+      screen.getByRole("link", { name: "A concise public response." })
+    ).toHaveAttribute("href", "/post/response-1");
+    expect(screen.getAllByText("A concise public response.")).toHaveLength(1);
     expect(screen.queryByText("Post", { exact: true })).not.toBeInTheDocument();
   });
 });

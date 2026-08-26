@@ -6,13 +6,49 @@ import type { ProfileRecordItem } from "@/lib/profileRecordData";
 import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
 
 /**
- * The record and the feed show the same object, so they should behave the same
- * way under a cursor. This mirrors the treatment in `PostCard`.
+ * Wrapper for a run of record entries. Exported so the profile page and the
+ * full record page cannot drift apart on the treatment: the two views are one
+ * continuous surface, and a reader moving between them should not meet a
+ * different object.
+ *
+ * The negative margin lets the hover tint and the row rules breathe past the
+ * text column without pushing the text out of line with the section heading
+ * above it. It stays inside the shell's 1rem phone gutter.
+ *
+ * Rules sit between rows only. Both callers already bound the run with a rule
+ * of their own (a section heading above, pagination below), and a border on
+ * the run itself would print a second line a few pixels away from each.
  */
-const CARD_SHELL =
-  "group relative overflow-hidden rounded-xl bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_20px_-4px_rgb(0_0_0/0.08),0_2px_6px_-2px_rgb(0_0_0/0.04)] motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+export const PROFILE_RECORD_LIST =
+  "-mx-3 divide-y divide-card-border";
 
-function PublicationCard({
+/**
+ * The record is an index of a body of work, not a browse surface. Entries used
+ * to borrow the feed's card: a full-width 16/9 cover above the title, roughly
+ * 590px per entry in the profile's main column, which put one entry on screen
+ * at a time. A reader asking "what does this person work on?" has to compare
+ * several titles at once, so an entry is a row: title first, thumbnail to the
+ * side, evidence and date on one metadata line.
+ */
+const ROW_SHELL =
+  "group relative flex items-start gap-4 px-3 py-5 transition-colors duration-150 ease-out hover:bg-card motion-reduce:transition-none sm:gap-5";
+
+const META_ROW =
+  "mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-muted";
+
+const EYEBROW = "text-[10px] font-bold uppercase tracking-[0.14em]";
+
+/** Sized so a row costs about 130px, against about 590px for the old card. */
+const THUMB =
+  "aspect-[4/3] w-[84px] shrink-0 overflow-hidden rounded-lg border border-card-border bg-canvas sm:w-[112px]";
+
+const THUMB_SIZES = "(max-width: 640px) 84px, 112px";
+
+function Separator() {
+  return <span aria-hidden="true">·</span>;
+}
+
+function PublicationRow({
   item,
 }: {
   item: Extract<ProfileRecordItem, { publication: unknown }>;
@@ -28,12 +64,58 @@ function PublicationCard({
     coAuthorCount: publication.coAuthors.length,
     isCoAuthor: publication.isCoAuthor,
   });
+  // An untitled response leads with its own text, so repeating the excerpt
+  // below the heading would print it twice.
+  const headline = title ?? excerpt ?? "View publication";
+  const href = `/post/${publication.slug}`;
 
   return (
-    <article className={`${CARD_SHELL} border border-card-border hover:border-card-border-hover`}>
-      {/* The cover leads the card. It previously rendered below the date and
-          the call to action, which left the link stranded mid-card and the
-          image reading as an afterthought. */}
+    <article className={ROW_SHELL}>
+      <div className="min-w-0 flex-1">
+        <h3
+          className={
+            title
+              ? "font-display text-[17px] font-semibold leading-snug text-ink sm:text-[19px]"
+              : "line-clamp-3 text-[15px] font-medium leading-6 text-ink"
+          }
+        >
+          {/* Stretched, so the row is the target that the hover tint promises.
+              The thumbnail is a positioned element later in the DOM, so the
+              overlay needs a z-index to stay above it and keep it clickable. */}
+          <Link
+            href={href}
+            className="stretch-target focus-ring after:z-10 group-hover:text-emerald-brand"
+          >
+            {headline}
+          </Link>
+        </h3>
+
+        {title && excerpt ? (
+          <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-ink-soft">
+            {excerpt}
+          </p>
+        ) : null}
+
+        <div className={META_ROW}>
+          <time dateTime={item.occurredAt}>{formatRelativeTime(item.occurredAt)}</time>
+          {label ? (
+            <>
+              <Separator />
+              <span className={`${EYEBROW} text-emerald-ink`}>{label}</span>
+            </>
+          ) : null}
+          {publication.coAuthors.length > 0 ? (
+            <>
+              <Separator />
+              <span className="max-w-full truncate">
+                With {publication.coAuthors.map((author) => author.name).join(", ")}
+              </span>
+            </>
+          ) : null}
+          <EvidenceLabels labels={labels} />
+        </div>
+      </div>
+
       {publication.coverImageUrl ? (
         <PostCover
           src={publication.coverImageUrl}
@@ -41,104 +123,50 @@ function PublicationCard({
           type={publication.type}
           content_kind={publication.contentKind}
           article_format={publication.articleFormat}
-          sizes="(max-width: 960px) calc(100vw - 48px), 800px"
-          className="aspect-[16/9] w-full border-b border-card-border bg-canvas"
+          sizes={THUMB_SIZES}
+          className={THUMB}
           imageClassName="object-cover"
         />
       ) : null}
-
-      <div className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          {label ? (
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.15em] text-emerald-ink">
-              {label}
-            </p>
-          ) : null}
-          {publication.isCoAuthor ? (
-            <span className="rounded-full border border-card-border bg-canvas px-2 py-0.5 text-[10px] font-semibold text-ink-muted">
-              Co-authored
-            </span>
-          ) : null}
-          <EvidenceLabels labels={labels} />
-        </div>
-
-        {title ? (
-          <>
-            <h3 className="font-display mt-2 text-[20px] font-semibold leading-tight text-ink sm:text-[22px]">
-              {/* `relative` keeps this above the stretched link below, so the
-                  heading stays its own target. */}
-              <Link
-                href={`/post/${publication.slug}`}
-                className="focus-ring relative group-hover:text-emerald-brand"
-              >
-                {title}
-              </Link>
-            </h3>
-            {excerpt ? (
-              <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-soft">
-                {excerpt}
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="mt-2 line-clamp-5 whitespace-pre-line text-[16px] leading-7 text-ink">
-            {excerpt || "View publication"}
-          </p>
-        )}
-
-        {publication.coAuthors.length > 0 ? (
-          <p className="mt-2 text-xs text-ink-muted">
-            With {publication.coAuthors.map((author) => author.name).join(", ")}
-          </p>
-        ) : null}
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-ink-muted">
-            {formatRelativeTime(item.occurredAt)}
-          </p>
-          <Link
-            href={`/post/${publication.slug}`}
-            className="stretch-target focus-ring text-xs font-semibold text-emerald-ink hover:underline"
-          >
-            {item.kind === "response" ? "Read response" : "Read publication"} →
-          </Link>
-        </div>
-      </div>
     </article>
   );
 }
 
-function DebateCard({ item }: { item: Extract<ProfileRecordItem, { kind: "debate" }> }) {
+function DebateRow({ item }: { item: Extract<ProfileRecordItem, { kind: "debate" }> }) {
   const debate = item.debate;
+  const title = debate.debate?.title ?? "Public debate";
+  const href = debate.debate ? `/debates/${debate.debate.id}` : null;
 
   return (
-    <article className={`${CARD_SHELL} border border-gold-tint hover:border-gold`}>
-      <div className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[10.5px] font-bold uppercase tracking-[0.15em] text-gold-ink">
-            Debate argument
-          </p>
+    <article className={ROW_SHELL}>
+      <div className="min-w-0 flex-1">
+        <h3 className="font-display text-[17px] font-semibold leading-snug text-ink sm:text-[19px]">
+          {href ? (
+            <Link
+              href={href}
+              className="stretch-target focus-ring after:z-10 group-hover:text-emerald-brand"
+            >
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
+        </h3>
+
+        <p className="mt-1.5 line-clamp-2 whitespace-pre-line text-sm leading-6 text-ink-soft">
+          {debate.content}
+        </p>
+
+        <div className={META_ROW}>
+          <time dateTime={item.occurredAt}>{formatRelativeTime(item.occurredAt)}</time>
+          <Separator />
+          {/* Gold is what tells a debate argument apart from a publication now
+              that the entry no longer carries its own border. */}
+          <span className={`${EYEBROW} text-gold-ink`}>Debate argument</span>
           {debate.stance ? (
             <span className="rounded-full border border-gold-tint bg-gold-tint px-2 py-0.5 text-[10px] font-semibold uppercase text-gold-ink">
               {debate.stance}
             </span>
-          ) : null}
-        </div>
-        <h3 className="font-display mt-2 text-lg font-semibold text-ink">
-          {debate.debate?.title ?? "Public debate"}
-        </h3>
-        <p className="mt-2 line-clamp-4 whitespace-pre-line text-sm leading-6 text-ink-soft">
-          {debate.content}
-        </p>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-ink-muted">{formatRelativeTime(item.occurredAt)}</p>
-          {debate.debate ? (
-            <Link
-              href={`/debates/${debate.debate.id}`}
-              className="stretch-target focus-ring text-xs font-semibold text-emerald-ink hover:underline"
-            >
-              View debate →
-            </Link>
           ) : null}
         </div>
       </div>
@@ -148,8 +176,8 @@ function DebateCard({ item }: { item: Extract<ProfileRecordItem, { kind: "debate
 
 export default function ProfileRecordCard({ item }: { item: ProfileRecordItem }) {
   return item.kind === "debate" ? (
-    <DebateCard item={item} />
+    <DebateRow item={item} />
   ) : (
-    <PublicationCard item={item} />
+    <PublicationRow item={item} />
   );
 }
