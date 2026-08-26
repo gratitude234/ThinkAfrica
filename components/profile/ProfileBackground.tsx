@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { PublicProfileIdentity } from "@/lib/profileIdentity";
+import { buildProfileRecordHref } from "@/lib/profileRecord";
 
 interface ResearchBackground {
   headline?: string | null;
@@ -54,6 +55,11 @@ interface BackgroundInput {
  * Whether this section will render anything for a visitor. The page needs the
  * same answer to decide if its anchor nav should advertise a Background link,
  * and a new profile should not be pointed at an empty section.
+ *
+ * Country is deliberately not counted. `getProfileIdentityLines` already joins
+ * it into the affiliation line the header prints under the author's name, so a
+ * Location field here restated it on the same screen. With the field gone, a
+ * country-only profile would otherwise open an empty section.
  */
 export function hasBackgroundContent({ profile, topics, research }: BackgroundInput) {
   const hasEducation = Boolean(
@@ -72,7 +78,6 @@ export function hasBackgroundContent({ profile, topics, research }: BackgroundIn
   return Boolean(
     hasEducation ||
       hasRole ||
-      value(profile.country) ||
       topics.length > 0 ||
       hasResearch ||
       profile.verified ||
@@ -95,7 +100,7 @@ export default function ProfileBackground({
   const organizationWebsite = safeExternalUrl(profile.organization_website);
   const orcidUrl = safeExternalUrl(research?.orcid_url);
   const researchWebsite = safeExternalUrl(research?.website_url);
-  const country = value(profile.country);
+
   const hasEducation = Boolean(
     (profile.profile_type === "student" || profile.is_alumni) &&
       (university || field || profile.graduation_year)
@@ -163,19 +168,13 @@ export default function ProfileBackground({
             </BackgroundField>
           ) : null}
 
-          {country ? (
-            <BackgroundField label="Location">
-              <p className="font-medium text-ink">{country}</p>
-            </BackgroundField>
-          ) : null}
-
           {topics.length > 0 ? (
             <BackgroundField label="Topics and expertise">
               <ul className="flex flex-wrap gap-2">
                 {topics.slice(0, 8).map((topic) => (
                   <li key={topic}>
                     <Link
-                      href={`/topics/${encodeURIComponent(topic)}`}
+                      href={buildProfileRecordHref({ username: profile.username, topic })}
                       className="tap-target focus-ring inline-flex items-center rounded-full bg-green-tint px-3 py-1.5 text-xs font-medium text-emerald-brand hover:opacity-80"
                     >
                       {topic}
@@ -229,7 +228,7 @@ export default function ProfileBackground({
         </div>
       ) : (
         <p className="mt-4 text-sm text-ink-muted">
-          Add your education, current role, country, and topics to complete this section.
+          Add your education, current role, and topics to complete this section.
         </p>
       )}
     </section>

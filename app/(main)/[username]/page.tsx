@@ -12,6 +12,7 @@ import ProfileStickyBar from "@/components/profile/ProfileStickyBar";
 import { FEATURE_FLAGS, isAuthorSubscriptionsEnabled, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import { getMessageEligibility } from "@/lib/messaging";
 import { getProfileIdentityLines } from "@/lib/profileIdentity";
+import { deriveProfileTopics } from "@/lib/profileTopics";
 import { PROFILE_COLUMNS, PROFILE_SHELL } from "@/lib/profileLayout";
 import { buildProfileRecordHref } from "@/lib/profileRecord";
 import { loadProfileRecordPage, loadProfileRecordSummary } from "@/lib/profileRecordData";
@@ -83,34 +84,16 @@ const PROFILE_SELECT =
 const PORTFOLIO_SELECT =
   "id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, citation_id, published_version_id, created_at, published_at, cover_image_url, post_reference_counts(reference_count), post_authors(user_id, accepted_at)";
 
+/**
+ * How much of the record the profile previews before handing off to the full
+ * record. This was 3 while an entry was a cover-led card costing about 590px,
+ * where six would have been a wall. An entry is a row now, so six preview
+ * rows cost about what three cards did and show twice the work.
+ */
+const PROFILE_LATEST_RECORD_SIZE = 6;
+
 function displayName(profile: Pick<ProfileRecord, "full_name" | "username">) {
   return profile.full_name?.trim() || profile.username;
-}
-
-function deriveTopics(posts: PortfolioPost[], declared: string[] | null) {
-  const counts = new Map<string, { label: string; count: number }>();
-  for (const post of posts) {
-    if (post.in_response_to) continue;
-    for (const rawTag of post.tags ?? []) {
-      const label = rawTag.trim();
-      if (!label) continue;
-      const key = label.toLowerCase();
-      const existing = counts.get(key);
-      counts.set(key, { label: existing?.label ?? label, count: (existing?.count ?? 0) + 1 });
-    }
-  }
-
-  const topics = [...counts.values()]
-    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
-    .map((topic) => topic.label);
-  const seen = new Set(topics.map((topic) => topic.toLowerCase()));
-  for (const rawInterest of declared ?? []) {
-    const interest = rawInterest.trim();
-    if (!interest || seen.has(interest.toLowerCase())) continue;
-    topics.push(interest);
-    seen.add(interest.toLowerCase());
-  }
-  return topics.slice(0, 8);
 }
 
 function normalizeCoAuthoredPosts(rows: unknown, profileId: string) {
@@ -172,7 +155,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     filter: "all",
     quality: "all",
     page: 1,
-    pageSize: 3,
+    pageSize: PROFILE_LATEST_RECORD_SIZE,
     includeResearch: FEATURE_FLAGS.research,
   });
 
@@ -239,7 +222,7 @@ export default async function UserProfilePage({ params }: PageProps) {
       (post) => !ownedTopics.some((owned) => owned.id === post.id)
     ),
   ];
-  const topics = deriveTopics(topicPosts, profile.interests);
+  const topics = deriveProfileTopics(topicPosts, profile.interests);
   const coauthoredIds = new Set(coauthoredTopics.map((post) => post.id));
   const featuredPool = (
     (featuredPostsResult.data ?? []) as unknown as PortfolioPost[]

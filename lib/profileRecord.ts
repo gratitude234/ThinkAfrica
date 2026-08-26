@@ -50,7 +50,24 @@ export const EMPTY_PROFILE_RECORD_SUMMARY: ProfileRecordSummary = {
 export interface ProfileRecordQuery {
   filter: ProfileRecordFilter;
   quality: ProfileRecordQuality;
+  topic: string | null;
   page: number;
+}
+
+/**
+ * Topics come from author-entered post tags, so a URL value is untrusted and
+ * of unbounded length. Keys are lowercased because `deriveProfileTopics`
+ * groups case-insensitively: an author who wrote "Poetry" once and "poetry"
+ * twice has one topic, and one filter has to find all three.
+ */
+export const PROFILE_RECORD_TOPIC_MAX_LENGTH = 60;
+
+export function normalizeProfileRecordTopic(
+  value: string | null | undefined
+): string | null {
+  const topic = value?.trim().toLowerCase() ?? "";
+  if (!topic || topic.length > PROFILE_RECORD_TOPIC_MAX_LENGTH) return null;
+  return topic;
 }
 
 type RawSummary = {
@@ -92,11 +109,12 @@ function isRecordQuality(value: unknown): value is ProfileRecordQuality {
 }
 
 export function parseProfileRecordQuery(
-  input: { type?: string; quality?: string; page?: string },
+  input: { type?: string; quality?: string; topic?: string; page?: string },
   includeResearch: boolean
 ): ProfileRecordQuery {
   let filter = isRecordFilter(input.type) ? input.type : "all";
   let quality = isRecordQuality(input.quality) ? input.quality : "all";
+  const topic = normalizeProfileRecordTopic(input.topic);
   const rawPage = input.page?.trim() ?? "1";
   const parsedPage = /^\d+$/.test(rawPage) ? Number(rawPage) : 1;
   const page = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
@@ -106,23 +124,30 @@ export function parseProfileRecordQuery(
     filter = "publications";
   }
 
-  return { filter, quality, page };
+  return { filter, quality, topic, page };
 }
 
 export function buildProfileRecordHref({
   username,
   filter = "all",
   quality = "all",
+  topic = null,
   page = 1,
 }: {
   username: string;
   filter?: ProfileRecordFilter;
   quality?: ProfileRecordQuality;
+  topic?: string | null;
   page?: number;
 }) {
   const params = new URLSearchParams();
   if (filter !== "all") params.set("type", filter);
   if (quality !== "all") params.set("quality", quality);
+  // Insertion order has to match the key order the record page uses when it
+  // rebuilds the incoming URL to check it is already canonical. A mismatch
+  // there is a redirect loop, not a cosmetic difference.
+  const normalizedTopic = normalizeProfileRecordTopic(topic);
+  if (normalizedTopic) params.set("topic", normalizedTopic);
   if (page > 1) params.set("page", String(page));
   const query = params.toString();
   return `/${username}/record${query ? `?${query}` : ""}`;

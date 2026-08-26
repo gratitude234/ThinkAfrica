@@ -15,7 +15,12 @@ import {
   type ProfileRecordFilter,
 } from "@/lib/profileRecord";
 import { RECORD_SHELL } from "@/lib/profileLayout";
-import { loadProfileRecordPage, loadProfileRecordSummary } from "@/lib/profileRecordData";
+import {
+  loadProfileRecordPage,
+  loadProfileRecordSummary,
+  loadProfileTopicIndex,
+} from "@/lib/profileRecordData";
+import { profileTopicKey } from "@/lib/profileTopics";
 import { createClient } from "@/lib/supabase/server";
 
 interface PageProps {
@@ -35,13 +40,14 @@ interface RecordProfile {
   profile_type: string | null;
   organization_name: string | null;
   bio: string | null;
+  interests: string[] | null;
   verified: boolean;
   verified_type: string | null;
   is_alumni: boolean;
 }
 
 const PROFILE_SELECT =
-  "id, username, full_name, avatar_url, professional_title, university, field_of_study, country, profile_type, organization_name, bio, verified, verified_type, is_alumni";
+  "id, username, full_name, avatar_url, professional_title, university, field_of_study, country, profile_type, organization_name, bio, interests, verified, verified_type, is_alumni";
 
 function name(profile: RecordProfile) {
   return profile.full_name?.trim() || profile.username;
@@ -61,7 +67,7 @@ function rawRecordHref(
   query: Record<string, string | string[] | undefined>
 ) {
   const params = new URLSearchParams();
-  for (const key of ["type", "quality", "page"] as const) {
+  for (const key of ["type", "quality", "topic", "page"] as const) {
     const value = firstQueryValue(query[key]);
     if (value !== undefined) params.set(key, value);
   }
@@ -83,6 +89,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
     {
       type: firstQueryValue(rawQuery.type),
       quality: firstQueryValue(rawQuery.quality),
+      topic: firstQueryValue(rawQuery.topic),
       page: firstQueryValue(rawQuery.page),
     },
     FEATURE_FLAGS.research
@@ -99,6 +106,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
         username: profile.username,
         filter: query.filter,
         quality: query.quality,
+        topic: query.topic,
         page: query.page,
       }),
     },
@@ -131,6 +139,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
     {
       type: firstQueryValue(rawQuery.type),
       quality: firstQueryValue(rawQuery.quality),
+      topic: firstQueryValue(rawQuery.topic),
       page: firstQueryValue(rawQuery.page),
     },
     FEATURE_FLAGS.research
@@ -139,11 +148,32 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
     username: profile.username,
     filter: query.filter,
     quality: query.quality,
+    topic: query.topic,
     page: query.page,
   });
   if (rawRecordHref(profile.username, rawQuery) !== normalizedHref) {
     redirect(normalizedHref);
   }
+  // The summary does not depend on the topic filter, so it goes out alongside
+  // the topic index rather than waiting behind it. Only the page of entries
+  // needs the ids the index resolves.
+  const summaryPromise = loadProfileRecordSummary(
+    supabase,
+    profile.id,
+    FEATURE_FLAGS.research
+  );
+  // The index also feeds the topic filter row below, so it loads whether or
+  // not a topic is active.
+  const topicIndex = await loadProfileTopicIndex({
+    supabase,
+    profileId: profile.id,
+    declaredInterests: profile.interests,
+    includeResearch: FEATURE_FLAGS.research,
+  });
+  const topicEntryIds = query.topic
+    ? topicIndex.postIdsByTopic.get(query.topic) ?? []
+    : null;
+
   const [record, summary] = await Promise.all([
     loadProfileRecordPage({
       supabase,
@@ -152,8 +182,9 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
       quality: query.quality,
       page: query.page,
       includeResearch: FEATURE_FLAGS.research,
+      entryIds: topicEntryIds,
     }),
-    loadProfileRecordSummary(supabase, profile.id, FEATURE_FLAGS.research),
+    summaryPromise,
   ]);
 
   if (query.page > 1 && record.items.length === 0) {
@@ -162,6 +193,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
         username: profile.username,
         filter: query.filter,
         quality: query.quality,
+        topic: query.topic,
       })
     );
   }
@@ -170,6 +202,19 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
     (filter) => FEATURE_FLAGS.research || filter !== "research"
   );
   const showQuality = query.filter === "publications" || query.filter === "research";
+  // Tab counts describe the whole record. With a topic active they would
+  // contradict the result count directly beneath them, so they come off.
+  const showFilterCounts = !query.topic;
+  const activeTopicLabel =
+    topicIndex.topics.find((topic) => profileTopicKey(topic) === query.topic) ??
+    query.topic;
+  // A topic typed straight into the URL still gets a chip, so the row always
+  // shows what is filtering the list rather than looking unfiltered.
+  const topicChips =
+    activeTopicLabel &&
+    !topicIndex.topics.some((topic) => profileTopicKey(topic) === query.topic)
+      ? [activeTopicLabel, ...topicIndex.topics]
+      : topicIndex.topics;
 
   return (
     <div className={`${RECORD_SHELL} space-y-6`}>
@@ -198,7 +243,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
             return (
               <Link
                 key={filter}
-                href={buildProfileRecordHref({ username: profile.username, filter })}
+                href={buildProfileRecordHref({ username: profile.username, filter, topic: query.topic })}
                 aria-current={active ? "page" : undefined}
                 className={`focus-ring -mb-px inline-flex min-h-11 shrink-0 items-center border-b-2 px-4 text-sm font-semibold ${
                   active
@@ -207,9 +252,11 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                 }`}
               >
                 {profileRecordFilterLabel(filter)}
-                <span className="ml-1.5 text-xs font-normal text-ink-muted">
-                  {filterCount(filter, summary).toLocaleString()}
-                </span>
+                {showFilterCounts ? (
+                  <span className="ml-1.5 text-xs font-normal text-ink-muted">
+                    {filterCount(filter, summary).toLocaleString()}
+                  </span>
+                ) : null}
               </Link>
             );
           })}
@@ -232,6 +279,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                     username: profile.username,
                     filter: query.filter,
                     quality,
+                    topic: query.topic,
                   })}
                   aria-current={query.quality === quality ? "page" : undefined}
                   className={`tap-target focus-ring inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
@@ -245,6 +293,55 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
               ))
             : null}
         </div>
+
+        {/* Type and evidence are the platform's categories. Topic is the
+            reader's: someone who came for this author's poetry cannot get to
+            it from the two rows above. */}
+        {topicChips.length > 0 ? (
+          <ScrollActiveIntoView
+            className="scroll-hint-x flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            label="Topic filters"
+          >
+            <Link
+              href={buildProfileRecordHref({
+                username: profile.username,
+                filter: query.filter,
+                quality: query.quality,
+              })}
+              aria-current={query.topic ? undefined : "page"}
+              className={`tap-target focus-ring inline-flex shrink-0 items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                query.topic
+                  ? "border-card-border bg-card text-ink-muted hover:text-ink"
+                  : "border-emerald-brand bg-green-tint text-emerald-brand"
+              }`}
+            >
+              All topics
+            </Link>
+            {topicChips.map((topic) => {
+              const key = profileTopicKey(topic);
+              const active = key === query.topic;
+              return (
+                <Link
+                  key={key}
+                  href={buildProfileRecordHref({
+                    username: profile.username,
+                    filter: query.filter,
+                    quality: query.quality,
+                    topic,
+                  })}
+                  aria-current={active ? "page" : undefined}
+                  className={`tap-target focus-ring inline-flex shrink-0 items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                    active
+                      ? "border-emerald-brand bg-green-tint text-emerald-brand"
+                      : "border-card-border bg-card text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  {topic}
+                </Link>
+              );
+            })}
+          </ScrollActiveIntoView>
+        ) : null}
       </section>
 
       <div className="flex items-center justify-between gap-4">
@@ -264,8 +361,22 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
         <div className="rounded-xl border border-dashed border-card-border bg-card p-8 text-center">
           <h2 className="font-display text-xl font-semibold text-ink">Nothing here yet</h2>
           <p className="mt-2 text-sm text-ink-muted">
-            This part of the Intellectual Record has no public entries.
+            {activeTopicLabel
+              ? `${name(profile)} has no public entries tagged ${activeTopicLabel}.`
+              : "This part of the Intellectual Record has no public entries."}
           </p>
+          {activeTopicLabel ? (
+            <Link
+              href={buildProfileRecordHref({
+                username: profile.username,
+                filter: query.filter,
+                quality: query.quality,
+              })}
+              className="tap-target focus-ring mt-3 inline-block text-sm font-semibold text-emerald-ink hover:underline"
+            >
+              Show all topics
+            </Link>
+          ) : null}
         </div>
       )}
 
@@ -277,6 +388,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                 username: profile.username,
                 filter: query.filter,
                 quality: query.quality,
+                topic: query.topic,
                 page: query.page - 1,
               })}
               className="focus-ring inline-flex min-h-11 items-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink"
@@ -291,6 +403,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                 username: profile.username,
                 filter: query.filter,
                 quality: query.quality,
+                topic: query.topic,
                 page: query.page + 1,
               })}
               className="focus-ring inline-flex min-h-11 items-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink"

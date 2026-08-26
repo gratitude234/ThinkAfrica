@@ -10,6 +10,7 @@ import {
   type ProfileRecordQuality,
   type ProfileRecordSummary,
 } from "@/lib/profileRecord";
+import { deriveProfileTopics, profileTopicKey } from "@/lib/profileTopics";
 
 export interface ProfileRecordPublication {
   id: string;
@@ -246,6 +247,7 @@ export async function loadProfileRecordPage({
   page,
   includeResearch,
   pageSize = PROFILE_RECORD_PAGE_SIZE,
+  entryIds,
 }: {
   supabase: SupabaseClient;
   profileId: string;
@@ -253,8 +255,27 @@ export async function loadProfileRecordPage({
   quality: ProfileRecordQuality;
   page: number;
   includeResearch: boolean;
+  /**
+   * Restricts the page to these entry ids, for filters the record view cannot
+   * express itself. `null` means no restriction; an empty array means nothing
+   * matched, which is not the same thing.
+   */
+  entryIds?: string[] | null;
   pageSize?: number;
 }) {
+  // An empty restriction means "nothing matched". Falling through would build
+  // `.in("entry_id", [])`, which returns everything rather than nothing.
+  if (entryIds && entryIds.length === 0) {
+    return {
+      items: [],
+      totalCount: 0,
+      page,
+      pageSize,
+      hasPreviousPage: page > 1,
+      hasNextPage: false,
+    };
+  }
+
   const start = (page - 1) * pageSize;
   const end = start + pageSize - 1;
   let query = supabase
@@ -285,6 +306,8 @@ export async function loadProfileRecordPage({
     query = query.eq("citable", true);
   }
 
+  if (entryIds) query = query.in("entry_id", entryIds);
+
   query = query
     .order("occurred_at", { ascending: false })
     .order("entry_id", { ascending: false })
@@ -301,5 +324,109 @@ export async function loadProfileRecordPage({
     pageSize,
     hasPreviousPage: page > 1,
     hasNextPage: start + entries.length < (count ?? 0),
+  };
+}
+
+interface TopicPostRow {
+  id: string;
+  author_id: string;
+  in_response_to: string | null;
+  tags: string[] | null;
+  type: string;
+  status?: string;
+}
+
+interface CoAuthoredTopicRow {
+  posts: TopicPostRow | TopicPostRow[] | null;
+}
+
+export interface ProfileTopicIndex {
+  /** Ordered topic labels, as the profile and the record both display them. */
+  topics: string[];
+  /** Post ids per `profileTopicKey`, for restricting a record page. */
+  postIdsByTopic: Map<string, string[]>;
+}
+
+const TOPIC_POST_SELECT = "id, author_id, in_response_to, tags, type";
+
+/**
+ * Guards the URL length of the `entry_id` restriction below: the ids travel to
+ * PostgREST as a query parameter, and an author with hundreds of posts under
+ * one tag would build a request too long to send. Well above any realistic
+ * single-topic count. The structural fix is carrying tags on
+ * `profile_record_entries` so the filter happens in the view, which is a
+ * migration rather than a change here.
+ */
+const TOPIC_POST_ID_CAP = 300;
+
+/**
+ * Builds an author's topic list and the post ids behind each topic.
+ *
+ * `profile_record_entries` carries identifiers and evidence flags only, with
+ * no tags, and it is a view, so there is no relationship for PostgREST to
+ * filter across. Topics are therefore resolved to ids here and handed back to
+ * `loadProfileRecordPage` as an `entryIds` restriction.
+ */
+export async function loadProfileTopicIndex({
+  supabase,
+  profileId,
+  declaredInterests,
+  includeResearch,
+}: {
+  supabase: SupabaseClient;
+  profileId: string;
+  declaredInterests?: string[] | null;
+  includeResearch: boolean;
+}): Promise<ProfileTopicIndex> {
+  const [ownedResult, coauthoredResult] = await Promise.all([
+    supabase
+      .from("posts")
+      .select(TOPIC_POST_SELECT)
+      .eq("author_id", profileId)
+      .eq("status", "published"),
+    supabase
+      .from("post_authors")
+      .select(`posts!post_authors_post_id_fkey(${TOPIC_POST_SELECT}, status)`)
+      .eq("user_id", profileId)
+      .not("accepted_at", "is", null),
+  ]);
+
+  if (ownedResult.error) throw new Error(ownedResult.error.message);
+  if (coauthoredResult.error) throw new Error(coauthoredResult.error.message);
+
+  const byId = new Map<string, TopicPostRow>();
+  for (const post of (ownedResult.data ?? []) as unknown as TopicPostRow[]) {
+    byId.set(post.id, post);
+  }
+  for (const row of (coauthoredResult.data ?? []) as unknown as CoAuthoredTopicRow[]) {
+    const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
+    if (!post || post.status !== "published" || post.author_id === profileId) continue;
+    if (!byId.has(post.id)) byId.set(post.id, post);
+  }
+
+  const posts = [...byId.values()].filter(
+    (post) => includeResearch || post.type !== "research"
+  );
+
+  const postIdsByTopic = new Map<string, string[]>();
+  for (const post of posts) {
+    // Ranking skips responses, because a reply carries the tags of the
+    // conversation it joined. Filtering does not: a tagged response is still
+    // work on that topic, and a reader who asked for it should see it.
+    for (const rawTag of post.tags ?? []) {
+      const key = profileTopicKey(rawTag);
+      if (!key) continue;
+      const ids = postIdsByTopic.get(key);
+      if (!ids) {
+        postIdsByTopic.set(key, [post.id]);
+      } else if (ids.length < TOPIC_POST_ID_CAP && !ids.includes(post.id)) {
+        ids.push(post.id);
+      }
+    }
+  }
+
+  return {
+    topics: deriveProfileTopics(posts, declaredInterests),
+    postIdsByTopic,
   };
 }

@@ -151,27 +151,50 @@ function RecordOverview({
     },
   ];
 
+  const tileClass =
+    "flex min-w-0 flex-col gap-0.5 px-3 py-1 first:pl-0 last:pr-0 sm:px-5";
+  const labelClass = "truncate text-[10.5px] text-ink-muted sm:text-xs";
+  const valueClass = "font-display text-xl font-semibold tabular-nums sm:text-2xl";
+
   return (
     <div className={`border-t border-card-border bg-canvas/70 px-5 py-4 sm:px-7 ${className}`}>
       <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-ink">
         Intellectual Record
       </p>
       <div className="grid grid-cols-3 divide-x divide-card-border">
-        {metrics.map((metric) => (
-          <Link
-            key={metric.label}
-            href={metric.href}
-            aria-label={`${metric.value} ${metric.label}. ${metric.description}`}
-            className="focus-ring group flex min-w-0 flex-col gap-0.5 px-3 py-1 first:pl-0 last:pr-0 sm:px-5"
-          >
-            <span className="truncate text-[10.5px] text-ink-muted sm:text-xs">
-              {metric.label}
-            </span>
-            <span className="font-display text-xl font-semibold tabular-nums text-ink group-hover:text-emerald-brand sm:text-2xl">
-              {metric.value.toLocaleString()}
-            </span>
-          </Link>
-        ))}
+        {metrics.map((metric) =>
+          /* A zero used to be a link like any other, so the most prominent
+             element on the page invited a click that landed on "Nothing here
+             yet". Citable is 0 for most authors, so that was the common case,
+             not the edge one. The tile still states the number and explains
+             itself on hover; it just stops offering a destination. */
+          metric.value > 0 ? (
+            <Link
+              key={metric.label}
+              href={metric.href}
+              title={metric.description}
+              aria-label={`${metric.value} ${metric.label}. ${metric.description}`}
+              className={`focus-ring group ${tileClass}`}
+            >
+              <span className={labelClass}>{metric.label}</span>
+              <span className={`${valueClass} text-ink group-hover:text-emerald-brand`}>
+                {metric.value.toLocaleString()}
+              </span>
+            </Link>
+          ) : (
+            <div
+              key={metric.label}
+              title={metric.description}
+              aria-label={`${metric.value} ${metric.label}. ${metric.description}`}
+              className={tileClass}
+            >
+              <span className={labelClass}>{metric.label}</span>
+              <span className={`${valueClass} text-ink-muted`}>
+                {metric.value.toLocaleString()}
+              </span>
+            </div>
+          )
+        )}
       </div>
     </div>
   );
@@ -370,7 +393,7 @@ export default function ProfileHeader({
                 {topics.slice(0, 3).map((topic) => (
                   <li key={topic}>
                     <Link
-                      href={`/topics/${encodeURIComponent(topic)}`}
+                      href={buildProfileRecordHref({ username: profile.username, topic })}
                       className="tap-target focus-ring inline-flex items-center rounded-full bg-green-tint px-3 py-1.5 text-xs font-medium text-emerald-brand hover:opacity-80"
                     >
                       {topic}

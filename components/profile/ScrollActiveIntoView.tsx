@@ -12,9 +12,12 @@ import { useEffect, useRef, type ReactNode } from "react";
  */
 export default function ScrollActiveIntoView({
   className = "",
+  label,
   children,
 }: {
   className?: string;
+  /** Names the row for assistive tech when no ancestor already does. */
+  label?: string;
   children: ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,7 +42,14 @@ export default function ScrollActiveIntoView({
   }, []);
 
   return (
-    <div ref={containerRef} className={className}>
+    // A bare div ignores `aria-label`, so a labelled row needs a role to go
+    // with it.
+    <div
+      ref={containerRef}
+      className={className}
+      role={label ? "group" : undefined}
+      aria-label={label}
+    >
       {children}
     </div>
   );
