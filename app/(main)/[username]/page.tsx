@@ -393,6 +393,11 @@ export default async function UserProfilePage({ params }: PageProps) {
               viewerState,
               surface: "featured_work",
             }}
+            /* One legend per page. Featured comes first, so it explains the
+               evidence chips whenever it renders and the record's own trigger
+               stands down. A profile with no Featured selection falls through
+               to the record's, below. */
+            showLegend
             action={isOwnProfile ? <FeaturedWorkManager initialPostIds={featuredIds} /> : null}
           />
 
@@ -407,7 +412,7 @@ export default async function UserProfilePage({ params }: PageProps) {
                 </h2>
               </div>
               <div className="flex items-center gap-4">
-                <EvidenceLegend />
+                {featuredPosts.length === 0 ? <EvidenceLegend /> : null}
                 {/* Offered only when there is something behind it. It used to
                     print beside an empty record, promising a fuller version of
                     nothing. */}

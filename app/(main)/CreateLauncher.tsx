@@ -30,16 +30,16 @@ export default function CreateLauncher({ userId, variant = "desktop", isActive =
   const children = mobile ? (
     <ComposeIcon className="h-[25px] w-[25px]" />
   ) : (
-    <><span aria-hidden="true" className="text-base leading-none">+</span>Contribute</>
+    <><span aria-hidden="true" className="text-base leading-none">+</span>Publish</>
   );
 
   if (!userId) {
     return (
-      <button type="button" onClick={() => requestAuth("create", { destination: "/write" })} className={className} style={style} aria-label={mobile ? "Contribute" : undefined}>
+      <button type="button" onClick={() => requestAuth("create", { destination: "/write" })} className={className} style={style} aria-label={mobile ? "Publish" : undefined}>
         {children}
       </button>
     );
   }
 
-  return <Link href="/write" className={className} style={style} aria-label={mobile ? "Contribute" : undefined}>{children}</Link>;
+  return <Link href="/write" className={className} style={style} aria-label={mobile ? "Publish" : undefined}>{children}</Link>;
 }

@@ -234,7 +234,7 @@ describe("collaboration and debate semantics", () => {
     // column list.
     const returnsTable = migration.slice(
       migration.indexOf("RETURNS TABLE ("),
-      migration.indexOf(")\nLANGUAGE sql")
+      migration.search(/\)\r?\nLANGUAGE sql/)
     );
     expect(returnsTable).not.toMatch(/winner|verdict|won/i);
     expect(returnsTable).toContain("debate_contribution_count");

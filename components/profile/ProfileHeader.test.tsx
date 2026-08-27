@@ -205,8 +205,8 @@ describe("ProfileHeader record metrics", () => {
     expect(screen.queryByText("Citable")).not.toBeInTheDocument();
   });
 
-  it("adapts the grid to one, two or three visible metrics", () => {
-    const grid = (summary: typeof POPULATED_RECORD) => {
+  it("renders one tile per visible metric", () => {
+    const tileCount = (summary: typeof POPULATED_RECORD) => {
       const { container, unmount } = render(
         <ProfileHeader
           profile={baseProfile()}
@@ -221,17 +221,17 @@ describe("ProfileHeader record metrics", () => {
           talentProfileId={null}
         />
       );
-      const node = container.querySelector("[class*='grid-cols-']");
-      const className = node?.className ?? "";
+      // One tile per visible metric, which is the behaviour. The row used to
+      // be an N-column grid and this asserted the Tailwind class name.
+      const row = container.querySelector("[class*='divide-x']");
+      const count = row?.childElementCount ?? 0;
       unmount();
-      return className;
+      return count;
     };
 
-    expect(grid({ ...POPULATED_RECORD, sourceBackedCount: 0, citableCount: 0 })).toContain(
-      "grid-cols-1"
-    );
-    expect(grid({ ...POPULATED_RECORD, citableCount: 0 })).toContain("grid-cols-2");
-    expect(grid(POPULATED_RECORD)).toContain("grid-cols-3");
+    expect(tileCount({ ...POPULATED_RECORD, sourceBackedCount: 0, citableCount: 0 })).toBe(1);
+    expect(tileCount({ ...POPULATED_RECORD, citableCount: 0 })).toBe(2);
+    expect(tileCount(POPULATED_RECORD)).toBe(3);
   });
 
   it("shows a visitor no metrics at all when the record is empty", () => {

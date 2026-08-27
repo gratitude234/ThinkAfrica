@@ -91,6 +91,26 @@ export function deriveDemonstratedTopics(
 }
 
 /**
+ * Display casing for one declared interest.
+ *
+ * Interests reach a profile from two places: a curated onboarding list that is
+ * already title-cased ("Politics & Governance"), and free text an author types
+ * ("law", "public policy"). Both land in the same row of chips, so the row
+ * carried two casings at once. Anything already holding a capital comes back
+ * untouched, because recasing "ORCID" or "pan-African" to a rule would be
+ * worse than the inconsistency this fixes.
+ */
+export function formatInterestLabel(interest: string) {
+  const label = interest.trim();
+  if (/[A-Z]/.test(label)) return label;
+  // The hyphen leads the class so it reads as a literal, not a range.
+  return label.replace(
+    /(^|[- /])([a-z])/g,
+    (_match, prefix: string, letter: string) => prefix + letter.toUpperCase()
+  );
+}
+
+/**
  * The interests an author declared, deduplicated case-insensitively and
  * trimmed of any that their published work already demonstrates.
  *

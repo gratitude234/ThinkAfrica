@@ -35,8 +35,8 @@ describe("BottomNav compose access", () => {
       <BottomNav username={null} userId={null} hasActiveDebate={false} />
     );
 
-    const trigger = screen.getByRole("button", { name: "Contribute" });
-    expect(screen.queryByRole("link", { name: "Contribute" })).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Publish" });
+    expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
 
     fireEvent.click(trigger);
 
@@ -57,7 +57,7 @@ describe("BottomNav compose access", () => {
     // 40px away, so the corner offered two writing controls and the more
     // prominent one led away from the article.
     expect(
-      screen.queryByRole("button", { name: "Contribute" })
+      screen.queryByRole("button", { name: "Publish" })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("navigation", { name: "Primary navigation" })
@@ -71,7 +71,7 @@ describe("BottomNav compose access", () => {
       <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
     );
 
-    expect(screen.queryByRole("button", { name: "Contribute" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Primary navigation" })).not.toBeInTheDocument();
   });
 });

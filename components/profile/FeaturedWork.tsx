@@ -9,7 +9,7 @@ import { resolveContentKind } from "@/lib/contentModel";
 import { normalizeFeatureNote } from "@/lib/featuredWork";
 import { getContributionQualityLabels } from "@/lib/intellectualRecord";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import { formatDate, sanitizePostExcerpt } from "@/lib/utils";
+import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
 
 interface FeaturedPost {
   id: string;
@@ -57,6 +57,13 @@ interface FeaturedWorkProps {
   hasPublishedWork?: boolean;
   /** Funnel context from the profile page. Omitted, the cards link plainly. */
   tracking?: ProfileWorkTracking | null;
+  /**
+   * Whether this section carries the evidence legend. The profile renders
+   * Featured and the record on one screen and both show evidence chips, so
+   * the page turns this off when the record below is already explaining them.
+   * Defaults to true for a surface that stands alone, like the owner preview.
+   */
+  showLegend?: boolean;
 }
 
 export default function FeaturedWork({
@@ -65,6 +72,7 @@ export default function FeaturedWork({
   isOwnProfile = false,
   hasPublishedWork = true,
   tracking = null,
+  showLegend = true,
 }: FeaturedWorkProps) {
   if (posts.length === 0) {
     if (!isOwnProfile || !hasPublishedWork) return null;
@@ -107,10 +115,11 @@ export default function FeaturedWork({
             Selected work
           </h2>
         </div>
-        {/* These cards carry evidence chips too, and this was the one surface
-            that rendered them with no way to find out what they mean. */}
+        {/* These cards carry evidence chips too. On the public profile the
+            record below explains them for the whole page, so the caller
+            suppresses this copy rather than printing a second trigger. */}
         <div className="flex shrink-0 items-center gap-4">
-          <EvidenceLegend />
+          {showLegend ? <EvidenceLegend /> : null}
           {action}
         </div>
       </div>
@@ -149,18 +158,21 @@ export default function FeaturedWork({
               key={post.id}
               className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-card-border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-card-border-hover hover:shadow-[0_8px_20px_-4px_rgb(0_0_0/0.08),0_2px_6px_-2px_rgb(0_0_0/0.04)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              {post.cover_image_url ? (
-                <PostCover
-                  src={post.cover_image_url}
-                  alt={displayTitle}
-                  type={post.type}
-                  content_kind={post.content_kind}
-                  article_format={post.article_format}
-                  sizes="(max-width: 768px) 84vw, (max-width: 1280px) 300px, 260px"
-                  className="aspect-video border-b border-card-border"
-                  imageClassName="object-cover"
-                />
-              ) : null}
+              {/* Rendered whether or not there is an image: PostCover falls
+                  back to a labelled gradient. Conditionally, a card with a
+                  cover started its title about 140px below its neighbours,
+                  so a row of three curated pieces read as three unrelated
+                  objects rather than one selection. */}
+              <PostCover
+                src={post.cover_image_url}
+                alt={displayTitle}
+                type={post.type}
+                content_kind={post.content_kind}
+                article_format={post.article_format}
+                sizes="(max-width: 768px) 84vw, (max-width: 1280px) 300px, 260px"
+                className="aspect-video border-b border-card-border"
+                imageClassName="object-cover"
+              />
               <div className="flex flex-1 flex-col p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   {label ? (
@@ -211,7 +223,14 @@ export default function FeaturedWork({
                   </div>
                 ) : null}
                 {publishedDate ? (
-                  <p className="mt-auto pt-3 text-xs text-ink-muted">{formatDate(publishedDate)}</p>
+                  /* Relative, like the record rows below. One screen used to
+                     print "July 15, 2026" here and "9h ago" there for work
+                     published days apart. */
+                  <p className="mt-auto pt-3 text-xs text-ink-muted">
+                    <time dateTime={publishedDate}>
+                      {formatRelativeTime(publishedDate)}
+                    </time>
+                  </p>
                 ) : null}
               </div>
             </article>

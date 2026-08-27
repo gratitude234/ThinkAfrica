@@ -11,10 +11,7 @@ import {
   type PublicProfileIdentity,
 } from "@/lib/profileIdentity";
 import { buildProfileRecordHref, type ProfileRecordSummary } from "@/lib/profileRecord";
-import {
-  getLinkedProfileRecordMetrics,
-  profileRecordMetricGridClass,
-} from "@/lib/profileRecordMetrics";
+import { getLinkedProfileRecordMetrics } from "@/lib/profileRecordMetrics";
 import {
   PROFILE_HEADER_TOPIC_LIMIT,
   type DemonstratedTopic,
@@ -121,9 +118,13 @@ function RecordOverview({
         </p>
         {interactive ? <RecordMetricLegend /> : null}
       </div>
-      <div
-        className={`grid divide-x divide-card-border ${profileRecordMetricGridClass(metrics.length)}`}
-      >
+      {/* A flex row, not an N-column grid. Two surviving metrics in
+          grid-cols-2 each owned half the card, so a label and a number sat in
+          about 100px of a 590px cell and the rest of the strip was empty.
+          Tiles size to their content now and the row reads as one group.
+          Onboarding still uses the grid helper: its preview is a full-width
+          equal-column strip, which is a different job. */}
+      <div className="flex flex-wrap items-start divide-x divide-card-border">
         {metrics.map((metric) => {
           const body = (
             <>
@@ -197,13 +198,20 @@ export default function ProfileIdentityPanel({
   return (
     <section className="flex flex-col overflow-hidden rounded-xl border border-card-border bg-card">
       {profile.cover_image_url ? (
-        <div className="relative h-20 overflow-hidden bg-canvas sm:h-24 lg:h-28">
+        /* An author uploads a picture, not a strip. At the old height this
+           band ran about 10.5:1 across the card, so object-cover kept a
+           sliver through the middle of whatever arrived and discarded the
+           rest: a portrait lost its subject, and a typographic cover came
+           out as one sliced line of letters. Roughly 6.7:1 at desktop is
+           still a band rather than a hero, and it survives an ordinary
+           upload. */
+        <div className="relative h-28 overflow-hidden bg-canvas sm:h-36 lg:h-44">
           <Image
             src={profile.cover_image_url}
             alt=""
             fill
             sizes="(max-width: 1180px) 100vw, 1180px"
-            className="object-cover"
+            className="object-cover object-center"
           />
         </div>
       ) : (

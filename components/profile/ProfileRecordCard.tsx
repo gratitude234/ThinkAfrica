@@ -79,7 +79,7 @@ function PublicationRow({
         <h3
           className={
             title
-              ? "font-display text-[17px] font-semibold leading-snug text-ink sm:text-[19px]"
+              ? "font-display line-clamp-2 text-[17px] font-semibold leading-snug text-ink sm:text-[19px]"
               : "line-clamp-3 text-[15px] font-medium leading-6 text-ink"
           }
         >
@@ -153,7 +153,7 @@ function DebateRow({
   return (
     <article className={ROW_SHELL}>
       <div className="min-w-0 flex-1">
-        <h3 className="font-display text-[17px] font-semibold leading-snug text-ink sm:text-[19px]">
+        <h3 className="font-display line-clamp-2 text-[17px] font-semibold leading-snug text-ink sm:text-[19px]">
           {href ? (
             <ProfileWorkLink
               href={href}

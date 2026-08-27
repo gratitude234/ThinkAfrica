@@ -1,7 +1,11 @@
 import Link from "next/link";
 import type { PublicProfileIdentity } from "@/lib/profileIdentity";
 import { buildProfileRecordHref } from "@/lib/profileRecord";
-import { PROFILE_TOPIC_LIMIT, type DemonstratedTopic } from "@/lib/profileTopics";
+import {
+  formatInterestLabel,
+  PROFILE_TOPIC_LIMIT,
+  type DemonstratedTopic,
+} from "@/lib/profileTopics";
 import { getExactCanonicalTag, normalizeTagValue } from "@/lib/tags";
 
 interface ResearchBackground {
@@ -239,6 +243,11 @@ export default function ProfileBackground({
               <ul className="flex flex-wrap gap-2">
                 {interests.slice(0, PROFILE_TOPIC_LIMIT).map((interest) => {
                   const href = interestTopicHref(interest);
+                  // Display casing only. Interests arrive both from a curated
+                  // onboarding list ("Politics & Governance") and from free
+                  // text an author types ("law"), so one row of chips carried
+                  // both. The href and the key stay on the stored value.
+                  const label = formatInterestLabel(interest);
                   return (
                     <li key={interest}>
                       {href ? (
@@ -246,11 +255,11 @@ export default function ProfileBackground({
                           href={href}
                           className="tap-target focus-ring inline-flex items-center rounded-full border border-card-border bg-canvas px-3 py-1.5 text-xs font-medium text-ink-soft hover:text-ink"
                         >
-                          {interest}
+                          {label}
                         </Link>
                       ) : (
                         <span className="inline-flex items-center rounded-full border border-card-border bg-canvas px-3 py-1.5 text-xs font-medium text-ink-soft">
-                          {interest}
+                          {label}
                         </span>
                       )}
                     </li>
