@@ -350,6 +350,13 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                     topic: topic.key,
                   })}
                   aria-current={active ? "page" : undefined}
+                  aria-label={
+                    topic.count > 0
+                      ? `Filter by ${topic.label}, ${topic.count} ${
+                          topic.count === 1 ? "entry" : "entries"
+                        }`
+                      : `Filter by ${topic.label}`
+                  }
                   className={`tap-target focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
                     active
                       ? "border-emerald-brand bg-green-tint text-emerald-brand"
@@ -358,7 +365,7 @@ export default async function ProfileRecordPage({ params, searchParams }: PagePr
                 >
                   {topic.label}
                   {topic.count > 0 ? (
-                    <span className="font-normal tabular-nums opacity-70">
+                    <span aria-hidden="true" className="font-normal tabular-nums opacity-70">
                       {topic.count}
                     </span>
                   ) : null}

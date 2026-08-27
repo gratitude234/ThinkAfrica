@@ -189,16 +189,32 @@ export default function FeaturedWorkManager({
               <button
                 type="button"
                 onClick={closeDialog}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-ink-muted hover:bg-canvas hover:text-ink-soft"
+                className="focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-canvas hover:text-ink-soft"
                 aria-label="Close featured work manager"
               >
-                x
+                {/* Was a literal lowercase "x" set in text, which read as a
+                    typo in the owner's most-used dialog. Same stroked glyph
+                    the notification panel closes with. */}
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
               </button>
             </div>
 
             {selectedPosts.length > 0 ? (
-              <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+              <div className="mt-5 rounded-xl border border-green-wash-border bg-green-tint p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-ink">
                   Featured order
                 </p>
                 <div className="mt-3 space-y-2">
@@ -256,7 +272,7 @@ export default function FeaturedWorkManager({
                     onClick={() => togglePost(post.id)}
                     className={`flex w-full items-start justify-between gap-4 rounded-xl border p-4 text-left transition-colors ${
                       selected
-                        ? "border-emerald-300 bg-emerald-50"
+                        ? "border-emerald-brand bg-green-tint"
                         : "border-card-border bg-card hover:border-card-border"
                     } ${disabled ? "opacity-50" : ""}`}
                   >
@@ -272,7 +288,7 @@ export default function FeaturedWorkManager({
                     <span
                       className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
                         selected
-                          ? "bg-emerald-600 text-white"
+                          ? "bg-emerald-brand text-white"
                           : "bg-canvas text-ink-muted"
                       }`}
                     >

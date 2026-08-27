@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { OPPORTUNITY_TYPES, OPPORTUNITY_LABELS } from "@/lib/opportunities";
 import {
@@ -225,7 +226,7 @@ export default function ContactInquiryModal({
                     organization_name: event.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                className="field-focus w-full rounded-lg border border-card-border bg-canvas px-3 py-2 text-sm text-ink"
               />
             </div>
             <div>
@@ -246,7 +247,7 @@ export default function ContactInquiryModal({
                     contact_email: event.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                className="field-focus w-full rounded-lg border border-card-border bg-canvas px-3 py-2 text-sm text-ink"
               />
             </div>
           </div>
@@ -271,7 +272,7 @@ export default function ContactInquiryModal({
                   }))
                 }
                 placeholder="Research assistant, fellowship..."
-                className="w-full rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                className="field-focus w-full rounded-lg border border-card-border bg-canvas px-3 py-2 text-sm text-ink"
               />
             </div>
             <div>
@@ -291,7 +292,7 @@ export default function ContactInquiryModal({
                     opportunity_type: event.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+                className="field-focus w-full rounded-lg border border-card-border bg-canvas px-3 py-2 text-sm text-ink"
               >
                 <option value="">Select a type</option>
                 {OPPORTUNITY_TYPES.map((type) => (
@@ -322,7 +323,7 @@ export default function ContactInquiryModal({
                 }))
               }
               placeholder="Describe the opportunity, timeline, commitment expected, and why this contributor's work caught your attention."
-              className="w-full resize-none rounded-lg border border-card-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-brand"
+              className="field-focus w-full resize-none rounded-lg border border-card-border bg-canvas px-3 py-2 text-sm text-ink"
             />
           </div>
 

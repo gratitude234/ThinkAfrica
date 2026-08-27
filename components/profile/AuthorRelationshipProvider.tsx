@@ -520,7 +520,7 @@ export default function AuthorRelationshipProvider({
                 ref={confirmButtonRef}
                 type="button"
                 onClick={() => setConfirmSource(null)}
-                className="min-h-11 rounded-lg border border-card-border px-4 text-sm font-semibold text-ink-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand"
+                className="min-h-11 rounded-lg border border-card-border px-4 text-sm font-semibold text-ink-soft focus-ring"
               >
                 Cancel
               </button>
@@ -531,7 +531,7 @@ export default function AuthorRelationshipProvider({
                   setConfirmSource(null);
                   void runFollow(false, source);
                 }}
-                className="min-h-11 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
+                className="min-h-11 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 focus-ring"
               >
                 Unfollow &amp; unsubscribe
               </button>

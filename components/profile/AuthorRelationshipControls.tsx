@@ -185,8 +185,8 @@ function LegacyAuthorRelationshipControls({
               compact || iconOnlySubscription ? "" : "flex-1"
             } border font-semibold transition-colors disabled:opacity-50 ${
               subscribed
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                : "border-card-border bg-card text-ink-soft hover:border-emerald-300 hover:text-emerald-700"
+                ? "border-green-wash-border bg-green-tint text-emerald-ink hover:bg-green-wash"
+                : "border-card-border bg-card text-ink-soft hover:border-card-border-hover hover:text-emerald-ink"
             }`}
           >
             {iconOnlySubscription ? (
@@ -205,7 +205,7 @@ function LegacyAuthorRelationshipControls({
         </p>
       ) : null}
       {confirmation ? (
-        <p className="mt-1 text-xs leading-5 text-emerald-700" role="status">
+        <p className="mt-1 text-xs leading-5 text-emerald-ink" role="status">
           {confirmation}
         </p>
       ) : null}

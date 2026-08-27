@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
  * cannot accidentally ship an input whose error is visible but unannounced.
  */
 export const FIELD_INPUT =
-  "min-h-11 w-full rounded-xl border border-card-border bg-canvas px-4 py-3 text-sm text-ink outline-none transition-[border-color,box-shadow] placeholder:text-ink-muted focus:border-emerald-brand focus:ring-4 focus:ring-green-tint disabled:cursor-not-allowed disabled:opacity-60";
+  "field-focus min-h-11 w-full rounded-xl border border-card-border bg-canvas px-4 py-3 text-sm text-ink transition-[border-color,box-shadow] placeholder:text-ink-muted disabled:cursor-not-allowed disabled:opacity-60";
 
 export function Field({
   label,

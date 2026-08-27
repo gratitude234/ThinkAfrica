@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import PostCover from "@/components/post/PostCover";
 import EvidenceLabels from "@/components/profile/EvidenceLabels";
+import EvidenceLegend from "@/components/profile/EvidenceLegend";
 import ProfileWorkLink, {
   type ProfileWorkTracking,
 } from "@/components/profile/ProfileWorkLink";
@@ -106,7 +107,12 @@ export default function FeaturedWork({
             Selected work
           </h2>
         </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
+        {/* These cards carry evidence chips too, and this was the one surface
+            that rendered them with no way to find out what they mean. */}
+        <div className="flex shrink-0 items-center gap-4">
+          <EvidenceLegend />
+          {action}
+        </div>
       </div>
 
       <div className="featured-rail" data-count={selected.length}>

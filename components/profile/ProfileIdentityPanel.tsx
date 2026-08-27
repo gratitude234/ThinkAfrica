@@ -285,9 +285,17 @@ export default function ProfileIdentityPanel({
                   const body = (
                     <>
                       {topic.label}
-                      <span className="tabular-nums text-emerald-brand/70">{topic.count}</span>
+                      {/* Hidden from the accessible name; the link states the
+                          count in words instead, so the digit is not announced
+                          bare as "Governance 4". */}
+                      <span aria-hidden="true" className="tabular-nums text-emerald-brand/70">
+                        {topic.count}
+                      </span>
                     </>
                   );
+                  const chipLabel = `${topic.label}: ${topic.count} ${
+                    topic.count === 1 ? "contribution" : "contributions"
+                  } in the Intellectual Record`;
                   const chipClass =
                     "inline-flex items-center gap-1.5 rounded-full bg-green-tint px-3 py-1.5 text-xs font-medium text-emerald-brand";
                   return (
@@ -298,12 +306,19 @@ export default function ProfileIdentityPanel({
                             username: profile.username,
                             topic: topic.key,
                           })}
+                          aria-label={chipLabel}
                           className={`tap-target focus-ring hover:opacity-80 ${chipClass}`}
                         >
                           {body}
                         </Link>
                       ) : (
-                        <span className={chipClass}>{body}</span>
+                        // The preview renders the same chip without a
+                        // destination, so the count is spelled out in text
+                        // that is available to assistive tech either way.
+                        <span className={chipClass}>
+                          {body}
+                          <span className="sr-only">{chipLabel}</span>
+                        </span>
                       )}
                     </li>
                   );

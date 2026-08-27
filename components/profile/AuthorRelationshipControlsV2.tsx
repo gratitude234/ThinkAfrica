@@ -57,7 +57,7 @@ function RelationshipButtons({
   const showSubscription = variant !== "follow_only";
   const iconOnlySubscription = variant === "icon";
   const rounded = variant === "full" ? "rounded-lg" : "rounded-full";
-  const buttonBase = `inline-flex min-h-11 items-center justify-center gap-2 border font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-2 ${rounded}`;
+  const buttonBase = `inline-flex min-h-11 items-center justify-center gap-2 border font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55 focus-ring ${rounded}`;
   const sizing =
     variant === "full"
       ? "px-4 text-sm"
@@ -121,8 +121,8 @@ function RelationshipButtons({
               iconOnlySubscription ? "h-11 w-11 p-0" : sizing
             } ${variant === "full" ? "flex-1" : ""} ${
               relationship.subscribed
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                : "border-card-border bg-card text-ink-soft hover:border-emerald-300 hover:text-emerald-700"
+                ? "border-green-wash-border bg-green-tint text-emerald-ink hover:bg-green-wash"
+                : "border-card-border bg-card text-ink-soft hover:border-card-border-hover hover:text-emerald-ink"
             }`}
           >
             <BellIcon active={relationship.subscribed} />

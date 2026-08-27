@@ -825,6 +825,34 @@ font-family: var(--font-inter), system-ui, sans-serif;
   border-radius: 5px;
 }
 
+/* The field counterpart to `.focus-ring`.
+
+   Two treatments, split by role rather than by accident: a control announces
+   focus by outlining its whole shape, while a text field already has a shape
+   and announces focus by lighting its own edge. What existed instead was
+   three treatments split by whoever wrote the file last -- a gold outline on
+   links, a 2px emerald ring in the inquiry modal, and a 4px green halo in
+   onboarding and the Command Center, so tabbing across one page changed the
+   affordance twice.
+
+   `:focus-visible` rather than `:focus`, because the ring on the old inputs
+   fired on mouse click too, which is noise for a pointer user who can already
+   see where they clicked. */
+.field-focus:focus-visible {
+  outline: none;
+  border-color: theme("colors.emerald-brand");
+  box-shadow: 0 0 0 4px theme("colors.green-tint");
+}
+
+/* Keyboard users on a browser without :focus-visible still get an edge. */
+@supports not selector(:focus-visible) {
+  .field-focus:focus {
+    outline: none;
+    border-color: theme("colors.emerald-brand");
+    box-shadow: 0 0 0 4px theme("colors.green-tint");
+  }
+}
+
 /* Stretches a link over its nearest positioned ancestor so a whole card is
    clickable. Anything that must stay independently clickable inside that card
    needs `relative` to sit above the overlay. */

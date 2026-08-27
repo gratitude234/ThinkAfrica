@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { INTELLECTUAL_RECORD_LABEL_DEFINITIONS } from "@/lib/intellectualRecord";
 import {
   PROFILE_RECORD_METRIC_DISCLAIMER,
   PROFILE_RECORD_METRIC_LIST,
@@ -92,14 +93,34 @@ function LegendDisclosure({
   );
 }
 
+/**
+ * The four chips, each with the sentence that defines it.
+ *
+ * This used to be one generic sentence about what labels are for, which left
+ * the actual question ("what does Citable mean?") answerable only by hovering
+ * a chip. The definitions come from the same module the chips are built from,
+ * so a label and its explanation cannot drift.
+ */
+const EVIDENCE_LABEL_LIST = Object.values(INTELLECTUAL_RECORD_LABEL_DEFINITIONS);
+
 export default function EvidenceLegend() {
   return (
     <LegendDisclosure
       triggerLabel="Evidence labels"
       panelLabel="What the evidence labels mean"
     >
-      Labels describe inspectable sources, review, citation records, or accepted
-      co-authorship. They are not popularity scores.
+      <dl className="space-y-2">
+        {EVIDENCE_LABEL_LIST.map((label) => (
+          <div key={label.key}>
+            <dt className="font-semibold text-ink">{label.label}</dt>
+            <dd>{label.description}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 border-t border-card-border pt-2">
+        Labels describe inspectable evidence attached to a publication. They are
+        not popularity scores.
+      </p>
     </LegendDisclosure>
   );
 }

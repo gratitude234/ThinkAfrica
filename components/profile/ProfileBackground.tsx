@@ -214,10 +214,17 @@ export default function ProfileBackground({
                         username: profile.username,
                         topic: topic.key,
                       })}
+                      aria-label={`${topic.label}: ${topic.count} ${
+                        topic.count === 1 ? "contribution" : "contributions"
+                      } in the Intellectual Record`}
                       className="tap-target focus-ring inline-flex items-center gap-1.5 rounded-full bg-green-tint px-3 py-1.5 text-xs font-medium text-emerald-brand hover:opacity-80"
                     >
                       {topic.label}
-                      <span className="tabular-nums text-emerald-brand/70">
+                      {/* Hidden from the accessible name, which the label
+                          above states in words. On its own the digit was
+                          announced as "Governance 4", which could be a count,
+                          a rank or a year. */}
+                      <span aria-hidden="true" className="tabular-nums text-emerald-brand/70">
                         {topic.count}
                       </span>
                     </Link>
@@ -281,12 +288,12 @@ export default function ProfileBackground({
             <BackgroundField label="Recognition">
               <ul className="flex flex-wrap gap-2">
                 {profile.verified ? (
-                  <li className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <li className="rounded-full border border-green-wash-border bg-green-tint px-3 py-1 text-xs font-semibold text-emerald-ink">
                     {profile.verified_type ? `Verified ${profile.verified_type}` : "Verified profile"}
                   </li>
                 ) : null}
                 {profile.is_alumni ? (
-                  <li className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                  <li className="rounded-full border border-gold-tint bg-gold-tint px-3 py-1 text-xs font-semibold text-gold-ink">
                     Alumni
                   </li>
                 ) : null}

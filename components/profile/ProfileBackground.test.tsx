@@ -128,6 +128,43 @@ describe("ProfileBackground topics and interests", () => {
   });
 });
 
+describe("demonstrated topic chip accessibility", () => {
+  it("names the count in words instead of announcing a bare digit", () => {
+    render(
+      <ProfileBackground
+        profile={profile}
+        demonstratedTopics={[{ key: "governance", label: "Governance", count: 4 }]}
+        interests={[]}
+        isOwnProfile={false}
+      />
+    );
+
+    // "Governance 4" could be a count, a rank or a year. The link says which.
+    const link = screen.getByRole("link", {
+      name: "Governance: 4 contributions in the Intellectual Record",
+    });
+    expect(link).toHaveAttribute("href", "/ada/record?topic=governance");
+    expect(within(link).getByText("4")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("uses the singular for one contribution", () => {
+    render(
+      <ProfileBackground
+        profile={profile}
+        demonstratedTopics={[{ key: "law", label: "Law", count: 1 }]}
+        interests={[]}
+        isOwnProfile={false}
+      />
+    );
+
+    expect(
+      screen.getByRole("link", {
+        name: "Law: 1 contribution in the Intellectual Record",
+      })
+    ).toBeInTheDocument();
+  });
+});
+
 describe("hasBackgroundContent", () => {
   const bare = {
     ...profile,
