@@ -7,6 +7,7 @@ import {
   type DebateV15ReminderPhase,
   type PlannedDebateV15Reminder,
 } from "@/lib/debateV15Reminders";
+import { getCronAuthorizationError } from "@/lib/cronAuth";
 
 /**
  * Notices V1.5 deadlines going by, which nothing else in the system does.
@@ -51,12 +52,8 @@ function asPhase(value: unknown): DebateV15ReminderPhase | null {
 }
 
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  const auth = request.headers.get("authorization");
-
-  if (!cronSecret || auth !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authorizationError = getCronAuthorizationError(request);
+  if (authorizationError) return authorizationError;
 
   const admin = createAdminClient();
   const now = Date.now();

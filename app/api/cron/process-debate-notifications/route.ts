@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCronAuthorizationError } from "@/lib/cronAuth";
 
 const DEFAULT_BATCH_LIMIT = 50;
 
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  const auth = request.headers.get("authorization");
-
-  if (!cronSecret || auth !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authorizationError = getCronAuthorizationError(request);
+  if (authorizationError) return authorizationError;
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("process_debate_notification_events_v2", {

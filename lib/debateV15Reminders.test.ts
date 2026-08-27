@@ -60,11 +60,8 @@ describe("planDebateV15Reminders — deadline still ahead", () => {
     expect(planned).toEqual([]);
   });
 
-  it("catches deadlines that fall in the gap between once-a-day runs", () => {
-    // The job runs daily, so anything up to 24h out must already be inside
-    // the window -- otherwise a deadline landing in that gap is warned about
-    // on no run at all: too far away on one, already passed by the next.
-    expect(REMINDER_SOON_WINDOW_HOURS).toBeGreaterThan(24);
+  it("uses the standard 24-hour window with sub-hourly evaluation", () => {
+    expect(REMINDER_SOON_WINDOW_HOURS).toBe(24);
 
     for (const hoursOut of [1, 6, 12, 18, 23.5]) {
       const planned = planDebateV15Reminders(
@@ -73,6 +70,13 @@ describe("planDebateV15Reminders — deadline still ahead", () => {
       );
       expect(planned.length, `${hoursOut}h before the deadline`).toBe(2);
     }
+
+    expect(
+      planDebateV15Reminders(
+        makeCandidate({ deadline: hoursFromNow(24.01) }),
+        NOW
+      )
+    ).toEqual([]);
   });
 
   it("does not chase debaters during phases they cannot submit in", () => {

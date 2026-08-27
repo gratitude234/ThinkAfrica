@@ -27,14 +27,11 @@ export type DebateV15ReminderKind =
 /**
  * How close a deadline must be before the "still unsubmitted" nudge goes out.
  *
- * This must stay comfortably wider than the gap between cron runs, or
- * deadlines falling in the gap are never warned about at all. The job runs
- * once a day (Vercel's free plan allows no better), so a 12-hour window would
- * silently miss anyone whose deadline sat more than 12 but less than 24 hours
- * after a run. 26 hours guarantees every deadline is seen at least once while
- * it is still ahead. The ledger keeps that to a single message.
+ * Supabase Cron evaluates deadlines every 15 minutes. A 24-hour window gives
+ * participants a standard one-day warning while the durable reminder ledger
+ * keeps repeated evaluations to a single message per recipient and phase.
  */
-export const REMINDER_SOON_WINDOW_HOURS = 26;
+export const REMINDER_SOON_WINDOW_HOURS = 24;
 
 export interface DebateV15ReminderCandidate {
   debateId: string;
