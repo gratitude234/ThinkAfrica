@@ -247,7 +247,16 @@ export default async function UserProfilePage({ params }: PageProps) {
   const featureNoteById = new Map(
     featuredRows.map((row) => [row.post_id, row.feature_note ?? null])
   );
-  const topicSelect = "id, author_id, in_response_to, tags, type";
+  /**
+   * Wide enough for both jobs this result serves. It ranks demonstrated
+   * topics, which needs only tags, and it is also the published-work list
+   * handed to the credibility graph, which cites individual pieces by name.
+   * Selecting only the tag columns meant every representative work rendered
+   * as "Untitled work" linking to /post/undefined, and sourceBacked and
+   * citable were silently false for everyone.
+   */
+  const topicSelect =
+    "id, author_id, in_response_to, tags, type, title, slug, citation_id, published_at, created_at, post_reference_counts(reference_count)";
   const [ownedTopicsResult, coauthoredTopicsResult, featuredPostsResult] = await Promise.all([
     supabase
       .from("posts")

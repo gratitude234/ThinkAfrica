@@ -25,6 +25,10 @@ interface PostCoverProps {
   article_format?: string | null;
   className?: string;
   imageClassName?: string;
+  // Replaces the type-coloured gradient shown when there is no image. A
+  // surface rendering several placeholders at once needs them quiet enough
+  // not to outshout the one real cover beside them.
+  fallbackClassName?: string;
   // "cover"/"contain" size the image inside whatever box `className` sets
   // (callers pass an aspect utility). "natural" instead lets the image's own
   // proportions drive the box height: the container's aspect ratio is taken
@@ -88,6 +92,7 @@ export default function PostCover({
   article_format,
   className = "",
   imageClassName,
+  fallbackClassName,
   fit = "cover",
   sizes = "100vw",
   priority = false,
@@ -159,7 +164,9 @@ export default function PostCover({
   if (!src || failed) {
     return (
       <div
-        className={`flex items-center justify-center overflow-hidden bg-gradient-to-br ${fallbackStyle} ${className}`}
+        className={`flex items-center justify-center overflow-hidden ${
+          fallbackClassName ?? `bg-gradient-to-br ${fallbackStyle}`
+        } ${className}`}
         style={naturalStyle}
       >
         <span className="px-3 text-center text-[11px] font-bold uppercase tracking-[0.15em]">

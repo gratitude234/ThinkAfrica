@@ -9,7 +9,7 @@ import { resolveContentKind } from "@/lib/contentModel";
 import { normalizeFeatureNote } from "@/lib/featuredWork";
 import { getContributionQualityLabels } from "@/lib/intellectualRecord";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
+import { formatDate, sanitizePostExcerpt } from "@/lib/utils";
 
 interface FeaturedPost {
   id: string;
@@ -104,6 +104,16 @@ export default function FeaturedWork({
   // selections each fill the row exactly instead of orphaning the last one.
   const selected = posts.slice(0, 3);
 
+  /**
+   * A cover slot appears on every card in the row or on none of them.
+   *
+   * With a cover on some, the slot is what keeps the titles on one line, and
+   * the cards without one get a quiet placeholder. With a cover on none, the
+   * slot would be three empty boxes above three headlines, so it goes and the
+   * cards are text from the top. Either way the row reads as one selection.
+   */
+  const showCovers = selected.some((post) => post.cover_image_url);
+
   return (
     <section id="featured-work" className="space-y-4">
       <div className="flex items-center justify-between gap-4 border-b border-card-border pb-3">
@@ -158,21 +168,23 @@ export default function FeaturedWork({
               key={post.id}
               className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-card-border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-card-border-hover hover:shadow-[0_8px_20px_-4px_rgb(0_0_0/0.08),0_2px_6px_-2px_rgb(0_0_0/0.04)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              {/* Rendered whether or not there is an image: PostCover falls
-                  back to a labelled gradient. Conditionally, a card with a
-                  cover started its title about 140px below its neighbours,
-                  so a row of three curated pieces read as three unrelated
-                  objects rather than one selection. */}
-              <PostCover
-                src={post.cover_image_url}
-                alt={displayTitle}
-                type={post.type}
-                content_kind={post.content_kind}
-                article_format={post.article_format}
-                sizes="(max-width: 768px) 84vw, (max-width: 1280px) 300px, 260px"
-                className="aspect-video border-b border-card-border"
-                imageClassName="object-cover"
-              />
+              {showCovers ? (
+                <PostCover
+                  src={post.cover_image_url}
+                  alt={displayTitle}
+                  type={post.type}
+                  content_kind={post.content_kind}
+                  article_format={post.article_format}
+                  sizes="(max-width: 768px) 84vw, (max-width: 1280px) 300px, 260px"
+                  className="aspect-video border-b border-card-border"
+                  imageClassName="object-cover"
+                  /* The default fallback is a saturated type-coloured
+                     gradient, which is right for one card in a feed and wrong
+                     for two of three side by side: the placeholders outshouted
+                     the one real photograph between them. */
+                  fallbackClassName="bg-green-wash text-ink-muted"
+                />
+              ) : null}
               <div className="flex flex-1 flex-col p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   {label ? (
@@ -223,13 +235,13 @@ export default function FeaturedWork({
                   </div>
                 ) : null}
                 {publishedDate ? (
-                  /* Relative, like the record rows below. One screen used to
-                     print "July 15, 2026" here and "9h ago" there for work
-                     published days apart. */
+                  /* Absolute here, relative in the record below, and the
+                     difference is deliberate. Featured is a curated shelf
+                     where a date is provenance: three pieces from one month
+                     all read "1mo ago" and distinguish nothing. The record is
+                     a chronological index, where recency is the point. */
                   <p className="mt-auto pt-3 text-xs text-ink-muted">
-                    <time dateTime={publishedDate}>
-                      {formatRelativeTime(publishedDate)}
-                    </time>
+                    <time dateTime={publishedDate}>{formatDate(publishedDate)}</time>
                   </p>
                 ) : null}
               </div>
