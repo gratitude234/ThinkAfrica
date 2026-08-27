@@ -136,7 +136,7 @@ export default function ReportModal({
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Details <span className="font-normal text-gray-400">(optional)</span>
+                  Details <span className="font-normal text-ink-muted">(optional)</span>
                 </label>
                 <textarea
                   rows={3}

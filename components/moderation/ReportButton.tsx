@@ -26,7 +26,7 @@ export default function ReportButton({
       {variant === "text" ? (
         <button
           onClick={() => setOpen(true)}
-          className={`text-xs text-gray-400 transition-colors hover:text-red-600 ${className}`}
+          className={`text-xs text-ink-soft transition-colors hover:text-red-600 ${className}`}
         >
           Report
         </button>

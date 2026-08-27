@@ -93,7 +93,7 @@ export default function BlockUserButton({
     return (
       <button
         onClick={() => setConfirming(true)}
-        className={`text-xs text-gray-400 transition-colors hover:text-red-600 ${className}`}
+        className={`text-xs text-ink-soft transition-colors hover:text-red-600 ${className}`}
       >
         Block user
       </button>

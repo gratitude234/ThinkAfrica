@@ -179,10 +179,13 @@ export default function FeaturedWork({
                   className="aspect-video border-b border-card-border"
                   imageClassName="object-cover"
                   /* The default fallback is a saturated type-coloured
-                     gradient, which is right for one card in a feed and wrong
-                     for two of three side by side: the placeholders outshouted
-                     the one real photograph between them. */
-                  fallbackClassName="bg-green-wash text-ink-muted"
+                     gradient, right for one card in a feed and wrong for two
+                     of three side by side, where the placeholders outshouted
+                     the one real photograph between them. A flat near-white
+                     overcorrected the other way and read as an empty box, so
+                     this is a low-chroma wash: clearly deliberate, quiet
+                     enough to let the real cover lead. */
+                  fallbackClassName="bg-gradient-to-br from-green-wash to-green-tint text-emerald-brand/70"
                 />
               ) : null}
               <div className="flex flex-1 flex-col p-4">
