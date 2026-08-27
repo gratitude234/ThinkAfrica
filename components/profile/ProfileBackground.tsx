@@ -221,7 +221,12 @@ export default function ProfileBackground({
               expertise and sent readers to record filters with nothing behind
               them. Every chip here leads to at least one entry. */}
           {railTopics.length > 0 ? (
-            <BackgroundField label="More demonstrated topics">
+            /* "More" read fine on a wide screen, where this rail sits beside
+               the header carrying the first three. On a phone the card drops
+               to the foot of the page, about 1,500px below them, and "more"
+               has nothing left to refer to. This says what the chips are
+               without depending on what is still on screen. */
+            <BackgroundField label="Also publishes on">
               <ul className="flex flex-wrap gap-2">
                 {railTopics.map((topic) => (
                   <li key={topic.key}>

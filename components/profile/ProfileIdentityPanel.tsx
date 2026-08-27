@@ -223,7 +223,14 @@ export default function ProfileIdentityPanel({
           name={displayName}
           src={profile.avatar_url}
           size={88}
-          className="profile-identity-avatar -mt-12 shrink-0 border-4 border-card shadow-sm sm:-mt-14"
+          /* Positioned, because the cover above it is. UserAvatar renders a
+             bare img, and a positioned sibling paints above non-positioned
+             inline content in the same stacking context, so the cover was
+             covering the 48px of avatar that -mt-12 pulls up into it: the
+             avatar rendered as a partial circle on every profile that has a
+             cover image. It looked correct without one only because that
+             fallback is an unpositioned div. */
+          className="profile-identity-avatar relative z-10 -mt-12 shrink-0 border-4 border-card shadow-sm sm:-mt-14"
         />
 
         <div className="profile-identity-name min-w-0">

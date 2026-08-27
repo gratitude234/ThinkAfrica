@@ -81,7 +81,7 @@ describe("ProfileBackground topics and interests", () => {
   it("keeps demonstrated topics and declared interests in separate fields", () => {
     renderBackground({ interests: ["Youth", "Diaspora"] });
 
-    expect(screen.getByText("More demonstrated topics")).toBeInTheDocument();
+    expect(screen.getByText("Also publishes on")).toBeInTheDocument();
     expect(screen.getByText("Interested in")).toBeInTheDocument();
     // The word the old single list used. A tag appearing once is not a claim
     // of expertise, and Phase 1 does not make one.
@@ -118,7 +118,7 @@ describe("ProfileBackground topics and interests", () => {
     expect(
       screen.queryByRole("link", { name: /Youth/ })
     ).not.toHaveAttribute("href", "/ada/record?topic=youth");
-    expect(screen.queryByText("More demonstrated topics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Also publishes on")).not.toBeInTheDocument();
   });
 
   it("links an interest only when it names a real platform topic", () => {
@@ -143,7 +143,7 @@ describe("ProfileBackground topics and interests", () => {
   it("shows contribution counts beside demonstrated topics only", () => {
     renderBackground({ interests: ["Youth"] });
 
-    const topics = screen.getByText("More demonstrated topics").parentElement;
+    const topics = screen.getByText("Also publishes on").parentElement;
     expect(within(topics as HTMLElement).getByText("3")).toBeInTheDocument();
 
     const interests = screen.getByText("Interested in").parentElement;
