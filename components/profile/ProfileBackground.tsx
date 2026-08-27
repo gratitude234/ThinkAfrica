@@ -3,6 +3,7 @@ import type { PublicProfileIdentity } from "@/lib/profileIdentity";
 import { buildProfileRecordHref } from "@/lib/profileRecord";
 import {
   formatInterestLabel,
+  PROFILE_HEADER_TOPIC_LIMIT,
   PROFILE_TOPIC_LIMIT,
   type DemonstratedTopic,
 } from "@/lib/profileTopics";
@@ -107,7 +108,9 @@ export function hasBackgroundContent({
   return Boolean(
     hasEducation ||
       hasRole ||
-      demonstratedTopics.length > 0 ||
+      // Only the topics past the header's, since those are the only ones this
+      // section renders.
+      demonstratedTopics.length > PROFILE_HEADER_TOPIC_LIMIT ||
       interests.length > 0 ||
       hasResearch ||
       profile.verified ||
@@ -145,6 +148,15 @@ export default function ProfileBackground({
       researchWebsite
   );
   const hasRecognition = profile.verified || profile.is_alumni;
+  /**
+   * The header already carries the leading topics, so the rail lists what it
+   * did not. The same three chips with the same counts, printed a few hundred
+   * pixels apart, read as two lists rather than one.
+   */
+  const railTopics = demonstratedTopics.slice(
+    PROFILE_HEADER_TOPIC_LIMIT,
+    PROFILE_TOPIC_LIMIT
+  );
   const hasContent = hasBackgroundContent({
     profile,
     demonstratedTopics,
@@ -208,10 +220,10 @@ export default function ProfileBackground({
               list labelled "Topics and expertise", which called a checkbox
               expertise and sent readers to record filters with nothing behind
               them. Every chip here leads to at least one entry. */}
-          {demonstratedTopics.length > 0 ? (
-            <BackgroundField label="Demonstrated topics">
+          {railTopics.length > 0 ? (
+            <BackgroundField label="More demonstrated topics">
               <ul className="flex flex-wrap gap-2">
-                {demonstratedTopics.slice(0, PROFILE_TOPIC_LIMIT).map((topic) => (
+                {railTopics.map((topic) => (
                   <li key={topic.key}>
                     <Link
                       href={buildProfileRecordHref({

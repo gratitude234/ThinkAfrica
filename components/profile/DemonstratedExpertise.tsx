@@ -100,12 +100,21 @@ export default function DemonstratedExpertise({
               {buildExpertiseSummary(topic)}
             </p>
             {topic.representativeWorks.length > 0 ? (
+              /* Two at most, so each takes half the row on a wide screen and
+                 truncates inside it. An author who titles a piece in 200
+                 characters of capitals was otherwise given two full lines of
+                 small green text here, the last unbounded run on the page.
+                 The full title stays available on hover. */
               <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 {topic.representativeWorks.map((work) => (
-                  <li key={work.postId}>
+                  <li
+                    key={work.postId}
+                    className="min-w-0 max-w-full sm:max-w-[calc(50%-0.5rem)]"
+                  >
                     <Link
                       href={`/post/${work.slug}`}
-                      className="tap-target focus-ring text-xs font-medium text-emerald-ink hover:underline"
+                      title={work.title}
+                      className="tap-target focus-ring block truncate text-xs font-medium text-emerald-ink hover:underline"
                     >
                       {work.title}
                     </Link>
@@ -117,9 +126,14 @@ export default function DemonstratedExpertise({
         ))}
       </ul>
 
+      {/* The header ranks the same topics by volume and this section ranks
+          them by evidence, so the two print the same names in different
+          orders. Saying so is cheaper than forcing a false agreement, and
+          losing the evidence order would undo the point of the section. */}
       <p className="text-xs leading-5 text-ink-muted">
-        Counted from tags on published work. Declared interests are listed
-        separately under Background and are not evidence.
+        Ordered by strength of evidence, not by volume. Counted from tags on
+        published work. Declared interests are listed separately under
+        Background and are not evidence.
       </p>
     </section>
   );

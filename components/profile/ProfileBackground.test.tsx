@@ -22,7 +22,19 @@ const profile = {
   positioning_statement: null,
 };
 
+/**
+ * The identity header carries the first three demonstrated topics, so this
+ * section renders only what comes after them. Fixtures pad past that boundary,
+ * and these three are never expected to appear in the rail.
+ */
+const HEADER_FILLER = [
+  { key: "policy", label: "Policy", count: 9 },
+  { key: "economics", label: "Economics", count: 8 },
+  { key: "health", label: "Health", count: 7 },
+];
+
 const DEMONSTRATED = [
+  ...HEADER_FILLER,
   { key: "governance", label: "Governance", count: 3 },
   { key: "climate", label: "Climate", count: 1 },
 ];
@@ -69,11 +81,22 @@ describe("ProfileBackground topics and interests", () => {
   it("keeps demonstrated topics and declared interests in separate fields", () => {
     renderBackground({ interests: ["Youth", "Diaspora"] });
 
-    expect(screen.getByText("Demonstrated topics")).toBeInTheDocument();
+    expect(screen.getByText("More demonstrated topics")).toBeInTheDocument();
     expect(screen.getByText("Interested in")).toBeInTheDocument();
     // The word the old single list used. A tag appearing once is not a claim
     // of expertise, and Phase 1 does not make one.
     expect(screen.queryByText(/expertise/i)).not.toBeInTheDocument();
+  });
+
+  it("leaves the topics the header already printed out of the rail", () => {
+    renderBackground();
+
+    for (const topic of HEADER_FILLER) {
+      expect(
+        screen.queryByRole("link", { name: new RegExp(`^${topic.label}`) })
+      ).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole("link", { name: /^Governance/ })).toBeInTheDocument();
   });
 
   it("links every demonstrated topic to the record filter that holds its work", () => {
@@ -95,7 +118,7 @@ describe("ProfileBackground topics and interests", () => {
     expect(
       screen.queryByRole("link", { name: /Youth/ })
     ).not.toHaveAttribute("href", "/ada/record?topic=youth");
-    expect(screen.queryByText("Demonstrated topics")).not.toBeInTheDocument();
+    expect(screen.queryByText("More demonstrated topics")).not.toBeInTheDocument();
   });
 
   it("links an interest only when it names a real platform topic", () => {
@@ -120,7 +143,7 @@ describe("ProfileBackground topics and interests", () => {
   it("shows contribution counts beside demonstrated topics only", () => {
     renderBackground({ interests: ["Youth"] });
 
-    const topics = screen.getByText("Demonstrated topics").parentElement;
+    const topics = screen.getByText("More demonstrated topics").parentElement;
     expect(within(topics as HTMLElement).getByText("3")).toBeInTheDocument();
 
     const interests = screen.getByText("Interested in").parentElement;
@@ -133,7 +156,10 @@ describe("demonstrated topic chip accessibility", () => {
     render(
       <ProfileBackground
         profile={profile}
-        demonstratedTopics={[{ key: "governance", label: "Governance", count: 4 }]}
+        demonstratedTopics={[
+          ...HEADER_FILLER,
+          { key: "governance", label: "Governance", count: 4 },
+        ]}
         interests={[]}
         isOwnProfile={false}
       />
@@ -151,7 +177,10 @@ describe("demonstrated topic chip accessibility", () => {
     render(
       <ProfileBackground
         profile={profile}
-        demonstratedTopics={[{ key: "law", label: "Law", count: 1 }]}
+        demonstratedTopics={[
+          ...HEADER_FILLER,
+          { key: "law", label: "Law", count: 1 },
+        ]}
         interests={[]}
         isOwnProfile={false}
       />

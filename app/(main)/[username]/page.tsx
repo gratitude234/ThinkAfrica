@@ -481,7 +481,15 @@ export default async function UserProfilePage({ params }: PageProps) {
           />
         </div>
 
-        <aside id="background" className="mt-8 lg:mt-0">
+        {/* Pinned like every other aside in the app (home, explore, admin, the
+            debate surfaces), which this one alone was not. Background is short
+            and the work beside it is long, so pinning keeps the standing
+            context available while a reader moves down the record instead of
+            letting it scroll away in the first screen. */}
+        <aside
+          id="background"
+          className="mt-8 lg:sticky lg:top-[var(--app-sticky-offset)] lg:mt-0 lg:self-start"
+        >
           <ProfileBackground
             profile={profile}
             demonstratedTopics={demonstratedTopics}
