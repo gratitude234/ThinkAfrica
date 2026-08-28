@@ -22,10 +22,19 @@ export default function CreateLauncher({ userId, variant = "desktop", isActive =
   const { requestAuth } = useGuestAuthGate();
   const mobile = variant === "mobileFab";
   const className = mobile
-    ? "group fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition duration-200 hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 active:scale-[0.96] md:hidden"
+    ? "group fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-brand text-white shadow-[0_8px_20px_-7px_rgb(7_57_41/0.5)] ring-1 ring-black/5 transition-[bottom,background-color,transform] duration-200 hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 active:scale-[0.96] motion-reduce:transition-none md:hidden"
     : `hidden min-h-11 items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 md:inline-flex ${isActive ? "bg-ink" : "bg-emerald-brand hover:bg-[#0E4B37]"}`;
+  /* `--profile-sticky-bar-height` is published by the profile sticky bar,
+     which is fixed to this same corner and sits below this button in the
+     stacking order. Without the term the FAB covered that bar's Follow
+     button outright. It resolves to 0px everywhere else, so every other
+     screen keeps the resting offset, and the bottom is transitioned so the
+     lift travels with the bar rather than snapping. */
   const style = mobile
-    ? { bottom: "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px))" }
+    ? {
+        bottom:
+          "calc(72px + env(safe-area-inset-bottom) + var(--mobile-visual-viewport-bottom, 0px) + var(--profile-sticky-bar-height, 0px))",
+      }
     : undefined;
   const children = mobile ? (
     <ComposeIcon className="h-[25px] w-[25px]" />
