@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { RecordMetricLegend } from "@/components/profile/EvidenceLegend";
+import ImageLightbox from "@/components/ui/ImageLightbox";
 import UserAvatar from "@/components/ui/UserAvatar";
 import {
   getProfileIdentityLines,
@@ -156,6 +157,80 @@ function RecordOverview({
   );
 }
 
+const COVER_BAND = "relative h-36 overflow-hidden bg-canvas sm:h-44 lg:h-56";
+
+const COVER_BUTTON =
+  COVER_BAND +
+  " block w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset";
+
+/**
+ * The cover, and the one way to see what the crop cut off.
+ *
+ * An author uploads a picture, not a strip, so some of it is always going to
+ * be cut. Two things narrow that gap from opposite ends. The band itself is
+ * now full-bleed rather than inset in a card, which buys back the width the
+ * gutters were taking and drops the crop from about 10.5:1 to nearer 2.7:1 on
+ * a phone and 5.3:1 at desktop: enough that a portrait keeps its subject and a
+ * typographic cover is no longer one sliced line of letters. And tapping shows
+ * the rest, which is the gesture a reader already makes at a cropped image and
+ * which did nothing here. It opens the same viewer post images use, so the
+ * back gesture, swipe-to-dismiss and Escape all behave the way they do
+ * everywhere else in the app.
+ *
+ * The avatar sits above this with its own z-index, so the corner it covers
+ * belongs to the avatar rather than to the viewer.
+ */
+function CoverBand({
+  src,
+  displayName,
+  interactive,
+}: {
+  src: string;
+  displayName: string;
+  interactive: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  const image = (
+    <Image
+      src={src}
+      alt=""
+      fill
+      sizes="(max-width: 1180px) 100vw, 1180px"
+      className="object-cover object-center"
+    />
+  );
+
+  // The Command Center preview renders the same band with nothing to click.
+  if (!interactive) return <div className={COVER_BAND}>{image}</div>;
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="View cover image full screen"
+        className={COVER_BUTTON}
+      >
+        {image}
+      </button>
+      <ImageLightbox
+        src={src}
+        alt={displayName + " cover image"}
+        open={open}
+        onClose={handleClose}
+      />
+    </>
+  );
+}
+
 export default function ProfileIdentityPanel({
   profile,
   demonstratedTopics,
@@ -210,23 +285,11 @@ export default function ProfileIdentityPanel({
        sitting above it, and only the shell can see whether one is. */
     <section className="-mx-4 flex flex-col overflow-hidden border-b border-card-border bg-card sm:-mx-6 lg:mx-0">
       {profile.cover_image_url ? (
-        /* An author uploads a picture, not a strip. Inset in a card this band
-           ran about 10.5:1, and widening it to 6.7:1 barely helped, because
-           object-cover still kept a sliver through the middle of whatever
-           arrived: a portrait lost its subject and a typographic cover came
-           out as one sliced line of letters. Going full-bleed buys back the
-           width the gutters were taking, so these taller heights land near
-           2.7:1 on a phone and 5.3:1 at desktop. Still a band rather than a
-           hero, and it survives an ordinary upload. */
-        <div className="relative h-36 overflow-hidden bg-canvas sm:h-44 lg:h-56">
-          <Image
-            src={profile.cover_image_url}
-            alt=""
-            fill
-            sizes="(max-width: 1180px) 100vw, 1180px"
-            className="object-cover object-center"
-          />
-        </div>
+        <CoverBand
+          src={profile.cover_image_url}
+          displayName={displayName}
+          interactive={interactive}
+        />
       ) : (
         <div className="h-14 bg-[radial-gradient(circle_at_18%_0%,rgba(16,185,129,0.14),transparent_38%),linear-gradient(135deg,#FFFFFF,#FAF8F5)] sm:h-16" />
       )}

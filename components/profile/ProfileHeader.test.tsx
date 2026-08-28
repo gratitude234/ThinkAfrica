@@ -410,3 +410,31 @@ describe("ProfileHeader funnel instrumentation", () => {
     expect(trackActivationEvent.mock.calls[0][0].metadata.viewerState).toBe("owner");
   });
 });
+
+describe("ProfileHeader cover image", () => {
+  const COVER = "https://example.test/cover.jpg";
+
+  it("opens the full-screen viewer, because the band shows a crop", async () => {
+    const user = userEvent.setup();
+    renderHeader({ profileOverrides: { cover_image_url: COVER } });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(
+      screen.getByRole("button", { name: "View cover image full screen" })
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "A Student cover image" }).getAttribute("src")
+    ).toBe(COVER);
+  });
+
+  it("offers nothing to click when there is no cover", () => {
+    renderHeader();
+
+    expect(
+      screen.queryByRole("button", { name: "View cover image full screen" })
+    ).toBeNull();
+  });
+});
