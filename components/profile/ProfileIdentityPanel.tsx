@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { RecordMetricLegend } from "@/components/profile/EvidenceLegend";
+import ImageLightbox from "@/components/ui/ImageLightbox";
 import UserAvatar from "@/components/ui/UserAvatar";
 import {
   getProfileIdentityLines,
@@ -156,6 +157,75 @@ function RecordOverview({
   );
 }
 
+const COVER_BAND = "relative h-28 overflow-hidden bg-canvas sm:h-36 lg:h-44";
+
+const COVER_BUTTON =
+  COVER_BAND +
+  " block w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset";
+
+/**
+ * The cover, and the one way to see what the crop cut off.
+ *
+ * An author uploads a picture, not a strip, and this band keeps roughly the
+ * middle 6.7:1 of it at desktop. Tapping to see the whole thing is the gesture
+ * a reader already makes at a cropped image, and it did nothing here. It opens
+ * the same viewer post images use, so the back gesture, swipe-to-dismiss and
+ * Escape all behave the way they do everywhere else in the app.
+ *
+ * The avatar sits above this with its own z-index, so the corner it covers
+ * belongs to the avatar rather than to the viewer.
+ */
+function CoverBand({
+  src,
+  displayName,
+  interactive,
+}: {
+  src: string;
+  displayName: string;
+  interactive: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  const image = (
+    <Image
+      src={src}
+      alt=""
+      fill
+      sizes="(max-width: 1180px) 100vw, 1180px"
+      className="object-cover object-center"
+    />
+  );
+
+  // The Command Center preview renders the same band with nothing to click.
+  if (!interactive) return <div className={COVER_BAND}>{image}</div>;
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="View cover image full screen"
+        className={COVER_BUTTON}
+      >
+        {image}
+      </button>
+      <ImageLightbox
+        src={src}
+        alt={displayName + " cover image"}
+        open={open}
+        onClose={handleClose}
+      />
+    </>
+  );
+}
+
 export default function ProfileIdentityPanel({
   profile,
   demonstratedTopics,
@@ -198,22 +268,11 @@ export default function ProfileIdentityPanel({
   return (
     <section className="flex flex-col overflow-hidden rounded-xl border border-card-border bg-card">
       {profile.cover_image_url ? (
-        /* An author uploads a picture, not a strip. At the old height this
-           band ran about 10.5:1 across the card, so object-cover kept a
-           sliver through the middle of whatever arrived and discarded the
-           rest: a portrait lost its subject, and a typographic cover came
-           out as one sliced line of letters. Roughly 6.7:1 at desktop is
-           still a band rather than a hero, and it survives an ordinary
-           upload. */
-        <div className="relative h-28 overflow-hidden bg-canvas sm:h-36 lg:h-44">
-          <Image
-            src={profile.cover_image_url}
-            alt=""
-            fill
-            sizes="(max-width: 1180px) 100vw, 1180px"
-            className="object-cover object-center"
-          />
-        </div>
+        <CoverBand
+          src={profile.cover_image_url}
+          displayName={displayName}
+          interactive={interactive}
+        />
       ) : (
         <div className="h-14 bg-[radial-gradient(circle_at_18%_0%,rgba(16,185,129,0.14),transparent_38%),linear-gradient(135deg,#FFFFFF,#FAF8F5)] sm:h-16" />
       )}
