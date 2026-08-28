@@ -354,7 +354,14 @@ export default async function UserProfilePage({ params }: PageProps) {
   });
 
   return (
-    <div className={PROFILE_SHELL}>
+    /* `first:` is load-bearing. The header below is full-bleed and should meet
+       the nav, which means cancelling the shell's top padding, but a guest
+       banner renders in flow directly above this on a profile and an
+       unconditional pull-up slid the cover underneath it. The banner is a
+       preceding sibling of this element and disappears from the DOM when it is
+       dismissed, so :first-child answers "is the header really the top of the
+       page" live, in both directions, without threading the flag down. */
+    <div className={`${PROFILE_SHELL} first:-mt-6 lg:first:mt-0`}>
       <ProfileHeader
         profile={profile}
         demonstratedTopics={demonstratedTopics}
@@ -410,7 +417,7 @@ export default async function UserProfilePage({ params }: PageProps) {
             action={isOwnProfile ? <FeaturedWorkManager initialPostIds={featuredIds} /> : null}
           />
 
-          <section id="latest-record" aria-labelledby="latest-record-title" className="space-y-4">
+          <section id="latest-record" aria-labelledby="latest-record-title" className="scroll-mt-24 lg:scroll-mt-32 space-y-4">
             <div className="flex flex-col gap-3 border-b border-card-border pb-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-ink">
@@ -488,7 +495,7 @@ export default async function UserProfilePage({ params }: PageProps) {
             letting it scroll away in the first screen. */}
         <aside
           id="background"
-          className="mt-8 lg:sticky lg:top-[var(--app-sticky-offset)] lg:mt-0 lg:self-start"
+          className="scroll-mt-24 lg:scroll-mt-32 mt-8 lg:sticky lg:top-[var(--app-sticky-offset)] lg:mt-0 lg:self-start"
         >
           <ProfileBackground
             profile={profile}

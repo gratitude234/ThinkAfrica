@@ -869,16 +869,22 @@ font-family: var(--font-inter), system-ui, sans-serif;
    page, below the topic chips. Areas let the phone and the desktop each get
    the order they need from one DOM, so the controls are never duplicated.
 
-   Phone:   avatar + name, then the actions, then the meta row.
-   640px +: the familiar three-column row, meta tucked under the name. */
+   Phone:   avatar, then the name, then the actions, then the meta row.
+   640px +: the familiar three-column row, meta tucked under the name.
+
+   The avatar takes its own row on a phone rather than sitting beside the
+   name. Sharing that row left the name about 210px to work with, and a
+   display face at text-3xl broke a two-part surname across three lines with
+   a hyphen. Stacking gives it the full measure. */
 .profile-identity {
   display: grid;
   gap: 12px 18px;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "avatar name"
-    "actions actions"
-    "meta meta";
+    "avatar"
+    "name"
+    "actions"
+    "meta";
   align-items: start;
 }
 
