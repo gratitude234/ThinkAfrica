@@ -41,6 +41,7 @@ const prefs: NotificationPrefs = {
   email_digest: true,
   email_account_security: true,
   email_profile_reminders: true,
+  email_announcements: true,
   email_review_assigned: true,
   email_review_started: true,
   email_review_reminder: true,
@@ -103,6 +104,45 @@ describe("NotificationsForm", () => {
     await waitFor(() => {
       expect(rpc).toHaveBeenCalledWith("set_notification_preference", {
         p_key: "inapp_likes",
+        p_enabled: false,
+      });
+    });
+  });
+});
+
+describe("the announcements preference", () => {
+  beforeEach(() => {
+    rpc.mockReset();
+    rpc.mockResolvedValue({ data: {}, error: null });
+  });
+
+  it("is offered as its own switch, separate from the weekly digest", async () => {
+    // Broadcasts are their own opt-out category. Muting the digest must not
+    // silently mute founder correspondence, so the reader needs both switches.
+    render(<NotificationsForm profileId="user-a" notificationPrefs={prefs} />);
+
+    expect(
+      screen.getByRole("switch", { name: "Email: Indegenius announcements" })
+    ).toBeChecked();
+    expect(
+      screen.getByRole("switch", { name: "Email: Weekly digest" })
+    ).toBeInTheDocument();
+  });
+
+  it("saves under the key the broadcast eligibility rule reads", async () => {
+    // set_notification_preference validates against a hardcoded allowlist, so
+    // a key the function does not know about throws rather than saving.
+    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED", "1");
+
+    render(<NotificationsForm profileId="user-a" notificationPrefs={prefs} />);
+
+    await userEvent.click(
+      screen.getByRole("switch", { name: "Email: Indegenius announcements" })
+    );
+
+    await waitFor(() => {
+      expect(rpc).toHaveBeenCalledWith("set_notification_preference", {
+        p_key: "email_announcements",
         p_enabled: false,
       });
     });

@@ -36,6 +36,8 @@ Optional:
 - `NEXT_PUBLIC_CREDIBILITY_GRAPH_ENABLED`: Set to `1` only after `20260827000001`, `20260827000002` and `20260827000003` are applied and verified. Gates citation edges, the public Demonstrated expertise and Recognition sections, and verified opportunity outcomes
 - `NEXT_PUBLIC_FEATURED_WORK_NOTES_ENABLED`: Set to `1` only after `20260826000002_featured_work_notes.sql` is applied and verified. Until then Featured Work notes are neither read nor written, and `replace_my_featured_posts` v1 is used
 - `NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED`: Set to `1` only after `20260826000001_profile_positioning_statement.sql` is applied and verified. Until then the public profile, the full record and settings leave the `positioning_statement` column out of their projections, because PostgREST rejects a select naming a column that does not exist
+- `EMAIL_SENDER_DOMAIN` / `EMAIL_PLATFORM_SENDER_DOMAIN`: Domains the five sender identities in `lib/emailSenders.ts` send from. Both default to `NEXT_PUBLIC_APP_DOMAIN`. The identities themselves are not configurable; `EMAIL_FROM` is no longer read
+- `RESEND_WEBHOOK_SECRET`: Signing secret for `/api/webhooks/resend`. Without it the route answers 503 and broadcasts record no delivery. Subscribe the endpoint to `email.delivered`, `email.bounced`, `email.complained`, `email.failed`, `email.suppressed` and `contact.updated`
 - `GOOGLE_TTS_API_KEY`: Text-to-speech
 - `CRON_SECRET`: Authenticates Vercel Cron requests to `/api/cron/*` routes (Vercel sends it automatically as `Authorization: Bearer <value>` when set)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_MAILTO`: Web push (VAPID keypair + contact address for `lib/push.ts`)
@@ -86,6 +88,8 @@ API routes (`app/api/`):
 | `GET /api/research-document/[postId]` | Retrieve research document |
 | `POST /api/audio-summary` | Claude API audio synthesis |
 | `POST /api/debate-recap` | Generate debate summary |
+| `GET /api/cron/resend-segment-sync` | Nightly recipient sync and broadcast reconciliation |
+| `POST /api/webhooks/resend` | Broadcast delivery counts and unsubscribe mirroring |
 | `POST /api/activation` | Track activation/onboarding events |
 | `GET /api/og` | Open Graph image generation |
 
@@ -199,4 +203,27 @@ snapshots written only by the `record_post_revision()` function, which throttles
 to one snapshot per three minutes and prunes to the most recent 40. Neither ever
 touches a published or reviewed post: `post_versions` still owns those.
 
-Schema: `supabase/schema.sql` (base) + `supabase/schema_phase2-5.sql` (incremental). Timestamped migrations in `supabase/migrations/`. Apply via Supabase dashboard or CLI. There is no local migration runner configured.
+Email broadcasts (`/admin/communications`) add `broadcasts`, `broadcast_segments`,
+`broadcast_contacts`, `broadcast_delivery_events`, `broadcast_sync_runs` and
+`broadcast_sync_state`. All six have RLS on with no policies and are readable
+only by `service_role`: `broadcast_contacts` holds one row per member with their
+address on it. Three rules the code depends on:
+
+- A broadcast is claimed for sending by `claim_broadcast_for_send()`, one
+  statement, and `dispatch_started_at` makes the row permanently unclaimable
+  once `broadcasts.send` has been called.
+- Delivery counters move only through `record_broadcast_delivery_event()`, which
+  writes to `broadcast_delivery_events` first and increments only when that
+  write was new. Resend retries webhooks, so replay is the normal case.
+- `email_announcements` is the opt-out category, separate from `email_digest`.
+  Resend owns the unsubscribe link, so an opt-out arrives from Resend and is
+  mirrored inward; only the member turning the switch back on in settings
+  reverses it, via the `profiles_broadcast_resubscribe` trigger.
+
+Schema: `supabase/schema.sql` (base) + `supabase/schema_phase2-5.sql` (incremental). Timestamped migrations in `supabase/migrations/`. Apply via Supabase dashboard or CLI. There is no local migration runner configured, so `supabase/migrations/emailBroadcastsMigration.test.ts` asserts the contracts that would otherwise only fail in production.
+
+Scheduling lives in Supabase Cron, not `vercel.json`. Adding a job means editing
+all four private functions in `20260827110918_migrate_scheduler_to_supabase_cron.sql`
+(dispatch allowlist, remove set, inspect set, install) and then running
+`select private.install_indegenius_cron_jobs();`. See
+`20260902000002_schedule_resend_segment_sync.sql` for the pattern.

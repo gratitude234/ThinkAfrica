@@ -4,6 +4,16 @@ import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SITE_URL } from "@/lib/site";
 import { BRAND_PROMISE, BRAND_TAGLINE } from "@/lib/brand";
+import {
+  emailSenderReplyTo,
+  formatEmailSenderFrom,
+  resolveEmailSender,
+  type EmailSenderKey,
+} from "@/lib/emailSenders";
+import { escapeHtml, renderEmailShell } from "@/lib/emailShell";
+
+// Re-exported so every existing caller keeps importing these from "@/lib/email".
+export { escapeHtml, renderEmailShell };
 
 export type NotificationPreferenceKey =
   | "email_comments"
@@ -15,6 +25,7 @@ export type NotificationPreferenceKey =
   | "email_digest"
   | "email_account_security"
   | "email_profile_reminders"
+  | "email_announcements"
   | "email_review_assigned"
   | "email_review_started"
   | "email_review_reminder"
@@ -44,10 +55,8 @@ type SendEmailInput = {
   html: string;
   text: string;
   idempotencyKey: string;
+  sender?: EmailSenderKey;
 };
-
-const DEFAULT_FOOTER_NOTE =
-  "You are receiving this because you have an Indegenius account. Manage email preferences in your notification settings.";
 
 type UserEmailInput = {
   recipientId: string;
@@ -63,6 +72,7 @@ type UserEmailInput = {
   idempotencyKey: string;
   preferenceKey?: NotificationPreferenceKey;
   cooldownMs?: number;
+  sender?: EmailSenderKey;
 };
 
 type DirectEmailInput = Omit<UserEmailInput, "recipientId" | "preferenceKey"> & {
@@ -93,15 +103,6 @@ export function absoluteUrl(path: string) {
   return `${getAppUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-export function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
@@ -114,93 +115,16 @@ function preferenceEnabled(
   return prefs[preferenceKey] !== false;
 }
 
-export function renderEmailShell(input: {
-  preview: string;
-  title: string;
-  intro?: string;
-  bodyHtml?: string;
-  ctaLabel?: string;
-  ctaHref?: string;
-  footerNote?: string;
-}) {
-  const preview = escapeHtml(input.preview);
-  const title = escapeHtml(input.title);
-  const introHtml = input.intro
-    ? `<p class="email-text" style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#374151;">${escapeHtml(input.intro)}</p>`
-    : "";
-  const footerNote = escapeHtml(input.footerNote ?? DEFAULT_FOOTER_NOTE);
-  const brandPromise = escapeHtml(BRAND_PROMISE);
-  const brandTagline = escapeHtml(BRAND_TAGLINE);
-  const ctaHtml =
-    input.ctaLabel && input.ctaHref
-      ? `<div style="margin:28px 0 18px;">
-                  <a href="${escapeHtml(input.ctaHref)}" style="display:inline-block;border-radius:10px;background:#073929;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:12px 18px;">${escapeHtml(input.ctaLabel)}</a>
-                </div>
-                <p class="email-muted" style="margin:0 0 18px;font-size:12px;line-height:1.6;color:#6b7280;">If the button does not work, open this link:<br><a href="${escapeHtml(input.ctaHref)}" style="color:#073929;">${escapeHtml(input.ctaHref)}</a></p>`
-      : "";
-
-  return `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
-    <meta name="supported-color-schemes" content="light dark">
-    <title>${title}</title>
-    <style>
-      @media (prefers-color-scheme: dark) {
-        .email-bg { background-color: #101613 !important; }
-        .email-card { background-color: #171d1a !important; border-color: #2a332e !important; }
-        .email-title { color: #f3f4f6 !important; }
-        .email-text { color: #d1d5db !important; }
-        .email-muted { color: #9ca3af !important; }
-        .email-footer { background-color: #131815 !important; border-color: #2a332e !important; }
-        .code-box { background-color: #0d1f16 !important; border-color: #234b36 !important; }
-        .code-text { color: #7fe0b3 !important; }
-      }
-    </style>
-  </head>
-  <body class="email-bg" style="margin:0;background:#f6f7f5;color:#1f2937;font-family:Arial,Helvetica,sans-serif;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preview}</div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="email-bg" style="background:#f6f7f5;padding:28px 14px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="email-card" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
-            <tr>
-              <td style="padding:22px 26px;border-bottom:1px solid #eef2f0;">
-                <div style="font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:20px;font-weight:700;color:#073929;">Indegenius</div>
-                <div class="email-muted" style="margin-top:4px;font-size:12px;line-height:1.5;color:#6b7280;">${brandPromise}</div>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:28px 26px 8px;">
-                <h1 class="email-title" style="margin:0 0 14px;font-size:20px;line-height:1.3;color:#111827;">${title}</h1>
-                ${introHtml}
-                ${input.bodyHtml ?? ""}
-                ${ctaHtml}
-              </td>
-            </tr>
-            <tr>
-              <td class="email-footer" style="padding:18px 26px;background:#f9fafb;border-top:1px solid #eef2f0;font-size:12px;line-height:1.6;color:#6b7280;">
-                <div style="margin-bottom:5px;font-weight:600;color:#4b5563;">${brandTagline}</div>
-                ${footerNote}
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
-}
-
 export async function sendEmail(input: SendEmailInput): Promise<EmailSendResult> {
   const resend = getResendClient();
-  const from = process.env.EMAIL_FROM;
 
-  if (!resend || !from) {
+  if (!resend) {
     return { skipped: true, reason: "missing_email_configuration" };
   }
+
+  const sender = resolveEmailSender(input.sender);
+  const from = formatEmailSenderFrom(sender);
+  const replyTo = emailSenderReplyTo(sender);
 
   try {
     const { data, error } = await resend.emails.send(
@@ -210,6 +134,7 @@ export async function sendEmail(input: SendEmailInput): Promise<EmailSendResult>
         subject: input.subject,
         html: input.html,
         text: input.text,
+        ...(replyTo ? { replyTo } : {}),
       },
       {
         headers: {
@@ -293,6 +218,7 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       }
     }
 
+    const sender = resolveEmailSender(input.sender);
     const ctaHref = input.ctaPath ? absoluteUrl(input.ctaPath) : undefined;
     const html = renderEmailShell({
       preview: input.preview,
@@ -302,6 +228,7 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       ctaLabel: input.ctaLabel,
       ctaHref,
       footerNote: input.footerNote,
+      sender: input.sender,
     });
     const text = [
       input.title,
@@ -313,7 +240,7 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       BRAND_PROMISE,
       BRAND_TAGLINE,
       "",
-      input.footerNote ?? "Manage email preferences in Indegenius notification settings.",
+      input.footerNote ?? sender.footerNote,
     ].join("\n");
 
     const result = await sendEmail({
@@ -322,6 +249,7 @@ export async function sendUserEmail(input: UserEmailInput): Promise<EmailSendRes
       html,
       text,
       idempotencyKey: input.idempotencyKey,
+      sender: input.sender,
     });
 
     if (input.cooldownMs && "ok" in result && result.ok) {
@@ -349,6 +277,7 @@ export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSen
     return { skipped: true, reason: "invalid_email_address" };
   }
 
+  const sender = resolveEmailSender(input.sender);
   const ctaHref = input.ctaPath ? absoluteUrl(input.ctaPath) : undefined;
   const html = renderEmailShell({
     preview: input.preview,
@@ -358,6 +287,7 @@ export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSen
     ctaLabel: input.ctaLabel,
     ctaHref,
     footerNote: input.footerNote,
+    sender: input.sender,
   });
   const text = [
     input.title,
@@ -369,7 +299,7 @@ export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSen
     BRAND_PROMISE,
     BRAND_TAGLINE,
     "",
-    input.footerNote ?? "Manage email preferences in Indegenius notification settings.",
+    input.footerNote ?? sender.footerNote,
   ].join("\n");
 
   return sendEmail({
@@ -378,6 +308,7 @@ export async function sendDirectEmail(input: DirectEmailInput): Promise<EmailSen
     html,
     text,
     idempotencyKey: input.idempotencyKey,
+    sender: input.sender,
   });
 }
 

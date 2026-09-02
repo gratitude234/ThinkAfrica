@@ -967,3 +967,37 @@ font-family: var(--font-inter), system-ui, sans-serif;
     mask-image: none;
   }
 }
+
+/* Broadcast composer.
+   An executive writing a letter, not an operator filling in a campaign form.
+   Larger measure than the admin default, quiet headings, nothing else. */
+.broadcast-composer-body {
+  min-height: 320px;
+  color: var(--ta-ink);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.broadcast-composer-body p,
+.broadcast-composer-body li {
+  margin-bottom: 1.1em;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.broadcast-composer-body h2 {
+  @apply font-display text-xl font-semibold mt-7 mb-2;
+}
+
+.broadcast-composer-body h3 {
+  @apply font-display text-lg font-semibold mt-6 mb-2;
+}
+
+.broadcast-composer-body a {
+  @apply text-emerald-brand underline underline-offset-2;
+}
+
+.broadcast-composer-body p.is-editor-empty:first-child::before {
+  color: #9aa0a6;
+}

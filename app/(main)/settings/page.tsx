@@ -164,6 +164,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     email_digest: true,
     email_account_security: true,
     email_profile_reminders: true,
+    email_announcements: true,
     email_review_assigned: true,
     email_review_started: true,
     email_review_reminder: true,

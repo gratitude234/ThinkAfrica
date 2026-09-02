@@ -44,6 +44,7 @@ export type NotificationPreferenceKey =
   | "email_digest"
   | "email_account_security"
   | "email_profile_reminders"
+  | "email_announcements"
   | "email_review_assigned"
   | "email_review_started"
   | "email_review_reminder"

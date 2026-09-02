@@ -41,6 +41,7 @@ interface BaseNotificationPrefs {
   email_digest: boolean;
   email_account_security: boolean;
   email_profile_reminders: boolean;
+  email_announcements: boolean;
   email_review_assigned: boolean;
   email_review_started: boolean;
   email_review_reminder: boolean;
@@ -77,6 +78,7 @@ const EMAIL_ROWS: { key: keyof NotificationPrefs; label: string; description: st
   { key: "email_digest", label: "Weekly digest", description: "A weekly summary of top content" },
   { key: "email_account_security", label: "Account and trust updates", description: "Verification, role, and account status emails" },
   { key: "email_profile_reminders", label: "Profile reminders", description: "Occasional reminders to complete your public profile" },
+  { key: "email_announcements", label: "Indegenius announcements", description: "Occasional letters from the Indegenius team about the platform and what is changing" },
   { key: "email_review_assigned", label: "Review assignments", description: "When you're assigned to review a submission" },
   { key: "email_review_started", label: "Your submission is under review", description: "When your submission's first reviewer is assigned" },
   { key: "email_review_reminder", label: "Review reminders", description: "A reminder if your review has been pending for a while" },

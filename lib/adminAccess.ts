@@ -16,7 +16,9 @@ export type AdminCapability =
   | "sponsors.manage"
   | "ambassadors.manage"
   | "analytics.view"
-  | "digest.manage";
+  | "digest.manage"
+  | "communications.manage"
+  | "communications.send_as_executive";
 
 export interface AdminContext {
   userId: string;
@@ -97,6 +99,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     capability: "analytics.view" as const,
   }] : []),
   {
+    href: "/admin/communications",
+    title: "Communications",
+    description: "Compose and broadcast email to the Indegenius community.",
+    capability: "communications.manage",
+  },
+  {
     href: "/admin/digest",
     title: "Digest",
     description: "Preview the weekly editorial digest.",
@@ -116,6 +124,11 @@ const FULL_ADMIN_CAPABILITIES: AdminCapability[] = [
   "ambassadors.manage",
   "analytics.view",
   "digest.manage",
+  "communications.manage",
+  // Sending as a named executive is deliberately its own capability: a
+  // moderator who can run the platform's own announcements still should not be
+  // able to write to the community as the founder.
+  "communications.send_as_executive",
 ];
 
 export function getAdminCapabilitiesForRole(
