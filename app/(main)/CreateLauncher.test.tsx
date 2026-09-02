@@ -23,6 +23,16 @@ describe("CreateLauncher", () => {
     expect(requestAuth).toHaveBeenCalledWith("create", { destination: "/write" });
   });
 
+  it("lifts the FAB clear of the profile sticky bar", () => {
+    // The bar is fixed to this same corner and paints below the FAB, so
+    // without this term the FAB covered its Follow button and ate the taps.
+    // The variable resolves to 0px on every other screen.
+    render(<CreateLauncher userId="user-1" variant="mobileFab" />);
+    const bottom = screen.getByRole("link", { name: "Publish" }).style.bottom;
+    expect(bottom).toContain("var(--profile-sticky-bar-height, 0px)");
+    expect(bottom).toContain("env(safe-area-inset-bottom)");
+  });
+
   it("uses the same md breakpoint for desktop and mobile controls", () => {
     const { rerender } = render(<CreateLauncher userId="user-1" />);
     expect(screen.getByRole("link", { name: "Publish" })).toHaveClass("hidden", "md:inline-flex");

@@ -84,7 +84,7 @@ function RecordOverview({
   if (metrics.length === 0) {
     if (!isOwnProfile) return null;
     return (
-      <div className={`border-t border-card-border bg-canvas/70 px-5 py-4 sm:px-7 ${className}`}>
+      <div className={`border-t border-card-border bg-canvas/70 px-4 py-4 sm:px-6 lg:px-0 ${className}`}>
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-ink">
           Intellectual Record
         </p>
@@ -112,7 +112,7 @@ function RecordOverview({
   const valueClass = "font-display text-xl font-semibold tabular-nums sm:text-2xl";
 
   return (
-    <div className={`border-t border-card-border bg-canvas/70 px-5 py-4 sm:px-7 ${className}`}>
+    <div className={`border-t border-card-border bg-canvas/70 px-4 py-4 sm:px-6 lg:px-0 ${className}`}>
       <div className="mb-2.5 flex items-center justify-between gap-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-ink">
           Intellectual Record
@@ -157,7 +157,7 @@ function RecordOverview({
   );
 }
 
-const COVER_BAND = "relative h-28 overflow-hidden bg-canvas sm:h-36 lg:h-44";
+const COVER_BAND = "relative h-36 overflow-hidden bg-canvas sm:h-44 lg:h-56";
 
 const COVER_BUTTON =
   COVER_BAND +
@@ -166,11 +166,16 @@ const COVER_BUTTON =
 /**
  * The cover, and the one way to see what the crop cut off.
  *
- * An author uploads a picture, not a strip, and this band keeps roughly the
- * middle 6.7:1 of it at desktop. Tapping to see the whole thing is the gesture
- * a reader already makes at a cropped image, and it did nothing here. It opens
- * the same viewer post images use, so the back gesture, swipe-to-dismiss and
- * Escape all behave the way they do everywhere else in the app.
+ * An author uploads a picture, not a strip, so some of it is always going to
+ * be cut. Two things narrow that gap from opposite ends. The band itself is
+ * now full-bleed rather than inset in a card, which buys back the width the
+ * gutters were taking and drops the crop from about 10.5:1 to nearer 2.7:1 on
+ * a phone and 5.3:1 at desktop: enough that a portrait keeps its subject and a
+ * typographic cover is no longer one sliced line of letters. And tapping shows
+ * the rest, which is the gesture a reader already makes at a cropped image and
+ * which did nothing here. It opens the same viewer post images use, so the
+ * back gesture, swipe-to-dismiss and Escape all behave the way they do
+ * everywhere else in the app.
  *
  * The avatar sits above this with its own z-index, so the corner it covers
  * belongs to the avatar rather than to the viewer.
@@ -266,7 +271,19 @@ export default function ProfileIdentityPanel({
   const showAboutToggle = interactive && (bioOverflows || aboutExpanded);
 
   return (
-    <section className="flex flex-col overflow-hidden rounded-xl border border-card-border bg-card">
+    /* Deliberately not a card. The card tokens are feed furniture: a rounded,
+       bordered box says "one item among several, separable from the page",
+       which is right for a Featured entry and wrong here. The header is not an
+       item on the profile, it is the profile, and boxing it made the person
+       read as row zero of a list. It keeps the white ground, because the
+       Record and About strips below separate themselves from it with
+       `bg-canvas/70`, but it gives up the radius and the side edges and
+       terminates on a single rule instead. Breaking the shell gutters below
+       `lg` is what lets the cover be a real band rather than a picture inset
+       on three sides. Meeting the nav is the shell's job rather than this
+       element's: the page's top padding has to survive when a guest banner is
+       sitting above it, and only the shell can see whether one is. */
+    <section className="-mx-4 flex flex-col overflow-hidden border-b border-card-border bg-card sm:-mx-6 lg:mx-0">
       {profile.cover_image_url ? (
         <CoverBand
           src={profile.cover_image_url}
@@ -277,7 +294,7 @@ export default function ProfileIdentityPanel({
         <div className="h-14 bg-[radial-gradient(circle_at_18%_0%,rgba(16,185,129,0.14),transparent_38%),linear-gradient(135deg,#FFFFFF,#FAF8F5)] sm:h-16" />
       )}
 
-      <div className="profile-identity p-5 sm:p-7">
+      <div className="profile-identity px-4 py-5 sm:px-6 sm:py-7 lg:px-0">
         <UserAvatar
           name={displayName}
           src={profile.avatar_url}
@@ -408,7 +425,7 @@ export default function ProfileIdentityPanel({
       </div>
 
       {/* On a phone the numbers come before About: they are the reason the
-          page exists. From 640px they return to the foot of the card. */}
+          page exists. From 640px they return to the foot of the header. */}
       <RecordOverview
         username={profile.username}
         summary={recordSummary}
@@ -418,7 +435,7 @@ export default function ProfileIdentityPanel({
       />
 
       {showAboutBlock ? (
-        <div className="order-3 px-5 pb-5 sm:order-2 sm:px-7 sm:pb-7">
+        <div className="order-3 px-4 pb-5 sm:order-2 sm:px-6 sm:pb-7 lg:px-0">
           {bio ? (
             <div className="border-t border-card-border pt-5">
               <div className="flex items-center justify-between gap-3">

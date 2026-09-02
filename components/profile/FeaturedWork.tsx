@@ -80,7 +80,7 @@ export default function FeaturedWork({
     return (
       <section
         id="featured-work"
-        className="rounded-xl border border-dashed border-card-border bg-card p-5 sm:p-6"
+        className="scroll-mt-24 lg:scroll-mt-32 rounded-xl border border-dashed border-card-border bg-card p-5 sm:p-6"
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -115,7 +115,7 @@ export default function FeaturedWork({
   const showCovers = selected.some((post) => post.cover_image_url);
 
   return (
-    <section id="featured-work" className="space-y-4">
+    <section id="featured-work" className="scroll-mt-24 lg:scroll-mt-32 space-y-4">
       <div className="flex items-center justify-between gap-4 border-b border-card-border pb-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-ink">
