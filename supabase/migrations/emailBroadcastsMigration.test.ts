@@ -216,3 +216,90 @@ describe("the nightly schedule", () => {
     }
   });
 });
+
+describe("the bulk address reader", () => {
+  const fn = read("20260903000001_broadcast_auth_emails.sql");
+
+  it("reads auth.users in SQL rather than through the GoTrue admin API", () => {
+    // listUsers cannot deserialise a row holding NULL in any token column, and
+    // one such row fails the whole request. Selecting two columns never builds
+    // that struct, so this is immune whichever column is NULL.
+    expect(fn).toMatch(/FROM auth\.users/);
+    expect(fn).toMatch(/CREATE OR REPLACE FUNCTION public\.list_broadcast_contact_emails/);
+  });
+
+  it("returns an id and an address and nothing else", () => {
+    // No tokens, no metadata, no password hashes leave the auth schema.
+    expect(fn).toMatch(/RETURNS TABLE \(profile_id uuid, email text\)/);
+  });
+
+  it("leaves out soft-deleted accounts", () => {
+    expect(fn).toMatch(/users\.deleted_at IS NULL/);
+  });
+
+  it("leaves out rows with no usable address", () => {
+    expect(fn).toMatch(/users\.email IS NOT NULL/);
+    expect(fn).toMatch(/btrim\(users\.email\) <> ''/);
+  });
+
+  it("orders the result, so paging it over PostgREST is stable", () => {
+    expect(fn).toMatch(/ORDER BY users\.id/);
+  });
+
+  it("is reachable only by service_role", () => {
+    // The auth schema stays unexposed to PostgREST; this is the only door, and
+    // it is not open to anon or authenticated.
+    expect(fn).toMatch(
+      /REVOKE ALL ON FUNCTION public\.list_broadcast_contact_emails\(\)\s*\n\s*FROM PUBLIC, anon, authenticated;/
+    );
+    expect(fn).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.list_broadcast_contact_emails\(\)\s*\n\s*TO service_role;/
+    );
+  });
+
+  it("is SECURITY DEFINER with a pinned search path", () => {
+    // service_role has no grant on auth.users, so it has to run as the owner,
+    // which makes an unpinned search_path a real escalation risk.
+    expect(fn).toMatch(/SECURITY DEFINER/);
+    expect(fn).toMatch(/SET search_path = ''/);
+  });
+
+  it("reloads the PostgREST schema cache, or the first call 404s", () => {
+    expect(fn).toMatch(/NOTIFY pgrst, 'reload schema'/);
+  });
+});
+
+describe("the auth token repair", () => {
+  const repair = read("20260903000002_repair_null_auth_tokens.sql");
+
+  it("normalises every column GoTrue models as a non-nullable string", () => {
+    for (const column of [
+      "confirmation_token",
+      "recovery_token",
+      "email_change",
+      "email_change_token_new",
+      "email_change_token_current",
+      "phone_change",
+      "phone_change_token",
+      "reauthentication_token",
+    ]) {
+      expect(repair).toContain(`${column} = coalesce(${column}, '')`);
+      expect(repair).toContain(`${column} IS NULL`);
+    }
+  });
+
+  it("touches only rows that are already unreadable", () => {
+    // Narrowed by a WHERE, so no healthy row is rewritten and re-running is a
+    // no-op rather than a second pass over every account.
+    expect(repair).toMatch(/WHERE confirmation_token IS NULL/);
+  });
+
+  it("changes no credential and no confirmation state", () => {
+    // Empty string is what GoTrue itself writes for "no token outstanding".
+    // The *_at timestamps that carry confirmation state are not mentioned.
+    expect(repair).not.toMatch(/encrypted_password/);
+    expect(repair).not.toMatch(/email_confirmed_at\s*=/);
+    expect(repair).not.toMatch(/confirmed_at\s*=/);
+    expect(repair).not.toMatch(/\bDELETE\b/);
+  });
+});

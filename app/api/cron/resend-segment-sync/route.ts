@@ -19,6 +19,7 @@ import {
   syncContactSegments,
 } from "@/lib/resendBroadcasts";
 import { isResendRateLimited } from "@/lib/resendClient";
+import { loadBroadcastContactEmails } from "@/lib/broadcastAuthEmails";
 import { reconcileStuckBroadcasts } from "@/lib/broadcastStore";
 import {
   STANDING_AUDIENCE_KEYS,
@@ -90,41 +91,12 @@ async function pageAll<T>(
   return rows;
 }
 
-/**
- * Addresses live in auth.users, which PostgREST does not expose. Paging the
- * admin API is the only bulk read available, and it is why this runs on a
- * schedule rather than per send: one getUserById per member does not survive
- * twelve thousand members.
- */
-async function loadAuthEmails(admin: AdminClient) {
-  const emails = new Map<string, string>();
-  let page = 1;
-
-  for (;;) {
-    const { data, error } = await admin.auth.admin.listUsers({
-      page,
-      perPage: 1000,
-    });
-    if (error) throw new Error(error.message);
-
-    const users = data.users ?? [];
-    for (const user of users) {
-      if (user.email) emails.set(user.id, user.email);
-    }
-
-    if (users.length < 1000) break;
-    page += 1;
-  }
-
-  return emails;
-}
-
 async function loadCandidates(admin: AdminClient): Promise<ContactSnapshot[]> {
   const activityCutoff = daysAgoIso(ACTIVE_WINDOW_DAYS);
 
   const [authEmails, profiles, publishedRows, recentPosts, recentComments] =
     await Promise.all([
-      loadAuthEmails(admin),
+      loadBroadcastContactEmails(admin),
       pageAll<{
         id: string;
         signup_email: string | null;

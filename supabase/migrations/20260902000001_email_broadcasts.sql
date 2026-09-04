@@ -27,16 +27,22 @@ BEGIN;
 -- -----------------
 -- Source-controlled only. Preflight:
 --   1. Apply this migration.
---   2. Apply 20260902000002_schedule_resend_segment_sync.sql and run
+--   2. Apply 20260903000001_broadcast_auth_emails.sql. The sync cannot read a
+--      single member address without it and will refuse to run.
+--   3. Apply 20260902000002_schedule_resend_segment_sync.sql and run
 --      select private.install_indegenius_cron_jobs();
---   3. Run /api/cron/resend-segment-sync by hand until it answers
+--   4. Run /api/cron/resend-segment-sync by hand until it answers
 --      {"complete": true}. The first run bootstraps every contact at Resend
 --      and will need several passes on a large account.
---   4. Confirm broadcast_segments has five rows with non-null
+--   5. Confirm broadcast_segments has five rows with non-null
 --      resend_segment_id and a recent last_synced_at.
---   5. Point a Resend webhook at /api/webhooks/resend and set
+--   6. Point a Resend webhook at /api/webhooks/resend and set
 --      RESEND_WEBHOOK_SECRET.
---   6. Only then remove the prototype banner from the admin section.
+--   7. Only then remove the prototype banner from the admin section.
+--
+-- 20260903000002_repair_null_auth_tokens.sql is optional and unrelated to the
+-- sync. It repairs auth rows that GoTrue itself cannot read, which breaks the
+-- dashboard user list and password reset for those accounts.
 
 -- ==========================================================================
 -- A. The opt-out category

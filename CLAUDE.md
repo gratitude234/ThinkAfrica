@@ -219,6 +219,14 @@ address on it. Three rules the code depends on:
   Resend owns the unsubscribe link, so an opt-out arrives from Resend and is
   mirrored inward; only the member turning the switch back on in settings
   reverses it, via the `profiles_broadcast_resubscribe` trigger.
+- Member addresses are read with `list_broadcast_contact_emails()`, never with
+  `auth.admin.listUsers()`. GoTrue models the auth token columns as
+  non-nullable strings, so a single row holding NULL in one of them (any row
+  inserted by direct SQL rather than through the Auth API) fails the whole
+  request with `Database error finding users`. Reading `id` and `email` in SQL
+  never constructs that struct. There is deliberately no fallback to
+  `profiles.signup_email`: it is populated for almost nobody, so a fallback
+  would sync a near-empty audience and report success.
 
 Schema: `supabase/schema.sql` (base) + `supabase/schema_phase2-5.sql` (incremental). Timestamped migrations in `supabase/migrations/`. Apply via Supabase dashboard or CLI. There is no local migration runner configured, so `supabase/migrations/emailBroadcastsMigration.test.ts` asserts the contracts that would otherwise only fail in production.
 

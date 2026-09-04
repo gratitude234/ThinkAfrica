@@ -25,6 +25,7 @@
     "lib/emailShell.ts",
     "lib/broadcasts.ts",
     "lib/broadcastEmail.ts",
+    "lib/broadcastAuthEmails.ts",
     "lib/broadcastEligibility.ts",
     "lib/broadcastSend.ts",
     "lib/broadcastStore.ts",
