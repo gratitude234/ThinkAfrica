@@ -55,6 +55,55 @@ export function isResendRateLimited(error: unknown) {
   );
 }
 
+/**
+ * Resend error names that describe the request rather than the moment: the
+ * broadcast, the address or the key was wrong, and sending the identical
+ * request again would be wrong in the identical way.
+ */
+const DEFINITIVE_REJECTION_CODES = new Set([
+  "validation_error",
+  "invalid_parameter",
+  "invalid_attachment",
+  "invalid_from_address",
+  "invalid_to_address",
+  "invalid_access",
+  "invalid_scope",
+  "missing_required_field",
+  "restricted_api_key",
+  "method_not_allowed",
+  "not_found",
+  "security_error",
+]);
+
+/**
+ * True when Resend has told us the request itself was unacceptable, rather
+ * than that something went wrong on the way to it.
+ *
+ * The distinction matters in exactly one place: a broadcast that failed at
+ * broadcasts.send. A timeout leaves us unable to prove the send was not
+ * accepted, so the row stays locked. A validation rejection is Resend saying
+ * it never started. That is not on its own permission to unlock: it is only a
+ * reason to go and ask Resend what state the broadcast is actually in, and
+ * the answer is what decides.
+ *
+ * 408, 409 and 425 are 4xx codes meaning "not now" rather than "not ever", so
+ * they are excluded alongside the rate limits.
+ */
+export function isResendDefinitiveRejection(error: unknown) {
+  if (!(error instanceof ResendApiError)) return false;
+  if (isResendRateLimited(error)) return false;
+
+  const status = error.statusCode;
+  if (status !== null) {
+    if (status === 408 || status === 409 || status === 425) return false;
+    return status >= 400 && status < 500;
+  }
+
+  // Older SDK error payloads carry a name and no status code at all, so the
+  // name is the only thing left to read.
+  return DEFINITIVE_REJECTION_CODES.has(error.code ?? "");
+}
+
 export class ResendNotConfiguredError extends Error {
   constructor() {
     super("RESEND_API_KEY is not configured.");

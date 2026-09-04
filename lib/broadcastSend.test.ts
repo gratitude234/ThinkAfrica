@@ -45,8 +45,31 @@ type Harness = {
     markSending: ReturnType<typeof vi.fn>;
     markDispatchStarted: ReturnType<typeof vi.fn>;
     releaseClaim: ReturnType<typeof vi.fn>;
+    readProviderBroadcastStatus: ReturnType<typeof vi.fn>;
+    releaseAfterRejection: ReturnType<typeof vi.fn>;
   };
 };
+
+/**
+ * Resend's own error shape, near enough for the classifier: a validation
+ * rejection carries a 4xx, a transport failure carries nothing at all.
+ */
+class FakeResendError extends Error {
+  readonly statusCode: number | null;
+
+  constructor(message: string, statusCode: number | null) {
+    super(message);
+    this.name = "ResendApiError";
+    this.statusCode = statusCode;
+  }
+}
+
+function isFakeDefinitiveRejection(error: unknown) {
+  if (!(error instanceof FakeResendError)) return false;
+  if (error.statusCode === null) return false;
+  if ([408, 409, 425, 429].includes(error.statusCode)) return false;
+  return error.statusCode >= 400 && error.statusCode < 500;
+}
 
 /**
  * A harness that behaves like the real store: the claim is atomic, mutates the
@@ -98,6 +121,24 @@ function harness(
     state.current = { ...state.current, status };
   });
 
+  // Defaults to the safe answer. A test that wants an unlock has to say so.
+  const readProviderBroadcastStatus = vi.fn(async () => "unknown" as const);
+
+  /**
+   * Mirrors the store's conditional update: it only matches while the row is
+   * still the queued, dispatch-stamped row this caller claimed.
+   */
+  const releaseAfterRejection = vi.fn(async () => {
+    const current = state.current;
+    if (current.status !== "queued" || !current.dispatchStartedAt) return false;
+    state.current = {
+      ...current,
+      status: "draft",
+      dispatchStartedAt: null,
+    };
+    return true;
+  });
+
   const deps: SendBroadcastDeps = {
     loadBroadcast: async () => state.current,
     checkSendPrecondition: async () => ({ ok: true, recipientCount: 1200 }),
@@ -110,6 +151,9 @@ function harness(
     markSending,
     markFailed,
     releaseClaim,
+    isDefinitiveRejection: isFakeDefinitiveRejection,
+    readProviderBroadcastStatus,
+    releaseAfterRejection,
     buildEmail: () => ({
       name: "Building the next chapter",
       from: "Indegenius <indegenius@indegenius.africa>",
@@ -136,6 +180,8 @@ function harness(
       markSending,
       markDispatchStarted,
       releaseClaim,
+      readProviderBroadcastStatus,
+      releaseAfterRejection,
     },
   };
 }
@@ -400,6 +446,124 @@ describe("Resend failures", () => {
     // And a second attempt is refused rather than sending again.
     const retry = await sendBroadcast("bc-1", "admin-1", test.deps);
     expect(retry).toMatchObject({ ok: false, reason: "already_dispatched" });
+  });
+
+  it("unlocks a validation rejection the provider still holds as a draft", async () => {
+    // The production sequence: Resend refused the audience over a reserved
+    // test domain, and its copy of the broadcast never left draft. Nothing was
+    // sent, so the row must not be locked to a reconciliation that can only
+    // ever confirm the same thing.
+    let attempts = 0;
+    const test = harness(row(), {
+      // Rejected once, then accepted, which is what fixing the audience and
+      // pressing send again looks like from here.
+      sendResendBroadcast: async () => {
+        attempts += 1;
+        if (attempts > 1) return;
+        throw new FakeResendError(
+          "Resend broadcasts.send failed: The audience contains an invalid contact: preview.lane03.1781075745@example.com",
+          422
+        );
+      },
+    });
+    test.calls.readProviderBroadcastStatus.mockResolvedValue("draft");
+
+    const result = await sendBroadcast("bc-1", "admin-1", test.deps);
+
+    expect(result).toMatchObject({ ok: false, reason: "provider_rejected" });
+    expect(test.calls.readProviderBroadcastStatus).toHaveBeenCalledWith(
+      "resend-bc-1"
+    );
+    expect(test.calls.markFailed).not.toHaveBeenCalled();
+
+    // Editable and claimable again, without a second Resend broadcast.
+    expect(test.state.current.status).toBe("draft");
+    expect(test.state.current.dispatchStartedAt).toBeNull();
+    expect(test.state.current.resendBroadcastId).toBe("resend-bc-1");
+
+    const retry = await sendBroadcast("bc-1", "admin-1", test.deps);
+    expect(retry).toMatchObject({ ok: true, outcome: "dispatched" });
+    expect(test.state.current.status).toBe("sending");
+    // The same Resend draft went out. A second one was never created.
+    expect(test.calls.createResendBroadcast).toHaveBeenCalledTimes(1);
+    expect(attempts).toBe(2);
+  });
+
+  it("never unlocks a broadcast the provider has queued or sent", async () => {
+    for (const providerStatus of ["queued", "sent"] as const) {
+      const test = harness(row(), {
+        sendResendBroadcast: async () => {
+          throw new FakeResendError("Resend broadcasts.send failed: bad", 422);
+        },
+      });
+      test.calls.readProviderBroadcastStatus.mockResolvedValue(providerStatus);
+
+      const result = await sendBroadcast("bc-1", "admin-1", test.deps);
+
+      expect(result).toMatchObject({ ok: false, reason: "needs_reconciliation" });
+      expect(test.calls.releaseAfterRejection).not.toHaveBeenCalled();
+      expect(test.state.current.dispatchStartedAt).not.toBeNull();
+
+      const retry = await sendBroadcast("bc-1", "admin-1", test.deps);
+      expect(retry).toMatchObject({ ok: false, reason: "already_dispatched" });
+    }
+  });
+
+  it("keeps the lock when the provider's state cannot be read at all", async () => {
+    const test = harness(row(), {
+      sendResendBroadcast: async () => {
+        throw new FakeResendError("Resend broadcasts.send failed: bad", 422);
+      },
+    });
+    test.calls.readProviderBroadcastStatus.mockRejectedValue(
+      new Error("gateway timeout")
+    );
+
+    const result = await sendBroadcast("bc-1", "admin-1", test.deps);
+
+    // Not knowing is the same as not being allowed to unlock.
+    expect(result).toMatchObject({ ok: false, reason: "needs_reconciliation" });
+    expect(test.state.current.dispatchStartedAt).not.toBeNull();
+  });
+
+  it("does not even ask the provider after a timeout or a 5xx", async () => {
+    // Either could have been accepted on the way through, so the answer we
+    // would get now proves nothing and the reconciler settles it later.
+    for (const thrown of [
+      new Error("network timeout"),
+      new FakeResendError("Resend broadcasts.send failed: bad gateway", 502),
+      new FakeResendError("Resend broadcasts.send failed: slow down", 429),
+    ]) {
+      const test = harness(row(), {
+        sendResendBroadcast: async () => {
+          throw thrown;
+        },
+      });
+      test.calls.readProviderBroadcastStatus.mockResolvedValue("draft");
+
+      const result = await sendBroadcast("bc-1", "admin-1", test.deps);
+
+      expect(result).toMatchObject({ ok: false, reason: "needs_reconciliation" });
+      expect(test.calls.readProviderBroadcastStatus).not.toHaveBeenCalled();
+      expect(test.state.current.dispatchStartedAt).not.toBeNull();
+    }
+  });
+
+  it("falls back to reconciliation when the release matches no row", async () => {
+    // Something else moved the row between the rejection and the release, so
+    // this caller no longer owns the claim it is trying to give back.
+    const test = harness(row(), {
+      sendResendBroadcast: async () => {
+        throw new FakeResendError("Resend broadcasts.send failed: bad", 422);
+      },
+      releaseAfterRejection: async () => false,
+    });
+    test.calls.readProviderBroadcastStatus.mockResolvedValue("draft");
+
+    const result = await sendBroadcast("bc-1", "admin-1", test.deps);
+
+    expect(result).toMatchObject({ ok: false, reason: "needs_reconciliation" });
+    expect(test.calls.markFailed).toHaveBeenCalled();
   });
 
   it("still reports success when only our own status write fails", async () => {

@@ -210,8 +210,13 @@ only by `service_role`: `broadcast_contacts` holds one row per member with their
 address on it. Three rules the code depends on:
 
 - A broadcast is claimed for sending by `claim_broadcast_for_send()`, one
-  statement, and `dispatch_started_at` makes the row permanently unclaimable
-  once `broadcasts.send` has been called.
+  statement, and `dispatch_started_at` makes the row unclaimable once
+  `broadcasts.send` has been called. Exactly one thing clears that stamp, and
+  it is never a guess: Resend answering that the broadcast is still `draft` on
+  its side, which proves no send was accepted. `releaseAfterRejection()` does
+  it at send time after a definitive validation rejection, and
+  `reconcileStuckBroadcasts()` does it later for anything stranded. A `queued`
+  or `sent` broadcast, and a broadcast Resend cannot account for, stay locked.
 - Delivery counters move only through `record_broadcast_delivery_event()`, which
   writes to `broadcast_delivery_events` first and increments only when that
   write was new. Resend retries webhooks, so replay is the normal case.
@@ -227,6 +232,13 @@ address on it. Three rules the code depends on:
   never constructs that struct. There is deliberately no fallback to
   `profiles.signup_email`: it is populated for almost nobody, so a fallback
   would sync a near-empty audience and report success.
+- Reserved test domains (`example.com`/`.org`/`.net`, and anything under the
+  `.invalid`, `.test`, `.example` and `.localhost` TLDs) are ineligible in
+  `lib/broadcastEligibility.ts`, alongside the opt-outs. Resend rejects a whole
+  broadcast when one is in the addressed segment, so the exclusion has to be in
+  the shared definition rather than in one caller's filter. A cached contact
+  already in a segment leaves it on the next sync, which pushes it with no
+  segments.
 
 Schema: `supabase/schema.sql` (base) + `supabase/schema_phase2-5.sql` (incremental). Timestamped migrations in `supabase/migrations/`. Apply via Supabase dashboard or CLI. There is no local migration runner configured, so `supabase/migrations/emailBroadcastsMigration.test.ts` asserts the contracts that would otherwise only fail in production.
 

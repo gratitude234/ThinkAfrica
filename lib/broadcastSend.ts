@@ -25,6 +25,13 @@ import type { BroadcastAudienceKey, BroadcastStatus } from "@/lib/broadcasts";
  *      that instant the row is never re-claimable, whatever happens next, and
  *      a later failure is recorded as needing reconciliation rather than as a
  *      retryable error. Sending twice is the one failure with no undo.
+ *
+ * There is exactly one way out of (4), and it is not a guess. When Resend
+ * rejects the send on its own terms, a validation error rather than a timeout,
+ * we ask Resend what state the broadcast is in. If it answers "draft", nobody
+ * was emailed and the lock is protecting nothing, so the claim is released and
+ * the broadcast becomes an editable draft again. Any other answer, and any
+ * failure to get an answer, leaves the row locked exactly as before.
  */
 
 /** A segment synced longer ago than this is not trusted to address a send. */
@@ -71,7 +78,16 @@ export type SendFailureReason =
   | "segment_stale"
   | "already_dispatched"
   | "resend_failed"
+  | "provider_rejected"
   | "needs_reconciliation";
+
+/**
+ * Resend's own view of a broadcast. "unknown" covers everything that is not a
+ * definite answer: a broadcast it cannot find, a status word we do not
+ * recognise, and a lookup that failed outright. Every one of them must be
+ * treated the same way, because none of them proves nothing was sent.
+ */
+export type ProviderBroadcastStatus = "draft" | "queued" | "sent" | "unknown";
 
 export type SendBroadcastResult =
   | {
@@ -137,6 +153,31 @@ export type SendBroadcastDeps = {
   markFailed(id: string, note: string): Promise<void>;
   /** Puts an un-dispatched broadcast back where it was so it can be edited. */
   releaseClaim(id: string, status: BroadcastStatus): Promise<void>;
+  /**
+   * True when Resend refused the request on its own terms rather than failing
+   * to answer. Only ever used to decide whether asking Resend for the
+   * broadcast's state is worth doing.
+   */
+  isDefinitiveRejection(error: unknown): boolean;
+  /**
+   * Resend's own status for a broadcast. Must answer "unknown" rather than
+   * throwing, because a lookup that failed is indistinguishable from a
+   * broadcast that is on its way out.
+   */
+  readProviderBroadcastStatus(
+    resendBroadcastId: string
+  ): Promise<ProviderBroadcastStatus>;
+  /**
+   * Clears the dispatch stamp and puts the broadcast back to an editable
+   * draft. Called only after Resend has confirmed the broadcast is still a
+   * draft on its side, and must itself be conditional on the row still being
+   * the one this caller claimed, so a row that moved on is left alone.
+   * Answers false when it matched nothing.
+   */
+  releaseAfterRejection(input: {
+    id: string;
+    note: string;
+  }): Promise<boolean>;
   buildEmail(row: BroadcastSendRow, recipientCount: number): BuiltBroadcastEmail;
   createResendBroadcast(input: {
     name: string;
@@ -161,6 +202,22 @@ export function isSegmentStale(lastSyncedAt: string | null, now: Date) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown Resend failure.";
+}
+
+/**
+ * Asking Resend what it holds must never itself be able to strand a send. A
+ * lookup that throws answers "unknown", which is the answer that keeps the row
+ * locked, so the failure mode of this question is the safe one.
+ */
+async function readProviderStatus(
+  deps: SendBroadcastDeps,
+  resendBroadcastId: string
+): Promise<ProviderBroadcastStatus> {
+  try {
+    return await deps.readProviderBroadcastStatus(resendBroadcastId);
+  } catch {
+    return "unknown";
+  }
 }
 
 function alreadyInProgress(row: BroadcastSendRow): SendBroadcastResult {
@@ -310,6 +367,26 @@ export async function sendBroadcast(
     await deps.sendResendBroadcast(resendBroadcastId);
   } catch (error) {
     const message = errorMessage(error);
+
+    // A rejection Resend owns, rather than a call that never arrived, is worth
+    // one question: is the broadcast still sitting there as a draft? Only that
+    // answer releases the lock, and only for the caller still holding the
+    // claim it stamped. Anything else falls through to reconciliation.
+    if (deps.isDefinitiveRejection(error)) {
+      const providerStatus = await readProviderStatus(deps, resendBroadcastId);
+
+      if (providerStatus === "draft") {
+        const released = await deps.releaseAfterRejection({
+          id: claimed.id,
+          note: `${message} The provider rejected the request and still holds this broadcast as a draft, so nobody was emailed. Fix the problem and send it again.`,
+        });
+
+        if (released) {
+          return { ok: false, reason: "provider_rejected", message };
+        }
+      }
+    }
+
     // Resend answered with an error, but the request may still have been
     // accepted. markFailed does not restore claimability, because
     // dispatch_started_at is set; the reconciler settles it against Resend.

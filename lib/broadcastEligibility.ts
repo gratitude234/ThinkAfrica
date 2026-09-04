@@ -36,9 +36,61 @@ export type BroadcastCandidate = {
 
 export type BroadcastIneligibleReason =
   | "no_email"
+  | "reserved_domain"
   | "suspended"
   | "preference_disabled"
   | "unsubscribed";
+
+/**
+ * Domains RFC 2606 and RFC 6761 reserve so that nobody can ever own them. An
+ * address at one of these belongs to a fixture, a seeded preview account or a
+ * copied-out example, never to a person, and Resend rejects a whole broadcast
+ * when one turns up in the addressed segment. So the exclusion is here, in the
+ * one definition of eligible that both the nightly sync and the send path
+ * read, rather than in a filter somebody has to remember to apply.
+ */
+export const RESERVED_EMAIL_DOMAINS = [
+  "example.com",
+  "example.org",
+  "example.net",
+] as const;
+
+/** Reserved top-level names. Everything under them is reserved with them. */
+export const RESERVED_EMAIL_TLDS = [
+  "invalid",
+  "test",
+  "example",
+  "localhost",
+] as const;
+
+/**
+ * The domain half of an address, lowercased. Null when there is nothing after
+ * the last @, which the format check would have refused anyway.
+ */
+function emailDomain(email: string) {
+  const at = email.lastIndexOf("@");
+  if (at < 0) return null;
+  const domain = email.slice(at + 1).trim().toLowerCase();
+  return domain || null;
+}
+
+/**
+ * True for a reserved domain and for anything beneath one, so a subdomain like
+ * mail.example.com is caught alongside example.com itself.
+ */
+export function isReservedEmailDomain(email: string | null | undefined) {
+  if (!email) return false;
+  const domain = emailDomain(email.trim());
+  if (!domain) return false;
+
+  const labels = domain.split(".");
+  const tld = labels[labels.length - 1];
+  if ((RESERVED_EMAIL_TLDS as readonly string[]).includes(tld)) return true;
+
+  return RESERVED_EMAIL_DOMAINS.some(
+    (reserved) => domain === reserved || domain.endsWith(`.${reserved}`)
+  );
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -63,6 +115,9 @@ export function broadcastIneligibleReason(
   candidate: BroadcastCandidate
 ): BroadcastIneligibleReason | null {
   if (!hasUsableEmail(candidate.email)) return "no_email";
+  // Checked second, before anything about the person: a reserved domain is a
+  // property of the address, and no preference or state can make it sendable.
+  if (isReservedEmailDomain(candidate.email)) return "reserved_domain";
   if (candidate.suspendedAt) return "suspended";
   if (candidate.unsubscribed) return "unsubscribed";
   if (!wantsBroadcastEmail(candidate.notificationPrefs)) {

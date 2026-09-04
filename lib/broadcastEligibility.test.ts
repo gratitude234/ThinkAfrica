@@ -7,6 +7,7 @@ import {
   broadcastIneligibleReason,
   hasUsableEmail,
   isEligibleForBroadcast,
+  isReservedEmailDomain,
   matchesAudience,
   wantsBroadcastEmail,
   type BroadcastCandidate,
@@ -23,7 +24,7 @@ function candidate(
 ): BroadcastCandidate {
   return {
     profileId: "p1",
-    email: "member@example.com",
+    email: "member@indegenius.africa",
     suspendedAt: null,
     notificationPrefs: {},
     unsubscribed: false,
@@ -70,7 +71,73 @@ describe("who may be written to", () => {
     expect(broadcastIneligibleReason(candidate({ email: "not-an-address" }))).toBe(
       "no_email"
     );
-    expect(hasUsableEmail("  member@example.com  ")).toBe(true);
+    expect(hasUsableEmail("  member@indegenius.africa  ")).toBe(true);
+  });
+
+  it("refuses a reserved test domain, whatever the account says", () => {
+    // preview.lane03.1781075745@example.com was a real row in this account,
+    // and Resend rejected the whole broadcast rather than skipping it.
+    expect(
+      broadcastIneligibleReason(
+        candidate({ email: "preview.lane03.1781075745@example.com" })
+      )
+    ).toBe("reserved_domain");
+
+    for (const address of [
+      "seed@example.com",
+      "seed@example.org",
+      "seed@example.net",
+      "seed@somewhere.invalid",
+      "seed@fixtures.test",
+      "seed@app.localhost",
+      "seed@mail.example.com",
+      "SEED@EXAMPLE.COM",
+    ]) {
+      expect(isReservedEmailDomain(address)).toBe(true);
+      expect(broadcastIneligibleReason(candidate({ email: address }))).toBe(
+        "reserved_domain"
+      );
+    }
+  });
+
+  it("leaves ordinary addresses alone, including ones that merely read alike", () => {
+    for (const address of [
+      "member@indegenius.africa",
+      "member@example.africa",
+      "member@myexample.com",
+      "member@exampleuniversity.edu.ng",
+      "member@gmail.com",
+    ]) {
+      expect(isReservedEmailDomain(address)).toBe(false);
+      expect(broadcastIneligibleReason(candidate({ email: address }))).toBeNull();
+    }
+  });
+
+  it("gives a reserved address no audiences, so a sync empties its segments", () => {
+    // Membership going empty is what the sync turns into a removal call at
+    // Resend, which is how a cached contact actually leaves the segments.
+    expect(
+      audienceMembership(
+        candidate({
+          email: "preview@example.com",
+          publishedCount: 4,
+          isVerified: true,
+          lastActivityAt: daysAgo(1),
+        }),
+        NOW
+      )
+    ).toEqual([]);
+  });
+
+  it("cannot be sent to by naming a reserved address by hand", () => {
+    expect(
+      matchesAudience(
+        candidate({ email: "preview@example.com" }),
+        "selected",
+        ["p1"],
+        NOW
+      )
+    ).toBe(false);
   });
 
   it("refuses a suspended account", () => {

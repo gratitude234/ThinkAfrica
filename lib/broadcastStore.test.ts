@@ -280,6 +280,191 @@ describe("the hand-picked segment", () => {
   });
 });
 
+describe("reconciling a stranded send", () => {
+  function dbRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "24b75e7d-b9c4-4fbb-887b-c8f4c903b138",
+      subject: "Subject",
+      preview_text: "",
+      body_html: "<p>Body</p>",
+      sender_key: "platform",
+      audience_key: "all",
+      selected_profile_ids: [],
+      selected_segment_id: null,
+      status: "failed",
+      resend_broadcast_id: "1ae001e6-ac31-48b7-8383-7778e5ba5cc7",
+      dispatch_started_at: "2026-09-03T10:00:00Z",
+      recipient_count: 1200,
+      delivered_count: 0,
+      failed_count: 0,
+      status_note: "Resend rejected the audience.",
+      created_by: null,
+      sent_by: null,
+      sent_at: null,
+      created_at: "2026-09-03T09:00:00Z",
+      updated_at: "2026-09-03T10:00:00Z",
+      ...overrides,
+    };
+  }
+
+  /** The update that clears the dispatch stamp, as opposed to the bulk release. */
+  function unlockUpdate() {
+    return adminState.updates.find(
+      (u) => u.table === "broadcasts" && "dispatch_started_at" in u.patch
+    );
+  }
+
+  it("unlocks a failed broadcast the provider still holds as a draft", async () => {
+    // The production sequence. Resend rejected the send over a reserved test
+    // domain in the audience, so its broadcast never left draft and nobody was
+    // emailed, but the local row stayed locked to a reconciliation that could
+    // only ever confirm the same thing.
+    adminState.tables.broadcasts = [dbRow()];
+    getResendBroadcastMock.mockResolvedValue({
+      id: "1ae001e6-ac31-48b7-8383-7778e5ba5cc7",
+      status: "draft",
+    });
+
+    await store.reconcileStuckBroadcasts();
+
+    const unlock = unlockUpdate();
+    expect(unlock?.patch).toMatchObject({
+      status: "draft",
+      dispatch_started_at: null,
+      send_claimed_at: null,
+      sent_at: null,
+      status_note: store.PROVIDER_DRAFT_RELEASE_NOTE,
+    });
+
+    // Only the row we read, still in the state we read it in, and still
+    // carrying the stamp we are clearing.
+    expect(unlock?.filters).toContain(
+      "eq:id:24b75e7d-b9c4-4fbb-887b-c8f4c903b138"
+    );
+    expect(unlock?.filters).toContain("eq:status:failed");
+    expect(unlock?.filters).toContain("not:dispatch_started_at:is:null");
+  });
+
+  it("unlocks a row stranded in queued or sending just the same", async () => {
+    for (const status of ["queued", "sending"]) {
+      adminState.updates = [];
+      adminState.tables.broadcasts = [dbRow({ status })];
+      getResendBroadcastMock.mockResolvedValue({ status: "draft" });
+
+      await store.reconcileStuckBroadcasts();
+
+      expect(unlockUpdate()?.patch).toMatchObject({
+        status: "draft",
+        dispatch_started_at: null,
+      });
+      expect(unlockUpdate()?.filters).toContain(`eq:status:${status}`);
+    }
+  });
+
+  it("never clears the dispatch stamp on a broadcast the provider queued", async () => {
+    adminState.tables.broadcasts = [dbRow({ status: "sending" })];
+    getResendBroadcastMock.mockResolvedValue({ status: "queued" });
+
+    await store.reconcileStuckBroadcasts();
+
+    expect(unlockUpdate()).toBeUndefined();
+  });
+
+  it("never clears the dispatch stamp on a broadcast the provider sent", async () => {
+    adminState.tables.broadcasts = [dbRow()];
+    getResendBroadcastMock.mockResolvedValue({
+      status: "sent",
+      sent_at: "2026-09-03T10:01:00Z",
+    });
+
+    await store.reconcileStuckBroadcasts();
+
+    expect(unlockUpdate()).toBeUndefined();
+
+    // It is corrected forward to sending, not backwards to a draft.
+    const update = adminState.updates.find(
+      (u) => u.table === "broadcasts" && u.patch.status === "sending"
+    );
+    expect(update?.patch.sent_at).toBe("2026-09-03T10:01:00Z");
+  });
+
+  it("leaves the row alone when the provider cannot account for it", async () => {
+    // getResendBroadcast answers null for a broadcast Resend does not have.
+    // Not knowing is not permission to unlock.
+    adminState.tables.broadcasts = [dbRow()];
+    getResendBroadcastMock.mockResolvedValue(null);
+
+    await store.reconcileStuckBroadcasts();
+
+    expect(unlockUpdate()).toBeUndefined();
+  });
+
+  it("only looks at rows that were dispatched and have gone quiet", async () => {
+    adminState.tables.broadcasts = [];
+
+    await store.reconcileStuckBroadcasts();
+
+    const scan = adminState.updates.find(
+      (u) => u.table === "broadcasts" && !("dispatch_started_at" in u.patch)
+    );
+    // The bulk release at the end is the other half: a claim that never
+    // reached Resend at all goes back to being a draft.
+    expect(scan?.filters).toContain("eq:status:queued");
+    expect(scan?.filters).toContain("is:dispatch_started_at:null");
+  });
+});
+
+describe("releasing a claim after a provider rejection", () => {
+  it("clears the stamp only for the caller still holding the claim", async () => {
+    adminState.tables.broadcasts = [{ id: "bc-1" }];
+
+    const released = await store.releaseAfterRejection({
+      id: "bc-1",
+      note: "Resend rejected the audience.",
+    });
+
+    expect(released).toBe(true);
+
+    const update = adminState.updates.find((u) => u.table === "broadcasts");
+    expect(update?.patch).toMatchObject({
+      status: "draft",
+      dispatch_started_at: null,
+      send_claimed_at: null,
+    });
+    // Queued is the status the claim itself wrote, and the stamp is the one
+    // this caller put there. A row that moved on matches neither.
+    expect(update?.filters).toContain("eq:status:queued");
+    expect(update?.filters).toContain("not:dispatch_started_at:is:null");
+  });
+
+  it("reports false when it matched nothing, so the caller reconciles instead", async () => {
+    adminState.tables.broadcasts = [];
+
+    expect(
+      await store.releaseAfterRejection({ id: "bc-1", note: "rejected" })
+    ).toBe(false);
+  });
+});
+
+describe("reading the provider's own status", () => {
+  it("passes through the three words Resend actually uses", async () => {
+    for (const status of ["draft", "queued", "sent"] as const) {
+      getResendBroadcastMock.mockResolvedValue({ status });
+      expect(await store.readProviderBroadcastStatus("resend-bc-1")).toBe(status);
+    }
+  });
+
+  it("answers unknown for a broadcast Resend cannot find", async () => {
+    getResendBroadcastMock.mockResolvedValue(null);
+    expect(await store.readProviderBroadcastStatus("resend-bc-1")).toBe("unknown");
+  });
+
+  it("answers unknown for a status word it does not recognise", async () => {
+    getResendBroadcastMock.mockResolvedValue({ status: "scheduled" });
+    expect(await store.readProviderBroadcastStatus("resend-bc-1")).toBe("unknown");
+  });
+});
+
 describe("standing segment freshness", () => {
   const now = new Date("2026-09-02T12:00:00Z");
   const fresh = "2026-09-02T06:00:00Z";

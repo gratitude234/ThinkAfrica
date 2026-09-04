@@ -15,10 +15,12 @@ import {
   MAX_SELECTED_RECIPIENTS,
   isSegmentStale,
   type BroadcastSendRow,
+  type ProviderBroadcastStatus,
   type SegmentResolution,
   type SendBroadcastDeps,
   type SendPrecondition,
 } from "@/lib/broadcastSend";
+import { isResendDefinitiveRejection } from "@/lib/resendClient";
 import {
   createResendBroadcast,
   ensureNamedSegment,
@@ -634,6 +636,61 @@ export async function releaseClaim(id: string, status: BroadcastStatus) {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Resend's status word for a broadcast, narrowed to the three we act on.
+ * Everything else, including a broadcast Resend cannot find, is "unknown",
+ * which is the answer that keeps a locked row locked.
+ */
+export async function readProviderBroadcastStatus(
+  resendBroadcastId: string
+): Promise<ProviderBroadcastStatus> {
+  const remote = await getResendBroadcast(resendBroadcastId);
+  if (!remote) return "unknown";
+  if (remote.status === "draft") return "draft";
+  if (remote.status === "queued") return "queued";
+  if (remote.status === "sent") return "sent";
+  return "unknown";
+}
+
+/**
+ * The one path that clears a dispatch stamp, and the only place in the product
+ * where a broadcast becomes retryable after broadcasts.send has been called.
+ *
+ * Three things have to hold before this runs at all, and all three are checked
+ * elsewhere: Resend rejected the request on its own terms, Resend confirms the
+ * broadcast is still a draft on its side, and this caller is the one that
+ * claimed the row. The last of those is enforced here, by the update matching
+ * only a row still queued with the dispatch stamp on it, so a row that has
+ * moved on in the meantime is left exactly where it is.
+ *
+ * resend_broadcast_id is deliberately left in place. The Resend draft already
+ * exists and re-sending it is what the retry does, so keeping the id is what
+ * stops a second broadcast being created beside the first.
+ */
+export async function releaseAfterRejection(input: {
+  id: string;
+  note: string;
+}): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("broadcasts")
+    .update({
+      status: "draft",
+      send_claimed_at: null,
+      dispatch_started_at: null,
+      sent_at: null,
+      status_note: input.note.slice(0, 500),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.id)
+    .eq("status", "queued")
+    .not("dispatch_started_at", "is", null)
+    .select("id");
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
 export function buildBroadcastEmail(row: BroadcastSendRow) {
   const sender = getEmailSender(row.senderKey);
   const html = buildBroadcastEmailHtml({
@@ -672,6 +729,9 @@ export function createSendDeps(): SendBroadcastDeps {
     markSending,
     markFailed,
     releaseClaim,
+    isDefinitiveRejection: isResendDefinitiveRejection,
+    readProviderBroadcastStatus,
+    releaseAfterRejection,
     buildEmail: buildBroadcastEmail,
     createResendBroadcast,
     sendResendBroadcast,
@@ -685,6 +745,10 @@ export function createSendDeps(): SendBroadcastDeps {
 
 /** A broadcast still queued or sending after this long is asked about. */
 export const RECONCILE_AFTER_MINUTES = 15;
+
+/** Left on the row so the admin can see why it went back to being a draft. */
+export const PROVIDER_DRAFT_RELEASE_NOTE =
+  "The provider never accepted this send and still holds the broadcast as a draft, so nobody was emailed. It has been unlocked. Check the audience, then send it again.";
 
 export type ReconcileOutcome = {
   broadcastId: string;
@@ -704,6 +768,13 @@ export type ReconcileOutcome = {
  * Resend's own broadcast status is draft, queued or sent. It never says
  * "sending", so a sent broadcast whose per message webhooks are still arriving
  * is left as sending here and finished by the webhook's own completion check.
+ *
+ * "draft" at Resend is the definite answer that nothing was accepted and
+ * nobody was emailed, so the dispatch stamp comes off and the broadcast goes
+ * back to being an editable draft. Leaving it locked, which is what this used
+ * to do, protected nothing and cost the admin the message. Only "draft"
+ * unlocks: queued and sent stay locked, and so does a broadcast Resend cannot
+ * account for, because getResendBroadcast answers null and the row is skipped.
  */
 export async function reconcileStuckBroadcasts(
   limit = 25
@@ -733,15 +804,36 @@ export async function reconcileStuckBroadcasts(
     const remote = await getResendBroadcast(row.resendBroadcastId);
     if (!remote) continue;
 
-    let next: BroadcastStatus | null = null;
-    if (remote.status === "sent") {
-      // Resend accepted and dispatched it. Delivery counts keep arriving over
-      // the webhook; the status stops being a lie in the meantime.
-      next = row.status === "sent" ? null : "sending";
-    } else if (remote.status === "draft") {
-      // The send call never took effect, so nothing was delivered.
-      next = row.status === "failed" ? null : "failed";
+    if (remote.status === "draft") {
+      // No send was ever accepted. Clearing the dispatch stamp is what makes
+      // the broadcast claimable again, and it is safe here for the same reason
+      // it is safe nowhere else: Resend has just said it holds a draft.
+      const { data: released, error: releaseFailure } = await admin
+        .from("broadcasts")
+        .update({
+          status: "draft",
+          send_claimed_at: null,
+          dispatch_started_at: null,
+          sent_at: null,
+          status_note: PROVIDER_DRAFT_RELEASE_NOTE,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id)
+        .eq("status", row.status)
+        .not("dispatch_started_at", "is", null)
+        .select("id");
+
+      if (releaseFailure) throw new Error(releaseFailure.message);
+      if ((released ?? []).length > 0) {
+        outcomes.push({ broadcastId: row.id, from: row.status, to: "draft" });
+      }
+      continue;
     }
+
+    // Resend accepted and dispatched it. Delivery counts keep arriving over
+    // the webhook; the status stops being a lie in the meantime.
+    const next: BroadcastStatus | null =
+      remote.status === "sent" && row.status !== "sent" ? "sending" : null;
 
     if (!next || next === row.status) continue;
 
@@ -749,12 +841,8 @@ export async function reconcileStuckBroadcasts(
       .from("broadcasts")
       .update({
         status: next,
-        status_note:
-          next === "failed"
-            ? "The provider still holds this as a draft, so nothing was delivered. Duplicate the broadcast to try again."
-            : null,
-        sent_at:
-          next === "sending" ? (remote.sent_at ?? new Date().toISOString()) : null,
+        status_note: null,
+        sent_at: remote.sent_at ?? new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", row.id);
