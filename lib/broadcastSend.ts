@@ -176,6 +176,8 @@ export type SendBroadcastDeps = {
    */
   releaseAfterRejection(input: {
     id: string;
+    /** The id whose provider status was just read, so the guard can match it. */
+    resendBroadcastId: string;
     note: string;
   }): Promise<boolean>;
   buildEmail(row: BroadcastSendRow, recipientCount: number): BuiltBroadcastEmail;
@@ -378,6 +380,7 @@ export async function sendBroadcast(
       if (providerStatus === "draft") {
         const released = await deps.releaseAfterRejection({
           id: claimed.id,
+          resendBroadcastId,
           note: `${message} The provider rejected the request and still holds this broadcast as a draft, so nobody was emailed. Fix the problem and send it again.`,
         });
 

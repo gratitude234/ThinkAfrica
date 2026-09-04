@@ -113,6 +113,21 @@ describe("what needs doing", () => {
     expect(plan.resendPushes[0].segmentKeys).toEqual([]);
   });
 
+  it("keeps asking until a push has actually landed at Resend", () => {
+    // stored.segmentKeys is what Resend is known to have, not what we want it
+    // to have. The sync used to write the desired set to it before the push,
+    // which erased the only difference the next run had to work from: a push
+    // that then failed left the contact looking permanently synced, and the
+    // removal never happened.
+    const becameIneligible = snapshot({ isEligible: false, segmentKeys: [] });
+    const lastPushed = stored({ segmentKeys: ["all"] });
+
+    const plan = planContactSync([becameIneligible], storedMap(lastPushed));
+
+    expect(plan.resendPushes).toHaveLength(1);
+    expect(plan.resendPushes[0].segmentKeys).toEqual([]);
+  });
+
   it("serves the longest-waiting contacts first", () => {
     // A run that exhausts its budget must leave the freshest contacts waiting
     // rather than starving the ones that have waited longest.

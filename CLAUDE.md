@@ -217,6 +217,22 @@ address on it. Three rules the code depends on:
   it at send time after a definitive validation rejection, and
   `reconcileStuckBroadcasts()` does it later for anything stranded. A `queued`
   or `sent` broadcast, and a broadcast Resend cannot account for, stay locked.
+  Both go through `release_broadcast_after_provider_draft()`, one statement,
+  for the same reason the claim is one statement: a guard over a nullable
+  column assembled from separate PostgREST filters can match nothing and report
+  no error. `reconcileStuckBroadcasts()` returns an outcome for every row it
+  examined, including the ones it declined, and the cron route returns them.
+- Resend has no operation that replaces a contact's segment memberships.
+  `POST /contacts` is an upsert that answers 201 for an existing contact and
+  whose `segments` field only ever adds, so an empty list removes nothing.
+  `syncContactSegments()` therefore reads `GET /contacts/{id}/segments` and
+  issues explicit `POST`/`DELETE .../segments/{segmentId}` calls, and removals
+  are computed only against the segment ids the caller says it manages.
+- `broadcast_contacts.segment_keys` is what Resend is known to have, not what
+  we want it to have. It is stamped with `synced_at` after a push succeeds,
+  never in the earlier derived-state upsert: the push queue is the difference
+  between those two, so writing the desired set early erases the evidence and a
+  failed push then looks permanently synced.
 - Delivery counters move only through `record_broadcast_delivery_event()`, which
   writes to `broadcast_delivery_events` first and increments only when that
   write was new. Resend retries webhooks, so replay is the normal case.

@@ -128,16 +128,21 @@ function harness(
    * Mirrors the store's conditional update: it only matches while the row is
    * still the queued, dispatch-stamped row this caller claimed.
    */
-  const releaseAfterRejection = vi.fn(async () => {
-    const current = state.current;
-    if (current.status !== "queued" || !current.dispatchStartedAt) return false;
-    state.current = {
-      ...current,
-      status: "draft",
-      dispatchStartedAt: null,
-    };
-    return true;
-  });
+  const releaseAfterRejection = vi.fn(
+    async (input: { id: string; resendBroadcastId: string; note: string }) => {
+      const current = state.current;
+      if (current.status !== "queued" || !current.dispatchStartedAt) return false;
+      // The statement matches on the Resend id whose status was read, so a row
+      // re-pointed at a different broadcast is not this caller's to release.
+      if (current.resendBroadcastId !== input.resendBroadcastId) return false;
+      state.current = {
+        ...current,
+        status: "draft",
+        dispatchStartedAt: null,
+      };
+      return true;
+    }
+  );
 
   const deps: SendBroadcastDeps = {
     loadBroadcast: async () => state.current,

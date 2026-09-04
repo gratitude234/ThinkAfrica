@@ -641,27 +641,38 @@ export async function releaseClaim(id: string, status: BroadcastStatus) {
  * Everything else, including a broadcast Resend cannot find, is "unknown",
  * which is the answer that keeps a locked row locked.
  */
+function toProviderStatus(
+  status: string | null | undefined
+): ProviderBroadcastStatus {
+  if (status === "draft") return "draft";
+  if (status === "queued") return "queued";
+  if (status === "sent") return "sent";
+  return "unknown";
+}
+
 export async function readProviderBroadcastStatus(
   resendBroadcastId: string
 ): Promise<ProviderBroadcastStatus> {
   const remote = await getResendBroadcast(resendBroadcastId);
-  if (!remote) return "unknown";
-  if (remote.status === "draft") return "draft";
-  if (remote.status === "queued") return "queued";
-  if (remote.status === "sent") return "sent";
-  return "unknown";
+  return toProviderStatus(remote?.status);
 }
 
 /**
  * The one path that clears a dispatch stamp, and the only place in the product
  * where a broadcast becomes retryable after broadcasts.send has been called.
  *
- * Three things have to hold before this runs at all, and all three are checked
- * elsewhere: Resend rejected the request on its own terms, Resend confirms the
- * broadcast is still a draft on its side, and this caller is the one that
- * claimed the row. The last of those is enforced here, by the update matching
- * only a row still queued with the dispatch stamp on it, so a row that has
- * moved on in the meantime is left exactly where it is.
+ * It goes through release_broadcast_after_provider_draft rather than a
+ * PostgREST update for the same reason claim_broadcast_for_send does: the
+ * guard is a conditional update over a nullable column, and assembled from
+ * separate PostgREST filters its failure is silent. The first version of this
+ * was a PostgREST update, and in production it left a row locked while
+ * reporting no error.
+ *
+ * The caller must already have been told by Resend that the broadcast is still
+ * a draft there. The statement enforces the rest: the row was dispatched, it
+ * is not recorded as sent, and it still carries the Resend id whose status was
+ * the evidence. Answers false when it matched nothing, which is a real answer
+ * and not an error.
  *
  * resend_broadcast_id is deliberately left in place. The Resend draft already
  * exists and re-sending it is what the retry does, so keeping the id is what
@@ -669,26 +680,21 @@ export async function readProviderBroadcastStatus(
  */
 export async function releaseAfterRejection(input: {
   id: string;
+  resendBroadcastId: string;
   note: string;
 }): Promise<boolean> {
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("broadcasts")
-    .update({
-      status: "draft",
-      send_claimed_at: null,
-      dispatch_started_at: null,
-      sent_at: null,
-      status_note: input.note.slice(0, 500),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", input.id)
-    .eq("status", "queued")
-    .not("dispatch_started_at", "is", null)
-    .select("id");
+  const { data, error } = await admin.rpc(
+    "release_broadcast_after_provider_draft",
+    {
+      p_broadcast_id: input.id,
+      p_resend_broadcast_id: input.resendBroadcastId,
+      p_status_note: input.note,
+    }
+  );
 
   if (error) throw new Error(error.message);
-  return (data ?? []).length > 0;
+  return ((data ?? []) as unknown[]).length > 0;
 }
 
 export function buildBroadcastEmail(row: BroadcastSendRow) {
@@ -750,11 +756,36 @@ export const RECONCILE_AFTER_MINUTES = 15;
 export const PROVIDER_DRAFT_RELEASE_NOTE =
   "The provider never accepted this send and still holds the broadcast as a draft, so nobody was emailed. It has been unlocked. Check the audience, then send it again.";
 
+/**
+ * Why a stranded broadcast was or was not settled.
+ *
+ * Recorded for every row examined, including the ones nothing happened to. The
+ * previous version simply skipped those, which meant a reconciler that settled
+ * nothing and a reconciler that never looked produced the same empty answer,
+ * and working out which had happened meant reading the provider's HTTP logs.
+ */
+export type ReconcileReason =
+  | "released_provider_draft"
+  | "release_matched_nothing"
+  | "marked_sending"
+  | "provider_queued"
+  | "provider_sent_already_recorded"
+  | "provider_unreadable"
+  | "no_resend_id";
+
 export type ReconcileOutcome = {
   broadcastId: string;
   from: BroadcastStatus;
-  to: BroadcastStatus;
+  /** Null when nothing changed. */
+  to: BroadcastStatus | null;
+  providerStatus: ProviderBroadcastStatus | null;
+  reason: ReconcileReason;
 };
+
+/** The subset that actually moved, which is what callers usually report. */
+export function settledBroadcasts(outcomes: readonly ReconcileOutcome[]) {
+  return outcomes.filter((outcome) => outcome.to !== null);
+}
 
 /**
  * Settles broadcasts that never reached a terminal state.
@@ -799,56 +830,99 @@ export async function reconcileStuckBroadcasts(
 
   for (const raw of (data ?? []) as BroadcastRowDb[]) {
     const row = toSendRow(raw);
-    if (!row.resendBroadcastId) continue;
 
-    const remote = await getResendBroadcast(row.resendBroadcastId);
-    if (!remote) continue;
-
-    if (remote.status === "draft") {
-      // No send was ever accepted. Clearing the dispatch stamp is what makes
-      // the broadcast claimable again, and it is safe here for the same reason
-      // it is safe nowhere else: Resend has just said it holds a draft.
-      const { data: released, error: releaseFailure } = await admin
-        .from("broadcasts")
-        .update({
-          status: "draft",
-          send_claimed_at: null,
-          dispatch_started_at: null,
-          sent_at: null,
-          status_note: PROVIDER_DRAFT_RELEASE_NOTE,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", row.id)
-        .eq("status", row.status)
-        .not("dispatch_started_at", "is", null)
-        .select("id");
-
-      if (releaseFailure) throw new Error(releaseFailure.message);
-      if ((released ?? []).length > 0) {
-        outcomes.push({ broadcastId: row.id, from: row.status, to: "draft" });
-      }
+    if (!row.resendBroadcastId) {
+      outcomes.push({
+        broadcastId: row.id,
+        from: row.status,
+        to: null,
+        providerStatus: null,
+        reason: "no_resend_id",
+      });
       continue;
     }
 
-    // Resend accepted and dispatched it. Delivery counts keep arriving over
-    // the webhook; the status stops being a lie in the meantime.
-    const next: BroadcastStatus | null =
-      remote.status === "sent" && row.status !== "sent" ? "sending" : null;
+    // One unreadable broadcast must not abandon the rest of the batch, and it
+    // must never be read as permission to unlock. It is recorded and skipped.
+    let providerStatus: ProviderBroadcastStatus;
+    let remoteSentAt: string | null = null;
+    try {
+      const remote = await getResendBroadcast(row.resendBroadcastId);
+      providerStatus = toProviderStatus(remote?.status);
+      remoteSentAt = remote?.sent_at ?? null;
+    } catch {
+      providerStatus = "unknown";
+    }
 
-    if (!next || next === row.status) continue;
+    if (providerStatus === "draft") {
+      // No send was ever accepted. Clearing the dispatch stamp is what makes
+      // the broadcast claimable again, and it is safe here for the same reason
+      // it is safe nowhere else: Resend has just said it holds a draft.
+      const released = await releaseAfterRejection({
+        id: row.id,
+        resendBroadcastId: row.resendBroadcastId,
+        note: PROVIDER_DRAFT_RELEASE_NOTE,
+      });
 
-    const { error: updateError } = await admin
-      .from("broadcasts")
-      .update({
-        status: next,
-        status_note: null,
-        sent_at: remote.sent_at ?? new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", row.id);
+      outcomes.push({
+        broadcastId: row.id,
+        from: row.status,
+        to: released ? "draft" : null,
+        providerStatus,
+        reason: released
+          ? "released_provider_draft"
+          : "release_matched_nothing",
+      });
+      continue;
+    }
 
-    if (updateError) throw new Error(updateError.message);
-    outcomes.push({ broadcastId: row.id, from: row.status, to: next });
+    if (providerStatus === "sent" && row.status !== "sent") {
+      // Resend accepted and dispatched it. Delivery counts keep arriving over
+      // the webhook; the status stops being a lie in the meantime.
+      if (row.status === "sending") {
+        outcomes.push({
+          broadcastId: row.id,
+          from: row.status,
+          to: null,
+          providerStatus,
+          reason: "provider_sent_already_recorded",
+        });
+        continue;
+      }
+
+      const { error: updateError } = await admin
+        .from("broadcasts")
+        .update({
+          status: "sending",
+          status_note: null,
+          sent_at: remoteSentAt ?? new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+
+      if (updateError) throw new Error(updateError.message);
+      outcomes.push({
+        broadcastId: row.id,
+        from: row.status,
+        to: "sending",
+        providerStatus,
+        reason: "marked_sending",
+      });
+      continue;
+    }
+
+    outcomes.push({
+      broadcastId: row.id,
+      from: row.status,
+      to: null,
+      providerStatus,
+      reason:
+        providerStatus === "queued"
+          ? "provider_queued"
+          : providerStatus === "sent"
+            ? "provider_sent_already_recorded"
+            : "provider_unreadable",
+    });
   }
 
   // A claim that never got as far as Resend is not a failure. Put it back.
@@ -872,6 +946,9 @@ export async function reconcileStuckBroadcasts(
       broadcastId: row.id as string,
       from: "queued",
       to: "draft",
+      // Nothing was ever created at Resend, so there was no status to read.
+      providerStatus: null,
+      reason: "released_provider_draft",
     });
   }
 

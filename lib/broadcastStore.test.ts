@@ -283,7 +283,7 @@ describe("the hand-picked segment", () => {
 describe("reconciling a stranded send", () => {
   function dbRow(overrides: Record<string, unknown> = {}) {
     return {
-      id: "24b75e7d-b9c4-4fbb-887b-c8f4c903b138",
+      id: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4",
       subject: "Subject",
       preview_text: "",
       body_html: "<p>Body</p>",
@@ -292,7 +292,7 @@ describe("reconciling a stranded send", () => {
       selected_profile_ids: [],
       selected_segment_id: null,
       status: "failed",
-      resend_broadcast_id: "1ae001e6-ac31-48b7-8383-7778e5ba5cc7",
+      resend_broadcast_id: "807c168c-6fd5-42c3-9ae0-977bd6869364",
       dispatch_started_at: "2026-09-03T10:00:00Z",
       recipient_count: 1200,
       delivered_count: 0,
@@ -307,85 +307,117 @@ describe("reconciling a stranded send", () => {
     };
   }
 
-  /** The update that clears the dispatch stamp, as opposed to the bulk release. */
-  function unlockUpdate() {
-    return adminState.updates.find(
-      (u) => u.table === "broadcasts" && "dispatch_started_at" in u.patch
-    );
+  const RELEASE_RPC = "release_broadcast_after_provider_draft";
+
+  /** The unlock now happens in one statement in Postgres, so it is an RPC. */
+  function releaseCall() {
+    return adminState.rpcCalls.find((call) => call.name === RELEASE_RPC);
+  }
+
+  function releaseSucceeds() {
+    adminState.rpcResults[RELEASE_RPC] = { data: [{ id: "x" }], error: null };
   }
 
   it("unlocks a failed broadcast the provider still holds as a draft", async () => {
-    // The production sequence. Resend rejected the send over a reserved test
-    // domain in the audience, so its broadcast never left draft and nobody was
-    // emailed, but the local row stayed locked to a reconciliation that could
-    // only ever confirm the same thing.
+    // The production sequence, with the status the live row actually had.
+    // Resend answered 200 with status draft for this exact broadcast and the
+    // local row stayed failed and locked, because the unlock was a PostgREST
+    // update whose guard could fail without saying so.
     adminState.tables.broadcasts = [dbRow()];
     getResendBroadcastMock.mockResolvedValue({
-      id: "1ae001e6-ac31-48b7-8383-7778e5ba5cc7",
+      id: "807c168c-6fd5-42c3-9ae0-977bd6869364",
       status: "draft",
     });
+    releaseSucceeds();
 
-    await store.reconcileStuckBroadcasts();
+    const outcomes = await store.reconcileStuckBroadcasts();
 
-    const unlock = unlockUpdate();
-    expect(unlock?.patch).toMatchObject({
-      status: "draft",
-      dispatch_started_at: null,
-      send_claimed_at: null,
-      sent_at: null,
-      status_note: store.PROVIDER_DRAFT_RELEASE_NOTE,
+    // The guard travels with the call rather than being assembled from
+    // filters, and it names the Resend id whose status was the evidence.
+    expect(releaseCall()?.args).toMatchObject({
+      p_broadcast_id: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4",
+      p_resend_broadcast_id: "807c168c-6fd5-42c3-9ae0-977bd6869364",
+      p_status_note: store.PROVIDER_DRAFT_RELEASE_NOTE,
     });
 
-    // Only the row we read, still in the state we read it in, and still
-    // carrying the stamp we are clearing.
-    expect(unlock?.filters).toContain(
-      "eq:id:24b75e7d-b9c4-4fbb-887b-c8f4c903b138"
+    // Exactly the transition the live row needs: failed and stamped, to an
+    // editable draft, keeping the Resend id it already has.
+    expect(outcomes).toContainEqual({
+      broadcastId: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4",
+      from: "failed",
+      to: "draft",
+      providerStatus: "draft",
+      reason: "released_provider_draft",
+    });
+    expect(store.settledBroadcasts(outcomes)).toContainEqual(
+      expect.objectContaining({
+        broadcastId: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4",
+      })
     );
-    expect(unlock?.filters).toContain("eq:status:failed");
-    expect(unlock?.filters).toContain("not:dispatch_started_at:is:null");
   });
 
   it("unlocks a row stranded in queued or sending just the same", async () => {
-    for (const status of ["queued", "sending"]) {
-      adminState.updates = [];
+    for (const status of ["queued", "sending"] as const) {
+      adminState.rpcCalls = [];
       adminState.tables.broadcasts = [dbRow({ status })];
       getResendBroadcastMock.mockResolvedValue({ status: "draft" });
+      releaseSucceeds();
 
-      await store.reconcileStuckBroadcasts();
+      const outcomes = await store.reconcileStuckBroadcasts();
 
-      expect(unlockUpdate()?.patch).toMatchObject({
-        status: "draft",
-        dispatch_started_at: null,
-      });
-      expect(unlockUpdate()?.filters).toContain(`eq:status:${status}`);
+      expect(releaseCall()).toBeDefined();
+      expect(outcomes[0]).toMatchObject({ from: status, to: "draft" });
     }
   });
 
-  it("never clears the dispatch stamp on a broadcast the provider queued", async () => {
-    adminState.tables.broadcasts = [dbRow({ status: "sending" })];
-    getResendBroadcastMock.mockResolvedValue({ status: "queued" });
+  it("reports a release that matched nothing rather than claiming success", async () => {
+    // The failure this whole path exists to make visible: the statement ran,
+    // the row did not move, and nothing said so.
+    adminState.tables.broadcasts = [dbRow()];
+    getResendBroadcastMock.mockResolvedValue({ status: "draft" });
+    adminState.rpcResults[RELEASE_RPC] = { data: [], error: null };
 
-    await store.reconcileStuckBroadcasts();
+    const outcomes = await store.reconcileStuckBroadcasts();
 
-    expect(unlockUpdate()).toBeUndefined();
+    expect(outcomes[0]).toMatchObject({
+      to: null,
+      providerStatus: "draft",
+      reason: "release_matched_nothing",
+    });
+    // The statement ran and is reported as having run, which is the whole
+    // point: silence is what made the live failure impossible to diagnose.
+    expect(releaseCall()).toBeDefined();
   });
 
-  it("never clears the dispatch stamp on a broadcast the provider sent", async () => {
+  it("never releases a broadcast the provider has queued", async () => {
+    adminState.tables.broadcasts = [dbRow({ status: "sending" })];
+    getResendBroadcastMock.mockResolvedValue({ status: "queued" });
+    releaseSucceeds();
+
+    const outcomes = await store.reconcileStuckBroadcasts();
+
+    expect(releaseCall()).toBeUndefined();
+    expect(outcomes[0]).toMatchObject({ to: null, reason: "provider_queued" });
+  });
+
+  it("never releases a broadcast the provider sent", async () => {
     adminState.tables.broadcasts = [dbRow()];
     getResendBroadcastMock.mockResolvedValue({
       status: "sent",
       sent_at: "2026-09-03T10:01:00Z",
     });
+    releaseSucceeds();
 
-    await store.reconcileStuckBroadcasts();
+    const outcomes = await store.reconcileStuckBroadcasts();
 
-    expect(unlockUpdate()).toBeUndefined();
+    expect(releaseCall()).toBeUndefined();
 
     // It is corrected forward to sending, not backwards to a draft.
     const update = adminState.updates.find(
       (u) => u.table === "broadcasts" && u.patch.status === "sending"
     );
     expect(update?.patch.sent_at).toBe("2026-09-03T10:01:00Z");
+    expect(outcomes[0]).toMatchObject({ to: "sending", reason: "marked_sending" });
   });
 
   it("leaves the row alone when the provider cannot account for it", async () => {
@@ -393,10 +425,33 @@ describe("reconciling a stranded send", () => {
     // Not knowing is not permission to unlock.
     adminState.tables.broadcasts = [dbRow()];
     getResendBroadcastMock.mockResolvedValue(null);
+    releaseSucceeds();
 
-    await store.reconcileStuckBroadcasts();
+    const outcomes = await store.reconcileStuckBroadcasts();
 
-    expect(unlockUpdate()).toBeUndefined();
+    expect(releaseCall()).toBeUndefined();
+    expect(outcomes[0]).toMatchObject({
+      to: null,
+      providerStatus: "unknown",
+      reason: "provider_unreadable",
+    });
+  });
+
+  it("records a lookup failure and carries on with the rest of the batch", async () => {
+    // One unreadable broadcast used to abandon the whole reconciliation, and
+    // with it every other stranded row behind it.
+    adminState.tables.broadcasts = [dbRow()];
+    getResendBroadcastMock.mockRejectedValue(new Error("gateway timeout"));
+    releaseSucceeds();
+
+    const outcomes = await store.reconcileStuckBroadcasts();
+
+    expect(releaseCall()).toBeUndefined();
+    expect(outcomes[0]).toMatchObject({
+      to: null,
+      providerStatus: "unknown",
+      reason: "provider_unreadable",
+    });
   });
 
   it("only looks at rows that were dispatched and have gone quiet", async () => {
@@ -415,33 +470,46 @@ describe("reconciling a stranded send", () => {
 });
 
 describe("releasing a claim after a provider rejection", () => {
-  it("clears the stamp only for the caller still holding the claim", async () => {
-    adminState.tables.broadcasts = [{ id: "bc-1" }];
+  it("goes through one statement in Postgres, not a chain of filters", async () => {
+    // The same argument claim_broadcast_for_send is built on. A guard over a
+    // nullable column assembled from separate PostgREST filters can match
+    // nothing and report no error, which is how a locked broadcast stayed
+    // locked through a reconciliation that looked like it had run.
+    adminState.rpcResults.release_broadcast_after_provider_draft = {
+      data: [{ id: "bc-1" }],
+      error: null,
+    };
 
     const released = await store.releaseAfterRejection({
       id: "bc-1",
+      resendBroadcastId: "resend-bc-1",
       note: "Resend rejected the audience.",
     });
 
     expect(released).toBe(true);
-
-    const update = adminState.updates.find((u) => u.table === "broadcasts");
-    expect(update?.patch).toMatchObject({
-      status: "draft",
-      dispatch_started_at: null,
-      send_claimed_at: null,
+    expect(adminState.rpcCalls[0]).toMatchObject({
+      name: "release_broadcast_after_provider_draft",
+      args: {
+        p_broadcast_id: "bc-1",
+        p_resend_broadcast_id: "resend-bc-1",
+        p_status_note: "Resend rejected the audience.",
+      },
     });
-    // Queued is the status the claim itself wrote, and the stamp is the one
-    // this caller put there. A row that moved on matches neither.
-    expect(update?.filters).toContain("eq:status:queued");
-    expect(update?.filters).toContain("not:dispatch_started_at:is:null");
+    expect(adminState.updates).toHaveLength(0);
   });
 
   it("reports false when it matched nothing, so the caller reconciles instead", async () => {
-    adminState.tables.broadcasts = [];
+    adminState.rpcResults.release_broadcast_after_provider_draft = {
+      data: [],
+      error: null,
+    };
 
     expect(
-      await store.releaseAfterRejection({ id: "bc-1", note: "rejected" })
+      await store.releaseAfterRejection({
+        id: "bc-1",
+        resendBroadcastId: "resend-bc-1",
+        note: "rejected",
+      })
     ).toBe(false);
   });
 });

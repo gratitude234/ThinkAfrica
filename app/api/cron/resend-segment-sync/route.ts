@@ -20,7 +20,10 @@ import {
 } from "@/lib/resendBroadcasts";
 import { isResendRateLimited } from "@/lib/resendClient";
 import { loadBroadcastContactEmails } from "@/lib/broadcastAuthEmails";
-import { reconcileStuckBroadcasts } from "@/lib/broadcastStore";
+import {
+  reconcileStuckBroadcasts,
+  settledBroadcasts,
+} from "@/lib/broadcastStore";
 import {
   STANDING_AUDIENCE_KEYS,
   type BroadcastAudienceKey,
@@ -385,6 +388,14 @@ export async function GET(request: NextRequest) {
     // 5. The cheap half: write changed derived state back to Supabase.
     //    synced_at is deliberately absent from the payload, so a new row keeps
     //    its null and stays at the front of the push queue until it is pushed.
+    //
+    //    segment_keys is absent for a stronger reason. The column records the
+    //    memberships Resend is known to have, not the ones we want it to have,
+    //    and the push queue is built by diffing those two. Writing the desired
+    //    set here would erase the difference before the push, so a push that
+    //    then failed would leave the contact looking synced forever: the next
+    //    run would compare [] against [] and skip it. It is stamped in step 6
+    //    instead, against a push that actually landed.
     for (let index = 0; index < plan.upserts.length; index += 500) {
       const batch = plan.upserts.slice(index, index + 500);
       const { error } = await admin.from("broadcast_contacts").upsert(
@@ -392,7 +403,6 @@ export async function GET(request: NextRequest) {
           profile_id: snapshot.profileId,
           email: snapshot.email,
           is_eligible: snapshot.isEligible,
-          segment_keys: snapshot.segmentKeys,
           last_activity_at: snapshot.lastActivityAt,
           published_count: snapshot.publishedCount,
           is_verified: snapshot.isVerified,
@@ -439,10 +449,14 @@ export async function GET(request: NextRequest) {
           resubscribe: snapshot.resubscribe,
         });
 
+        // Every add and remove landed, so this is the first moment the stored
+        // memberships and Resend's actual memberships are the same thing.
+        // Stamping them together is what makes the pair meaningful.
         await admin
           .from("broadcast_contacts")
           .update({
             resend_contact_id: contact.id,
+            segment_keys: snapshot.segmentKeys,
             synced_at: new Date().toISOString(),
             sync_error: null,
           })
@@ -519,7 +533,11 @@ export async function GET(request: NextRequest) {
         complete: mirror.complete,
       },
       provisioned,
-      reconciled: reconciled.length,
+      reconciled: settledBroadcasts(reconciled).length,
+      // The full picture, including the rows nothing happened to and why. A
+      // reconciler that examined nothing and one that examined a row and
+      // declined to unlock it used to look identical from out here.
+      reconcileOutcomes: reconciled,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Sync failed.";

@@ -134,9 +134,59 @@ export async function ensureNamedSegment(name: string) {
 }
 
 /**
+ * The managed segments this contact is currently in at Resend, read from
+ * GET /contacts/{id}/segments and filtered to the ones we manage.
+ *
+ * Paged, because a contact can be in more segments than one page holds: the
+ * five standing audiences plus a hand-picked segment for every broadcast they
+ * were ever named in. Stopping at the first page would read a membership as
+ * absent and then "add" it, or worse, fail to see one that needs removing.
+ */
+async function listManagedMemberships(
+  contactId: string,
+  managed: ReadonlySet<string>
+) {
+  const resend = requireResendClient();
+  const memberships = new Set<string>();
+  let after: string | undefined;
+
+  for (;;) {
+    const page = unwrapResend(
+      "contacts.segments.list",
+      await resend.contacts.segments.list({ contactId, limit: 100, after })
+    );
+
+    for (const segment of page.data) {
+      if (managed.has(segment.id)) memberships.add(segment.id);
+    }
+
+    const last = page.data[page.data.length - 1];
+    if (!page.has_more || !last) break;
+    after = last.id;
+  }
+
+  return memberships;
+}
+
+/**
  * Puts a contact in exactly the managed segments given, and out of the managed
  * segments not given. Segments we do not manage are left alone, so a segment
  * someone builds by hand in the Resend dashboard survives our sync.
+ *
+ * Membership is changed one call at a time, through
+ * POST/DELETE /contacts/{id}/segments/{segmentId}, because Resend has no
+ * operation that replaces a contact's memberships wholesale. In particular
+ * POST /contacts is an upsert whose `segments` field only ever adds: it
+ * answers 201 for a contact that already exists, and passing an empty list
+ * removes nothing. Using it as a replacement is what left an opted-out contact
+ * sitting in "Indegenius: All eligible users" while our own row said the
+ * segments were empty and the sync reported success. So create is only ever
+ * used to make the contact exist; what it belongs to is settled below.
+ *
+ * Every add and every remove is awaited and unwrapped, so a single failed call
+ * throws. The caller stamps synced_at and segment_keys only on a clean return,
+ * which is what keeps "we said it is in no segments" and "Resend has it in no
+ * segments" the same statement.
  *
  * `resubscribe` lifts Resend's own unsubscribed flag. It is only ever passed
  * for somebody who turned the category back on inside Indegenius themselves,
@@ -151,49 +201,43 @@ export async function syncContactSegments(input: {
 }) {
   const resend = requireResendClient();
   const email = input.email.trim().toLowerCase();
+  const managed = new Set(input.managedSegmentIds);
+  const desired = new Set(input.segmentIds);
 
-  // The common path is a contact that does not exist yet, which create handles
-  // in one call including its segment membership.
+  // Upsert, purely to guarantee the contact exists and to carry the name. The
+  // segments passed here are an optimisation for a contact that really is new;
+  // for one that already exists they add and never remove, which is why the
+  // reconcile below runs either way rather than being skipped on a 201.
   const created = await resend.contacts.create({
     email,
     firstName: input.firstName ?? undefined,
     segments: input.segmentIds.map((id) => ({ id })),
   });
 
-  if (!created.error && created.data) {
-    return { id: created.data.id, created: true };
+  let contactId = created.error ? null : (created.data?.id ?? null);
+
+  // The create response carries an id and nothing else, so the contact is only
+  // read when the id is missing or when the unsubscribed flag is needed.
+  if (!contactId || input.resubscribe) {
+    const existing = await resend.contacts.get({ email });
+    if (existing.error || !existing.data) {
+      throw resendApiError("contacts.create", created.error ?? existing.error);
+    }
+
+    contactId = existing.data.id;
+
+    if (input.resubscribe && existing.data.unsubscribed) {
+      unwrapResend(
+        "contacts.update",
+        await resend.contacts.update({ id: contactId, unsubscribed: false })
+      );
+    }
   }
 
-  // Otherwise the contact already exists. Rather than parse Resend's error
-  // text, ask for the contact: if it is really there, reconcile it; if it is
-  // not, the original create error was the real problem.
-  const existing = await resend.contacts.get({ email });
-  if (existing.error || !existing.data) {
-    throw resendApiError("contacts.create", created.error);
-  }
+  const currentManaged = await listManagedMemberships(contactId, managed);
 
-  const contactId = existing.data.id;
-
-  if (input.resubscribe && existing.data.unsubscribed) {
-    unwrapResend(
-      "contacts.update",
-      await resend.contacts.update({ id: contactId, unsubscribed: false })
-    );
-  }
-
-  const current = unwrapResend(
-    "contacts.segments.list",
-    await resend.contacts.segments.list({ contactId, limit: 100 })
-  );
-
-  const managed = new Set(input.managedSegmentIds);
-  const currentManaged = current.data
-    .map((segment) => segment.id)
-    .filter((id) => managed.has(id));
-  const desired = new Set(input.segmentIds);
-
-  for (const segmentId of input.segmentIds) {
-    if (!currentManaged.includes(segmentId)) {
+  for (const segmentId of desired) {
+    if (!currentManaged.has(segmentId)) {
       unwrapResend(
         "contacts.segments.add",
         await resend.contacts.segments.add({ contactId, segmentId })
@@ -201,6 +245,9 @@ export async function syncContactSegments(input: {
     }
   }
 
+  // Only ever a segment we manage and no longer want. A contact who has become
+  // ineligible reaches here with an empty desired set, so this is the loop that
+  // actually takes them out of every standing audience.
   for (const segmentId of currentManaged) {
     if (!desired.has(segmentId)) {
       unwrapResend(
@@ -210,7 +257,7 @@ export async function syncContactSegments(input: {
     }
   }
 
-  return { id: contactId, created: false };
+  return { id: contactId };
 }
 
 export type SegmentContactPage = {
