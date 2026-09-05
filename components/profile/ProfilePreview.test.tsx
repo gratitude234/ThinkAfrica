@@ -39,7 +39,6 @@ function previewData(
       sourceBackedCount: 2,
       citableCount: 0,
       responseCount: 0,
-      debateCount: 0,
       researchCount: 0,
     },
     followerCount: 12,
@@ -85,11 +84,11 @@ describe("ProfilePreview", () => {
     expect(container.textContent).not.toContain("Citable");
   });
 
-  it("keeps demonstrated topics and declared interests distinct", () => {
+  it("keeps published topics and declared interests distinct", () => {
     const { container } = render(
       <ProfilePreview data={previewData()} hasUnsavedChanges={false} />
     );
-    expect(container.textContent).toContain("Demonstrated topics");
+    expect(container.textContent).toContain("Writes about");
     expect(container.textContent).toContain("Interested in");
   });
 
@@ -180,7 +179,6 @@ describe("ProfilePreview", () => {
             sourceBackedCount: 0,
             citableCount: 0,
             responseCount: 0,
-            debateCount: 0,
             researchCount: 0,
           },
           followerCount: 0,

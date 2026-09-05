@@ -37,7 +37,6 @@ export const metadata: Metadata = {
     "intellectual identity",
     "ideas",
     "publishing",
-    "debates",
     "African intellectual network",
   ],
   manifest: "/manifest.webmanifest",

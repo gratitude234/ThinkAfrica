@@ -23,8 +23,8 @@ const RAIL_SUPPRESSED_PREFIXES = [
 
 /**
  * Segment-boundary route match: exact, or a real `/` boundary. Deliberately not
- * `String.startsWith`, which would treat `/submitted` as living under `/submit`
- * and `/debatesomething` as the debates section.
+ * `String.startsWith`, which would treat `/submitted` as living under
+ * `/submit` rather than as its own route.
  */
 export function matchesRoute(pathname: string, route: string) {
   return pathname === route || pathname.startsWith(`${route}/`);
@@ -40,10 +40,6 @@ export function shouldShowMobilePrimaryNav(pathname: string) {
 }
 
 export function shouldShowDesktopRail(pathname: string) {
-  // /debates is a browse list and keeps the rail; /debates/<anything> is either
-  // a debate room or the create flow, and both run their own full-bleed layout.
-  if (matchesRoute(pathname, "/debates")) return pathname === "/debates";
-
   return !RAIL_SUPPRESSED_PREFIXES.some((prefix) =>
     matchesRoute(pathname, prefix)
   );

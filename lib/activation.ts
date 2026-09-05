@@ -30,7 +30,6 @@ export interface ActivationState {
   responseStartedCount: number;
   submittedPostCount: number;
   draftCount: number;
-  debateArgumentCount: number;
   activated: boolean;
   tasks: ActivationTask[];
   nextTask: ActivationTask | null;
@@ -117,7 +116,6 @@ export async function getActivationState(
     responseStartedCount,
     submittedPostCount,
     draftCount,
-    debateArgumentCount,
     { data: onboardingPreferenceRaw },
   ] = await Promise.all([
     supabase
@@ -181,32 +179,21 @@ export async function getActivationState(
         .eq("status", "draft")
         .limit(1) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
     ),
-    countRowsSafe(
-      supabase
-        .from("debate_arguments")
-        .select("id")
-        .eq("author_id", userId)
-        .limit(1) as unknown as Promise<{ data?: unknown[] | null; error?: unknown }>
-    ),
     supabase.rpc("get_my_onboarding_state"),
   ]);
 
   const onboardingPreference = normalizeOnboardingPreference(onboardingPreferenceRaw);
   const profileComplete = isProfileComplete(profile, onboardingPreference);
-  const firstContributionStarted =
-    draftCount > 0 || debateArgumentCount > 0 || responseStartedCount > 0;
+  const firstContributionStarted = draftCount > 0 || responseStartedCount > 0;
   const firstContributionLabel =
     draftCount > 0
       ? "Draft started"
-      : debateArgumentCount > 0
-        ? "Debate argument started"
-        : responseStartedCount > 0
-          ? "Response started"
-          : null;
+      : responseStartedCount > 0
+        ? "Response started"
+        : null;
   const meaningfulEngagementCount = postOpenCount + bookmarkCount + responsePostCount;
   const hasMeaningfulEngagement = meaningfulEngagementCount >= 2;
-  const hasSubmittedContribution =
-    submittedPostCount > 0 || debateArgumentCount > 0;
+  const hasSubmittedContribution = submittedPostCount > 0;
   // Onboarding deliberately stops asking for a photo and a bio, so this is where
   // they get picked back up. Optional, because neither one blocks publishing.
   const profilePolished = hasText(profile?.avatar_url) && hasText(profile?.bio);
@@ -280,7 +267,6 @@ export async function getActivationState(
     responseStartedCount,
     submittedPostCount,
     draftCount,
-    debateArgumentCount,
     activated:
       profileComplete && (firstContributionStarted || hasSubmittedContribution),
     tasks: orderedTasks,

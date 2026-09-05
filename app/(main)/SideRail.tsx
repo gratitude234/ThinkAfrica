@@ -9,7 +9,6 @@ import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import {
   BookmarksIcon,
   CampusIcon,
-  DebatesIcon,
   ExploreIcon,
   HomeIcon,
   MessagesIcon,
@@ -26,7 +25,6 @@ import {
 interface SideRailProps {
   userId: string | null;
   username: string | null;
-  hasActiveDebate: boolean;
 }
 
 // Deliberately reuses NavClient's existing active/idle tokens rather than
@@ -78,7 +76,6 @@ function RailLink({
 export default function SideRail({
   userId,
   username,
-  hasActiveDebate,
 }: SideRailProps) {
   const pathname = usePathname();
 
@@ -91,8 +88,8 @@ export default function SideRail({
     <aside
       // Sticky under the top nav and independently scrollable, so a short
       // viewport can still reach the Create button. The +1rem offset is shared
-      // with every other sticky aside in the app (home sidebar, explore, admin,
-      // the debate surfaces) so columns in the same viewport pin in line -- and
+      // with every other sticky aside in the app (home sidebar, explore, admin)
+      // so columns in the same viewport pin in line -- and
       // it tracks --app-nav-offset rather than the measured height so the rail
       // rises with the nav when it retreats, instead of the feed's tab strip
       // sliding up while this column stays behind. max-h stays on the measured
@@ -122,26 +119,6 @@ export default function SideRail({
           icon={ExploreIcon}
           isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore)}
         />
-        {FEATURE_FLAGS.debates ? (
-          <RailLink
-            href="/debates"
-            label="Debates"
-            icon={DebatesIcon}
-            isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates)}
-            badge={
-              hasActiveDebate ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-brand ring-2 ring-white"
-                />
-              ) : undefined
-            }
-          >
-            {hasActiveDebate ? (
-              <span className="sr-only">A debate is live now</span>
-            ) : null}
-          </RailLink>
-        ) : null}
         <RailLink
           href="/responses"
           label="Responses"

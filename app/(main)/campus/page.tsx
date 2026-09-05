@@ -11,7 +11,7 @@ import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/s
 import { createClient } from "@/lib/supabase/server";
 
 const DESCRIPTION =
-  "Join recurring writing, response, and debate programs at selected Indegenius campus cohorts.";
+  "Join recurring writing and response programs at selected Indegenius campus cohorts.";
 
 export const metadata: Metadata = {
   title: "Campus Programs",
@@ -145,7 +145,7 @@ export default async function CampusPage() {
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
             Indegenius is concentrating prompts, response circles, publication clinics,
-            and debates within a small set of campus cohorts before expanding.
+            and responses within a small set of campus cohorts before expanding.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             {!user ? (

@@ -104,8 +104,8 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   );
   const title = `${name(profile)}'s Intellectual Record`;
   const recordKinds = FEATURE_FLAGS.research
-    ? "Publications, responses, research, and debate arguments"
-    : "Publications, responses, and debate arguments";
+    ? "Publications, responses, and research"
+    : "Publications and responses";
   const positioning = getProfileIdentityLines(profile).positioning;
   return {
     title,
@@ -130,9 +130,8 @@ function filterCount(
 ) {
   if (filter === "publications") return summary.publicationCount;
   if (filter === "responses") return summary.responseCount;
-  if (filter === "debates") return summary.debateCount;
   if (filter === "research") return summary.researchCount;
-  return summary.publicationCount + summary.responseCount + summary.debateCount;
+  return summary.publicationCount + summary.responseCount;
 }
 
 export default async function ProfileRecordPage({ params, searchParams }: PageProps) {

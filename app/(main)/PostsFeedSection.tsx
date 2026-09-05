@@ -13,7 +13,7 @@ import {
   prepareFeedPageForClient,
 } from "@/lib/feedExposure";
 import { createClient } from "@/lib/supabase/server";
-import type { DebateInterludeData } from "@/components/post/DebateInterlude";
+
 import type { HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
 
@@ -32,7 +32,7 @@ interface Props {
   showFollowingEligible: boolean;
   showTopicsEligible: boolean;
   showSubscriptionsEligible: boolean;
-  activeDebate: DebateInterludeData | null;
+
   peopleSuggestions: {
     id: string;
     username: string;
@@ -84,7 +84,7 @@ export default async function PostsFeedSection({
   showFollowingEligible,
   showTopicsEligible,
   showSubscriptionsEligible,
-  activeDebate,
+
   peopleSuggestions,
   peopleSuggestionReason,
   prioritizePeopleSuggestions = false,
@@ -157,7 +157,7 @@ export default async function PostsFeedSection({
       showTopicsTab={showTopicsEligible}
       showSubscriptionsTab={showSubscriptionsEligible}
       initialSubscriptionSource={subscriptionSource}
-      activeDebate={activeDebate}
+
       peopleSuggestions={peopleSuggestions}
       peopleSuggestionReason={peopleSuggestionReason}
       prioritizePeopleSuggestions={prioritizePeopleSuggestions}

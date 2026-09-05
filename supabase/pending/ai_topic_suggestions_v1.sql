@@ -1,6 +1,6 @@
 -- AI-Assisted Topic Selection V1 release candidate.
--- Pending only: do not copy to supabase/migrations or apply until the Debate
--- deployment ledger has been reconciled.
+-- Pending only: do not copy to supabase/migrations or apply until the
+-- migration ledger has been reconciled.
 
 alter table public.posts
   add column if not exists research_keywords text[];

@@ -139,57 +139,6 @@ function PublicationRow({
   );
 }
 
-function DebateRow({
-  item,
-  tracking,
-}: {
-  item: Extract<ProfileRecordItem, { kind: "debate" }>;
-  tracking?: ProfileWorkTracking | null;
-}) {
-  const debate = item.debate;
-  const title = debate.debate?.title ?? "Public debate";
-  const href = debate.debate ? `/debates/${debate.debate.id}` : null;
-
-  return (
-    <article className={ROW_SHELL}>
-      <div className="min-w-0 flex-1">
-        <h3 className="font-display line-clamp-2 text-[17px] font-semibold leading-snug text-ink sm:text-[19px]">
-          {href ? (
-            <ProfileWorkLink
-              href={href}
-              workId={item.id}
-              workKind="debate"
-              tracking={tracking}
-              className="stretch-target focus-ring after:z-10 group-hover:text-emerald-brand"
-            >
-              {title}
-            </ProfileWorkLink>
-          ) : (
-            title
-          )}
-        </h3>
-
-        <p className="mt-1.5 line-clamp-2 whitespace-pre-line text-sm leading-6 text-ink-soft">
-          {debate.content}
-        </p>
-
-        <div className={META_ROW}>
-          <time dateTime={item.occurredAt}>{formatRelativeTime(item.occurredAt)}</time>
-          <Separator />
-          {/* Gold is what tells a debate argument apart from a publication now
-              that the entry no longer carries its own border. */}
-          <span className={`${EYEBROW} text-gold-ink`}>Debate argument</span>
-          {debate.stance ? (
-            <span className="rounded-full border border-gold-tint bg-gold-tint px-2 py-0.5 text-[10px] font-semibold uppercase text-gold-ink">
-              {debate.stance}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </article>
-  );
-}
-
 export default function ProfileRecordCard({
   item,
   tracking = null,
@@ -201,9 +150,5 @@ export default function ProfileRecordCard({
    */
   tracking?: ProfileWorkTracking | null;
 }) {
-  return item.kind === "debate" ? (
-    <DebateRow item={item} tracking={tracking} />
-  ) : (
-    <PublicationRow item={item} tracking={tracking} />
-  );
+  return <PublicationRow item={item} tracking={tracking} />;
 }

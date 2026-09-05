@@ -10,7 +10,7 @@ describe("AuthShell brand contract", () => {
         eyebrow="Create your profile"
         title="Create your account"
         subtitle="Start here."
-        proofItems={["Publish", "Respond", "Debate"]}
+        proofItems={["Publish", "Respond", "Collaborate"]}
         quote="Ideas deserve a durable record."
         quoteSource="Indegenius"
       >

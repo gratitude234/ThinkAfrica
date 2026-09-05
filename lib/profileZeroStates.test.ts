@@ -56,8 +56,8 @@ describe("full record zero states", () => {
     expect(parseProfileRecordQuery({ type: "responses" }, true).filter).toBe(
       "responses"
     );
-    expect(parseProfileRecordQuery({ type: "debates" }, true).filter).toBe(
-      "debates"
+    expect(parseProfileRecordQuery({ type: "research" }, true).filter).toBe(
+      "research"
     );
     expect(
       parseProfileRecordQuery({ type: "publications", quality: "citable" }, true)

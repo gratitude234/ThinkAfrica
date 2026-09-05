@@ -84,7 +84,7 @@ export default function NavClient({
     pathname,
     NAV_MATCH_PREFIXES.research
   );
-  const isDebatesActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates);
+
   const isResponsesActive = isNavItemActive(
     pathname,
     NAV_MATCH_PREFIXES.responses
@@ -178,15 +178,6 @@ export default function NavClient({
                   aria-current={isResearchActive ? "page" : undefined}
                 >
                   Research
-                </Link>
-              ) : null}
-              {FEATURE_FLAGS.debates ? (
-                <Link
-                  href="/debates"
-                  className={navItemClass(isDebatesActive)}
-                  aria-current={isDebatesActive ? "page" : undefined}
-                >
-                  Debates
                 </Link>
               ) : null}
             </div>

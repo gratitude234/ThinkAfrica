@@ -58,25 +58,6 @@ export function ExploreIcon({ className }: NavIconProps) {
   );
 }
 
-export function DebatesIcon({ className }: NavIconProps) {
-  return (
-    // Balance scale rather than a speech bubble: Messages sits next to this
-    // and already owns the bubble.
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 4v16m-7-3h14M5 7l-2 6h4L5 7zm14 0l-2 6h4l-2-6zM7 5h10"
-      />
-    </svg>
-  );
-}
 
 export function MessagesIcon({ className, filled }: NavIconProps) {
   return (
@@ -215,7 +196,6 @@ export function BookmarksIcon({ className, filled }: NavIconProps) {
 export const NAV_MATCH_PREFIXES = {
   home: ["/"],
   explore: ["/explore", "/discover"],
-  debates: ["/debates"],
   opportunities: ["/opportunities"],
   messages: ["/messages"],
   responses: ["/responses"],

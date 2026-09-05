@@ -1,10 +1,10 @@
 -- RELEASE-GATED SQL CANDIDATE — DO NOT APPLY DIRECTLY.
 --
 -- Before promoting this file into supabase/migrations:
---   1. Complete docs/debate-deployment-state.md for staging and production.
---   2. Reconcile the migration ledger/catalog if they disagree.
---   3. Confirm the deployed notifications_type_check definition.
---   4. Assign a timestamp that is safe relative to the resolved Debate files.
+--   1. Reconcile the migration ledger/catalog if they disagree.
+--   2. Confirm the deployed notifications_type_check definition, which
+--      20260906000004_remove_debate_schema narrowed.
+--   3. Assign a timestamp later than 20260906000004.
 --
 -- This script intentionally creates no subscriptions for existing followers
 -- and no publication events for existing published posts.
@@ -385,30 +385,27 @@ grant execute on function public.renew_publication_event_lease(uuid)
 grant execute on function public.renew_publication_delivery_lease(uuid)
   to service_role;
 
--- The deployed notifications_type_check was probed against the live database on
--- 2026-07-29. It matched 20260728000001_debate_v1_5_foundation.sql exactly:
--- thirty types, same order. This block therefore restates the complete list the
--- way every other migration in this repository does, rather than appending
--- author_published to whatever it finds. That matters because eight migrations
--- rewrite this constraint wholesale; the next one will be copied from a file, so
--- author_published has to live in a file or it will be silently dropped.
+-- This block restates the complete notifications_type_check list the way every
+-- other migration in this repository does, rather than appending
+-- author_published to whatever it finds. That matters because several
+-- migrations rewrite this constraint wholesale; the next one will be copied
+-- from a file, so author_published has to live in a file or it will be
+-- silently dropped.
 --
--- The guard fails loudly if the deployed list has drifted since the probe, so a
--- type added elsewhere can never be removed here without someone noticing.
+-- The Debate types are deliberately absent. 20260906000004_remove_debate_schema
+-- narrows the deployed constraint to drop them, and restating them here would
+-- put them straight back. Re-probe the live list before promoting this file:
+-- the guard below fails loudly on drift, which is exactly what it is for.
 do $$
 declare
   v_types text[] := array[
-    'like', 'comment', 'follow', 'debate_reply', 'debate_argument',
+    'like', 'comment', 'follow',
     'fellowship', 'badge', 'post_approved', 'post_rejected',
     'post_published', 'review_assigned', 'review_started', 'review_reminder',
     'revision_requested',
     'co_author_invite', 'co_author_accepted', 'co_author_declined',
     'response_post', 'opportunity_inquiry',
     'moderation_post_removed', 'moderation_comment_hidden', 'account_suspended',
-    'debate_v2_round_change', 'debate_v2_final_vote',
-    'debate_v2_direct_response', 'debate_v2_evidence_requested',
-    'debate_invitation', 'debate_invitation_response',
-    'debate_phase_advanced', 'debate_cancelled',
     -- Added by this file. topic_published is already rendered by
     -- app/(main)/notifications/NotificationItem.tsx but has never been allowed
     -- by the database; provisioning it here keeps Topic Subscriptions V1 from

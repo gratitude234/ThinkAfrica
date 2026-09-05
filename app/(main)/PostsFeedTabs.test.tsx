@@ -111,7 +111,7 @@ const common = {
   initialTimeframe: "all" as const,
   initialPosts: [],
   initialHasMore: false,
-  activeDebate: null,
+
   peopleSuggestions: [],
   peopleSuggestionReason: "",
   prioritizePeopleSuggestions: false,

@@ -192,17 +192,66 @@ describe("draft persistence", () => {
 });
 
 describe("claiming a send", () => {
-  it("goes through the database function rather than a client-side update", async () => {
+  it("asks the duplicate question inside the claim, not before it", async () => {
     // Two racing callers must not both win, which needs one statement in
-    // Postgres. A read-then-write from the route would let both through.
-    adminState.rpcResults.claim_broadcast_for_send = { data: [], error: null };
+    // Postgres. A read-then-write from the route would let both through, and
+    // that is exactly how two "Welcome to Indegenius" campaigns went out two
+    // minutes apart from two different rows.
+    adminState.rpcResults.claim_broadcast_for_campaign = {
+      data: [{ outcome: "unclaimable" }],
+      error: null,
+    };
 
-    const claimed = await store.claimForSend("bc-1", "admin-1");
+    const claim = await store.claimForCampaign({
+      id: "bc-1",
+      actorId: "admin-1",
+      fingerprint: "fp-welcome",
+      windowHours: 24,
+      override: false,
+    });
 
-    expect(claimed).toBeNull();
+    expect(claim.outcome).toBe("unclaimable");
     expect(adminState.rpcCalls[0]).toMatchObject({
-      name: "claim_broadcast_for_send",
-      args: { p_broadcast_id: "bc-1", p_actor_id: "admin-1" },
+      name: "claim_broadcast_for_campaign",
+      args: {
+        p_broadcast_id: "bc-1",
+        p_actor_id: "admin-1",
+        p_fingerprint: "fp-welcome",
+        p_window_hours: 24,
+        p_override: false,
+      },
+    });
+  });
+
+  it("reports the campaign that blocked it, so the admin can go and look", async () => {
+    adminState.rpcResults.claim_broadcast_for_campaign = {
+      data: [
+        {
+          outcome: "duplicate",
+          duplicate_broadcast_id: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4",
+          duplicate_subject: "Welcome to Indegenius",
+          duplicate_status: "sent",
+          duplicate_sent_at: "2026-09-04T23:09:00Z",
+          broadcast: null,
+        },
+      ],
+      error: null,
+    };
+
+    const claim = await store.claimForCampaign({
+      id: "24b75e7d-b9c4-4fbb-887b-c8f4c903b138",
+      actorId: "admin-1",
+      fingerprint: "fp-welcome",
+      windowHours: 24,
+      override: false,
+    });
+
+    expect(claim).toMatchObject({
+      outcome: "duplicate",
+      duplicate: {
+        broadcastId: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4",
+        subject: "Welcome to Indegenius",
+      },
     });
   });
 });
@@ -400,24 +449,48 @@ describe("reconciling a stranded send", () => {
     expect(outcomes[0]).toMatchObject({ to: null, reason: "provider_queued" });
   });
 
-  it("never releases a broadcast the provider sent", async () => {
-    adminState.tables.broadcasts = [dbRow()];
+  it("finalises a broadcast the provider has sent, rather than leaving it sending", async () => {
+    // Both production campaigns reported sent at Resend and sat at 'sending'
+    // locally, because completion was inferred from delivered + failed
+    // reaching the recipient count. 24 suppressed messages will never be
+    // delivered and will never fail, so that sum could not arrive.
+    adminState.tables.broadcasts = [dbRow({ status: "sending" })];
     getResendBroadcastMock.mockResolvedValue({
       status: "sent",
-      sent_at: "2026-09-03T10:01:00Z",
+      sent_at: "2026-09-04T23:09:00Z",
     });
     releaseSucceeds();
+    adminState.rpcResults.mark_broadcast_provider_sent = {
+      data: [{ id: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4" }],
+      error: null,
+    };
 
     const outcomes = await store.reconcileStuckBroadcasts();
 
     expect(releaseCall()).toBeUndefined();
+    expect(
+      adminState.rpcCalls.find(
+        (call) => call.name === "mark_broadcast_provider_sent"
+      )?.args
+    ).toMatchObject({
+      p_broadcast_id: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4",
+      p_resend_broadcast_id: "807c168c-6fd5-42c3-9ae0-977bd6869364",
+      p_sent_at: "2026-09-04T23:09:00Z",
+    });
+    expect(outcomes[0]).toMatchObject({ to: "sent", reason: "marked_sent" });
+  });
 
-    // It is corrected forward to sending, not backwards to a draft.
-    const update = adminState.updates.find(
-      (u) => u.table === "broadcasts" && u.patch.status === "sending"
-    );
-    expect(update?.patch.sent_at).toBe("2026-09-03T10:01:00Z");
-    expect(outcomes[0]).toMatchObject({ to: "sending", reason: "marked_sending" });
+  it("finalises a locally failed broadcast the provider actually sent", async () => {
+    adminState.tables.broadcasts = [dbRow({ status: "failed" })];
+    getResendBroadcastMock.mockResolvedValue({ status: "sent", sent_at: null });
+    adminState.rpcResults.mark_broadcast_provider_sent = {
+      data: [{ id: "x" }],
+      error: null,
+    };
+
+    const outcomes = await store.reconcileStuckBroadcasts();
+
+    expect(outcomes[0]).toMatchObject({ from: "failed", to: "sent" });
   });
 
   it("leaves the row alone when the provider cannot account for it", async () => {

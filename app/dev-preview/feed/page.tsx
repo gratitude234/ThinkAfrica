@@ -5,7 +5,7 @@ import HomeFeedCard from "@/components/post/HomeFeedCard";
 import HomeFeaturedLead from "@/components/post/HomeFeaturedLead";
 import HomeSidebar from "@/components/ui/HomeSidebar";
 import PostFeed from "@/components/post/PostFeed";
-import DebateInterlude from "@/components/post/DebateInterlude";
+
 import PeopleInterlude from "@/components/post/PeopleInterlude";
 import TopicInterlude from "@/components/post/TopicInterlude";
 import { EndStateCard } from "@/app/(main)/PostsFeedTabs";
@@ -13,7 +13,7 @@ import FeedSkeleton from "@/components/post/FeedSkeleton";
 import {
   ACTIVATION_FALLBACK_FIXTURE,
   ARTICLE_FIXTURES,
-  DEBATE_FIXTURE,
+
   FEATURED_FIXTURE,
   FEATURED_TODAY_FIXTURE,
   POST_FIXTURES,
@@ -162,9 +162,8 @@ export default function FeedPreviewPage() {
         </div>
 
         <div className="flex flex-wrap gap-6">
-          <RailFrame label="Full rail (all four cards + topics)">
+          <RailFrame label="Full rail (all cards + topics)">
             <HomeSidebar
-              activeDebate={DEBATE_FIXTURE}
               recentDraft={RECENT_DRAFT_FIXTURE}
               activationState={null}
               featuredToday={FEATURED_TODAY_FIXTURE}
@@ -176,7 +175,6 @@ export default function FeedPreviewPage() {
 
           <RailFrame label="Personal action: incomplete activation fallback (no draft)">
             <HomeSidebar
-              activeDebate={null}
               recentDraft={null}
               activationState={ACTIVATION_FALLBACK_FIXTURE}
               featuredToday={null}
@@ -188,7 +186,6 @@ export default function FeedPreviewPage() {
 
           <RailFrame label="Missing optional sections (topics only)">
             <HomeSidebar
-              activeDebate={null}
               recentDraft={null}
               activationState={null}
               featuredToday={null}
@@ -205,9 +202,7 @@ export default function FeedPreviewPage() {
         title="Discovery interludes"
         note="Rendered directly (not through the impression-tracking feed list) -- For You/Discover only, first shown after three items, with each module appearing at most once per load."
       >
-        <div className="mx-auto max-w-[680px]">
-          <DebateInterlude debate={DEBATE_FIXTURE} />
-        </div>
+
         <div className="mx-auto max-w-[680px]">
           <PeopleInterlude people={WRITER_FIXTURES.slice(0, 3)} reason="Based on your reading history" currentUserId={null} />
         </div>

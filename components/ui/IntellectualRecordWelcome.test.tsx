@@ -23,10 +23,7 @@ describe("IntellectualRecordWelcome", () => {
       "href",
       "/responses"
     );
-    expect(screen.getByRole("link", { name: "Join a debate" })).toHaveAttribute(
-      "href",
-      "/debates"
-    );
+
     expect(window.location.search).toBe("");
   });
 

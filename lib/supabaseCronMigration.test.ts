@@ -10,6 +10,11 @@ const migrationPath = join(
 );
 const sql = readFileSync(migrationPath, "utf8");
 
+// The original scheduler is applied history and is read here as history: it is
+// asserted for the structural guarantees that no later migration revisits
+// (extensions, the private schema, Vault resolution, retention). The job set it
+// installed has since changed, so that lives in the current-set test below
+// rather than here.
 const expectedJobs = new Map([
   ["indegenius-daily-brief", "0 8 * * *"],
   ["indegenius-review-reminders", "0 9 * * *"],
@@ -34,7 +39,7 @@ describe("Supabase Cron migration", () => {
     );
   });
 
-  it("defines exactly the approved job names and UTC schedules", () => {
+  it("defines exactly the job names and UTC schedules it installed at the time", () => {
     const scheduled = [
       ...sql.matchAll(
         /perform\s+cron\.schedule\(\s*'([^']+)'\s*,\s*'([^']+)'/gi
@@ -45,7 +50,7 @@ describe("Supabase Cron migration", () => {
     expect(scheduled).toHaveLength(expectedJobs.size);
   });
 
-  it("whitelists only the protected application worker paths", () => {
+  it("whitelisted only protected application worker paths", () => {
     const expectedPaths = [
       "/api/cron/health",
       "/api/cron/daily-brief",

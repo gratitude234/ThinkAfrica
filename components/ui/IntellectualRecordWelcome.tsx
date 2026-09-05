@@ -28,7 +28,7 @@ export default function IntellectualRecordWelcome() {
             Your Intellectual Record starts with one contribution.
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">
-            Discover an idea, publish your own, respond to someone else, or add an argument to a debate. Each public contribution is added to your record.
+            Discover an idea, publish your own, or respond to someone else. Each public contribution is added to your record.
           </p>
         </div>
         <button
@@ -53,12 +53,7 @@ export default function IntellectualRecordWelcome() {
         >
           Read responses
         </Link>
-        <Link
-          href="/debates"
-          className="inline-flex min-h-11 items-center rounded-lg border border-white/25 px-4 text-sm font-semibold text-white transition-colors hover:bg-white/10"
-        >
-          Join a debate
-        </Link>
+
       </div>
     </section>
   );

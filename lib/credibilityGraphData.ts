@@ -24,8 +24,6 @@ export interface CredibilitySummary {
   editoriallyReviewedCount: number;
   acceptedCollaborationCount: number;
   distinctCollaboratorCount: number;
-  debateContributionCount: number;
-  completedDebateCount: number;
 }
 
 export const EMPTY_CREDIBILITY_SUMMARY: CredibilitySummary = {
@@ -36,8 +34,6 @@ export const EMPTY_CREDIBILITY_SUMMARY: CredibilitySummary = {
   editoriallyReviewedCount: 0,
   acceptedCollaborationCount: 0,
   distinctCollaboratorCount: 0,
-  debateContributionCount: 0,
-  completedDebateCount: 0,
 };
 
 function count(value: unknown) {
@@ -56,8 +52,6 @@ export function normalizeCredibilitySummary(value: unknown): CredibilitySummary 
     editoriallyReviewedCount: count(row.editorially_reviewed_count),
     acceptedCollaborationCount: count(row.accepted_collaboration_count),
     distinctCollaboratorCount: count(row.distinct_collaborator_count),
-    debateContributionCount: count(row.debate_contribution_count),
-    completedDebateCount: count(row.completed_debate_count),
   };
 }
 

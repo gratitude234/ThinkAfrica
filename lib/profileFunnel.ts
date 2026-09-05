@@ -57,7 +57,7 @@ export type ProfileFunnelSurface = (typeof PROFILE_FUNNEL_SURFACES)[number];
 export type ProfileViewerState = "anonymous" | "authenticated" | "owner";
 
 /** The kinds of entry a reader can open from a profile. */
-export type ProfileWorkKind = "publication" | "response" | "research" | "debate";
+export type ProfileWorkKind = "publication" | "response" | "research";
 
 export function getProfileViewerState({
   viewerId,

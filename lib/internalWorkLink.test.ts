@@ -209,7 +209,7 @@ describe("review privacy in the public projection", () => {
   });
 });
 
-describe("collaboration and debate semantics", () => {
+describe("collaboration semantics", () => {
   it("counts only accepted co-authorship", () => {
     expect(migration).toContain("collaborator.accepted_at IS NOT NULL");
   });
@@ -225,28 +225,11 @@ describe("collaboration and debate semantics", () => {
     expect(migration).toContain("count(DISTINCT user_id) FROM collaborations");
   });
 
-  it("counts debate participation and completion, and derives no winner", () => {
-    expect(migration).toContain("debate_contribution_count");
-    expect(migration).toContain("completed_debate_count");
-    // No column or alias names a winner. The word appears once, in the
-    // function's COMMENT, explaining why no such signal exists; that is
-    // documentation, not a claim, so the check runs against the returned
-    // column list.
+  it("derives no ranked or judged outcome anywhere in its returned columns", () => {
     const returnsTable = migration.slice(
       migration.indexOf("RETURNS TABLE ("),
       migration.search(/\)\r?\nLANGUAGE sql/)
     );
     expect(returnsTable).not.toMatch(/winner|verdict|won/i);
-    expect(returnsTable).toContain("debate_contribution_count");
-    expect(returnsTable).toContain("completed_debate_count");
-
-    const sql = migration
-      .split(/\r?\n/)
-      .filter((line) => !line.trim().startsWith("--"))
-      .join(" ");
-    // Completion is read from the debate's own status, never from votes,
-    // ballots or engagement.
-    expect(sql).toContain("WHERE status = 'closed'");
-    expect(sql).not.toMatch(/debate_votes|debate_ballots|like_count|vote_count/);
   });
 });

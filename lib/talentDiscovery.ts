@@ -40,7 +40,7 @@ export interface TalentDiscoveryInput {
     followerCount?: number | null;
     badgeCount?: number | null;
     featuredWorkCount?: number | null;
-    debateContributionCount?: number | null;
+
   };
 }
 
@@ -78,7 +78,7 @@ export function getTalentDiscoverySummary(
       followerCount: input.stats?.followerCount,
       badgeCount: input.stats?.badgeCount,
       featuredWorkCount: input.stats?.featuredWorkCount,
-      debateContributionCount: input.stats?.debateContributionCount,
+
       topicCount: input.profile?.interests?.length ?? 0,
       opportunityReadinessScore: readiness.score,
       isOpenToOpportunities: input.talentProfile?.open_to_opportunities,

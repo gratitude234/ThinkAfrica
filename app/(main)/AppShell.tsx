@@ -10,7 +10,6 @@ interface AppShellProps {
   showGuestBanner: boolean;
   userId: string | null;
   username: string | null;
-  hasActiveDebate: boolean;
   children: ReactNode;
 }
 
@@ -18,7 +17,7 @@ const MAIN_BASE =
   "mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-6 md:pb-16 lg:px-8";
 
 // The container only widens on rail routes. Every suppressed route -- messages,
-// post pages, debate rooms, admin -- stays at 1240px and is pixel-identical to
+// post pages, admin -- stays at 1240px and is pixel-identical to
 // before the rail existed, which is what keeps their full-bleed layouts intact.
 const MAIN_WITH_RAIL = `${MAIN_BASE} xl:grid xl:max-w-[1480px] xl:grid-cols-[184px_minmax(0,1fr)] xl:items-start xl:gap-7`;
 
@@ -34,7 +33,6 @@ export default function AppShell({
   showGuestBanner,
   userId,
   username,
-  hasActiveDebate,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -46,7 +44,6 @@ export default function AppShell({
         <SideRail
           userId={userId}
           username={username}
-          hasActiveDebate={hasActiveDebate}
         />
       ) : null}
 

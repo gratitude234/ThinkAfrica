@@ -21,7 +21,7 @@ supabase/pending/ai_topic_suggestions_v1.sql
 ```
 
 It is not part of the executable migration ledger and must not be applied
-until the Debate deployment ledger is reconciled.
+until the migration ledger is reconciled.
 
 ## Runtime configuration
 

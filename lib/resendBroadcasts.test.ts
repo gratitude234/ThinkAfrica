@@ -326,6 +326,48 @@ describe("putting a contact into a segment", () => {
   });
 });
 
+describe("one contact, one membership, one message", () => {
+  /**
+   * A user showed Gmail with roughly six "Welcome to Indegenius" rows in the
+   * All inboxes view. Only two campaigns were ever sent from Indegenius, so
+   * the count is Gmail aggregating several signed-in inboxes rather than the
+   * provider duplicating anything. Still worth holding the property that makes
+   * the provider side incapable of it: a Resend broadcast addresses a segment,
+   * and a contact is in a segment at most once.
+   */
+  it("never adds a membership the contact already has", async () => {
+    fake.contacts.push({
+      id: "contact-1",
+      email: "member@indegenius.africa",
+      unsubscribed: false,
+      segments: ["seg-all"],
+    });
+
+    await syncContactSegments({
+      email: "member@indegenius.africa",
+      segmentIds: ["seg-all"],
+      managedSegmentIds: MANAGED,
+    });
+
+    expect(additions()).toHaveLength(0);
+    expect(findContact("member@indegenius.africa")?.segments).toEqual(["seg-all"]);
+  });
+
+  it("leaves a single membership behind however many times it runs", async () => {
+    for (let run = 0; run < 3; run += 1) {
+      await syncContactSegments({
+        email: "member@indegenius.africa",
+        segmentIds: ["seg-all"],
+        managedSegmentIds: MANAGED,
+      });
+    }
+
+    const contact = findContact("member@indegenius.africa");
+    expect(contact?.segments).toEqual(["seg-all"]);
+    expect(fake.contacts).toHaveLength(1);
+  });
+});
+
 describe("failure and consent", () => {
   it("throws when a removal fails, so nothing is stamped as synced", async () => {
     fake.contacts.push({

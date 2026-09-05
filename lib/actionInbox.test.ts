@@ -14,37 +14,6 @@ function notification(type: string, overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("Debate V1.5 action inbox notifications", () => {
-  it.each([
-    ["debate_invitation", "Debate invitation", "Review invitation"],
-    [
-      "debate_invitation_response",
-      "Debate invitation update",
-      "Open debate",
-    ],
-    ["debate_phase_advanced", "Debate stage opened", "Open debate"],
-    ["debate_cancelled", "Debate cancelled", "View record"],
-  ])("maps %s to a clear debate action", (type, label, cta) => {
-    const summary = getActionInboxSummary([
-      {
-        id: type,
-        type,
-        read: false,
-        created_at: createdAt,
-        message: "A debate update",
-        link: "/debates/debate-id",
-      },
-    ]);
-
-    expect(summary.primaryAction).toMatchObject({
-      type,
-      label,
-      cta,
-      href: "/debates/debate-id",
-      description: "A debate update",
-    });
-  });
-});
 
 describe("actionability", () => {
   it.each([
@@ -54,7 +23,6 @@ describe("actionability", () => {
     "opportunity_inquiry",
     "co_author_invite",
     "research_collaboration_request",
-    "debate_invitation",
   ])("treats %s as something the reader must act on", (type) => {
     expect(isActionableType(type)).toBe(true);
     expect(getActionInboxSummary([notification(type)]).items[0].actionable).toBe(
@@ -171,10 +139,6 @@ describe("type coverage regressions", () => {
     ["review_reminder", "Review overdue"],
     ["co_author_accepted", "Co-author invite accepted"],
     ["topic_published", "New in a topic you follow"],
-    ["debate_v2_round_change", "New debate round"],
-    ["debate_v2_final_vote", "Final vote open"],
-    ["debate_v2_direct_response", "Direct response"],
-    ["debate_v2_evidence_requested", "Evidence requested"],
   ])("gives %s its own label", (type, label) => {
     expect(getActionInboxSummary([notification(type)]).items[0].label).toBe(label);
   });

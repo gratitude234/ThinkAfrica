@@ -25,7 +25,6 @@ export interface TopicEvidence {
   inboundCitationCount: number;
   reviewedCount: number;
   coAuthoredCount: number;
-  debateContributionCount: number;
   lastContributionAt: string | null;
   representativeWorks: Array<{
     postId: string;
@@ -94,11 +93,6 @@ export function buildExpertiseSummary(evidence: TopicEvidence): string {
   }
   if (evidence.coAuthoredCount > 0) {
     clauses.push(plural(evidence.coAuthoredCount, "accepted collaboration"));
-  }
-  if (evidence.debateContributionCount > 0) {
-    clauses.push(
-      plural(evidence.debateContributionCount, "structured debate contribution")
-    );
   }
 
   if (clauses.length === 0) return `${opening}.`;
@@ -205,8 +199,6 @@ export interface ExpertiseTopicInput {
   citable?: boolean;
   reviewed?: boolean;
   inboundCitations?: number;
-  /** A debate argument rather than a publication. */
-  isDebateContribution?: boolean;
 }
 
 /**
@@ -243,7 +235,6 @@ export function buildTopicEvidence(
           inboundCitationCount: 0,
           reviewedCount: 0,
           coAuthoredCount: 0,
-          debateContributionCount: 0,
           lastContributionAt: null,
           representativeWorks: [],
           works: [],
@@ -251,17 +242,13 @@ export function buildTopicEvidence(
         byTopic.set(key, entry);
       }
 
-      if (contribution.isDebateContribution) {
-        entry.debateContributionCount += 1;
-      } else {
-        entry.contributionCount += 1;
-        if (contribution.sourceBacked) entry.sourceBackedCount += 1;
-        if (contribution.citable) entry.citableCount += 1;
-        if (contribution.reviewed) entry.reviewedCount += 1;
-        if (contribution.isCoAuthor) entry.coAuthoredCount += 1;
-        entry.inboundCitationCount += contribution.inboundCitations ?? 0;
-        entry.works.push(contribution);
-      }
+      entry.contributionCount += 1;
+      if (contribution.sourceBacked) entry.sourceBackedCount += 1;
+      if (contribution.citable) entry.citableCount += 1;
+      if (contribution.reviewed) entry.reviewedCount += 1;
+      if (contribution.isCoAuthor) entry.coAuthoredCount += 1;
+      entry.inboundCitationCount += contribution.inboundCitations ?? 0;
+      entry.works.push(contribution);
 
       if (!entry.lastContributionAt || contribution.occurredAt > entry.lastContributionAt) {
         entry.lastContributionAt = contribution.occurredAt;

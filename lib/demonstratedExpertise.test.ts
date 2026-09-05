@@ -19,7 +19,6 @@ function evidence(overrides: Partial<TopicEvidence> = {}): TopicEvidence {
     inboundCitationCount: 0,
     reviewedCount: 0,
     coAuthoredCount: 0,
-    debateContributionCount: 0,
     lastContributionAt: "2026-08-01T00:00:00.000Z",
     representativeWorks: [],
     ...overrides,
@@ -62,16 +61,15 @@ describe("expertise qualification", () => {
           contributionCount: 0,
           reviewedCount: 3,
           inboundCitationCount: 5,
-          debateContributionCount: 4,
         })
       )
     ).toBe(false);
   });
 
-  it("does not let debate contributions alone qualify a topic", () => {
+  it("does not let review or citation counts alone qualify a topic", () => {
     expect(
       qualifiesAsDemonstratedExpertise(
-        evidence({ contributionCount: 0, debateContributionCount: 6 })
+        evidence({ contributionCount: 0, reviewedCount: 6 })
       )
     ).toBe(false);
   });
@@ -109,19 +107,6 @@ describe("expertise summary grammar", () => {
     ).toBe("1 contribution on Education policy, including 1 citable record.");
   });
 
-  it("describes debate contributions when they are the supporting evidence", () => {
-    expect(
-      buildExpertiseSummary(
-        evidence({
-          contributionCount: 3,
-          debateContributionCount: 2,
-          label: "Education policy",
-        })
-      )
-    ).toBe(
-      "3 contributions on Education policy, including 2 structured debate contributions."
-    );
-  });
 
   it("never produces an unsupported claim", () => {
     const summary = buildExpertiseSummary(
@@ -233,14 +218,6 @@ describe("topic evidence assembly", () => {
     });
   });
 
-  it("keeps debate contributions out of the publication count", () => {
-    const [topic] = buildTopicEvidence([
-      { ...base, tags: ["law"] },
-      { ...base, postId: "d1", tags: ["law"], isDebateContribution: true },
-    ]);
-    expect(topic.contributionCount).toBe(1);
-    expect(topic.debateContributionCount).toBe(1);
-  });
 
   it("ignores blank tags and produces no topic from none", () => {
     expect(buildTopicEvidence([{ ...base, tags: ["  ", ""] }])).toEqual([]);

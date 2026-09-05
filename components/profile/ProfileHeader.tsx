@@ -23,6 +23,28 @@ import { createClient } from "@/lib/supabase/client";
 
 export type { PublicProfileIdentity } from "@/lib/profileIdentity";
 
+/**
+ * The header's own action buttons, in one place so Message, Edit profile and
+ * the overflow trigger cannot drift apart.
+ *
+ * The radius is deliberately `rounded-lg` rather than the mockup's pill. The
+ * Follow control sitting beside these is `AuthorRelationshipControls`, which
+ * is shared with the mobile sticky bar, the feed interludes and the V2
+ * variant, and it sets its own radius internally. Rounding only the buttons
+ * this file owns would put a pill next to a rectangle; rounding the shared
+ * control instead would restyle four other surfaces to settle a corner on
+ * this one. The mockup's restraint is carried here by weight and colour
+ * instead: one filled primary, one outlined secondary, everything else quiet.
+ */
+const ACTION_BASE =
+  "focus-ring inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors";
+
+/** The single filled action. Only ever one of these is on screen at a time. */
+const ACTION_PRIMARY = `${ACTION_BASE} bg-emerald-brand text-white hover:bg-[#0E4B37]`;
+
+/** Outlined in the brand, the way the mockup sets Message beside Follow. */
+const ACTION_SECONDARY = `${ACTION_BASE} border border-emerald-brand/40 bg-card text-emerald-ink hover:border-emerald-brand hover:bg-green-tint`;
+
 interface ProfileHeaderProps {
   profile: PublicProfileIdentity;
   /**
@@ -33,6 +55,13 @@ interface ProfileHeaderProps {
   demonstratedTopics: DemonstratedTopic[];
   recordSummary: ProfileRecordSummary;
   followerCount: number;
+  /**
+   * Counted from `follows` on every request, like the follower count beside
+   * it. Neither is stored: both are a single indexed head query, and a
+   * denormalised counter would need triggers and a reconciliation job to earn
+   * its keep.
+   */
+  followingCount?: number | null;
   isOwnProfile: boolean;
   currentUserId: string | null;
   initialFollowing: boolean;
@@ -138,6 +167,7 @@ export default function ProfileHeader({
   demonstratedTopics,
   recordSummary,
   followerCount,
+  followingCount = null,
   isOwnProfile,
   currentUserId,
   initialFollowing,
@@ -158,10 +188,7 @@ export default function ProfileHeader({
 
   const actions = isOwnProfile ? (
     <>
-      <Link
-        href="/settings/profile"
-        className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 text-sm font-semibold text-white hover:bg-[#0E4B37]"
-      >
+      <Link href="/settings/profile" className={ACTION_PRIMARY}>
         Edit profile
       </Link>
       <ShareButton className="min-h-11" />
@@ -201,7 +228,7 @@ export default function ProfileHeader({
           onClick={() =>
             router.push(`/login?redirectTo=${encodeURIComponent(`/${profile.username}`)}`)
           }
-          className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink"
+          className={ACTION_SECONDARY}
         >
           Message
         </button>
@@ -257,6 +284,7 @@ export default function ProfileHeader({
         demonstratedTopics={demonstratedTopics}
         recordSummary={recordSummary}
         followerCount={followerCount}
+        followingCount={followingCount}
         isOwnProfile={isOwnProfile}
         actions={actions}
         availability={availability}
@@ -328,7 +356,7 @@ function MessageButton({
         disabled={isBusy}
         aria-busy={isBusy || undefined}
         title={reason ?? undefined}
-        className="focus-ring inline-flex min-h-11 items-center justify-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:border-card-border-hover hover:text-ink disabled:opacity-50"
+        className={`${ACTION_SECONDARY} disabled:opacity-50`}
       >
         {isBusy ? "Opening…" : "Message"}
       </button>

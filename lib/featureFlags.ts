@@ -6,7 +6,6 @@ export const FEATURE_FLAGS = {
   // Temporary product kill switch. Keep every Research surface and mutation
   // behind this value so the feature can be restored in one place.
   research: false,
-  debates: true,
   fellowshipsSection: false,
   ambassadors: false,
   talentMarketplace: false,

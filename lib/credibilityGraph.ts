@@ -22,8 +22,6 @@ export const CREDIBILITY_SIGNAL_KINDS = [
   "responded_to",
   "cited_by",
   "reviewed",
-  "debate_participation",
-  "debate_completion",
   "verified_opportunity_selection",
   "verified_opportunity_completion",
   "verified_external_recognition",
@@ -31,17 +29,6 @@ export const CREDIBILITY_SIGNAL_KINDS = [
 
 export type CredibilitySignalKind = (typeof CREDIBILITY_SIGNAL_KINDS)[number];
 
-/**
- * Deliberately absent: `debate_winner`.
- *
- * Debate ballots exist in the schema but are private, and the migration that
- * introduced them states that a public aggregate-results function is deferred.
- * Until a canonical judged result exists, a winner could only be inferred from
- * votes, likes or follower counts, and inferring intellectual outcomes from
- * popularity is the thing this graph exists to avoid. Participation and
- * completion are facts; a winner is not yet one.
- */
-export const UNSUPPORTED_SIGNAL_KINDS = ["debate_winner"] as const;
 
 export const CREDIBILITY_SOURCE_TYPES = [
   "post",
@@ -49,8 +36,6 @@ export const CREDIBILITY_SOURCE_TYPES = [
   "post_reference",
   "post_review",
   "post_editor_decision",
-  "debate",
-  "debate_argument",
   "opportunity_outcome",
   "external_recognition",
 ] as const;
@@ -135,15 +120,7 @@ export const CREDIBILITY_SIGNAL_COPY: Record<
     explanation:
       "A publication that completed a review workflow on this platform.",
   },
-  debate_participation: {
-    label: "Structured debate contribution",
-    explanation: "A published argument in a public structured debate.",
-  },
-  debate_completion: {
-    label: "Completed structured debate",
-    explanation:
-      "Took part in a public structured debate that ran to completion.",
-  },
+
   verified_opportunity_selection: {
     label: "Verified selection",
     explanation:
@@ -247,7 +224,6 @@ export const RECOGNITION_SIGNAL_KINDS: CredibilitySignalKind[] = [
   "cited_by",
   "reviewed",
   "accepted_coauthor",
-  "debate_completion",
   "verified_opportunity_selection",
   "verified_opportunity_completion",
   "verified_external_recognition",

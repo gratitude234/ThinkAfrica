@@ -31,7 +31,7 @@ type PostRow = {
   created_at: string | null;
   updated_at: string | null;
 };
-type DebateRow = { id: string; created_at: string | null; ends_at: string | null };
+
 type ProfileRow = {
   id: string;
   username: string | null;
@@ -46,7 +46,7 @@ type ResearcherProfileRow = { user_id: string | null };
 const staticRoutes: SitemapRow[] = [
   { url: absoluteUrl("/landing"), changeFrequency: "daily", priority: 1 },
   { url: absoluteUrl("/explore"), changeFrequency: "hourly", priority: 0.9 },
-  { url: absoluteUrl("/debates"), changeFrequency: "daily", priority: 0.8 },
+
   { url: absoluteUrl("/campus"), changeFrequency: "daily", priority: 0.75 },
   ...(FEATURE_FLAGS.research
     ? [{ url: absoluteUrl("/research"), changeFrequency: "daily" as const, priority: 0.8 }]
@@ -112,7 +112,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const [
       posts,
-      debates,
       profiles,
       publishedAuthors,
       researchProjects,
@@ -131,17 +130,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           .abortSignal(signal),
         deadline
       ),
-      collect<DebateRow>(
-        "debates",
-        supabase
-          .from("debates")
-          .select("id, created_at, ends_at")
-          .in("status", ["open", "active", "closed"])
-          .order("created_at", { ascending: false })
-          .limit(500)
-          .abortSignal(signal),
-        deadline
-      ),
+
       collect<ProfileRow>(
         "profiles",
         supabase
@@ -207,12 +196,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       }));
 
-    const debateRoutes = debates.map((debate) => ({
-      url: absoluteUrl(`/debates/${debate.id}`),
-      lastModified: debate.ends_at ?? debate.created_at ?? undefined,
-      changeFrequency: "daily" as const,
-      priority: 0.65,
-    }));
 
     const profileRoutes = profiles
       .filter((profile) => {
@@ -242,7 +225,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [
       ...staticRoutes,
       ...postRoutes,
-      ...debateRoutes,
       ...researchProjectRoutes,
       ...profileRoutes,
     ];

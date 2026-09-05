@@ -33,7 +33,6 @@ export type NotificationPreferenceKey =
   | "inapp_likes"
   | "inapp_comments"
   | "inapp_follows"
-  | "inapp_debates"
   | "inapp_collaboration"
   | "email_comments"
   | "email_follows"
@@ -53,15 +52,13 @@ export type NotificationPreferenceKey =
   | "email_co_author_declined"
   | "email_opportunity_inquiry"
   | "email_author_publications"
-  | "email_debate_updates"
   | "push_published"
   | "push_messages"
   | "push_comments"
   | "push_likes"
   | "push_follows"
   | "push_daily_brief"
-  | "push_author_publications"
-  | "push_debate_updates";
+  | "push_author_publications";
 
 export interface SubscriptionMatchReason {
   kind: "author" | "topic";

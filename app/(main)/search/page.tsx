@@ -53,12 +53,6 @@ interface TopicResult {
   count: number;
 }
 
-interface DebateResult {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-}
 
 interface OpportunityResult {
   id: string;
@@ -68,7 +62,7 @@ interface OpportunityResult {
 }
 
 interface DiscoverSearchGroup {
-  key: "people" | "posts" | "topics" | "debates" | "opportunities";
+  key: "people" | "posts" | "topics" | "opportunities";
   label: string;
   count: number;
 }
@@ -162,7 +156,7 @@ function SearchPageContent() {
   const [posts, setPosts] = useState<PostResult[]>([]);
   const [people, setPeople] = useState<PersonResult[]>([]);
   const [topics, setTopics] = useState<TopicResult[]>([]);
-  const [debates, setDebates] = useState<DebateResult[]>([]);
+
   const [opportunities, setOpportunities] = useState<OpportunityResult[]>([]);
   const [allTopics, setAllTopics] = useState<TopicResult[]>([]);
   const [trending, setTrending] = useState<string[]>([]);
@@ -179,7 +173,6 @@ function SearchPageContent() {
         setPosts([]);
         setPeople([]);
         setTopics([]);
-        setDebates([]);
         setOpportunities([]);
         setLoading(false);
         return;
@@ -192,7 +185,6 @@ function SearchPageContent() {
       const [
         { data: postResults },
         { data: peopleResults },
-        { data: debateResults },
         { data: opportunityResults },
       ] = await Promise.all([
         supabase
@@ -212,12 +204,6 @@ function SearchPageContent() {
             `username.ilike.%${trimmed}%,full_name.ilike.%${trimmed}%,university.ilike.%${trimmed}%`
           )
           .limit(8),
-        supabase
-          .from("debates")
-          .select("id, title, description, status")
-          .or(`title.ilike.%${trimmed}%,description.ilike.%${trimmed}%`)
-          .order("created_at", { ascending: false })
-          .limit(6),
         supabase
           .from("fellowships")
           .select("id, title, sponsor_name, deadline")
@@ -242,7 +228,6 @@ function SearchPageContent() {
       setPosts(normalizedPosts);
       setPeople((peopleResults ?? []) as PersonResult[]);
       setTopics(normalizedTopics);
-      setDebates((debateResults ?? []) as DebateResult[]);
       setOpportunities((opportunityResults ?? []) as OpportunityResult[]);
       setLoading(false);
       trackActivationEvent({
@@ -253,13 +238,11 @@ function SearchPageContent() {
           postResults: normalizedPosts.length,
           peopleResults: peopleResults?.length ?? 0,
           topicResults: normalizedTopics.length,
-          debateResults: debateResults?.length ?? 0,
           opportunityResults: opportunityResults?.length ?? 0,
           resultCount:
             normalizedPosts.length +
             (peopleResults?.length ?? 0) +
             normalizedTopics.length +
-            (debateResults?.length ?? 0) +
             (opportunityResults?.length ?? 0),
         },
       });
@@ -321,12 +304,12 @@ function SearchPageContent() {
 
   const showResults = query.trim().length >= 2 && !loading;
   const totalResults =
-    people.length + posts.length + topics.length + debates.length + opportunities.length;
+    people.length + posts.length + topics.length + opportunities.length;
   const groups: DiscoverSearchGroup[] = [
     { key: "posts", label: "Posts", count: posts.length },
     { key: "people", label: "Writers", count: people.length },
     { key: "topics", label: "Topics", count: topics.length },
-    { key: "debates", label: "Debates", count: debates.length },
+
     { key: "opportunities", label: "Opportunities", count: opportunities.length },
   ].filter((group) => group.count > 0) as DiscoverSearchGroup[];
 
@@ -340,7 +323,7 @@ function SearchPageContent() {
           Search across Indegenius
         </h1>
         <p className="mt-2 text-sm leading-6 text-gray-500">
-          Find posts, writers, topics, debates, and opportunities from one place.
+          Find posts, writers, topics, and opportunities from one place.
         </p>
       </div>
 
@@ -586,50 +569,6 @@ function SearchPageContent() {
             </section>
           ) : null}
 
-          {debates.length > 0 ? (
-            <section>
-              <h2
-                id="debates"
-                className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500"
-              >
-                Debates
-              </h2>
-              <div className="space-y-3">
-                {debates.map((debate) => (
-                  <Link
-                    key={debate.id}
-                    href={`/debates/${debate.id}`}
-                    onClick={() => {
-                      trackActivationEvent({
-                        event: "discover_item_clicked",
-                        metadata: {
-                          item: "search_debate",
-                          debateId: debate.id,
-                          surface: "search",
-                        },
-                      });
-                    }}
-                    className="block rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
-                  >
-                    <div className="mb-2 flex items-center gap-2">
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                        {debate.status}
-                      </span>
-                      <span className="text-xs text-gray-500">Debate</span>
-                    </div>
-                    <p className="line-clamp-2 text-sm font-semibold text-gray-900">
-                      {debate.title}
-                    </p>
-                    {debate.description ? (
-                      <p className="mt-2 line-clamp-2 text-sm text-gray-500">
-                        {debate.description}
-                      </p>
-                    ) : null}
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : null}
 
           {opportunities.length > 0 ? (
             <section>

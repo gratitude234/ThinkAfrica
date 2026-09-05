@@ -31,13 +31,13 @@ import { formatDate } from "@/lib/utils";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
 
 const EXPLORE_DESCRIPTION =
-  "Discover posts, articles, debates, topics, and people building evidence-backed Intellectual Records on Indegenius.";
+  "Discover posts, articles, topics, and people building evidence-backed Intellectual Records on Indegenius.";
 
 /**
  * No `revalidate` here. This route reads the session through
  * `supabase.auth.getUser()`, which opts it into dynamic rendering, so a
  * route-level revalidate window is silently inert. The expensive shared
- * queries (topic counts, top people, debates, fellowships, opportunity
+ * queries (topic counts, top people, fellowships, opportunity
  * counts) carry their own `unstable_cache` windows in lib/discoverData.ts,
  * which is where the caching actually takes effect.
  */
@@ -537,73 +537,6 @@ function ConversationsRailCard({ data }: { data: DiscoverData }) {
   );
 }
 
-function DebateRailCard({ data }: { data: DiscoverData }) {
-  const debate = data.debateHighlights[0];
-  if (!debate) return null;
-
-  return (
-    <section className="rounded-xl bg-emerald-brand p-5 text-white">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-gold animate-pulse motion-reduce:animate-none" />
-        <p className="text-kicker font-semibold uppercase text-white/80">
-          {debate.status === "active" ? "Live debate" : "Open debate"}
-        </p>
-      </div>
-      <h3 className="font-display text-byline font-semibold leading-snug">
-        {debate.title}
-      </h3>
-      <p className="mt-2 text-meta leading-5 text-white/80">
-        {debate.argumentCount === 0
-          ? "Be the first to argue the motion."
-          : `${debate.argumentCount.toLocaleString()} ${
-              debate.argumentCount === 1 ? "argument" : "arguments"
-            } so far`}
-      </p>
-      <ExploreTrackedLink
-        href={`/debates/${debate.id}`}
-        metadata={{ item: "active_debate", debateId: debate.id, surface: "explore" }}
-        className="mt-4 inline-flex items-center gap-1 text-meta font-semibold text-gold hover:underline"
-      >
-        Join the debate
-        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2.5}
-            d="M5 12h14M12 5l7 7-7 7"
-          />
-        </svg>
-      </ExploreTrackedLink>
-    </section>
-  );
-}
-
-function MobileDebateBanner({ data }: { data: DiscoverData }) {
-  const debate = data.debateHighlights[0];
-  if (!debate) return null;
-
-  return (
-    <ExploreTrackedLink
-      href={`/debates/${debate.id}`}
-      metadata={{ item: "mobile_debate_banner", debateId: debate.id, surface: "explore" }}
-      className="mb-4 flex min-h-16 min-w-0 items-center justify-between gap-3 rounded-xl bg-emerald-brand px-4 py-3 text-white lg:hidden"
-    >
-      <span className="flex min-w-0 items-center gap-2">
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold animate-pulse motion-reduce:animate-none" />
-        <span className="min-w-0">
-          <span className="block text-kicker font-semibold uppercase text-white/80">
-            {debate.status === "active" ? "Live debate" : "Open debate"}
-          </span>
-          <span className="block truncate text-byline font-semibold">
-            {debate.title}
-          </span>
-        </span>
-      </span>
-      <span className="shrink-0 text-meta font-semibold text-gold">Join</span>
-    </ExploreTrackedLink>
-  );
-}
-
 function WritersRailCard({
   people,
   currentUserId,
@@ -790,7 +723,6 @@ function ExploreAside({
   return (
     <aside className="hidden space-y-4 lg:sticky lg:top-[var(--app-sticky-offset)] lg:block">
       <ConversationsRailCard data={data} />
-      <DebateRailCard data={data} />
       <WritersRailCard people={data.people} currentUserId={currentUserId} />
       <OpportunitiesRailCard data={data} />
       <MoreDestinationsCard />
@@ -1044,7 +976,7 @@ export default async function ExplorePage({ searchParams }: PageProps) {
           Find ideas worth engaging with
         </h1>
         <p className="mt-1.5 max-w-measure text-byline text-ink-muted sm:mt-2">
-          Posts, articles, debates, and people across Indegenius.
+          Posts, articles, and people across Indegenius.
         </p>
         <SearchEntry />
       </div>
@@ -1054,7 +986,6 @@ export default async function ExplorePage({ searchParams }: PageProps) {
         activePrimary={activePrimary}
         activeGenre={activeGenre}
       />
-      <MobileDebateBanner data={data} />
 
       <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_312px] lg:gap-8">
         <main className="min-w-0">

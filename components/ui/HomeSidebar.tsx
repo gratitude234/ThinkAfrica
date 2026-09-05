@@ -1,12 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import FollowButton from "@/components/ui/FollowButton";
 import UserAvatar from "@/components/ui/UserAvatar";
 import type { ActivationState } from "@/lib/activation";
 import { getContentKindLabel, resolveContentKind } from "@/lib/contentModel";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
-import { formatRelativeTime, formatTimeUntil } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface RecentDraft {
   id: string;
@@ -35,7 +34,7 @@ export interface FeaturedTodayPost {
 }
 
 interface Props {
-  activeDebate: DebateInterludeData | null;
+
   recentDraft: RecentDraft | null;
   activationState: ActivationState | null;
   featuredToday: FeaturedTodayPost | null;
@@ -115,27 +114,6 @@ function FeaturedTodayCard({ post }: { post: FeaturedTodayPost }) {
   );
 }
 
-function DebateCard({ debate }: { debate: DebateInterludeData }) {
-  const forCount = debate.motionForCount ?? 0;
-  const againstCount = debate.motionAgainstCount ?? 0;
-  const total = forCount + againstCount;
-  const forPct = total > 0 ? Math.round((forCount / total) * 100) : 50;
-  const remaining = formatTimeUntil(debate.endsAt ?? null);
-  const statusLabel = debate.status === "active" ? "Live debate" : "Open debate";
-
-  return (
-    <section className="rounded-2xl bg-gray-900 p-[18px] text-white shadow-[0_8px_24px_rgb(17_24_39/0.14)]">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-300">{statusLabel}</p>
-      <Link href={`/debates/${debate.id}`}><h2 className="font-display line-clamp-3 text-[17px] font-semibold leading-[1.25] hover:text-emerald-100">{debate.title}</h2></Link>
-      <p className="mt-1.5 text-[12px] text-gray-400">{debate.argumentCount} arguments{remaining ? ` · ${remaining}` : ""}</p>
-      <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-gray-700" aria-label={`${forPct}% for, ${100 - forPct}% against`}>
-        <span className="bg-emerald-500" style={{ width: `${forPct}%` }} />
-        <span className="bg-purple-500" style={{ width: `${100 - forPct}%` }} />
-      </div>
-      <Link href={`/debates/${debate.id}`} className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900">Join the debate →</Link>
-    </section>
-  );
-}
 
 function PeopleCard({ people, currentUserId }: { people: SuggestedPerson[]; currentUserId: string | null }) {
   if (people.length === 0) return null;
@@ -168,13 +146,13 @@ function PeopleCard({ people, currentUserId }: { people: SuggestedPerson[]; curr
   );
 }
 
-export default function HomeSidebar({ activeDebate, recentDraft, activationState, featuredToday, peopleSuggestions, currentUserId, topics }: Props) {
+export default function HomeSidebar({ recentDraft, activationState, featuredToday, peopleSuggestions, currentUserId, topics }: Props) {
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex items-end justify-between gap-3 px-1 pb-0.5">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Your intellectual brief</p>
-          <p className="mt-0.5 text-[12px] text-gray-500">Ideas, people and debates for you</p>
+          <p className="mt-0.5 text-[12px] text-gray-500">Ideas, people and topics for you</p>
         </div>
         <Link href="/explore" className="shrink-0 text-[11.5px] font-semibold text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2">
           Explore
@@ -182,7 +160,6 @@ export default function HomeSidebar({ activeDebate, recentDraft, activationState
       </div>
       <PersonalAction recentDraft={recentDraft} activationState={activationState} />
       {featuredToday ? <FeaturedTodayCard post={featuredToday} /> : null}
-      {activeDebate ? <DebateCard debate={activeDebate} /> : null}
       <PeopleCard people={peopleSuggestions} currentUserId={currentUserId} />
       {topics.length > 0 ? (
         <nav aria-label="Browse popular topics" className="px-1 pt-1">

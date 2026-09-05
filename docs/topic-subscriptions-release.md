@@ -27,12 +27,12 @@ It is not part of the executable Supabase migration ledger.
 
 ## Prerequisites
 
-1. Complete every live staging and production probe in
-   `docs/debate-deployment-state.md`.
-2. Reconcile any migration-ledger/catalog disagreement.
-3. Promote, apply, verify, and release the Author Subscriptions migration.
-4. Confirm the deployed `notifications_type_check` still matches the reviewed
-   constraint before assigning Topic V1 a later timestamp.
+1. Reconcile any migration-ledger/catalog disagreement.
+2. Promote, apply, verify, and release the Author Subscriptions migration.
+3. Confirm the deployed `notifications_type_check` still matches the reviewed
+   constraint before assigning Topic V1 a later timestamp. Debate was removed
+   in `20260906000004_remove_debate_schema`, which narrowed that constraint,
+   so re-probe rather than trusting any list written before it.
 
 Do not combine Topic V1 with the first Author Subscriptions release. The topic
 candidate assumes `publication_events` and `publication_deliveries` already

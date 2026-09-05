@@ -24,6 +24,13 @@ import EmailPreview from "./EmailPreview";
 import FieldSelect from "./FieldSelect";
 import Modal from "./Modal";
 
+type DuplicateCampaign = {
+  broadcastId: string;
+  subject: string;
+  status: string;
+  sentAt: string | null;
+};
+
 type Stage = "compose" | "sending" | "sent";
 type OpenModal = "test" | "preview" | "confirm" | null;
 type SaveState = "clean" | "saving" | "saved" | "error" | "locked";
@@ -139,6 +146,12 @@ export default function BroadcastComposer({
   const [testPending, setTestPending] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  /**
+   * The campaign the server refused to duplicate. Held so the admin can open
+   * it before deciding, rather than being told "blocked" with nowhere to look.
+   */
+  const [duplicate, setDuplicate] = useState<DuplicateCampaign | null>(null);
+  const [resendAcknowledged, setResendAcknowledged] = useState(false);
   const [progress, setProgress] = useState(0);
   const [sentCount, setSentCount] = useState(0);
   const [sending, setSending] = useState(false);
@@ -274,7 +287,12 @@ export default function BroadcastComposer({
     hasEditedRef.current = true;
   }
 
-  async function confirmSend() {
+  /**
+   * `overrideDuplicate` is only ever true on the second, deliberate press,
+   * after the admin has been shown the campaign that already went out and has
+   * ticked the acknowledgement. Review and send never sets it.
+   */
+  async function confirmSend(overrideDuplicate = false) {
     // A second click while the first is in flight must not reach the server.
     // The claim on the server is the real guard; this only spares the round
     // trip and keeps the progress screen honest.
@@ -282,6 +300,7 @@ export default function BroadcastComposer({
     setSending(true);
     setOpenModal(null);
     setSendError(null);
+    if (!overrideDuplicate) setDuplicate(null);
 
     try {
       // Flush any pending edit so the row that gets sent is the row on screen.
@@ -301,11 +320,13 @@ export default function BroadcastComposer({
       setProgress(0);
       setStage("sending");
 
-      const result = await dispatchBroadcast(id);
+      const result = await dispatchBroadcast(id, { overrideDuplicate });
 
       if (!result.ok) {
         setStage("compose");
         setSendError(result.error);
+        setDuplicate("duplicate" in result ? (result.duplicate ?? null) : null);
+        setResendAcknowledged(false);
         return;
       }
 
@@ -447,13 +468,54 @@ export default function BroadcastComposer({
         </div>
       </div>
 
-      {sendError ? (
+      {sendError && !duplicate ? (
         <p
           role="alert"
           className="mx-auto max-w-[720px] rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
         >
           {sendError}
         </p>
+      ) : null}
+
+      {duplicate ? (
+        <div
+          role="alert"
+          className="mx-auto max-w-[720px] rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"
+        >
+          <p className="font-semibold">
+            An equivalent broadcast was already sent to this audience recently.
+          </p>
+          <p className="mt-1">
+            {duplicate.subject} went to the same audience. Open it before you
+            decide.{" "}
+            <Link
+              href={`/admin/communications/${duplicate.broadcastId}`}
+              className="font-semibold underline underline-offset-2"
+            >
+              View that broadcast
+            </Link>
+          </p>
+          <label className="mt-3 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={resendAcknowledged}
+              onChange={(event) => setResendAcknowledged(event.target.checked)}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-amber-300 text-emerald-brand focus:ring-emerald-brand"
+            />
+            <span>
+              I understand this will send substantially the same campaign to
+              these people again.
+            </span>
+          </label>
+          <button
+            type="button"
+            disabled={!resendAcknowledged || sending}
+            onClick={() => void confirmSend(true)}
+            className="mt-3 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Send it anyway
+          </button>
+        </div>
       ) : null}
 
       {saveState === "locked" ? (

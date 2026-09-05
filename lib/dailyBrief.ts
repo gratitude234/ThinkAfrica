@@ -10,7 +10,6 @@ import {
   getReferenceCountsByPostId,
 } from "@/lib/postCounts";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
-import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 
 export interface DailyBriefProfile {
@@ -46,15 +45,6 @@ export interface FeaturedPostRow {
   profiles: DailyBriefProfile | DailyBriefProfile[] | null;
 }
 
-interface HotDebateRow {
-  id: string;
-  title: string;
-  status: string;
-  ends_at: string | null;
-  motion_for_count: number | null;
-  motion_against_count: number | null;
-  debate_arguments: { count: number }[] | { count: number } | null;
-}
 
 export const FEATURED_POST_SELECT = `
   id, author_id, title, slug, type, content_kind, article_format, excerpt, tags, cover_image_url, view_count, impression_count, read_count, word_count, featured, published_at, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes,
@@ -119,41 +109,6 @@ export async function getFeaturedPostCandidates(supabase: SupabaseClient) {
   return { manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult };
 }
 
-export function getActiveDebate(supabase: SupabaseClient) {
-  return supabase
-    .from("debates")
-    .select(
-      "id, title, status, ends_at, motion_for_count, motion_against_count, debate_arguments(count)"
-    )
-    .in("status", ["open", "active"])
-    .order("status", { ascending: true })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-}
-
-export function toDebateInterludeData(
-  hotDebateRaw: HotDebateRow | null | undefined
-): DebateInterludeData | null {
-  if (!hotDebateRaw) return null;
-
-  const argumentCount = hotDebateRaw.debate_arguments
-    ? Array.isArray(hotDebateRaw.debate_arguments)
-      ? ((hotDebateRaw.debate_arguments[0] as unknown as { count: number } | undefined)
-          ?.count ?? 0)
-      : 0
-    : 0;
-
-  return {
-    id: hotDebateRaw.id,
-    title: hotDebateRaw.title,
-    status: hotDebateRaw.status,
-    endsAt: hotDebateRaw.ends_at,
-    argumentCount,
-    motionForCount: hotDebateRaw.motion_for_count ?? 0,
-    motionAgainstCount: hotDebateRaw.motion_against_count ?? 0,
-  };
-}
 
 export interface EngagementCounts {
   referenceCounts: Record<string, number>;
@@ -217,7 +172,6 @@ export function normalizeFeaturedPost(post: FeaturedPostRow) {
 
 export interface DailyBriefContent {
   featuredPost: { id: string; title: string; slug: string } | null;
-  activeDebate: DebateInterludeData | null;
 }
 
 /**
@@ -230,8 +184,8 @@ export interface DailyBriefContent {
 export async function getDailyBriefContent(
   supabase: SupabaseClient
 ): Promise<DailyBriefContent> {
-  const [{ manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult }, hotDebateResult] =
-    await Promise.all([getFeaturedPostCandidates(supabase), getActiveDebate(supabase)]);
+  const { manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult } =
+    await getFeaturedPostCandidates(supabase);
 
   const manualFeaturedRaw = (manualFeaturedResult.data as FeaturedPostRow | null) ?? null;
   const latestPublishedRaw = (latestPublishedResult.data as FeaturedPostRow | null) ?? null;
@@ -284,8 +238,6 @@ export async function getDailyBriefContent(
     ranked.find((post) => post.id !== manualFeaturedPost?.id) ?? null;
   const featuredPost = manualFeaturedPost ?? automaticFeaturedPost;
 
-  const hotDebateRaw = (hotDebateResult.data as HotDebateRow | null) ?? null;
-
   return {
     featuredPost: featuredPost
       ? {
@@ -294,6 +246,5 @@ export async function getDailyBriefContent(
           slug: featuredPost.slug,
         }
       : null,
-    activeDebate: toDebateInterludeData(hotDebateRaw),
   };
 }

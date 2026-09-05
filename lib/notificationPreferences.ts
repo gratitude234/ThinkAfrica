@@ -10,7 +10,7 @@ import { describeNotificationType } from "./notificationCatalog";
  * Two deliberate constraints:
  *
  * 1. Only *non-actionable* types can be muted. You can turn down likes, follows,
- *    debate chatter, and collaboration replies, but never something that asks you
+ *    and collaboration replies, but never something that asks you
  *    to act and never a moderation or account notice. Publication subscription
  *    alerts are intentionally absent because explicit subscriptions are always on
  *    in-app. `assertMutableTypes()` holds the line in the test suite.
@@ -27,7 +27,6 @@ export interface InAppNotificationPrefs {
   inapp_likes: boolean;
   inapp_comments: boolean;
   inapp_follows: boolean;
-  inapp_debates: boolean;
   inapp_collaboration: boolean;
 }
 
@@ -57,18 +56,7 @@ export const IN_APP_PREF_GROUPS: InAppPrefGroup[] = [
     description: "When someone follows you or subscribes to your work",
     types: ["follow", "author_subscribed"],
   },
-  {
-    key: "inapp_debates",
-    label: "Debate activity",
-    description:
-      "Arguments, invitation replies and cancellations. Invitations and your own turns always come through.",
-    types: [
-      "debate_reply",
-      "debate_argument",
-      "debate_invitation_response",
-      "debate_cancelled",
-    ],
-  },
+
   {
     key: "inapp_collaboration",
     label: "Co-author replies",
@@ -82,7 +70,6 @@ export const IN_APP_PREF_DEFAULTS: InAppNotificationPrefs = {
   inapp_likes: true,
   inapp_comments: true,
   inapp_follows: true,
-  inapp_debates: true,
   inapp_collaboration: true,
 };
 

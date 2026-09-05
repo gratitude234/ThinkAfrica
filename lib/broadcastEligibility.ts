@@ -28,18 +28,37 @@ export type BroadcastCandidate = {
   notificationPrefs: unknown;
   /** Resend owns the unsubscribe link, so this is the authoritative opt-out. */
   unsubscribed: boolean;
+  /**
+   * Resend has declined to deliver to this address. A different question from
+   * whether the member wants to hear from us, and answered separately, so that
+   * a deliverability problem is never mistaken for a preference they set.
+   */
+  suppressed?: boolean;
   lastActivityAt: string | null;
   publishedCount: number;
   isVerified: boolean;
   profileCreatedAt: string | null;
 };
 
+/**
+ * Two independent questions decide whether somebody is written to, and this
+ * union deliberately keeps them apart:
+ *
+ *   does this person want announcements?  preference_disabled, unsubscribed
+ *   can this address be delivered to?     no_email, reserved_domain, suppressed
+ *
+ * A suppressed member can be opted in and still be ineligible, and that is not
+ * a contradiction. Collapsing the two, by writing a suppression into
+ * notification_prefs, would put words in their mouth and would leave nothing
+ * able to tell a preference they set from one invented on their behalf.
+ */
 export type BroadcastIneligibleReason =
   | "no_email"
   | "reserved_domain"
   | "suspended"
   | "preference_disabled"
-  | "unsubscribed";
+  | "unsubscribed"
+  | "suppressed";
 
 /**
  * Domains RFC 2606 and RFC 6761 reserve so that nobody can ever own them. An
@@ -123,6 +142,10 @@ export function broadcastIneligibleReason(
   if (!wantsBroadcastEmail(candidate.notificationPrefs)) {
     return "preference_disabled";
   }
+  // Last, so the reason reported for somebody who has also opted out is the
+  // opt-out. Their preference is the more meaningful fact about them, and it
+  // is the one that survives a suppression being cleared.
+  if (candidate.suppressed) return "suppressed";
   return null;
 }
 

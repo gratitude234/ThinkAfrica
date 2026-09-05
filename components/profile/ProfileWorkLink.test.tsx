@@ -123,37 +123,6 @@ describe("ProfileRecordCard funnel wiring", () => {
     );
   });
 
-  it("reports a debate argument by the debate it belongs to", async () => {
-    const user = userEvent.setup();
-    render(
-      <ProfileRecordCard
-        item={{
-          id: "argument-3",
-          kind: "debate",
-          occurredAt: "2026-08-20T10:00:00.000Z",
-          debate: {
-            id: "argument-3",
-            content: "The case against.",
-            stance: "against",
-            createdAt: "2026-08-20T10:00:00.000Z",
-            debate: { id: "debate-7", title: "Should the levy stay?" },
-          },
-        }}
-        tracking={tracking}
-      />
-    );
-
-    await user.click(screen.getByRole("link", { name: "Should the levy stay?" }));
-
-    expect(trackActivationEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        metadata: expect.objectContaining({
-          workKind: "debate",
-          workId: "argument-3",
-        }),
-      })
-    );
-  });
 
   it("sends nothing when the page gave it no funnel context", async () => {
     const user = userEvent.setup();

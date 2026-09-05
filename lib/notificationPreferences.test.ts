@@ -25,7 +25,6 @@ describe("what may be muted", () => {
       "revision_requested",
       "review_assigned",
       "co_author_invite",
-      "debate_invitation",
       "response_post",
       "opportunity_inquiry",
     ]) {

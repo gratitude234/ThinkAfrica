@@ -468,16 +468,10 @@ export default async function DashboardPage() {
         .eq("status", "published")
         .order("created_at", { ascending: false })
         .limit(10),
-      supabase
-        .from("debate_arguments")
-        .select("created_at, debates!debate_arguments_debate_id_fkey(id, title)")
-        .eq("author_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(10),
     ]),
   ]);
 
-  const [likesResult, responsesResult, debatesResult] = activityData;
+  const [likesResult, responsesResult] = activityData;
   const recentActivity: RecentActivityItem[] = [
     ...(likesResult.data ?? []).map((like) => {
       const post = Array.isArray(like.posts) ? like.posts[0] : like.posts;
@@ -496,17 +490,6 @@ export default async function DashboardPage() {
       link: response.slug ? `/post/${response.slug}` : "#",
       created_at: response.created_at,
     })),
-    ...(debatesResult.data ?? []).map((argument) => {
-      const debate = Array.isArray(argument.debates)
-        ? argument.debates[0]
-        : argument.debates;
-      return {
-        type: "debate" as const,
-        description: `Argued in "${debate?.title ?? "a debate"}"`,
-        link: debate ? `/debates/${debate.id}` : "#",
-        created_at: argument.created_at,
-      };
-    }),
   ]
     .sort(
       (left, right) =>

@@ -299,7 +299,6 @@ export default async function AdminAnalyticsPage() {
   const [
     { data: profilesRaw },
     { data: postsByTypeRaw },
-    { count: totalDebates },
     { count: totalApplications },
     { data: opportunityApplicationsRaw },
     { count: savedOpportunityCount },
@@ -317,7 +316,6 @@ export default async function AdminAnalyticsPage() {
     { data: notificationsRaw },
     { count: acceptedCoauthorCount },
     { count: totalMessages },
-    { data: debateArgumentsRaw },
     { count: featuredProfileCount },
     { data: phase0BaselineRaw, error: phase0BaselineError },
   ] = await Promise.all([
@@ -326,7 +324,6 @@ export default async function AdminAnalyticsPage() {
       .select("id, created_at, full_name, username, country, university, field_of_study, bio, avatar_url, verified, interests")
       .limit(10000),
     supabase.from("posts").select("type").eq("status", "published"),
-    supabase.from("debates").select("*", { count: "exact", head: true }),
     supabase.from("fellowship_applications").select("*", { count: "exact", head: true }),
     supabase
       .from("fellowship_applications")
@@ -395,7 +392,6 @@ export default async function AdminAnalyticsPage() {
       .not("accepted_at", "is", null)
       .gt("display_order", 0),
     supabase.from("messages").select("*", { count: "exact", head: true }),
-    supabase.from("debate_arguments").select("author_id").limit(10000),
     supabase
       .from("profile_featured_posts")
       .select("user_id", { count: "exact", head: true }),
@@ -596,15 +592,9 @@ export default async function AdminAnalyticsPage() {
   const draftStarted = uniqueUsersForEvent(activationEvents, "draft_started");
   const responseStarted = uniqueUsersForEvent(activationEvents, "response_started");
   const postSubmitted = uniqueUsersForEvent(activationEvents, "post_submitted");
-  const debateArgumentUsers = new Set(
-    (debateArgumentsRaw ?? [])
-      .map((argument) => argument.author_id)
-      .filter(Boolean) as string[]
-  );
   const firstContributionStarted = new Set([
     ...Array.from(draftStarted),
     ...Array.from(responseStarted),
-    ...Array.from(debateArgumentUsers),
   ]);
 
   const followCounts = new Map<string, number>();
@@ -719,10 +709,7 @@ export default async function AdminAnalyticsPage() {
     const item = eventMetadataValue(event, "item");
     return item === "topic" || item === "topic_strip" || item === "search_topic";
   });
-  const debateOpenRows = discoveryClickRows.filter((event) => {
-    const item = eventMetadataValue(event, "item");
-    return item === "active_debate" || item === "search_debate";
-  });
+
   const opportunityClickRows = discoveryClickRows.filter((event) => {
     const item = eventMetadataValue(event, "item");
     return (
@@ -1356,12 +1343,7 @@ export default async function AdminAnalyticsPage() {
             trend="neutral"
             trendLabel="follow conversion signal"
           />
-          <HealthCard
-            label="Debate Opens"
-            value={debateOpenRows.length}
-            trend="neutral"
-            trendLabel="from discovery surfaces"
-          />
+
           <HealthCard
             label="Opportunity Clicks"
             value={opportunityClickRows.length}
@@ -1810,7 +1792,7 @@ export default async function AdminAnalyticsPage() {
             .map((p) => `${p.count} ${p.type === "policy_brief" ? "briefs" : `${p.type}s`}`)
             .join(" / ")}
         />
-        <StatCard label="Debates Created" value={totalDebates ?? 0} />
+
         <StatCard label="Opportunity Applications" value={totalApplications ?? 0} />
         <StatCard label="Post Impressions" value={totalImpressions} />
         <StatCard label="Post Views" value={totalViews} />

@@ -79,7 +79,6 @@ The database temporarily retains the legacy `posts.type` values `blog`, `essay`,
 | Submit Research | `/submit/research` |
 | View a publication | `/post/[slug]` |
 | User profile | `/[username]` |
-| Debates | `/debates` |
 | Opportunities | `/opportunities` |
 | Editorial review queue | `/admin/review` |
 

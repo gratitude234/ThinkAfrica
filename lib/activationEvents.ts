@@ -17,7 +17,7 @@ export type ActivationEventName =
   | "draft_started"
   | "publish_drawer_opened"
   | "post_submitted"
-  | "debate_joined"
+
   | "home_viewed"
   | "home_tab_changed"
   | "dashboard_viewed"

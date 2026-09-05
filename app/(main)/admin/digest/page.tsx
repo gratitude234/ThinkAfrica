@@ -20,7 +20,6 @@ export default async function AdminDigestPage() {
 
   const [
     { data: topPosts },
-    { data: topDebateRaw },
     { data: openFellowships },
     { data: campusPromptsRaw },
   ] = await Promise.all([
@@ -32,11 +31,6 @@ export default async function AdminDigestPage() {
       .order("view_count", { ascending: false })
       .limit(5),
 
-    supabase
-      .from("debates")
-      .select("id, title, status, debate_arguments(count)")
-      .order("created_at", { ascending: false })
-      .limit(10),
 
     supabase
       .from("fellowships")
@@ -58,10 +52,6 @@ export default async function AdminDigestPage() {
 
   ]);
 
-  // Top debate (most arguments)
-  const topDebate = (topDebateRaw ?? [])
-    .map((d) => ({ ...d, argCount: Array.isArray(d.debate_arguments) ? d.debate_arguments.length : (d.debate_arguments as { count: number } | null)?.count ?? 0 }))
-    .sort((a, b) => b.argCount - a.argCount)[0] ?? null;
 
   const posts = (topPosts ?? []).map((p) => ({
     ...p,
@@ -142,16 +132,6 @@ export default async function AdminDigestPage() {
           )}
         </section>
 
-        {/* Featured debate */}
-        <section className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-3">Featured Debate</h2>
-          {topDebate ? (
-            <Link href={`/debates/${topDebate.id}`} className="block p-3 rounded-lg hover:bg-gray-50 group">
-              <p className="text-sm font-medium text-gray-900 group-hover:text-emerald-brand transition-colors">{topDebate.title}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{topDebate.argCount} arguments · {topDebate.status}</p>
-            </Link>
-          ) : <p className="text-sm text-gray-400">No debate to feature right now.</p>}
-        </section>
 
         {/* Fellowships */}
         <section className="bg-white rounded-xl border border-gray-200 p-6">

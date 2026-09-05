@@ -8,7 +8,7 @@ export default function LandingAnimations() {
     const heroEls = document.querySelectorAll<HTMLElement>(".hero-animate");
     const compactEls = document.querySelectorAll<HTMLElement>(".hero-compact");
     const revealEls = document.querySelectorAll<HTMLElement>(
-      ".section-head, .stat-item, .post-card, .topic-pill, .value-item, .cta-card, .debate-card"
+      ".section-head, .stat-item, .post-card, .topic-pill, .value-item, .cta-card"
     );
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
@@ -22,9 +22,8 @@ export default function LandingAnimations() {
       heroEls.forEach((el) => el.classList.add("go"));
       compactEls.forEach((el) => el.classList.add("revealed"));
       revealEls.forEach((el) => el.classList.add("revealed"));
-      document.getElementById("debates-copy")?.removeAttribute("style");
-      document.getElementById("debates-cards")?.removeAttribute("style");
-      document.getElementById("stance-bar")?.classList.add("animated");
+
+
     };
 
     const onScroll = () =>
@@ -165,47 +164,7 @@ export default function LandingAnimations() {
       statsObserver.observe(statsBar);
     }
 
-    const stanceBar = document.getElementById("stance-bar");
-    if (stanceBar) {
-      let done = false;
-      const stanceObserver = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting && !done) {
-            done = true;
-            setTimeout(() => stanceBar.classList.add("animated"), 300);
-          }
-        },
-        { threshold: 0.5 }
-      );
-      observers.push(stanceObserver);
-      stanceObserver.observe(stanceBar);
-    }
 
-    const debatesCards = document.getElementById("debates-cards");
-    const debatesCopy = document.getElementById("debates-copy");
-    if (debatesCards && debatesCopy) {
-      debatesCopy.style.cssText += `opacity:0;transform:translateX(-20px);transition:opacity 0.6s ${EASE},transform 0.6s ${EASE};`;
-      debatesCards.style.cssText += `opacity:0;transform:translateX(20px);transition:opacity 0.6s ${EASE} 0.1s,transform 0.6s ${EASE} 0.1s;`;
-      const debatesObserver = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) {
-            debatesCopy.style.opacity = "1";
-            debatesCopy.style.transform = "none";
-            debatesCards.style.opacity = "1";
-            debatesCards.style.transform = "none";
-            debatesCards
-              .querySelectorAll<HTMLElement>(".debate-card")
-              .forEach((c, i) => {
-                c.style.transitionDelay = 0.1 + i * 0.1 + "s";
-                c.classList.add("revealed");
-              });
-          }
-        },
-        { threshold: 0.1 }
-      );
-      observers.push(debatesObserver);
-      debatesObserver.observe(debatesCards);
-    }
 
     const topicsGrid = document.getElementById("topics-grid");
     if (topicsGrid) {

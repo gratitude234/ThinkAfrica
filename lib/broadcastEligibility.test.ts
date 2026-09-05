@@ -173,6 +173,90 @@ describe("who may be written to", () => {
   });
 });
 
+describe("wanting announcements against being deliverable", () => {
+  /**
+   * Two independent questions. The first production broadcast had 24
+   * suppressed recipients, and the temptation was to write that into their
+   * preferences. That would have said they opted out, which they did not, and
+   * would have left nothing able to tell a preference they set from one
+   * invented for them.
+   */
+  it("writes to somebody opted in and deliverable", () => {
+    expect(
+      broadcastIneligibleReason(
+        candidate({ notificationPrefs: { email_announcements: true } })
+      )
+    ).toBeNull();
+  });
+
+  it("does not write to somebody opted out, however deliverable", () => {
+    expect(
+      broadcastIneligibleReason(
+        candidate({
+          notificationPrefs: { email_announcements: false },
+          suppressed: false,
+        })
+      )
+    ).toBe("preference_disabled");
+  });
+
+  it("does not write to somebody opted in but suppressed", () => {
+    expect(
+      broadcastIneligibleReason(
+        candidate({
+          notificationPrefs: { email_announcements: true },
+          suppressed: true,
+        })
+      )
+    ).toBe("suppressed");
+  });
+
+  it("keeps the opt-out as the reason when somebody is both", () => {
+    // Their preference is the more meaningful fact, and it is the one that
+    // survives the suppression being cleared.
+    expect(
+      broadcastIneligibleReason(
+        candidate({
+          notificationPrefs: { email_announcements: false },
+          suppressed: true,
+        })
+      )
+    ).toBe("preference_disabled");
+  });
+
+  it("restores eligibility when a suppression clears, if the preference allows", () => {
+    const optedIn = candidate({
+      notificationPrefs: { email_announcements: true },
+      suppressed: true,
+    });
+
+    expect(isEligibleForBroadcast(optedIn)).toBe(false);
+    expect(isEligibleForBroadcast({ ...optedIn, suppressed: false })).toBe(true);
+
+    // And clearing it restores nothing for somebody who genuinely opted out.
+    const optedOut = candidate({
+      notificationPrefs: { email_announcements: false },
+      suppressed: true,
+    });
+    expect(isEligibleForBroadcast({ ...optedOut, suppressed: false })).toBe(false);
+  });
+
+  it("gives a suppressed member no audiences, so the sync empties their segments", () => {
+    expect(
+      audienceMembership(
+        candidate({ suppressed: true, publishedCount: 3, isVerified: true }),
+        NOW
+      )
+    ).toEqual([]);
+  });
+
+  it("cannot be sent to by naming a suppressed member by hand", () => {
+    expect(
+      matchesAudience(candidate({ suppressed: true }), "selected", ["p1"], NOW)
+    ).toBe(false);
+  });
+});
+
 describe("audience membership", () => {
   it("puts every eligible member in the all audience", () => {
     expect(audienceMembership(candidate(), NOW)).toEqual(["all"]);

@@ -33,8 +33,7 @@ export type NotificationPreferenceKey =
   | "email_co_author_accepted"
   | "email_co_author_declined"
   | "email_opportunity_inquiry"
-  | "email_author_publications"
-  | "email_debate_updates";
+  | "email_author_publications";
 
 export type EmailSendResult =
   | { ok: true; id: string | null }

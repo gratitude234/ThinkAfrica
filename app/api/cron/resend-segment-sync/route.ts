@@ -153,24 +153,46 @@ async function loadCandidates(admin: AdminClient): Promise<ContactSnapshot[]> {
 
   // Read after the mirror pass, so an opt-out Resend told us about minutes ago
   // is already reflected here and cannot be planned back into a segment.
-  const knownUnsubscribed = await pageAll<{ profile_id: string }>((from, to) =>
+  const contactState = await pageAll<{
+    profile_id: string;
+    unsubscribed: boolean;
+    suppressed_at: string | null;
+    suppressed_email: string | null;
+  }>((from, to) =>
     admin
       .from("broadcast_contacts")
-      .select("profile_id")
-      .eq("unsubscribed", true)
+      .select("profile_id, unsubscribed, suppressed_at, suppressed_email")
       .range(from, to)
   );
+
   const unsubscribed = new Set(
-    knownUnsubscribed.map((row) => row.profile_id)
+    contactState.filter((row) => row.unsubscribed).map((row) => row.profile_id)
   );
 
+  // Suppression belongs to an address, not to a person, so it is keyed by the
+  // address it was recorded against. A member who moves to a new address is
+  // deliverable again without anybody doing anything, which matters because
+  // the installed Resend SDK exposes no suppression list to consult.
+  const suppressedAddress = new Map<string, string>();
+  for (const row of contactState) {
+    if (row.suppressed_at && row.suppressed_email) {
+      suppressedAddress.set(row.profile_id, row.suppressed_email.toLowerCase());
+    }
+  }
+
   return profiles.map((profile) => {
+    const email = authEmails.get(profile.id) ?? profile.signup_email;
+    const suppressedFor = suppressedAddress.get(profile.id);
+
     const candidate: BroadcastCandidate = {
       profileId: profile.id,
-      email: authEmails.get(profile.id) ?? profile.signup_email,
+      email,
       suspendedAt: profile.suspended_at,
       notificationPrefs: profile.notification_prefs,
       unsubscribed: unsubscribed.has(profile.id),
+      suppressed:
+        Boolean(suppressedFor) &&
+        suppressedFor === (email ?? "").trim().toLowerCase(),
       lastActivityAt: lastActivity.get(profile.id) ?? null,
       publishedCount: publishedCounts.get(profile.id) ?? 0,
       isVerified: profile.verified === true,

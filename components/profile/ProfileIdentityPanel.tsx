@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { RecordMetricLegend } from "@/components/profile/EvidenceLegend";
 import ImageLightbox from "@/components/ui/ImageLightbox";
@@ -14,6 +14,7 @@ import {
 import { buildProfileRecordHref, type ProfileRecordSummary } from "@/lib/profileRecord";
 import { getLinkedProfileRecordMetrics } from "@/lib/profileRecordMetrics";
 import {
+  formatInterestLabel,
   PROFILE_HEADER_TOPIC_LIMIT,
   type DemonstratedTopic,
 } from "@/lib/profileTopics";
@@ -36,6 +37,13 @@ export interface ProfileIdentityPanelProps {
   demonstratedTopics: DemonstratedTopic[];
   recordSummary: ProfileRecordSummary;
   followerCount: number;
+  /**
+   * Optional because the Command Center preview does not load it: that model
+   * is built for the owner's own editing surface and adding a second
+   * relationship count to it would mean a query the preview has no use for.
+   * Omitted, the row simply reads one number instead of two.
+   */
+  followingCount?: number | null;
   isOwnProfile: boolean;
   /** Relationship controls, or nothing in a preview. */
   actions?: ReactNode;
@@ -49,17 +57,70 @@ export interface ProfileIdentityPanelProps {
   interactive?: boolean;
 }
 
+/**
+ * The separator between meta items. Decorative: the items either side are
+ * already distinct elements, and a screen reader announcing "middle dot"
+ * between every one of them is noise.
+ */
+function Dot() {
+  return (
+    <span aria-hidden="true" className="text-card-border-hover">
+      ·
+    </span>
+  );
+}
+
+/**
+ * One line of identity metadata with separators placed between the items that
+ * actually rendered. Built from a list rather than written inline because
+ * affiliation is optional, and a hand-written `·` before it prints a leading
+ * dot on every profile that has no institution.
+ *
+ * The separator trails its item rather than leading the next one. Both read
+ * identically while the line fits, and they differ entirely when it wraps: a
+ * leading dot starts the new line looking like a bullet, which is what a
+ * 320px phone showed for "· 64 following" and "· Political Science student".
+ * Trailing, the dot stays on the line it finishes.
+ */
+function MetaLine({
+  items,
+  className = "",
+}: {
+  items: Array<{ key: string; node: ReactNode }>;
+  className?: string;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <p className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${className}`}>
+      {items.map((item, index) => (
+        <span key={item.key} className="inline-flex items-center gap-x-2">
+          {item.node}
+          {index < items.length - 1 ? <Dot /> : null}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 function VerifiedMark({ profile }: { profile: PublicProfileIdentity }) {
   if (!profile.verified) return null;
   const label = profile.verified_type
     ? `Verified ${profile.verified_type}`
     : "Verified profile";
+  /**
+   * The name of the state is the accessible name, and it is on the element
+   * itself. The mockup explains verification in a hover card; a hover card is
+   * unreachable by touch and by keyboard, so the meaning stays where every
+   * input method can get at it and `title` is only a pointer convenience on
+   * top of it.
+   */
   return (
     <span
       role="img"
       aria-label={label}
       title={label}
-      className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-brand text-xs font-bold text-white"
+      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-[11px] font-bold leading-none text-white"
     >
       ✓
     </span>
@@ -168,10 +229,12 @@ const COVER_BUTTON =
  *
  * An author uploads a picture, not a strip, so some of it is always going to
  * be cut. Two things narrow that gap from opposite ends. The band itself is
- * now full-bleed rather than inset in a card, which buys back the width the
+ * full-bleed rather than inset in a card, which buys back the width the
  * gutters were taking and drops the crop from about 10.5:1 to nearer 2.7:1 on
  * a phone and 5.3:1 at desktop: enough that a portrait keeps its subject and a
- * typographic cover is no longer one sliced line of letters. And tapping shows
+ * typographic cover is no longer one sliced line of letters. The mockup insets
+ * the band and rounds its corners; doing that here would hand back the width
+ * this deliberately reclaimed, so the production band wins. And tapping shows
  * the rest, which is the gesture a reader already makes at a cropped image and
  * which did nothing here. It opens the same viewer post images use, so the
  * back gesture, swipe-to-dismiss and Escape all behave the way they do
@@ -236,6 +299,7 @@ export default function ProfileIdentityPanel({
   demonstratedTopics,
   recordSummary,
   followerCount,
+  followingCount = null,
   isOwnProfile,
   actions = null,
   availability = null,
@@ -244,6 +308,7 @@ export default function ProfileIdentityPanel({
   const [aboutExpanded, setAboutExpanded] = useState(false);
   const [bioOverflows, setBioOverflows] = useState(false);
   const bioRef = useRef<HTMLParagraphElement>(null);
+  const topicsHeadingId = useId();
   const displayName = profile.full_name ?? profile.username;
   const identity = getProfileIdentityLines(profile);
   const bio = profile.bio?.trim() || null;
@@ -270,19 +335,59 @@ export default function ProfileIdentityPanel({
 
   const showAboutToggle = interactive && (bioOverflows || aboutExpanded);
 
+  /**
+   * Affiliation, then the two relationship counts, on one line. Both counts
+   * are single text nodes rather than an emphasised number beside a label:
+   * an element whose whole text is "0" reads as a metric of zero to anything
+   * scanning the page, which is exactly what the record strip below is
+   * careful never to print.
+   */
+  const countLinkClass =
+    "tap-target focus-ring font-medium text-ink-soft hover:text-ink";
+  const metaItems: Array<{ key: string; node: ReactNode }> = [];
+  if (identity.affiliation) {
+    metaItems.push({ key: "affiliation", node: <span>{identity.affiliation}</span> });
+  }
+  metaItems.push({
+    key: "followers",
+    node: interactive ? (
+      <Link href={`/${profile.username}/followers`} className={countLinkClass}>
+        {followerCount.toLocaleString()} follower{followerCount === 1 ? "" : "s"}
+      </Link>
+    ) : (
+      <span className="font-medium text-ink-soft">
+        {followerCount.toLocaleString()} follower{followerCount === 1 ? "" : "s"}
+      </span>
+    ),
+  });
+  if (typeof followingCount === "number") {
+    metaItems.push({
+      key: "following",
+      node: interactive ? (
+        <Link href={`/${profile.username}/following`} className={countLinkClass}>
+          {followingCount.toLocaleString()} following
+        </Link>
+      ) : (
+        <span className="font-medium text-ink-soft">
+          {followingCount.toLocaleString()} following
+        </span>
+      ),
+    });
+  }
+
   return (
     /* Deliberately not a card. The card tokens are feed furniture: a rounded,
        bordered box says "one item among several, separable from the page",
        which is right for a Featured entry and wrong here. The header is not an
        item on the profile, it is the profile, and boxing it made the person
        read as row zero of a list. It keeps the white ground, because the
-       Record and About strips below separate themselves from it with
-       `bg-canvas/70`, but it gives up the radius and the side edges and
-       terminates on a single rule instead. Breaking the shell gutters below
-       `lg` is what lets the cover be a real band rather than a picture inset
-       on three sides. Meeting the nav is the shell's job rather than this
-       element's: the page's top padding has to survive when a guest banner is
-       sitting above it, and only the shell can see whether one is. */
+       Record strip below separates itself from it with `bg-canvas/70`, but it
+       gives up the radius and the side edges and terminates on a single rule
+       instead. Breaking the shell gutters below `lg` is what lets the cover be
+       a real band rather than a picture inset on three sides. Meeting the nav
+       is the shell's job rather than this element's: the page's top padding
+       has to survive when a guest banner is sitting above it, and only the
+       shell can see whether one is. */
     <section className="-mx-4 flex flex-col overflow-hidden border-b border-card-border bg-card sm:-mx-6 lg:mx-0">
       {profile.cover_image_url ? (
         <CoverBand
@@ -291,7 +396,11 @@ export default function ProfileIdentityPanel({
           interactive={interactive}
         />
       ) : (
-        <div className="h-14 bg-[radial-gradient(circle_at_18%_0%,rgba(16,185,129,0.14),transparent_38%),linear-gradient(135deg,#FFFFFF,#FAF8F5)] sm:h-16" />
+        /* Deep enough to read as a band the avatar sits on rather than as a
+           printing error. The previous mix bottomed out near #FFFFFF, so on a
+           white card there was nothing to see and the avatar appeared to float
+           above a seam. */
+        <div className="h-14 bg-[radial-gradient(circle_at_18%_0%,rgba(7,57,41,0.16),transparent_46%),linear-gradient(135deg,#F1EEE8,#E9E5DE)] sm:h-16" />
       )}
 
       <div className="profile-identity px-4 py-5 sm:px-6 sm:py-7 lg:px-0">
@@ -306,180 +415,224 @@ export default function ProfileIdentityPanel({
              avatar rendered as a partial circle on every profile that has a
              cover image. It looked correct without one only because that
              fallback is an unpositioned div. */
-          className="profile-identity-avatar relative z-10 -mt-12 shrink-0 border-4 border-card shadow-sm sm:-mt-14"
+          /* rounded-full belongs here rather than only inside UserAvatar: the
+             fallback path renders a circular SVG inside a plain div, so the
+             4px card-coloured border this call site adds was painting a white
+             square around every avatar-less profile. */
+          className="profile-identity-avatar relative z-10 -mt-12 shrink-0 overflow-hidden rounded-full border-4 border-card shadow-sm sm:-mt-14"
         />
 
         <div className="profile-identity-name min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-3xl font-semibold leading-tight text-ink">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className="font-display text-[28px] font-semibold leading-[1.06] tracking-[-0.015em] text-ink [overflow-wrap:anywhere] sm:text-[32px]">
               {displayName}
             </h1>
             <VerifiedMark profile={profile} />
           </div>
-          <p className="mt-1 text-sm text-ink-muted">@{profile.username}</p>
-          <p className="mt-3 text-[15px] font-medium text-ink-soft">{identity.headline}</p>
-          {identity.affiliation ? (
-            <p className="mt-1 text-sm text-ink-muted">{identity.affiliation}</p>
+          {/* The handle and what this person is, on one line. Routed through
+              MetaLine rather than written inline so the separator follows the
+              same trailing rule as the line below it: a long handle wraps, and
+              the dot has to stay with the handle rather than open a new line
+              in front of the descriptor. */}
+          <MetaLine
+            className="mt-1.5 text-sm"
+            items={[
+              {
+                key: "handle",
+                node: (
+                  <span className="text-ink-muted [overflow-wrap:anywhere]">
+                    @{profile.username}
+                  </span>
+                ),
+              },
+              {
+                key: "headline",
+                node: (
+                  <span className="font-semibold text-ink-soft">
+                    {identity.headline}
+                  </span>
+                ),
+              },
+            ]}
+          />
+        </div>
+
+        <div className="profile-identity-meta min-w-0">
+          <MetaLine items={metaItems} className="text-[13.5px] text-ink-muted" />
+
+          {availability ? <div className="mt-3">{availability}</div> : null}
+
+          {showAboutBlock ? (
+            <div className="mt-4">
+              {bio ? (
+                <>
+                  <p
+                    ref={bioRef}
+                    className={`max-w-measure whitespace-pre-line text-[15.5px] leading-[1.62] text-ink-soft ${
+                      aboutExpanded || !interactive ? "" : "line-clamp-3"
+                    }`}
+                  >
+                    {bio}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4">
+                    {showAboutToggle ? (
+                      <button
+                        type="button"
+                        onClick={() => setAboutExpanded((current) => !current)}
+                        aria-expanded={aboutExpanded}
+                        className="tap-target focus-ring text-sm font-semibold text-emerald-ink"
+                      >
+                        {aboutExpanded ? "Show less" : "More"}
+                      </button>
+                    ) : null}
+                    {isOwnProfile && interactive ? (
+                      <Link
+                        href="/settings/profile#focus"
+                        className="tap-target focus-ring text-xs font-semibold text-ink-muted hover:text-ink"
+                      >
+                        Edit
+                      </Link>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <Link
+                  href="/settings/profile#focus"
+                  className="tap-target focus-ring text-sm font-semibold text-emerald-ink"
+                >
+                  Add an About section
+                </Link>
+              )}
+            </div>
           ) : null}
-          {/* The author's own account of what they are working on. Set larger
-              than the affiliation and lighter than a title, because it is a
-              position rather than a credential: no chip, no border, no badge
-              treatment that would make it read as something the platform
-              awarded. */}
+
+          {/* The author's own account of what they are working on. Secondary
+              to the bio and the work below it by design: it is set quieter and
+              smaller than the biography rather than above it, so it reads as a
+              footnote to the identity instead of competing with the name for
+              the top of the page. No chip, no border, no badge treatment that
+              would make it look like something the platform awarded. */}
           {identity.positioning ? (
-            <p className="mt-3 max-w-[52ch] text-[15px] leading-6 text-ink">
+            <p className="mt-3 max-w-measure text-[13.5px] leading-6 text-ink-muted">
               {identity.positioning}
             </p>
           ) : isOwnProfile && interactive ? (
+            /* Set at the weight of the Edit affordance above it, not at the
+               weight of a primary call to action. Rendering the owner's empty
+               focus prompt in brand green put the loudest thing on the page
+               directly under the biography, which is the one comparison this
+               statement is not allowed to win. */
             <Link
               href="/settings/profile#focus"
-              className="tap-target focus-ring mt-3 inline-block text-sm font-semibold text-emerald-ink"
+              className="tap-target focus-ring mt-3 inline-block text-xs font-semibold text-ink-muted hover:text-ink"
             >
-              Add your intellectual focus →
+              Add your intellectual focus
             </Link>
           ) : null}
         </div>
 
+        {/* Below 640px the grid stacks in source order, so the mandated
+            reading order and the focus order are the same sequence: the
+            actions come after the bio and before the topics. From 640px the
+            grid lifts this into the column beside the name without the markup
+            moving. */}
         {actions ? (
           <div className="profile-identity-actions flex flex-wrap items-start gap-2 sm:max-w-[290px] sm:justify-end">
             {actions}
           </div>
         ) : null}
 
-        <div className="profile-identity-meta min-w-0">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            {interactive ? (
-              <Link
-                href={`/${profile.username}/followers`}
-                className="tap-target focus-ring font-medium text-ink-soft hover:text-ink"
-              >
-                {followerCount.toLocaleString()} follower{followerCount === 1 ? "" : "s"}
-              </Link>
-            ) : (
-              <span className="font-medium text-ink-soft">
-                {followerCount.toLocaleString()} follower{followerCount === 1 ? "" : "s"}
-              </span>
-            )}
-            {availability}
-          </div>
+        {/* Its own area, after the actions, because the mandated reading order
+            ends "bio, actions, Writes about". Every entry resolves to at least
+            one record entry: the list is built from tags on published work
+            rather than from anything the author declared.
 
-          {/* Every chip here resolves to at least one record entry, because
-              the list is built from tags on published work rather than from
-              anything the author declared. */}
-          {headerTopics.length > 0 ? (
-            <div className="mt-3">
-              <h2 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
-                Demonstrated topics
-              </h2>
-              <ul className="mt-1.5 flex flex-wrap gap-2" aria-label="Demonstrated topics">
-                {headerTopics.map((topic) => {
-                  const body = (
-                    <>
-                      {topic.label}
-                      {/* Hidden from the accessible name; the link states the
-                          count in words instead, so the digit is not announced
-                          bare as "Governance 4". */}
-                      <span aria-hidden="true" className="tabular-nums text-emerald-brand/70">
-                        {topic.count}
+            Set as text rather than as chips. A row of tinted pills reads as
+            metadata the platform attached; the same words in the display face,
+            at reading size, read as the subjects this person writes about,
+            which is the one claim this block exists to make. */}
+        {headerTopics.length > 0 ? (
+          <div className="profile-identity-topics min-w-0">
+            <h2
+              id={topicsHeadingId}
+              className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-muted"
+            >
+              Writes about
+            </h2>
+            {/* Labelled by the heading rather than by a separate aria-label,
+                so the name assistive tech announces is the words on screen.
+                The two used to differ: the group was called "Demonstrated
+                topics" while nothing on the page said that. */}
+            <ul
+              className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-2"
+              aria-labelledby={topicsHeadingId}
+            >
+              {headerTopics.map((topic) => {
+                /* Tags arrive as the author typed them, which on real
+                   profiles means "education policy" and "nigeria" set in the
+                   display face beside each other. The same rule the interest
+                   chips already use: anything carrying a capital is left
+                   alone, so "pan-African" survives. */
+                const label = formatInterestLabel(topic.label);
+                const body = (
+                  <>
+                    <span className="font-display text-[17px] font-semibold leading-tight">
+                      {label}
+                    </span>
+                    {/* Hidden from the accessible name; the link states the
+                        count in words instead, so the digit is not announced
+                        bare as "Governance 4". */}
+                    <span
+                      aria-hidden="true"
+                      className="text-[11px] font-medium tabular-nums text-ink-muted"
+                    >
+                      {topic.count}
+                    </span>
+                  </>
+                );
+                const topicLabel = `${label}: ${topic.count} ${
+                  topic.count === 1 ? "contribution" : "contributions"
+                } in the Intellectual Record`;
+                return (
+                  <li key={topic.key}>
+                    {interactive ? (
+                      <Link
+                        href={buildProfileRecordHref({
+                          username: profile.username,
+                          topic: topic.key,
+                        })}
+                        aria-label={topicLabel}
+                        className="tap-target focus-ring inline-flex items-baseline gap-1.5 text-ink transition-colors hover:text-emerald-brand"
+                      >
+                        {body}
+                      </Link>
+                    ) : (
+                      // The preview renders the same entry without a
+                      // destination, so the count is spelled out in text
+                      // that is available to assistive tech either way.
+                      <span className="inline-flex items-baseline gap-1.5 text-ink">
+                        {body}
+                        <span className="sr-only">{topicLabel}</span>
                       </span>
-                    </>
-                  );
-                  const chipLabel = `${topic.label}: ${topic.count} ${
-                    topic.count === 1 ? "contribution" : "contributions"
-                  } in the Intellectual Record`;
-                  const chipClass =
-                    "inline-flex items-center gap-1.5 rounded-full bg-green-tint px-3 py-1.5 text-xs font-medium text-emerald-brand";
-                  return (
-                    <li key={topic.key}>
-                      {interactive ? (
-                        <Link
-                          href={buildProfileRecordHref({
-                            username: profile.username,
-                            topic: topic.key,
-                          })}
-                          aria-label={chipLabel}
-                          className={`tap-target focus-ring hover:opacity-80 ${chipClass}`}
-                        >
-                          {body}
-                        </Link>
-                      ) : (
-                        // The preview renders the same chip without a
-                        // destination, so the count is spelled out in text
-                        // that is available to assistive tech either way.
-                        <span className={chipClass}>
-                          {body}
-                          <span className="sr-only">{chipLabel}</span>
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : isOwnProfile ? (
-            <p className="mt-3 text-xs leading-5 text-ink-muted">
-              Topics appear here once you publish work tagged with them.
-            </p>
-          ) : null}
-        </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : isOwnProfile ? (
+          <p className="profile-identity-topics text-xs leading-5 text-ink-muted">
+            Topics appear here once you publish work tagged with them.
+          </p>
+        ) : null}
       </div>
 
-      {/* On a phone the numbers come before About: they are the reason the
-          page exists. From 640px they return to the foot of the header. */}
       <RecordOverview
         username={profile.username}
         summary={recordSummary}
         isOwnProfile={isOwnProfile}
         interactive={interactive}
-        className="order-2 sm:order-3"
       />
-
-      {showAboutBlock ? (
-        <div className="order-3 px-4 pb-5 sm:order-2 sm:px-6 sm:pb-7 lg:px-0">
-          {bio ? (
-            <div className="border-t border-card-border pt-5">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-ink">About</h2>
-                {isOwnProfile && interactive ? (
-                  <Link
-                    href="/settings/profile#focus"
-                    className="tap-target focus-ring text-xs font-semibold text-emerald-ink"
-                  >
-                    Edit
-                  </Link>
-                ) : null}
-              </div>
-              <p
-                ref={bioRef}
-                className={`mt-2 max-w-[72ch] whitespace-pre-line text-sm leading-6 text-ink-soft ${
-                  aboutExpanded || !interactive ? "" : "line-clamp-3"
-                }`}
-              >
-                {bio}
-              </p>
-              {showAboutToggle ? (
-                <button
-                  type="button"
-                  onClick={() => setAboutExpanded((current) => !current)}
-                  aria-expanded={aboutExpanded}
-                  className="tap-target focus-ring mt-2 text-xs font-semibold text-emerald-ink"
-                >
-                  {aboutExpanded ? "Show less" : "See more"}
-                </button>
-              ) : null}
-            </div>
-          ) : (
-            <div className="border-t border-card-border pt-5">
-              <Link
-                href="/settings/profile#focus"
-                className="tap-target focus-ring text-sm font-semibold text-emerald-ink"
-              >
-                Add an About section
-              </Link>
-            </div>
-          )}
-        </div>
-      ) : null}
     </section>
   );
 }

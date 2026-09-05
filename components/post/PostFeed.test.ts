@@ -7,18 +7,38 @@ describe("Home discovery cadence", () => {
       getDiscoveryModuleOrder({
         prioritizePeople: true,
         hasPeople: true,
-        hasDebate: true,
         hasTopic: true,
       })
-    ).toEqual(["people", "debate", "topic"]);
+    ).toEqual(["people", "topic"]);
+  });
+
+  it("leads with topics for users who already follow enough writers", () => {
+    expect(
+      getDiscoveryModuleOrder({
+        prioritizePeople: false,
+        hasPeople: true,
+        hasTopic: true,
+      })
+    ).toEqual(["topic", "people"]);
+  });
+
+  it("drops a module with nothing to show", () => {
+    expect(
+      getDiscoveryModuleOrder({
+        prioritizePeople: true,
+        hasPeople: false,
+        hasTopic: true,
+      })
+    ).toEqual(["topic"]);
   });
 
   it("surfaces discovery after three items, then leaves four-item reading runs", () => {
-    const modules = ["debate", "people", "topic"] as const;
+    const modules = ["topic", "people"] as const;
     expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 2, modules: [...modules] })).toBeNull();
-    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 3, modules: [...modules] })).toBe("debate");
+    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 3, modules: [...modules] })).toBe("topic");
     expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 7, modules: [...modules] })).toBe("people");
-    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 11, modules: [...modules] })).toBe("topic");
+    // Only two modules exist, so the third breakpoint has nothing left to show.
+    expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 11, modules: [...modules] })).toBeNull();
     expect(getDiscoveryModuleAt({ activeTab: "home", completedCount: 15, modules: [...modules] })).toBeNull();
   });
 
@@ -28,7 +48,7 @@ describe("Home discovery cadence", () => {
         getDiscoveryModuleAt({
           activeTab,
           completedCount: 3,
-          modules: ["debate", "people", "topic"],
+          modules: ["topic", "people"],
         })
       ).toBeNull();
     }

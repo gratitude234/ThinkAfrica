@@ -22,8 +22,7 @@ const ICON_NAMES: NotificationIconName[] = [
  *
  *   likeActions, followActions, responsePost, write/actions, notifications/actions,
  *   admin/review/actions, admin/moderation/actions, cron/review-reminders,
- *   publicationDistribution, opportunityInquiryActions, the Debate V1.5 RPCs,
- *   emit_debate_notification_event_v2 call sites, and notify_debate_reply.
+ *   publicationDistribution, and opportunityInquiryActions.
  *
  * Anything emitted but missing from the catalog renders as "New notification"
  * with an "Open" CTA at the lowest priority, which is what this guards against.
@@ -57,16 +56,6 @@ const EMITTED_TYPES = [
   "moderation_post_removed",
   "moderation_comment_hidden",
   "account_suspended",
-  // debates
-  "debate_invitation",
-  "debate_invitation_response",
-  "debate_phase_advanced",
-  "debate_cancelled",
-  "debate_reply",
-  "debate_v2_round_change",
-  "debate_v2_final_vote",
-  "debate_v2_direct_response",
-  "debate_v2_evidence_requested",
 ];
 
 describe("catalog coverage", () => {
@@ -207,9 +196,6 @@ describe("notificationHref", () => {
     }
   });
 
-  it("sends debate notifications to the debates hub", () => {
-    expect(notificationHref({ type: "debate_v2_final_vote" })).toBe("/debates");
-  });
 
   it("returns null when nothing sensible can be built", () => {
     // The surface renders these as plain text rather than a dead link.
@@ -237,7 +223,6 @@ describe("icons and tones", () => {
     expect(critical).toEqual([
       "account_suspended",
       "co_author_declined",
-      "debate_cancelled",
       "moderation_comment_hidden",
       "moderation_post_removed",
       "post_rejected",

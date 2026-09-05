@@ -15,13 +15,12 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   const content = await getDailyBriefContent(admin);
 
-  if (!content.featuredPost && !content.activeDebate) {
+  if (!content.featuredPost) {
     return NextResponse.json({ skipped: "no_content", dryRun });
   }
 
   const bodyParts: string[] = [];
   if (content.featuredPost) bodyParts.push(`Top post: ${content.featuredPost.title}`);
-  if (content.activeDebate) bodyParts.push(`Live debate: ${content.activeDebate.title}`);
 
   const title = "Today's brief on Indegenius";
   const body = bodyParts.join(" · ");

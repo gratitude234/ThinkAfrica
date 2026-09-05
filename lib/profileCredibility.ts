@@ -33,7 +33,6 @@ export interface ProfileCredibilityInput {
     citableCount?: number | null;
     reviewedCount?: number | null;
     coAuthoredCount?: number | null;
-    debateContributionCount?: number | null;
     followerCount?: number | null;
     badgeCount?: number | null;
     topicCount?: number | null;
@@ -132,9 +131,7 @@ export function getProfileCredibilitySummary(
   if (positive(stats.coAuthoredCount)) {
     badges.push({ key: "coauthor", label: "Co-authored work", tone: "amber" });
   }
-  if (positive(stats.debateContributionCount)) {
-    badges.push({ key: "debate", label: "Debate contributor", tone: "amber" });
-  }
+
   if (positive(stats.responseCount)) {
     badges.push({ key: "responses", label: "Published responses", tone: "amber" });
   }

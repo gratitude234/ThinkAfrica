@@ -3,7 +3,6 @@ export const PROFILE_RECORD_PAGE_SIZE = 20;
 export const PROFILE_RECORD_ENTRY_KINDS = [
   "publication",
   "response",
-  "debate",
   "research",
 ] as const;
 
@@ -14,7 +13,6 @@ export const PROFILE_RECORD_FILTERS = [
   "all",
   "publications",
   "responses",
-  "debates",
   "research",
 ] as const;
 
@@ -34,7 +32,6 @@ export interface ProfileRecordSummary {
   sourceBackedCount: number;
   citableCount: number;
   responseCount: number;
-  debateCount: number;
   researchCount: number;
 }
 
@@ -43,7 +40,6 @@ export const EMPTY_PROFILE_RECORD_SUMMARY: ProfileRecordSummary = {
   sourceBackedCount: 0,
   citableCount: 0,
   responseCount: 0,
-  debateCount: 0,
   researchCount: 0,
 };
 
@@ -75,7 +71,6 @@ type RawSummary = {
   source_backed_count?: unknown;
   citable_count?: unknown;
   response_count?: unknown;
-  debate_count?: unknown;
   research_count?: unknown;
 };
 
@@ -95,7 +90,6 @@ export function normalizeProfileRecordSummary(
     sourceBackedCount: toCount(row.source_backed_count),
     citableCount: toCount(row.citable_count),
     responseCount: toCount(row.response_count),
-    debateCount: toCount(row.debate_count),
     researchCount: toCount(row.research_count),
   };
 }
@@ -158,7 +152,6 @@ export function profileRecordFilterLabel(filter: ProfileRecordFilter) {
     all: "All",
     publications: "Publications",
     responses: "Responses",
-    debates: "Debates",
     research: "Research",
   };
   return labels[filter];

@@ -47,7 +47,7 @@ const POPULATED_RECORD = {
   sourceBackedCount: 3,
   citableCount: 1,
   responseCount: 4,
-  debateCount: 2,
+
   researchCount: 0,
 };
 
@@ -56,7 +56,7 @@ const EMPTY_RECORD = {
   sourceBackedCount: 0,
   citableCount: 0,
   responseCount: 0,
-  debateCount: 0,
+
   researchCount: 0,
 };
 
@@ -289,11 +289,11 @@ describe("ProfileHeader record metrics", () => {
 });
 
 describe("ProfileHeader topics", () => {
-  it("limits the visible demonstrated topics to three and labels the group", () => {
+  it("limits the visible topics to three and labels the group", () => {
     renderHeader();
 
     expect(
-      screen.getByRole("list", { name: "Demonstrated topics" })
+      screen.getByRole("list", { name: "Writes about" })
     ).toBeInTheDocument();
     expect(screen.getByText("Governance")).toBeInTheDocument();
     expect(screen.getByText("History")).toBeInTheDocument();
@@ -323,7 +323,7 @@ describe("ProfileHeader topics", () => {
     });
 
     expect(
-      screen.queryByRole("list", { name: "Demonstrated topics" })
+      screen.queryByRole("list", { name: "Writes about" })
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/Topics appear here/i)).not.toBeInTheDocument();
   });
@@ -333,6 +333,135 @@ describe("ProfileHeader topics", () => {
 
     expect(
       screen.getByText(/Topics appear here once you publish work tagged with them/i)
+    ).toBeInTheDocument();
+  });
+});
+
+describe("ProfileHeader relationship counts", () => {
+  it("links both counts to the lists behind them", () => {
+    renderHeader({ props: { followerCount: 12, followingCount: 34 } });
+
+    expect(screen.getByRole("link", { name: "12 followers" })).toHaveAttribute(
+      "href",
+      "/student1/followers"
+    );
+    expect(screen.getByRole("link", { name: "34 following" })).toHaveAttribute(
+      "href",
+      "/student1/following"
+    );
+  });
+
+  it("says one follower rather than 1 followers", () => {
+    renderHeader({ props: { followerCount: 1, followingCount: 0 } });
+
+    expect(screen.getByRole("link", { name: "1 follower" })).toBeInTheDocument();
+  });
+
+  /**
+   * A zero here is a real answer to "how many people follow this person", not
+   * an empty metric. The record strip suppresses its zeros because an
+   * unpublished author has nothing to report yet; a follower count of zero is
+   * something to report.
+   */
+  it("prints a zero count as words, never as a bare metric", () => {
+    renderHeader({
+      props: { followerCount: 0, followingCount: 0, recordSummary: EMPTY_RECORD },
+    });
+
+    expect(screen.getByRole("link", { name: "0 followers" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "0 following" })).toBeInTheDocument();
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
+  });
+
+  /**
+   * The Command Center preview renders the same panel without a following
+   * count, because that model never loads one. The row has to read as one
+   * number rather than as a number and a gap.
+   */
+  it("omits the following count entirely when none was supplied", () => {
+    renderHeader({ props: { followerCount: 12 } });
+
+    expect(screen.getByRole("link", { name: "12 followers" })).toBeInTheDocument();
+    expect(screen.queryByText(/following/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Separators trail the item they follow rather than leading the next one.
+   * The two are indistinguishable while the line fits on one row and behave
+   * completely differently when it wraps: a leading dot opens the new line
+   * looking like a bullet, which is what a 320px phone showed for
+   * "· 64 following". Asserted at both ends, since a trailing dot on the last
+   * item would be the same defect in reverse.
+   */
+  it("never opens or closes the meta line with a separator", () => {
+    renderHeader({
+      profileOverrides: {
+        university: null,
+        country: null,
+        organization_name: null,
+      },
+      props: { followerCount: 3, followingCount: 4 },
+    });
+
+    const metaLine = screen
+      .getByRole("link", { name: "3 followers" })
+      .closest("p");
+    const text = metaLine?.textContent?.trim() ?? "";
+
+    expect(text.startsWith("·")).toBe(false);
+    expect(text.endsWith("·")).toBe(false);
+    expect(text).toContain("3 followers");
+    expect(text).toContain("4 following");
+  });
+});
+
+describe("ProfileHeader actions", () => {
+  it("offers the owner editing and nothing to do to themselves", () => {
+    renderHeader();
+
+    expect(screen.getByRole("link", { name: "Edit profile" })).toHaveAttribute(
+      "href",
+      "/settings/profile"
+    );
+    expect(screen.queryByRole("button", { name: /Follow author/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Message" })).not.toBeInTheDocument();
+  });
+
+  it("offers a visitor the relationship controls", () => {
+    renderHeader({
+      props: {
+        isOwnProfile: false,
+        currentUserId: "viewer-9",
+        messagingEligibility: { eligible: true, reason: null },
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "Follow author" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Message" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit profile" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * A blocked visitor is shown a profile with no relationship controls and no
+   * explanation. Saying "you have blocked this person" here would be a
+   * disclosure in the other direction too, since the same header renders for
+   * both sides of the block.
+   */
+  it("tells a blocked visitor nothing about the block", () => {
+    renderHeader({
+      props: {
+        isOwnProfile: false,
+        currentUserId: "viewer-9",
+        initialBlocked: true,
+        messagingEligibility: { eligible: true, reason: null },
+      },
+    });
+
+    expect(screen.queryByRole("button", { name: "Follow author" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Message" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/block/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "More profile actions" })
     ).toBeInTheDocument();
   });
 });

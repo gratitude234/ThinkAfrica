@@ -38,27 +38,12 @@ export interface ProfileRecordPublication {
   coAuthors: Array<{ userId: string; name: string }>;
 }
 
-export interface ProfileRecordDebate {
+export type ProfileRecordItem = {
   id: string;
-  content: string;
-  stance: string | null;
-  createdAt: string;
-  debate: { id: string; title: string } | null;
-}
-
-export type ProfileRecordItem =
-  | {
-      id: string;
-      kind: Exclude<ProfileRecordEntryKind, "debate">;
-      occurredAt: string;
-      publication: ProfileRecordPublication;
-    }
-  | {
-      id: string;
-      kind: "debate";
-      occurredAt: string;
-      debate: ProfileRecordDebate;
-    };
+  kind: ProfileRecordEntryKind;
+  occurredAt: string;
+  publication: ProfileRecordPublication;
+};
 
 interface RecordEntryRow {
   profile_id: string;
@@ -96,16 +81,6 @@ interface PostRow {
   }>;
 }
 
-interface DebateRow {
-  id: string;
-  content: string;
-  stance: string | null;
-  created_at: string;
-  debates:
-    | { id: string; title: string }
-    | Array<{ id: string; title: string }>
-    | null;
-}
 
 export async function loadProfileRecordSummary(
   supabase: SupabaseClient,
@@ -172,34 +147,19 @@ async function hydrateRecordEntries(
   supabase: SupabaseClient,
   entries: RecordEntryRow[]
 ): Promise<ProfileRecordItem[]> {
-  const publicationIds = entries
-    .filter((entry) => entry.entry_kind !== "debate")
-    .map((entry) => entry.entry_id);
-  const debateIds = entries
-    .filter((entry) => entry.entry_kind === "debate")
-    .map((entry) => entry.entry_id);
+  const publicationIds = entries.map((entry) => entry.entry_id);
 
-  const [publicationResult, debateResult] = await Promise.all([
+  const publicationResult =
     publicationIds.length > 0
-      ? supabase
+      ? await supabase
           .from("posts")
           .select(
             "id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, citation_id, published_version_id, created_at, published_at, cover_image_url, tags, post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
           )
           .in("id", publicationIds)
-      : Promise.resolve({ data: [], error: null }),
-    debateIds.length > 0
-      ? supabase
-          .from("debate_arguments")
-          .select(
-            "id, content, stance, created_at, debates!debate_arguments_debate_id_fkey(id, title)"
-          )
-          .in("id", debateIds)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
+      : { data: [], error: null };
 
   if (publicationResult.error) throw new Error(publicationResult.error.message);
-  if (debateResult.error) throw new Error(debateResult.error.message);
 
   const postsById = new Map(
     ((publicationResult.data ?? []) as unknown as PostRow[]).map((post) => [
@@ -207,34 +167,8 @@ async function hydrateRecordEntries(
       post,
     ])
   );
-  const debatesById = new Map(
-    ((debateResult.data ?? []) as unknown as DebateRow[]).map((debate) => [
-      debate.id,
-      debate,
-    ])
-  );
 
   return entries.flatMap((entry): ProfileRecordItem[] => {
-    if (entry.entry_kind === "debate") {
-      const row = debatesById.get(entry.entry_id);
-      if (!row) return [];
-      const debate = Array.isArray(row.debates) ? row.debates[0] : row.debates;
-      return [
-        {
-          id: entry.entry_id,
-          kind: "debate",
-          occurredAt: entry.occurred_at,
-          debate: {
-            id: row.id,
-            content: row.content,
-            stance: row.stance,
-            createdAt: row.created_at,
-            debate,
-          },
-        },
-      ];
-    }
-
     const post = postsById.get(entry.entry_id);
     if (!post) return [];
     return [
@@ -303,8 +237,6 @@ export async function loadProfileRecordPage({
       : query.eq("entry_kind", "publication");
   } else if (filter === "responses") {
     query = query.eq("entry_kind", "response");
-  } else if (filter === "debates") {
-    query = query.eq("entry_kind", "debate");
   } else if (filter === "research") {
     query = query.eq("entry_kind", "research");
   }

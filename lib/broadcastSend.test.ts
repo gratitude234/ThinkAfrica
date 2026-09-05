@@ -7,6 +7,10 @@ import {
   type BroadcastSendRow,
   type SendBroadcastDeps,
 } from "@/lib/broadcastSend";
+import {
+  DUPLICATE_CAMPAIGN_WINDOW_HOURS,
+  campaignFingerprint,
+} from "@/lib/broadcastFingerprint";
 
 /**
  * The send path is where a bug costs the most: an email that goes twice cannot
@@ -37,10 +41,11 @@ type Harness = {
   deps: SendBroadcastDeps;
   state: { current: BroadcastSendRow };
   calls: {
+    claimForCampaign: ReturnType<typeof vi.fn>;
+    supersedeEquivalentDrafts: ReturnType<typeof vi.fn>;
     createResendBroadcast: ReturnType<typeof vi.fn>;
     sendResendBroadcast: ReturnType<typeof vi.fn>;
     resolveSendSegment: ReturnType<typeof vi.fn>;
-    claimForSend: ReturnType<typeof vi.fn>;
     markFailed: ReturnType<typeof vi.fn>;
     markSending: ReturnType<typeof vi.fn>;
     markDispatchStarted: ReturnType<typeof vi.fn>;
@@ -76,23 +81,78 @@ function isFakeDefinitiveRejection(error: unknown) {
  * shared row, and only succeeds once. Testing the send path against a claim
  * that always succeeds would prove nothing about the race it exists to lose.
  */
+type CampaignRecord = {
+  id: string;
+  subject: string;
+  fingerprint: string;
+  irreversible: boolean;
+};
+
 function harness(
   initial: BroadcastSendRow,
-  overrides: Partial<SendBroadcastDeps> = {}
+  overrides: Partial<SendBroadcastDeps> = {},
+  seed: { campaigns?: CampaignRecord[]; supersedable?: string[] } = {}
 ): Harness {
   const state = { current: initial };
+  // Used by reference, not copied, so two harnesses can be given the same
+  // store and race each other the way two tabs race one campaign.
+  const campaigns: CampaignRecord[] = seed.campaigns ?? [];
+  const supersedable: string[] = [...(seed.supersedable ?? [])];
 
-  const claimForSend = vi.fn(async () => {
-    const current = state.current;
-    if (
-      !["draft", "failed"].includes(current.status) ||
-      current.dispatchStartedAt
-    ) {
-      return null;
+  /**
+   * Behaves like claim_broadcast_for_campaign: the duplicate check and the
+   * claim happen together, against a shared store, so a test that races two
+   * sends is racing the thing the real system races.
+   */
+  const claimForCampaign = vi.fn(
+    async (input: {
+      id: string;
+      fingerprint: string;
+      windowHours: number;
+      override: boolean;
+    }) => {
+      if (!input.override) {
+        const duplicate = campaigns.find(
+          (entry) =>
+            entry.id !== input.id &&
+            entry.fingerprint === input.fingerprint &&
+            entry.irreversible
+        );
+        if (duplicate) {
+          return {
+            outcome: "duplicate" as const,
+            duplicate: {
+              broadcastId: duplicate.id,
+              subject: duplicate.subject,
+              status: "sent" as const,
+              sentAt: "2026-09-04T23:09:00Z",
+            },
+          };
+        }
+      }
+
+      const current = state.current;
+      if (
+        !["draft", "failed"].includes(current.status) ||
+        current.dispatchStartedAt
+      ) {
+        return { outcome: "unclaimable" as const };
+      }
+
+      state.current = { ...current, status: "queued" };
+      // The claim itself is what makes this campaign irreversible to any other
+      // caller, which is the property the advisory lock exists to guarantee.
+      campaigns.push({
+        id: current.id,
+        subject: current.subject,
+        fingerprint: input.fingerprint,
+        irreversible: true,
+      });
+      return { outcome: "claimed" as const, row: state.current };
     }
-    state.current = { ...current, status: "queued" };
-    return state.current;
-  });
+  );
+
+  const supersedeEquivalentDrafts = vi.fn(async () => supersedable.splice(0));
 
   const createResendBroadcast = vi.fn(async () => ({ id: "resend-bc-1" }));
   const sendResendBroadcast = vi.fn(async () => {});
@@ -148,7 +208,12 @@ function harness(
     loadBroadcast: async () => state.current,
     checkSendPrecondition: async () => ({ ok: true, recipientCount: 1200 }),
     resolveSendSegment,
-    claimForSend,
+    claimForCampaign,
+    // The real fingerprint, so the tests exercise the actual normalisation
+    // rather than a stand-in that could agree where the real one disagrees.
+    fingerprint: campaignFingerprint,
+    duplicateWindowHours: DUPLICATE_CAMPAIGN_WINDOW_HOURS,
+    supersedeEquivalentDrafts,
     attachResendBroadcastId: async (_id, resendBroadcastId) => {
       state.current = { ...state.current, resendBroadcastId };
     },
@@ -180,7 +245,8 @@ function harness(
       createResendBroadcast,
       sendResendBroadcast,
       resolveSendSegment,
-      claimForSend,
+      claimForCampaign,
+      supersedeEquivalentDrafts,
       markFailed,
       markSending,
       markDispatchStarted,
@@ -253,7 +319,7 @@ describe("double send prevention", () => {
     const result = await sendBroadcast("bc-1", "admin-1", test.deps);
 
     expect(result).toMatchObject({ ok: true, outcome: "already_in_progress" });
-    expect(test.calls.claimForSend).not.toHaveBeenCalled();
+    expect(test.calls.claimForCampaign).not.toHaveBeenCalled();
     expect(test.calls.sendResendBroadcast).not.toHaveBeenCalled();
   });
 
@@ -312,6 +378,189 @@ describe("double send prevention", () => {
   });
 });
 
+describe("cross-broadcast duplicate protection", () => {
+  const WELCOME = {
+    subject: "Welcome to Indegenius",
+    bodyHtml: "<p>We are glad you are here.</p>",
+    audienceKey: "all" as const,
+  };
+
+  /** The campaign that already went out, as the production one did. */
+  function alreadySent(overrides: Partial<CampaignRecord> = {}): CampaignRecord {
+    return {
+      id: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4",
+      subject: "Welcome to Indegenius",
+      fingerprint: campaignFingerprint(WELCOME),
+      irreversible: true,
+      ...overrides,
+    };
+  }
+
+  it("blocks a second row carrying the same campaign", async () => {
+    // The production sequence: two different local rows, identical subject,
+    // body and audience, two minutes apart. Per-row idempotency was never
+    // going to see it, because each row was sent exactly once.
+    const test = harness(
+      row({ id: "24b75e7d-b9c4-4fbb-887b-c8f4c903b138", ...WELCOME }),
+      {},
+      { campaigns: [alreadySent()] }
+    );
+
+    const result = await sendBroadcast("24b75e7d", "admin-1", test.deps);
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "duplicate_campaign",
+      duplicate: { broadcastId: "c5134c35-dc18-4cd4-8bc0-ad23e0c8bfd4" },
+    });
+    expect(test.calls.sendResendBroadcast).not.toHaveBeenCalled();
+    // Refused before anything was spent at Resend, and the row is untouched.
+    expect(test.calls.createResendBroadcast).not.toHaveBeenCalled();
+    expect(test.state.current.status).toBe("draft");
+  });
+
+  it("blocks it even though the sender identity differs", async () => {
+    // One went as platform and one as ceo. Who signs a campaign is
+    // presentation; the campaign is the message and the people who get it.
+    const test = harness(
+      row({ id: "24b75e7d", senderKey: "ceo", ...WELCOME }),
+      {},
+      { campaigns: [alreadySent()] }
+    );
+
+    const result = await sendBroadcast("24b75e7d", "admin-1", test.deps);
+
+    expect(result).toMatchObject({ ok: false, reason: "duplicate_campaign" });
+  });
+
+  it("allows the same subject with a different body", async () => {
+    const test = harness(
+      row({
+        id: "bc-2",
+        subject: "Welcome to Indegenius",
+        bodyHtml: "<p>A different message entirely.</p>",
+        audienceKey: "all",
+      }),
+      {},
+      { campaigns: [alreadySent()] }
+    );
+
+    const result = await sendBroadcast("bc-2", "admin-1", test.deps);
+
+    expect(result).toMatchObject({ ok: true, outcome: "dispatched" });
+  });
+
+  it("allows the same content to a materially different audience", async () => {
+    const test = harness(
+      row({ id: "bc-2", ...WELCOME, audienceKey: "authors" }),
+      {},
+      { campaigns: [alreadySent()] }
+    );
+
+    const result = await sendBroadcast("bc-2", "admin-1", test.deps);
+
+    expect(result).toMatchObject({ ok: true, outcome: "dispatched" });
+  });
+
+  it("allows a campaign whose equivalent is outside the window", async () => {
+    // Nothing irreversible is on record any more, which is what "outside the
+    // window" means to the statement: the row stops matching the recency
+    // predicate and the claim proceeds exactly as it would have on day one.
+    const test = harness(
+      row({ id: "bc-2", ...WELCOME }),
+      {},
+      { campaigns: [alreadySent({ irreversible: false })] }
+    );
+
+    const result = await sendBroadcast("bc-2", "admin-1", test.deps);
+
+    expect(result).toMatchObject({ ok: true, outcome: "dispatched" });
+  });
+
+  it("lets exactly one of two racing equivalent campaigns through", async () => {
+    // Two tabs, two rows, one campaign. The claim and the duplicate check
+    // happen together against the same store, so the loser sees the winner's
+    // claim rather than an empty table.
+    const shared: CampaignRecord[] = [];
+    const first = harness(row({ id: "bc-a", ...WELCOME }), {}, { campaigns: shared });
+    const second = harness(row({ id: "bc-b", ...WELCOME }), {}, { campaigns: shared });
+
+    // Both harnesses hold the same campaign store, which is what the advisory
+    // lock gives the real implementation.
+    const [a, b] = await Promise.all([
+      sendBroadcast("bc-a", "admin-1", first.deps),
+      sendBroadcast("bc-b", "admin-1", second.deps),
+    ]);
+
+    const outcomes = [a, b].map((result) => (result.ok ? result.outcome : result.reason));
+    expect(outcomes).toContain("dispatched");
+    expect(outcomes).toContain("duplicate_campaign");
+    expect(
+      first.calls.sendResendBroadcast.mock.calls.length +
+        second.calls.sendResendBroadcast.mock.calls.length
+    ).toBe(1);
+  });
+
+  it("sends anyway only when an override is passed explicitly", async () => {
+    const test = harness(
+      row({ id: "bc-2", ...WELCOME }),
+      {},
+      { campaigns: [alreadySent()] }
+    );
+
+    expect(await sendBroadcast("bc-2", "admin-1", test.deps)).toMatchObject({
+      ok: false,
+      reason: "duplicate_campaign",
+    });
+
+    const overridden = await sendBroadcast("bc-2", "admin-1", test.deps, {
+      overrideDuplicate: true,
+    });
+
+    expect(overridden).toMatchObject({ ok: true, outcome: "dispatched" });
+  });
+
+  it("refuses a draft that has already been superseded", async () => {
+    const test = harness(row({ status: "superseded" }));
+
+    const result = await sendBroadcast("bc-1", "admin-1", test.deps);
+
+    expect(result).toMatchObject({ ok: false, reason: "superseded" });
+    expect(test.calls.claimForCampaign).not.toHaveBeenCalled();
+  });
+
+  it("supersedes equivalent drafts only after the campaign actually went", async () => {
+    const test = harness(row(WELCOME), {}, { supersedable: ["stale-draft-1"] });
+
+    const result = await sendBroadcast("bc-1", "admin-1", test.deps);
+
+    expect(result).toMatchObject({
+      ok: true,
+      supersededBroadcastIds: ["stale-draft-1"],
+    });
+    expect(test.calls.supersedeEquivalentDrafts).toHaveBeenCalledWith({
+      sentBroadcastId: "bc-1",
+      fingerprint: campaignFingerprint(WELCOME),
+    });
+  });
+
+  it("does not retire any draft when the send failed", async () => {
+    const test = harness(
+      row(WELCOME),
+      {
+        createResendBroadcast: async () => {
+          throw new Error("network reset");
+        },
+      },
+      { supersedable: ["stale-draft-1"] }
+    );
+
+    await sendBroadcast("bc-1", "admin-1", test.deps);
+
+    expect(test.calls.supersedeEquivalentDrafts).not.toHaveBeenCalled();
+  });
+});
+
 describe("refusing an untrustworthy audience", () => {
   it("blocks a send against a stale segment and leaves the draft editable", async () => {
     const test = harness(row(), {
@@ -325,7 +574,7 @@ describe("refusing an untrustworthy audience", () => {
     const result = await sendBroadcast("bc-1", "admin-1", test.deps);
 
     expect(result).toMatchObject({ ok: false, reason: "segment_stale" });
-    expect(test.calls.claimForSend).not.toHaveBeenCalled();
+    expect(test.calls.claimForCampaign).not.toHaveBeenCalled();
     expect(test.state.current.status).toBe("draft");
   });
 
@@ -352,7 +601,7 @@ describe("refusing an untrustworthy audience", () => {
     const result = await sendBroadcast("bc-1", "admin-1", test.deps);
 
     expect(result).toMatchObject({ ok: false, reason: "no_recipients" });
-    expect(test.calls.claimForSend).not.toHaveBeenCalled();
+    expect(test.calls.claimForCampaign).not.toHaveBeenCalled();
   });
 
   it("caps a hand-picked list before it can time out the request", async () => {
@@ -401,8 +650,8 @@ describe("refusing an untrustworthy audience", () => {
       reason: "empty_body",
     });
 
-    expect(noSubject.calls.claimForSend).not.toHaveBeenCalled();
-    expect(noBody.calls.claimForSend).not.toHaveBeenCalled();
+    expect(noSubject.calls.claimForCampaign).not.toHaveBeenCalled();
+    expect(noBody.calls.claimForCampaign).not.toHaveBeenCalled();
   });
 });
 

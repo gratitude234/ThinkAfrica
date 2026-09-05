@@ -10,7 +10,7 @@ import { useStickySubnav } from "@/lib/useStickySubnav";
  * children -- so a Server Component can wrap a server-rendered strip in this
  * without any of that strip becoming client code.
  *
- * Client components that already own the element (the debate rooms, the feed's
+ * Client components that already own the element (the feed's
  * control strip) call useStickySubnav directly instead of nesting another div.
  */
 export default function StickySubnav({

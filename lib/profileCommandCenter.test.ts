@@ -80,7 +80,6 @@ function model(
       sourceBackedCount: 2,
       citableCount: 0,
       responseCount: 0,
-      debateCount: 0,
       researchCount: 0,
     },
     followerCount: 3,

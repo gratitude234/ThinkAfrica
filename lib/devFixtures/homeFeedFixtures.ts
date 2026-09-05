@@ -5,7 +5,7 @@
  *
  * Every record here is a plain object conforming to the real card data
  * contracts (PostCardData / HomeFeaturedPost / FeaturedTodayPost /
- * DebateInterludeData / ActivationState). No `as any`, no partial shapes --
+ * ActivationState). No `as any`, no partial shapes --
  * if a card's props change shape, this file should fail to typecheck
  * rather than silently drift out of sync with the real contract.
  */
@@ -13,7 +13,7 @@
 import type { PostCardData } from "@/components/post/PostCard";
 import type { HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
 import type { FeaturedTodayPost } from "@/components/ui/HomeSidebar";
-import type { DebateInterludeData } from "@/components/post/DebateInterlude";
+
 import type { ActivationState } from "@/lib/activation";
 
 const COVER_EMERALD = "/dev-fixtures/cover-emerald.svg";
@@ -618,7 +618,6 @@ export const ACTIVATION_FALLBACK_FIXTURE: ActivationState = {
   responseStartedCount: 0,
   submittedPostCount: 0,
   draftCount: 0,
-  debateArgumentCount: 0,
   activated: false,
   tasks: [
     { key: "profile", label: "Add your university", description: "Readers verify credibility from your profile basics.", href: "/settings", done: false },
@@ -636,15 +635,6 @@ export const ACTIVATION_FALLBACK_FIXTURE: ActivationState = {
   },
 };
 
-export const DEBATE_FIXTURE: DebateInterludeData = {
-  id: "fx-debate-1",
-  title: "Should African universities adopt English-only instruction policies?",
-  status: "active",
-  endsAt: new Date(NOW.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-  argumentCount: 142,
-  motionForCount: 61,
-  motionAgainstCount: 81,
-};
 
 export interface FixtureWriter {
   id: string;

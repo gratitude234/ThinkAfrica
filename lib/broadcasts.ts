@@ -16,13 +16,20 @@ import {
  * "queued" is the window between claiming a draft for sending and Resend
  * accepting it. It is usually milliseconds, but a broadcast can be left there
  * by a crash, so it is a status the list and the pill have to be able to draw.
+ *
+ * "superseded" is a draft that was overtaken. When a campaign goes out, any
+ * other editable draft carrying the same campaign is moved here rather than
+ * deleted: it stays readable, it says which broadcast replaced it, and it can
+ * no longer be sent. Debug drafts that sit around looking sendable are how the
+ * same message goes out twice a week later.
  */
 export type BroadcastStatus =
   | "draft"
   | "queued"
   | "sending"
   | "sent"
-  | "failed";
+  | "failed"
+  | "superseded";
 
 export const BROADCAST_STATUS_META: Record<
   BroadcastStatus,
@@ -33,6 +40,7 @@ export const BROADCAST_STATUS_META: Record<
   sending: { label: "Sending", className: "bg-gold-tint text-gold-ink" },
   sent: { label: "Sent", className: "bg-green-tint text-emerald-brand" },
   failed: { label: "Failed", className: "bg-red-50 text-red-700" },
+  superseded: { label: "Superseded", className: "bg-gray-100 text-gray-500" },
 };
 
 /** Statuses whose content is frozen because a send is under way or done. */
@@ -43,6 +51,7 @@ export const IN_FLIGHT_BROADCAST_STATUSES: BroadcastStatus[] = [
 ];
 
 export function isBroadcastEditable(status: BroadcastStatus) {
+  if (status === "superseded") return false;
   return !IN_FLIGHT_BROADCAST_STATUSES.includes(status);
 }
 
@@ -228,11 +237,38 @@ export type BroadcastRecord = {
   sentAt: string | null;
   updatedAt: string;
   delivered: number;
+  /**
+   * Resend declined to attempt these because the address was already on its
+   * suppression list. Kept apart from `failed`: nothing bounced, and reporting
+   * it as a bounce sends the reader looking for a delivery problem that is not
+   * there.
+   */
+  suppressed: number;
   failed: number;
   sentBy: string;
   /** Present when something went wrong, shown on the detail page. */
   statusNote?: string;
+  /** The broadcast that overtook this draft, when it was superseded. */
+  supersededBy?: string;
 };
+
+/**
+ * Recipients no terminal outcome has arrived for yet. Derived rather than
+ * stored, so it cannot drift from the three buckets it is the remainder of,
+ * and floored at zero because a recipient count captured at dispatch is a
+ * snapshot and the events are the truth.
+ */
+export function pendingRecipients(record: {
+  recipientCount: number;
+  delivered: number;
+  suppressed: number;
+  failed: number;
+}) {
+  return Math.max(
+    0,
+    record.recipientCount - record.delivered - record.suppressed - record.failed
+  );
+}
 
 /**
  * A sender as the composer needs it: resolved on the server, where the sending

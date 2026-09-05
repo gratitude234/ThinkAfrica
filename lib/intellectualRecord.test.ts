@@ -32,7 +32,7 @@ describe("Intellectual Record quality labels", () => {
 });
 
 describe("Intellectual Record summary", () => {
-  it("counts published work, linked responses, debates, and evidence separately", () => {
+  it("counts published work, linked responses, and evidence separately", () => {
     expect(
       getIntellectualRecordSummary({
         posts: [
@@ -40,13 +40,11 @@ describe("Intellectual Record summary", () => {
           { citationId: "IND-1", publishedVersionId: "version-1" },
           { isCoAuthor: true },
         ],
-        debateContributionCount: 2,
       })
     ).toEqual({
-      contributionCount: 5,
+      contributionCount: 3,
       publishedCount: 3,
       responseCount: 1,
-      debateContributionCount: 2,
       sourceBackedCount: 1,
       reviewedCount: 1,
       citableCount: 1,

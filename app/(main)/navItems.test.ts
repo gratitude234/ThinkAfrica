@@ -20,9 +20,6 @@ describe("isNavItemActive", () => {
     // Segment boundary, not a string prefix.
     ["/explorer", NAV_MATCH_PREFIXES.explore, false],
 
-    ["/debates", NAV_MATCH_PREFIXES.debates, true],
-    ["/debates/live-room", NAV_MATCH_PREFIXES.debates, true],
-    ["/debatesomething", NAV_MATCH_PREFIXES.debates, false],
 
     ["/campus", NAV_MATCH_PREFIXES.campus, true],
     ["/campus/programs", NAV_MATCH_PREFIXES.campus, true],

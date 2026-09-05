@@ -59,7 +59,6 @@ export interface IntellectualRecordSummary {
   contributionCount: number;
   publishedCount: number;
   responseCount: number;
-  debateContributionCount: number;
   sourceBackedCount: number;
   reviewedCount: number;
   citableCount: number;
@@ -103,10 +102,8 @@ export function getContributionQualityLabels(
 
 export function getIntellectualRecordSummary({
   posts,
-  debateContributionCount = 0,
 }: {
   posts: IntellectualRecordPost[];
-  debateContributionCount?: number | null;
 }): IntellectualRecordSummary {
   let responseCount = 0;
   let sourceBackedCount = 0;
@@ -131,13 +128,10 @@ export function getIntellectualRecordSummary({
     if (getContributionQualityLabels(post).length > 0) qualityLabelledCount += 1;
   }
 
-  const debates = Math.max(0, debateContributionCount ?? 0);
-
   return {
-    contributionCount: posts.length + debates,
+    contributionCount: posts.length,
     publishedCount: posts.length,
     responseCount,
-    debateContributionCount: debates,
     sourceBackedCount,
     reviewedCount,
     citableCount,

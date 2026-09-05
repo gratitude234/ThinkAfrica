@@ -32,7 +32,7 @@ describe("BottomNav compose access", () => {
 
   it("shows the compose FAB to guests and gates the universal composer", () => {
     render(
-      <BottomNav username={null} userId={null} hasActiveDebate={false} />
+      <BottomNav username={null} userId={null} />
     );
 
     const trigger = screen.getByRole("button", { name: "Publish" });
@@ -49,7 +49,7 @@ describe("BottomNav compose access", () => {
     navigationState.pathname = "/post/a-test-post";
 
     render(
-      <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
+      <BottomNav username="writer" userId="user-1" />
     );
 
     // The post page floats its own ReadingBar, whose Respond writes a reply to
@@ -68,7 +68,7 @@ describe("BottomNav compose access", () => {
     navigationState.pathname = "/create/post";
 
     render(
-      <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
+      <BottomNav username="writer" userId="user-1" />
     );
 
     expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
@@ -86,30 +86,30 @@ describe("BottomNav account label and safe areas", () => {
 
   it("labels the account destination Join for a guest and Record for a signed-in user", () => {
     const { rerender } = render(
-      <BottomNav username={null} userId={null} hasActiveDebate={false} />
+      <BottomNav username={null} userId={null} />
     );
     expect(screen.getByText("Join")).toBeInTheDocument();
     expect(screen.queryByText("Record")).not.toBeInTheDocument();
 
-    rerender(<BottomNav username="writer" userId="user-1" hasActiveDebate={false} />);
+    rerender(<BottomNav username="writer" userId="user-1" />);
     expect(screen.getByText("Record")).toBeInTheDocument();
     expect(screen.queryByText("Join")).not.toBeInTheDocument();
   });
 
   it("still routes the guest account destination to Join, not the authenticated profile route", () => {
-    render(<BottomNav username={null} userId={null} hasActiveDebate={false} />);
+    render(<BottomNav username={null} userId={null} />);
 
     expect(screen.getByText("Join").closest("a")).toHaveAttribute("href", "/signup");
   });
 
   it("pads the bar for the safe area and keeps every nav destination at least 44px tall", () => {
-    render(<BottomNav username="writer" userId="user-1" hasActiveDebate={false} />);
+    render(<BottomNav username="writer" userId="user-1" />);
 
     const nav = screen.getByRole("navigation", { name: "Primary navigation" });
     expect(nav.className).toMatch(/\bfixed\b/);
     expect(nav).toHaveStyle({ paddingBottom: "env(safe-area-inset-bottom)" });
 
-    for (const label of ["For you", "Discover", "Debates", "Responses", "Record"]) {
+    for (const label of ["For you", "Discover", "Responses", "Record"]) {
       const link = screen.getByText(label).closest("a");
       expect(link?.className).toMatch(/h-full/);
     }
@@ -125,7 +125,7 @@ describe("BottomNav account label and safe areas", () => {
     ]) {
       navigationState.pathname = pathname;
       const { unmount } = render(
-        <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
+        <BottomNav username="writer" userId="user-1" />
       );
       expect(screen.getByText("Record").closest("a")).toHaveAttribute(
         "aria-current",
@@ -133,47 +133,6 @@ describe("BottomNav account label and safe areas", () => {
       );
       unmount();
     }
-  });
-});
-
-describe("BottomNav debates destination", () => {
-  beforeEach(() => {
-    navigationState.pathname = "/";
-    mocks.requestAuth.mockReset();
-  });
-
-  afterEach(() => cleanup());
-
-  it("gives mobile users a route into debates", () => {
-    render(<BottomNav username="writer" userId="user-1" hasActiveDebate={false} />);
-
-    expect(screen.getByText("Debates").closest("a")).toHaveAttribute(
-      "href",
-      "/debates"
-    );
-  });
-
-  it("announces a live debate only while one is running", () => {
-    const { rerender } = render(
-      <BottomNav username="writer" userId="user-1" hasActiveDebate={false} />
-    );
-    expect(screen.queryByText("A debate is live now")).not.toBeInTheDocument();
-
-    rerender(
-      <BottomNav username="writer" userId="user-1" hasActiveDebate />
-    );
-    expect(screen.getByText("A debate is live now")).toBeInTheDocument();
-  });
-
-  it("marks the debates tab as the current page inside a debate room", () => {
-    navigationState.pathname = "/debates/some-debate-id";
-
-    render(<BottomNav username="writer" userId="user-1" hasActiveDebate />);
-
-    expect(screen.getByText("Debates").closest("a")).toHaveAttribute(
-      "aria-current",
-      "page"
-    );
   });
 });
 
@@ -188,7 +147,7 @@ describe("BottomNav shared chrome contract", () => {
   });
 
   it("registers as the bottom composited chrome surface", () => {
-    render(<BottomNav username="writer" userId="user-1" hasActiveDebate={false} />);
+    render(<BottomNav username="writer" userId="user-1" />);
     const bar = screen.getByRole("navigation", { name: "Primary navigation" });
     expect(bar).toHaveAttribute("data-app-bottom-nav");
     expect(bar).toHaveAttribute("data-app-chrome-motion");

@@ -13,7 +13,6 @@ const platformLinks = [
   { label: "Explore", href: "/explore" },
   { label: "Opportunities", href: "/opportunities" },
   { label: "Policy Hub", href: "/policy" },
-  ...(FEATURE_FLAGS.debates ? [{ label: "Debates", href: "/debates" }] : []),
 ];
 
 const FOOTER_LINK_CLASS =

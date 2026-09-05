@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { PostCardData } from "./PostCard";
 import HomeFeedCardImpression from "./HomeFeedCardImpression";
-import DebateInterlude, { type DebateInterludeData } from "./DebateInterlude";
 import PeopleInterlude from "./PeopleInterlude";
 import TopicInterlude from "./TopicInterlude";
 
@@ -11,26 +10,23 @@ type FeedTabKey =
   | "subscriptions"
   | "topics"
   | "latest";
-export type DiscoveryModule = "people" | "debate" | "topic";
+export type DiscoveryModule = "people" | "topic";
 
 export function getDiscoveryModuleOrder({
   prioritizePeople,
   hasPeople,
-  hasDebate,
   hasTopic,
 }: {
   prioritizePeople: boolean;
   hasPeople: boolean;
-  hasDebate: boolean;
   hasTopic: boolean;
 }): DiscoveryModule[] {
   const order: DiscoveryModule[] = prioritizePeople
-    ? ["people", "debate", "topic"]
-    : ["debate", "people", "topic"];
+    ? ["people", "topic"]
+    : ["topic", "people"];
 
   return order.filter((module) => {
     if (module === "people") return hasPeople;
-    if (module === "debate") return hasDebate;
     return hasTopic;
   });
 }
@@ -57,7 +53,6 @@ export function getDiscoveryModuleAt({
 interface PostFeedProps {
   posts: PostCardData[];
   activeTab: FeedTabKey;
-  activeDebate?: DebateInterludeData | null;
   peopleSuggestions?: {
     id: string;
     username: string;
@@ -74,7 +69,6 @@ interface PostFeedProps {
 export default function PostFeed({
   posts,
   activeTab,
-  activeDebate = null,
   peopleSuggestions = [],
   peopleSuggestionReason = "Suggested for you",
   prioritizePeopleSuggestions = false,
@@ -85,7 +79,6 @@ export default function PostFeed({
   const discoveryModules = getDiscoveryModuleOrder({
     prioritizePeople: prioritizePeopleSuggestions,
     hasPeople: peopleSuggestions.length > 0,
-    hasDebate: Boolean(activeDebate),
     hasTopic: topicPosts.length > 1,
   });
 
@@ -98,9 +91,6 @@ export default function PostFeed({
           currentUserId={currentUserId}
         />
       );
-    }
-    if (module === "debate" && activeDebate) {
-      return <DebateInterlude debate={activeDebate} />;
     }
     if (module === "topic") return <TopicInterlude posts={topicPosts} />;
     return null;

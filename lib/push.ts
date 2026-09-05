@@ -11,8 +11,7 @@ export type PushPreferenceKey =
   | "push_likes"
   | "push_follows"
   | "push_daily_brief"
-  | "push_author_publications"
-  | "push_debate_updates";
+  | "push_author_publications";
 
 export type PushSendResult =
   | { ok: true; sent: number }

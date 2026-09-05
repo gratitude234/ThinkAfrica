@@ -30,7 +30,7 @@ vi.mock("./pushActions", () => ({ sendCurrentDeviceTestPush: vi.fn() }));
 const prefs: NotificationPrefs = {
   inapp_likes: true,
   inapp_follows: true,
-  inapp_debates: true,
+
   inapp_collaboration: true,
   email_comments: true,
   email_follows: true,
@@ -50,7 +50,7 @@ const prefs: NotificationPrefs = {
   email_co_author_declined: true,
   email_opportunity_inquiry: true,
   email_author_publications: true,
-  email_debate_updates: true,
+
   push_published: true,
   push_messages: true,
   push_comments: true,
@@ -58,7 +58,7 @@ const prefs: NotificationPrefs = {
   push_follows: true,
   push_daily_brief: true,
   push_author_publications: true,
-  push_debate_updates: true,
+
 };
 
 describe("NotificationsForm", () => {
@@ -73,12 +73,9 @@ describe("NotificationsForm", () => {
     await waitFor(() => {
       expect(screen.getByText("This browser does not support push notifications.")).toBeInTheDocument();
     });
-    for (const label of ["Submission decisions", "Direct messages", "Comments", "Likes", "New followers", "Daily brief", "Subscribed author publications", "Debate updates"]) {
+    for (const label of ["Submission decisions", "Direct messages", "Comments", "Likes", "New followers", "Daily brief", "Subscribed author publications"]) {
       expect(screen.getByRole("switch", { name: `Push: ${label}` })).toBeEnabled();
     }
-    expect(
-      screen.getByRole("switch", { name: "Email: Debate updates" })
-    ).toBeChecked();
   });
 
   it("keeps subscription delivery always on in-app and auto-saves other V2 switches", async () => {

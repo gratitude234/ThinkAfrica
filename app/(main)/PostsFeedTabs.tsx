@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import PostFeed from "@/components/post/PostFeed";
 import FeedSkeleton from "@/components/post/FeedSkeleton";
-import type { DebateInterludeData } from "@/components/post/DebateInterlude";
+
 import type { PostCardData } from "@/components/post/PostCard";
 import type { FeedContentFilter, FeedTimeframe } from "@/lib/feedData";
 import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
@@ -159,7 +159,7 @@ export default function PostsFeedTabs({
   showFollowingTab,
   showTopicsTab = false,
   showSubscriptionsTab = false,
-  activeDebate,
+
   peopleSuggestions,
   peopleSuggestionReason,
   prioritizePeopleSuggestions,
@@ -177,7 +177,7 @@ export default function PostsFeedTabs({
   showFollowingTab: boolean;
   showTopicsTab?: boolean;
   showSubscriptionsTab?: boolean;
-  activeDebate: DebateInterludeData | null;
+
   peopleSuggestions: {
     id: string;
     username: string;
@@ -959,7 +959,7 @@ export default function PostsFeedTabs({
           <PostFeed
             posts={visiblePosts}
             activeTab={activeTab}
-            activeDebate={activeDebate}
+      
             peopleSuggestions={peopleSuggestions}
             peopleSuggestionReason={peopleSuggestionReason}
             prioritizePeopleSuggestions={prioritizePeopleSuggestions}

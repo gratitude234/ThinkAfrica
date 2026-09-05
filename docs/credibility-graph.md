@@ -5,7 +5,7 @@ Last updated: 2026-08-27
 ## Purpose
 
 Connect person → work → topic → evidence → citation → review → collaboration →
-debate → recognition → verified outcome, so an Indegenius profile becomes more
+recognition → verified outcome, so an Indegenius profile becomes more
 defensible the longer someone uses it.
 
 Every public credibility claim is derived from a canonical platform record or
@@ -26,21 +26,9 @@ cannot smuggle an arbitrary claim onto a profile.
 | `responded_to` | `posts.in_response_to` | Publishing a response | Unpublishing |
 | `cited_by` | `post_references.referenced_post_id` | Another **published** work resolves a reference to this work | Either end unpublished, the reference edited away, the citing work deleted |
 | `reviewed` | `post_reviews` / `post_editor_decisions` | A reviewer submits a completed review, or an editor accepts | The review row is removed or reset; the work is unpublished |
-| `debate_participation` | `debate_arguments` | Publishing an argument in a public debate | The argument is removed |
-| `debate_completion` | `debates.status = 'closed'` | Taking part in a debate that ran to completion | The debate is cancelled |
 | `verified_opportunity_selection` | `opportunity_outcomes` | Verified by a third party **and** published by the owner | Dispute, revocation, owner unpublishing |
 | `verified_opportunity_completion` | `opportunity_outcomes` | As above, at completion stage | As above |
 | `verified_external_recognition` | `opportunity_outcomes` with `source_type = 'external'` | Administrator verification | As above |
-
-### There is no `debate_winner`
-
-Debate ballots exist (`20260718000002`), but that migration states plainly
-that they are private and a public aggregate-results function is deferred.
-Until a canonical judged result exists, a winner could only be inferred from
-votes, likes or follower counts. Inferring an intellectual outcome from
-popularity is the thing this graph exists to avoid, so
-`UNSUPPORTED_SIGNAL_KINDS` names it explicitly and a test asserts its absence.
-Participation and completion are facts; a winner is not yet one.
 
 ## Citation semantics
 
@@ -151,7 +139,7 @@ The function has no clause that could emit "leading", "expert", "top" or
 "highly regarded", and a test asserts it. Topics normalize
 case-insensitively and keep the author's own spelling. Representative works
 are selected deterministically, strength first, with the post id breaking
-ties. Debate contributions are counted but cannot qualify a topic alone.
+ties.
 
 ## Recognition projection
 

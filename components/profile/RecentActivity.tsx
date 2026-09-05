@@ -8,7 +8,7 @@ import { formatRelativeTime } from "@/lib/utils";
  * profile it read as record content while never being visible to any reader.
  */
 
-export type RecentActivityType = "like" | "response" | "debate";
+export type RecentActivityType = "like" | "response";
 
 export interface RecentActivityItem {
   type: RecentActivityType;
@@ -20,7 +20,6 @@ export interface RecentActivityItem {
 const TYPE_LABELS: Record<RecentActivityType, string> = {
   like: "Like",
   response: "Response",
-  debate: "Debate",
 };
 
 export default function RecentActivity({

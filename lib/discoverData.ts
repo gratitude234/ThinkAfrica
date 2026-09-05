@@ -34,13 +34,6 @@ export interface DiscoverPerson extends SuggestedPerson {
   subscribed: boolean;
 }
 
-export interface DiscoverDebate {
-  id: string;
-  title: string;
-  status: string;
-  description: string | null;
-  argumentCount: number;
-}
 
 export interface DiscoverConversation {
   postId: string;
@@ -97,7 +90,6 @@ export interface DiscoverData {
   people: DiscoverPerson[];
   peopleReason: string;
   activeConversations: DiscoverConversation[];
-  debateHighlights: DiscoverDebate[];
   fellowships: DiscoverFellowship[];
   opportunitySummary: DiscoverOpportunitySummary;
 }
@@ -131,13 +123,6 @@ interface RawPerson {
   points: number | null;
 }
 
-interface RawDebate {
-  id: string;
-  title: string;
-  status: string;
-  description: string | null;
-  debate_arguments?: { count: number }[] | { count: number } | null;
-}
 
 interface RawFellowship {
   id: string;
@@ -159,11 +144,6 @@ function normalizeTag(value: string) {
   return normalizeTagValue(value);
 }
 
-function getDebateArgumentCount(value: RawDebate["debate_arguments"]) {
-  if (!value) return 0;
-  if (Array.isArray(value)) return value[0]?.count ?? 0;
-  return value.count ?? 0;
-}
 
 async function getUserContext(supabase: SupabaseLike, userId: string | null) {
   if (!userId) {
@@ -477,40 +457,6 @@ const getCachedTopPeople = unstable_cache(
   { revalidate: 300, tags: ["discover", "people"] }
 );
 
-async function getDebateHighlights(
-  supabase: SupabaseLike
-): Promise<DiscoverDebate[]> {
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return getCachedDebateHighlights();
-  }
-
-  return getDebateHighlightsUncached(supabase);
-}
-
-async function getDebateHighlightsUncached(
-  supabase: SupabaseLike
-): Promise<DiscoverDebate[]> {
-  const { data } = await supabase
-    .from("debates")
-    .select("id, title, status, description, debate_arguments(count)")
-    .in("status", ["open", "active"])
-    .order("created_at", { ascending: false })
-    .limit(3);
-
-  return ((data ?? []) as RawDebate[]).map((debate) => ({
-    id: debate.id,
-    title: debate.title,
-    status: debate.status,
-    description: debate.description,
-    argumentCount: getDebateArgumentCount(debate.debate_arguments),
-  }));
-}
-
-const getCachedDebateHighlights = unstable_cache(
-  async () => getDebateHighlightsUncached(createAdminClient()),
-  ["discover-debate-highlights"],
-  { revalidate: 120, tags: ["discover", "debates"] }
-);
 
 async function getFellowships(
   supabase: SupabaseLike
@@ -670,7 +616,6 @@ export async function getDiscoverData(
     citablePosts,
     topics,
     peopleResult,
-    debateHighlights,
     fellowships,
     opportunitySummary,
   ] = await Promise.all([
@@ -708,7 +653,6 @@ export async function getDiscoverData(
       blockedIds: userContext.blockedIds,
       authorSubscriptionIds: userContext.authorSubscriptionIds,
     }),
-    getDebateHighlights(supabase),
     getFellowships(supabase),
     // Previously awaited on its own line after this Promise.all, which added a
     // whole serial round trip to every Explore render for a query that depends
@@ -734,7 +678,6 @@ export async function getDiscoverData(
     people: peopleResult.people,
     peopleReason: peopleResult.reason,
     activeConversations,
-    debateHighlights,
     fellowships,
     opportunitySummary,
   };

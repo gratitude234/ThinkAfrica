@@ -68,7 +68,6 @@ async function buildWeeklyDigest(admin: AdminClient) {
 
   const [
     { data: topPosts },
-    { data: topDebateRaw },
     { data: openFellowships },
     { data: campusPromptsRaw },
   ] = await Promise.all([
@@ -80,11 +79,6 @@ async function buildWeeklyDigest(admin: AdminClient) {
       .order("view_count", { ascending: false })
       .limit(5),
 
-    admin
-      .from("debates")
-      .select("id, title, status, debate_arguments(count)")
-      .order("created_at", { ascending: false })
-      .limit(10),
 
     admin
       .from("fellowships")
@@ -125,15 +119,6 @@ async function buildWeeklyDigest(admin: AdminClient) {
     profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
   }));
 
-  const topDebate =
-    (topDebateRaw ?? [])
-      .map((debate) => ({
-        ...debate,
-        argCount: Array.isArray(debate.debate_arguments)
-          ? debate.debate_arguments.length
-          : (debate.debate_arguments as { count: number } | null)?.count ?? 0,
-      }))
-      .sort((left, right) => right.argCount - left.argCount)[0] ?? null;
 
   const postItems =
     posts.length > 0
@@ -182,18 +167,6 @@ async function buildWeeklyDigest(admin: AdminClient) {
   const bodyHtml = `
     <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Publications worth reading</h2>
     <ul style="margin:0 0 18px;padding-left:20px;font-size:14px;line-height:1.6;color:#374151;">${postItems}</ul>
-    <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Featured debate</h2>
-    <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#374151;">${
-      topDebate
-        ? `<a href="${escapeHtml(
-            absoluteUrl(`/debates/${topDebate.id}`)
-          )}" style="color:#047857;font-weight:700;text-decoration:none;">${escapeHtml(
-            topDebate.title
-          )}</a><br><span style="color:#6b7280;font-size:13px;">${topDebate.argCount} arguments - ${escapeHtml(
-            topDebate.status
-          )}</span>`
-        : "No debate to feature right now."
-    }</p>
     <h2 style="margin:20px 0 10px;font-size:16px;color:#111827;">Open fellowships</h2>
     <ul style="margin:0 0 18px;padding-left:20px;font-size:14px;line-height:1.6;color:#374151;">${fellowshipItems}</ul>
   `;
@@ -204,10 +177,6 @@ async function buildWeeklyDigest(admin: AdminClient) {
       (post) =>
         `- ${getPostMetadataTitle(post, post.profiles)} (${post.view_count ?? 0} views): ${absoluteUrl(`/post/${post.slug}`)}`
     ),
-    "",
-    topDebate
-      ? `Featured debate: ${topDebate.title} (${topDebate.argCount} arguments): ${absoluteUrl(`/debates/${topDebate.id}`)}`
-      : "Featured debate: No debate to feature right now.",
     "",
     "Open fellowships:",
     ...(openFellowships ?? []).map(
@@ -292,7 +261,7 @@ export async function sendWeeklyDigestEmails() {
       const result = await sendUserEmail({
         recipientId: recipient.id,
         subject: "This week on Indegenius",
-        preview: "New publications, debates, and opportunities from Indegenius.",
+        preview: "New publications and opportunities from Indegenius.",
         title: "This week on Indegenius",
         intro:
           "Here are ideas and conversations worth returning to this week.",

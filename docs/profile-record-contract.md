@@ -33,7 +33,7 @@ complete publication history.
 
 `Publications` counts original published work by the profile owner plus
 published work for which they are an accepted co-author. It includes enabled
-Research. It excludes responses and debate arguments.
+Research. It excludes responses.
 
 `Source-backed` and `Citable` are subsets of Publications:
 
@@ -65,7 +65,6 @@ Application surfaces use only these neutral kinds:
 
 - `publication`
 - `response`
-- `debate`
 - `research`
 
 A publication title changes its presentation, not its kind or value. Titled
@@ -130,7 +129,7 @@ caption slot, so one-, two- and three-card layouts stay balanced.
 
 The record route accepts:
 
-- `type=all|publications|responses|debates|research`
+- `type=all|publications|responses|research`
 - `quality=all|source_backed|citable`
 - `page=<positive integer>`
 

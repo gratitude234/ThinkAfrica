@@ -41,10 +41,16 @@ describe("author subscription SQL release candidate", () => {
     // because the next migration to touch this constraint will be copied from a
     // file. Spot-check the oldest and newest deployed types.
     expect(sql).toContain("'like', 'comment', 'follow'");
-    expect(sql).toContain("'debate_phase_advanced', 'debate_cancelled'");
     expect(sql).toContain(
       "'author_published', 'author_subscribed', 'topic_published'"
     );
+  });
+
+  it("names no Debate type, which 20260906000004 removed from the constraint", () => {
+    // Restating them here would put them straight back the moment this
+    // candidate is promoted, which is the one way a removed notification type
+    // comes back to life.
+    expect(sql).not.toMatch(/'debate[a-z0-9_]*'/);
   });
 
   it("reports whether a subscription row was actually created", () => {

@@ -5,7 +5,7 @@ describe("shouldShowMobilePrimaryNav", () => {
   it.each([
     ["/", true],
     ["/explore", true],
-    ["/debates/live-room", true],
+
     ["/messages", true],
     ["/me", true],
     ["/writer", true],
@@ -46,10 +46,7 @@ describe("shouldShowDesktopRail", () => {
     ["/stats", true],
     // The /-boundary match is load-bearing: /submitted is not under /submit.
     ["/submitted", true],
-    // The debates list is a browse surface; rooms and the create flow are not.
-    ["/debates", true],
-    ["/debates/live-room", false],
-    ["/debates/create", false],
+
     // Layouts that already own the full content width.
     ["/post/a-published-piece", false],
     ["/messages", false],

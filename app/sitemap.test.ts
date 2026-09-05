@@ -58,7 +58,7 @@ describe("sitemap", () => {
 
   it("gives up on queries that never settle instead of hanging the render", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    createAdminClient.mockReturnValue(client({ posts: never, profiles: never, debates: never }));
+    createAdminClient.mockReturnValue(client({ posts: never, profiles: never }));
 
     const started = Date.now();
     const entries = await (await loadSitemap())();
@@ -86,7 +86,6 @@ describe("sitemap", () => {
             },
           ]),
         profiles: () => Promise.resolve({ data: null, error: { message: "boom" } }),
-        debates: () => rows([{ id: "debate-1", created_at: "2026-01-01T00:00:00Z", ends_at: null }]),
       })
     );
 
@@ -94,7 +93,7 @@ describe("sitemap", () => {
     const urls = entries.map((entry) => entry.url);
 
     expect(urls.some((url) => url.endsWith("/post/african-energy"))).toBe(true);
-    expect(urls.some((url) => url.endsWith("/debates/debate-1"))).toBe(true);
+    expect(urls.some((url) => url.includes("/undefined"))).toBe(false);
   });
 
   it("drops low-quality titles but keeps titleless lightweight posts", async () => {

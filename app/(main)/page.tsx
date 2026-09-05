@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { DebateInterludeData } from "@/components/post/DebateInterlude";
 import FeedSkeleton from "@/components/post/FeedSkeleton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
 import PushPromptBanner from "@/components/push/PushPromptBanner";
@@ -21,10 +20,8 @@ import {
 } from "@/lib/blocking";
 import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
 import {
-  getActiveDebate,
   getEngagementCounts,
   getFeaturedPostCandidates,
-  toDebateInterludeData,
   uniqueFeaturedPosts,
   type FeaturedPostRow as FeaturedPostRaw,
 } from "@/lib/dailyBrief";
@@ -171,7 +168,6 @@ export default async function HomePage({ searchParams }: PageProps) {
   const [
     { data: profileData },
     { data: followedUsers },
-    hotDebateResult,
     { data: recentDraft },
     featuredCandidates,
     { data: topicSubscriptions },
@@ -196,8 +192,6 @@ export default async function HomePage({ searchParams }: PageProps) {
           .select("following_id")
           .eq("follower_id", user.id)
       : Promise.resolve({ data: [], error: null }),
-
-    getActiveDebate(supabase),
 
     user
       ? supabase
@@ -272,7 +266,6 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   const { manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult } =
     featuredCandidates;
-  const hotDebateRaw = hotDebateResult.data;
 
   logHomeQueryError("manual featured post", manualFeaturedResult.error);
   logHomeQueryError(
@@ -291,8 +284,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     (row: { author_id: string }) => row.author_id
   );
   const followCount = followedIds.length;
-
-  const homeDebate: DebateInterludeData | null = toDebateInterludeData(hotDebateRaw);
 
   const manualFeaturedRaw =
     (manualFeaturedResult.data as FeaturedPostRaw | null) ?? null;
@@ -502,7 +493,6 @@ export default async function HomePage({ searchParams }: PageProps) {
               showFollowingEligible={showFollowingEligible}
               showTopicsEligible={showTopicsEligible}
               showSubscriptionsEligible={showSubscriptionsEligible}
-              activeDebate={homeDebate}
               peopleSuggestions={peopleResult.suggestions}
               peopleSuggestionReason={peopleResult.reason}
               prioritizePeopleSuggestions={followCount < 3}
@@ -511,8 +501,8 @@ export default async function HomePage({ searchParams }: PageProps) {
           </Suspense>
         </div>
 
-        {/* This column can stack five cards (draft or activation, featured
-            today, debate, people, topics), which runs past 800px -- taller
+        {/* This column can stack four cards (draft or activation, featured
+            today, people, topics), which runs past 800px -- taller
             than the ~700px of usable height on a 1366x768 laptop. It used to
             cap its height and scroll inside itself, which made the lower cards
             reachable but not findable: a second gesture, on a region whose
@@ -523,7 +513,6 @@ export default async function HomePage({ searchParams }: PageProps) {
             than its first against the nav. See the comment there. */}
         <BriefColumn>
           <HomeSidebar
-            activeDebate={homeDebate}
             recentDraft={recentDraft ?? null}
             activationState={activationState}
             featuredToday={featuredTodayPost}

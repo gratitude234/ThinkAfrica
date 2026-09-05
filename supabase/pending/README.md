@@ -4,10 +4,10 @@ Files in this directory are reviewed SQL release candidates, not executable
 Supabase migrations. Supabase CLI does not include this directory in `db push`.
 
 `author_subscriptions_publication_delivery_v1.sql` must not be copied into
-`supabase/migrations/` until every staging and production probe in
-`docs/debate-deployment-state.md` is recorded. In particular, the deployed
-migration ledger and the complete live `notifications_type_check` definition
-must be known before assigning the migration timestamp.
+`supabase/migrations/` until the deployed migration ledger and the complete
+live `notifications_type_check` definition are known, because it restates that
+constraint in full. `20260906000004_remove_debate_schema` narrowed it, so
+re-probe the live definition rather than trusting any list written earlier.
 
 `topic_subscriptions_v1.sql` is a separate extension and must receive a later
 timestamp. Do not promote it until the author-subscription candidate has been
@@ -16,8 +16,7 @@ keys, but never profile interests, subscriptions, publication events, or
 deliveries.
 
 `ai_topic_suggestions_v1.sql` is independent of subscription delivery and may
-be promoted before Topic Subscriptions once the Debate migration ledger is
-resolved. It adds only separated Research keywords and a private daily Gemini
+be promoted before Topic Subscriptions once the migration ledger is resolved. It adds only separated Research keywords and a private daily Gemini
 quota; it never rewrites published Research tags or stores draft content.
 
 `profile_private_projection_contract.sql` is the CONTRACT half of the Phase 0

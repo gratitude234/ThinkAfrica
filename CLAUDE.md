@@ -29,7 +29,6 @@ Optional:
 - `ADMIN_SECRET`: Protects internal API routes
 - `RESEND_API_KEY`: Email service
 - `ANTHROPIC_API_KEY`: Claude API for audio summaries (`/api/audio-summary`)
-- `GEMINI_API_KEY`: Gemini API for debate recaps (`/api/debate-recap`)
 - `GEMINI_RECAP_MODEL`: Optional Gemini recap model override; defaults to `gemini-3.6-flash`
 - `GEMINI_TOPIC_MODEL`: Optional Gemini topic-classification model override; defaults to `gemini-3.6-flash`
 - `NEXT_PUBLIC_AI_TOPIC_SUGGESTIONS_ENABLED`: Set to `1` only after the AI topic pending migration is applied and verified
@@ -41,7 +40,6 @@ Optional:
 - `GOOGLE_TTS_API_KEY`: Text-to-speech
 - `CRON_SECRET`: Authenticates Vercel Cron requests to `/api/cron/*` routes (Vercel sends it automatically as `Authorization: Bearer <value>` when set)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_MAILTO`: Web push (VAPID keypair + contact address for `lib/push.ts`)
-- `DEBATE_V2_ACTIVATION_ENABLED`: Set to `1` to expose the moderator-facing "convert to Debate V2" control and allow `activate_debate_v2` to run. Off by default until staging concurrency/grant verification and cron scheduling for round auto-advancement are confirmed (see `docs/debate-v2-phase2-lifecycle.md`).
 
 ## Architecture Overview
 
@@ -65,7 +63,6 @@ app/
 │   ├── dashboard/   # User dashboard
 │   ├── settings/    # User settings
 │   ├── admin/       # Review queue, analytics, fellowships, partners, sponsors, ambassadors, digest, verification
-│   ├── debates/     # Debate platform (guarded by FEATURE_FLAGS.debates)
 │   ├── messages/[id]/  # Direct messaging
 │   ├── discover/    # Explore interface
 │   ├── search/      # Full-text search
@@ -87,7 +84,6 @@ API routes (`app/api/`):
 | `POST /api/research-document/upload` | PDF/document upload |
 | `GET /api/research-document/[postId]` | Retrieve research document |
 | `POST /api/audio-summary` | Claude API audio synthesis |
-| `POST /api/debate-recap` | Generate debate summary |
 | `GET /api/cron/resend-segment-sync` | Nightly recipient sync and broadcast reconciliation |
 | `POST /api/webhooks/resend` | Broadcast delivery counts and unsubscribe mirroring |
 | `POST /api/activation` | Track activation/onboarding events |
@@ -104,7 +100,7 @@ The feed is driven by `lib/feedData.ts` (`fetchFeedPage()`) with tab/timeframe/t
 
 ### Authentication & Authorization
 
-`proxy.ts` (the middleware) creates a Supabase SSR client, refreshes auth cookies, and redirects unauthenticated users away from protected routes: `/write`, `/admin/*`, `/debates/create`, `/onboarding`, `/stats`, `/dashboard`, `/settings`, `/bookmarks`, `/notifications`, `/edit/*`.
+`proxy.ts` (the middleware) creates a Supabase SSR client, refreshes auth cookies, and redirects unauthenticated users away from protected routes: `/write`, `/admin/*`, `/onboarding`, `/stats`, `/dashboard`, `/settings`, `/bookmarks`, `/notifications`, `/edit/*`.
 
 Role system (`lib/roles.ts`):
 - Roles: `student` | `reviewer` | `editor` | `admin`
@@ -124,11 +120,10 @@ Post type minimum word counts: blog (50), essay (500), policy_brief (400), resea
 | File | Purpose |
 |------|---------|
 | `lib/types.ts` | Shared TypeScript interfaces: `PostStatus`, `PostType`, `AppRole`, `ReviewRecommendation`, `EditorDecision` |
-| `lib/featureFlags.ts` | Feature gates: `debates: true`, `fellowshipsSection/ambassadors/talentMarketplace: false` |
+| `lib/featureFlags.ts` | Feature gates: `research/fellowshipsSection/ambassadors/talentMarketplace: false` |
 | `lib/sanitizePostHtml.ts` | HTML sanitization before DB writes |
 | `lib/activation.ts` / `lib/activationServer.ts` | Onboarding/activation tracking |
 | `lib/roles.ts` | Permission helpers |
-| `lib/debatePhases.ts` | Debate state machine |
 | `lib/opportunityMatch.ts` | Fellowship recommendation matching |
 | `lib/citationId.ts` | Citation ID generation for publications |
 
@@ -170,7 +165,7 @@ than the toolbar currently exposes.
 - Loading states use `loading.tsx` skeleton files (Suspense boundaries).
 - Custom brand colors in `tailwind.config.ts` are deep and low-chroma, not the bright Tailwind defaults: `emerald-brand` (#073929), `gold` (#CE932B), `gold-ink` (#8A5D1E), `purple-accent` (#391A60), with `green-tint`/`gold-tint`/`purple-tint` and `green-wash`/`green-wash-border` as their surfaces. Neutrals are `canvas` (#FAF8F5), `surface`, `ink`, `ink-muted`. Use these rather than raw Tailwind color classes, and read the config rather than this list when exact values matter.
 - Fonts: Inter (body, `font-sans`) and Bodoni Moda (headlines, `font-display`), both loaded in the root layout via `next/font/google`.
-- Nav visibility for feature-flagged sections (debates, fellowships, ambassadors, talent) is controlled exclusively via `lib/featureFlags.ts`.
+- Nav visibility for feature-flagged sections (fellowships, ambassadors, talent) is controlled exclusively via `lib/featureFlags.ts`.
 
 ### Product Voice
 
@@ -194,7 +189,7 @@ into the next string someone writes.
 
 ### Database
 
-Key tables: `profiles`, `posts`, `post_versions`, `post_authors` (co-authors), `post_references`, `post_likes`, `post_comments`, `post_reviews`, `post_editor_decisions`, `post_edit_drafts`, `post_draft_shares`, `post_revisions`, `debates`, `debate_rounds`, `debate_arguments`, `follows`, `messages`, `notifications`, `badges`, `user_badges`, `opportunities`, `opportunity_applications`, `ambassador_applications`, `editor_assignments`.
+Key tables: `profiles`, `posts`, `post_versions`, `post_authors` (co-authors), `post_references`, `post_likes`, `post_comments`, `post_reviews`, `post_editor_decisions`, `post_edit_drafts`, `post_draft_shares`, `post_revisions`, `follows`, `messages`, `notifications`, `badges`, `user_badges`, `opportunities`, `opportunity_applications`, `ambassador_applications`, `editor_assignments`.
 
 Two draft-only tables back the composer and are separate from the editorial
 workflow. `post_draft_shares` holds one unlisted read token per draft, revoked
@@ -233,9 +228,33 @@ address on it. Three rules the code depends on:
   never in the earlier derived-state upsert: the push queue is the difference
   between those two, so writing the desired set early erases the evidence and a
   failed push then looks permanently synced.
-- Delivery counters move only through `record_broadcast_delivery_event()`, which
-  writes to `broadcast_delivery_events` first and increments only when that
-  write was new. Resend retries webhooks, so replay is the normal case.
+- Delivery counters move only through `record_broadcast_delivery_outcome()`,
+  which writes to `broadcast_delivery_events` first and increments only when
+  that write was new. Resend retries webhooks, so replay is the normal case.
+  There are three mutually exclusive buckets, `delivered_count`,
+  `suppressed_count` and `failed_count`, and at most one event per `email_id`
+  ever counts. Suppression is never a failure: Resend declined to attempt the
+  address, nothing bounced. Pending is derived, never stored.
+- A campaign is finished when Resend's broadcast says `sent`, not when the
+  buckets add up. `mark_broadcast_provider_sent()` is the only transition to
+  `sent`, called by `reconcileStuckBroadcasts()` and by the detail page on
+  view. Recipient outcomes keep arriving and keep counting afterwards.
+- Two different rows carrying the same campaign are one campaign.
+  `claim_broadcast_for_campaign()` takes an advisory lock on the fingerprint
+  from `lib/broadcastFingerprint.ts` (normalised subject, body text and
+  audience identity, deliberately *not* the sender), checks for an equivalent
+  irreversible broadcast inside a 24-hour window, and only then runs the
+  per-row claim. Doing the check from the application before calling a claim
+  that does not know about it is what let two of them out two minutes apart.
+  The override skips only the duplicate question.
+- After a send, equivalent editable drafts become `superseded`: kept, readable,
+  linked to what replaced them, and not sendable. Nothing is deleted.
+- `broadcast_contacts.suppressed_at` is deliverability and is kept strictly
+  apart from `email_announcements`, which is consent. A suppression never
+  touches `notification_prefs`. It is keyed to `suppressed_email`, so a member
+  who changes address is deliverable again with no manual step; otherwise
+  clearing is explicit via `clear_broadcast_suppression()`, because
+  `resend@6.12.3` exposes no suppression-list API to consult.
 - `email_announcements` is the opt-out category, separate from `email_digest`.
   Resend owns the unsubscribe link, so an opt-out arrives from Resend and is
   mirrored inward; only the member turning the switch back on in settings

@@ -19,7 +19,7 @@ import { resendSignupConfirmationEmail } from "../accountEmailActions";
 
 const PROOF_ITEMS = [
   "Return to drafts and saved reading",
-  "Keep debates and replies in context",
+  "Keep responses and replies in context",
   "Keep building your Intellectual Record",
 ];
 

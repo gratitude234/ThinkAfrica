@@ -130,12 +130,11 @@ describe("delivery counting", () => {
     const response = await POST(request(deliveredEvent()));
 
     expect(response.status).toBe(200);
-    expect(rpcMock).toHaveBeenCalledWith("record_broadcast_delivery_event", {
+    expect(rpcMock).toHaveBeenCalledWith("record_broadcast_delivery_outcome", {
       p_resend_broadcast_id: "resend-bc-1",
       p_email_id: "email_1",
       p_event_type: "email.delivered",
-      p_delivered: 1,
-      p_failed: 0,
+      p_outcome: "delivered",
     });
   });
 
@@ -173,10 +172,60 @@ describe("delivery counting", () => {
 
     await POST(request(bounced));
 
-    expect(rpcMock.mock.calls[0][1]).toMatchObject({
-      p_delivered: 0,
-      p_failed: 1,
+    expect(rpcMock.mock.calls[0][1]).toMatchObject({ p_outcome: "failed" });
+  });
+
+  it("records a suppression as its own outcome, not as a failure", async () => {
+    // The first production broadcast had 253 recipients, 222 delivered and 24
+    // suppressed. Counting the 24 as bounces said there was a delivery problem
+    // when Resend had simply declined to attempt addresses already on its
+    // suppression list.
+    const suppressed = {
+      ...deliveredEvent(),
+      type: "email.suppressed",
+      data: {
+        ...deliveredEvent().data,
+        to: ["member@indegenius.africa"],
+        suppressed: { type: "hard_bounce", message: "Previously bounced." },
+      },
+    };
+    verifyMock.mockReturnValue(suppressed);
+
+    await POST(request(suppressed));
+
+    const outcomeCall = rpcMock.mock.calls.find(
+      (call) => call[0] === "record_broadcast_delivery_outcome"
+    );
+    expect(outcomeCall?.[1]).toMatchObject({ p_outcome: "suppressed" });
+  });
+
+  it("persists the suppression against the address, leaving preferences alone", async () => {
+    // A suppression is deliverability, not consent. Writing it into
+    // notification_prefs would put words in the member's mouth and would leave
+    // nothing able to tell a preference they set from one invented for them.
+    const suppressed = {
+      ...deliveredEvent(),
+      type: "email.suppressed",
+      data: {
+        ...deliveredEvent().data,
+        to: ["Member@Indegenius.Africa"],
+        suppressed: { type: "hard_bounce", message: "Previously bounced." },
+      },
+    };
+    verifyMock.mockReturnValue(suppressed);
+
+    await POST(request(suppressed));
+
+    expect(rpcMock).toHaveBeenCalledWith("record_broadcast_suppression", {
+      p_email: "member@indegenius.africa",
+      p_reason: "hard_bounce: Previously bounced.",
     });
+    expect(
+      rpcMock.mock.calls.some((call) => call[0] === "mirror_broadcast_unsubscribe")
+    ).toBe(false);
+    expect(
+      rpcMock.mock.calls.some((call) => call[0] === "set_notification_preference")
+    ).toBe(false);
   });
 
   it("ignores transactional email, which carries no broadcast id", async () => {

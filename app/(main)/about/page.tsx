@@ -69,7 +69,7 @@ const GAPS = [
   {
     number: "02",
     title: "Contribution stays fragmented",
-    body: "Young people who engage seriously with ideas lack one place to publish, debate, collaborate, and build a durable record across communities.",
+    body: "Young people who engage seriously with ideas lack one place to publish, respond, collaborate, and build a durable record across communities.",
     tag: "Platform gap",
     accent: "bg-purple-accent",
     tagClass: "bg-purple-400/15 text-purple-200",
@@ -109,7 +109,7 @@ const TEAM_MEMBERS: TeamMember[] = [
       "Law student and Co-Founder, driven by the belief that Africa's young thinkers have ideas worth hearing, publishing, debating, and acting on. Responsible for building Indegenius's credibility infrastructure across institutions.",
     fullBio: [
       "Malik sees Indegenius as more than an app: a movement for young thinkers, intellectual growth, and Pan-African impact.",
-      "He is helping build a place where young thinkers can connect across communities, challenge ideas through debates, and produce research that can influence institutions, communities, and public policy.",
+      "He is helping build a place where young thinkers can connect across communities, challenge ideas through published responses, and produce research that can influence institutions, communities, and public policy.",
       "His commitment is rooted in the belief that Africa's future will be shaped by the quality of ideas its young people are allowed to express, test, and refine.",
     ],
   },
@@ -119,10 +119,10 @@ const TEAM_MEMBERS: TeamMember[] = [
     image: "/team/olanibi-gratitude.jpeg",
     badgeClass: "bg-amber-50 text-amber-700",
     shortBio:
-      "Self-taught full-stack developer building Indegenius from the ground up while studying at JABU, Nigeria. Ships editorial-review workflows, debate mechanics, AI audio summaries, and low-bandwidth modes.",
+      "Self-taught full-stack developer building Indegenius from the ground up while studying at JABU, Nigeria. Ships editorial-review workflows, publishing mechanics, AI audio summaries, and low-bandwidth modes.",
     fullBio: [
       "His vision for Indegenius has always been technical as much as intellectual: a platform that began in African university communities can offer young people the credibility, depth, and design quality their serious work deserves.",
-      "He has independently architected and shipped the platform's core systems, from editorial-review workflows and debate mechanics to AI-powered audio summaries, low-bandwidth modes, and WhatsApp-native sharing.",
+      "He has independently architected and shipped the platform's core systems, from editorial-review workflows and publishing mechanics to AI-powered audio summaries, low-bandwidth modes, and WhatsApp-native sharing.",
       "For Gratitude, Indegenius is proof that the best technology is built by people who live closest to the problem.",
     ],
   },
@@ -396,7 +396,7 @@ export default function AboutPage() {
             </h2>
             <p className="mx-auto mt-4 max-w-[460px] text-[15px] leading-[1.7] text-white/60">
               Join people who take ideas seriously. Read, publish, respond,
-              debate, and build a record that grows with you. Free to join.
+              respond, and build a record that grows with you. Free to join.
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3">
               <Link

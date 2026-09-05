@@ -173,7 +173,18 @@ export async function sendBroadcastTest(input: {
   }
 }
 
-export async function dispatchBroadcast(broadcastId: string) {
+/**
+ * `overrideDuplicate` is the intentional-resend path, and it is deliberately
+ * not a button the normal flow can reach. Review and send never sets it: the
+ * admin has to be shown the campaign that already went out, and acknowledge in
+ * as many words that they mean to send substantially the same thing again.
+ * Overriding skips only the duplicate check; every per-row guard still holds,
+ * so it can never send one broadcast twice.
+ */
+export async function dispatchBroadcast(
+  broadcastId: string,
+  options: { overrideDuplicate?: boolean } = {}
+) {
   try {
     const row = await loadSendRow(broadcastId);
     if (!row) return failure("Broadcast not found.");
@@ -186,11 +197,29 @@ export async function dispatchBroadcast(broadcastId: string) {
     const result = await sendBroadcast(
       broadcastId,
       context.userId,
-      createSendDeps()
+      createSendDeps(),
+      { overrideDuplicate: options.overrideDuplicate === true }
     );
 
     if (!result.ok) {
+      if (result.reason === "duplicate_campaign") {
+        return {
+          ok: false as const,
+          error: result.message,
+          duplicate: result.duplicate ?? null,
+        };
+      }
       return failure(result.message);
+    }
+
+    if (result.outcome === "dispatched" && options.overrideDuplicate) {
+      await recordAdminAuditEvent({
+        action: "broadcast_duplicate_override",
+        targetTable: "broadcasts",
+        targetId: broadcastId,
+        metadata: { sender_key: row.senderKey, audience_key: row.audienceKey },
+        context,
+      });
     }
 
     if (result.outcome === "dispatched") {

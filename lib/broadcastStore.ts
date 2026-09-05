@@ -15,11 +15,16 @@ import {
   MAX_SELECTED_RECIPIENTS,
   isSegmentStale,
   type BroadcastSendRow,
+  type ClaimOutcome,
   type ProviderBroadcastStatus,
   type SegmentResolution,
   type SendBroadcastDeps,
   type SendPrecondition,
 } from "@/lib/broadcastSend";
+import {
+  DUPLICATE_CAMPAIGN_WINDOW_HOURS,
+  campaignFingerprint,
+} from "@/lib/broadcastFingerprint";
 import { isResendDefinitiveRejection } from "@/lib/resendClient";
 import {
   createResendBroadcast,
@@ -53,8 +58,12 @@ type BroadcastRowDb = {
   dispatch_started_at: string | null;
   recipient_count: number;
   delivered_count: number;
+  suppressed_count: number | null;
   failed_count: number;
   status_note: string | null;
+  campaign_fingerprint: string | null;
+  superseded_by: string | null;
+  superseded_at: string | null;
   created_by: string | null;
   sent_by: string | null;
   sent_at: string | null;
@@ -62,8 +71,18 @@ type BroadcastRowDb = {
   updated_at: string;
 };
 
+/** The shape claim_broadcast_for_campaign answers with. */
+type ClaimRowDb = {
+  outcome: "claimed" | "duplicate" | "unclaimable";
+  duplicate_broadcast_id: string | null;
+  duplicate_subject: string | null;
+  duplicate_status: string | null;
+  duplicate_sent_at: string | null;
+  broadcast: BroadcastRowDb | null;
+};
+
 const BROADCAST_COLUMNS =
-  "id, subject, preview_text, body_html, sender_key, audience_key, selected_profile_ids, selected_segment_id, status, resend_broadcast_id, dispatch_started_at, recipient_count, delivered_count, failed_count, status_note, created_by, sent_by, sent_at, created_at, updated_at";
+  "id, subject, preview_text, body_html, sender_key, audience_key, selected_profile_ids, selected_segment_id, status, resend_broadcast_id, dispatch_started_at, recipient_count, delivered_count, suppressed_count, failed_count, status_note, campaign_fingerprint, superseded_by, superseded_at, created_by, sent_by, sent_at, created_at, updated_at";
 
 function daysAgoIso(days: number) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -103,12 +122,14 @@ export function toBroadcastRecord(
     sentAt: row.sent_at,
     updatedAt: row.updated_at,
     delivered: row.delivered_count,
+    suppressed: row.suppressed_count ?? 0,
     failed: row.failed_count,
     sentBy:
       senderNameById.get(row.sent_by ?? "") ??
       senderNameById.get(row.created_by ?? "") ??
       "Indegenius",
     statusNote: row.status_note ?? undefined,
+    supersededBy: row.superseded_by ?? undefined,
   };
 }
 
@@ -243,6 +264,25 @@ export async function saveDraft(
   return (data ?? []).length > 0 ? "saved" : "locked";
 }
 
+/**
+ * Eligible means the same thing here as it does in the sync: opted in, valid
+ * address, account in good standing, and deliverable.
+ *
+ * is_eligible is the sync's stored answer and already carries the first three.
+ * Deliverability is checked again rather than left to it, because a
+ * suppression arrives on a webhook between syncs and the number an admin reads
+ * before pressing send should not be a day out of date. Showing 253 while
+ * knowing 24 of them will not be attempted is the kind of number that gets
+ * quoted in a meeting.
+ */
+function eligibleContacts(admin: AdminClient) {
+  return admin
+    .from("broadcast_contacts")
+    .select("profile_id", { count: "exact", head: true })
+    .eq("is_eligible", true)
+    .is("suppressed_at", null);
+}
+
 export async function countAudience(
   audienceKey: BroadcastAudienceKey,
   selectedProfileIds: readonly string[] = []
@@ -251,19 +291,15 @@ export async function countAudience(
 
   if (audienceKey === "selected") {
     if (selectedProfileIds.length === 0) return 0;
-    const { count, error } = await admin
-      .from("broadcast_contacts")
-      .select("profile_id", { count: "exact", head: true })
-      .eq("is_eligible", true)
-      .in("profile_id", selectedProfileIds as string[]);
+    const { count, error } = await eligibleContacts(admin).in(
+      "profile_id",
+      selectedProfileIds as string[]
+    );
     if (error) throw new Error(error.message);
     return count ?? 0;
   }
 
-  let query = admin
-    .from("broadcast_contacts")
-    .select("profile_id", { count: "exact", head: true })
-    .eq("is_eligible", true);
+  let query = eligibleContacts(admin);
 
   if (audienceKey === "active") {
     query = query.gte("last_activity_at", daysAgoIso(ACTIVE_WINDOW_DAYS));
@@ -316,6 +352,7 @@ export async function listSelectableRecipients(
       "profile_id, published_count, is_verified, profiles!broadcast_contacts_profile_id_fkey(full_name, username)"
     )
     .eq("is_eligible", true)
+    .is("suppressed_at", null)
     .order("published_count", { ascending: false })
     .limit(Math.min(limit, MAX_SELECTED_RECIPIENTS));
 
@@ -458,6 +495,9 @@ async function resolveSelectedSegment(
     .from("broadcast_contacts")
     .select("email")
     .eq("is_eligible", true)
+    // A suppressed address is never pushed into a send segment, hand-picked
+    // or not. Naming somebody by hand cannot make them deliverable.
+    .is("suppressed_at", null)
     .in("profile_id", row.selectedProfileIds);
 
   if (error) throw new Error(error.message);
@@ -522,23 +562,122 @@ export async function resolveSendSegment(
 }
 
 /**
- * The claim is a single statement in Postgres, behind claim_broadcast_for_send,
- * so two racing callers cannot both win it and a row that has ever been
- * dispatched can never be claimed again.
+ * The claim, and with it the duplicate question.
+ *
+ * claim_broadcast_for_campaign takes an advisory lock on the fingerprint,
+ * looks for an equivalent campaign that is already irreversible, and only then
+ * runs the same conditional update the old claim ran. Two tabs racing the same
+ * campaign serialise on that lock: the second one wakes to find the first
+ * one's row sitting in 'queued' and is refused. Asking the question from here,
+ * before calling a claim that does not know about it, is exactly the shape
+ * that lets both through.
  */
-export async function claimForSend(
-  id: string,
-  actorId: string
-): Promise<BroadcastSendRow | null> {
+export async function claimForCampaign(input: {
+  id: string;
+  actorId: string;
+  fingerprint: string;
+  windowHours: number;
+  override: boolean;
+}): Promise<ClaimOutcome> {
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("claim_broadcast_for_send", {
-    p_broadcast_id: id,
-    p_actor_id: actorId,
+  const { data, error } = await admin.rpc("claim_broadcast_for_campaign", {
+    p_broadcast_id: input.id,
+    p_actor_id: input.actorId,
+    p_fingerprint: input.fingerprint,
+    p_window_hours: input.windowHours,
+    p_override: input.override,
   });
 
   if (error) throw new Error(error.message);
-  const rows = (data ?? []) as BroadcastRowDb[];
-  return rows.length > 0 ? toSendRow(rows[0]) : null;
+
+  const rows = (data ?? []) as ClaimRowDb[];
+  const row = rows[0];
+  if (!row) return { outcome: "unclaimable" };
+
+  if (row.outcome === "duplicate") {
+    return {
+      outcome: "duplicate",
+      duplicate: {
+        broadcastId: row.duplicate_broadcast_id ?? "",
+        subject: row.duplicate_subject ?? "",
+        status: (row.duplicate_status ?? "sent") as BroadcastStatus,
+        sentAt: row.duplicate_sent_at,
+      },
+    };
+  }
+
+  if (row.outcome === "claimed" && row.broadcast) {
+    return { outcome: "claimed", row: toSendRow(row.broadcast) };
+  }
+
+  return { outcome: "unclaimable" };
+}
+
+/**
+ * Editable drafts that carry the same campaign as the one just sent.
+ *
+ * Matched in the application rather than in SQL because a draft written before
+ * fingerprints existed carries none, and the only way to know whether it is
+ * equivalent is to normalise it the way the sender did. The list is capped: a
+ * cleanup pass is not worth walking an unbounded table for.
+ */
+export async function findEquivalentDraftIds(input: {
+  fingerprint: string;
+  excludeId: string;
+  limit?: number;
+}): Promise<string[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("broadcasts")
+    .select("id, subject, body_html, audience_key, selected_profile_ids")
+    .in("status", ["draft", "failed"])
+    .is("dispatch_started_at", null)
+    .neq("id", input.excludeId)
+    .order("updated_at", { ascending: false })
+    .limit(input.limit ?? 200);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? [])
+    .filter(
+      (row) =>
+        campaignFingerprint({
+          subject: row.subject as string,
+          bodyHtml: row.body_html as string,
+          audienceKey: row.audience_key as BroadcastAudienceKey,
+          selectedProfileIds: (row.selected_profile_ids ?? []) as string[],
+        }) === input.fingerprint
+    )
+    .map((row) => row.id as string);
+}
+
+/**
+ * Moves those drafts to 'superseded'. Nothing is deleted and nothing sent is
+ * touched: the statement's own guard only matches an editable, never
+ * dispatched row that is not the one which just sent.
+ */
+export async function supersedeEquivalentDrafts(input: {
+  sentBroadcastId: string;
+  fingerprint: string;
+}): Promise<string[]> {
+  const ids = await findEquivalentDraftIds({
+    fingerprint: input.fingerprint,
+    excludeId: input.sentBroadcastId,
+  });
+
+  if (ids.length === 0) return [];
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("supersede_broadcast_drafts", {
+    p_broadcast_ids: ids,
+    p_superseded_by: input.sentBroadcastId,
+    p_fingerprint: input.fingerprint,
+  });
+
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as { id?: string }[] | string[]).map((row) =>
+    typeof row === "string" ? row : (row.id ?? "")
+  );
 }
 
 export async function attachResendBroadcastId(
@@ -723,13 +862,68 @@ export function buildBroadcastEmail(row: BroadcastSendRow) {
   };
 }
 
+/**
+ * Finalises a campaign against the provider's own view of it.
+ *
+ * Resend's broadcast status is the campaign's status: 'sent' there means the
+ * provider finished dispatching, which is a fact about the campaign and not
+ * about any one recipient. Recipient outcomes go on arriving afterwards and
+ * are counted afterwards. Waiting for delivered + failed to reach the
+ * recipient count is what left two finished campaigns saying "Sending"
+ * forever, because 24 suppressed messages are never going to be delivered and
+ * were never going to fail either.
+ */
+export async function settleAgainstProvider(
+  row: BroadcastSendRow
+): Promise<BroadcastStatus | null> {
+  if (!row.resendBroadcastId) return null;
+  if (row.status !== "queued" && row.status !== "sending" && row.status !== "failed") {
+    return null;
+  }
+
+  const remote = await getResendBroadcast(row.resendBroadcastId);
+  if (!remote || remote.status !== "sent") return null;
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("mark_broadcast_provider_sent", {
+    p_broadcast_id: row.id,
+    p_resend_broadcast_id: row.resendBroadcastId,
+    p_sent_at: remote.sent_at ?? null,
+  });
+
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown[]).length > 0 ? "sent" : null;
+}
+
+/**
+ * The same finalisation, run when an admin opens a broadcast that has not
+ * settled. Reconciliation is nightly, and a campaign that finished an hour ago
+ * should not have to wait until morning to say so on the one screen somebody
+ * is actually looking at. One provider call, on a page that already talks to
+ * the server, and it is a no-op for anything already terminal.
+ */
+export async function settleBroadcastOnView(id: string) {
+  const row = await loadSendRow(id);
+  if (!row) return null;
+  try {
+    return await settleAgainstProvider(row);
+  } catch {
+    // A provider that cannot be reached must not stop the page rendering. The
+    // nightly reconciler will settle it.
+    return null;
+  }
+}
+
 /** The production wiring of the send state machine. */
 export function createSendDeps(): SendBroadcastDeps {
   return {
     loadBroadcast: loadSendRow,
     checkSendPrecondition,
     resolveSendSegment,
-    claimForSend: (id, actorId) => claimForSend(id, actorId),
+    claimForCampaign,
+    fingerprint: campaignFingerprint,
+    duplicateWindowHours: DUPLICATE_CAMPAIGN_WINDOW_HOURS,
+    supersedeEquivalentDrafts,
     attachResendBroadcastId,
     markDispatchStarted,
     markSending,
@@ -767,7 +961,7 @@ export const PROVIDER_DRAFT_RELEASE_NOTE =
 export type ReconcileReason =
   | "released_provider_draft"
   | "release_matched_nothing"
-  | "marked_sending"
+  | "marked_sent"
   | "provider_queued"
   | "provider_sent_already_recorded"
   | "provider_unreadable"
@@ -796,9 +990,10 @@ export function settledBroadcasts(outcomes: readonly ReconcileOutcome[]) {
  * guessing, so both are resolved by asking, and a row that has never been
  * dispatched is simply released back to draft.
  *
- * Resend's own broadcast status is draft, queued or sent. It never says
- * "sending", so a sent broadcast whose per message webhooks are still arriving
- * is left as sending here and finished by the webhook's own completion check.
+ * Resend's own broadcast status is draft, queued or sent, and "sent" is the
+ * end of the campaign whatever the individual messages are still doing. A
+ * broadcast whose per-message webhooks are still arriving is marked sent here
+ * and goes on counting outcomes afterwards.
  *
  * "draft" at Resend is the definite answer that nothing was accepted and
  * nobody was emailed, so the dispatch stamp comes off and the broadcast goes
@@ -876,37 +1071,30 @@ export async function reconcileStuckBroadcasts(
       continue;
     }
 
-    if (providerStatus === "sent" && row.status !== "sent") {
-      // Resend accepted and dispatched it. Delivery counts keep arriving over
-      // the webhook; the status stops being a lie in the meantime.
-      if (row.status === "sending") {
-        outcomes.push({
-          broadcastId: row.id,
-          from: row.status,
-          to: null,
-          providerStatus,
-          reason: "provider_sent_already_recorded",
-        });
-        continue;
-      }
+    if (providerStatus === "sent") {
+      // The provider finished dispatching the campaign, which is the whole
+      // question. Recipient outcomes are a separate dimension and go on
+      // arriving afterwards: a message that was suppressed will never be
+      // delivered and will never fail, so waiting for the buckets to add up
+      // to the recipient count is waiting for something that cannot happen.
+      const { data: finalised, error: finaliseError } = await admin.rpc(
+        "mark_broadcast_provider_sent",
+        {
+          p_broadcast_id: row.id,
+          p_resend_broadcast_id: row.resendBroadcastId,
+          p_sent_at: remoteSentAt,
+        }
+      );
 
-      const { error: updateError } = await admin
-        .from("broadcasts")
-        .update({
-          status: "sending",
-          status_note: null,
-          sent_at: remoteSentAt ?? new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", row.id);
+      if (finaliseError) throw new Error(finaliseError.message);
 
-      if (updateError) throw new Error(updateError.message);
+      const moved = ((finalised ?? []) as unknown[]).length > 0;
       outcomes.push({
         broadcastId: row.id,
         from: row.status,
-        to: "sending",
+        to: moved ? "sent" : null,
         providerStatus,
-        reason: "marked_sending",
+        reason: moved ? "marked_sent" : "provider_sent_already_recorded",
       });
       continue;
     }
@@ -916,12 +1104,10 @@ export async function reconcileStuckBroadcasts(
       from: row.status,
       to: null,
       providerStatus,
+      // Only 'queued' and 'unknown' reach here: 'draft' and 'sent' both
+      // returned above.
       reason:
-        providerStatus === "queued"
-          ? "provider_queued"
-          : providerStatus === "sent"
-            ? "provider_sent_already_recorded"
-            : "provider_unreadable",
+        providerStatus === "queued" ? "provider_queued" : "provider_unreadable",
     });
   }
 

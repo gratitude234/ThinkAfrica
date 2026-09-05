@@ -50,7 +50,7 @@ interface BaseNotificationPrefs {
   email_co_author_declined: boolean;
   email_opportunity_inquiry: boolean;
   email_author_publications: boolean;
-  email_debate_updates: boolean;
+
   push_published: boolean;
   push_messages: boolean;
   push_comments: boolean;
@@ -58,7 +58,7 @@ interface BaseNotificationPrefs {
   push_follows: boolean;
   push_daily_brief: boolean;
   push_author_publications: boolean;
-  push_debate_updates: boolean;
+
 }
 
 /**
@@ -87,7 +87,7 @@ const EMAIL_ROWS: { key: keyof NotificationPrefs; label: string; description: st
   { key: "email_co_author_declined", label: "Co-author invitation declined", description: "When someone declines your co-author invitation" },
   { key: "email_opportunity_inquiry", label: "Opportunity inquiries", description: "When an organization sends you an opportunity inquiry" },
   { key: "email_author_publications", label: "Subscribed author publications", description: "Articles from authors you explicitly subscribe to" },
-  { key: "email_debate_updates", label: "Debate updates", description: "Invitations, participant responses, stage openings, and cancellations" },
+
 ];
 
 const PUSH_ROWS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
@@ -96,9 +96,9 @@ const PUSH_ROWS: { key: keyof NotificationPrefs; label: string; description: str
   { key: "push_comments", label: "Comments", description: "Browser push when someone comments on your post or replies to your comment" },
   { key: "push_likes", label: "Likes", description: "Browser push when someone likes your post" },
   { key: "push_follows", label: "New followers", description: "Browser push when someone follows you" },
-  { key: "push_daily_brief", label: "Daily brief", description: "One browser push a day with today's top post and live debate" },
+  { key: "push_daily_brief", label: "Daily brief", description: "One browser push a day with today's top post" },
   { key: "push_author_publications", label: "Subscribed author publications", description: "Browser push for Articles from subscribed authors" },
-  { key: "push_debate_updates", label: "Debate updates", description: "Browser push for important debate invitations and lifecycle changes" },
+
 ];
 
 type PushState = "checking" | "unsupported" | "default" | "denied" | "active" | "unsubscribed";

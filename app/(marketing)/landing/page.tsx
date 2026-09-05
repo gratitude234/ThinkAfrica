@@ -96,13 +96,13 @@ const VALUE_PROPS = [
     num: "02",
     numStyle: "bg-amber-100 text-amber-700",
     title: "Build a body of work",
-    desc: "Bring publications, Responses, debates, collaborations, and review signals together in one evidence-backed Intellectual Record.",
+    desc: "Bring publications, Responses, collaborations, and review signals together in one evidence-backed Intellectual Record.",
   },
   {
     num: "03",
     numStyle: "bg-purple-100 text-purple-700",
     title: "Test ideas in public",
-    desc: "Move from reading into questions, counterpoints, Responses, and structured debates that make your reasoning part of your Intellectual Record.",
+    desc: "Move from reading into questions, counterpoints, and Responses that make your reasoning part of your Intellectual Record.",
   },
 ];
 
@@ -595,95 +595,6 @@ export default async function LandingPage() {
           </div>
         </section>
       )}
-
-      {/* ── Debates ───────────────────────────────────────────────── */}
-      <section className="border-b border-gray-200 bg-white py-14 sm:py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
-
-            {/* Copy */}
-            <div id="debates-copy">
-              <div className="mb-5 flex items-center gap-2.5">
-                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-400" />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Live feature</span>
-              </div>
-              <h2 className="mb-4 font-display text-[32px] font-medium leading-[1.1] text-ink sm:text-[40px]">
-                Argue the motion.<br />Move the debate.
-              </h2>
-              <p className="mb-7 max-w-[420px] text-base leading-[1.7] text-ink-muted">
-                Structured debates run in live rounds. Make your argument for or against,
-                engage with counterpoints, and make your reasoning visible in your Intellectual Record.
-              </p>
-              <LandingTrackedLink
-                href="/debates"
-                event="landing_read_clicked"
-                metadata={{ source: "debates_section" }}
-                className="inline-flex items-center rounded-[10px] bg-emerald-brand px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-[#0E4B37]"
-              >
-                View active debates
-              </LandingTrackedLink>
-            </div>
-
-            {/* Cards */}
-            <div id="debates-cards" className="flex flex-col gap-3">
-              {/* Active */}
-              <div className="debate-card flex flex-col gap-3 rounded-xl border border-gray-200 bg-canvas p-5">
-                <div className="flex items-center gap-1.5">
-                  <span className="debate-dot-live h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-brand" />
-                  <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-emerald-600">
-                    Example · Active debate
-                  </span>
-                </div>
-                <p className="font-display text-[18px] font-semibold leading-snug text-ink">
-                  Should African universities adopt English-only instruction policies?
-                </p>
-                <div className="flex gap-2" aria-label="Debate stances">
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700">For</span>
-                  <span className="rounded-full bg-purple-50 px-3 py-1 text-[11px] font-medium text-purple-700">Against</span>
-                </div>
-                <div>
-                  <LandingTrackedLink
-                    href="/debates"
-                    event="landing_read_clicked"
-                    metadata={{ source: "debate_active" }}
-                    className="inline-flex items-center rounded-lg bg-emerald-brand px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-[#0E4B37]"
-                  >
-                    Join debate
-                  </LandingTrackedLink>
-                </div>
-              </div>
-
-              {/* Open */}
-              <div className="debate-card flex flex-col gap-3 rounded-xl border border-gray-200 bg-canvas p-5">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-400" />
-                  <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber-700">
-                    Example · Open for arguments
-                  </span>
-                </div>
-                <p className="font-display text-[18px] font-semibold leading-snug text-ink">
-                  Is IMF conditionality still a legitimate development tool in Africa?
-                </p>
-                <p className="text-xs text-ink-muted">Opening round · Add the first argument</p>
-              </div>
-
-              {/* Closed */}
-              <div className="debate-card flex flex-col gap-3 rounded-xl border border-gray-200 bg-canvas p-5 opacity-70">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400" />
-                  <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-gray-500">
-                    Example · Completed debate
-                  </span>
-                </div>
-                <p className="font-display text-[18px] font-semibold leading-snug text-ink">
-                  Should African nations create a unified continental currency?
-                </p>
-                <p className="text-xs text-ink-muted">Recap available</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* ── Value props ───────────────────────────────────────────── */}
       <section className="border-b border-gray-200 bg-white py-12 sm:py-14">

@@ -7,7 +7,7 @@
 --   1. 20260815000001 and 20260815000002 are applied and catalog-verified.
 --   2. The application version using get_my_profile_private() is deployed.
 --   3. Settings, onboarding, notifications, subscriptions, the home push
---      seed, public profiles, search, feeds, debates, and admin surfaces pass.
+--      seed, public profiles, search, feeds, and admin surfaces pass.
 --   4. A source scan confirms ordinary clients no longer select the private
 --      columns revoked below.
 --

@@ -17,7 +17,7 @@ export async function proxy(request: NextRequest) {
     "/write",
     "/create",
     "/admin",
-    "/debates/create",
+
     "/onboarding",
     "/stats",
     "/dashboard",

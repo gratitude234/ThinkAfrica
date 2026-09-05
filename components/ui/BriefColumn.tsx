@@ -117,7 +117,7 @@ export default function BriefColumn({ children }: { children: ReactNode }) {
     window.addEventListener("resize", remeasure);
     twoColumn?.addEventListener("change", remeasure);
 
-    // Cards land after hydration (unread counts, follow state, a debate that
+    // Cards land after hydration (unread counts, follow state, a card that
     // opens), and each one moves the floor. Without this the column keeps
     // resting against a bottom edge it has already outgrown.
     const observer =

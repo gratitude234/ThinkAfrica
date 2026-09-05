@@ -47,7 +47,7 @@ export default function ProfileCompletionCard({ pct, items }: Props) {
           <p className="mb-1 text-2xl">🎉</p>
           <p className="text-sm font-semibold text-gray-900">Profile complete!</p>
           <p className="mt-1 text-xs text-gray-400">
-            You&apos;re all set to publish and debate.
+            You&apos;re all set to publish and respond.
           </p>
         </div>
       ) : expanded ? (

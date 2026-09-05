@@ -80,8 +80,6 @@ live functionality.
 | Article composer | Implemented at `/write?kind=article` | Authenticated user; new Articles dual-write legacy `type=essay` | Unknown |
 | Research submission and review | Implemented at `/submit/research` and `/admin/review` | Storage, review tables/RPCs, roles, and current executable migrations | Unknown |
 | Comments and Responses | Implemented | Comments and post relationship migrations/RLS | Unknown |
-| Debates V1.5 | Implemented; `FEATURE_FLAGS.debates` is `true` | Navigation respects the static flag; debate schema and deadline cron also matter | Unknown |
-| Debates V2 | Code exists but activation is env-gated | Exact `DEBATE_V2_ACTIVATION_ENABLED=1`; deployed V2 ledger/catalog and cron state are unresolved | Unknown; keep off until `docs/debate-deployment-state.md` is completed |
 | Opportunities | Implemented and primary navigation | Opportunity inventory and related tables | Unknown |
 | Fellowships | Implemented route and linked from Opportunities | `fellowshipsSection=false` does not currently gate the route | Unknown; not a hard-disabled feature |
 | Ambassadors | Implemented route | `ambassadors=false` hides the footer link, but other direct links/routes remain | Unknown; not a hard-disabled feature |
@@ -172,9 +170,6 @@ verification artifact before authorizing any write or migration.
 
 - [ ] Export the complete `supabase_migrations.schema_migrations` ledger.
 - [ ] Compare every on-disk executable migration with the ledger.
-- [ ] Run the read-only object fingerprints in
-      `docs/debate-deployment-state.md` against staging.
-- [ ] Record whether ledger and catalog agree for every Debate V2/V1.5 object.
 - [ ] Record the deployed `notifications_type_check` definition and the
       distinct stored notification types.
 - [ ] Confirm the content-model columns, constraints, resolver functions, sync
@@ -187,7 +182,7 @@ verification artifact before authorizing any write or migration.
 ### C. Verify authorization and data boundaries
 
 - [ ] With read-only catalog inspection, record RLS enablement and policies for
-      profiles, posts, reviews, comments, messages, opportunities, debates, and
+      profiles, posts, reviews, comments, messages, opportunities, and
       notifications.
 - [ ] In a controlled staging account, verify a user can edit ordinary profile
       fields but cannot self-assign roles, verification, points, suspension, or
@@ -205,10 +200,10 @@ verification artifact before authorizing any write or migration.
       verify that no push delivery occurs.
 - [ ] Confirm `CRON_SECRET`, push/VAPID, email, AI, and application URL settings
       are present only where required.
-- [ ] Record the status and latest result of review reminders, daily brief,
-      Debate V1.5 deadlines, and debate notification crons.
-- [ ] Confirm Debate V2 round advancement is not assumed to be scheduled merely
-      because an API route exists.
+- [ ] Record the status and latest result of the review reminder, daily brief,
+      publication recovery and Resend segment sync crons.
+- [ ] Confirm no cron job dispatches to a route that no longer exists: a
+      removed route still costs a pg_net request and a 404 on every firing.
 
 ### E. Controlled staging walkthrough
 
@@ -220,7 +215,7 @@ verification artifact before authorizing any write or migration.
       editorial workflow.
 - [ ] Verify Comment versus Response behavior, feed/profile placement, and
       protected actions for a guest.
-- [ ] Walk through Debates V1.5, Opportunities, messaging, blocking, reporting,
+- [ ] Walk through Opportunities, messaging, blocking, reporting,
       and role-restricted editorial/admin surfaces.
 - [ ] Keep every pending subscription/AI feature off unless its SQL candidate
       has been promoted, applied, and verified through its release document.

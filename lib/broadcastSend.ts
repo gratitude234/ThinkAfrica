@@ -77,9 +77,24 @@ export type SendFailureReason =
   | "segment_missing"
   | "segment_stale"
   | "already_dispatched"
+  | "duplicate_campaign"
+  | "superseded"
   | "resend_failed"
   | "provider_rejected"
   | "needs_reconciliation";
+
+/** The campaign that already went out, so the admin can go and look at it. */
+export type DuplicateCampaign = {
+  broadcastId: string;
+  subject: string;
+  status: BroadcastStatus;
+  sentAt: string | null;
+};
+
+export type ClaimOutcome =
+  | { outcome: "claimed"; row: BroadcastSendRow }
+  | { outcome: "duplicate"; duplicate: DuplicateCampaign }
+  | { outcome: "unclaimable" };
 
 /**
  * Resend's own view of a broadcast. "unknown" covers everything that is not a
@@ -96,8 +111,15 @@ export type SendBroadcastResult =
       status: BroadcastStatus;
       recipientCount: number;
       resendBroadcastId: string | null;
+      /** Drafts moved to 'superseded' because this campaign went out. */
+      supersededBroadcastIds?: string[];
     }
-  | { ok: false; reason: SendFailureReason; message: string };
+  | {
+      ok: false;
+      reason: SendFailureReason;
+      message: string;
+      duplicate?: DuplicateCampaign;
+    };
 
 export type BuiltBroadcastEmail = {
   name: string;
@@ -128,15 +150,38 @@ export type SendBroadcastDeps = {
    */
   resolveSendSegment(row: BroadcastSendRow, now: Date): Promise<SegmentResolution>;
   /**
-   * Must be a single conditional update matching only 'draft' or 'failed' with
-   * no dispatch recorded, returning the row it claimed or null when another
-   * caller got there first.
+   * The claim and the duplicate check, together in one statement.
+   *
+   * Must hold a lock on the fingerprint across both, so two callers racing the
+   * same campaign cannot both be told there is no duplicate. Doing the check
+   * out here and then calling a claim that does not know about it is precisely
+   * the shape that let two "Welcome to Indegenius" campaigns go out two
+   * minutes apart.
    */
-  claimForSend(
-    id: string,
-    actorId: string,
-    at: Date
-  ): Promise<BroadcastSendRow | null>;
+  claimForCampaign(input: {
+    id: string;
+    actorId: string;
+    fingerprint: string;
+    windowHours: number;
+    override: boolean;
+  }): Promise<ClaimOutcome>;
+  /** The campaign identity. Sender is deliberately not part of it. */
+  fingerprint(identity: {
+    subject: string;
+    bodyHtml: string;
+    audienceKey: BroadcastAudienceKey;
+    selectedProfileIds?: readonly string[];
+  }): string;
+  duplicateWindowHours: number;
+  /**
+   * Moves other editable drafts carrying this campaign to 'superseded'. Runs
+   * after the send, never before: a draft must not be retired by a send that
+   * then failed.
+   */
+  supersedeEquivalentDrafts(input: {
+    sentBroadcastId: string;
+    fingerprint: string;
+  }): Promise<string[]>;
   attachResendBroadcastId(id: string, resendBroadcastId: string): Promise<void>;
   /** Stamped before the dispatch call, and the point of no return. */
   markDispatchStarted(input: {
@@ -232,14 +277,34 @@ function alreadyInProgress(row: BroadcastSendRow): SendBroadcastResult {
   };
 }
 
+export type SendBroadcastOptions = {
+  /**
+   * Skips only the duplicate-campaign check, and only when an admin has said
+   * in as many words that they mean to send substantially the same campaign
+   * again. Every per-row guard still applies, so this can never send one
+   * broadcast twice.
+   */
+  overrideDuplicate?: boolean;
+};
+
 export async function sendBroadcast(
   broadcastId: string,
   actorId: string,
-  deps: SendBroadcastDeps
+  deps: SendBroadcastDeps,
+  options: SendBroadcastOptions = {}
 ): Promise<SendBroadcastResult> {
   const row = await deps.loadBroadcast(broadcastId);
   if (!row) {
     return { ok: false, reason: "not_found", message: "Broadcast not found." };
+  }
+
+  if (row.status === "superseded") {
+    return {
+      ok: false,
+      reason: "superseded",
+      message:
+        "An equivalent broadcast was already sent, so this draft was superseded. It is kept for the record and cannot be sent.",
+    };
   }
 
   // Already on its way or already gone. Answering with the existing state
@@ -301,8 +366,35 @@ export async function sendBroadcast(
     };
   }
 
-  const claimed = await deps.claimForSend(row.id, actorId, deps.now());
-  if (!claimed) {
+  // Computed before the claim and carried into it, so the duplicate question
+  // and the claim are decided together under one lock rather than as two
+  // decisions with a gap between them.
+  const fingerprint = deps.fingerprint({
+    subject: row.subject,
+    bodyHtml: row.bodyHtml,
+    audienceKey: row.audienceKey,
+    selectedProfileIds: row.selectedProfileIds,
+  });
+
+  const claim = await deps.claimForCampaign({
+    id: row.id,
+    actorId,
+    fingerprint,
+    windowHours: deps.duplicateWindowHours,
+    override: options.overrideDuplicate === true,
+  });
+
+  if (claim.outcome === "duplicate") {
+    return {
+      ok: false,
+      reason: "duplicate_campaign",
+      message:
+        "An equivalent broadcast was already sent to this audience recently. Open it to check before sending this one.",
+      duplicate: claim.duplicate,
+    };
+  }
+
+  if (claim.outcome !== "claimed") {
     // Lost the race, or the row became un-claimable between the load and the
     // claim. Report what the winner left behind rather than failing.
     const current = await deps.loadBroadcast(row.id);
@@ -314,6 +406,8 @@ export async function sendBroadcast(
       resendBroadcastId: current?.resendBroadcastId ?? null,
     };
   }
+
+  const claimed = claim.row;
 
   // Everything from here spends Resend calls, and only the winner gets here.
   let segment: SegmentResolution;
@@ -412,11 +506,26 @@ export async function sendBroadcast(
     // here would be a lie to the admin about mail that is going out.
   }
 
+  // Only now, with the campaign genuinely gone. Any other editable draft
+  // carrying the same message stops being sendable, which is what stops a
+  // debug copy going out a week later to the same people.
+  let supersededBroadcastIds: string[] = [];
+  try {
+    supersededBroadcastIds = await deps.supersedeEquivalentDrafts({
+      sentBroadcastId: claimed.id,
+      fingerprint,
+    });
+  } catch {
+    // Housekeeping. The send succeeded, and a draft that stayed sendable is
+    // still covered by the duplicate check the next time somebody tries.
+  }
+
   return {
     ok: true,
     outcome: "dispatched",
     status: "sending",
     recipientCount: segment.recipientCount,
     resendBroadcastId,
+    supersededBroadcastIds,
   };
 }

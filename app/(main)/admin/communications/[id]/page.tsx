@@ -9,11 +9,15 @@ import {
   formatRecipientCount,
   getBroadcastAudience,
   isBroadcastEditable,
+  pendingRecipients,
 } from "@/lib/broadcasts";
 import BroadcastStatusPill from "../BroadcastStatusPill";
 import EmailFrame from "../EmailFrame";
 import { PrototypeNotice } from "../CommunicationsChrome";
-import { getBroadcastRecord } from "@/lib/broadcastStore";
+import {
+  getBroadcastRecord,
+  settleBroadcastOnView,
+} from "@/lib/broadcastStore";
 
 function SummaryRow({
   label,
@@ -77,14 +81,21 @@ export default async function BroadcastDetailPage({
   }
 
   const { id } = await params;
+
+  // Reconciliation is nightly, and a campaign the provider finished an hour
+  // ago should not still say "Sending" on the one screen somebody is actually
+  // looking at. One provider call, and a no-op for anything already terminal.
+  await settleBroadcastOnView(id);
+
   const broadcast = await getBroadcastRecord(id);
   if (!broadcast) notFound();
 
   const sender = getEmailSender(broadcast.senderKey);
   const audience = getBroadcastAudience(broadcast.audienceKey);
-  const attempted = broadcast.delivered + broadcast.failed;
+  const pending = pendingRecipients(broadcast);
   const isDraft = broadcast.status === "draft";
   const canEdit = isBroadcastEditable(broadcast.status);
+  const isSuperseded = broadcast.status === "superseded";
 
   const timingLine = isDraft
     ? `Last edited ${formatBroadcastDateTime(broadcast.updatedAt)}`
@@ -141,8 +152,22 @@ export default async function BroadcastDetailPage({
       </div>
 
       {broadcast.statusNote ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">
-          {broadcast.statusNote}
+        <p
+          className={
+            isSuperseded
+              ? "rounded-lg border border-gray-200 bg-canvas px-4 py-3 text-sm leading-6 text-gray-600"
+              : "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
+          }
+        >
+          {broadcast.statusNote}{" "}
+          {isSuperseded && broadcast.supersededBy ? (
+            <Link
+              href={`/admin/communications/${broadcast.supersededBy}`}
+              className="font-semibold underline underline-offset-2"
+            >
+              View the broadcast that was sent
+            </Link>
+          ) : null}
         </p>
       ) : null}
 
@@ -168,7 +193,7 @@ export default async function BroadcastDetailPage({
         </dl>
       </section>
 
-      {isDraft ? null : (
+      {isDraft || isSuperseded ? null : (
         <section>
           <h2 className="text-sm font-semibold text-ink">Delivery</h2>
           <div className="mt-3 grid grid-cols-2 divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white sm:grid-cols-4 sm:divide-x sm:divide-y-0">
@@ -176,10 +201,18 @@ export default async function BroadcastDetailPage({
               label="Total recipients"
               value={formatRecipientCount(broadcast.recipientCount)}
             />
-            <DeliveryStat label="Sent" value={formatRecipientCount(attempted)} />
             <DeliveryStat
               label="Delivered"
               value={formatRecipientCount(broadcast.delivered)}
+            />
+            {/* Not a failure. The provider declined to attempt these because
+                the address was already on its suppression list, and calling
+                that a bounce sends the reader hunting a problem that is not
+                there. */}
+            <DeliveryStat
+              label="Suppressed"
+              value={formatRecipientCount(broadcast.suppressed)}
+              tone={broadcast.suppressed > 0 ? "default" : "muted"}
             />
             <DeliveryStat
               label="Failed or bounced"
@@ -187,10 +220,21 @@ export default async function BroadcastDetailPage({
               tone={broadcast.failed > 0 ? "warning" : "muted"}
             />
           </div>
-          {broadcast.status === "sending" || broadcast.status === "queued" ? (
+
+          {pending > 0 ? (
             <p className="mt-3 text-xs text-gray-500">
-              Delivery is still in progress. These numbers update as the
-              provider reports back, one message at a time.
+              {formatRecipientCount(pending)} awaiting a final result from the
+              provider.{" "}
+              {broadcast.status === "sent"
+                ? "The campaign itself has finished sending."
+                : "These numbers update as the provider reports back, one message at a time."}
+            </p>
+          ) : null}
+
+          {broadcast.suppressed > 0 ? (
+            <p className="mt-2 text-xs text-gray-500">
+              Suppressed addresses were not attempted. They stay out of future
+              audiences without changing anyone&rsquo;s email preferences.
             </p>
           ) : null}
         </section>

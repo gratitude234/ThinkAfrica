@@ -24,12 +24,9 @@ export default async function MainLayout({
   // This layout re-renders on every navigation inside the app shell, so its
   // queries sit on the critical path of every click. They're independent of
   // each other -- running them sequentially made each navigation pay both
-  // round trips back to back.
-  const [
-    { data: profileData },
-    { count: activeDebateCount },
-    { error: activityDayError },
-  ] =
+  // round trips back to back. Both are also skipped entirely for a signed-out
+  // visitor, so a public profile or post costs this layout no database work.
+  const [{ data: profileData }, { error: activityDayError }] =
     await Promise.all([
       user
         ? supabase
@@ -38,10 +35,6 @@ export default async function MainLayout({
             .eq("id", user.id)
             .single()
         : Promise.resolve({ data: null }),
-      supabase
-        .from("debates")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "active"),
       user
         ? supabase.rpc("record_user_activity_day")
         : Promise.resolve({ data: null, error: null }),
@@ -71,14 +64,12 @@ export default async function MainLayout({
           profile={profileData}
           isAdmin={isAdmin}
           canAccessReview={canAccessReview}
-          hasActiveDebate={(activeDebateCount ?? 0) > 0}
         />
 
         <AppShell
           showGuestBanner={!user}
           userId={user?.id ?? null}
           username={profileData?.username ?? null}
-          hasActiveDebate={(activeDebateCount ?? 0) > 0}
         >
           {children}
         </AppShell>

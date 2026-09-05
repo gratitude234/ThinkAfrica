@@ -10,7 +10,6 @@ import {
   REVIEW_KIND_COPY,
   sortSignalsByRecency,
   toPublicSignals,
-  UNSUPPORTED_SIGNAL_KINDS,
   type CredibilitySignal,
 } from "./credibilityGraph";
 
@@ -41,13 +40,6 @@ describe("credibility signal contract", () => {
     }
   });
 
-  it("never claims a debate winner", () => {
-    expect(CREDIBILITY_SIGNAL_KINDS).not.toContain("debate_winner");
-    expect([...UNSUPPORTED_SIGNAL_KINDS]).toContain("debate_winner");
-    // Participation and completion are the two facts the platform can prove.
-    expect(CREDIBILITY_SIGNAL_KINDS).toContain("debate_participation");
-    expect(CREDIBILITY_SIGNAL_KINDS).toContain("debate_completion");
-  });
 
   it("uses no ranking or scoring language anywhere in its copy", () => {
     const forbidden = /\b(top|best|leading|expert|elite|rank|score|level|streak)\b/i;

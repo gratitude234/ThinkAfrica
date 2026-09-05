@@ -1,7 +1,7 @@
 -- RELEASE-GATED SQL CANDIDATE — DO NOT APPLY DIRECTLY.
 --
 -- Prerequisites:
---   1. Complete the Debate deployment probes and reconcile the migration ledger.
+--   1. Reconcile the migration ledger against the deployed catalog.
 --   2. Promote, apply, and verify author_subscriptions_publication_delivery_v1.sql.
 --   3. Confirm the complete live notifications_type_check definition.
 --   4. Assign this extension a later migration timestamp than the verified

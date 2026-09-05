@@ -137,8 +137,8 @@
    lower than it looks, so it pins early, and every measurement of it (where it
    pinned, what it covers, how tall it is) disagrees with what the reader sees.
    Driving the sticky offset keeps paint and layout in agreement. Defined once
-   here because all four sub-headers -- the feed controls, both debate rooms
-   and StickySubnav -- have to move identically. */
+   here because every sub-header -- the feed controls, the profile section nav
+   and StickySubnav -- has to move identically. */
 [data-app-context-nav] {
   position: sticky;
   top: var(--app-nav-offset);
@@ -189,11 +189,6 @@
     display: none;
   }
 
-  [data-app-chrome][data-chrome-mode="compact"] [data-app-debate-header-content] {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
 
   [data-app-chrome][data-chrome-mode="compact"] [data-app-bottom-nav] {
     transform: translate3d(0, 100%, 0);
@@ -564,10 +559,6 @@ font-family: var(--font-inter), system-ui, sans-serif;
   from { opacity: 0; transform: translateX(28px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-@keyframes ta-pulse-dot {
-  0%, 100% { transform: scale(1);   opacity: 1; }
-  50%       { transform: scale(1.6); opacity: 0.5; }
-}
 
 /* Hero entrance */
 .landing-page.landing-animations-ready .hero-animate { opacity: 0; }
@@ -646,24 +637,6 @@ font-family: var(--font-inter), system-ui, sans-serif;
 .landing-page .cta-card.revealed { opacity: 1; transform: none; }
 .cta-card:nth-child(2) { transition-delay: 0.1s; }
 
-/* Debate cards */
-.landing-page.landing-animations-ready .debate-card {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.5s cubic-bezier(0.25,0,0,1), transform 0.5s cubic-bezier(0.25,0,0,1);
-}
-.landing-page .debate-card.revealed { opacity: 1; transform: none; }
-
-/* Stance bar fill animation */
-.stance-for, .stance-against {
-  width: 0 !important;
-  transition: width 1.1s cubic-bezier(0.25,0,0,1);
-}
-#stance-bar.animated .stance-for    { width: var(--for-w)     !important; }
-#stance-bar.animated .stance-against { width: var(--against-w) !important; }
-
-/* Live dot pulse */
-.debate-dot-live { animation: ta-pulse-dot 2s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .landing-page .hero-animate,
@@ -673,8 +646,7 @@ font-family: var(--font-inter), system-ui, sans-serif;
   .landing-page .post-card,
   .landing-page .topic-pill,
   .landing-page .value-item,
-  .landing-page .cta-card,
-  .landing-page .debate-card {
+  .landing-page .cta-card {
     opacity: 1 !important;
     transform: none !important;
     animation: none !important;
@@ -876,6 +848,13 @@ font-family: var(--font-inter), system-ui, sans-serif;
    name. Sharing that row left the name about 210px to work with, and a
    display face at text-3xl broke a two-part surname across three lines with
    a hyphen. Stacking gives it the full measure. */
+/* Stacked on a phone, in the order the page is meant to be read: who this is,
+   then what they are, then what to do about it, and last the subjects they
+   write about, which is the line the reader leaves with. Follow does not go
+   missing by sitting late, because ProfileStickyBar carries it back in as soon
+   as the header scrolls away. From 640px the actions move into a column of
+   their own beside the name, where they read as page-level controls rather
+   than a step in the sequence, and the topics settle under the biography. */
 .profile-identity {
   display: grid;
   gap: 12px 18px;
@@ -883,8 +862,9 @@ font-family: var(--font-inter), system-ui, sans-serif;
   grid-template-areas:
     "avatar"
     "name"
+    "meta"
     "actions"
-    "meta";
+    "topics";
   align-items: start;
 }
 
@@ -894,7 +874,8 @@ font-family: var(--font-inter), system-ui, sans-serif;
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "avatar name actions"
-      "avatar meta actions";
+      "avatar meta actions"
+      "avatar topics actions";
   }
 }
 
@@ -902,6 +883,7 @@ font-family: var(--font-inter), system-ui, sans-serif;
 .profile-identity-name { grid-area: name; }
 .profile-identity-actions { grid-area: actions; }
 .profile-identity-meta { grid-area: meta; }
+.profile-identity-topics { grid-area: topics; }
 
 /* Featured is a swipeable rail on a phone, where three stacked cards with 16:9
    covers ran to roughly 900px of scroll, and a grid from 768px up. */

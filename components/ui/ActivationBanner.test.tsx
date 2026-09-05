@@ -15,7 +15,6 @@ describe("ActivationBanner -- Post CTA bypasses the generic Create chooser", () 
         userId="user-1"
         hasPublished={false}
         hasFollowed={true}
-        hasDebated={true}
       />
     );
 
@@ -31,7 +30,6 @@ describe("ActivationBanner -- Post CTA bypasses the generic Create chooser", () 
         userId="user-1"
         hasPublished={false}
         hasFollowed={true}
-        hasDebated={true}
       />
     );
 

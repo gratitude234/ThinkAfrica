@@ -88,7 +88,6 @@ describe("profile record query contract", () => {
           source_backed_count: "2",
           citable_count: "1",
           response_count: "3",
-          debate_count: "2",
           research_count: "1",
         },
       ])
@@ -97,7 +96,6 @@ describe("profile record query contract", () => {
       sourceBackedCount: 2,
       citableCount: 1,
       responseCount: 3,
-      debateCount: 2,
       researchCount: 1,
     });
   });

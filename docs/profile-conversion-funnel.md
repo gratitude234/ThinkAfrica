@@ -42,7 +42,7 @@ timestamp. Nothing else is sent.
 | `viewerState` | `anonymous`, `authenticated`, `owner` |
 | `surface` | `profile_header`, `featured_work`, `latest_record`, `full_record`, `sticky_bar` |
 | `workId` | Present on `profile_work_opened` only |
-| `workKind` | `publication`, `response`, `research`, `debate` |
+| `workKind` | `publication`, `response`, `research` |
 
 No display name, no email, no biography, no positioning statement, no tag
 text. `lib/profileFunnel.test.ts` asserts the property set exactly, so a

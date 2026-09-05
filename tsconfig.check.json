@@ -43,7 +43,6 @@
     "app/api/cron/resend-segment-sync/route.ts",
     "app/api/webhooks/resend/route.ts",
     "lib/push.ts",
-    "lib/debateV15.ts",
     "lib/actionInbox.ts",
     "lib/useHasScrolled.ts",
     "app/(main)/AppChromeProvider.tsx",
@@ -106,11 +105,6 @@
     "app/api/cron/daily-brief/route.ts",
     "app/(main)/messages/[id]/actions.ts",
     "app/(main)/NavClient.tsx",
-    "app/(main)/debates/create/page.tsx",
-    "app/(main)/debates/[id]/page.tsx",
-    "app/(main)/debates/[id]/LiveArguments.tsx",
-    "app/(main)/debates/[id]/v15/DebateV15Room.tsx",
-    "app/(main)/debates/[id]/v2/DebateV2Room.tsx",
     "app/(main)/PostsFeedSection.tsx",
     "app/(main)/submit/research/page.tsx",
     "app/(main)/submit/research/ResearchSubmissionForm.tsx",
@@ -135,6 +129,14 @@
     "lib/activation.ts",
     "app/(onboarding)/onboarding/page.tsx",
     "app/(onboarding)/onboarding/OnboardingClient.tsx",
-    "app/(main)/settings/ProfileForm.tsx"
+    "app/(main)/settings/ProfileForm.tsx",
+    "app/(main)/[username]/loading.tsx",
+    "app/(main)/[username]/error.tsx",
+    "app/(main)/[username]/followers/page.tsx",
+    "app/(main)/[username]/following/page.tsx",
+    "components/profile/ProfileIdentityPanel.tsx",
+    "components/profile/ProfilePreview.tsx",
+    "lib/profileRelationships.ts",
+    "lib/profileUsername.ts"
   ]
 }

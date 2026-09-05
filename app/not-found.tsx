@@ -25,10 +25,10 @@ export default function NotFound() {
             Explore the Feed
           </Link>
           <Link
-            href="/debates"
+            href="/explore"
             className="px-5 py-2.5 bg-white text-gray-700 border border-gray-200 font-medium rounded-lg hover:bg-canvas transition-colors text-sm"
           >
-            Join a Debate
+            Discover Ideas
           </Link>
         </div>
       </div>

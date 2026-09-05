@@ -23,7 +23,6 @@ function renderRail(
     <SideRail
       userId="user-1"
       username="ada"
-      hasActiveDebate={false}
       {...overrides}
     />
   );
@@ -40,7 +39,7 @@ describe("SideRail", () => {
     expect(hrefFor("Discover")).toBe("/explore");
     expect(hrefFor("Campus")).toBe("/campus");
     expect(screen.queryByRole("link", { name: "Research" })).not.toBeInTheDocument();
-    expect(hrefFor("Debates")).toBe("/debates");
+
     expect(hrefFor("Responses")).toBe("/responses");
     expect(hrefFor("Opportunities")).toBe("/opportunities");
     expect(hrefFor("Bookmarks")).toBe("/bookmarks");
@@ -88,14 +87,6 @@ describe("SideRail", () => {
     );
   });
 
-  it("announces a live debate only while one is running", () => {
-    const { unmount } = renderRail({ hasActiveDebate: true });
-    expect(screen.getByText("A debate is live now")).toBeInTheDocument();
-    unmount();
-
-    renderRail({ hasActiveDebate: false });
-    expect(screen.queryByText("A debate is live now")).not.toBeInTheDocument();
-  });
 
   it("routes guests through the sign-in gate", () => {
     renderRail({ userId: null, username: null });

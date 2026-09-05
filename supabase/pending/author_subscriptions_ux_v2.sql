@@ -307,7 +307,7 @@ begin
     raise exception 'Authentication required';
   end if;
   if p_key not in (
-    'inapp_likes', 'inapp_follows', 'inapp_debates',
+    'inapp_likes', 'inapp_follows',
     'inapp_collaboration',
     'email_comments', 'email_follows', 'email_likes', 'email_responses',
     'email_messages', 'email_published', 'email_digest',
@@ -315,9 +315,9 @@ begin
     'email_review_assigned', 'email_review_started', 'email_review_reminder',
     'email_co_author_invite', 'email_co_author_accepted',
     'email_co_author_declined', 'email_opportunity_inquiry',
-    'email_author_publications', 'email_debate_updates', 'push_published',
+    'email_author_publications', 'push_published',
     'push_messages', 'push_comments', 'push_likes', 'push_follows',
-    'push_daily_brief', 'push_author_publications', 'push_debate_updates'
+    'push_daily_brief', 'push_author_publications'
   ) then
     raise exception 'Unsupported notification preference';
   end if;

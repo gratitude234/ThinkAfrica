@@ -6,9 +6,8 @@ import { useEffect } from "react";
 import CreateLauncher from "./CreateLauncher";
 import { shouldShowMobilePrimaryNav } from "./navRoutes";
 import { useAppChrome } from "./AppChromeProvider";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
+
 import {
-  DebatesIcon,
   ExploreIcon,
   HomeIcon,
   ResponsesIcon,
@@ -21,7 +20,6 @@ import {
 interface BottomNavProps {
   username: string | null;
   userId: string | null;
-  hasActiveDebate: boolean;
 }
 
 function navLinkClass(isCurrent: boolean) {
@@ -40,7 +38,6 @@ function navPillClass(isCurrent: boolean) {
 export default function BottomNav({
   username,
   userId,
-  hasActiveDebate,
 }: BottomNavProps) {
   const pathname = usePathname();
   const { setInteractionLocked } = useAppChrome();
@@ -60,7 +57,6 @@ export default function BottomNav({
 
   const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
   const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
-  const isDebatesActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.debates);
   const isResponsesActive = isNavItemActive(
     pathname,
     NAV_MATCH_PREFIXES.responses
@@ -118,32 +114,6 @@ export default function BottomNav({
               <span className="whitespace-nowrap text-[11px] font-medium">Discover</span>
             </span>
           </Link>
-
-          {FEATURE_FLAGS.debates ? (
-            <Link
-              href="/debates"
-              className={navLinkClass(isDebatesActive)}
-              aria-current={isDebatesActive ? "page" : undefined}
-            >
-              <span className={navPillClass(isDebatesActive)}>
-                <div className="relative">
-                  <DebatesIcon className="h-[22px] w-[22px]" />
-                  {hasActiveDebate ? (
-                    <span
-                      aria-hidden="true"
-                      className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-brand ring-2 ring-white"
-                    />
-                  ) : null}
-                </div>
-                <span className="whitespace-nowrap text-[11px] font-medium">
-                  Debates
-                </span>
-                {hasActiveDebate ? (
-                  <span className="sr-only">A debate is live now</span>
-                ) : null}
-              </span>
-            </Link>
-          ) : null}
 
           <Link
             href="/responses"

@@ -202,6 +202,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     recordSummary,
     latestRecord,
     followerResult,
+    followingResult,
     talentResult,
     featuredResult,
     followResult,
@@ -212,6 +213,11 @@ export default async function UserProfilePage({ params }: PageProps) {
     recordSummaryPromise,
     latestRecordPromise,
     supabase.from("follows").select("following_id", { count: "exact", head: true }).eq("following_id", profile.id),
+    // Counted rather than stored, like the follower count above it. Both are
+    // head queries over the same index, so the second number costs a round
+    // trip in a wave that is already running, and no counter column has to be
+    // kept honest by a trigger.
+    supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("follower_id", profile.id),
     supabase.from("talent_profiles").select("id, open_to_opportunities, visibility").eq("user_id", profile.id).maybeSingle<TalentProfile>(),
     supabase
       .from("profile_featured_posts")
@@ -367,6 +373,7 @@ export default async function UserProfilePage({ params }: PageProps) {
         demonstratedTopics={demonstratedTopics}
         recordSummary={recordSummary}
         followerCount={followerResult.count ?? 0}
+        followingCount={followingResult.count ?? 0}
         isOwnProfile={isOwnProfile}
         currentUserId={user?.id ?? null}
         initialFollowing={Boolean(followResult.data)}
@@ -489,7 +496,7 @@ export default async function UserProfilePage({ params }: PageProps) {
         </div>
 
         {/* Pinned like every other aside in the app (home, explore, admin, the
-            debate surfaces), which this one alone was not. Background is short
+            other pinned surfaces), which this one alone was not. Background is short
             and the work beside it is long, so pinning keeps the standing
             context available while a reader moves down the record instead of
             letting it scroll away in the first screen. */}

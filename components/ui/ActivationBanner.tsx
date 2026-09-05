@@ -7,7 +7,6 @@ interface Props {
   userId: string;
   hasPublished: boolean;
   hasFollowed: boolean;
-  hasDebated: boolean;
 }
 
 const DISMISS_KEY = "ta_nudge_dismissed";
@@ -15,7 +14,6 @@ const DISMISS_KEY = "ta_nudge_dismissed";
 export default function ActivationBanner({
   hasPublished,
   hasFollowed,
-  hasDebated,
 }: Props) {
   const [dismissed, setDismissed] = useState(true);
 
@@ -38,13 +36,8 @@ export default function ActivationBanner({
         href: "/leaderboard",
         done: hasFollowed,
       },
-      {
-        label: "Join a debate",
-        href: "/debates",
-        done: hasDebated,
-      },
     ],
-    [hasDebated, hasFollowed, hasPublished]
+    [hasFollowed, hasPublished]
   );
 
   const doneCount = steps.filter((step) => step.done).length;

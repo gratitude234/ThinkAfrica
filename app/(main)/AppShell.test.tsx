@@ -20,7 +20,6 @@ function renderShell(pathname: string, showGuestBanner = false) {
       showGuestBanner={showGuestBanner}
       userId="user-1"
       username="ada"
-      hasActiveDebate={false}
     >
       <p>page content</p>
     </AppShell>
@@ -28,13 +27,13 @@ function renderShell(pathname: string, showGuestBanner = false) {
   return { ...result, main: result.container.querySelector("main") };
 }
 
-const railRoutes = ["/", "/explore", "/debates", "/opportunities", "/settings"];
+const railRoutes = ["/", "/explore", "/opportunities", "/settings"];
 const suppressedRoutes = [
   "/post/a-published-piece",
   "/messages",
   "/messages/conversation-1",
   "/admin/review",
-  "/debates/live-room",
+
   "/about",
 ];
 

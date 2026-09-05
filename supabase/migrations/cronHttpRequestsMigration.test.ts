@@ -20,6 +20,7 @@ function read(name: string) {
 
 const original = read("20260827110918_migrate_scheduler_to_supabase_cron.sql");
 const surrogateKey = read("20260904000001_cron_http_requests_surrogate_key.sql");
+const debateRemoval = read("20260906000003_remove_debate_cron_jobs.sql");
 
 describe("the cron http request log", () => {
   it("was originally keyed on the pg_net request id, which is the bug", () => {
@@ -102,19 +103,18 @@ describe("inspecting the jobs", () => {
 
   it("still names every scheduled job, including the recipient sync", () => {
     // inspect_indegenius_cron_jobs lists the expected set explicitly, so a
-    // redefinition that drops one silently stops reporting on it.
+    // redefinition that drops one silently stops reporting on it. Read from
+    // the newest redefinition, not this file's own: the expected set is
+    // whatever the last migration to touch the function says it is.
     for (const job of [
       "indegenius-daily-brief",
       "indegenius-review-reminders",
-      "indegenius-debate-v2-advance",
-      "indegenius-debate-v2-notifications",
       "indegenius-publication-recovery",
-      "indegenius-debate-v15-deadlines",
       "indegenius-resend-segment-sync",
       "indegenius-cron-http-reconcile",
       "indegenius-cron-history-prune",
     ]) {
-      expect(surrogateKey).toContain(`('${job}'`);
+      expect(debateRemoval).toContain(`('${job}'`);
     }
   });
 });
