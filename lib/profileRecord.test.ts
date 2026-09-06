@@ -89,6 +89,8 @@ describe("profile record query contract", () => {
           citable_count: "1",
           response_count: "3",
           research_count: "1",
+          article_count: "3",
+          post_count: "1",
         },
       ])
     ).toEqual({
@@ -97,6 +99,47 @@ describe("profile record query contract", () => {
       citableCount: 1,
       responseCount: 3,
       researchCount: 1,
+      articleCount: 3,
+      postCount: 1,
     });
+  });
+
+  /**
+   * The v1 summary function carries no split at all. Reading its silence as
+   * zero would let a deployment that has not applied 20260907000001 state
+   * that an author has published no Articles, which is a claim about the
+   * author rather than about the schema.
+   */
+  it("leaves the split unknown when the row does not carry it", () => {
+    const summary = normalizeProfileRecordSummary([
+      {
+        publication_count: "4",
+        source_backed_count: "2",
+        citable_count: "1",
+        response_count: "3",
+        research_count: "0",
+      },
+    ]);
+
+    expect(summary.publicationCount).toBe(4);
+    expect(summary.articleCount).toBeNull();
+    expect(summary.postCount).toBeNull();
+  });
+
+  it("reads a zero split as zero, not as unknown", () => {
+    const summary = normalizeProfileRecordSummary([
+      {
+        publication_count: "0",
+        source_backed_count: "0",
+        citable_count: "0",
+        response_count: "0",
+        research_count: "0",
+        article_count: "0",
+        post_count: "0",
+      },
+    ]);
+
+    expect(summary.articleCount).toBe(0);
+    expect(summary.postCount).toBe(0);
   });
 });

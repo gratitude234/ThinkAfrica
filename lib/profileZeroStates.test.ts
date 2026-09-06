@@ -16,9 +16,12 @@ const onboarding = read("app/(onboarding)/onboarding/OnboardingClient.tsx");
 
 describe("public profile zero states", () => {
   it("never offers the full record when the preview is empty", () => {
-    expect(profilePage).toContain("{latestRecord.items.length > 0 ? (");
+    // The preview arrives from profileViewData as a list rather than a page
+    // object now, so the guard reads `latestRecord.length`. Same rule.
+    const guard = "{latestRecord.length > 0 ? (";
+    expect(profilePage).toContain(guard);
     const linkIndex = profilePage.indexOf("View full record");
-    const guardIndex = profilePage.indexOf("{latestRecord.items.length > 0 ? (");
+    const guardIndex = profilePage.indexOf(guard);
     expect(guardIndex).toBeGreaterThan(-1);
     expect(guardIndex).toBeLessThan(linkIndex);
   });

@@ -72,6 +72,20 @@ export function contentKindFromLegacyType(type: string | null | undefined): Cont
   return LEGACY_TYPE_TO_CONTENT_KIND[type];
 }
 
+/**
+ * The legacy `type` values that resolve to one content kind, read off the same
+ * mapping the resolver uses.
+ *
+ * Exists so a database query can select "Articles" without a second copy of
+ * "essay and policy_brief are articles" written into a PostgREST filter. The
+ * mapping changes in one place or it does not change.
+ */
+export function legacyTypesForContentKind(kind: ContentKind): LegacyPostType[] {
+  return LEGACY_POST_TYPES.filter(
+    (type) => LEGACY_TYPE_TO_CONTENT_KIND[type] === kind
+  );
+}
+
 /** Maps a legacy `type` value to its target article_format. Returns null when the type has no genre (blog/research) or is unknown. */
 export function articleFormatFromLegacyType(type: string | null | undefined): ArticleFormat | null {
   if (!isLegacyPostType(type)) return null;

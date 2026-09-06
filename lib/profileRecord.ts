@@ -33,6 +33,22 @@ export interface ProfileRecordSummary {
   citableCount: number;
   responseCount: number;
   researchCount: number;
+  /**
+   * The Article / Post split, or null when the database answering could not
+   * supply it.
+   *
+   * Null is not zero and the difference matters to what renders: zero means
+   * this author has published no Articles, null means the deployment has not
+   * applied 20260907000001 yet and nothing is known either way. A surface
+   * showing "0 articles" on the strength of a missing migration would be
+   * stating a fact about the author that the database never asserted.
+   *
+   * Both are non-null once that migration is applied everywhere, at which
+   * point the fallback in loadProfileRecordSummary and this nullability go
+   * together.
+   */
+  articleCount: number | null;
+  postCount: number | null;
 }
 
 export const EMPTY_PROFILE_RECORD_SUMMARY: ProfileRecordSummary = {
@@ -41,6 +57,10 @@ export const EMPTY_PROFILE_RECORD_SUMMARY: ProfileRecordSummary = {
   citableCount: 0,
   responseCount: 0,
   researchCount: 0,
+  // Zero rather than null: an author with no record has no Articles and no
+  // Posts, which is a fact rather than an absence of information.
+  articleCount: 0,
+  postCount: 0,
 };
 
 export interface ProfileRecordQuery {
@@ -72,11 +92,23 @@ type RawSummary = {
   citable_count?: unknown;
   response_count?: unknown;
   research_count?: unknown;
+  article_count?: unknown;
+  post_count?: unknown;
 };
 
 function toCount(value: unknown) {
   const count = typeof value === "number" ? value : Number(value ?? 0);
   return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+}
+
+/**
+ * The same coercion, except that a key the row does not carry stays unknown.
+ * v1 of the summary function returns no article_count at all, and reading
+ * that absence as 0 is what would let a pre-migration deployment claim an
+ * author has published nothing.
+ */
+function toOptionalCount(value: unknown) {
+  return value === undefined || value === null ? null : toCount(value);
 }
 
 export function normalizeProfileRecordSummary(
@@ -91,6 +123,8 @@ export function normalizeProfileRecordSummary(
     citableCount: toCount(row.citable_count),
     responseCount: toCount(row.response_count),
     researchCount: toCount(row.research_count),
+    articleCount: toOptionalCount(row.article_count),
+    postCount: toOptionalCount(row.post_count),
   };
 }
 

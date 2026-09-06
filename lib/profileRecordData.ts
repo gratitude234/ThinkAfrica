@@ -82,22 +82,61 @@ interface PostRow {
 }
 
 
+/**
+ * PostgREST's code for "I have no such function in the schema cache", which
+ * is what an application deployed ahead of 20260907000001 gets back when it
+ * asks for the v2 summary. Matched on the code rather than on the message,
+ * because the message is prose and is localised by nobody in particular.
+ */
+const PGRST_FUNCTION_NOT_FOUND = "PGRST202";
+
+function isMissingFunction(error: { code?: string | null; message?: string | null } | null) {
+  if (!error) return false;
+  if (error.code === PGRST_FUNCTION_NOT_FOUND) return true;
+  // A schema cache that has not reloaded reports the same absence as a 404
+  // with no code on some PostgREST versions. Narrow enough to be the same
+  // fact, not a catch-all for query failure.
+  return /could not find the function|does not exist/i.test(error.message ?? "");
+}
+
+/**
+ * The record counts, including the Article / Post split when the database
+ * can supply it.
+ *
+ * Two functions are tried in order, which is the deployment seam rather than
+ * indecision. v2 arrives with 20260907000001 and carries the split; v1 is
+ * what every environment already has. Asking for v2 first and falling back
+ * means this can ship before the migration without turning a profile into an
+ * error page, and the fallback removes itself the day v1 is dropped rather
+ * than surviving as a flag nobody dares flip.
+ *
+ * A real query failure is not caught here. It throws, and the profile route's
+ * error boundary handles it: counts are identity-critical, and a profile that
+ * silently reports zero publications during an outage is worse than one that
+ * admits it could not load.
+ */
 export async function loadProfileRecordSummary(
   supabase: SupabaseClient,
   profileId: string,
   includeResearch: boolean
 ): Promise<ProfileRecordSummary> {
-  const { data, error } = await supabase.rpc(
-    "get_public_profile_record_summary",
-    {
-      p_profile_id: profileId,
-      p_include_research: includeResearch,
-    }
-  );
+  const args = {
+    p_profile_id: profileId,
+    p_include_research: includeResearch,
+  };
 
-  if (error) throw new Error(error.message);
-  return data
-    ? normalizeProfileRecordSummary(data)
+  const v2 = await supabase.rpc("get_public_profile_record_summary_v2", args);
+  if (!v2.error) {
+    return v2.data
+      ? normalizeProfileRecordSummary(v2.data)
+      : EMPTY_PROFILE_RECORD_SUMMARY;
+  }
+  if (!isMissingFunction(v2.error)) throw new Error(v2.error.message);
+
+  const v1 = await supabase.rpc("get_public_profile_record_summary", args);
+  if (v1.error) throw new Error(v1.error.message);
+  return v1.data
+    ? normalizeProfileRecordSummary(v1.data)
     : EMPTY_PROFILE_RECORD_SUMMARY;
 }
 
@@ -274,6 +313,8 @@ interface TopicPostRow {
   in_response_to: string | null;
   tags: string[] | null;
   type: string;
+  published_at?: string | null;
+  created_at?: string | null;
   status?: string;
 }
 
@@ -295,7 +336,31 @@ export interface ProfileTopicIndex {
   postIdsByTopic: Map<string, string[]>;
 }
 
-const TOPIC_POST_SELECT = "id, author_id, in_response_to, tags, type";
+const TOPIC_POST_SELECT =
+  "id, author_id, in_response_to, tags, type, published_at, created_at";
+
+/**
+ * How much of an author's history the topic ranking reads.
+ *
+ * This used to be unbounded: every published post the author owned or
+ * co-authored, all columns needed to rank tags, fetched on every profile
+ * view. For a prolific author that is thousands of rows travelling across
+ * the wire to draw three words.
+ *
+ * 200 most recent works is a deliberate compromise rather than a round
+ * number. It covers every author on the platform today with room to spare,
+ * so nothing visible changes now, and it caps the cost for the authors who
+ * eventually pass it. Where it does bind, it biases the list toward what
+ * someone is writing about lately, which is the more useful answer to
+ * "what does this person write about" than an all-time frequency count.
+ *
+ * The structural fix is aggregation in SQL: a topics function grouping
+ * tags over profile_record_entries and returning a dozen rows rather than a
+ * page of posts. That belongs with Phase 4's Intellectual Footprint, which
+ * needs the same aggregate, and is deliberately not smuggled into the
+ * content-split migration.
+ */
+export const TOPIC_SCAN_LIMIT = 200;
 
 /**
  * Guards the URL length of the `entry_id` restriction below: the ids travel to
@@ -331,12 +396,20 @@ export async function loadProfileTopicIndex({
       .from("posts")
       .select(TOPIC_POST_SELECT)
       .eq("author_id", profileId)
-      .eq("status", "published"),
+      .eq("status", "published")
+      .order("published_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(TOPIC_SCAN_LIMIT),
     supabase
       .from("post_authors")
       .select(`posts!post_authors_post_id_fkey(${TOPIC_POST_SELECT}, status)`)
       .eq("user_id", profileId)
-      .not("accepted_at", "is", null),
+      .not("accepted_at", "is", null)
+      // Co-authorship rows carry no date of their own, so this bound is on
+      // the acceptance order rather than on publication. Same purpose: a cap
+      // on how much history one profile view reads.
+      .order("accepted_at", { ascending: false })
+      .limit(TOPIC_SCAN_LIMIT),
   ]);
 
   if (ownedResult.error) throw new Error(ownedResult.error.message);

@@ -81,6 +81,14 @@ export function isAiTopicSuggestionsEnabled(): boolean {
  * rejection as a missing profile, so deploying ahead of the migration would
  * turn every public profile into a 404. Set to 1 only after
  * 20260826000001_profile_positioning_statement.sql is applied and verified.
+ *
+ * Production was confirmed on 2026-09-06 to have profiles.positioning_statement.
+ * The gate is kept anyway, because it does not protect production alone: a
+ * preview branch or a developer's local database can still lag, and there is
+ * no way from here to know that every environment has caught up. The
+ * condition for deleting it is that claim being verifiable, not production
+ * being ahead. Note that the failure it prevents is no longer a 404 either
+ * way: the profile loader now separates a failed query from a missing row.
  */
 export function isProfilePositioningEnabled(): boolean {
   return process.env.NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED === "1";
@@ -92,14 +100,26 @@ export function isProfilePositioningEnabled(): boolean {
  * select naming a column PostgREST does not know about fails outright, and
  * this one is on the public profile query. Set to 1 only after
  * 20260826000002_featured_work_notes.sql is applied and verified.
+ *
+ * Production was confirmed on 2026-09-06 to have
+ * profile_featured_posts.feature_note. Kept for the same reason as the
+ * positioning gate above: production being ahead is not the same as every
+ * environment being ahead.
  */
 export function isFeaturedWorkNotesEnabled(): boolean {
   return process.env.NEXT_PUBLIC_FEATURED_WORK_NOTES_ENABLED === "1";
 }
 
 /**
- * Gates the Phase 3 credibility graph: citation edges, the public recognition
- * and demonstrated-expertise sections, and verified opportunity outcomes.
+ * Gates the credibility graph: citation edges, the public recognition and
+ * demonstrated-expertise sections, and verified opportunity outcomes.
+ *
+ * Production was confirmed on 2026-09-06 NOT to have this schema:
+ * post_citation_edges, profile_recognitions and
+ * opportunity_applications.outcome_verified_at are all absent. The gate must
+ * stay off. The public profile no longer depends on it either way, because
+ * the redesign does not surface Demonstrated Expertise or Recognition and so
+ * stopped loading the graph rather than loading it to render nothing.
  *
  * Same reason as the gates above. The credibility migrations add a column to
  * post_references and two new tables; a select naming any of them before

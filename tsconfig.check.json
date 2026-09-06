@@ -137,6 +137,10 @@
     "components/profile/ProfileIdentityPanel.tsx",
     "components/profile/ProfilePreview.tsx",
     "lib/profileRelationships.ts",
-    "lib/profileUsername.ts"
+    "lib/profileUsername.ts",
+    "lib/profileViewData.ts",
+    "lib/profileRecordData.ts",
+    "lib/profileRecord.ts",
+    "lib/contentModel.ts"
   ]
 }

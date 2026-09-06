@@ -243,18 +243,28 @@ describe("positioning statement editing contract", () => {
     expect(flags).toContain(
       'process.env.NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED === "1"'
     );
-    for (const page of [
-      "app/(main)/[username]/page.tsx",
+    // Wherever a profile projection is built, the gate decides whether the
+    // column is named. The public profile no longer builds one of its own:
+    // it goes through profileViewData, which is the point of that module.
+    for (const source of [
+      "lib/profileViewData.ts",
       "app/(main)/[username]/record/page.tsx",
       "app/(main)/settings/page.tsx",
     ]) {
-      const source = readFileSync(resolve(process.cwd(), page), "utf8");
-      expect(source).toContain("isProfilePositioningEnabled()");
+      const text = readFileSync(resolve(process.cwd(), source), "utf8");
+      expect(text).toContain("isProfilePositioningEnabled()");
       // The column is never named in an unconditional projection.
-      expect(source).not.toMatch(
+      expect(text).not.toMatch(
         /const [A-Z_]*SELECT\s*=\s*\n?\s*"[^"]*positioning_statement[^"]*";/
       );
     }
+
+    // And the page itself names the column nowhere at all.
+    const profilePage = readFileSync(
+      resolve(process.cwd(), "app/(main)/[username]/page.tsx"),
+      "utf8"
+    );
+    expect(profilePage).not.toContain("positioning_statement");
   });
 
   it("does not hard-truncate a paste with maxLength", () => {
