@@ -8,7 +8,12 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import { formatRelativeTime } from "@/lib/utils";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { shouldUseRealtime } from "@/lib/realtime";
-import { sendConversationMessage } from "./actions";
+import {
+  deleteConversationMessage,
+  editConversationMessage,
+  markConversationRead,
+  sendConversationMessage,
+} from "./actions";
 
 interface Message {
   id: string;
@@ -153,11 +158,10 @@ export default function MessageThread({
           const newMessage = payload.new as Message;
           if (newMessage.sender_id !== currentUserId) {
             setMessages((prev) => [...prev, newMessage]);
-            await supabase
-              .from("conversation_participants")
-              .update({ last_read_at: new Date().toISOString() })
-              .eq("conversation_id", conversationId)
-              .eq("user_id", currentUserId);
+            // Membership is established on the server. This tab can still see
+            // the realtime event because the subscription's own RLS allows it,
+            // but the write that follows is no longer this tab's to make.
+            await markConversationRead({ conversationId });
           }
         }
       )
@@ -296,13 +300,12 @@ export default function MessageThread({
   };
 
   const handleDelete = async (messageId: string) => {
-    const deletedAt = new Date().toISOString();
-    await supabase
-      .from("messages")
-      .update({ deleted_at: deletedAt })
-      .eq("id", messageId)
-      .eq("sender_id", currentUserId);
+    const result = await deleteConversationMessage({ messageId });
+    if (result.error || !result.deletedAt) return;
 
+    // The server's timestamp, not one this tab invented, so what is shown is
+    // what was stored.
+    const deletedAt = result.deletedAt;
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, deleted_at: deletedAt } : m))
     );
@@ -312,13 +315,10 @@ export default function MessageThread({
     const trimmed = editContent.trim();
     if (!trimmed) return;
 
-    const editedAt = new Date().toISOString();
-    await supabase
-      .from("messages")
-      .update({ content: trimmed, edited_at: editedAt })
-      .eq("id", messageId)
-      .eq("sender_id", currentUserId);
+    const result = await editConversationMessage({ messageId, content: trimmed });
+    if (result.error || !result.editedAt) return;
 
+    const editedAt = result.editedAt;
     setMessages((prev) =>
       prev.map((m) =>
         m.id === messageId ? { ...m, content: trimmed, edited_at: editedAt } : m

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { toggleSavedOpportunity } from "./opportunityActions";
 
 interface SaveOpportunityButtonProps {
   fellowshipId: string;
@@ -29,35 +29,19 @@ export default function SaveOpportunityButton({
     }
 
     setLoading(true);
-    const supabase = createClient();
-    if (saved) {
-      const { error } = await supabase
-        .from("saved_opportunities")
-        .delete()
-        .eq("user_id", userId)
-        .eq("fellowship_id", fellowshipId);
-      if (!error) {
-        setSaved(false);
-        trackActivationEvent({
-          event: "opportunity_unsaved",
-          metadata: { fellowshipId, source },
-        });
-      }
-    } else {
-      const { error } = await supabase.from("saved_opportunities").upsert(
-        {
-          user_id: userId,
-          fellowship_id: fellowshipId,
-        },
-        { onConflict: "user_id,fellowship_id" }
-      );
-      if (!error) {
-        setSaved(true);
-        trackActivationEvent({
-          event: "opportunity_saved",
-          metadata: { fellowshipId, source },
-        });
-      }
+    // The saved row belongs to whoever is signed in, which the server decides.
+    // This component still takes `userId`, but only to know whether to send
+    // the visitor to the sign-in page first.
+    const result = await toggleSavedOpportunity({
+      fellowshipId,
+      save: !saved,
+    });
+    if (result.ok) {
+      setSaved(result.data.saved);
+      trackActivationEvent({
+        event: result.data.saved ? "opportunity_saved" : "opportunity_unsaved",
+        metadata: { fellowshipId, source },
+      });
     }
     setLoading(false);
   };

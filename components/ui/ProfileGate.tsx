@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import UniversitySelect from "@/components/ui/UniversitySelect";
 import Button from "@/components/ui/Button";
-import { isUsernameConflict, USERNAME_TAKEN_MESSAGE } from "@/lib/supabaseErrors";
+import { completeProfileGate } from "@/app/(main)/settings/profileActions";
 
 interface ProfileGateProfile {
   full_name: string | null;
@@ -105,20 +105,22 @@ export default function ProfileGate({
         : university.trim() || null,
     };
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update(payload)
-      .eq("id", userId);
+    // The server resolves the viewer from the session, so this gate can no
+    // longer be pointed at another member's row by changing a prop.
+    const result = await completeProfileGate({
+      fullName: payload.full_name,
+      username: payload.username,
+      university: payload.university,
+    });
 
     setSaving(false);
 
-    if (error) {
-      setUsernameError(isUsernameConflict(error) ? USERNAME_TAKEN_MESSAGE : error.message);
+    if (!result.ok) {
+      setUsernameError(result.error);
       return;
     }
 
-    onComplete(payload);
+    onComplete({ ...payload, username: result.data.username });
   };
 
   return (

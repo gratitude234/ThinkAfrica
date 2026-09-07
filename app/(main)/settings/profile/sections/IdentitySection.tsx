@@ -3,7 +3,7 @@
 import { useState } from "react";
 import AvatarUploader from "@/app/(main)/settings/AvatarUploader";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
-import { createClient } from "@/lib/supabase/client";
+import { saveProfileMedia } from "@/app/(main)/settings/profileActions";
 import type { ProfileCommandCenterModel } from "@/lib/profileCommandCenter";
 import {
   PROFILE_TYPE_OPTIONS,
@@ -59,8 +59,9 @@ export default function IdentitySection({
   // That difference is stated in the section footnote rather than left for an
   // author to discover by navigating away and finding one thing kept.
   const saveMedia = async (column: "avatar_url" | "cover_image_url", value: string | null) => {
-    const supabase = createClient();
-    await supabase.from("profiles").update({ [column]: value }).eq("id", model.identity.id);
+    await saveProfileMedia(
+      column === "avatar_url" ? { avatarUrl: value } : { coverImageUrl: value }
+    );
   };
 
   return (

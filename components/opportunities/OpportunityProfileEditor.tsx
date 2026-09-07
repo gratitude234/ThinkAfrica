@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import TagInput from "@/components/ui/TagInput";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { OPPORTUNITY_LABELS, OPPORTUNITY_TYPES } from "@/lib/opportunities";
-import { createClient } from "@/lib/supabase/client";
+import { saveTalentProfile } from "./opportunityActions";
 
 interface TalentProfile {
   id: string;
@@ -19,12 +19,10 @@ interface TalentProfile {
 }
 
 export default function OpportunityProfileEditor({
-  userId,
   talentProfile,
   source,
   mobileCollapsed = false,
 }: {
-  userId: string;
   talentProfile: TalentProfile | null;
   source: "dashboard" | "profile" | "opportunities";
   mobileCollapsed?: boolean;
@@ -64,26 +62,21 @@ export default function OpportunityProfileEditor({
     setSaved(false);
     setError(null);
 
-    const payload = {
-      user_id: userId,
-      open_to_opportunities: form.open_to_opportunities,
-      opportunity_types: form.opportunity_types,
-      cv_url: form.cv_url.trim() || null,
-      linkedin_url: form.linkedin_url.trim() || null,
+    // The row is keyed on the signed-in member, resolved by the server. This
+    // component no longer sends a user id at all.
+    const result = await saveTalentProfile({
+      openToOpportunities: form.open_to_opportunities,
+      opportunityTypes: form.opportunity_types,
+      cvUrl: form.cv_url,
+      linkedinUrl: form.linkedin_url,
       skills: form.skills,
       visibility: form.visibility,
-      updated_at: new Date().toISOString(),
-    };
-
-    const supabase = createClient();
-    const { error: saveError } = await supabase
-      .from("talent_profiles")
-      .upsert(payload, { onConflict: "user_id" });
+    });
 
     setSaving(false);
 
-    if (saveError) {
-      setError(saveError.message);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
 

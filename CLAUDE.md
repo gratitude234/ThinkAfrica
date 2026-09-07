@@ -37,6 +37,11 @@ Optional:
 - `NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED`: Set to `1` only after `20260826000001_profile_positioning_statement.sql` is applied and verified. Until then the public profile, the full record and settings leave the `positioning_statement` column out of their projections, because PostgREST rejects a select naming a column that does not exist
 - `EMAIL_SENDER_DOMAIN` / `EMAIL_PLATFORM_SENDER_DOMAIN`: Domains the five sender identities in `lib/emailSenders.ts` send from. Both default to `NEXT_PUBLIC_APP_DOMAIN`. The identities themselves are not configurable; `EMAIL_FROM` is no longer read
 - `RESEND_WEBHOOK_SECRET`: Signing secret for `/api/webhooks/resend`. Without it the route answers 503 and broadcasts record no delivery. Subscribe the endpoint to `email.delivered`, `email.bounced`, `email.complained`, `email.failed`, `email.suppressed` and `contact.updated`
+- `SUPABASE_SERVER_TIMEOUT_MS`: Deadline in milliseconds on every PostgREST and Auth call made through `lib/supabase/server.ts`. Defaults to `8000`; `0` disables it. Storage is always exempt. See `lib/supabase/fetchTimeout.ts`
+- `POST_QUERY_DEBUG`: Set to `1` to log one `[post/<slug>] core post query executed` line per core post lookup. Off by default; used to confirm in production that `generateMetadata` and the page share one query
+- `DATABASE_ADAPTER`: Which implementation `lib/db` answers from. Unset (the default) and `supabase` both mean Supabase PostgREST, which is what production runs. `postgres` selects the direct-SQL adapter, which needs `DATABASE_URL`. Any other value throws, so a typo during a cutover is not mistaken for a decision to stay on Supabase. See `docs/neon-migration-plan.md`
+- `DATABASE_URL`: Pooled PostgreSQL connection string, read only when `DATABASE_ADAPTER=postgres`. Preview and scratch only for now; production does not set it. In a Cloudflare Worker this is **not** read: the connection string comes from the Hyperdrive binding through `setConnectionString()`
+- `DATABASE_URL_DIRECT`: Unpooled admin connection for migrations and DDL, under a different role. Deliberately never read at runtime
 - `GOOGLE_TTS_API_KEY`: Text-to-speech
 - `CRON_SECRET`: Authenticates Vercel Cron requests to `/api/cron/*` routes (Vercel sends it automatically as `Authorization: Bearer <value>` when set)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_MAILTO`: Web push (VAPID keypair + contact address for `lib/push.ts`)
@@ -92,11 +97,37 @@ API routes (`app/api/`):
 ### Data Layer
 
 Supabase clients are split by context. Always use the right one:
-- `lib/supabase/browser.ts`: client components
+- `lib/supabase/client.ts`: client components
 - `lib/supabase/server.ts`: server components and route handlers
 - `lib/supabase/admin.ts`: server-only operations requiring elevated privileges
 
 The feed is driven by `lib/feedData.ts` (`fetchFeedPage()`) with tab/timeframe/type filtering and custom ranking logic in `lib/feedRanking.ts`. Quality signals come from `lib/postQuality.ts`.
+
+`lib/db` is the provider boundary for the migration off PostgREST. It holds the
+row shapes and repository contracts (`lib/db/types.ts`), the Supabase
+implementation that production runs (`lib/db/supabase/`), and the direct-SQL
+implementation that will run against Neon (`lib/db/postgres/`).
+`getDatabase()` picks between them from `DATABASE_ADAPTER`, process-wide rather
+than per request, so a page is never composed of rows from two databases.
+
+One domain is behind it so far: the core post lookup, which `lib/postBySlug.ts`
+now asks for instead of querying itself. Everything else still calls Supabase
+directly, and the audit of what that means is in
+`docs/database-access-inventory.md`.
+
+`postgres.js` is installed and `lib/db/postgres/connection.ts` opens a real
+pool. Its options (`max: 5`, `prepare: false`, an 8-second
+`statement_timeout`) are not preferences and are pinned by a test; the reasons
+are in `docs/neon-migration-plan.md` §2.
+
+Two rules for anything moved next:
+
+- A repository is `server-only` and takes the acting user id as a required
+  argument when it mutates. RLS is what refuses an unauthorized write today,
+  and a direct connection does not have it.
+- The Supabase and Postgres implementations of a method must be behaviourally
+  identical, not merely similar. `lib/db/postgres/posts.ts` documents the four
+  places where a faithful port is not the obvious one.
 
 ### Authentication & Authorization
 
@@ -126,6 +157,10 @@ Post type minimum word counts: blog (50), essay (500), policy_brief (400), resea
 | `lib/roles.ts` | Permission helpers |
 | `lib/opportunityMatch.ts` | Fellowship recommendation matching |
 | `lib/citationId.ts` | Citation ID generation for publications |
+| `lib/postBySlug.ts` | The one core post lookup for `/post/[slug]`, memoised per render with React `cache()` |
+| `lib/serverAuth.ts` | `getCurrentUser()`, the session validation memoised per render |
+| `lib/supabase/fetchTimeout.ts` | Fail-fast deadline on PostgREST and Auth calls |
+| `lib/db/` | The provider boundary: repository contracts, the Supabase implementation, and the direct-SQL one |
 
 ### Component Organization
 
@@ -275,6 +310,14 @@ address on it. Three rules the code depends on:
   already in a segment leaves it on the next sync, which pushes it with no
   segments.
 
+Database telemetry (`20260908000001_database_telemetry.sql`) adds four private
+tables (`db_health_snapshots`, `db_connection_snapshots`, `db_activity_snapshots`,
+`db_query_snapshots`), two delta views and `private.db_incident_report()`. RLS on,
+no policies, `private` schema, so only a BYPASSRLS role reads them. The capture
+job runs every five minutes under an 8-second statement timeout and prunes to
+seven days inside the same run. It never resets `pg_stat_statements`: the
+accumulated counters are the evidence. See `docs/database-incident-diagnostics.md`.
+
 Schema: `supabase/schema.sql` (base) + `supabase/schema_phase2-5.sql` (incremental). Timestamped migrations in `supabase/migrations/`. Apply via Supabase dashboard or CLI. There is no local migration runner configured, so `supabase/migrations/emailBroadcastsMigration.test.ts` asserts the contracts that would otherwise only fail in production.
 
 Scheduling lives in Supabase Cron, not `vercel.json`. Adding a job means editing
@@ -282,3 +325,60 @@ all four private functions in `20260827110918_migrate_scheduler_to_supabase_cron
 (dispatch allowlist, remove set, inspect set, install) and then running
 `select private.install_indegenius_cron_jobs();`. See
 `20260902000002_schedule_resend_segment_sync.sql` for the pattern.
+
+### Infrastructure migration (in progress)
+
+Indegenius is moving from Vercel + Supabase to Cloudflare Workers + Hyperdrive
++ Neon + Better Auth + R2. Resend stays. **Production is still entirely on
+Vercel + Supabase**; Phase 1 is an audit plus one database-abstraction proof of
+concept, and nothing about auth, storage, DNS or hosting has changed.
+
+Four documents carry the plan, and they are the answer to "can I just query
+that table here":
+
+| Doc | Covers |
+|---|---|
+| `docs/database-access-inventory.md` | Every database call site, classified. Browser-side access, tables, RPCs, what is obsolete |
+| `docs/auth-and-rls-migration.md` | `auth.users`, the 146 RLS policies, and where authorization has to move to |
+| `docs/neon-migration-plan.md` | Driver choice, `lib/db`, the Neon runbook, Hyperdrive, environment variables |
+| `docs/post-page-query-path.md` §8 | The article's 17 round trips, classified for the caching work |
+| `docs/rpc-identity-migration.md` | The 22 `auth.uid()` RPCs, the six that are parameterised, and the rollout |
+| `docs/pending-migration-decisions.md` | Which `supabase/pending/` candidates are actually live. Four of five are |
+| `docs/neon-schema-transformation.md` | The Supabase to Neon pipeline, the manifest, and the two driver bugs it found |
+| `docs/realtime-blocker.md` | What depends on Supabase Realtime, and the options for replacing it |
+
+Four constraints that apply to new code written before the migration lands:
+
+- **Never write to the database from a client component.** Phase 2 took this to
+  zero: all twenty table writes and all five write-RPCs moved behind server
+  actions and one route handler. `lib/browserWriteBoundary.test.ts` enforces
+  it, so a new one is a failing test rather than a review comment. Fifteen
+  client components still *read*, and those are classified in
+  `docs/database-access-inventory.md` §3.
+- **A mutation never takes a user, profile or owner id as an argument.** The
+  server resolves the viewer with `requireViewer()` from `lib/serverActions.ts`.
+  An argument is something a browser can choose, and RLS is what currently
+  makes a forged one harmless. A direct PostgreSQL connection will not.
+- **Do not add a database function that derives the actor from `auth.uid()`.**
+  Take the user id as a parameter and raise on null. `auth.uid()` returns null
+  off Supabase, so a guard written that way does not fail after the migration:
+  it silently updates nothing and reports success. See
+  `20260909000001_parameterize_identity_rpcs.sql` for the shape.
+- **Do not rely on RLS as the only check on a write.** New writes authorize
+  explicitly, in this order: authenticated, owns the resource, role permits it,
+  business rules, and then check the affected row count. An
+  `UPDATE ... WHERE id = $1 AND owner = $2` whose result nobody inspects is the
+  same silent failure as `auth.uid()`.
+
+Two things Phase 3 established that change how to read the rest of this file:
+
+- **The catalogue is the source of truth, not `supabase/migrations/`.** Four of
+  the five candidates in `supabase/pending/` are applied in production despite
+  having no promoted migration file, and three objects exist that the
+  repository has no `CREATE TABLE` for. Before reasoning about the schema, read
+  it: `node scripts/migration/measure-supabase.mjs`.
+- **`postgres.js` runs with `fetch_types: false`**, so it has no type OIDs.
+  Arrays neither serialise as parameters nor parse as results. Pass scalars,
+  and select an array column as `to_jsonb(...)`. Both failure modes reached a
+  running application before anything caught them; see
+  `docs/neon-schema-transformation.md` §5.

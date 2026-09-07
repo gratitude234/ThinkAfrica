@@ -107,6 +107,7 @@ export default function DiscussionSection({
             userId={userId}
             userProfileId={userProfileId}
             showHeading={responseCards.length > 0}
+            totalCount={commentCount}
           />
         </Suspense>
       </div>

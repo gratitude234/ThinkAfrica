@@ -17,7 +17,9 @@ import {
 // commentThread would pull `server-only` into the client bundle.
 import type { ThreadComment, ThreadReply } from "@/lib/commentThread";
 import { DEFAULT_COMMENT_SORT, type CommentSort } from "@/lib/commentSort";
-import { deleteComment, loadMoreComments, submitComment, updateComment } from "./commentActions";
+import { deleteComment, loadMoreComments, submitComment, updateComment ,
+  toggleCommentVote,
+} from "./commentActions";
 
 export type { ThreadComment as CommentItem, ThreadReply as ReplyItem };
 
@@ -123,26 +125,22 @@ export default function CommentThread({
       userVoted: !currentlyVoted,
     }));
 
-    // Votes are the one comment mutation that goes through the RPC rather than
-    // a server action: toggle_comment_vote is SECURITY DEFINER and is the only
-    // thing that keeps comments.upvotes in step with comment_votes.
-    const supabase = createClient();
-    const { data, error } = await supabase.rpc("toggle_comment_vote", {
-      p_comment_id: commentId,
-    });
+    // The vote is still one SECURITY DEFINER function, because it is the only
+    // thing that keeps comments.upvotes in step with comment_votes. What moved
+    // is who calls it: this component no longer holds a Supabase client.
+    const result = await toggleCommentVote({ commentId });
 
-    if (error) {
+    if (!result.ok) {
       mapComment(commentId, (item) => ({
         ...item,
         upvotes: Math.max(0, item.upvotes - delta),
         userVoted: currentlyVoted,
       }));
-      setToastMessage(error.message);
+      setToastMessage(result.error);
       return;
     }
 
-    const result = data as { voted: boolean; upvotes: number } | null;
-    if (result) {
+    {
       mapComment(commentId, (item) => ({
         ...item,
         upvotes: result.upvotes,

@@ -3,9 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import NotificationsForm, { type NotificationPrefs } from "./NotificationsForm";
 
-const rpc = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({ rpc }),
+/** The per-switch autosave is still one RPC per switch, but the form no longer
+ *  calls it: setNotificationPreference resolves the acting member from the
+ *  session and then calls it. The assertions below are unchanged in substance,
+ *  and now read the action's argument rather than PostgREST's. */
+const setPreference = vi.hoisted(() => vi.fn());
+const savePrefs = vi.hoisted(() => vi.fn());
+vi.mock("./profileActions", () => ({
+  setNotificationPreference: setPreference,
+  saveNotificationPrefs: savePrefs,
 }));
 vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
 vi.mock("@/lib/pushClient", () => ({
@@ -65,7 +71,8 @@ describe("NotificationsForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    rpc.mockResolvedValue({ error: null });
+    setPreference.mockResolvedValue({ ok: true, data: null });
+    savePrefs.mockResolvedValue({ ok: true, data: null });
   });
 
   it("keeps account-wide push preferences editable on an unsupported device", async () => {
@@ -99,18 +106,26 @@ describe("NotificationsForm", () => {
       screen.getByRole("switch", { name: "In-app: Likes" })
     );
     await waitFor(() => {
-      expect(rpc).toHaveBeenCalledWith("set_notification_preference", {
-        p_key: "inapp_likes",
-        p_enabled: false,
+      expect(setPreference).toHaveBeenCalledWith({
+        key: "inapp_likes",
+        enabled: false,
       });
     });
+  });
+
+  it("sends no member id, so a switch cannot be flipped on another account", () => {
+    // profileId is still a prop, for the push-nudge storage key. It is
+    // deliberately not part of what the save sends.
+    for (const call of setPreference.mock.calls) {
+      expect(Object.keys(call[0])).toEqual(["key", "enabled"]);
+    }
   });
 });
 
 describe("the announcements preference", () => {
   beforeEach(() => {
-    rpc.mockReset();
-    rpc.mockResolvedValue({ data: {}, error: null });
+    setPreference.mockReset();
+    setPreference.mockResolvedValue({ ok: true, data: null });
   });
 
   it("is offered as its own switch, separate from the weekly digest", async () => {
@@ -129,6 +144,13 @@ describe("the announcements preference", () => {
   it("saves under the key the broadcast eligibility rule reads", async () => {
     // set_notification_preference validates against a hardcoded allowlist, so
     // a key the function does not know about throws rather than saving.
+    //
+    // All three flags, because isAuthorSubscriptionsUxV2Enabled() reads all
+    // three and the per-switch autosave only exists under V2. This used to
+    // stub one and rely on the other two leaking from the previous describe's
+    // last test, which made it pass for a reason unrelated to what it checks.
+    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED", "1");
+    vi.stubEnv("NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED", "1");
     vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED", "1");
 
     render(<NotificationsForm profileId="user-a" notificationPrefs={prefs} />);
@@ -138,9 +160,9 @@ describe("the announcements preference", () => {
     );
 
     await waitFor(() => {
-      expect(rpc).toHaveBeenCalledWith("set_notification_preference", {
-        p_key: "email_announcements",
-        p_enabled: false,
+      expect(setPreference).toHaveBeenCalledWith({
+        key: "email_announcements",
+        enabled: false,
       });
     });
   });

@@ -3,6 +3,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getPostAuthor,
+  getPostBySlug,
+  type AuthorProfile,
+  type PostRecord,
+} from "@/lib/postBySlug";
+import { getCurrentUser } from "@/lib/serverAuth";
 import { SITE_URL, canonicalPath, absoluteUrl } from "@/lib/site";
 import UserAvatar from "@/components/ui/UserAvatar";
 import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
@@ -70,53 +77,10 @@ function parseResponsePages(raw: string | string[] | undefined): number {
   return Math.min(Math.max(parsed, 1), 20);
 }
 
-interface AuthorProfile {
-  id: string;
-  username: string;
-  full_name: string | null;
-  university: string | null;
-  field_of_study: string | null;
-  bio: string | null;
-  avatar_url: string | null;
-  verified?: boolean;
-  verified_type?: string | null;
-}
-
 interface ParentPostRef {
   id: string;
   title: string | null;
   slug: string;
-}
-
-interface PostRecord {
-  id: string;
-  title: string | null;
-  slug: string;
-  content: string | null;
-  excerpt: string | null;
-  type: string;
-  content_kind?: string | null;
-  article_format?: string | null;
-  tags: string[] | null;
-  status: string;
-  author_id: string;
-  created_at: string;
-  published_at: string | null;
-  view_count: number | null;
-  impression_count: number | null;
-  read_count: number | null;
-  cover_image_url: string | null;
-  citation_id: string | null;
-  published_version_id: string | null;
-  current_round: number | null;
-  revision_due_at: string | null;
-  in_response_to: string | null;
-  audio_summary_url: string | null;
-  document_path: string | null;
-  document_original_name: string | null;
-  document_mime_type: string | null;
-  document_size_bytes: number | null;
-  profiles: AuthorProfile | AuthorProfile[] | null;
 }
 
 interface ReferenceRecord {
@@ -247,10 +211,6 @@ function renderReferenceShortcodes(content: string): string {
   );
 }
 
-function getAuthor(post: PostRecord): AuthorProfile | null {
-  return Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles;
-}
-
 // Evidence-based, not name-based: a post's type/kind says its workflow
 // *requires* review, but only citation_id/published_version_id prove a
 // specific record actually completed it (see lib/contentModel.ts).
@@ -324,11 +284,6 @@ function getVersionKindLabel(value: string | null | undefined) {
   return value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function throwPostQueryError(slug: string, stage: "metadata" | "page", error: unknown): never {
-  console.error(`[post/${slug}] ${stage} query failed`, error);
-  throw new Error(`Failed to load post "${slug}".`);
 }
 
 function getFullQualitySummary({
@@ -1560,23 +1515,12 @@ async function ResearchDossierSidebar({
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: post, error: postError } = await supabase
-    .from("posts")
-    .select(
-      "title, excerpt, content, cover_image_url, slug, status, author_id, type, profiles!posts_author_id_fkey(full_name, username, university)"
-    )
-    .eq("slug", slug)
-    .in("status", ["published", "pending", "pending_revision", "draft"])
-    .maybeSingle();
-
-  if (postError) {
-    throwPostQueryError(slug, "metadata", postError);
-  }
+  // Both of these are memoised for this render, so the page component below
+  // reuses them instead of asking the database and the auth server again.
+  const [post, user] = await Promise.all([
+    getPostBySlug(slug),
+    getCurrentUser(),
+  ]);
 
   if (!post) return { title: "Post not found - Indegenius" };
   if (!isResearchEnabled() && post.type === "research") {
@@ -1591,13 +1535,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: "Post not found - Indegenius" };
   }
 
-  const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+  const author = getPostAuthor(post);
   const authorLabel = author?.full_name ?? author?.username ?? "an Indegenius contributor";
   const metadataTitle = getPostMetadataTitle(post, author);
-  const coverUrl = (post as { cover_image_url?: string | null }).cover_image_url;
+  const coverUrl = post.cover_image_url;
   const description = getPostMetaDescription({
     excerpt: post.excerpt,
-    content: (post as { content?: string | null }).content,
+    content: post.content,
     fallback: `Read this post by ${authorLabel} on Indegenius`,
   });
   // TODO(gratitude): confirm production domain — SITE_URL is a placeholder until then.
@@ -1636,33 +1580,14 @@ export default async function PostPage({ params, searchParams }: PageProps) {
   const responsePages = parseResponsePages((await searchParams)?.responses);
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // generateMetadata() ran first and asked for exactly these two things, so
+  // both are already resolved here. See lib/postBySlug.ts.
+  const [post, user] = await Promise.all([
+    getPostBySlug(slug),
+    getCurrentUser(),
+  ]);
 
-  const { data: postRaw, error: postError } = await supabase
-    .from("posts")
-    .select(
-      `
-      id, title, slug, content, excerpt, type, content_kind, article_format, tags, status, author_id,
-      created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id,
-      published_version_id, current_round, revision_due_at,
-      in_response_to,
-      audio_summary_url,
-      document_path, document_original_name, document_mime_type, document_size_bytes,
-      profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url, verified, verified_type)
-    `
-    )
-    .eq("slug", slug)
-    .in("status", ["published", "pending", "pending_revision", "draft"])
-    .maybeSingle();
-
-  if (postError) {
-    throwPostQueryError(slug, "page", postError);
-  }
-
-  if (!postRaw) notFound();
-  const post = postRaw as PostRecord;
+  if (!post) notFound();
 
   if (!isResearchEnabled() && resolveContentKind(post) === "research") notFound();
 
@@ -1710,7 +1635,7 @@ export default async function PostPage({ params, searchParams }: PageProps) {
   const engagementToken = isPublished
     ? createPostEngagementToken(post.id, slug)
     : null;
-  const author = getAuthor(post);
+  const author = getPostAuthor(post);
   const sanitizedContent = sanitizePostHtml(post.content);
   const sanitizedExcerpt = sanitizePostExcerpt(post.excerpt);
   const readTime = estimateReadTime(sanitizedContent);

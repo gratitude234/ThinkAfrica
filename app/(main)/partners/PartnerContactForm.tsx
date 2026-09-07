@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 export default function PartnerContactForm() {
   const [form, setForm] = useState({
@@ -18,15 +17,31 @@ export default function PartnerContactForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = createClient();
-    const { error: err } = await supabase
-      .from("contact_requests")
-      .insert([form]);
-    if (err) {
-      setError(err.message);
+
+    // This used to insert straight into contact_requests with an anon Supabase
+    // client and no check of any kind behind it. The route validates,
+    // normalizes and rate-limits before anything reaches the table.
+    try {
+      const response = await fetch("/api/partner-contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setError(payload?.error ?? "Your message could not be sent. Try again.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("Your message could not be sent. Try again.");
       setLoading(false);
       return;
     }
+
     setLoading(false);
     setSubmitted(true);
   };

@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import {
+  saveNotificationPrefs,
+  setNotificationPreference,
+} from "./profileActions";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import {
   getCurrentPushDeviceState,
@@ -176,13 +179,9 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
 
   const handleSave = async () => {
     setSaving(true);
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ notification_prefs: prefs })
-      .eq("id", profileId);
+    const result = await saveNotificationPrefs({ prefs });
     setSaving(false);
-    setToast(error ? error.message : "Preferences saved.");
+    setToast(result.ok ? "Preferences saved." : result.error);
   };
 
   const updatePreference = async (
@@ -200,14 +199,14 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
     setPrefs((current) => ({ ...current, [key]: nextValue }));
     setSwitchStatus((current) => ({ ...current, [key]: "saving" }));
 
-    const supabase = createClient();
-    const { error } = await supabase.rpc("set_notification_preference", {
-      p_key: key,
-      p_enabled: nextValue,
-    });
+    // Still one key at a time through the RPC, which writes inside the jsonb
+    // without a read-modify-write, so two switches flipped in quick succession
+    // do not overwrite each other. What changed is that the server resolves
+    // who is flipping it.
+    const result = await setNotificationPreference({ key, enabled: nextValue });
     if (switchRequestRef.current[key] !== requestId) return;
 
-    if (error) {
+    if (!result.ok) {
       setPrefs((current) => ({ ...current, [key]: previousValue }));
       setSwitchStatus((current) => ({ ...current, [key]: "error" }));
       return;

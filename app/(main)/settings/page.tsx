@@ -261,7 +261,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
           </>
         )}
         {tab === "privacy" && (
-          <PrivacyForm profileId={profile.id} privacySettings={privacySettings} />
+          <PrivacyForm privacySettings={privacySettings} />
         )}
       </div>
     </div>

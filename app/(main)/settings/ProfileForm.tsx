@@ -30,10 +30,8 @@ import {
   getProfileUsernameError,
   normalizeProfileUsername,
 } from "@/lib/profileUsername";
-import {
-  deriveLegacyOnboardingPreference,
-  type OnboardingPreference,
-} from "@/lib/onboarding";
+import { type OnboardingPreference } from "@/lib/onboarding";
+import { saveProfileDetails, saveProfileMedia } from "./profileActions";
 
 const COMMON_INTERESTS = [
   "economics",
@@ -215,45 +213,31 @@ export default function ProfileForm({
     });
   };
 
-  // FIX: Auto-save avatar URL to DB immediately on upload
+  // Media saves the moment it uploads, unlike every other field on this form.
+  // The write goes through saveProfileMedia, which resolves the viewer from the
+  // session and checks the URL belongs to this project's own storage.
   const handleAvatarUpload = async (url: string) => {
     setAvatarUrl(url);
-
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ avatar_url: url })
-      .eq("id", profile.id);
-
-    if (error) {
+    const result = await saveProfileMedia({ avatarUrl: url });
+    if (!result.ok) {
       setToast("Failed to save profile photo.");
     }
   };
 
-  // FIX: Auto-save cover URL to DB immediately on upload
   const handleCoverUpload = async (url: string) => {
     setCoverImageUrl(url);
-
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ cover_image_url: url })
-      .eq("id", profile.id);
-
-    if (error) {
+    const result = await saveProfileMedia({ coverImageUrl: url });
+    if (!result.ok) {
       setToast("Failed to save cover photo.");
     }
   };
 
-  // FIX: Auto-clear cover URL in DB on remove
   const handleCoverRemove = async () => {
     setCoverImageUrl(null);
-
-    const supabase = createClient();
-    await supabase
-      .from("profiles")
-      .update({ cover_image_url: null })
-      .eq("id", profile.id);
+    const result = await saveProfileMedia({ coverImageUrl: null });
+    if (!result.ok) {
+      setToast("Failed to remove cover photo.");
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -295,67 +279,50 @@ export default function ProfileForm({
       }
     }
 
-    const supabase = createClient();
     const nextSecondaryProfileTypes = normalizeSecondaryProfileTypes(
       secondaryProfileTypes,
       profileType
     );
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        full_name: fullName,
-        username,
-        bio,
-        // Normalized on the way in, so a pasted line break does not open a
-        // gap under the author's name on their public profile. Empty saves as
-        // NULL: the column's CHECK rejects a whitespace-only value, and a
-        // reader should not have to tell blank from absent.
-        ...(positioningEnabled
-          ? {
-              positioning_statement:
-                normalizePositioningStatement(positioningStatement),
-            }
-          : {}),
-        profile_type: profileType,
-        secondary_profile_types: nextSecondaryProfileTypes,
-        country,
-        university: university.trim(),
-        field_of_study: fieldOfStudy,
-        graduation_year: parsedYear,
-        organization_name: organizationName.trim() || null,
-        professional_title: professionalTitle.trim() || null,
-        organization_website: organizationWebsite.trim() || null,
-        open_to_mentoring: openToMentoring,
-        interests,
-        avatar_url: avatarUrl,
-        cover_image_url: coverImageUrl,
-      })
-      .eq("id", profile.id);
+    // Every check above runs again on the server, which is where the decision
+    // is actually made. saveProfileDetails resolves the viewer from the
+    // session, so the row written is the viewer's own whatever this form
+    // thinks `profile.id` is. Positioning normalisation and the recommendation
+    // preference moved with it.
+    const result = await saveProfileDetails({
+      fullName,
+      username,
+      bio,
+      positioningStatement,
+      profileType,
+      secondaryProfileTypes: nextSecondaryProfileTypes,
+      country,
+      university,
+      fieldOfStudy,
+      graduationYear,
+      organizationName,
+      professionalTitle,
+      organizationWebsite,
+      openToMentoring,
+      interests,
+      avatarUrl,
+      coverImageUrl,
+      syncRecommendationPreference:
+        profileType !== savedProfileTypeRef.current ||
+        !onboardingPreference?.currentPath,
+    });
 
-    if (error) {
+    if (!result.ok) {
       setSaving(false);
-      setToast(`Failed to save: ${error.message}`);
+      setToast(result.error);
       return;
     }
 
-    const nextPreference = deriveLegacyOnboardingPreference(profileType);
-    const profileTypeChanged = profileType !== savedProfileTypeRef.current;
-    const hasStoredPreference = Boolean(onboardingPreference?.currentPath);
-    if (nextPreference.currentPath && (profileTypeChanged || !hasStoredPreference)) {
-      const { error: preferenceError } = await supabase.rpc(
-        "save_onboarding_preferences",
-        {
-          p_current_path: nextPreference.currentPath,
-          p_work_category: nextPreference.workCategory,
-        }
-      );
-      if (preferenceError) {
-        setSaving(false);
-        setToast("Profile saved, but recommendation settings could not be updated.");
-        router.refresh();
-        return;
-      }
+    if (result.data.preferenceFailed) {
+      setSaving(false);
+      setToast("Profile saved, but recommendation settings could not be updated.");
+      router.refresh();
+      return;
     }
 
     setSaving(false);
@@ -364,10 +331,12 @@ export default function ProfileForm({
     setSecondaryProfileTypes(nextSecondaryProfileTypes);
     setPositioningStatement(normalizePositioningStatement(positioningStatement) ?? "");
     setToast("Profile saved successfully!");
-    if (username !== profile.username) {
+    // The server normalises the username, so the redirect follows what was
+    // actually stored rather than what this form sent.
+    if (result.data.username !== profile.username) {
       // Hard redirect forces the server layout to re-fetch the profile,
       // so the nav "Me" link immediately reflects the new username.
-      window.location.href = `/${username}`;
+      window.location.href = `/${result.data.username}`;
     } else {
       router.refresh();
     }

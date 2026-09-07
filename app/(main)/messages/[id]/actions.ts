@@ -192,3 +192,197 @@ export async function sendConversationMessage(
 
   return { error: null, message };
 }
+
+// ---------------------------------------------------------------------------
+// Mutations migrated out of MessageThread
+// ---------------------------------------------------------------------------
+
+/**
+ * Three writes used to leave the browser directly: marking a conversation
+ * read, soft-deleting a message, and editing one. Each carried its own
+ * predicate (`.eq("sender_id", currentUserId)`) built from a prop, and each
+ * relied on RLS to refuse a conversation the viewer was not in.
+ *
+ * They are the same three operations here, with membership and ownership
+ * established before the statement rather than alongside it. None of them
+ * takes a user id: `currentUserId` was a prop, and a prop is something a
+ * browser chooses.
+ */
+
+/** Membership is the gate for everything in a conversation. Asked once,
+ *  the same way `sendConversationMessage` asks it. */
+async function isConversationParticipant(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  conversationId: string,
+  userId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("conversation_participants")
+    .select("user_id")
+    .eq("conversation_id", conversationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[messages] participant lookup failed", error);
+    return false;
+  }
+  return Boolean(data);
+}
+
+export async function markConversationRead(input: {
+  conversationId: string;
+}): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  if (!(await isConversationParticipant(supabase, input.conversationId, user.id))) {
+    // Same sentence whether the conversation is missing or not theirs: the
+    // difference would let anyone probe for conversation ids.
+    return { error: "You cannot read this conversation." };
+  }
+
+  const { error } = await supabase
+    .from("conversation_participants")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("conversation_id", input.conversationId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error("[messages] mark read failed", error);
+    return { error: "Could not update this conversation." };
+  }
+  return { error: null };
+}
+
+/**
+ * The row a mutation is about to touch, loaded before it is touched.
+ *
+ * Both the edit and the delete need the same three facts, and neither can get
+ * them from a filtered update: `UPDATE ... WHERE id = $1 AND sender_id = $2`
+ * cannot tell "someone else's message" from "no such message", and the
+ * difference decides whether the caller is refused or told nothing happened.
+ */
+async function loadOwnMessage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  messageId: string,
+  userId: string
+): Promise<
+  | { ok: true; message: { id: string; conversation_id: string; deleted_at: string | null } }
+  | { ok: false; error: string }
+> {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id, conversation_id, sender_id, deleted_at")
+    .eq("id", messageId)
+    .maybeSingle<{
+      id: string;
+      conversation_id: string;
+      sender_id: string;
+      deleted_at: string | null;
+    }>();
+
+  if (error) {
+    console.error("[messages] message lookup failed", error);
+    return { ok: false, error: "Could not load that message." };
+  }
+  if (!data || data.sender_id !== userId) {
+    return { ok: false, error: "You cannot change that message." };
+  }
+  if (!(await isConversationParticipant(supabase, data.conversation_id, userId))) {
+    // A sender who has since left the conversation does not keep write access
+    // to what is now someone else's thread.
+    return { ok: false, error: "You cannot change that message." };
+  }
+
+  return {
+    ok: true,
+    message: {
+      id: data.id,
+      conversation_id: data.conversation_id,
+      deleted_at: data.deleted_at,
+    },
+  };
+}
+
+export async function deleteConversationMessage(input: {
+  messageId: string;
+}): Promise<{ error: string | null; deletedAt?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const loaded = await loadOwnMessage(supabase, input.messageId, user.id);
+  if (!loaded.ok) return { error: loaded.error };
+  if (loaded.message.deleted_at) {
+    // Already gone. Reported as success so a double click is not an error.
+    return { error: null, deletedAt: loaded.message.deleted_at };
+  }
+
+  const deletedAt = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("messages")
+    .update({ deleted_at: deletedAt })
+    .eq("id", input.messageId)
+    .eq("sender_id", user.id)
+    .is("deleted_at", null)
+    .select("id");
+
+  if (error) {
+    console.error("[messages] delete failed", error);
+    return { error: "Could not delete that message." };
+  }
+  if (((data ?? []) as unknown[]).length === 0) {
+    return { error: "Could not delete that message." };
+  }
+
+  return { error: null, deletedAt };
+}
+
+export async function editConversationMessage(input: {
+  messageId: string;
+  content: string;
+}): Promise<{ error: string | null; editedAt?: string }> {
+  const content = input.content.trim();
+  // The same bounds the insert path enforces, and the same bounds the column's
+  // own CHECK enforces. Stated here so the failure is a sentence rather than a
+  // constraint violation.
+  if (!content) return { error: "Message cannot be empty." };
+  if (content.length > 2000) return { error: "Message cannot exceed 2000 characters." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const loaded = await loadOwnMessage(supabase, input.messageId, user.id);
+  if (!loaded.ok) return { error: loaded.error };
+  if (loaded.message.deleted_at) {
+    return { error: "That message has been deleted." };
+  }
+
+  const editedAt = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("messages")
+    .update({ content, edited_at: editedAt })
+    .eq("id", input.messageId)
+    .eq("sender_id", user.id)
+    .is("deleted_at", null)
+    .select("id");
+
+  if (error) {
+    console.error("[messages] edit failed", error);
+    return { error: "Could not save that edit." };
+  }
+  if (((data ?? []) as unknown[]).length === 0) {
+    return { error: "Could not save that edit." };
+  }
+
+  return { error: null, editedAt };
+}

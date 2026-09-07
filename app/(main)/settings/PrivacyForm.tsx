@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
+import { savePrivacySettings } from "./profileActions";
 
 export interface PrivacySettings {
   profile_visibility: "public" | "members_only";
@@ -15,26 +15,29 @@ const INPUT_STYLES =
   "w-full rounded-xl border border-gray-200 bg-canvas px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 interface Props {
-  profileId: string;
   privacySettings: PrivacySettings;
 }
 
-export default function PrivacyForm({ profileId, privacySettings }: Props) {
+export default function PrivacyForm({ privacySettings }: Props) {
   const [settings, setSettings] = useState<PrivacySettings>(privacySettings);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const handleSave = async () => {
     setSaving(true);
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ privacy_settings: settings })
-      .eq("id", profileId);
+    // The server rebuilds the settings object from three validated values
+    // rather than writing this one through, so nothing can ride along into the
+    // jsonb column, and it resolves the viewer from the session rather than
+    // being handed a profile id.
+    const result = await savePrivacySettings({
+      profileVisibility: settings.profile_visibility,
+      allowMessages: settings.allow_messages,
+      showInDirectory: settings.show_in_directory,
+    });
     setSaving(false);
 
-    if (error) {
-      setToast(error.message);
+    if (!result.ok) {
+      setToast(result.error);
       return;
     }
     setToast("Privacy settings saved.");

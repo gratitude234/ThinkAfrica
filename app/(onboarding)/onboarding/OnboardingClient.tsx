@@ -33,6 +33,12 @@ import {
 } from "@/lib/profileRecordMetrics";
 import { isProfileType, type ProfileType } from "@/lib/profileTypes";
 import { createClient } from "@/lib/supabase/client";
+import {
+  completeOnboarding,
+  saveOnboardingIdentity,
+  saveOnboardingPath,
+  saveOnboardingTopics,
+} from "./actions";
 
 interface OnboardingClientProps {
   requestedStep: string | null;
@@ -313,13 +319,11 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
 
     setLoading(true);
     setError(null);
-    const { error: saveError } = await createClient().rpc("save_onboarding_path", {
-      p_current_path: currentPath,
-    });
+    const result = await saveOnboardingPath({ currentPath });
     setLoading(false);
 
-    if (saveError) {
-      setError("We couldn't save your choice. Please try again.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
 
@@ -359,20 +363,20 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
 
     setLoading(true);
     setError(null);
-    const { error: saveError } = await createClient().rpc("save_onboarding_identity", {
-      p_current_path: currentPath,
-      p_work_category: currentPath === "non_student" ? workCategory : null,
-      p_country: country,
-      p_university: currentPath === "student" ? university : null,
-      p_field_of_study: currentPath === "student" ? fieldOfStudy : null,
-      p_graduation_year: currentPath === "student" ? parsedGraduationYear : null,
-      p_professional_title: currentPath === "non_student" ? professionalTitle : null,
-      p_organization_name: currentPath === "non_student" ? organizationName : null,
+    const result = await saveOnboardingIdentity({
+      currentPath,
+      workCategory: currentPath === "non_student" ? workCategory : null,
+      country,
+      university: currentPath === "student" ? university : null,
+      fieldOfStudy: currentPath === "student" ? fieldOfStudy : null,
+      graduationYear: currentPath === "student" ? parsedGraduationYear : null,
+      professionalTitle: currentPath === "non_student" ? professionalTitle : null,
+      organizationName: currentPath === "non_student" ? organizationName : null,
     });
     setLoading(false);
 
-    if (saveError) {
-      setError("We couldn't save your profile details. Please try again.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
 
@@ -410,13 +414,11 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
 
     setLoading(true);
     setError(null);
-    const { error: saveError } = await createClient().rpc("save_onboarding_topics", {
-      p_interests: interests,
-    });
+    const result = await saveOnboardingTopics({ interests });
     setLoading(false);
 
-    if (saveError) {
-      setError("We couldn't save your topics. Please try again.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
 
@@ -445,11 +447,11 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
 
     setLoading(true);
     setError(null);
-    const { error: completionError } = await createClient().rpc("complete_onboarding");
+    const completion = await completeOnboarding();
     setLoading(false);
 
-    if (completionError) {
-      setError("We couldn't finish your setup. Your information is saved, so you can try again.");
+    if (!completion.ok) {
+      setError(completion.error);
       return;
     }
 

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { submitFellowshipApplication } from "./applyActions";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 
 interface Props {
@@ -78,17 +78,16 @@ export default function FellowshipApply({
     if (wordCount < 200) return;
     setLoading(true);
     setError(null);
-    const supabase = createClient();
-    const { error: err } = await supabase.from("fellowship_applications").insert([
-      {
-        fellowship_id: fellowshipId,
-        user_id: userId,
-        cover_letter: coverLetter,
-        proof_post_id: proofPostId || null,
-      },
-    ]);
-    if (err) {
-      setError(err.message);
+
+    // The word count, the closed check and the attached-work check are all
+    // re-decided on the server. This form's copies are for feedback.
+    const result = await submitFellowshipApplication({
+      fellowshipId,
+      coverLetter,
+      proofPostId: proofPostId || null,
+    });
+    if (!result.ok) {
+      setError(result.error);
       setLoading(false);
       return;
     }

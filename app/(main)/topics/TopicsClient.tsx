@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { setProfileInterests } from "@/app/(main)/settings/profileActions";
 import Toast from "@/components/ui/Toast";
 import TopicSubscribeButton from "@/components/topic/TopicSubscribeButton";
 import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
@@ -49,15 +49,13 @@ export default function TopicsClient({
     setInterests(nextInterests);
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ interests: nextInterests })
-        .eq("id", userId);
+      const result = await setProfileInterests({ interests: nextInterests });
 
-      if (error) {
+      if (!result.ok) {
         setInterests(interests);
-        setToastMessage(`Failed to update topics: ${error.message}`);
+        setToastMessage(result.error);
+      } else {
+        setInterests(result.data.interests);
       }
     } catch {
       setInterests(interests);

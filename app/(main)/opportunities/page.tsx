@@ -364,7 +364,6 @@ export default async function OpportunitiesPage({ searchParams }: PageProps) {
           />
           <OpportunityReadinessCard summary={readiness} source="opportunities" />
           <OpportunityProfileEditor
-            userId={user.id}
             talentProfile={currentTalentProfile}
             source="opportunities"
             mobileCollapsed

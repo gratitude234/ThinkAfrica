@@ -13,8 +13,14 @@ const client = readFileSync(
   resolve(process.cwd(), "app/(onboarding)/onboarding/OnboardingClient.tsx"),
   "utf8"
 );
+const onboardingActions = readFileSync(
+  resolve(process.cwd(), "app/(onboarding)/onboarding/actions.ts"),
+  "utf8"
+);
+// The settings form used to call save_onboarding_preferences itself. The call
+// moved into the server action when the profile write did.
 const profileSettings = readFileSync(
-  resolve(process.cwd(), "app/(main)/settings/ProfileForm.tsx"),
+  resolve(process.cwd(), "app/(main)/settings/profileActions.ts"),
   "utf8"
 );
 
@@ -39,7 +45,10 @@ describe("identity-first onboarding migration", () => {
   });
 
   it("finishes through the existing atomic RPC without a follow or push step", () => {
-    expect(client).toContain('createClient().rpc("complete_onboarding")');
+    // The call moved into a server action when onboarding's writes left the
+    // browser. It is still the same atomic RPC, and still the only step.
+    expect(onboardingActions).toContain('supabase.rpc("complete_onboarding")');
+    expect(client).toContain("completeOnboarding()");
     expect(client).toContain("Publish your first idea");
     expect(client).toContain("Explore ideas first");
     expect(client).not.toContain("NotificationPermissionPrompt");

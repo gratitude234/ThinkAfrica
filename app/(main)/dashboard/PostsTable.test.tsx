@@ -7,16 +7,29 @@ vi.mock("@/lib/realtime", () => ({
   shouldUseRealtime: () => false,
 }));
 
-const deleteResult = { current: { error: null as { message: string } | null } };
+/** What the server action answers, and the ids it was asked about. The table
+ *  no longer issues a delete of its own: ownership and status are decided in
+ *  app/(write)/write/deleteActions.ts. */
+const deleteResult = {
+  current: { ok: true, data: { deleted: ["post-1"], refusedCount: 0 } } as
+    | { ok: true; data: { deleted: string[]; refusedCount: number } }
+    | { ok: false; error: string },
+};
+const deleteCalls: string[][] = [];
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
-    from: () => ({
-      delete: () => ({
-        eq: () => Promise.resolve(deleteResult.current),
-      }),
-    }),
+    from: () => ({ select: () => ({ eq: () => Promise.resolve({ data: [] }) }) }),
+    channel: () => ({ on: () => ({ on: () => ({ subscribe: () => ({}) }) }) }),
+    removeChannel: () => {},
   }),
+}));
+
+vi.mock("@/app/(write)/write/deleteActions", () => ({
+  deleteOwnDraftPosts: async ({ postIds }: { postIds: string[] }) => {
+    deleteCalls.push(postIds);
+    return deleteResult.current;
+  },
 }));
 
 const withdrawSubmissionMock = vi.fn();
@@ -54,8 +67,11 @@ function pendingSubmission(overrides: Partial<DashboardPost> = {}): DashboardPos
 }
 
 describe("PostsTable delete", () => {
-  it("keeps the row visible and shows an error toast when the database rejects the delete", async () => {
-    deleteResult.current = { error: { message: "This post is no longer an editable draft." } };
+  it("keeps the row visible and shows an error toast when the server refuses the delete", async () => {
+    deleteResult.current = {
+      ok: false,
+      error: "Only drafts can be deleted. Withdraw a submission instead of deleting it.",
+    };
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(<PostsTable posts={[draftPost()]} userId="user-1" />);
@@ -63,14 +79,15 @@ describe("PostsTable delete", () => {
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {
-      expect(screen.getByText("This post is no longer an editable draft.")).toBeInTheDocument();
+      expect(screen.getByText(/Only drafts can be deleted/)).toBeInTheDocument();
     });
     // The row itself is unaffected by a rejected delete -- it stays visible.
     expect(screen.getByText("My draft")).toBeInTheDocument();
   });
 
   it("removes the row and shows no toast when the delete succeeds", async () => {
-    deleteResult.current = { error: null };
+    deleteCalls.length = 0;
+    deleteResult.current = { ok: true, data: { deleted: ["post-1"], refusedCount: 0 } };
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(<PostsTable posts={[draftPost()]} userId="user-1" />);
@@ -80,11 +97,28 @@ describe("PostsTable delete", () => {
     await waitFor(() => {
       expect(screen.queryByText("My draft")).not.toBeInTheDocument();
     });
-    expect(screen.queryByText(/no longer an editable draft/i)).not.toBeInTheDocument();
+    // The post id is all that is sent. An author id is not the client's to
+    // supply, and the action does not accept one.
+    expect(deleteCalls).toEqual([["post-1"]]);
+    expect(screen.queryByText(/Only drafts can be deleted/i)).not.toBeInTheDocument();
+  });
+
+  it("removes only the rows the server reports as deleted", async () => {
+    // A draft submitted for review in another tab is refused server-side. The
+    // list follows what actually went, not what was asked for, so the row
+    // stays on screen rather than disappearing from a table that still has it.
+    deleteResult.current = { ok: true, data: { deleted: [], refusedCount: 1 } };
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<PostsTable posts={[draftPost()]} userId="user-1" />);
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(screen.getByText("My draft")).toBeInTheDocument());
   });
 
   it("does nothing when the confirm dialog is dismissed", async () => {
-    deleteResult.current = { error: null };
+    deleteCalls.length = 0;
+    deleteResult.current = { ok: true, data: { deleted: [], refusedCount: 0 } };
     vi.spyOn(window, "confirm").mockReturnValue(false);
 
     render(<PostsTable posts={[draftPost()]} userId="user-1" />);
@@ -92,6 +126,7 @@ describe("PostsTable delete", () => {
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     expect(screen.getByText("My draft")).toBeInTheDocument();
+    expect(deleteCalls).toEqual([]);
   });
 
   it("never offers Delete for a pending/pending_revision submission -- only Withdraw", () => {

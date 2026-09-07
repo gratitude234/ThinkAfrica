@@ -21,6 +21,7 @@ const onboardingClient = readRepoFile(
   "app/(onboarding)/onboarding/OnboardingClient.tsx"
 );
 const profileSettings = readRepoFile("app/(main)/settings/ProfileForm.tsx");
+const profileActions = readRepoFile("app/(main)/settings/profileActions.ts");
 
 describe("onboarding topic allowlist", () => {
   it("matches the topics the client offers", () => {
@@ -86,12 +87,19 @@ describe("onboarding client loader", () => {
 
 describe("settings preference sync", () => {
   it("only re-derives the work category when the profile type actually changes", () => {
-    expect(profileSettings).toContain(
-      "const profileTypeChanged = profileType !== savedProfileTypeRef.current"
+    // The form still owns the question, because it is the only thing that
+    // knows what the profile type was when the page loaded. It now answers it
+    // as an input to the server action instead of by skipping an RPC itself.
+    expect(profileSettings.replace(/\s+/g, " ")).toContain(
+      "syncRecommendationPreference: profileType !== savedProfileTypeRef.current || !onboardingPreference?.currentPath"
     );
-    expect(profileSettings).toContain(
-      "if (nextPreference.currentPath && (profileTypeChanged || !hasStoredPreference))"
+    expect(profileActions).toContain(
+      "if (input.syncRecommendationPreference && nextPreference.currentPath)"
     );
+    // Deliberately a hint and not an authorization input: the action says so,
+    // and the worst a wrong value can do is skip or repeat an idempotent write
+    // to the viewer's own row.
+    expect(profileActions).toContain("A hint, not an authorization input");
   });
 
   it("splits school fields from work fields by onboarding path, not profile type", () => {

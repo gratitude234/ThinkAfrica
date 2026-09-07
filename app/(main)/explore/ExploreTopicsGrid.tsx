@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { setProfileInterests } from "@/app/(main)/settings/profileActions";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import type { DiscoverTopic } from "@/lib/discoverData";
 import TopicSubscribeButton from "@/components/topic/TopicSubscribeButton";
@@ -44,16 +44,13 @@ export default function ExploreTopicsGrid({
     setInterests(nextInterests);
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ interests: nextInterests })
-        .eq("id", userId);
+      const result = await setProfileInterests({ interests: nextInterests });
 
-      if (error) {
+      if (!result.ok) {
         setInterests(interests);
         return;
       }
+      setInterests(result.data.interests);
 
       trackActivationEvent({
         event: currentlyFollowing ? "discover_item_clicked" : "interest_selected",

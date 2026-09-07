@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { resolveContentKind } from "@/lib/contentModel";
 import { isAbandonedScrap } from "@/lib/contribution";
+import { deleteOwnDraftPosts } from "./deleteActions";
 
 interface Draft {
   id: string;
@@ -82,22 +83,24 @@ export default function MyDrafts({
   const scraps = useMemo(() => filtered.filter((draft) => isAbandonedScrap(draft)), [filtered]);
 
   /**
-   * Deleting a draft is a plain row delete: guard_locked_post_write in the
-   * database is what actually permits it, and only ever for an author's own
-   * draft. A row that changed status in another tab is rejected there.
+   * Deleting a draft goes through a server action that checks ownership and
+   * status before the statement runs. guard_locked_post_write is still
+   * underneath and still only permits an author's own draft, but it is now the
+   * backstop rather than the decision. See lib/postDeletion.ts.
    */
   const remove = useCallback(async (ids: string[]) => {
     if (!ids.length) return;
     setBusy(true);
     setError(null);
-    const supabase = createClient();
-    const { error: deleteError } = await supabase.from("posts").delete().in("id", ids);
+    const result = await deleteOwnDraftPosts({ postIds: ids });
     setBusy(false);
-    if (deleteError) {
-      setError(deleteError.message || "Couldn't delete that. Try again.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    const removed = new Set(ids);
+    // Driven by what the server actually deleted, not by what was asked for,
+    // so a row that stopped being a draft in another tab stays on screen.
+    const removed = new Set(result.data.deleted);
     setDrafts((current) => current.filter((draft) => !removed.has(draft.id)));
     setConfirmingSweep(false);
   }, []);

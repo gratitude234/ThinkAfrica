@@ -19,6 +19,7 @@ import {
   resolveContentKind,
 } from "@/lib/contentModel";
 import { withdrawSubmission } from "@/app/(write)/write/actions";
+import { deleteOwnDraftPosts } from "@/app/(write)/write/deleteActions";
 
 export interface DashboardPostReview {
   assigned_at: string;
@@ -273,23 +274,21 @@ export default function PostsTable({
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this draft? This cannot be undone.")) return;
     setDeletingId(id);
-    const supabase = createClient();
-    const { error } = await supabase.from("posts").delete().eq("id", id);
+    // The delete button only shows for status="draft" rows, but the decision
+    // is not the button's to make. deleteOwnDraftPosts checks ownership and
+    // status on the server before the statement runs, so a post submitted in
+    // another tab is refused with a sentence rather than silently reported as
+    // done. See lib/postDeletion.ts.
+    const result = await deleteOwnDraftPosts({ postIds: [id] });
     setDeletingId(null);
 
-    if (error) {
-      // The delete button only shows for status="draft" rows, but the
-      // actual protection lives in the guard_locked_post_write DB trigger,
-      // which now only allows an author to hard-delete a draft, full stop
-      // -- if this post's status changed underneath this tab (e.g.
-      // submitted in another tab) the delete is rejected here rather than
-      // silently reported as done.
-      setToastMessage(error.message || "Couldn't delete this post.");
+    if (!result.ok) {
+      setToastMessage(result.error);
       return;
     }
 
     statusMapRef.current.delete(id);
-    setRows((prev) => prev.filter((post) => post.id !== id));
+    setRows((prev) => prev.filter((post) => !result.data.deleted.includes(post.id)));
   };
 
   const handleWithdraw = async (id: string) => {

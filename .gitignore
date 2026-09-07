@@ -36,3 +36,8 @@ next-env.d.ts
 .vercel
 .env*
 !.env.example
+
+# Migration working directory. Holds schema dumps and catalogue extracts taken
+# from the live database: table names are harmless, but a dump is a copy of the
+# production schema and does not belong in version control.
+scripts/migration/out/

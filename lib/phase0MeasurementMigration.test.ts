@@ -13,6 +13,10 @@ const onboardingPage = readFileSync(
   resolve(process.cwd(), "app/(onboarding)/onboarding/OnboardingClient.tsx"),
   "utf8"
 );
+const onboardingActions = readFileSync(
+  resolve(process.cwd(), "app/(onboarding)/onboarding/actions.ts"),
+  "utf8"
+);
 const mainLayout = readFileSync(
   resolve(process.cwd(), "app/(main)/layout.tsx"),
   "utf8"
@@ -40,7 +44,9 @@ describe("Phase 0 measurement foundation", () => {
     expect(migration).toContain("coalesce(cardinality(v_interests), 0) < 1");
     expect(migration).toContain("v_profile_type IN ('student', 'researcher', 'educator')");
     expect(migration).toContain("'complete_onboarding_rpc'");
-    expect(onboardingPage).toContain('createClient().rpc("complete_onboarding")');
+    // Called from app/(onboarding)/onboarding/actions.ts now, not from the
+    // client component. Still one RPC, still the only completion path.
+    expect(onboardingActions).toContain('supabase.rpc("complete_onboarding")');
     expect(onboardingPage).not.toContain(
       'trackActivationEvent({ event: "onboarding_completed" })'
     );

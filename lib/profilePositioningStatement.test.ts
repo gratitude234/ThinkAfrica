@@ -23,6 +23,12 @@ const profileForm = readFileSync(
   resolve(process.cwd(), "app/(main)/settings/ProfileForm.tsx"),
   "utf8"
 );
+/** The form no longer writes the column. saveProfileDetails does, and it is
+ *  where the feature gate and the normalisation now have to be. */
+const profileActions = readFileSync(
+  resolve(process.cwd(), "app/(main)/settings/profileActions.ts"),
+  "utf8"
+);
 const pendingContract = readFileSync(
   resolve(process.cwd(), "supabase/pending/profile_private_projection_contract.sql"),
   "utf8"
@@ -216,9 +222,15 @@ describe("positioning statement editing contract", () => {
 
   it("is saved through the existing profile update, with a counter and validation", () => {
     // Whitespace-insensitive: the assertion is about what the save writes,
-    // not about how the formatter wrapped it.
-    expect(profileForm.replace(/\s+/g, " ")).toContain(
-      "positioning_statement: normalizePositioningStatement(positioningStatement)"
+    // not about how the formatter wrapped it. The write moved out of the form
+    // and into the server action, so that is where it is asserted.
+    expect(profileActions.replace(/\s+/g, " ")).toContain(
+      "positioning_statement: normalizePositioningStatement( input.positioningStatement )"
+    );
+    // And the server checks the length itself rather than trusting that the
+    // form's counter stopped anyone.
+    expect(profileActions).toContain(
+      "getPositioningStatementError(input.positioningStatement)"
     );
     expect(profileForm).toContain('id="positioning_statement"');
     expect(profileForm).toContain('htmlFor="positioning_statement"');
@@ -234,10 +246,13 @@ describe("positioning statement editing contract", () => {
     // profile page reads that rejection as a missing profile. Deploying this
     // ahead of the migration without the gate would 404 every public profile.
     expect(profileForm).toContain("positioningEnabled = false");
-    expect(profileForm.replace(/\s+/g, " ")).toContain(
-      "...(positioningEnabled ? { positioning_statement:"
-    );
     expect(profileForm).toContain("{positioningEnabled ? (");
+    // The gate travelled with the write. The action reads the flag itself
+    // rather than taking a prop's word for it, which is what stops a stale
+    // client from naming a column the database does not have.
+    expect(profileActions.replace(/\s+/g, " ")).toContain(
+      "...(isProfilePositioningEnabled() ? { positioning_statement:"
+    );
 
     const flags = readFileSync(resolve(process.cwd(), "lib/featureFlags.ts"), "utf8");
     expect(flags).toContain(
