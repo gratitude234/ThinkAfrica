@@ -187,6 +187,9 @@
     "app/api/topics/route.ts",
     "components/ui/SearchOverlay.tsx",
     "components/ui/TagInput.tsx",
-    "app/(main)/search/page.tsx"
+    "app/(main)/search/page.tsx",
+    "app/(marketing)/landing/landingData.ts",
+    "app/(marketing)/landing/page.tsx",
+    "lib/supabase/admin.ts"
   ]
 }

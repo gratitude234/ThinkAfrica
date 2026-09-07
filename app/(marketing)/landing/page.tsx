@@ -1,21 +1,20 @@
-import { unstable_cache } from "next/cache";
 import type { Metadata } from "next";
 import Footer from "@/components/ui/Footer";
 import PostCover from "@/components/post/PostCover";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { getPublicTopicCounts, type TopicCount } from "@/lib/discoverData";
+import {
+  loadLandingData,
+  TOPICS_DISPLAY_LIMIT,
+  type LandingPost,
+  type LandingPostRaw,
+} from "./landingData";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
 import {
   getArticleFormatLabel,
   resolveArticleFormat,
   resolveContentKind,
 } from "@/lib/contentModel";
-import {
-  FEATURE_FLAGS,
-  RESEARCH_TYPE_QUERY_EXCLUSION,
-} from "@/lib/featureFlags";
+import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
@@ -29,37 +28,22 @@ import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/s
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type LandingPost = {
-  id: string;
-  title: string | null;
-  slug: string;
-  type: string;
-  content_kind?: string | null;
-  article_format?: string | null;
-  excerpt: string | null;
-  cover_image_url: string | null;
-  view_count: number | null;
-  published_at: string | null;
-  featured?: boolean | null;
-  profiles: {
-    username: string | null;
-    full_name: string | null;
-    university: string | null;
-  } | null;
-};
 
-type LandingPostRaw = Omit<LandingPost, "profiles"> & {
-  profiles: LandingPost["profiles"] | LandingPost["profiles"][];
-};
-
-type LandingData = {
-  postsRaw: LandingPostRaw[];
-  postCount: number;
-  userCount: number;
-  topics: TopicCount[];
-};
-
-export const revalidate = 300;
+/**
+ * Rendered per request, not at build time.
+ *
+ * This page is the front door and it reads four things out of Supabase. As a
+ * statically generated page that read ran during `next build`, which meant a
+ * deployment could only succeed while the database was responsive. On
+ * 2026-09-07 it was not: Next killed the page build at 60 seconds, retried
+ * three times, and failed the deployment. An identical redeploy two minutes
+ * later succeeded.
+ *
+ * A build must not depend on a third party being fast. The data is still
+ * cached for five minutes, in the Data Cache rather than the Route Cache, so
+ * a visitor still does not pay for four round trips. See ./landingData.ts.
+ */
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Build Your Intellectual Identity",
@@ -82,8 +66,6 @@ export const metadata: Metadata = {
 };
 
 // ── Static data ──────────────────────────────────────────────────────
-
-const TOPICS_DISPLAY_LIMIT = 12;
 
 const VALUE_PROPS = [
   {
@@ -158,55 +140,13 @@ function authorLine(post: LandingPost) {
   };
 }
 
-async function fetchLandingData(
-  supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>
-): Promise<LandingData> {
-  const [{ data: postsRaw }, { count: postCount }, { count: userCount }, topicCounts] =
-    await Promise.all([
-      supabase
-        .from("posts")
-        .select(
-          `id, title, slug, type, content_kind, article_format, excerpt, cover_image_url, view_count, published_at, featured,
-           profiles!posts_author_id_fkey (username, full_name, university)`
-        )
-        .eq("status", "published")
-        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-        .order("featured", { ascending: false })
-        .order("view_count", { ascending: false })
-        .order("published_at", { ascending: false })
-        .limit(7),
-      supabase
-        .from("posts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "published")
-        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION),
-      supabase.from("profiles").select("id", { count: "exact", head: true }),
-      getPublicTopicCounts(supabase),
-    ]);
-
-  return {
-    postsRaw: (postsRaw ?? []) as LandingPostRaw[],
-    postCount: postCount ?? 0,
-    userCount: userCount ?? 0,
-    topics: topicCounts
-      .sort((a, b) => b.count - a.count)
-      .slice(0, TOPICS_DISPLAY_LIMIT),
-  };
-}
-
-const getCachedLandingData = unstable_cache(
-  async () => fetchLandingData(createAdminClient()),
-  ["marketing-landing-data"],
-  { revalidate: 300, tags: ["landing", "public"] }
-);
 
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default async function LandingPage() {
-  const { postsRaw, postCount, userCount, topics } =
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? await getCachedLandingData()
-      : await fetchLandingData(await createClient());
+  // Never rejects. An unreachable database renders the page with empty
+  // strips rather than an error, and says so in the server log.
+  const { postsRaw, postCount, userCount, topics } = await loadLandingData();
 
   const posts: LandingPost[] = postsRaw
     .filter(
