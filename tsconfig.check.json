@@ -190,6 +190,8 @@
     "app/(main)/search/page.tsx",
     "app/(marketing)/landing/landingData.ts",
     "app/(marketing)/landing/page.tsx",
-    "lib/supabase/admin.ts"
+    "lib/supabase/admin.ts",
+    "lib/postPolicy.ts",
+    "lib/postMutations.ts"
   ]
 }
