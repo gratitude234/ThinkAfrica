@@ -4,6 +4,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { PostStatus } from "@/lib/types";
 import {
+  resolvePostgresExecutor,
+  withPostgresTransaction,
+} from "@/lib/db/postgres/connection";
+import {
+  createPostgresWriteRepository,
+  createSupabaseWriteRepository,
+  resolveWriteAdapter,
+  type PostWriteRepository,
+} from "@/lib/db/postWrites";
+import {
   AUTHOR_EDITABLE_POST_COLUMNS,
   canWriteToPost,
   checkComposition,
@@ -58,11 +68,22 @@ import {
  *
  * ## Provider
  *
- * Takes a `SupabaseClient` today. The policy above is the part that must not
- * be rewritten when this moves to `lib/db`; everything Supabase-shaped is in
- * the four small functions at the bottom of this file, and each one is a
- * single statement with its predicates already explicit, which is the form a
- * direct-SQL port takes unchanged.
+ * Every statement lives behind `PostWriteRepository` in lib/db/postWrites.ts,
+ * and which implementation answers is decided by `WRITE_DATABASE_ADAPTER`.
+ * Unset means Supabase, which is what production is.
+ *
+ * That variable is deliberately separate from `DATABASE_ADAPTER`, which
+ * already routes reads. Reads and writes carry different risk: a read served
+ * from the wrong database shows stale content, while a write sent to the wrong
+ * database is a row that exists in one place and not the other, and switching
+ * back afterwards does not repair it. So the preview can read from Neon while
+ * still writing to Supabase, and moving writes is a second decision with its
+ * own rollback.
+ *
+ * Nothing above this line changes when the adapter does. The policy, the
+ * ordering, the predicates and the row-count check are the same code against
+ * either backend, which is the whole reason the seam is here rather than
+ * inside each operation.
  */
 
 // ── Results ──────────────────────────────────────────────────────────
@@ -118,6 +139,23 @@ export function postMutationMessage(failure: PostMutationFailure): string {
   }
 }
 
+/**
+ * Thrown to roll a transaction back while carrying the refusal that caused it.
+ *
+ * A transaction rolls back when its callback throws, and the caller still
+ * needs the reason. Throwing the result rather than returning it is what makes
+ * "the write did not land" and "undo everything before it" the same event.
+ */
+class PostTransactionRollback extends Error {
+  readonly result: PostMutationResult;
+
+  constructor(result: PostMutationResult) {
+    super("post transaction rolled back");
+    this.name = "PostTransactionRollback";
+    this.result = result;
+  }
+}
+
 function refused(decision: {
   refusal: PostWriteRefusal;
   reason: string;
@@ -137,28 +175,54 @@ export async function loadPostState(
   supabase: SupabaseClient,
   postId: string
 ): Promise<PostStateSnapshot | null> {
-  const { data, error } = await supabase
-    .from("posts")
-    .select(SNAPSHOT_COLUMNS)
-    .eq("id", postId)
-    .maybeSingle();
+  return createSupabaseWriteRepository(supabase).loadState(postId);
+}
 
-  if (error) {
-    // A failed lookup is not an absent post. Collapsing the two is what tells
-    // an author their work does not exist while the database is unreachable.
-    throw new Error(`post lookup failed: ${error.message.slice(0, 200)}`);
-  }
-
-  return (data as PostStateSnapshot | null) ?? null;
+/** The same lookup, through whichever backend this call writes to. Reading the
+ *  state from one database and writing to another is how a policy decision
+ *  gets made about a row that is not the row being changed. */
+async function loadFor(
+  context: MutationContext,
+  postId: string
+): Promise<{ repository: PostWriteRepository; post: PostStateSnapshot | null }> {
+  const repository = writeRepositoryFor(context);
+  return { repository, post: await repository.loadState(postId) };
 }
 
 // ── Operations ───────────────────────────────────────────────────────
 
 export interface MutationContext {
+  /** The request-scoped Supabase client. Still required: it is what the
+   *  Supabase repository writes through, and it is what every call site
+   *  already has to hand. Ignored when WRITE_DATABASE_ADAPTER is postgres. */
   supabase: SupabaseClient;
   actor: PostActor;
   options?: PostPolicyOptions;
+  /** Overrides the adapter for one call. Tests and the write rehearsal use it;
+   *  no application code does. */
+  repository?: PostWriteRepository;
 }
+
+/**
+ * The repository this call writes through.
+ *
+ * Resolved per call rather than per process, because the answer depends only
+ * on an environment variable and resolving it here keeps the decision visible
+ * at the point the write happens. `resolveWriteAdapter` throws on an
+ * unrecognised value, so a typo fails immediately rather than quietly writing
+ * to Supabase.
+ */
+export function writeRepositoryFor(context: MutationContext): PostWriteRepository {
+  if (context.repository) return context.repository;
+  if (resolveWriteAdapter() === "postgres") {
+    return createPostgresWriteRepository(
+      resolvePostgresExecutor(),
+      withPostgresTransaction
+    );
+  }
+  return createSupabaseWriteRepository(context.supabase);
+}
+
 
 /**
  * An author editing their own content. No status change, ever.
@@ -168,9 +232,9 @@ export async function updatePostContent(
   postId: string,
   patch: Record<string, unknown>
 ): Promise<PostMutationResult> {
-  const { supabase, actor, options = LIVE_POLICY } = context;
+  const { actor, options = LIVE_POLICY } = context;
 
-  const post = await loadPostState(supabase, postId);
+  const { repository, post } = await loadFor(context, postId);
   if (!post) return { ok: false, failure: { kind: "not_found" } };
 
   const decision = checkContentEdit(actor, post, patch, options);
@@ -183,7 +247,7 @@ export async function updatePostContent(
     return { ok: true, data: { id: post.id } };
   }
 
-  return writeOnePost(supabase, {
+  return writeOnePost(repository, {
     postId,
     patch: allowed,
     // The state this was authorized against. If any of it moved, the write
@@ -206,7 +270,7 @@ export async function createPost(
   context: MutationContext,
   values: Record<string, unknown>
 ): Promise<PostMutationResult> {
-  const { supabase, actor, options = LIVE_POLICY } = context;
+  const { actor, options = LIVE_POLICY } = context;
 
   const withAuthor =
     actor.kind === "author"
@@ -226,21 +290,14 @@ export async function createPost(
     if (column in withAuthor) insertValues[column] = withAuthor[column];
   }
 
-  const { data, error } = await supabase
-    .from("posts")
-    .insert(insertValues)
-    .select("id")
-    .single();
-
-  if (error) {
-    console.error("[posts] insert failed", error.message);
-    return { ok: false, failure: { kind: "query_failed", message: error.message } };
+  try {
+    const id = await writeRepositoryFor(context).insert(insertValues);
+    return { ok: true, data: { id } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[posts] insert failed", message);
+    return { ok: false, failure: { kind: "query_failed", message } };
   }
-  if (!data) {
-    return { ok: false, failure: { kind: "conflict" } };
-  }
-
-  return { ok: true, data: { id: (data as { id: string }).id } };
 }
 
 /**
@@ -257,9 +314,9 @@ export async function updateDraftComposition(
   postId: string,
   patch: Record<string, unknown>
 ): Promise<PostMutationResult> {
-  const { supabase, actor, options = LIVE_POLICY } = context;
+  const { actor, options = LIVE_POLICY } = context;
 
-  const post = await loadPostState(supabase, postId);
+  const { repository, post } = await loadFor(context, postId);
   if (!post) return { ok: false, failure: { kind: "not_found" } };
 
   const decision = checkComposition(actor, post, patch, options);
@@ -269,7 +326,7 @@ export async function updateDraftComposition(
     return { ok: true, data: { id: post.id } };
   }
 
-  return writeOnePost(supabase, {
+  return writeOnePost(repository, {
     postId,
     patch,
     expect: { author_id: post.author_id, status: post.status },
@@ -420,15 +477,15 @@ export async function renamePostSlug(
   postId: string,
   slug: string
 ): Promise<PostMutationResult> {
-  const { supabase, actor, options = LIVE_POLICY } = context;
+  const { actor, options = LIVE_POLICY } = context;
 
-  const post = await loadPostState(supabase, postId);
+  const { repository, post } = await loadFor(context, postId);
   if (!post) return { ok: false, failure: { kind: "not_found" } };
 
   const decision = checkSlugRename(actor, post, slug, options);
   if (!decision.allowed) return refused(decision);
 
-  return writeOnePost(supabase, {
+  return writeOnePost(repository, {
     postId,
     patch: { slug },
     expect: { author_id: post.author_id, status: post.status },
@@ -454,9 +511,9 @@ export async function featurePostExclusively(
   postId: string,
   featured: boolean
 ): Promise<PostMutationResult> {
-  const { supabase, actor, options = LIVE_POLICY } = context;
+  const { actor, options = LIVE_POLICY } = context;
 
-  const post = await loadPostState(supabase, postId);
+  const { repository, post } = await loadFor(context, postId);
   if (!post) return { ok: false, failure: { kind: "not_found" } };
 
   const permitted = checkCuration(actor);
@@ -465,26 +522,44 @@ export async function featurePostExclusively(
   const writable = canWriteToPost(actor, post, options);
   if (!writable.allowed) return refused(writable);
 
-  if (featured) {
-    const { error } = await supabase
-      .from("posts")
-      .update({ featured: false })
-      .eq("featured", true);
-
-    if (error) {
-      console.error("[posts] unfeature sweep failed", error.message);
-      return {
-        ok: false,
-        failure: { kind: "query_failed", message: error.message },
-      };
+  // Both halves in one transaction where the backend has them. On Supabase
+  // that is ordering rather than atomicity, which is what production has
+  // today; on PostgreSQL a failure between the sweep and the set rolls the
+  // sweep back, so the site is never left with nothing featured.
+  return repository.transaction(async (tx) => {
+    if (featured) {
+      try {
+        await tx.clearFeatured();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("[posts] unfeature sweep failed", message);
+        return {
+          ok: false,
+          failure: { kind: "query_failed", message },
+        } as PostMutationResult;
+      }
     }
-  }
 
-  return writeOnePost(supabase, {
-    postId,
-    patch: { featured },
-    expect: { author_id: post.author_id, status: post.status },
-    actor,
+    const result = await writeOnePost(tx, {
+      postId,
+      patch: { featured },
+      expect: { author_id: post.author_id, status: post.status },
+      actor,
+    });
+
+    // Undo the sweep when the set did not land. Without this the transaction
+    // commits a table with nothing featured, which is the exact failure the
+    // two statements had when they lived in a server action.
+    if (!result.ok && featured) {
+      throw new PostTransactionRollback(result);
+    }
+
+    return result;
+  }).catch((error: unknown) => {
+    if (error instanceof PostTransactionRollback) return error.result;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[posts] feature transaction failed", message);
+    return { ok: false, failure: { kind: "query_failed", message } };
   });
 }
 
@@ -500,9 +575,9 @@ export async function setPostFeatured(
   postId: string,
   featured: boolean
 ): Promise<PostMutationResult> {
-  const { supabase, actor, options = LIVE_POLICY } = context;
+  const { actor, options = LIVE_POLICY } = context;
 
-  const post = await loadPostState(supabase, postId);
+  const { repository, post } = await loadFor(context, postId);
   if (!post) return { ok: false, failure: { kind: "not_found" } };
 
   const permitted = checkCuration(actor);
@@ -511,7 +586,7 @@ export async function setPostFeatured(
   const writable = canWriteToPost(actor, post, options);
   if (!writable.allowed) return refused(writable);
 
-  return writeOnePost(supabase, {
+  return writeOnePost(repository, {
     postId,
     patch: { featured },
     expect: { author_id: post.author_id, status: post.status },
@@ -524,28 +599,29 @@ export async function deleteDraftPost(
   context: MutationContext,
   postId: string
 ): Promise<PostMutationResult> {
-  const { supabase, actor, options = LIVE_POLICY } = context;
+  const { actor, options = LIVE_POLICY } = context;
 
-  const post = await loadPostState(supabase, postId);
+  const { repository, post } = await loadFor(context, postId);
   if (!post) return { ok: false, failure: { kind: "not_found" } };
 
   const decision = checkDelete(actor, post, options);
   if (!decision.allowed) return refused(decision);
 
-  let query = supabase.from("posts").delete().eq("id", postId);
-  if (actor.kind === "author") {
+  let affected: number;
+  try {
     // The predicates the policy already checked, restated so a row that moved
     // between the load and the delete is missed rather than deleted.
-    query = query.eq("author_id", actor.userId).eq("status", "draft");
+    affected = await repository.deleteOne(postId, {
+      status: post.status,
+      authorId: actor.kind === "author" ? actor.userId : null,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[posts] delete failed for ${postId}`, message);
+    return { ok: false, failure: { kind: "query_failed", message } };
   }
 
-  const { data, error } = await query.select("id");
-
-  if (error) {
-    console.error(`[posts] delete failed for ${postId}`, error.message);
-    return { ok: false, failure: { kind: "query_failed", message: error.message } };
-  }
-  if (!data || data.length === 0) {
+  if (affected === 0) {
     return { ok: false, failure: { kind: "conflict" } };
   }
 
@@ -573,9 +649,9 @@ export async function authorizeTransition(
   postId: string,
   nextStatus: PostStatus
 ): Promise<PostMutationResult<PostStateSnapshot>> {
-  const { supabase, actor, options = LIVE_POLICY } = context;
+  const { actor, options = LIVE_POLICY } = context;
 
-  const post = await loadPostState(supabase, postId);
+  const { repository, post } = await loadFor(context, postId);
   if (!post) return { ok: false, failure: { kind: "not_found" } };
 
   const decision = checkTransition({ actor, post, nextStatus }, options);
@@ -596,9 +672,9 @@ export async function transitionPost(
   nextStatus: PostStatus,
   extra: Record<string, unknown> = {}
 ): Promise<PostMutationResult> {
-  const { supabase, actor, options = LIVE_POLICY } = context;
+  const { actor, options = LIVE_POLICY } = context;
 
-  const post = await loadPostState(supabase, postId);
+  const { repository, post } = await loadFor(context, postId);
   if (!post) return { ok: false, failure: { kind: "not_found" } };
 
   const decision = checkTransition({ actor, post, nextStatus }, options);
@@ -619,7 +695,7 @@ export async function transitionPost(
   const evidence = checkWorkflowEvidence(actor, post, extra);
   if (!evidence.allowed) return refused(evidence);
 
-  return writeOnePost(supabase, {
+  return writeOnePost(repository, {
     postId,
     patch: { status: nextStatus, ...extra },
     expect: { author_id: post.author_id, status: post.status },
@@ -642,7 +718,7 @@ export async function transitionPost(
  * every editorial decision into a conflict.
  */
 async function writeOnePost(
-  supabase: SupabaseClient,
+  repository: PostWriteRepository,
   input: {
     postId: string;
     patch: Record<string, unknown>;
@@ -650,37 +726,33 @@ async function writeOnePost(
     actor: PostActor;
   }
 ): Promise<PostMutationResult> {
-  let query = supabase
-    .from("posts")
-    .update(input.patch)
-    .eq("id", input.postId)
-    .eq("status", input.expect.status);
-
-  if (input.actor.kind === "author") {
-    query = query.eq("author_id", input.actor.userId);
-  }
-
-  const { data, error } = await query.select("id");
-
-  if (error) {
-    console.error(`[posts] write failed for ${input.postId}`, error.message);
-    return { ok: false, failure: { kind: "query_failed", message: error.message } };
+  let affected: number;
+  try {
+    affected = await repository.updateOne(input.postId, input.patch, {
+      status: input.expect.status,
+      // An author writes only their own row. An editor legitimately writes
+      // rows they do not own, and constraining them would turn every
+      // editorial decision into a conflict.
+      authorId: input.actor.kind === "author" ? input.actor.userId : null,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[posts] write failed for ${input.postId}`, message);
+    return { ok: false, failure: { kind: "query_failed", message } };
   }
 
   // The check that replaces RLS. Zero rows is not a no-op: it means the row
   // moved, or the predicates did not match what the policy authorized, and
   // either way the caller must not be told this succeeded.
-  if (!data || data.length === 0) {
+  if (affected === 0) {
     return { ok: false, failure: { kind: "conflict" } };
   }
 
-  if (data.length > 1) {
+  if (affected > 1) {
     // `id` is the primary key, so this cannot happen. If it ever does, the
     // write touched rows nobody authorized and that is worth an error rather
     // than a shrug.
-    console.error(
-      `[posts] write for ${input.postId} affected ${data.length} rows`
-    );
+    console.error(`[posts] write for ${input.postId} affected ${affected} rows`);
     return { ok: false, failure: { kind: "conflict" } };
   }
 

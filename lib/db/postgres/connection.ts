@@ -1,7 +1,11 @@
 import "server-only";
 
 import postgres from "postgres";
-import { adaptDriver, type SqlExecutor } from "@/lib/db/postgres/executor";
+import {
+  adaptDriver,
+  type SqlExecutor,
+  type TaggedTemplateDriver,
+} from "@/lib/db/postgres/executor";
 
 /**
  * The one PostgreSQL connection the application uses.
@@ -136,6 +140,28 @@ function getDriver(): ReturnType<typeof postgres> {
 
 export function resolvePostgresExecutor(): SqlExecutor {
   return adaptDriver(getDriver());
+}
+
+/**
+ * Runs a function inside one PostgreSQL transaction.
+ *
+ * The reads a mutation authorizes against and the write it then issues have to
+ * be the same transaction, or the row can move between them and the predicates
+ * are the only thing left. They are a good last line and they are not a
+ * substitute for atomicity when an operation is several dependent statements:
+ * featuring a post clears every other featured row and then sets one, and a
+ * failure between those two leaves the site with nothing featured.
+ *
+ * postgres.js rolls back when the callback throws and commits when it returns,
+ * so an affected-row check that throws inside here undoes everything before it.
+ */
+export async function withPostgresTransaction<T>(
+  run: (executor: SqlExecutor) => Promise<T>
+): Promise<T> {
+  const driver = getDriver();
+  return driver.begin(async (tx) => {
+    return run(adaptDriver(tx as unknown as TaggedTemplateDriver));
+  }) as Promise<T>;
 }
 
 /** Closes the pool. For scripts and tests; a serverless request never calls

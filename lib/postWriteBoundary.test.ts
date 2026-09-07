@@ -31,8 +31,15 @@ const ROOTS = ["app", "lib", "components"];
  * be forgotten.
  */
 const ALLOWED: Record<string, string> = {
+  "lib/db/postWrites.ts":
+    "The write repository. Every statement the domain issues lives here, " +
+    "behind an interface narrow enough that a caller cannot express a " +
+    "filter the policy never saw: each method takes the state it was " +
+    "authorized against and returns how many rows it touched.",
   "lib/postMutations.ts":
-    "The domain itself. Every statement below the policy lives here.",
+    "The domain. It holds the pipeline and the policy calls; the statements " +
+    "moved to lib/db/postWrites.ts so the same policy can run against " +
+    "Supabase or Neon.",
   "lib/postDeletion.ts":
     "The batch delete. Its decision is checkDelete(); what it adds is the " +
     "partition of many ids into deletable, refused and missing, which the " +
