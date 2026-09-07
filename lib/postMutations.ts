@@ -357,6 +357,38 @@ export async function deleteDraftPost(
 }
 
 /**
+ * Authorization without execution.
+ *
+ * For the one transition whose statement lives in the database rather than
+ * here: withdrawal runs through `withdraw_post_submission()`, a SECURITY
+ * DEFINER function that changes the status and retires the still-assigned
+ * reviewers in the same transaction. Splitting that into two calls from the
+ * application would leave a withdrawn submission sitting in the reviewer queue
+ * whenever the second one failed, and the author has no grant on
+ * `post_reviews` to make the second call with anyway.
+ *
+ * So the execution stays there and the decision moves here. The caller runs
+ * this first and only calls the function if it allows. That is the whole point
+ * of the exercise: the database is where the statement runs, not where the
+ * rules live.
+ */
+export async function authorizeTransition(
+  context: MutationContext,
+  postId: string,
+  nextStatus: PostStatus
+): Promise<PostMutationResult<PostStateSnapshot>> {
+  const { supabase, actor, options = LIVE_POLICY } = context;
+
+  const post = await loadPostState(supabase, postId);
+  if (!post) return { ok: false, failure: { kind: "not_found" } };
+
+  const decision = checkTransition({ actor, post, nextStatus }, options);
+  if (!decision.allowed) return refused(decision);
+
+  return { ok: true, data: post };
+}
+
+/**
  * The shared transition path.
  *
  * Every status change goes through here, so the policy call, the predicates

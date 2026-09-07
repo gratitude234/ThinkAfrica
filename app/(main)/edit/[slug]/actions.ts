@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  postMutationMessage,
+  resubmitRevision,
+  updateDraftComposition,
+} from "@/lib/postMutations";
+import {
   getTopicValuesValidationError,
   normalizeTagValue,
 } from "@/lib/tags";
@@ -186,31 +191,44 @@ export async function saveEditedPost(input: {
 
   await syncReferences(supabase, input.postId, input.references);
 
-  const nextStatus = post.status === "pending_revision" ? "pending" : post.status;
-  const nextRound =
-    post.status === "pending_revision" ? post.current_round + 1 : post.current_round;
   const sanitizedContent = sanitizePostHtml(input.content);
+  const actor = { kind: "author" as const, userId: user.id };
 
-  const { error } = await supabase
-    .from("posts")
-    .update({
-      title: input.title.trim(),
-      excerpt: input.excerpt,
-      content: sanitizedContent,
-      tags: input.tags.map(normalizeTagValue).filter(Boolean),
-      type: effectiveType,
-      content_kind: effectiveContentKind,
-      article_format: effectiveArticleFormat,
-      cover_image_url: input.coverImageUrl || null,
-      status: nextStatus,
-      current_round: nextRound,
-      revision_due_at: post.status === "pending_revision" ? null : undefined,
-    })
-    .eq("id", input.postId)
-    .eq("author_id", user.id);
+  // Two writes where there was one, and deliberately in this order.
+  //
+  // The single statement saved the revision and resubmitted it together, which
+  // reads like the safer shape and was not: it carried no status predicate and
+  // nobody checked how many rows it touched, so a submission an editor accepted
+  // between the read above and this write was silently overwritten. Splitting
+  // it puts both operations behind the domain, where each carries the state it
+  // was authorized against.
+  //
+  // Content first. If the resubmission then fails, the writer's revision is
+  // saved and the post is still in revision, which is a state they can retry
+  // from. The reverse ordering loses the revision.
+  const composed = await updateDraftComposition({ supabase, actor }, input.postId, {
+    title: input.title.trim(),
+    excerpt: input.excerpt,
+    content: sanitizedContent,
+    tags: input.tags.map(normalizeTagValue).filter(Boolean),
+    type: effectiveType,
+    content_kind: effectiveContentKind,
+    article_format: effectiveArticleFormat,
+    cover_image_url: input.coverImageUrl || null,
+  });
 
-  if (error) {
-    return { error: error.message };
+  if (!composed.ok) {
+    return { error: postMutationMessage(composed.failure) };
+  }
+
+  if (post.status === "pending_revision") {
+    const resubmitted = await resubmitRevision({ supabase, actor }, input.postId, {
+      current_round: post.current_round + 1,
+    });
+
+    if (!resubmitted.ok) {
+      return { error: postMutationMessage(resubmitted.failure) };
+    }
   }
 
   if (post.status === "pending_revision") {

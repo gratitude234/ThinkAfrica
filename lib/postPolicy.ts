@@ -165,6 +165,9 @@ export const AUTHOR_EDITABLE_POST_COLUMNS = [
   "document_mime_type",
   "document_size_bytes",
   "in_response_to",
+  // The research submission form keeps its keywords apart from tags. Author
+  // content like any other field here.
+  "research_keywords",
 ] as const;
 
 export type AuthorEditablePostColumn =

@@ -75,6 +75,27 @@ function standardRoutes() {
   };
 }
 
+/**
+ * The row lib/postMutations.ts loads before authorizing a write. Every domain
+ * operation reads it: the decision is the application's now, not a trigger's.
+ */
+function policySnapshot(overrides: Record<string, unknown> = {}) {
+  return {
+    data: {
+      id: "post-1",
+      author_id: "user-1",
+      status: "draft",
+      type: "research",
+      content_kind: "research",
+      article_format: null,
+      citation_id: null,
+      published_version_id: null,
+      ...overrides,
+    },
+    error: null,
+  };
+}
+
 describe("submitResearchPaper", () => {
   it("keeps topics optional but requires at least one Research keyword", async () => {
     fakeSupabase.current = makeFakeSupabase({
@@ -99,6 +120,9 @@ describe("submitResearchPaper", () => {
           data: { id: "post-1", author_id: "user-1", slug: "a-paper", status: "draft", current_round: 1, type: "research" },
           error: null,
         },
+        policySnapshot(),
+        { data: [{ id: "post-1" }], error: null },
+        policySnapshot(),
         { data: [{ id: "post-1" }], error: null }
       ),
       ...standardRoutes(),
@@ -109,7 +133,7 @@ describe("submitResearchPaper", () => {
     );
 
     expect(result.error).toBeNull();
-    expect(fakeSupabase.current!.builders.posts[1].updatedWith).toEqual(
+    expect(fakeSupabase.current!.builders.posts[2].updatedWith).toEqual(
       expect.objectContaining({
         tags: [],
         research_keywords: ["groundwater"],
@@ -169,6 +193,9 @@ describe("submitResearchPaper", () => {
           data: { id: "post-1", author_id: "user-1", slug: "a-paper", status: "pending_revision", current_round: 2, type: "research" },
           error: null,
         },
+        policySnapshot({ status: "pending_revision" }),
+        { data: [{ id: "post-1" }], error: null },
+        policySnapshot({ status: "pending_revision" }),
         { data: [{ id: "post-1" }], error: null }
       ),
       ...standardRoutes(),
@@ -177,7 +204,9 @@ describe("submitResearchPaper", () => {
     const result = await submitResearchPaper(basePayload({ authorNote: "Addressed reviewer feedback." }));
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    // The resubmission is its own statement now, so the round and the status
+    // move together and separately from the content.
+    const updatedWith = fakeSupabase.current!.builders.posts[4].updatedWith as Record<string, unknown>;
     expect(updatedWith.status).toBe("pending");
     expect(updatedWith.current_round).toBe(3);
   });
@@ -186,6 +215,9 @@ describe("submitResearchPaper", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { id: "post-1", author_id: "user-1", slug: "a-paper", status: "draft", current_round: 1, type: "research" }, error: null },
+        policySnapshot(),
+        { data: [{ id: "post-1" }], error: null },
+        policySnapshot(),
         { data: [{ id: "post-1" }], error: null }
       ),
       ...standardRoutes(),
@@ -194,7 +226,7 @@ describe("submitResearchPaper", () => {
     const result = await submitResearchPaper(basePayload());
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    const updatedWith = fakeSupabase.current!.builders.posts[4].updatedWith as Record<string, unknown>;
     expect(updatedWith.status).toBe("pending");
     expect(updatedWith.current_round).toBe(1);
   });
@@ -203,6 +235,7 @@ describe("submitResearchPaper", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { id: "post-1", author_id: "user-1", slug: "a-paper", status: "draft", current_round: 1, type: "research" }, error: null },
+        policySnapshot(),
         { data: [], error: null }
       ),
     });
@@ -270,6 +303,7 @@ describe("saveResearchDraft", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { id: "post-1", author_id: "user-1", slug: "a-paper", status: "draft", current_round: 1, type: "research" }, error: null },
+        policySnapshot(),
         { data: [{ id: "post-1" }], error: null }
       ),
       ...standardRoutes(),

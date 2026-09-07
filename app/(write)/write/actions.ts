@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/server";
 import {
+  authorizeTransition,
   postMutationMessage,
   publishOwnDraft,
   submitPostForReview,
@@ -1404,6 +1405,21 @@ export async function withdrawSubmission(input: { postId: string }) {
 
   if (!user) {
     return { error: "You must be signed in." };
+  }
+
+  // The decision is the application's; the statement stays in the database
+  // because it also retires the assigned reviewers in the same transaction.
+  // Without this check the only thing standing between a caller and a
+  // withdrawal is the function's own auth.uid() ownership filter, which
+  // returns NULL off Supabase.
+  const permitted = await authorizeTransition(
+    { supabase, actor: { kind: "author", userId: user.id } },
+    input.postId,
+    "withdrawn"
+  );
+
+  if (!permitted.ok) {
+    return { error: postMutationMessage(permitted.failure) };
   }
 
   const { error } = await supabase.rpc("withdraw_post_submission", {

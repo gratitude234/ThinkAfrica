@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  postMutationMessage,
+  submitPostForReview,
+  updateDraftComposition,
+} from "@/lib/postMutations";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { recordActivationEvent } from "@/lib/activationServer";
@@ -445,47 +450,54 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
     // pre-check above, so a concurrent write changing this row's status
     // can't be raced past -- mirrors the atomic-update pattern used
     // throughout app/(write)/write/actions.ts.
-    const { data: updatedRows, error } = await supabase
-      .from("posts")
-      .update({
-        title: input.title.trim(),
-        excerpt: input.abstract.trim(),
-        content,
-        tags: normalizedTags,
-        ...researchKeywordPatch,
-        type: "research",
-        content_kind: contentKindFromLegacyType("research"),
-        article_format: null,
-        status: nextStatus,
-        published_at: nextStatus === "published" ? undefined : null,
-        current_round: nextRound,
-        revision_due_at: status === "pending" ? null : undefined,
-        document_path: input.document.documentPath,
-        document_original_name: input.document.originalName,
-        document_mime_type: input.document.mimeType,
-        document_size_bytes: input.document.sizeBytes,
-      })
-      .eq("id", postId)
-      .eq("author_id", user.id)
-      .in("status", ["draft", "pending_revision"])
-      .select("id");
+    // Two writes, content first. The single statement that carried both put
+    // the classification and the status transition in one place, which is the
+    // shape guard_locked_post_write's classification freeze exists to catch,
+    // and which on Neon nothing catches at all. Each half now carries the
+    // state it was authorized against and a row count that is checked.
+    const actor = { kind: "author" as const, userId: user.id };
 
-    if (error) {
+    const composed = await updateDraftComposition({ supabase, actor }, postId, {
+      title: input.title.trim(),
+      excerpt: input.abstract.trim(),
+      content,
+      tags: normalizedTags,
+      ...researchKeywordPatch,
+      type: "research",
+      content_kind: contentKindFromLegacyType("research"),
+      article_format: null,
+      document_path: input.document.documentPath,
+      document_original_name: input.document.originalName,
+      document_mime_type: input.document.mimeType,
+      document_size_bytes: input.document.sizeBytes,
+    });
+
+    if (!composed.ok) {
       return {
         error:
-          userSafeDatabaseError(error.message) ??
-          "Failed to save research submission.",
+          composed.failure.kind === "conflict"
+            ? "This research submission can no longer be edited from here."
+            : postMutationMessage(composed.failure),
         postId: null,
         slug: null,
       };
     }
 
-    if (!updatedRows || updatedRows.length === 0) {
-      return {
-        error: "This research submission can no longer be edited from here.",
-        postId: null,
-        slug: null,
-      };
+    if (nextStatus !== effectiveStatus) {
+      const submitted = await submitPostForReview({ supabase, actor }, postId, {
+        current_round: nextRound,
+      });
+
+      if (!submitted.ok) {
+        return {
+          error:
+            submitted.failure.kind === "conflict"
+              ? "This research submission can no longer be edited from here."
+              : postMutationMessage(submitted.failure),
+          postId: null,
+          slug: null,
+        };
+      }
     }
   } else {
     slug = buildSlugFromTitle(input.title, "research", Date.now().toString(36));

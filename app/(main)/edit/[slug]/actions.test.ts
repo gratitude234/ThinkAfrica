@@ -41,6 +41,28 @@ function withPostReferencesRoute(routes: Record<string, () => ReturnType<typeof 
   return { post_references: queueResults({ data: [], error: null }), ...routes };
 }
 
+/**
+ * The row lib/postMutations.ts loads before authorizing a write. Queued
+ * alongside the results a test describes, because every domain operation
+ * reads it: the decision is the application's now, not a trigger's.
+ */
+function policySnapshot(overrides: Record<string, unknown> = {}) {
+  return {
+    data: {
+      id: "post-1",
+      author_id: "user-1",
+      status: "published",
+      type: "essay",
+      content_kind: "article",
+      article_format: null,
+      citation_id: null,
+      published_version_id: null,
+      ...overrides,
+    },
+    error: null,
+  };
+}
+
 describe("saveEditedPost", () => {
   it("preserves a legacy Essay's article_format after editing, with no client-supplied classification", async () => {
     fakeSupabase.current = makeFakeSupabase({
@@ -57,7 +79,8 @@ describe("saveEditedPost", () => {
           },
           error: null,
         },
-        { error: null }
+        policySnapshot({ article_format: "essay" }),
+        { data: [{ id: "post-1" }], error: null }
       ),
       ...withPostReferencesRoute({}),
     });
@@ -65,7 +88,7 @@ describe("saveEditedPost", () => {
     const result = await saveEditedPost(baseInput());
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    const updatedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
     expect(updatedWith.type).toBe("essay");
     expect(updatedWith.content_kind).toBe("article");
     expect(updatedWith.article_format).toBe("essay");
@@ -90,7 +113,8 @@ describe("saveEditedPost", () => {
           },
           error: null,
         },
-        { error: null }
+        policySnapshot(),
+        { data: [{ id: "post-1" }], error: null }
       ),
       ...withPostReferencesRoute({}),
     });
@@ -98,7 +122,7 @@ describe("saveEditedPost", () => {
     const result = await saveEditedPost(baseInput({ title: "An edited generic article" }));
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    const updatedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
     expect(updatedWith.type).toBe("essay");
     expect(updatedWith.content_kind).toBe("article");
     expect(updatedWith.article_format).toBeNull();
@@ -119,7 +143,18 @@ describe("saveEditedPost", () => {
           },
           error: null,
         },
-        { error: null }
+        policySnapshot({
+          type: "policy_brief",
+          article_format: "policy_brief",
+          status: "pending_revision",
+        }),
+        { data: [{ id: "post-1" }], error: null },
+        policySnapshot({
+          type: "policy_brief",
+          article_format: "policy_brief",
+          status: "pending_revision",
+        }),
+        { data: [{ id: "post-1" }], error: null }
       ),
       ...withPostReferencesRoute({}),
     });
@@ -145,12 +180,18 @@ describe("saveEditedPost", () => {
     );
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    // Composition and resubmission are two writes now, and separating them is
+    // the point: a single statement that carried both had no status predicate,
+    // so a submission an editor accepted in between was silently overwritten.
+    const updatedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
     expect(updatedWith.type).toBe("policy_brief");
     expect(updatedWith.article_format).toBe("policy_brief");
+    expect(updatedWith.status).toBeUndefined();
+
     // pending_revision resubmits into the review queue, not straight to published
-    expect(updatedWith.status).toBe("pending");
-    expect(updatedWith.current_round).toBe(2);
+    const transitionedWith = fakeSupabase.current!.builders.posts[4].updatedWith as Record<string, unknown>;
+    expect(transitionedWith.status).toBe("pending");
+    expect(transitionedWith.current_round).toBe(2);
   });
 
   it("requires an author note before resubmitting a pending_revision policy brief", async () => {
@@ -209,7 +250,18 @@ describe("saveEditedPost", () => {
           },
           error: null,
         },
-        { error: null }
+        policySnapshot({
+          type: "policy_brief",
+          article_format: "policy_brief",
+          status: "pending_revision",
+        }),
+        { data: [{ id: "post-1" }], error: null },
+        policySnapshot({
+          type: "policy_brief",
+          article_format: "policy_brief",
+          status: "pending_revision",
+        }),
+        { data: [{ id: "post-1" }], error: null }
       ),
       ...withPostReferencesRoute({}),
     });
@@ -242,10 +294,13 @@ describe("saveEditedPost", () => {
     const result = await saveEditedPost(spoofedInput);
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
-    // Derived from the DB's real pending_revision state, not the spoofed "published"/999.
-    expect(updatedWith.status).toBe("pending");
-    expect(updatedWith.current_round).toBe(2);
+    // Derived from the stored pending_revision state, not the spoofed
+    // "published"/999, and issued by the named resubmission rather than
+    // smuggled into the content write.
+    const transitionedWith = fakeSupabase.current!.builders.posts[4]
+      .updatedWith as Record<string, unknown>;
+    expect(transitionedWith.status).toBe("pending");
+    expect(transitionedWith.current_round).toBe(2);
   });
 
   it("refuses to revise a research post through this action", async () => {
@@ -301,7 +356,8 @@ describe("saveEditedPost", () => {
           },
           error: null,
         },
-        { error: null }
+        policySnapshot({ type: "blog", content_kind: "post" }),
+        { data: [{ id: "post-1" }], error: null }
       ),
       ...withPostReferencesRoute({}),
     });
@@ -309,7 +365,7 @@ describe("saveEditedPost", () => {
     const result = await saveEditedPost(baseInput({ title: "Still has a title" }));
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    const updatedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
     expect(updatedWith.type).toBe("blog");
     expect(updatedWith.content_kind).toBe("post");
     expect(updatedWith.article_format).toBeNull();

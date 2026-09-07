@@ -804,18 +804,33 @@ describe("savePostReferences", () => {
 });
 
 describe("withdrawSubmission", () => {
-  // withdrawSubmission() is a thin wrapper around the
-  // withdraw_post_submission() Postgres RPC (see
-  // supabase/migrations/20260720000001_lock_accepted_and_removed_posts.sql):
-  // every actual authorization/precondition/transactionality guarantee
-  // (ownership, status, retiring active post_reviews assignments) lives in
-  // that SECURITY DEFINER function, not in this action, so these tests only
-  // verify the action calls the RPC correctly and propagates its result --
-  // the RPC's own logic is covered by the JS-ported trigger/RPC tests in
-  // lib/contentModel.test.ts.
+  // The statement still lives in the withdraw_post_submission() Postgres
+  // function, because it changes the status and retires the assigned
+  // reviewers in one transaction and the author has no grant on post_reviews
+  // to do the second half from here.
+  //
+  // The *decision* no longer lives there. The action authorizes through
+  // lib/postPolicy.ts first, so the check holds on a database where the
+  // function's own auth.uid() ownership filter returns NULL. These tests
+  // cover the action: that it authorizes before calling, calls correctly, and
+  // propagates the result.
   it("calls the withdraw_post_submission RPC with the given postId and returns no error on success", async () => {
     fakeSupabase.current = makeFakeSupabase(
-      {},
+      {
+        posts: queueResults({
+          data: {
+            id: "post-1",
+            author_id: "user-1",
+            status: "pending",
+            type: "research",
+            content_kind: "research",
+            article_format: null,
+            citation_id: null,
+            published_version_id: null,
+          },
+          error: null,
+        }),
+      },
       "user-1",
       { withdraw_post_submission: () => ({ data: { id: "post-1", status: "withdrawn" }, error: null }) }
     );
@@ -830,7 +845,21 @@ describe("withdrawSubmission", () => {
 
   it("propagates the RPC's rejection message when the submission isn't withdrawable", async () => {
     fakeSupabase.current = makeFakeSupabase(
-      {},
+      {
+        posts: queueResults({
+          data: {
+            id: "post-1",
+            author_id: "user-1",
+            status: "pending",
+            type: "research",
+            content_kind: "research",
+            article_format: null,
+            citation_id: null,
+            published_version_id: null,
+          },
+          error: null,
+        }),
+      },
       "user-1",
       {
         withdraw_post_submission: () => ({
