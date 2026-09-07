@@ -8,6 +8,7 @@ import {
   canWriteToPost,
   checkComposition,
   checkContentEdit,
+  checkCuration,
   checkDelete,
   checkTransition,
   checkWorkflowEvidence,
@@ -315,12 +316,75 @@ export async function editorialDecision(
   });
 }
 
-/** Moderation. Admins only, and never reversible through this module. */
+/** Moderation. Admins only. */
 export async function removePost(
   context: MutationContext,
   postId: string
 ): Promise<PostMutationResult> {
   return transitionPost(context, postId, "removed", {});
+}
+
+/**
+ * Moderation reversing itself: the only way out of `removed`.
+ *
+ * Restores to published because that is what a removal is applied to. A post
+ * that was a draft when it was removed is not something the moderation queue
+ * can produce, since removal acts on reported live content.
+ */
+export async function restorePost(
+  context: MutationContext,
+  postId: string
+): Promise<PostMutationResult> {
+  return transitionPost(context, postId, "published", {});
+}
+
+/**
+ * An editor publishing work that needed a decision but not a citation.
+ *
+ * Distinct from `publishReviewedPost()` in lib/reviewWorkflow.ts, which is the
+ * acceptance path for research and policy briefs and additionally mints a
+ * citation and a version snapshot. This is the plainer case: content that
+ * reached the review desk and is simply approved.
+ */
+export async function publishApprovedPost(
+  context: MutationContext,
+  postId: string,
+  extra: { published_at?: string } = {}
+): Promise<PostMutationResult> {
+  return transitionPost(context, postId, "published", {
+    published_at: extra.published_at ?? new Date().toISOString(),
+  });
+}
+
+/**
+ * Curation: which post the review desk features.
+ *
+ * Not a lifecycle transition and not content, so it has its own operation
+ * rather than being smuggled through one of the others. An author may not do
+ * it, which is a rule the trigger could never express.
+ */
+export async function setPostFeatured(
+  context: MutationContext,
+  postId: string,
+  featured: boolean
+): Promise<PostMutationResult> {
+  const { supabase, actor, options = LIVE_POLICY } = context;
+
+  const post = await loadPostState(supabase, postId);
+  if (!post) return { ok: false, failure: { kind: "not_found" } };
+
+  const permitted = checkCuration(actor);
+  if (!permitted.allowed) return refused(permitted);
+
+  const writable = canWriteToPost(actor, post, options);
+  if (!writable.allowed) return refused(writable);
+
+  return writeOnePost(supabase, {
+    postId,
+    patch: { featured },
+    expect: { author_id: post.author_id, status: post.status },
+    actor,
+  });
 }
 
 /** Hard delete. Drafts only. */

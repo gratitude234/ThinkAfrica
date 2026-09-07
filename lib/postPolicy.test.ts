@@ -194,19 +194,47 @@ describe("a removed post is untouchable", () => {
     expect(decision.allowed === false && decision.refusal).toBe("removed_post");
   });
 
-  it("refuses an editor and an admin too", () => {
-    // Moderation is not undone by editing around it.
+  it("refuses an editor, who has no moderation authority", () => {
+    // Moderation is not undone by editing around it, and editorial authority
+    // is not moderation authority.
     expect(canWriteToPost(editor, post({ status: "removed" })).allowed).toBe(false);
-    expect(canWriteToPost(admin, post({ status: "removed" })).allowed).toBe(false);
   });
 
-  it("refuses every transition out of removed", () => {
-    for (const next of ["draft", "pending", "published"] as PostStatus[]) {
+  it("lets moderation reverse itself, and only through the restore", () => {
+    // Not a weakening: the trigger exempts service_role entirely, and
+    // restoring a removed post is a thing moderation does today. The
+    // transition table is what limits it to the one legitimate move.
+    expect(
+      checkTransition({
+        actor: admin,
+        post: post({ status: "removed" }),
+        nextStatus: "published",
+      }).allowed
+    ).toBe(true);
+  });
+
+  it("refuses every other transition out of removed, for everyone", () => {
+    for (const next of ["draft", "pending", "pending_revision", "rejected"] as PostStatus[]) {
+      for (const who of [author, editor, admin]) {
+        expect(
+          checkTransition({
+            actor: who,
+            post: post({ status: "removed" }),
+            nextStatus: next,
+          }).allowed,
+          `removed -> ${next} as ${who.kind}`
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("refuses the author and the editor a restore", () => {
+    for (const who of [author, editor]) {
       expect(
         checkTransition({
-          actor: admin,
+          actor: who,
           post: post({ status: "removed" }),
-          nextStatus: next,
+          nextStatus: "published",
         }).allowed
       ).toBe(false);
     }
@@ -441,14 +469,21 @@ describe("the state machine", () => {
     ).toBe(true);
   });
 
-  it("has no transition table entry that contradicts a lock", () => {
-    // Any rule leaving removed or withdrawn would be a table that disagrees
-    // with canWriteToPost, and the two would drift.
-    for (const rule of POST_TRANSITIONS) {
-      expect(
-        ["removed", "withdrawn"].includes(rule.from),
-        `${rule.from} -> ${rule.to} should not exist`
-      ).toBe(rule.to === "removed" && rule.from === "withdrawn");
+  it("lets nothing but moderation leave a terminal state", () => {
+    // The table and canWriteToPost have to agree about what is terminal, or
+    // one of them is decoration. Exactly two rules may start from a terminal
+    // status: withdrawn -> removed, and the moderation restore.
+    const fromTerminal = POST_TRANSITIONS.filter((rule) =>
+      ["removed", "withdrawn"].includes(rule.from)
+    );
+
+    expect(
+      fromTerminal.map((rule) => `${rule.from}->${rule.to}`).sort()
+    ).toEqual(["removed->published", "withdrawn->removed"]);
+
+    for (const rule of fromTerminal) {
+      expect(rule.actors, `${rule.from} -> ${rule.to}`).not.toContain("author");
+      expect(rule.actors, `${rule.from} -> ${rule.to}`).not.toContain("editor");
     }
   });
 

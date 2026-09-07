@@ -9,6 +9,11 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { getPostDisplayTitle } from "@/lib/postDisplay";
+import {
+  postMutationMessage,
+  removePost,
+  restorePost,
+} from "@/lib/postMutations";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -114,12 +119,12 @@ export async function removeReportedPost(reportId: string) {
     if (!post) return { error: "This post no longer exists." };
     if (post.status === "removed") return { error: "This post is already removed." };
 
-    const { error: updateError } = await admin
-      .from("posts")
-      .update({ status: "removed" })
-      .eq("id", post.id);
+    const removed = await removePost(
+      { supabase: admin, actor: { kind: "admin", userId: context.userId } },
+      post.id
+    );
 
-    if (updateError) return { error: updateError.message };
+    if (!removed.ok) return { error: postMutationMessage(removed.failure) };
 
     await markReport(admin, context, reportId, "resolved", "post_removed");
 
@@ -188,12 +193,12 @@ export async function restoreRemovedPost(postId: string) {
       return { error: "Only removed posts can be restored." };
     }
 
-    const { error: updateError } = await admin
-      .from("posts")
-      .update({ status: "published" })
-      .eq("id", postId);
+    const restored = await restorePost(
+      { supabase: admin, actor: { kind: "admin", userId: context.userId } },
+      postId
+    );
 
-    if (updateError) return { error: updateError.message };
+    if (!restored.ok) return { error: postMutationMessage(restored.failure) };
 
     await recordAdminAuditEvent({
       admin,

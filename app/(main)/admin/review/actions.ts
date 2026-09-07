@@ -15,6 +15,12 @@ import {
 } from "@/lib/reviewWorkflow";
 import type { EditorDecision } from "@/lib/types";
 import { schedulePublicationDistribution } from "@/lib/publicationDistribution";
+import {
+  editorialDecision as applyEditorialDecision,
+  postMutationMessage,
+  publishApprovedPost,
+  setPostFeatured,
+} from "@/lib/postMutations";
 
 async function requireEditorAccess() {
   try {
@@ -209,11 +215,23 @@ export async function toggleFeaturedPost(postId: string, nextFeatured: boolean) 
     }
   }
 
+  const curated = await setPostFeatured(
+    { supabase, actor: { kind: "admin", userId: context.userId } },
+    postId,
+    nextFeatured
+  );
+
+  if (!curated.ok) {
+    return {
+      error: postMutationMessage(curated.failure),
+      featured: !nextFeatured,
+    };
+  }
+
   const { data: post, error } = await supabase
     .from("posts")
-    .update({ featured: nextFeatured })
-    .eq("id", postId)
     .select("slug")
+    .eq("id", postId)
     .single();
 
   if (error) {
@@ -287,13 +305,16 @@ export async function submitEditorialDecision(input: {
         : null;
 
       if (!requiresEditorialWorkflow(post.type)) {
-        const { error } = await supabase
-          .from("posts")
-          .update({ status: "published", published_at: new Date().toISOString() })
-          .eq("id", input.postId);
+        // Content that reached the review desk and is simply approved. The
+        // acceptance path for research and policy briefs is
+        // publishReviewedPost(), which also mints a citation.
+        const published = await publishApprovedPost(
+          { supabase, actor: { kind: "editor", userId: context.userId } },
+          input.postId
+        );
 
-        if (error) {
-          return { error: error.message };
+        if (!published.ok) {
+          return { error: postMutationMessage(published.failure) };
         }
       }
 
@@ -395,13 +416,15 @@ export async function submitEditorialDecision(input: {
 
   if (input.decision === "request_revision") {
     const dueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await supabase
-      .from("posts")
-      .update({ status: "pending_revision", revision_due_at: dueDate })
-      .eq("id", input.postId);
+    const revised = await applyEditorialDecision(
+      { supabase, actor: { kind: "editor", userId: context.userId } },
+      input.postId,
+      "request_revision",
+      { revision_due_at: dueDate }
+    );
 
-    if (error) {
-      return { error: error.message };
+    if (!revised.ok) {
+      return { error: postMutationMessage(revised.failure) };
     }
 
     const { error: notificationError } = await supabase.from("notifications").insert({
@@ -469,9 +492,13 @@ export async function submitEditorialDecision(input: {
     return { error: null };
   }
 
-  const { error } = await supabase.from("posts").update({ status: "rejected" }).eq("id", input.postId);
-  if (error) {
-    return { error: error.message };
+  const rejected = await applyEditorialDecision(
+    { supabase, actor: { kind: "editor", userId: context.userId } },
+    input.postId,
+    "reject"
+  );
+  if (!rejected.ok) {
+    return { error: postMutationMessage(rejected.failure) };
   }
 
   const { error: notificationError } = await supabase.from("notifications").insert({

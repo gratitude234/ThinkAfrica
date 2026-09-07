@@ -203,6 +203,26 @@ export const COMPOSABLE_POST_COLUMNS = [
 
 export type ComposablePostColumn = (typeof COMPOSABLE_POST_COLUMNS)[number];
 
+/**
+ * Curation, which is neither content nor lifecycle.
+ *
+ * `featured` decides what appears on the review desk's front page. It is not
+ * part of guard_locked_post_write's rules, because a trigger that fires on
+ * every write has no way to say "an editor may set this and an author may
+ * not". It is here so that every write to `posts` goes through one door.
+ */
+export const CURATION_POST_COLUMNS = ["featured"] as const;
+
+export function checkCuration(actor: PostActor): PolicyDecision {
+  if (actor.kind === "author") {
+    return deny(
+      "role_required",
+      "Featuring a post is an editorial decision."
+    );
+  }
+  return allow;
+}
+
 const CLASSIFICATION_COLUMNS = [
   "type",
   "content_kind",
@@ -228,6 +248,7 @@ export const TRANSITION_BOOKKEEPING_COLUMNS = [
   "current_round",
   "revision_due_at",
   "published_version_id",
+  "citation_id",
   "slug",
 ] as const;
 
@@ -387,10 +408,16 @@ export const POST_TRANSITIONS: readonly TransitionRule[] = [
   { from: "published", to: "removed", actors: ["admin", "system"] },
   { from: "rejected", to: "removed", actors: ["admin", "system"] },
   { from: "withdrawn", to: "removed", actors: ["admin", "system"] },
+
+  // Moderation reversing itself. The only way out of `removed`, available to
+  // nobody else, and it restores to published because that is what the
+  // moderation action does today: a removal is applied to a live post, so a
+  // restoration returns it to being live.
+  { from: "removed", to: "published", actors: ["admin", "system"] },
 ];
 
-/** Terminal for everyone below `system`: nothing may be written to a post in
- *  one of these states through an ordinary flow. */
+/** Terminal for the author and the editorial side. `removed` is reversible by
+ *  moderation and by nothing else; `withdrawn` is reversible by nobody. */
 export const TERMINAL_POST_STATUSES: readonly PostStatus[] = [
   "removed",
   "withdrawn",
@@ -459,10 +486,21 @@ export function canWriteToPost(
     return deny("not_owner", "The viewer does not own this post.");
   }
 
-  // Moderation removed it. Nothing below `system` touches it again, owner
-  // included: an author editing their way out of a moderation decision is the
-  // failure this prevents.
-  if (post.status === "removed" && actor.kind !== "system") {
+  // Moderation removed it. The author and the editorial side do not touch it
+  // again: an author editing their way out of a moderation decision is the
+  // failure this prevents, and an editor has no moderation authority.
+  //
+  // Moderation itself does, which is why `admin` is not on this list. That is
+  // not a weakening: the trigger exempts service_role entirely, and restoring
+  // a removed post is a thing moderation does today
+  // (app/(main)/admin/moderation/actions.ts). The transition table is what
+  // limits it to the one legitimate move, and `restorePost` is the only
+  // operation that performs it.
+  if (
+    post.status === "removed" &&
+    actor.kind !== "system" &&
+    actor.kind !== "admin"
+  ) {
     return deny("removed_post", "This post was removed and cannot be modified.");
   }
 

@@ -1,5 +1,9 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { transitionPost } from "@/lib/postMutations";
+
 import { generateCitationId } from "@/lib/citationId";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -361,10 +365,30 @@ export async function publishReviewedPost(input: {
     updatePayload.citation_id = await generateCitationId(admin, new Date().getFullYear());
   }
 
-  const { error } = await admin.from("posts").update(updatePayload).eq("id", input.postId);
+  // Through the domain, as `system`: this is the one path permitted to write
+  // citation_id and published_version_id, and naming the actor is what makes
+  // that a stated capability rather than a consequence of holding the service
+  // key. The row count is checked there, so an acceptance that matched nothing
+  // is no longer reported as a successful publication.
+  const published = await transitionPost(
+    { supabase: admin as unknown as SupabaseClient, actor: { kind: "system" } },
+    input.postId,
+    "published",
+    {
+      published_at: updatePayload.published_at,
+      published_version_id: updatePayload.published_version_id,
+      ...(updatePayload.citation_id !== undefined
+        ? { citation_id: updatePayload.citation_id }
+        : {}),
+    }
+  );
 
-  if (error) {
-    throw new Error(error.message);
+  if (!published.ok) {
+    throw new Error(
+      published.failure.kind === "query_failed"
+        ? published.failure.message
+        : "This submission could not be published."
+    );
   }
 
   return {
