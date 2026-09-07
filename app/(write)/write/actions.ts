@@ -7,6 +7,7 @@ import {
   authorizeTransition,
   createPost,
   postMutationMessage,
+  renamePostSlug,
   publishOwnDraft,
   submitPostForReview,
   updateDraftComposition,
@@ -412,18 +413,17 @@ async function slugForPublication(
   const base = slugBaseFromTitle(title);
   if (!base || draft.slug.startsWith(`${base}-`)) return draft.slug;
 
-  const { data: renamed } = await supabase
-    .from("posts")
-    .update({ slug: `${base}-${uniqueSlugSuffix()}` })
-    .eq("id", draft.id)
-    .eq("author_id", authorId)
-    .eq("status", "draft")
-    .select("slug")
-    .maybeSingle();
+  const nextSlug = `${base}-${uniqueSlugSuffix()}`;
+  const renamed = await renamePostSlug(
+    { supabase, actor: { kind: "author", userId: authorId } },
+    draft.id,
+    nextSlug
+  );
 
   // A rename is a courtesy, not a gate: keep publishing on the original slug
-  // rather than failing the publish over a cosmetic URL.
-  return renamed?.slug ?? draft.slug;
+  // rather than failing the publish over a cosmetic URL. The domain refuses a
+  // rename of a locked or removed post, which this statement never checked.
+  return renamed.ok ? nextSlug : draft.slug;
 }
 
 async function validateCampusPrompt(
@@ -510,10 +510,9 @@ export async function ensureContributionDraft(input: {
       };
     }
   } else {
-    const { data, error } = await supabase
-      .from("posts")
-      .insert({
-        author_id: user.id,
+    const created = await createPost(
+      { supabase, actor: { kind: "author", userId: user.id } },
+      {
         ...classification,
         slug: universalSlug(input.snapshot),
         excerpt: input.snapshot.excerpt,
@@ -524,10 +523,15 @@ export async function ensureContributionDraft(input: {
         status: "draft",
         published_at: null,
         current_round: 1,
-      })
-      .select("id")
-      .single();
-    if (error || !data) return { error: error?.message ?? "We couldn't save this draft.", draftId: null as string | null };
+      }
+    );
+    if (!created.ok) {
+      return {
+        error: postMutationMessage(created.failure),
+        draftId: null as string | null,
+      };
+    }
+    const data = created.data;
     draftId = data.id;
   }
 
@@ -806,9 +810,10 @@ export async function ensureDraft(input: {
     // submitted by a concurrent publishPost() call between the select above
     // and this update, the WHERE clause excludes it and zero rows are
     // affected, rather than silently overwriting the now-submitted content.
-    const { data: updated, error } = await supabase
-      .from("posts")
-      .update({
+    const composed = await updateDraftComposition(
+      { supabase, actor: { kind: "author", userId: user.id } },
+      input.draftId,
+      {
         title: input.title.trim(),
         excerpt: input.excerpt,
         content: sanitizedContent,
@@ -818,28 +823,27 @@ export async function ensureDraft(input: {
         article_format: effectiveArticleFormat,
         cover_image_url: input.coverImageUrl || null,
         in_response_to: input.inResponseTo ?? null,
-      })
-      .eq("id", input.draftId)
-      .eq("author_id", user.id)
-      .eq("status", "draft")
-      .select("id");
+      }
+    );
 
-    if (!error && (!updated || updated.length === 0)) {
+    if (!composed.ok) {
       return {
-        error: "This post is no longer an editable draft.",
+        error:
+          composed.failure.kind === "conflict"
+            ? "This post is no longer an editable draft."
+            : postMutationMessage(composed.failure),
         draftId: null as string | null,
       };
     }
 
-    return { error: error?.message ?? null, draftId: input.draftId };
+    return { error: null, draftId: input.draftId };
   }
 
   const slug = buildSlugFromTitle(input.title, "untitled", Date.now().toString(36));
 
-  const { data, error } = await supabase
-    .from("posts")
-    .insert({
-      author_id: user.id,
+  const created = await createPost(
+    { supabase, actor: { kind: "author", userId: user.id } },
+    {
       title: input.title.trim(),
       slug,
       excerpt: input.excerpt,
@@ -851,11 +855,12 @@ export async function ensureDraft(input: {
       status: "draft",
       cover_image_url: input.coverImageUrl || null,
       in_response_to: input.inResponseTo ?? null,
-    })
-    .select("id")
-    .single();
+    }
+  );
 
-  return { error: error?.message ?? null, draftId: data?.id ?? null };
+  return created.ok
+    ? { error: null, draftId: created.data.id }
+    : { error: postMutationMessage(created.failure), draftId: null };
 }
 
 export async function savePostReferences(input: {
@@ -1197,10 +1202,9 @@ export async function publishPost(input: {
   } else {
     // New work is also created as a private draft first. Publication is a
     // separate guarded transition after references/authors have succeeded.
-    const { data, error } = await supabase
-      .from("posts")
-      .insert({
-        author_id: user.id,
+    const created = await createPost(
+      { supabase, actor: { kind: "author", userId: user.id } },
+      {
         title: input.title.trim(),
         slug,
         content: sanitizedContent,
@@ -1214,15 +1218,17 @@ export async function publishPost(input: {
         published_at: null,
         current_round: 1,
         cover_image_url: input.coverImageUrl || null,
-      })
-      .select("id")
-      .single();
+      }
+    );
 
-    if (error || !data) {
-      return { error: error?.message ?? "Failed to publish.", slug: null as string | null };
+    if (!created.ok) {
+      return {
+        error: postMutationMessage(created.failure),
+        slug: null as string | null,
+      };
     }
 
-    postId = data.id;
+    postId = created.data.id;
   }
 
   if (!postId) {

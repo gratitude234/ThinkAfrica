@@ -40,22 +40,33 @@ const ALLOWED: Record<string, string> = {
 };
 
 /**
- * Sites not yet migrated, with what each one is.
+ * Sites not yet migrated.
  *
- * Separate from ALLOWED on purpose: these are not approved, they are
- * outstanding. The test pins the exact set so the number cannot drift upward
- * without somebody noticing, and each line is a unit of remaining work.
+ * Empty, and that is the point. It is kept as a named, asserted-empty list
+ * rather than deleted, so that adding one back is a deliberate edit to a thing
+ * called OUTSTANDING rather than a quiet addition to ALLOWED.
  */
-const OUTSTANDING: Record<string, string> = {
-  "app/(write)/write/actions.ts":
-    "Three inserts (new drafts) and the slug rename. createPost() exists for " +
-    "the inserts; the rename is a draft-only slug write.",
-  "app/(main)/submit/research/actions.ts":
-    "Two inserts and the draft-save update on the research form.",
-  "app/(main)/admin/review/actions.ts":
-    "The unfeature sweep, which clears `featured` across every row rather " +
-    "than addressing one post, so it has no single row to authorize against.",
-};
+const OUTSTANDING: Record<string, string> = {};
+
+/**
+ * Tables that are adjacent to the post lifecycle and are not part of it.
+ *
+ * `post_reviews` is reviewer feedback, `post_editor_decisions` is the editor's
+ * verdict, `post_versions` is the immutable snapshot taken at each round.
+ * None of them can change a post's status, its classification, its citation or
+ * its moderation state, which is what makes them separate domains rather than
+ * a way around this one: the worst a write there can do is record an opinion
+ * about a post, and the editorial actions that write them already go through
+ * requireEditorAccess.
+ *
+ * Listed explicitly so that the exclusion is a decision somebody made rather
+ * than a gap in a regular expression.
+ */
+export const ADJACENT_TABLES = [
+  "post_reviews",
+  "post_editor_decisions",
+  "post_versions",
+] as const;
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
@@ -73,10 +84,17 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
-/** `.from("posts")` followed by a write, across line breaks and chained
- *  filters, which is how the real call sites are formatted. */
+/**
+ * `.from("posts")` followed by a write, across line breaks and chained
+ * filters, which is how the real call sites are formatted.
+ *
+ * The gap may not contain another `.from(`. Without that, a read of `posts`
+ * standing immediately before an unrelated write to another table matches, and
+ * the boundary reports a violation for two adjacent statements that are each
+ * fine. `removeReviewer` is exactly that shape.
+ */
 const POSTS_MUTATION =
-  /\.from\("posts"\)[\s\S]{0,160}?\.(update|insert|upsert|delete)\(/g;
+  /\.from\("posts"\)((?:(?!\.from\()[\s\S]){0,160}?)\.(update|insert|upsert|delete)\(/g;
 
 /**
  * Comments are not call sites.
@@ -109,7 +127,7 @@ function findMutationSites(): Array<{ file: string; line: number; op: string }> 
         found.push({
           file: rel,
           line: text.slice(0, match.index).split("\n").length,
-          op: match[1],
+          op: match[2],
         });
       }
     }
@@ -132,15 +150,62 @@ describe("the post write boundary", () => {
     ).toEqual([]);
   });
 
-  it("keeps the outstanding list from growing", () => {
-    // Every file that still writes directly is named above. A file dropping
-    // off this list is progress and the list should be trimmed; a file
-    // appearing on it is the thing this test exists to prevent.
-    const stillDirect = new Set(
-      sites.map((site) => site.file).filter((file) => !(file in ALLOWED))
-    );
+it("reports POST LIFECYCLE OUTSTANDING: 0", () => {
+    // The gate. Every lifecycle write to `posts` is behind the domain, so the
+    // only files that may name one are the domain and the batch delete whose
+    // decision the domain makes.
+    const stillDirect = [
+      ...new Set(
+        sites.map((site) => site.file).filter((file) => !(file in ALLOWED))
+      ),
+    ].sort();
 
-    expect([...stillDirect].sort()).toEqual(Object.keys(OUTSTANDING).sort());
+    expect(
+      stillDirect,
+      `POST LIFECYCLE OUTSTANDING: ${stillDirect.length}`
+    ).toEqual([]);
+    expect(Object.keys(OUTSTANDING)).toEqual([]);
+  });
+
+  it("treats the adjacent editorial tables as separate domains, not exemptions", () => {
+    // A write to post_reviews, post_editor_decisions or post_versions cannot
+    // change a post's status, classification, citation or moderation state.
+    // That is what makes them separate domains rather than a way around this
+    // one. If a write to any of them ever set a lifecycle column, it would
+    // belong behind lib/postMutations.ts, and this assertion is what would
+    // notice.
+    const lifecycleColumns =
+      /\b(status|citation_id|published_version_id|author_id|featured)\s*:/;
+
+    const offenders: string[] = [];
+
+    for (const table of ADJACENT_TABLES) {
+      const pattern = new RegExp(
+        String.raw`\.from\("` +
+          table +
+          String.raw`"\)(?:(?!\.from\()[\s\S]){0,200}?\.(?:update|insert|upsert)\(\{([\s\S]{0,400}?)\}`,
+        "g"
+      );
+
+      for (const root of ROOTS) {
+        for (const file of sourceFiles(root)) {
+          const text = withoutComments(readFileSync(file, "utf8"));
+          pattern.lastIndex = 0;
+          let match: RegExpExecArray | null;
+          while ((match = pattern.exec(text))) {
+            if (lifecycleColumns.test(match[1])) {
+              offenders.push(
+                `${relative(process.cwd(), file)
+                  .split(sep)
+                  .join("/")} writes a lifecycle column through ${table}`
+              );
+            }
+          }
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
   });
 
   it("names a reason for every exemption", () => {

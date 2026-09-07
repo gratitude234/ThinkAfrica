@@ -793,6 +793,33 @@ export function checkComposition(
 }
 
 /**
+ * A slug the application is willing to put in a URL.
+ *
+ * Lowercase, alphanumeric and hyphens. Checked rather than sanitised: a rename
+ * that silently produced a different slug from the one asked for would be a
+ * rename nobody could predict, and the callers all build their slugs from a
+ * title through the same helpers already.
+ */
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const MAX_SLUG_LENGTH = 200;
+
+export function checkSlugRename(
+  actor: PostActor,
+  post: PostStateSnapshot,
+  slug: string,
+  options: PostPolicyOptions = LIVE_POLICY
+): PolicyDecision {
+  const writable = canWriteToPost(actor, post, options);
+  if (!writable.allowed) return writable;
+
+  if (!slug || slug.length > MAX_SLUG_LENGTH || !SLUG_PATTERN.test(slug)) {
+    return deny("protected_field", "That is not a usable slug.");
+  }
+
+  return allow;
+}
+
+/**
  * Creating a post.
  *
  * There is no stored row to authorize against, so this is the one check that

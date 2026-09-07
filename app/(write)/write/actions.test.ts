@@ -159,6 +159,7 @@ describe("ensureDraft", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { type: "policy_brief", status: "draft", author_id: "user-1" }, error: null },
+        policySnapshot({ type: "policy_brief", article_format: "policy_brief" }),
         { data: [{ id: "draft-1" }], error: null }
       ),
     });
@@ -166,7 +167,7 @@ describe("ensureDraft", () => {
     const result = await ensureDraft(baseDraftInput({ draftId: "draft-1", postType: "essay" }));
 
     expect(result).toEqual({ error: null, draftId: "draft-1" });
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    const updatedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
     expect(updatedWith.type).toBe("policy_brief");
     expect(updatedWith.content_kind).toBe("article");
     expect(updatedWith.article_format).toBe("policy_brief");
@@ -196,6 +197,7 @@ describe("ensureDraft", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { type: "essay", status: "draft", author_id: "user-1" }, error: null },
+        policySnapshot(),
         { data: [], error: null }
       ),
     });
@@ -914,7 +916,8 @@ describe("publishContribution", () => {
         queueResults(
           { data: { id: "draft-1" }, error: null },
           { data: { id: "draft-1", slug: BODY_SEEDED_SLUG, status: "draft" }, error: null },
-          { data: { slug: "one-continuous-workflow-mdef-4a5b6c" }, error: null },
+          policySnapshot(),
+          { data: [{ id: "draft-1" }], error: null },
           policySnapshot(),
           { data: [{ id: "draft-1" }], error: null }
         )
@@ -927,9 +930,12 @@ describe("publishContribution", () => {
     });
 
     expect(result.error).toBeNull();
-    expect(result.slug).toBe("one-continuous-workflow-mdef-4a5b6c");
-    const rename = fakeSupabase.current!.builders.posts[2].updatedWith as { slug: string };
-    expect(rename.slug).toMatch(/^one-continuous-workflow-/);
+    // The suffix is random and is no longer read back out of the database:
+    // renamePostSlug returns the slug it wrote. What matters is that the
+    // publish happened on a slug named after the title.
+    expect(result.slug).toMatch(/^one-continuous-workflow-/);
+    const rename = fakeSupabase.current!.builders.posts[3].updatedWith as { slug: string };
+    expect(rename.slug).toBe(result.slug);
   });
 
   it("keeps the body-seeded slug when the writer never adds a title", async () => {
@@ -983,7 +989,10 @@ describe("publishContribution", () => {
         queueResults(
           { data: { id: "draft-1" }, error: null },
           { data: { id: "draft-1", slug: BODY_SEEDED_SLUG, status: "draft" }, error: null },
-          { data: null, error: { message: "slug already taken" } },
+          policySnapshot(),
+          // The rename matches nothing, which the domain reports as a
+          // conflict rather than as success.
+          { data: [], error: null },
           policySnapshot(),
           { data: [{ id: "draft-1" }], error: null }
         )

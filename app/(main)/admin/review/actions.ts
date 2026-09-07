@@ -18,8 +18,8 @@ import { schedulePublicationDistribution } from "@/lib/publicationDistribution";
 import {
   editorialDecision as applyEditorialDecision,
   postMutationMessage,
+  featurePostExclusively,
   publishApprovedPost,
-  setPostFeatured,
 } from "@/lib/postMutations";
 
 async function requireEditorAccess() {
@@ -204,18 +204,10 @@ export async function toggleFeaturedPost(postId: string, nextFeatured: boolean) 
     return { error: accessError, featured: !nextFeatured };
   }
 
-  if (nextFeatured) {
-    const { error: unfeatureError } = await supabase
-      .from("posts")
-      .update({ featured: false })
-      .eq("featured", true);
-
-    if (unfeatureError) {
-      return { error: unfeatureError.message, featured: !nextFeatured };
-    }
-  }
-
-  const curated = await setPostFeatured(
+  // One operation owns both halves: clearing whatever was featured and
+  // setting this one. They used to be two statements here, and a failure
+  // between them left the site with nothing featured at all.
+  const curated = await featurePostExclusively(
     { supabase, actor: { kind: "admin", userId: context.userId } },
     postId,
     nextFeatured

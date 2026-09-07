@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
+  createPost,
   postMutationMessage,
   submitPostForReview,
   updateDraftComposition,
@@ -501,10 +502,9 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
     }
   } else {
     slug = buildSlugFromTitle(input.title, "research", Date.now().toString(36));
-    const { data, error } = await supabase
-      .from("posts")
-      .insert({
-        author_id: user.id,
+    const created = await createPost(
+      { supabase, actor: { kind: "author", userId: user.id } },
+      {
         title: input.title.trim(),
         slug,
         excerpt: input.abstract.trim(),
@@ -521,9 +521,14 @@ async function upsertResearchPost(input: ResearchPayload, status: "draft" | "pen
         document_original_name: input.document.originalName,
         document_mime_type: input.document.mimeType,
         document_size_bytes: input.document.sizeBytes,
-      })
-      .select("id")
-      .single();
+      }
+    );
+    const { data, error } = created.ok
+      ? { data: { id: created.data.id }, error: null }
+      : {
+          data: null,
+          error: { message: postMutationMessage(created.failure) },
+        };
 
     if (error || !data) {
       return {
@@ -690,23 +695,25 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
       };
     }
 
-    const { error } = await supabase
-      .from("posts")
-      .update({
+    const prepared = await updateDraftComposition(
+      { supabase, actor: { kind: "author", userId: user.id } },
+      existingPost.id as string,
+      {
         title,
         excerpt: abstract,
         content,
         tags,
         ...researchKeywordPatch,
-      })
-      .eq("id", existingPost.id)
-      .eq("author_id", user.id);
+      }
+    );
 
-    if (error) {
+    if (!prepared.ok) {
       return {
         error:
-          userSafeDatabaseError(error.message) ??
-          "Failed to prepare the research draft for upload.",
+          prepared.failure.kind === "query_failed"
+            ? userSafeDatabaseError(prepared.failure.message) ??
+              "Failed to prepare the research draft for upload."
+            : postMutationMessage(prepared.failure),
         postId: null,
         slug: null,
       };
@@ -718,10 +725,9 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
   }
 
   const slug = buildSlugFromTitle(title, "research", now);
-  const { data, error } = await supabase
-    .from("posts")
-    .insert({
-      author_id: user.id,
+  const created = await createPost(
+    { supabase, actor: { kind: "author", userId: user.id } },
+    {
       title,
       slug,
       excerpt: abstract,
@@ -734,9 +740,12 @@ export async function ensureResearchDraftForUpload(input: ResearchUploadDraftInp
       status: "draft",
       current_round: 1,
       published_at: null,
-    })
-    .select("id")
-    .single();
+    }
+  );
+
+  const { data, error } = created.ok
+    ? { data: { id: created.data.id }, error: null }
+    : { data: null, error: { message: postMutationMessage(created.failure) } };
 
   if (error || !data) {
     return {

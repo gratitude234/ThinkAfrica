@@ -11,6 +11,8 @@ import {
   checkCuration,
   checkDelete,
   checkInsert,
+  checkSlugRename,
+  INSERTABLE_POST_COLUMNS,
   checkTransition,
   checkWorkflowEvidence,
   LIVE_POLICY,
@@ -214,9 +216,19 @@ export async function createPost(
   const decision = checkInsert(actor, withAuthor, options);
   if (!decision.allowed) return refused(decision);
 
+  // Built from the allowlist rather than spread. checkInsert already refuses
+  // an unknown key, so this cannot change what is written today; it is here so
+  // that a caller passing a request body straight through still produces an
+  // insert made only of columns somebody chose. Two independent reasons a
+  // browser payload cannot become an insert object is the right number.
+  const insertValues: Record<string, unknown> = {};
+  for (const column of INSERTABLE_POST_COLUMNS) {
+    if (column in withAuthor) insertValues[column] = withAuthor[column];
+  }
+
   const { data, error } = await supabase
     .from("posts")
-    .insert(withAuthor)
+    .insert(insertValues)
     .select("id")
     .single();
 
@@ -393,6 +405,86 @@ export async function publishApprovedPost(
 ): Promise<PostMutationResult> {
   return transitionPost(context, postId, "published", {
     published_at: extra.published_at ?? new Date().toISOString(),
+  });
+}
+
+/**
+ * Renaming a post's slug, and nothing else.
+ *
+ * Its own operation because a rename is the one edit that changes a public URL,
+ * and because folding it into a content edit would let any content write carry
+ * a slug the caller chose. Nothing else may travel with it.
+ */
+export async function renamePostSlug(
+  context: MutationContext,
+  postId: string,
+  slug: string
+): Promise<PostMutationResult> {
+  const { supabase, actor, options = LIVE_POLICY } = context;
+
+  const post = await loadPostState(supabase, postId);
+  if (!post) return { ok: false, failure: { kind: "not_found" } };
+
+  const decision = checkSlugRename(actor, post, slug, options);
+  if (!decision.allowed) return refused(decision);
+
+  return writeOnePost(supabase, {
+    postId,
+    patch: { slug },
+    expect: { author_id: post.author_id, status: post.status },
+    actor,
+  });
+}
+
+/**
+ * Featuring one post, which means unfeaturing every other.
+ *
+ * Both halves belong to this operation. They used to be two statements in a
+ * server action, the first of which cleared `featured` across the whole table,
+ * and a failure between them left the site with nothing featured at all.
+ *
+ * On Supabase this is still two statements, in the order that fails safe: the
+ * sweep first, then the set, so the worst outcome is briefly nothing featured
+ * rather than briefly two. The PostgreSQL repository will run both inside one
+ * transaction, which is why they live behind one function now rather than
+ * being tidied up later.
+ */
+export async function featurePostExclusively(
+  context: MutationContext,
+  postId: string,
+  featured: boolean
+): Promise<PostMutationResult> {
+  const { supabase, actor, options = LIVE_POLICY } = context;
+
+  const post = await loadPostState(supabase, postId);
+  if (!post) return { ok: false, failure: { kind: "not_found" } };
+
+  const permitted = checkCuration(actor);
+  if (!permitted.allowed) return refused(permitted);
+
+  const writable = canWriteToPost(actor, post, options);
+  if (!writable.allowed) return refused(writable);
+
+  if (featured) {
+    const { error } = await supabase
+      .from("posts")
+      .update({ featured: false })
+      .eq("featured", true);
+
+    if (error) {
+      console.error("[posts] unfeature sweep failed", error.message);
+      return {
+        ok: false,
+        failure: { kind: "query_failed", message: error.message },
+      };
+    }
+  }
+
+  return writeOnePost(supabase, {
+    postId,
+    patch: { featured },
+    expect: { author_id: post.author_id, status: post.status },
+    actor,
   });
 }
 
