@@ -198,6 +198,7 @@
     "lib/reviewWorkflow.ts",
     "app/(main)/admin/review/actions.ts",
     "app/(main)/submit/research/actions.ts",
-    "app/(main)/edit/[slug]/actions.ts"
+    "app/(main)/edit/[slug]/actions.ts",
+    "lib/auth/betterAuth.ts"
   ]
 }
