@@ -6,11 +6,14 @@ import type { PostStatus } from "@/lib/types";
 import {
   AUTHOR_EDITABLE_POST_COLUMNS,
   canWriteToPost,
+  checkComposition,
   checkContentEdit,
   checkDelete,
   checkTransition,
+  checkWorkflowEvidence,
   LIVE_POLICY,
   partitionPostPatch,
+  TRANSITION_BOOKKEEPING_COLUMNS,
   type PostActor,
   type PostPolicyOptions,
   type PostStateSnapshot,
@@ -187,23 +190,84 @@ export async function updatePostContent(
   });
 }
 
+/**
+ * A composer write: content plus classification, no status change.
+ *
+ * The composer derives classification from the stored row and writes it back
+ * on every save, so most calls here change nothing about it. The ones that do
+ * are an author deciding what they are writing, which is theirs to decide
+ * while it is not a published record and, under LIVE_POLICY, while it is in
+ * review. See `checkComposition`.
+ */
+export async function updateDraftComposition(
+  context: MutationContext,
+  postId: string,
+  patch: Record<string, unknown>
+): Promise<PostMutationResult> {
+  const { supabase, actor, options = LIVE_POLICY } = context;
+
+  const post = await loadPostState(supabase, postId);
+  if (!post) return { ok: false, failure: { kind: "not_found" } };
+
+  const decision = checkComposition(actor, post, patch, options);
+  if (!decision.allowed) return refused(decision);
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: true, data: { id: post.id } };
+  }
+
+  return writeOnePost(supabase, {
+    postId,
+    patch,
+    expect: { author_id: post.author_id, status: post.status },
+    actor,
+  });
+}
+
 /** Draft to published, for content whose publication is the author's to make. */
 export async function publishOwnDraft(
   context: MutationContext,
   postId: string,
-  extra: { published_at?: string } = {}
+  extra: {
+    published_at?: string;
+    current_round?: number;
+    revision_due_at?: string | null;
+  } = {}
 ): Promise<PostMutationResult> {
+  const { published_at, ...bookkeeping } = extra;
   return transitionPost(context, postId, "published", {
-    published_at: extra.published_at ?? new Date().toISOString(),
+    published_at: published_at ?? new Date().toISOString(),
+    ...bookkeeping,
   });
 }
 
-/** Draft to pending: the author submitting work for editorial review. */
+/**
+ * Draft to pending: the author submitting work for editorial review.
+ *
+ * The bookkeeping travels with the status because the row is briefly wrong
+ * without it: a submission at round zero, or carrying a revision deadline from
+ * a previous cycle, is a submission the review queue renders incorrectly.
+ * `published_version_id` is written as null, which it already is; the write is
+ * there so a resubmission cannot carry a stale one, and
+ * `checkWorkflowEvidence` still refuses any actual change.
+ */
 export async function submitPostForReview(
   context: MutationContext,
-  postId: string
+  postId: string,
+  extra: {
+    current_round?: number;
+    revision_due_at?: string | null;
+    published_at?: string | null;
+    published_version_id?: string | null;
+  } = {}
 ): Promise<PostMutationResult> {
-  return transitionPost(context, postId, "pending", {});
+  return transitionPost(context, postId, "pending", {
+    current_round: 1,
+    revision_due_at: null,
+    published_at: null,
+    published_version_id: null,
+    ...extra,
+  });
 }
 
 /** pending_revision to pending: the author resubmitting after revision. */
@@ -311,6 +375,21 @@ export async function transitionPost(
 
   const decision = checkTransition({ actor, post, nextStatus }, options);
   if (!decision.allowed) return refused(decision);
+
+  // `extra` is bookkeeping the transition owns, not a patch the caller chose.
+  // Without this check a named operation would be a general update API with a
+  // better name on it.
+  const bookkeeping = new Set<string>(TRANSITION_BOOKKEEPING_COLUMNS);
+  const smuggled = Object.keys(extra).filter((key) => !bookkeeping.has(key));
+  if (smuggled.length > 0) {
+    return refused({
+      refusal: "protected_field",
+      reason: `A transition may not also write: ${smuggled.join(", ")}.`,
+    });
+  }
+
+  const evidence = checkWorkflowEvidence(actor, post, extra);
+  if (!evidence.allowed) return refused(evidence);
 
   return writeOnePost(supabase, {
     postId,

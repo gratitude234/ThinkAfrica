@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache";
 import slugify from "slugify";
 import { createClient } from "@/lib/supabase/server";
+import {
+  postMutationMessage,
+  publishOwnDraft,
+  submitPostForReview,
+  updateDraftComposition,
+} from "@/lib/postMutations";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEmailResult, sendUserEmail } from "@/lib/email";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
@@ -609,15 +615,20 @@ export async function publishContribution(input: {
     return { error: error instanceof Error ? error.message : "We couldn't save the collaborators.", slug: null as string | null };
   }
 
-  const { data: published, error } = await supabase
-    .from("posts")
-    .update({ status: "published", published_at: new Date().toISOString() })
-    .eq("id", draft.id)
-    .eq("author_id", user.id)
-    .eq("status", "draft")
-    .select("id");
-  if (error || !published?.length) {
-    return { error: error?.message ?? "This draft changed in another window.", slug: null as string | null };
+  // Through the domain, so the policy decides. The predicates and the
+  // affected-row check that used to live here are inside publishOwnDraft, and
+  // it additionally refuses what this statement could not see: a draft whose
+  // type is research or a policy brief, whose publication is an editorial act
+  // rather than the author's.
+  const publishResult = await publishOwnDraft(
+    { supabase, actor: { kind: "author", userId: user.id } },
+    draft.id
+  );
+  if (!publishResult.ok) {
+    return {
+      error: postMutationMessage(publishResult.failure),
+      slug: null as string | null,
+    };
   }
 
   if (prompt.promptId) {
@@ -1146,9 +1157,13 @@ export async function publishPost(input: {
     // attribution are synchronized below before the public status transition,
     // so a metadata failure never leaves an Article live while the UI reports
     // that publishing failed.
-    const { data: updatedRows, error } = await supabase
-      .from("posts")
-      .update({
+    // Composition rather than an ordinary edit: this write sets the
+    // classification, which is the author's to choose while the piece is still
+    // theirs to shape. See checkComposition.
+    const composed = await updateDraftComposition(
+      { supabase, actor: { kind: "author", userId: user.id } },
+      postId,
+      {
         title: input.title.trim(),
         excerpt: input.excerpt,
         content: sanitizedContent,
@@ -1161,19 +1176,15 @@ export async function publishPost(input: {
         slug,
         current_round: 1,
         revision_due_at: null,
-      })
-      .eq("id", postId)
-      .eq("author_id", user.id)
-      .eq("status", "draft")
-      .select("id");
+      }
+    );
 
-    if (error) {
-      return { error: error.message, slug: null as string | null };
-    }
-
-    if (!updatedRows || updatedRows.length === 0) {
+    if (!composed.ok) {
       return {
-        error: "This post is no longer an editable draft. Use the edit page to make further changes.",
+        error:
+          composed.failure.kind === "conflict"
+            ? "This post is no longer an editable draft. Use the edit page to make further changes."
+            : postMutationMessage(composed.failure),
         slug: null as string | null,
       };
     }
@@ -1259,28 +1270,22 @@ export async function publishPost(input: {
   // This is the only operation that makes the contribution public or sends
   // it into review. Keeping the status predicate in the write closes the
   // autosave/double-submit race: exactly one request can transition a draft.
-  const finalTransition = {
-    status: submitStatus,
-    published_at: publishedAt,
-    current_round: 1,
-    revision_due_at: null,
-    ...(submitStatus === "published" ? {} : { published_version_id: null }),
-  };
-  const { data: transitionedRows, error: transitionError } = await supabase
-    .from("posts")
-    .update(finalTransition)
-    .eq("id", postId)
-    .eq("author_id", user.id)
-    .eq("status", "draft")
-    .select("id");
+  const actor = { kind: "author" as const, userId: user.id };
+  const transitioned =
+    submitStatus === "published"
+      ? await publishOwnDraft({ supabase, actor }, postId, {
+          published_at: publishedAt ?? undefined,
+          current_round: 1,
+          revision_due_at: null,
+        })
+      : await submitPostForReview({ supabase, actor }, postId);
 
-  if (transitionError) {
-    return { error: transitionError.message, slug: null as string | null };
-  }
-
-  if (!transitionedRows || transitionedRows.length === 0) {
+  if (!transitioned.ok) {
     return {
-      error: "This draft was already published or changed in another window.",
+      error:
+        transitioned.failure.kind === "conflict"
+          ? "This draft was already published or changed in another window."
+          : postMutationMessage(transitioned.failure),
       slug: null as string | null,
     };
   }

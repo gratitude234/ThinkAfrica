@@ -2,6 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { checkDelete, type PostStateSnapshot } from "@/lib/postPolicy";
+
 /**
  * Who may hard-delete a post, decided in application code.
  *
@@ -12,15 +14,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * wrong.
  *
  * Two of those three disappear when the database becomes a direct connection
- * the application authenticates to itself, so the decision moves here, in
- * front of the statement. The trigger stays: this module deliberately runs its
- * delete through the viewer's own client rather than the service role, so RLS
- * and the trigger remain underneath as a backstop for as long as they exist.
+ * the application authenticates to itself, so the decision moves in front of
+ * the statement. The trigger stays: this module deliberately runs its delete
+ * through the viewer's own client rather than the service role, so RLS and the
+ * trigger remain underneath as a backstop for as long as they exist.
+ *
+ * The decision itself is NOT made here. It is `checkDelete()` from
+ * lib/postPolicy.ts, the same function the single-post path uses, so there is
+ * one statement of "an author may hard-delete their own draft and nothing
+ * else" rather than one per call shape. What this module adds is the batch: a
+ * partition of many ids into deletable, refused and missing, which the policy
+ * has no opinion about because it decides about one post at a time.
  */
 
-/** The only status an author may hard-delete. Everything else is withdrawn,
- *  rejected, published or under review, and `guard_locked_post_write` refuses
- *  it in the database too. */
+/** The only status an author may hard-delete. Kept as a named constant for
+ *  the SQL predicate below; the *decision* is `checkDelete()`, and this must
+ *  not drift from it. lib/postDeletion.test.ts pins that they agree. */
 export const DELETABLE_POST_STATUS = "draft";
 
 export type DeletionRefusal =
@@ -38,7 +47,11 @@ export interface DeletionPlan {
   missing: string[];
 }
 
-type PostOwnershipRow = { id: string; author_id: string; status: string };
+/** Everything `checkDelete` inspects. Wider than the two columns the old
+ *  hand-rolled check needed, because the policy also refuses a removed or
+ *  withdrawn post and a locked publication, and it cannot do that from a
+ *  status alone. */
+type PostOwnershipRow = PostStateSnapshot;
 
 /**
  * Resolves what the viewer is actually allowed to delete.
@@ -61,7 +74,9 @@ export async function planPostDeletion(
 
   const { data, error } = await supabase
     .from("posts")
-    .select("id, author_id, status")
+    .select(
+      "id, author_id, status, type, content_kind, article_format, citation_id, published_version_id"
+    )
     .in("id", requested);
 
   if (error) {
@@ -75,15 +90,26 @@ export async function planPostDeletion(
   const plan: DeletionPlan = { deletable: [], refused: [], missing: [] };
   for (const id of requested) {
     const row = byId.get(id);
-    if (!row || row.author_id !== input.viewerId) {
+    if (!row) {
       plan.missing.push(id);
       continue;
     }
-    if (row.status !== DELETABLE_POST_STATUS) {
-      plan.refused.push(id);
+
+    const decision = checkDelete(
+      { kind: "author", userId: input.viewerId },
+      row
+    );
+
+    if (decision.allowed) {
+      plan.deletable.push(id);
       continue;
     }
-    plan.deletable.push(id);
+
+    // "Not yours" and "does not exist" stay indistinguishable to the caller;
+    // "yours, but not a draft" is the one refusal the author is supposed to
+    // understand, because it tells them to withdraw instead.
+    if (decision.refusal === "not_owner") plan.missing.push(id);
+    else plan.refused.push(id);
   }
 
   return { plan };

@@ -171,6 +171,64 @@ export type AuthorEditablePostColumn =
   (typeof AUTHOR_EDITABLE_POST_COLUMNS)[number];
 
 /**
+ * What the composer may additionally write while a piece is still being
+ * composed.
+ *
+ * Classification is genuinely the author's to choose: deciding that a draft is
+ * an essay rather than a blog post, or a research paper rather than either, is
+ * the act of writing it. The trigger agrees, and this is worth being precise
+ * about because it looks like a hole and is not: `guard_locked_post_write`
+ * freezes classification only while a submission sits in `pending` or
+ * `pending_revision`, and only in the repository's version at that. A draft's
+ * type has never been locked.
+ *
+ * `current_round` and `revision_due_at` are here because the composer resets
+ * them when a piece enters review, which is bookkeeping that belongs to the
+ * same statement.
+ *
+ * `status` is deliberately still absent. Composition and publication remain
+ * different acts.
+ */
+export const COMPOSABLE_POST_COLUMNS = [
+  ...AUTHOR_EDITABLE_POST_COLUMNS,
+  "type",
+  "content_kind",
+  "article_format",
+  "current_round",
+  "revision_due_at",
+] as const;
+
+export type ComposablePostColumn = (typeof COMPOSABLE_POST_COLUMNS)[number];
+
+const CLASSIFICATION_COLUMNS = [
+  "type",
+  "content_kind",
+  "article_format",
+] as const;
+
+/**
+ * The only columns a named transition may carry alongside the status.
+ *
+ * A transition writes more than `status`: publishing stamps `published_at`,
+ * entering review resets the round and the revision deadline. That bookkeeping
+ * has to travel in the same statement or the row is briefly inconsistent.
+ *
+ * It is an allowlist for the same reason everything else here is. Without it,
+ * `extra` would be a general patch parameter hiding behind a named operation,
+ * and `citation_id` would be one keystroke from being writable again.
+ * `published_version_id` is permitted here only so a transition can write the
+ * null it already holds; `checkWorkflowEvidence` still refuses any actual
+ * change for anyone but `system`.
+ */
+export const TRANSITION_BOOKKEEPING_COLUMNS = [
+  "published_at",
+  "current_round",
+  "revision_due_at",
+  "published_version_id",
+  "slug",
+] as const;
+
+/**
  * Columns an authenticated write may never set, whatever else it is doing.
  *
  * The first four are the ones the trigger names. The rest are here because
@@ -617,6 +675,80 @@ export function checkDelete(
   }
 
   return canWriteToPost(actor, post, options);
+}
+
+/** Does this patch actually change how the post is classified, as opposed to
+ *  writing the same values back? The composer derives classification from the
+ *  stored row and rewrites it on every save, so "present in the patch" and
+ *  "changed" are very different questions. */
+export function changesClassification(
+  post: PostStateSnapshot,
+  patch: Record<string, unknown>
+): boolean {
+  return CLASSIFICATION_COLUMNS.some(
+    (column) =>
+      column in patch && (patch[column] ?? null) !== (post[column] ?? null)
+  );
+}
+
+/**
+ * A composer write: content plus classification, while the piece is still the
+ * author's to shape.
+ *
+ * Separate from `checkContentEdit` because the two have different allowlists
+ * and the difference is the whole point. An ordinary edit may not touch
+ * classification; composing may. Collapsing them would mean either forbidding
+ * the composer from doing its job or letting an edit reclassify a submission.
+ */
+export function checkComposition(
+  actor: PostActor,
+  post: PostStateSnapshot,
+  patch: Record<string, unknown>,
+  options: PostPolicyOptions = LIVE_POLICY
+): PolicyDecision {
+  const writable = canWriteToPost(actor, post, options);
+  if (!writable.allowed) return writable;
+
+  const evidence = checkWorkflowEvidence(actor, post, patch);
+  if (!evidence.allowed) return evidence;
+
+  if (isPrivileged(actor)) return allow;
+
+  const composable = new Set<string>(COMPOSABLE_POST_COLUMNS);
+  const rejected = Object.keys(patch).filter((key) => !composable.has(key));
+  if (rejected.length > 0) {
+    return deny(
+      "protected_field",
+      `A composer write may not set: ${rejected.join(", ")}.`
+    );
+  }
+
+  const reclassifying = changesClassification(post, patch);
+
+  // A published post's classification is the published record. Changing it
+  // after the fact rewrites what readers and citations already refer to,
+  // whatever the type is.
+  if (reclassifying && post.status === "published") {
+    return deny(
+      "classification_frozen",
+      "A published post cannot be reclassified."
+    );
+  }
+
+  // REPO_ONLY. Production permits this today; see PostPolicyOptions.
+  if (
+    options.freezeClassificationInReview &&
+    reclassifying &&
+    (post.status === "pending" || post.status === "pending_revision") &&
+    requiresEditorialPublication(post, options)
+  ) {
+    return deny(
+      "classification_frozen",
+      "A submission awaiting review or in revision cannot change its classification."
+    );
+  }
+
+  return allow;
 }
 
 /**

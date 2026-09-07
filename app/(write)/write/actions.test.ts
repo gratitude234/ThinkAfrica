@@ -291,6 +291,31 @@ describe("ensureDraft", () => {
   });
 });
 
+/**
+ * The row lib/postMutations.ts loads before it authorizes a write.
+ *
+ * Every domain operation reads it, so it is queued alongside the results a
+ * test is actually describing. It is not an extra statement the action chose
+ * to make: it is how the write is authorized at all, now that the decision is
+ * the application's rather than a trigger's.
+ */
+function policySnapshot(overrides: Record<string, unknown> = {}) {
+  return {
+    data: {
+      id: "draft-1",
+      author_id: "user-1",
+      status: "draft",
+      type: "essay",
+      content_kind: "article",
+      article_format: null,
+      citation_id: null,
+      published_version_id: null,
+      ...overrides,
+    },
+    error: null,
+  };
+}
+
 describe("publishPost", () => {
   it("rejects postType=research outright before touching the database", async () => {
     fakeSupabase.current = makeFakeSupabase({});
@@ -343,7 +368,11 @@ describe("publishPost", () => {
     "publishes a brand-new submission as a generic Article immediately, ignoring spoofed postType=%s",
     async (spoofedType) => {
       fakeSupabase.current = makeFakeSupabase({
-        posts: queueResults({ data: { id: "new-post-id" }, error: null }),
+        posts: queueResults(
+          { data: { id: "new-post-id" }, error: null },
+          policySnapshot({ id: "new-post-id" }),
+          { data: [{ id: "new-post-id" }], error: null }
+        ),
         ...standardPublishRoutes(),
       });
 
@@ -362,7 +391,7 @@ describe("publishPost", () => {
       expect(insertedWith.article_format).toBeNull();
       expect(insertedWith.status).toBe("draft");
       expect(insertedWith.published_at).toBeNull();
-      const transitionedWith = fakeSupabase.current!.builders.posts[1]
+      const transitionedWith = fakeSupabase.current!.builders.posts[2]
         .updatedWith as Record<string, unknown>;
       expect(transitionedWith.status).toBe("published");
       expect(transitionedWith.published_at).not.toBeNull();
@@ -373,6 +402,9 @@ describe("publishPost", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { status: "draft", type: "essay" }, error: null },
+        policySnapshot(),
+        { data: [{ id: "draft-1" }], error: null },
+        policySnapshot(),
         { data: [{ id: "draft-1" }], error: null }
       ),
       ...standardPublishRoutes(),
@@ -383,10 +415,10 @@ describe("publishPost", () => {
     );
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    const updatedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
     expect(updatedWith.type).toBe("essay");
     expect(updatedWith.content_kind).toBe("article");
-    const transitionedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
+    const transitionedWith = fakeSupabase.current!.builders.posts[4].updatedWith as Record<string, unknown>;
     expect(transitionedWith.status).toBe("published");
   });
 
@@ -394,6 +426,9 @@ describe("publishPost", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { status: "draft", type: "essay", content_kind: "article", article_format: "policy_brief" }, error: null },
+        policySnapshot({ article_format: "policy_brief" }),
+        { data: [{ id: "draft-1" }], error: null },
+        policySnapshot({ article_format: "policy_brief" }),
         { data: [{ id: "draft-1" }], error: null }
       ),
       ...standardPublishRoutes(),
@@ -402,10 +437,10 @@ describe("publishPost", () => {
     const result = await publishPost(basePublishInput({ draftId: "draft-1" }));
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    const updatedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
     expect(updatedWith.article_format).toBe("policy_brief");
     expect(
-      (fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>)
+      (fakeSupabase.current!.builders.posts[4].updatedWith as Record<string, unknown>)
         .status
     ).toBe("published");
   });
@@ -414,6 +449,9 @@ describe("publishPost", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { status: "draft", type: "essay", content_kind: "article", article_format: "policy_brief" }, error: null },
+        policySnapshot({ article_format: "policy_brief" }),
+        { data: [{ id: "draft-1" }], error: null },
+        policySnapshot({ article_format: "policy_brief" }),
         { data: [{ id: "draft-1" }], error: null }
       ),
       ...standardPublishRoutes(),
@@ -422,7 +460,7 @@ describe("publishPost", () => {
     const result = await publishPost(basePublishInput({ draftId: "draft-1", articleFormat: null }));
 
     expect(result.error).toBeNull();
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    const updatedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
     expect(updatedWith.article_format).toBeNull();
   });
 
@@ -430,6 +468,13 @@ describe("publishPost", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { status: "draft", type: "policy_brief" }, error: null },
+        policySnapshot({ type: "policy_brief" }),
+        { data: [{ id: "draft-1" }], error: null },
+        // By now the composition write above has converted the legacy draft to
+        // an ordinary Article, so the row the transition authorizes against is
+        // an essay. A policy brief here would be refused, and correctly:
+        // publishing one is an editorial act.
+        policySnapshot(),
         { data: [{ id: "draft-1" }], error: null }
       ),
       ...standardPublishRoutes(),
@@ -439,7 +484,7 @@ describe("publishPost", () => {
 
     expect(result.error).toBeNull();
     expect(result.submittedForReview).toBe(false);
-    const updatedWith = fakeSupabase.current!.builders.posts[1].updatedWith as Record<string, unknown>;
+    const updatedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
     // Dual-writes type="essay" like any other new Article -- never the raw
     // legacy "policy_brief" value -- while its genre survives as
     // article_format metadata, per lib/contentModel.ts's
@@ -449,7 +494,7 @@ describe("publishPost", () => {
     expect(updatedWith.type).toBe("essay");
     expect(updatedWith.content_kind).toBe("article");
     expect(updatedWith.article_format).toBe("policy_brief");
-    const transitionedWith = fakeSupabase.current!.builders.posts[2].updatedWith as Record<string, unknown>;
+    const transitionedWith = fakeSupabase.current!.builders.posts[4].updatedWith as Record<string, unknown>;
     expect(transitionedWith.status).toBe("published");
     expect(transitionedWith.published_at).not.toBeNull();
   });
@@ -509,6 +554,7 @@ describe("publishPost", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { status: "draft", type: "essay" }, error: null },
+        policySnapshot(),
         { data: [], error: null }
       ),
     });
@@ -568,7 +614,9 @@ describe("publishPost", () => {
             data: { id: "parent-1", author_id: "parent-author", slug: "p", title: "T" },
             error: null,
           },
-          { data: { id: "new-post-id" }, error: null }
+          { data: { id: "new-post-id" }, error: null },
+          policySnapshot({ id: "new-post-id" }),
+          { data: [{ id: "new-post-id" }], error: null }
         ),
       });
 
@@ -587,13 +635,18 @@ describe("publishPost", () => {
     it("does not require any parent validation at all when inResponseTo is absent", async () => {
       fakeSupabase.current = makeFakeSupabase({
         ...standardPublishRoutes(),
-        posts: queueResults({ data: { id: "new-post-id" }, error: null }),
+        posts: queueResults(
+          { data: { id: "new-post-id" }, error: null },
+          policySnapshot({ id: "new-post-id" }),
+          { data: [{ id: "new-post-id" }], error: null }
+        ),
       });
 
       const result = await publishPost(basePublishInput({ draftId: null, inResponseTo: null }));
 
       expect(result.error).toBeNull();
-      expect(fakeSupabase.current!.builders.posts).toHaveLength(2);
+      // Insert, the domain's authorization snapshot, then the transition.
+      expect(fakeSupabase.current!.builders.posts).toHaveLength(3);
     });
   });
 
@@ -622,6 +675,9 @@ describe("publishPost", () => {
     fakeSupabase.current = makeFakeSupabase({
       posts: queueResults(
         { data: { status: "draft", type: "essay" }, error: null },
+        policySnapshot(),
+        { data: [{ id: "draft-1" }], error: null },
+        policySnapshot(),
         { data: [{ id: "draft-1" }], error: null }
       ),
       profiles: queueResults({ data: { full_name: "Test Author" }, error: null }),
@@ -830,6 +886,7 @@ describe("publishContribution", () => {
           { data: { id: "draft-1" }, error: null },
           { data: { id: "draft-1", slug: BODY_SEEDED_SLUG, status: "draft" }, error: null },
           { data: { slug: "one-continuous-workflow-mdef-4a5b6c" }, error: null },
+          policySnapshot(),
           { data: [{ id: "draft-1" }], error: null }
         )
       )
@@ -852,6 +909,7 @@ describe("publishContribution", () => {
         queueResults(
           { data: { id: "draft-1" }, error: null },
           { data: { id: "draft-1", slug: BODY_SEEDED_SLUG, status: "draft" }, error: null },
+          policySnapshot(),
           { data: [{ id: "draft-1" }], error: null }
         )
       )
@@ -861,8 +919,9 @@ describe("publishContribution", () => {
 
     expect(result.error).toBeNull();
     expect(result.slug).toBe(BODY_SEEDED_SLUG);
-    // Insert, read back, publish. No rename in between.
-    expect(fakeSupabase.current!.builders.posts).toHaveLength(3);
+    // Insert, read back, the domain authorization snapshot, publish. No
+    // rename in between.
+    expect(fakeSupabase.current!.builders.posts).toHaveLength(4);
   });
 
   it("leaves a slug alone when it already comes from the title", async () => {
@@ -874,6 +933,7 @@ describe("publishContribution", () => {
             data: { id: "draft-1", slug: "one-continuous-workflow-mabc-1z2y3x", status: "draft" },
             error: null,
           },
+          policySnapshot(),
           { data: [{ id: "draft-1" }], error: null }
         )
       )
@@ -885,7 +945,7 @@ describe("publishContribution", () => {
     });
 
     expect(result.slug).toBe("one-continuous-workflow-mabc-1z2y3x");
-    expect(fakeSupabase.current!.builders.posts).toHaveLength(3);
+    expect(fakeSupabase.current!.builders.posts).toHaveLength(4);
   });
 
   it("publishes on the original slug when the rename cannot be written", async () => {
@@ -895,6 +955,7 @@ describe("publishContribution", () => {
           { data: { id: "draft-1" }, error: null },
           { data: { id: "draft-1", slug: BODY_SEEDED_SLUG, status: "draft" }, error: null },
           { data: null, error: { message: "slug already taken" } },
+          policySnapshot(),
           { data: [{ id: "draft-1" }], error: null }
         )
       )
