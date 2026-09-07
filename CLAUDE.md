@@ -85,6 +85,8 @@ API routes (`app/api/`):
 | Route | Purpose |
 |-------|---------|
 | `GET /api/feed` | Paginated feed with ranking |
+| `GET /api/search` | Site search. `scope=overlay` is the command-palette typeahead |
+| `GET /api/topics` | Every topic in use, with counts, for tag suggestions and the trending list |
 | `POST /api/upload-image` | Image upload to Supabase Storage |
 | `POST /api/research-document/upload` | PDF/document upload |
 | `GET /api/research-document/[postId]` | Retrieve research document |
@@ -110,10 +112,22 @@ implementation that will run against Neon (`lib/db/postgres/`).
 `getDatabase()` picks between them from `DATABASE_ADAPTER`, process-wide rather
 than per request, so a page is never composed of rows from two databases.
 
-One domain is behind it so far: the core post lookup, which `lib/postBySlug.ts`
-now asks for instead of querying itself. Everything else still calls Supabase
-directly, and the audit of what that means is in
-`docs/database-access-inventory.md`.
+Two domains are behind it so far, **reads only**:
+
+- The core post lookup, which `lib/postBySlug.ts` asks for instead of querying
+  itself.
+- The public profile identity lookup, which `loadProfileIdentity()` in
+  `lib/profileViewData.ts` asks for. Everything else on the profile page still
+  takes a `SupabaseClient` directly.
+
+Every **write** goes to Supabase unconditionally, with no adapter branch
+anywhere in its path, and that is the boundary rather than an unfinished
+migration. Profile writes go through `lib/profileMutations.ts`. See
+`docs/profiles-domain-migration.md` for the read/write split and
+`docs/adr-neon-authorization.md` for why.
+
+Everything else still calls Supabase directly, and the audit of what that means
+is in `docs/database-access-inventory.md`.
 
 `postgres.js` is installed and `lib/db/postgres/connection.ts` opens a real
 pool. Its options (`max: 5`, `prepare: false`, an 8-second
@@ -127,7 +141,21 @@ Two rules for anything moved next:
   and a direct connection does not have it.
 - The Supabase and Postgres implementations of a method must be behaviourally
   identical, not merely similar. `lib/db/postgres/posts.ts` documents the four
-  places where a faithful port is not the obvious one.
+  places where a faithful port is not the obvious one, and
+  `lib/db/postgres/profiles.ts` three more.
+- Anything the driver does not hand back in the shape TypeScript claims goes
+  through `lib/db/postgres/normalise.ts`, which exists because
+  `fetch_types: false` means postgres.js knows no type OIDs. Both Phase 3
+  production failures were array columns, in opposite directions, and neither
+  was caught by a type.
+
+Four layers keep the two implementations honest: per-adapter unit tests, the
+normaliser regression tests, `lib/db/parity.ts` field-by-field against two live
+databases (`node scripts/migration/parity-check.mjs`), and
+`scripts/migration/preview-check.mjs`, which renders real pages through both
+adapters on one build and compares the visible text. Only the last catches the
+failure mode that matters most: a TypeError inside a Suspense boundary, on a
+page that still answers HTTP 200.
 
 ### Authentication & Authorization
 
@@ -157,6 +185,7 @@ Post type minimum word counts: blog (50), essay (500), policy_brief (400), resea
 | `lib/roles.ts` | Permission helpers |
 | `lib/opportunityMatch.ts` | Fellowship recommendation matching |
 | `lib/citationId.ts` | Citation ID generation for publications |
+| `lib/searchData.ts` | Every search query, server-side. Escapes the PostgREST `or=` filters that used to take raw user text |
 | `lib/postBySlug.ts` | The one core post lookup for `/post/[slug]`, memoised per render with React `cache()` |
 | `lib/serverAuth.ts` | `getCurrentUser()`, the session validation memoised per render |
 | `lib/supabase/fetchTimeout.ts` | Fail-fast deadline on PostgREST and Auth calls |

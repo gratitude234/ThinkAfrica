@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import {
   MAX_TOPIC_KEY_LENGTH,
   normalizeTagValue,
@@ -16,10 +15,6 @@ interface TagInputProps {
   maxTags?: number;
   showLabel?: boolean;
   disabled?: boolean;
-}
-
-interface TagRow {
-  tags: string[] | null;
 }
 
 export default function TagInput({
@@ -53,23 +48,16 @@ export default function TagInput({
     setLoadingTags(true);
 
     try {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("posts")
-        .select("tags")
-        .eq("status", "published")
-        .limit(500);
+      // The application, not the database. The normalising and de-duplicating
+      // moved to lib/searchData.ts, where the trending list reads the same
+      // rows: the two used to key on different things and disagree about what
+      // a topic was.
+      const response = await fetch("/api/topics");
+      const payload = response.ok
+        ? ((await response.json()) as { keys?: string[] })
+        : { keys: [] };
 
-      const uniqueTags = Array.from(
-        new Set(
-          ((data ?? []) as TagRow[])
-            .flatMap((post) => post.tags ?? [])
-            .map((tag) => normalizeTagValue(tag))
-            .filter(Boolean)
-        )
-      ).sort((a, b) => a.localeCompare(b));
-
-      setAllTags(uniqueTags);
+      setAllTags(payload.keys ?? []);
       setLoaded(true);
     } catch {
       setAllTags([]);

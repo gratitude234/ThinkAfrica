@@ -1,0 +1,163 @@
+name: Migration guards
+
+# The checks that keep the Neon migration honest, run on every push and pull
+# request. Two tiers, and the split matters:
+#
+#   * `static` needs no credentials and runs everywhere, including on forks and
+#     on pull requests from them. It is the tier that must never be skipped.
+#   * `differential` needs read access to two live databases and runs only on
+#     the migration branch, only when the secrets exist, and never on a fork.
+#
+# Nothing here deploys anything, and nothing here writes to a database.
+#
+# ## Secrets this workflow reads
+#
+# All are repository or environment secrets. None is committed, none is echoed,
+# and none is passed as a command-line argument (see scripts/migration/pg.mjs
+# for why: an argument is visible in the process list, an environment variable
+# is not).
+#
+#   NEXT_PUBLIC_SUPABASE_URL      the Supabase project URL
+#   SUPABASE_SERVICE_ROLE_KEY     server-only; used read-only by the parity run
+#   DATABASE_URL                  the NEON SCRATCH connection string, pooled
+#
+# DATABASE_URL must point at the scratch branch and never at anything else. The
+# parity harness refuses a host that is not *.neon.tech, but a secret is set by
+# a person and that check is the last line, not the first.
+#
+# Deliberately absent: SUPABASE_DB_URL and DATABASE_URL_DIRECT. Nothing in CI
+# needs a direct connection, schema dumps are a local operation with a human
+# watching, and a secret that is not present cannot leak.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: migration-guards-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Static guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        # The suite carries the guards that would otherwise only fail in
+        # production: the browser write boundary, the server action contract,
+        # the migration contracts, and the adapter parity rules.
+        run: npm test
+
+      - name: Build
+        # Not redundant with typecheck. `tsconfig.check.json` lists files
+        # explicitly, and a "use server" module exporting a synchronous
+        # function is a compile-only error that lint, typecheck and the tests
+        # all pass. It was found by a build and nothing else.
+        run: npm run build
+        env:
+          # Enough to build. No database is reached at build time; these exist
+          # because module-level validation runs during the build.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-key
+
+      - name: No database credential may reach the browser bundle
+        # The one thing that would make this migration unsafe rather than
+        # incomplete. A connection string in a client chunk is not a
+        # misconfiguration to fix later, it is a published credential.
+        #
+        # Greps the built client output for the shapes a Postgres URL takes.
+        # The build above uses placeholders, so a hit here means a literal was
+        # committed rather than that a secret leaked, which is the case worth
+        # catching before it becomes the other one.
+        run: |
+          set -euo pipefail
+          if grep -rIlE 'postgres(ql)?://|\.neon\.tech|DATABASE_URL_DIRECT' \
+               .next/static 2>/dev/null; then
+            echo "::error::A database credential shape appears in the client bundle."
+            exit 1
+          fi
+          echo "No database credential shapes in .next/static."
+
+  differential:
+    name: Live adapter differential
+    runs-on: ubuntu-latest
+    # Only where the secrets can exist, and only for this repository. A fork's
+    # pull request must not be able to request a job that reads our databases.
+    if: >-
+      github.repository == 'gratitude234/ThinkAfrica' &&
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/heads/migration/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Confirm the credentials are present
+        # A missing secret must be a visible skip, never a silent pass. The
+        # parity harness itself exits 2 and names what is missing; this step
+        # exists so the reason appears in the job summary rather than only in
+        # the log.
+        id: creds
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEON_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${SUPABASE_URL:-}" ] || missing="$missing NEXT_PUBLIC_SUPABASE_URL"
+          [ -n "${SERVICE_KEY:-}" ] || missing="$missing SUPABASE_SERVICE_ROLE_KEY"
+          [ -n "${NEON_URL:-}" ] || missing="$missing DATABASE_URL"
+          if [ -n "$missing" ]; then
+            echo "::warning::Differential skipped. Missing secrets:$missing"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Adapter parity, both domains, read-only on both databases
+        if: steps.creds.outputs.ready == 'true'
+        # One SELECT per subject per adapter. Posts and profiles. The harness
+        # excludes rows created after the Neon snapshot was taken, deriving the
+        # boundary from Neon itself, so production continuing to accept work
+        # does not read as a migration defect.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/migration/parity-check.mjs
+
+      - name: Unapplied migrations still parse against the real schema
+        if: steps.creds.outputs.ready == 'true'
+        # Runs them inside a transaction and rolls back. There is no local
+        # migration runner in this project, so without this a file that has
+        # never been executed is a file nobody has proved parses, and the
+        # person who finds out is whoever applies it to production.
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          node scripts/migration/validate-migration.mjs \
+            supabase/migrations/20260909000001_parameterize_identity_rpcs.sql \
+            supabase/migrations/20260910000001_parameterize_identity_rpcs_group2.sql

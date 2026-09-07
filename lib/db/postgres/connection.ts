@@ -87,19 +87,40 @@ export function resolveConnectionString(
  * connection open across long idle periods, which is how a small pool becomes
  * a large one at the database.
  *
- * `connect_timeout` and `statement_timeout` are the direct heirs of
- * lib/supabase/fetchTimeout.ts. That deadline exists because a database that
- * stopped answering held a Vercel function open for 300 seconds and produced
- * nothing; the fix must not be lost in the port. `statement_timeout` is also
- * set on the role by scripts/migration/neon-preflight.sql, so the ceiling
- * holds even for a client that forgets to ask for it.
+ * `statement_timeout` is the direct heir of lib/supabase/fetchTimeout.ts. That
+ * deadline exists because a database that stopped answering held a Vercel
+ * function open for 300 seconds and produced nothing; the fix must not be lost
+ * in the port. It is also set on the role by
+ * scripts/migration/neon-preflight.sql, so the ceiling holds even for a client
+ * that forgets to ask for it.
+ *
+ * `connect_timeout` is a different question and gets a different answer. It
+ * bounds a TCP and TLS handshake, not a query, so it has nothing to do with
+ * the hang this migration exists to prevent: a statement that never returns is
+ * caught by `statement_timeout`, and Vercel's own function ceiling sits behind
+ * that.
+ *
+ * It was 10 seconds, and measurement showed that was too tight to be useful.
+ * Opening a fresh connection to Neon from a development machine in another
+ * region takes 4.6 to 8.4 seconds, median 5.2; Supabase's own pooler measures
+ * 2.1 to 7.0 from the same place, so this is the network path rather than
+ * either provider. A reused connection then answers in about 320ms, which is
+ * what a warm pool actually experiences.
+ *
+ * Ten seconds therefore left about two seconds of headroom and turned a slow
+ * network into intermittent hard failures for nothing: refusing at ten rather
+ * than fifteen protects no budget that matters. Fifteen has real headroom and
+ * still bounds the handshake.
+ *
+ * Worth re-measuring once the runtime is co-located with the database, where
+ * the honest number will be much smaller.
  */
 export const POSTGRES_POOL_OPTIONS = {
   max: 5,
   prepare: false,
   idle_timeout: 20,
   max_lifetime: 60 * 30,
-  connect_timeout: 10,
+  connect_timeout: 15,
   connection: { statement_timeout: 8000 },
   // postgres.js otherwise runs a type-OID lookup on connect, which is a whole
   // extra round trip on every cold isolate.

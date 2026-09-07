@@ -3,6 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getMessageEligibility = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/messaging", () => ({ getMessageEligibility }));
 
+/**
+ * The profile identity read moved behind lib/db, so it no longer travels
+ * through the Supabase client stubbed below. The row it returns is set per
+ * test here; the null-versus-error distinction the query itself has to
+ * preserve is tested against the adapter, in lib/db/supabase/profiles.test.ts.
+ */
+const findIdentityByUsername = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/db", () => ({
+  getDatabase: () => ({ profiles: { findIdentityByUsername } }),
+}));
+
 import {
   contentKindFilter,
   loadProfileIdentity,
@@ -115,56 +126,65 @@ const PROFILE_ROW = {
 };
 
 beforeEach(() => {
+  findIdentityByUsername.mockReset();
+  findIdentityByUsername.mockResolvedValue(null);
   getMessageEligibility.mockReset();
   getMessageEligibility.mockResolvedValue({ eligible: true, reason: null });
 });
 
-describe("loadProfileIdentity: an absent profile and a broken database", () => {
-  it("returns null when the query succeeded and matched nothing", async () => {
-    const { client } = makeClient({ routes: { profiles: { data: null, error: null } } });
+describe("loadProfileIdentity: delegation to the database boundary", () => {
+  /**
+   * The loader is a pass-through now. What matters is that it is a faithful
+   * one: the username reaches the repository unchanged, an absence stays an
+   * absence, and a failure is not converted into one. The last of those is
+   * the distinction that told every visitor that every member's profile did
+   * not exist while Supabase was down, so it is asserted at both levels.
+   */
+  it("forwards the username and returns what the repository answered", async () => {
+    const { client } = makeClient();
+    findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
+
+    await expect(loadProfileIdentity(client, "student1")).resolves.toEqual(
+      PROFILE_ROW
+    );
+    expect(findIdentityByUsername).toHaveBeenCalledWith("student1");
+  });
+
+  it("returns null when the repository found nothing", async () => {
+    const { client } = makeClient();
 
     await expect(loadProfileIdentity(client, "nobody")).resolves.toBeNull();
   });
 
-  /**
-   * The distinction this whole loader exists to preserve. A null row with no
-   * error is an answer; a null row with an error is a failure wearing the
-   * same clothes. Reading the second as the first is what told every visitor
-   * that every member's profile did not exist while Supabase was down.
-   */
-  it("throws when the query itself failed", async () => {
-    const { client } = makeClient({
-      routes: {
-        profiles: { data: null, error: { message: "connection timed out" } },
-      },
-    });
+  it("propagates a failure rather than reporting an absence", async () => {
+    const { client } = makeClient();
+    findIdentityByUsername.mockRejectedValue(
+      new Error('Failed to load profile "student1".')
+    );
 
     await expect(loadProfileIdentity(client, "student1")).rejects.toThrow(
-      /profile lookup failed/
+      /Failed to load profile/
     );
   });
 
-  it("does not leak the database message into the thrown surface text", async () => {
-    const { client } = makeClient({
-      routes: {
-        profiles: {
-          data: null,
-          error: { message: 'relation "profiles" does not exist' },
-        },
-      },
-    });
+  /**
+   * The client parameter is vestigial: kept so call sites did not all have to
+   * change, ignored so the adapter decides where the read goes. A test that
+   * did not pin this would not notice the loader quietly reading from two
+   * databases at once.
+   */
+  it("does not touch the Supabase client it is still handed", async () => {
+    const { client, tables } = makeClient();
 
-    // The message is for the server log. What the reader sees is the route's
-    // error boundary, which never prints this.
-    await expect(loadProfileIdentity(client, "student1")).rejects.toThrow(
-      /profile lookup failed/
-    );
+    await loadProfileIdentity(client, "student1");
+
+    expect(tables).toHaveLength(0);
   });
 });
 
 describe("loadProfileView: not-found versus failure", () => {
   it("returns null for a username that does not exist", async () => {
-    const { client } = makeClient({ routes: { profiles: { data: null, error: null } } });
+    const { client } = makeClient();
 
     await expect(
       loadProfileView({ supabase: client, username: "nobody" })
@@ -172,9 +192,10 @@ describe("loadProfileView: not-found versus failure", () => {
   });
 
   it("propagates a query failure instead of reporting an absence", async () => {
-    const { client } = makeClient({
-      routes: { profiles: { data: null, error: { message: "502 bad gateway" } } },
-    });
+    const { client } = makeClient();
+    findIdentityByUsername.mockRejectedValue(
+      new Error('Failed to load profile "student1".')
+    );
 
     await expect(
       loadProfileView({ supabase: client, username: "student1" })
@@ -182,9 +203,9 @@ describe("loadProfileView: not-found versus failure", () => {
   });
 
   it("throws when a relationship count fails rather than printing zero", async () => {
+    findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
     const { client } = makeClient({
       routes: {
-        profiles: { data: PROFILE_ROW, error: null },
         follows: { data: null, error: { message: "statement timeout" }, count: 0 },
       },
     });
@@ -412,9 +433,9 @@ describe("the Article and Post split", () => {
 
 describe("what the public profile no longer loads", () => {
   it("asks for no researcher profile and no citation edges", async () => {
+    findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
     const { client, tables } = makeClient({
       routes: {
-        profiles: { data: PROFILE_ROW, error: null },
         follows: { count: 0, data: null, error: null },
       },
     });
@@ -431,9 +452,9 @@ describe("what the public profile no longer loads", () => {
    * page that lists none of them is the cost this loader exists to avoid.
    */
   it("does not page publications for a view that shows none", async () => {
+    findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
     const { client, tables, rpcNames } = makeClient({
       routes: {
-        profiles: { data: PROFILE_ROW, error: null },
         follows: { count: 0, data: null, error: null },
       },
     });
@@ -452,9 +473,9 @@ describe("what the public profile no longer loads", () => {
   });
 
   it("loads only the list an Articles view renders", async () => {
+    findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
     const { client, tables } = makeClient({
       routes: {
-        profiles: { data: PROFILE_ROW, error: null },
         follows: { count: 0, data: null, error: null },
         posts: { data: [], error: null },
         post_authors: { data: [], error: null },

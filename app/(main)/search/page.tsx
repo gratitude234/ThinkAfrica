@@ -4,14 +4,11 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import Badge from "@/components/ui/Badge";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
 import { isFormallyReviewed } from "@/lib/contentModel";
-import { formatTagLabel } from "@/lib/tags";
 
 interface PostResult {
   id: string;
@@ -66,14 +63,6 @@ interface DiscoverSearchGroup {
   label: string;
   count: number;
 }
-
-type RawPostResult = Omit<PostResult, "profiles"> & {
-  profiles: PostResult["profiles"] | PostResult["profiles"][];
-};
-
-type TrendingRow = {
-  tags: string[] | null;
-};
 
 // Evidence-based, not name-based: a type says a workflow *requires* review,
 // but only citation_id/published_version_id prove a specific record
@@ -180,55 +169,47 @@ function SearchPageContent() {
 
       const requestId = ++requestIdRef.current;
       setLoading(true);
-      const supabase = createClient();
 
-      const [
-        { data: postResults },
-        { data: peopleResults },
-        { data: opportunityResults },
-      ] = await Promise.all([
-        supabase
-          .from("posts")
-          .select(
-            "id, title, slug, excerpt, type, content_kind, article_format, citation_id, published_version_id, published_at, profiles!posts_author_id_fkey(username, full_name, university)"
-          )
-          .eq("status", "published")
-          .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-          .or(`title.ilike.%${trimmed}%,excerpt.ilike.%${trimmed}%`)
-          .order("published_at", { ascending: false })
-          .limit(15),
-        supabase
-          .from("profiles")
-          .select("id, username, full_name, university, points, avatar_url")
-          .or(
-            `username.ilike.%${trimmed}%,full_name.ilike.%${trimmed}%,university.ilike.%${trimmed}%`
-          )
-          .limit(8),
-        supabase
-          .from("fellowships")
-          .select("id, title, sponsor_name, deadline")
-          .eq("status", "open")
-          .or(`title.ilike.%${trimmed}%,sponsor_name.ilike.%${trimmed}%`)
-          .order("deadline", { ascending: true, nullsFirst: false })
-          .limit(6),
-      ]);
+      /**
+       * One request to the application, which runs the three queries. They used
+       * to run from here against the anon key, and the user's text was
+       * interpolated straight into a PostgREST `or=` filter: a search
+       * containing a comma or a bracket sent a malformed filter and returned
+       * nothing at all, which looks exactly like a search that found nothing.
+       * See lib/searchData.ts.
+       */
+      let postResults: PostResult[] = [];
+      let peopleResults: PersonResult[] = [];
+      let opportunityResults: OpportunityResult[] = [];
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
+        if (response.ok) {
+          const payload = (await response.json()) as {
+            posts?: PostResult[];
+            people?: PersonResult[];
+            opportunities?: OpportunityResult[];
+          };
+          postResults = payload.posts ?? [];
+          peopleResults = payload.people ?? [];
+          opportunityResults = payload.opportunities ?? [];
+        }
+      } catch {
+        // Nothing found, and the next keystroke tries again.
+      }
 
       if (requestId !== requestIdRef.current) {
         return;
       }
 
-      const normalizedPosts = ((postResults ?? []) as RawPostResult[]).map((post) => ({
-        ...post,
-        profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
-      }));
+      const normalizedPosts = postResults;
       const normalizedTopics = allTopics
         .filter((topic) => topic.tag.toLowerCase().includes(trimmed.toLowerCase()))
         .slice(0, 12);
 
       setPosts(normalizedPosts);
-      setPeople((peopleResults ?? []) as PersonResult[]);
+      setPeople(peopleResults);
       setTopics(normalizedTopics);
-      setOpportunities((opportunityResults ?? []) as OpportunityResult[]);
+      setOpportunities(opportunityResults);
       setLoading(false);
       trackActivationEvent({
         event: "search_performed",
@@ -236,14 +217,14 @@ function SearchPageContent() {
           surface: "search",
           queryLength: trimmed.length,
           postResults: normalizedPosts.length,
-          peopleResults: peopleResults?.length ?? 0,
+          peopleResults: peopleResults.length,
           topicResults: normalizedTopics.length,
-          opportunityResults: opportunityResults?.length ?? 0,
+          opportunityResults: opportunityResults.length,
           resultCount:
             normalizedPosts.length +
-            (peopleResults?.length ?? 0) +
+            (peopleResults.length) +
             normalizedTopics.length +
-            (opportunityResults?.length ?? 0),
+            (opportunityResults.length),
         },
       });
     },
@@ -271,34 +252,21 @@ function SearchPageContent() {
   }, [query, runSearch]);
 
   useEffect(() => {
-    const supabase = createClient();
-
-    supabase
-      .from("posts")
-      .select("tags")
-      .eq("status", "published")
-      .limit(500)
-      .then(({ data }) => {
-        const counts: Record<string, number> = {};
-
-        ((data ?? []) as TrendingRow[]).forEach((post) => {
-          (post.tags ?? []).forEach((tag) => {
-            // Tally on the hash-stripped label, not the raw tag. Keying on the
-            // raw value counted "#africa" and "africa" as two separate topics,
-            // so a topic split across both spellings ranked as two half-sized
-            // entries and could miss the trending list entirely.
-            const label = formatTagLabel(tag);
-            if (!label) return;
-            counts[label] = (counts[label] ?? 0) + 1;
-          });
-        });
-
-        const sortedTopics = Object.entries(counts)
-          .sort((a, b) => b[1] - a[1])
-          .map(([tag, count]) => ({ tag, count }));
-
-        setAllTopics(sortedTopics);
-        setTrending(sortedTopics.slice(0, 10).map((topic) => topic.tag));
+    // The same list the tag field's suggestions come from, counted once on the
+    // server. Two copies of this aggregation keyed on different things, which
+    // is how "#africa" and "africa" became two topics. See /api/topics.
+    fetch("/api/topics")
+      .then((response) => (response.ok ? response.json() : { topics: [] }))
+      .then((payload: { topics?: TopicResult[] }) => {
+        const topics = payload.topics ?? [];
+        setAllTopics(topics);
+        // Already ordered most-used-first by the route.
+        setTrending(topics.slice(0, 10).map((topic) => topic.tag));
+      })
+      .catch(() => {
+        // No trending row and no suggestions is a usable search page.
+        setAllTopics([]);
+        setTrending([]);
       });
   }, []);
 

@@ -103,8 +103,18 @@ describe("the connection", () => {
   it("carries the fail-fast deadline across from the Supabase client", () => {
     // lib/supabase/fetchTimeout.ts exists because a database that stopped
     // answering held a Vercel function open for 300 seconds. The direct-SQL
-    // equivalent must not be lost in the port.
+    // equivalent must not be lost in the port. This is the statement deadline,
+    // and it is the one that matters.
     expect(POSTGRES_POOL_OPTIONS.connection.statement_timeout).toBe(8000);
-    expect(POSTGRES_POOL_OPTIONS.connect_timeout).toBeLessThanOrEqual(15);
+  });
+
+  it("bounds the handshake without mistaking it for the query deadline", () => {
+    // connect_timeout guards a TCP and TLS handshake, not a statement, so it
+    // is not what prevents the 300-second hang. It was 10s, which measured too
+    // tight: a fresh connection from a machine in another region takes 4.6 to
+    // 8.4 seconds, so 10 left about two seconds of headroom and produced
+    // intermittent hard failures for no gain. It still has to bound something.
+    expect(POSTGRES_POOL_OPTIONS.connect_timeout).toBeGreaterThanOrEqual(15);
+    expect(POSTGRES_POOL_OPTIONS.connect_timeout).toBeLessThanOrEqual(30);
   });
 });

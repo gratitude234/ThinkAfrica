@@ -178,6 +178,15 @@
     "lib/db/parity.ts",
     "app/(onboarding)/onboarding/actions.ts",
     "app/(main)/post/[slug]/commentActions.ts",
-    "app/(main)/post/[slug]/CommentThread.tsx"
+    "app/(main)/post/[slug]/CommentThread.tsx",
+    "lib/db/postgres/normalise.ts",
+    "lib/db/supabase/profiles.ts",
+    "lib/db/postgres/profiles.ts",
+    "lib/searchData.ts",
+    "app/api/search/route.ts",
+    "app/api/topics/route.ts",
+    "components/ui/SearchOverlay.tsx",
+    "components/ui/TagInput.tsx",
+    "app/(main)/search/page.tsx"
   ]
 }

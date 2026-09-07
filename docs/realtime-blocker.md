@@ -80,5 +80,24 @@ database client is a component whose realtime strategy can change without
 touching its data access.
 
 **Do not solve this by accident.** Moving the messaging browser reads
-server-side is a Phase 4 task with an obvious shape; choosing a realtime
-architecture is a separate decision with a budget attached.
+server-side has an obvious shape; choosing a realtime architecture is a
+separate decision with a budget attached.
+
+## 6. Phase 4 status: unchanged, deliberately
+
+Phase 4 moved five browser reads server-side, all of them search. It did
+**not** move the messaging reads, and the count in
+[database-access-inventory.md](database-access-inventory.md) reflects that:
+thirteen browser reads remain, two of which are these.
+
+The reason is the paragraph above, taken seriously. The messaging reads sit
+inside components that also hold a `postgres_changes` subscription. Moving the
+read while leaving the subscription produces a component that fetches its
+initial state from the application and its updates from the database, which is
+two data paths where there was one, and which is harder to reason about than
+either end state. It also quietly commits to keeping Supabase Realtime alive,
+because a subscription with no accompanying read is more awkward to remove, not
+less.
+
+So the messaging reads move when the realtime decision is made, not before. The
+search reads had no such coupling, which is why they went first.

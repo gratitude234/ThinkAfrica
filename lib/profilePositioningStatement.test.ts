@@ -259,10 +259,13 @@ describe("positioning statement editing contract", () => {
       'process.env.NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED === "1"'
     );
     // Wherever a profile projection is built, the gate decides whether the
-    // column is named. The public profile no longer builds one of its own:
-    // it goes through profileViewData, which is the point of that module.
+    // column is named. The public profile builds none of its own: it reads
+    // through lib/db, so both adapters carry the gate and both are listed
+    // here. A projection that appeared somewhere not on this list is exactly
+    // what this loop exists to notice.
     for (const source of [
-      "lib/profileViewData.ts",
+      "lib/db/supabase/profiles.ts",
+      "lib/db/postgres/profiles.ts",
       "app/(main)/[username]/record/page.tsx",
       "app/(main)/settings/page.tsx",
     ]) {
@@ -273,6 +276,15 @@ describe("positioning statement editing contract", () => {
         /const [A-Z_]*SELECT\s*=\s*\n?\s*"[^"]*positioning_statement[^"]*";/
       );
     }
+
+    // The loader that used to build the projection now delegates, so it
+    // names neither the column nor a select of its own.
+    const viewData = readFileSync(
+      resolve(process.cwd(), "lib/profileViewData.ts"),
+      "utf8"
+    );
+    expect(viewData).not.toContain("positioning_statement");
+    expect(viewData).toContain("getDatabase().profiles.findIdentityByUsername");
 
     // And the page itself names the column nowhere at all.
     const profilePage = readFileSync(

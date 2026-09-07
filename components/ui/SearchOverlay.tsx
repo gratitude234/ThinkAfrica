@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import Badge from "@/components/ui/Badge";
 import { isFormallyReviewed } from "@/lib/contentModel";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 interface SearchResult {
   id: string;
@@ -34,6 +32,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,35 +51,47 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  /**
+   * The typeahead asks the application, not the database.
+   *
+   * The query, the limit and the research exclusion all live on the server
+   * now: see lib/searchData.ts. This side keeps only what is about this
+   * component, which is the race. Keystrokes are debounced but the responses
+   * still arrive in whatever order the network chooses, and a slow request for
+   * "af" landing after a fast one for "africa" used to replace the right
+   * results with stale ones. The request id is checked before anything is set.
+   */
   const search = useCallback(async (q: string) => {
     if (!q.trim()) {
+      requestIdRef.current += 1;
       setResults([]);
       setFocusedIndex(null);
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("posts")
-      .select(
-        "id, title, slug, type, content_kind, article_format, citation_id, published_version_id, profiles!posts_author_id_fkey(full_name, username)"
-      )
-      .eq("status", "published")
-      .ilike("title", `%${q}%`)
-      .limit(6);
 
-    const mapped: SearchResult[] = (data ?? [])
-      .filter(
-        (post) =>
-          FEATURE_FLAGS.research ||
-          (post.type !== "research" && post.content_kind !== "research")
-      )
-      .map((post) => ({
-        ...post,
-        url: `/post/${post.slug}`,
-        profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
-      }));
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+
+    let mapped: SearchResult[] = [];
+    try {
+      const response = await fetch(
+        `/api/search?scope=overlay&q=${encodeURIComponent(q)}`
+      );
+      if (response.ok) {
+        const payload = (await response.json()) as { posts?: SearchResult[] };
+        mapped = (payload.posts ?? []).map((post) => ({
+          ...post,
+          url: `/post/${post.slug}`,
+        }));
+      }
+    } catch {
+      // A failed search shows nothing and lets the next keystroke try again.
+      mapped = [];
+    }
+
+    if (requestId !== requestIdRef.current) return;
+
     setResults(mapped);
     setFocusedIndex(mapped.length > 0 ? 0 : null);
     setLoading(false);

@@ -248,3 +248,70 @@ describe("array columns", () => {
     }
   });
 });
+
+describe("connection retry", () => {
+  /** A driver that fails a given number of times, then succeeds. */
+  function flakyDriver(failures: number, code: string) {
+    let attempts = 0;
+    return {
+      get attempts() {
+        return attempts;
+      },
+      async unsafe() {
+        attempts += 1;
+        if (attempts <= failures) {
+          throw Object.assign(new Error(`simulated ${code}`), { code });
+        }
+        return [{ id: "post-1" }];
+      },
+    };
+  }
+
+  it("retries a connection-phase failure, because the statement never ran", async () => {
+    // Neon suspends an idle compute. The first connection afterwards wakes it
+    // and can fail outright; every attempt after settles. A preview
+    // environment is idle almost always, so without this the first visitor
+    // after a quiet period gets an error page for a healthy database.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const driver = flakyDriver(1, "CONNECT_TIMEOUT");
+
+    const rows = await adaptDriver(driver).query("select 1");
+
+    expect(rows).toEqual([{ id: "post-1" }]);
+    expect(driver.attempts).toBe(2);
+    warn.mockRestore();
+  });
+
+  it("gives up after a bounded number of attempts", async () => {
+    // Short and few: enough for a compute wake, nowhere near a thundering herd.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const driver = flakyDriver(99, "ECONNRESET");
+
+    await expect(adaptDriver(driver).query("select 1")).rejects.toThrow(/ECONNRESET/);
+    expect(driver.attempts).toBe(3);
+    warn.mockRestore();
+  });
+
+  it("never retries an error raised after the statement reached the server", async () => {
+    // A timeout, a constraint violation or a syntax error may have taken
+    // effect. Repeating it is exactly what lib/supabase/fetchTimeout.ts warns
+    // against, and would make a write non-idempotent.
+    for (const code of ["57014", "23505", "42601", "42P01"]) {
+      const driver = flakyDriver(99, code);
+      await expect(adaptDriver(driver).query("select 1")).rejects.toThrow();
+      expect(driver.attempts, code).toBe(1);
+    }
+  });
+
+  it("never retries an error with no code at all", async () => {
+    const driver = {
+      attempts: 0,
+      async unsafe() {
+        this.attempts += 1;
+        throw new Error("something else entirely");
+      },
+    };
+    await expect(adaptDriver(driver).query("select 1")).rejects.toThrow();
+    expect(driver.attempts).toBe(1);
+  });
+});

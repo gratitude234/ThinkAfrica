@@ -1,4 +1,5 @@
 import "server-only";
+import { getDatabase } from "@/lib/db";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -11,7 +12,6 @@ import {
 import {
   isAuthorSubscriptionsEnabled,
   isFeaturedWorkNotesEnabled,
-  isProfilePositioningEnabled,
 } from "@/lib/featureFlags";
 import { getMessageEligibility } from "@/lib/messaging";
 import type { ProfileRecordSummary } from "@/lib/profileRecord";
@@ -67,27 +67,14 @@ export const PROFILE_PUBLICATION_PAGE_SIZE = 20;
  */
 export const PROFILE_OVERVIEW_RECORD_SIZE = 6;
 
-export interface ProfileIdentityRecord {
-  id: string;
-  username: string;
-  full_name: string | null;
-  country: string | null;
-  university: string | null;
-  field_of_study: string | null;
-  graduation_year: number | null;
-  is_alumni: boolean;
-  bio: string | null;
-  avatar_url: string | null;
-  cover_image_url: string | null;
-  verified: boolean;
-  verified_type: string | null;
-  interests: string[] | null;
-  profile_type: string | null;
-  professional_title: string | null;
-  organization_name: string | null;
-  organization_website: string | null;
-  positioning_statement?: string | null;
-}
+/**
+ * Re-exported so the many call sites that import the profile row shape from
+ * this module keep working. lib/db/types owns the definition now, because the
+ * adapters both have to produce it.
+ */
+import type { ProfileIdentityRecord } from "@/lib/db/types";
+
+export type { ProfileIdentityRecord } from "@/lib/db/types";
 
 export interface ProfileViewerContext {
   viewerId: string | null;
@@ -183,20 +170,6 @@ function queryFailure(label: string, message: string) {
   return new Error(`${label}: ${capped}`);
 }
 
-const PROFILE_BASE_SELECT =
-  "id, username, full_name, country, university, field_of_study, graduation_year, is_alumni, bio, avatar_url, cover_image_url, verified, verified_type, interests, profile_type, professional_title, organization_name, organization_website";
-
-/**
- * The positioning column is named only once its migration has been applied.
- * Production is confirmed to have it; the gate stays because preview and
- * local environments are not guaranteed to, and PostgREST rejects the whole
- * select over one unknown column name. See isProfilePositioningEnabled.
- */
-export function profileIdentitySelect() {
-  return isProfilePositioningEnabled()
-    ? `${PROFILE_BASE_SELECT}, positioning_statement`
-    : PROFILE_BASE_SELECT;
-}
 
 const PUBLICATION_SELECT =
   "id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, citation_id, created_at, published_at, cover_image_url, post_reference_counts(reference_count)";
@@ -279,18 +252,24 @@ export function contentKindFilter(kind: ContentKind) {
  * database's message, which the route logs and the error boundary replaces
  * with something a reader can act on.
  */
+/**
+ * The public identity of one member, by username.
+ *
+ * The query moved behind lib/db so the profiles domain can be pointed at Neon
+ * without this module changing. The client parameter is kept and ignored:
+ * every caller already has one to hand, and removing it would ripple a
+ * signature change through call sites for no benefit while the adapter still
+ * defaults to Supabase. It is named with a leading underscore rather than
+ * deleted, so the next reader can see the omission is deliberate.
+ *
+ * Reads only. Profile *writes* stay on the Supabase path entirely; see
+ * lib/profileMutations.ts and docs/adr-neon-authorization.md.
+ */
 export async function loadProfileIdentity(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   username: string
 ): Promise<ProfileIdentityRecord | null> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(profileIdentitySelect())
-    .eq("username", username)
-    .maybeSingle();
-
-  if (error) throw queryFailure("profile lookup failed", error.message);
-  return (data as ProfileIdentityRecord | null) ?? null;
+  return getDatabase().profiles.findIdentityByUsername(username);
 }
 
 /**

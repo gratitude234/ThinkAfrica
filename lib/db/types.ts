@@ -101,4 +101,60 @@ export interface Database {
   /** Which implementation answered. Useful in logs during the migration. */
   readonly adapter: "supabase" | "postgres";
   readonly posts: PostsRepository;
+  readonly profiles: ProfilesRepository;
+}
+
+// ---------------------------------------------------------------------------
+// Profiles
+// ---------------------------------------------------------------------------
+
+/**
+ * The public identity of a member, as a profile page renders it.
+ *
+ * Deliberately the *public* projection and nothing more. `notification_prefs`,
+ * `privacy_settings` and `secondary_profile_types` are absent because they are
+ * viewer-private or self-editable, and moving a private read behind an adapter
+ * before its authorization semantics are explicit is exactly what the Phase 4
+ * brief says not to do. They stay on the Supabase path until they have their
+ * own contract.
+ *
+ * Mirrors `ProfileIdentityRecord` in lib/profileViewData.ts, which re-exports
+ * this so no caller has to move.
+ */
+export interface ProfileIdentityRecord {
+  id: string;
+  username: string;
+  full_name: string | null;
+  country: string | null;
+  university: string | null;
+  field_of_study: string | null;
+  graduation_year: number | null;
+  is_alumni: boolean;
+  bio: string | null;
+  avatar_url: string | null;
+  cover_image_url: string | null;
+  verified: boolean;
+  verified_type: string | null;
+  interests: string[] | null;
+  profile_type: string | null;
+  professional_title: string | null;
+  organization_name: string | null;
+  organization_website: string | null;
+  /** Present only when NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED is set. The
+   *  column exists in production; the gate stays because preview and local
+   *  environments are not guaranteed to have it. */
+  positioning_statement?: string | null;
+}
+
+export interface ProfilesRepository {
+  /**
+   * One member's public identity, by username, or null.
+   *
+   * A public read: it returns what any visitor may see, so unlike
+   * `PostsRepository.findBySlug` there is no status gate for the caller to
+   * apply afterwards. What it does share with that method is that it performs
+   * no authorization of its own, and it is not the place to add any: a
+   * private field would need a viewer, and this method has none by design.
+   */
+  findIdentityByUsername(username: string): Promise<ProfileIdentityRecord | null>;
 }

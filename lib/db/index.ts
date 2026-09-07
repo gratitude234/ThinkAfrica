@@ -1,7 +1,9 @@
 import "server-only";
 
 import { supabasePostsRepository } from "@/lib/db/supabase/posts";
+import { supabaseProfilesRepository } from "@/lib/db/supabase/profiles";
 import { createPostgresPostsRepository } from "@/lib/db/postgres/posts";
+import { createPostgresProfilesRepository } from "@/lib/db/postgres/profiles";
 import { resolvePostgresExecutor } from "@/lib/db/postgres/connection";
 import type { Database } from "@/lib/db/types";
 
@@ -38,9 +40,21 @@ export function resolveAdapterName(
 
 export function createDatabase(adapter: AdapterName): Database {
   if (adapter === "supabase") {
-    return { adapter, posts: supabasePostsRepository };
+    return {
+      adapter,
+      posts: supabasePostsRepository,
+      profiles: supabaseProfilesRepository,
+    };
   }
-  return { adapter, posts: createPostgresPostsRepository(resolvePostgresExecutor()) };
+
+  // One executor for every repository: they share the pool, and constructing
+  // it once here is what keeps a second domain from opening a second one.
+  const executor = resolvePostgresExecutor();
+  return {
+    adapter,
+    posts: createPostgresPostsRepository(executor),
+    profiles: createPostgresProfilesRepository(executor),
+  };
 }
 
 /**
@@ -54,5 +68,12 @@ export function getDatabase(): Database {
   return createDatabase(resolveAdapterName());
 }
 
-export type { Database, PostsRepository, PostRecord, AuthorProfile } from "@/lib/db/types";
+export type {
+  Database,
+  PostsRepository,
+  PostRecord,
+  AuthorProfile,
+  ProfilesRepository,
+  ProfileIdentityRecord,
+} from "@/lib/db/types";
 export { VISIBLE_POST_STATUSES, getPostAuthor } from "@/lib/db/types";

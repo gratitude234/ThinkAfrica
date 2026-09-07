@@ -7,6 +7,11 @@ import {
   type PostsRepository,
 } from "@/lib/db/types";
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
+import {
+  toNumber,
+  toStringArray,
+  toTimestampString,
+} from "@/lib/db/postgres/normalise";
 
 /**
  * The same lookup as lib/db/supabase/posts.ts, expressed as SQL.
@@ -96,74 +101,6 @@ export const POST_BY_SLUG_SQL = `
     and p.status in (${STATUS_PLACEHOLDERS})
   limit 2
 `;
-
-/** A driver may return a Date, a string, or null for a timestamptz. Callers
- *  were promised the string PostgREST gave them. */
-function toTimestampString(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  if (value instanceof Date) return value.toISOString();
-  return String(value);
-}
-
-function toNumber(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  // int8 arrives as a string from most drivers, to avoid a lossy Number cast
-  // the driver cannot know is safe. These columns are counters and fit.
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-/**
- * A `text[]` column, however the driver chose to hand it over.
- *
- * `fetch_types: false` (see lib/db/postgres/connection.ts) stops postgres.js
- * asking the server for type OIDs, and without them it cannot parse an array
- * result any more than it can serialise an array parameter. `posts.tags` then
- * arrives as the literal string `{governance,energy}`, `PostTags` calls
- * `.map()` on it, and the whole article body fails to render behind a Suspense
- * boundary: the page still returns 200, just three quarters empty.
- *
- * The query works around it by selecting `to_jsonb(p.tags)`, because jsonb is
- * a built-in type postgres.js parses without any OID lookup. This function is
- * the second line, so a future change to the driver options cannot silently
- * reintroduce the same failure: whatever arrives, callers get an array or null.
- */
-function toStringArray(value: unknown): string[] | null {
-  if (value === null || value === undefined) return null;
-  if (Array.isArray(value)) return value.map((entry) => String(entry));
-  if (typeof value !== "string") return null;
-
-  const trimmed = value.trim();
-  if (trimmed === "" || trimmed === "{}") return [];
-  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return [trimmed];
-
-  // A PostgreSQL array literal: braces, comma separated, quotes around any
-  // element containing a comma, a brace, a quote or whitespace.
-  const inner = trimmed.slice(1, -1);
-  const items: string[] = [];
-  let current = "";
-  let quoted = false;
-  let escaped = false;
-
-  for (const character of inner) {
-    if (escaped) {
-      current += character;
-      escaped = false;
-    } else if (character === "\\") {
-      escaped = true;
-    } else if (character === '"') {
-      quoted = !quoted;
-    } else if (character === "," && !quoted) {
-      items.push(current);
-      current = "";
-    } else {
-      current += character;
-    }
-  }
-  items.push(current);
-
-  return items.map((item) => item.trim()).filter((item) => item.length > 0);
-}
 
 function toAuthor(value: unknown): AuthorProfile | null {
   if (!value || typeof value !== "object") return null;

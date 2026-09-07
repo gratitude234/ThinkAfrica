@@ -102,6 +102,40 @@ audience syncs successfully and mails nobody. On Neon it raises
 `feature_not_supported` until it is rewritten against the Better Auth user
 table.
 
+#### What the rewrite has to preserve
+
+It is a four-line function, and every line of it is there for a reason that
+survives the migration. Whoever rewrites it against Better Auth's user table
+needs all four:
+
+1. **It reads `id` and `email` in SQL, and that is the whole point.** It exists
+   because `auth.admin.listUsers()` fails outright when any single row holds
+   NULL in one of GoTrue's token columns, which happens to every row inserted
+   by direct SQL rather than through the Auth API. GoTrue models those columns
+   as non-nullable strings, so one bad row breaks the whole request with
+   `Database error finding users`. A projection of two columns never
+   constructs that struct. Better Auth has its own client library and its own
+   struct, so this reasoning has to be re-checked against it rather than
+   assumed to have gone away.
+2. **There is deliberately no fallback to `profiles.signup_email`.** It is
+   populated for almost nobody, so a fallback would sync a near-empty audience
+   and report success. The rewrite must fail loudly on an unreadable user
+   table, exactly as the stub does now.
+3. **It is the only reader of the member address list.** Nothing else may grow
+   a second path to those addresses, because a second path is a second
+   eligibility filter, and `lib/broadcastEligibility.ts` exists precisely
+   because Resend rejects an entire broadcast when one ineligible address is in
+   the addressed segment.
+4. **The stub raises rather than returns.** Keep that shape until the
+   replacement is verified against a real user table. A function that returns
+   an empty set is indistinguishable, at every call site, from a platform with
+   no members.
+
+The user table itself is not a blocker: `profiles.id` already holds the same
+UUID `auth.users.id` does, and the three foreign keys to `auth.users` were
+removed with their columns untouched for exactly this reason. What is missing
+is the address, which lives only in GoTrue today.
+
 ### Removed: three foreign keys to `auth.users`
 
 `profiles_id_fkey`, `activation_events_user_id_fkey`,

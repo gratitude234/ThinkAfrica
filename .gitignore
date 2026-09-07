@@ -41,3 +41,6 @@ next-env.d.ts
 # from the live database: table names are harmless, but a dump is a copy of the
 # production schema and does not belong in version control.
 scripts/migration/out/
+
+.vercel
+.env*

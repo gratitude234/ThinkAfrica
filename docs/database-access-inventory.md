@@ -6,6 +6,11 @@ move from Supabase PostgREST to a direct PostgreSQL data layer.
 Written as the Phase 1 audit and updated after Phase 2. Production is on
 Vercel + Supabase and stays there.
 
+**Phase 4 changed the read side.** The five search reads moved to
+`/api/search` and `/api/topics`, taking three components off the browser
+database client entirely. Thirteen browser reads remain, two of them blocked
+on Supabase Realtime rather than pending. See the browser-reads section below.
+
 **Phase 2 changed §3.** Direct browser database writes are now zero: all
 twenty table writes and all five write-RPCs moved behind server actions and one
 route handler, each with explicit authorization in front of the statement. The
@@ -217,16 +222,35 @@ nothing currently provides.
 
 </details>
 
-### Browser reads (18 sites) - still browser-side, classified
+### Browser reads: 18 sites before Phase 4, 13 after
 
-These were deliberately not migrated. The brief for Phase 2 was writes first,
+Phase 2 left every read in the browser on purpose: its brief was writes first,
 and turning all 48 call sites into endpoints would have been a rewrite rather
 than a migration.
 
+**Phase 4 moved the five search reads.** `/api/search` and `/api/topics` now run
+them server-side, through [lib/searchData.ts](../lib/searchData.ts). The three
+components that held them keep their behaviour and lose their database client.
+
+Two things came out of that move that were not the point of it:
+
+- The search filters were injectable in shape, if not in consequence. The
+  user's text went straight into a PostgREST `or=` list, so a query containing
+  a comma or a bracket sent a malformed filter and the search returned nothing
+  at all. Not a data-exposure hole, because PostgREST's grammar cannot express
+  a join and RLS still applied, but a correctness hole that looked exactly like
+  "no results". The filters are quoted and escaped now, pinned by
+  [lib/searchData.test.ts](../lib/searchData.test.ts) and verified against live
+  PostgREST for ten punctuation shapes.
+- The tag suggestions and the trending list were two aggregations of the same
+  500 rows, keyed differently: one on the normalised value, one on the display
+  label. So "#africa" and "africa" counted as one topic in one place and two in
+  the other. One query now serves both.
+
 | Read | Files | Class | Why |
 |---|---|---|---|
-| `posts` typeahead | [SearchOverlay](../components/ui/SearchOverlay.tsx), [TagInput](../components/ui/TagInput.tsx) | **migrate now (next)** | Public, cacheable, already endpoint-shaped. The cheapest three to move. |
-| `posts`, `profiles`, `fellowships` search | [search/page.tsx](<../app/(main)/search/page.tsx>) | migrate now (next) | Four queries in one component; one route handler replaces all four |
+| ~~`posts` typeahead~~ | [SearchOverlay](../components/ui/SearchOverlay.tsx), [TagInput](../components/ui/TagInput.tsx) | **done (Phase 4)** | Now `/api/search?scope=overlay` and `/api/topics` |
+| ~~`posts`, `profiles`, `fellowships` search~~ | [search/page.tsx](<../app/(main)/search/page.tsx>) | **done (Phase 4)** | Now `/api/search` and `/api/topics`; one request replaces four queries |
 | `profiles` username availability | [ProfileForm](<../app/(main)/settings/ProfileForm.tsx>), [ProfileGate](../components/ui/ProfileGate.tsx) | migrate later | Public read, but it is an existence check on a username. Wants rate limiting when it moves, so it is not a pure lift |
 | `profiles` co-author lookup | [CoAuthorPicker](../components/collaboration/CoAuthorPicker.tsx) | migrate later | Public directory read |
 | `posts` draft list | [MyDrafts](<../app/(write)/write/MyDrafts.tsx>), [ContinueDraftRow](<../app/(main)/ContinueDraftRow.tsx>) | migrate later | Owner-scoped by RLS. Safe today, needs an owner predicate when it moves |
@@ -235,9 +259,13 @@ than a migration.
 | `messages`, `conversation_participants` | [MessageThread](<../app/(main)/messages/[id]/MessageThread.tsx>), [MessagesUnreadBadge](../components/ui/MessagesUnreadBadge.tsx) | **realtime-specific** | These sit alongside a `postgres_changes` subscription. Supabase Realtime has no successor in the target stack, so the read and the subscription move together or not at all |
 | `profiles` onboarding state | [OnboardingClient](<../app/(onboarding)/onboarding/OnboardingClient.tsx>), [ResearchSubmissionForm](<../app/(main)/submit/research/ResearchSubmissionForm.tsx>) | safe temporarily | Owner-scoped; moves with the rest of onboarding |
 
-Every one is a read of public data or of the viewer's own row, so none of them
-can leak another member's data through a forged argument. That is why they are
-second in the order, not because they can stay.
+Every remaining one is a read of public data or of the viewer's own row, so
+none of them can leak another member's data through a forged argument. That is
+why they were second in the order, not because they can stay.
+
+Of the thirteen left, the two `messages` reads are blocked rather than pending:
+they sit alongside a `postgres_changes` subscription that has no successor in
+the target stack. See [realtime-blocker.md](realtime-blocker.md).
 
 ### The Phase 1 read notes
 
@@ -246,10 +274,9 @@ second in the order, not because they can stay.
 [app/(main)/search/page.tsx](<../app/(main)/search/page.tsx>) which runs four of
 them for live search.
 
-Two of these are already server-shaped and only need a route handler:
-[components/ui/SearchOverlay.tsx](../components/ui/SearchOverlay.tsx) and
-[components/ui/TagInput.tsx](../components/ui/TagInput.tsx) both query `posts`
-for typeahead, which is a public read with an obvious cache.
+Phase 4 moved all of the search reads named above: the two typeaheads and the
+four queries in the search page. What that section says about them is the
+history, not the current state.
 
 ### Browser RPCs: 10 before, 4 after
 
