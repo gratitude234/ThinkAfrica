@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  postMutationMessage,
+  updatePostContent,
+} from "@/lib/postMutations";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -116,16 +120,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  const { error: updateError } = await admin
-    .from("posts")
-    .update({
+  const stored = await updatePostContent(
+    { supabase: admin, actor: { kind: "author", userId: user.id } },
+    post.id,
+    {
       document_path: path,
       document_original_name: file.name || "research-paper.pdf",
       document_mime_type: "application/pdf",
       document_size_bytes: file.size,
-    })
-    .eq("id", post.id)
-    .eq("author_id", user.id);
+    }
+  );
+
+  const updateError = stored.ok
+    ? null
+    : { message: postMutationMessage(stored.failure) };
 
   if (updateError) {
     return NextResponse.json(

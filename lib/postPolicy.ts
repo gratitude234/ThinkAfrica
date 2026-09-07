@@ -793,6 +793,96 @@ export function checkComposition(
 }
 
 /**
+ * Creating a post.
+ *
+ * There is no stored row to authorize against, so this is the one check that
+ * reads the caller's values rather than the database's. The trigger has an
+ * INSERT branch for exactly the same reason, and it enforces the same three
+ * things:
+ *
+ *   - a new row may not already carry `citation_id` or
+ *     `published_version_id`, because both are evidence a workflow completed
+ *     and no workflow has run yet;
+ *   - a new row may not be born published if publishing it would be an
+ *     editorial act;
+ *   - and, which the trigger cannot check, the author is the viewer.
+ *
+ * Everything else about a new post is composition, so the allowlist is the
+ * composer's plus the two columns only an insert sets.
+ */
+export const INSERTABLE_POST_COLUMNS = [
+  ...COMPOSABLE_POST_COLUMNS,
+  "author_id",
+  "status",
+  "published_at",
+] as const;
+
+export function checkInsert(
+  actor: PostActor,
+  values: Record<string, unknown>,
+  options: PostPolicyOptions = LIVE_POLICY
+): PolicyDecision {
+  if (actor.kind === "system") return allow;
+
+  if (actor.kind === "author" && values.author_id !== actor.userId) {
+    return deny(
+      "not_owner",
+      "A post is created for the viewer, not for an author they name."
+    );
+  }
+
+  if (values.citation_id != null) {
+    return deny(
+      "citation_id_forbidden",
+      "citation_id can only be assigned by the editorial acceptance workflow."
+    );
+  }
+  if (values.published_version_id != null) {
+    return deny(
+      "published_version_id_forbidden",
+      "published_version_id can only be assigned by the editorial acceptance workflow."
+    );
+  }
+
+  const status = (values.status as PostStatus | undefined) ?? "draft";
+
+  if (status === "removed" || status === "withdrawn" || status === "rejected") {
+    return deny(
+      "illegal_transition",
+      `A post cannot be created as ${status}.`
+    );
+  }
+
+  if (
+    status === "published" &&
+    !isPrivileged(actor) &&
+    requiresEditorialPublication(
+      {
+        type: String(values.type ?? ""),
+        content_kind: (values.content_kind as string | null) ?? null,
+      },
+      options
+    )
+  ) {
+    return deny(
+      "self_publish_reviewed",
+      "Research and policy briefs can only be published by an editor accepting a submission."
+    );
+  }
+
+  const insertable = new Set<string>(INSERTABLE_POST_COLUMNS);
+  const rejected = Object.keys(values).filter((key) => !insertable.has(key));
+  if (rejected.length > 0) {
+    return deny(
+      "protected_field",
+      `A new post may not set: ${rejected.join(", ")}.`
+    );
+  }
+
+  return allow;
+}
+
+/**
  * An ordinary content edit: no status change, no classification change.
  *
  * The single entry point that composes the three checks in the order the

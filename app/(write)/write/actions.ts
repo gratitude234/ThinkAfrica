@@ -5,6 +5,7 @@ import slugify from "slugify";
 import { createClient } from "@/lib/supabase/server";
 import {
   authorizeTransition,
+  createPost,
   postMutationMessage,
   publishOwnDraft,
   submitPostForReview,
@@ -487,22 +488,26 @@ export async function ensureContributionDraft(input: {
     if (existing.status !== "draft") {
       return { error: "This publication is no longer an editable draft.", draftId: null as string | null };
     }
-    const { data: updated, error } = await supabase
-      .from("posts")
-      .update({
+    const composed = await updateDraftComposition(
+      { supabase, actor: { kind: "author", userId: user.id } },
+      draftId,
+      {
         ...classification,
         excerpt: input.snapshot.excerpt,
         content,
         tags,
         cover_image_url: input.snapshot.coverImageUrl || null,
         in_response_to: input.snapshot.inResponseToId,
-      })
-      .eq("id", draftId)
-      .eq("author_id", user.id)
-      .eq("status", "draft")
-      .select("id");
-    if (error || !updated?.length) {
-      return { error: error?.message ?? "This draft changed in another window.", draftId: null as string | null };
+      }
+    );
+    if (!composed.ok) {
+      return {
+        error:
+          composed.failure.kind === "conflict"
+            ? "This draft changed in another window."
+            : postMutationMessage(composed.failure),
+        draftId: null as string | null,
+      };
     }
   } else {
     const { data, error } = await supabase

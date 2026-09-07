@@ -192,6 +192,12 @@
     "app/(marketing)/landing/page.tsx",
     "lib/supabase/admin.ts",
     "lib/postPolicy.ts",
-    "lib/postMutations.ts"
+    "lib/postMutations.ts",
+    "app/api/audio-summary/route.ts",
+    "app/api/research-document/upload/route.ts",
+    "lib/reviewWorkflow.ts",
+    "app/(main)/admin/review/actions.ts",
+    "app/(main)/submit/research/actions.ts",
+    "app/(main)/edit/[slug]/actions.ts"
   ]
 }

@@ -10,6 +10,7 @@ import {
   checkContentEdit,
   checkCuration,
   checkDelete,
+  checkInsert,
   checkTransition,
   checkWorkflowEvidence,
   LIVE_POLICY,
@@ -189,6 +190,45 @@ export async function updatePostContent(
     expect: { author_id: post.author_id, status: post.status },
     actor,
   });
+}
+
+/**
+ * Creating a post.
+ *
+ * The only operation with no stored row behind it, so it is the only one that
+ * authorizes against the caller's own values. `author_id` is overwritten with
+ * the resolved viewer rather than trusted: an insert is the one place a caller
+ * could otherwise name somebody else as the author of their work.
+ */
+export async function createPost(
+  context: MutationContext,
+  values: Record<string, unknown>
+): Promise<PostMutationResult> {
+  const { supabase, actor, options = LIVE_POLICY } = context;
+
+  const withAuthor =
+    actor.kind === "author"
+      ? { ...values, author_id: actor.userId }
+      : values;
+
+  const decision = checkInsert(actor, withAuthor, options);
+  if (!decision.allowed) return refused(decision);
+
+  const { data, error } = await supabase
+    .from("posts")
+    .insert(withAuthor)
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("[posts] insert failed", error.message);
+    return { ok: false, failure: { kind: "query_failed", message: error.message } };
+  }
+  if (!data) {
+    return { ok: false, failure: { kind: "conflict" } };
+  }
+
+  return { ok: true, data: { id: (data as { id: string }).id } };
 }
 
 /**

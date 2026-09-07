@@ -1,4 +1,8 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
+import {
+  postMutationMessage,
+  updatePostContent,
+} from "@/lib/postMutations";
 import { createClient } from "@supabase/supabase-js";
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
@@ -156,10 +160,23 @@ Return ONLY the spoken script, nothing else.`,
     .from("audio-summaries")
     .getPublicUrl(storagePath);
 
-  await supabase
-    .from("posts")
-    .update({ audio_summary_url: urlData.publicUrl })
-    .eq("id", postId);
+  // `system`, and deliberately not `author`: this route has no user session at
+  // all. It is gated by ADMIN_SECRET and runs as the service role, so there is
+  // no viewer to resolve and pretending otherwise would be inventing an
+  // identity to satisfy a signature. It still goes through the domain, so the
+  // write is one named operation on one column rather than an open update.
+  const stored = await updatePostContent(
+    { supabase, actor: { kind: "system" } },
+    postId,
+    { audio_summary_url: urlData.publicUrl }
+  );
+
+  if (!stored.ok) {
+    return NextResponse.json(
+      { error: postMutationMessage(stored.failure) },
+      { status: 403 }
+    );
+  }
 
   return NextResponse.json({ url: urlData.publicUrl });
 }
