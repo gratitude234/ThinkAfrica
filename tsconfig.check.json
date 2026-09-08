@@ -202,6 +202,8 @@
     "lib/auth/betterAuth.ts",
     "lib/db/postPage.ts",
     "lib/db/postWrites.ts",
-    "lib/auth/viewer.ts"
+    "lib/auth/viewer.ts",
+    "lib/db/feed.ts",
+    "lib/db/readAdapter.ts"
   ]
 }

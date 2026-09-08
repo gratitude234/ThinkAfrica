@@ -1,4 +1,5 @@
 import type { PostCardData } from "@/components/post/PostCard";
+import { feedRepository } from "@/lib/db/readAdapter";
 import { unstable_cache } from "next/cache";
 import {
   createAnonymousRankingContext,
@@ -402,102 +403,43 @@ async function enrichPosts(
     )
   );
 
-  const [
-    likeCounts,
-    bookmarkCounts,
-    referenceCounts,
-    commentCounts,
-    responseCounts,
-    profilesResult,
-    postAuthorsResult,
-    viewerLikesResult,
-    viewerBookmarksResult,
-  ] = await Promise.all([
-    getLikeCountsByPostId(reader, ids),
-    getBookmarkCountsByPostId(reader, ids),
-    getReferenceCountsByPostId(reader, ids),
-    // Read with the caller's client, never the admin one: the RLS SELECT policy
-    // on comments is what hides moderated rows, so a service-role count leaks
-    // them. An author legitimately sees their own hidden comment, so this
-    // number is per-viewer by design.
-    viewerClient
-      ? getVisibleCommentCountsByPostId(viewerClient, ids)
-      : Promise.resolve({} as Record<string, number>),
-    ids.length > 0
-      ? reader
-          .from("posts")
-          .select("in_response_to")
-          .in("in_response_to", ids)
-          .eq("status", "published")
-      : Promise.resolve({ data: [], error: null }),
-    authorIds.length > 0
-      ? reader
-          .from("profiles")
-          .select(
-            "id, username, full_name, university, avatar_url, verified, verified_type"
-          )
-          .in("id", authorIds)
-      : Promise.resolve({ data: [], error: null }),
-    ids.length > 0
-      ? reader
-          .from("post_authors")
-          .select("post_id, user_id, display_order")
-          .in("post_id", ids)
-          .not("accepted_at", "is", null)
-          .order("display_order", { ascending: true })
-      : Promise.resolve({ data: [], error: null }),
-    ids.length > 0 && rankingContext?.userId
-      ? reader
-          .from("likes")
-          .select("post_id")
-          .eq("user_id", rankingContext.userId)
-          .in("post_id", ids)
-      : Promise.resolve({ data: [], error: null }),
-    ids.length > 0 && rankingContext?.userId
-      ? reader
-          .from("bookmarks")
-          .select("post_id")
-          .eq("user_id", rankingContext.userId)
-          .in("post_id", ids)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
+  // Nine PostgREST round trips, or one PostgreSQL statement. Which one
+  // depends on whether the feed domain has been migrated; see
+  // lib/db/readAdapter.ts. The shapes below are identical either way, so
+  // everything downstream is untouched by the move.
+  //
+  // The comment count is the one that carries a security rule rather than
+  // just a number: on PostgREST it is issued with the viewer's client so the
+  // RLS policy on the comments table hides moderated rows, and the PostgreSQL side
+  // writes that policy out explicitly. See lib/db/feed.ts.
+  const hydration = await feedRepository(reader as never, viewerClient as never).hydrate({
+    postIds: ids,
+    authorIds,
+    viewer: { id: rankingContext?.userId ?? null },
+  });
 
-  const responseRows = expectRows<{ in_response_to?: string | null }>(
-    responseCounts,
-    "count published responses"
-  );
-  const profileRows = expectRows<{
-    id: string;
-    username: string;
-    full_name: string | null;
-    university: string | null;
-    avatar_url: string | null;
-    verified?: boolean;
-    verified_type?: string | null;
-  }>(profilesResult, "load feed author profiles");
-  const acceptedPostAuthorRows = expectRows<{
-    post_id: string;
-    user_id: string;
-    display_order: number;
-  }>(postAuthorsResult, "load accepted post authors");
-  const viewerLikeRows = expectRows<{ post_id: string }>(
-    viewerLikesResult,
-    "load viewer likes"
-  );
-  const viewerBookmarkRows = expectRows<{ post_id: string }>(
-    viewerBookmarksResult,
-    "load viewer bookmarks"
-  );
+  const likeCounts: Record<string, number> = {};
+  const bookmarkCounts: Record<string, number> = {};
+  const referenceCounts: Record<string, number> = {};
+  const commentCounts: Record<string, number> = {};
+  const responseCountsByPostId: Record<string, number> = {};
+  const viewerLikeRows: Array<{ post_id: string }> = [];
+  const viewerBookmarkRows: Array<{ post_id: string }> = [];
 
-  const responseCountsByPostId = responseRows.reduce(
-    (acc, row) => {
-      if (row.in_response_to) {
-        acc[row.in_response_to] = (acc[row.in_response_to] ?? 0) + 1;
-      }
-      return acc;
-    },
-    {} as Record<string, number>
-  );
+  for (const entry of hydration.counts) {
+    likeCounts[entry.postId] = entry.likeCount;
+    bookmarkCounts[entry.postId] = entry.bookmarkCount;
+    referenceCounts[entry.postId] = entry.referenceCount;
+    commentCounts[entry.postId] = entry.commentCount;
+    if (entry.responseCount > 0) {
+      responseCountsByPostId[entry.postId] = entry.responseCount;
+    }
+    if (entry.viewerLiked) viewerLikeRows.push({ post_id: entry.postId });
+    if (entry.viewerBookmarked) viewerBookmarkRows.push({ post_id: entry.postId });
+  }
+
+  const profileRows = hydration.profiles;
+  const acceptedPostAuthorRows = hydration.coAuthors;
 
   const profiles = profileRows;
 
@@ -507,18 +449,9 @@ async function enrichPosts(
     new Set(acceptedPostAuthors.map((row) => row.user_id).filter(Boolean))
   );
 
-  const coAuthorProfilesResult =
-    coAuthorIds.length > 0
-      ? await reader
-          .from("profiles")
-          .select("id, username, full_name")
-          .in("id", coAuthorIds)
-      : { data: [], error: null };
-  const coAuthorProfiles = expectRows<{
-    id: string;
-    username: string;
-    full_name: string | null;
-  }>(coAuthorProfilesResult, "load coauthor profiles");
+  // Fetched below, together with the response parents: they were three
+  // sequential calls and the third depended on the second, which one CTE
+  // removes. See lib/db/feed.ts.
 
   // Response context (Part 5): batch-fetch the parent post's title/author for
   // any row that is itself a response, so the feed can render a real
@@ -542,51 +475,20 @@ async function enrichPosts(
     )
   );
 
-  let parentPostsQuery =
-    responseToIds.length > 0
-      ? reader
-          .from("posts")
-          .select("id, slug, title, type, content_kind, author_id")
-          .in("id", responseToIds)
-          .eq("status", "published")
-      : null;
-  if (parentPostsQuery && excludedParentAuthorIds.length > 0) {
-    parentPostsQuery = parentPostsQuery.not(
-      "author_id",
-      "in",
-      `(${excludedParentAuthorIds.join(",")})`
-    );
+  let context;
+  try {
+    context = await feedRepository(reader as never, viewerClient as never).responseContext({
+      coAuthorIds,
+      parentIds: responseToIds,
+      excludedAuthorIds: excludedParentAuthorIds,
+    });
+  } catch (error) {
+    throw new FeedDataError("load response context", error);
   }
-  const parentPostsResult = parentPostsQuery
-    ? await parentPostsQuery
-    : { data: [], error: null };
-  const parentPostRows = expectRows<{
-    id: string;
-    slug: string;
-    title: string | null;
-    type: string;
-    content_kind: string | null;
-    author_id: string;
-  }>(parentPostsResult, "load response parent posts");
 
-  const parentPosts = parentPostRows;
-
-  const parentAuthorIds = Array.from(
-    new Set(parentPosts.map((parent) => parent.author_id).filter(Boolean))
-  );
-
-  const parentAuthorProfilesResult =
-    parentAuthorIds.length > 0
-      ? await reader
-          .from("profiles")
-          .select("id, username, full_name")
-          .in("id", parentAuthorIds)
-      : { data: [], error: null };
-  const parentAuthorProfiles = expectRows<{
-    id: string;
-    username: string;
-    full_name: string | null;
-  }>(parentAuthorProfilesResult, "load response parent authors");
+  const coAuthorProfiles = context.coAuthorProfiles;
+  const parentPosts = context.parentPosts;
+  const parentAuthorProfiles = context.parentAuthorProfiles;
 
   const parentAuthorProfilesById = new Map(
     parentAuthorProfiles.map((profile) => [profile.id, profile])
@@ -779,17 +681,20 @@ export async function fetchResponseCards(
     RESPONSE_PAGE_SIZE,
     MAX_FEED_PAGE_SIZE + 1
   );
-  const result = (await supabase
-    .from("posts")
-    .select(POST_SELECT)
-    .eq("in_response_to", postId)
-    .eq("status", "published")
-    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-    .order("published_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(safeLimit)) as SupabaseQueryResult<unknown[]>;
-
-  const rows = expectRows(result, "load responses for post");
+  // The last public read the post page makes. Through the repository, so a
+  // logged-out published post page has no PostgREST dependency left.
+  let rows: Array<Record<string, unknown>>;
+  try {
+    rows = await feedRepository(supabase as never, supabase as never).responsePosts({
+      parentId: postId,
+      limit: safeLimit,
+      excludedType: RESEARCH_TYPE_QUERY_EXCLUSION,
+    });
+  } catch (error) {
+    // The repository surfaces the database's message and code; the operation
+    // name is this caller's to supply, exactly as expectRows did.
+    throw new FeedDataError("load responses for post", error);
+  }
   if (rows.length === 0) return [];
 
   const rankingContext: RankingContext = {

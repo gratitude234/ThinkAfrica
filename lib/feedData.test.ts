@@ -767,7 +767,11 @@ describe("fetchFeedPage -- correctness contracts", () => {
       })
     ).rejects.toMatchObject({
       name: "FeedDataError",
-      operation: "load response parent posts",
+      // The parent lookup, the co-author names and the parents' authors were
+      // three sequential calls and are now one, so they report under one
+      // operation. What matters is unchanged: the failure propagates with the
+      // database's own code rather than becoming an empty list.
+      operation: "load response context",
       code: "42501",
     });
   });

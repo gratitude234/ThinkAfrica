@@ -4,6 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolvePostgresExecutor } from "@/lib/db/postgres/connection";
 import {
+  createPostgresFeedRepository,
+  createSupabaseFeedRepository,
+  type FeedRepository,
+} from "@/lib/db/feed";
+import {
   createPostgresPostPageRepository,
   createSupabasePostPageRepository,
   type PostPageRepository,
@@ -38,7 +43,7 @@ import {
  * doing it this way round.
  */
 
-export const MIGRATABLE_READ_DOMAINS = ["post-page"] as const;
+export const MIGRATABLE_READ_DOMAINS = ["post-page", "feed"] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
 
@@ -83,4 +88,22 @@ export function postPageRepository(
   return isReadDomainMigrated("post-page")
     ? createPostgresPostPageRepository(resolvePostgresExecutor())
     : createSupabasePostPageRepository(supabase);
+}
+
+/**
+ * The feed's shared hydration.
+ *
+ * Takes both clients because the un-migrated path needs them and because every
+ * call site already has them: the reader may be the admin client for a public
+ * list, while the viewer's own client is what makes the comment count obey
+ * RLS. When the domain has moved neither is used, and that visibility rule
+ * becomes a parameter the server resolves instead. See lib/db/feed.ts.
+ */
+export function feedRepository(
+  reader: SupabaseClient,
+  viewerClient: SupabaseClient | null
+): FeedRepository {
+  return isReadDomainMigrated("feed")
+    ? createPostgresFeedRepository(resolvePostgresExecutor())
+    : createSupabaseFeedRepository(viewerClient ?? reader);
 }
