@@ -1,29 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { viewerStateRepository } from "@/lib/db/readAdapter";
-
-export async function getMessageEligibility(
-  supabase: SupabaseClient,
-  currentUserId: string,
-  targetUserId: string
-): Promise<{ eligible: boolean; reason: string | null }> {
-  if (currentUserId === targetUserId) {
-    return { eligible: false, reason: null };
-  }
-
-  const blocked = await viewerStateRepository(supabase).isBlockedPair(
-    currentUserId,
-    targetUserId
-  );
-
-  if (blocked) {
-    // Deliberately no reason: blocking is never disclosed to the blocked side.
-    return { eligible: false, reason: null };
-  }
-
-  return { eligible: true, reason: null };
-}
-
+/**
+ * Starting a conversation.
+ *
+ * `getMessageEligibility` used to live here and now lives in
+ * `lib/messagingEligibility.ts`: it reads the database through the adapter, so
+ * it is `server-only`, and this module is imported by two client components.
+ * Keeping them together pulled the server repository graph into the browser
+ * bundle.
+ */
 export async function findOrCreateConversation(
   supabase: SupabaseClient,
   userA: string,

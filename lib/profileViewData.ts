@@ -15,7 +15,7 @@ import {
   isAuthorSubscriptionsEnabled,
   isFeaturedWorkNotesEnabled,
 } from "@/lib/featureFlags";
-import { getMessageEligibility } from "@/lib/messaging";
+import { getMessageEligibility } from "@/lib/messagingEligibility";
 import type { ProfileRecordSummary } from "@/lib/profileRecord";
 import {
   loadProfileRecordPage,

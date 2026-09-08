@@ -13,7 +13,7 @@ vi.mock("@/lib/serverAuth", () => ({
   getCurrentUser: async () => currentUser.value,
 }));
 
-vi.mock("@/lib/messaging", () => ({ getMessageEligibility }));
+vi.mock("@/lib/messagingEligibility", () => ({ getMessageEligibility }));
 
 /**
  * The profile identity read moved behind lib/db, so it no longer travels

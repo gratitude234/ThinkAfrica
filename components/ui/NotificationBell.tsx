@@ -8,16 +8,10 @@ import { markAllNotificationsRead } from "@/lib/notificationMutations";
 import { markNotificationRead } from "@/lib/notificationRead";
 import { notificationHref, notificationMessage } from "@/lib/notificationCatalog";
 import NotificationAvatar from "@/components/notifications/NotificationAvatar";
-import {
-  fetchNotificationRows,
-  fetchUnreadCount,
-  type NotificationData,
-} from "@/lib/notificationData";
-import { mutedNotificationTypes } from "@/lib/notificationPreferences";
+import { type NotificationData } from "@/lib/notificationShape";
 import { shouldUseRealtime } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/utils";
-import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
 
 const POLL_MS = 30_000;
 
@@ -26,7 +20,6 @@ export default function NotificationBell({ userId }: { userId: string }) {
   const [unreadCount, setUnreadCount] = useState(0);
   // null until the reader's in-app preferences have loaded. Fetching before then
   // would flash notifications they have muted, then remove them a moment later.
-  const [mutedTypes, setMutedTypes] = useState<string[] | null>(null);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -53,38 +46,34 @@ export default function NotificationBell({ userId }: { userId: string }) {
     [notifications, heroItem]
   );
 
-  useEffect(() => {
-    let cancelled = false;
-
-    void supabase
-      .rpc("get_my_profile_private")
-      .then(({ data }: { data: unknown }) => {
-        if (cancelled) return;
-        const privateProfile = normalizeMyPrivateProfile(data);
-        // On failure fall back to muting nothing: an unreadable preference should
-        // under-filter rather than silently hide a reader's notifications.
-        setMutedTypes(mutedNotificationTypes(privateProfile?.notification_prefs));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [supabase, userId]);
-
+  // The bell asks the application, not the database. A browser has no
+  // database credential once the database is Neon, and the reader's own mute
+  // preference comes from an owner-only function that derives the reader from
+  // the session, which answers nothing over a direct connection. Resolving
+  // both on the server is what takes them off the browser's path.
+  //
+  // The badge is still counted separately from the list rather than derived
+  // from it: the list is capped at ten and the unread total is not. Both apply
+  // the same mute list, or the badge counts notifications the dropdown will
+  // not show.
   const fetchNotifications = useCallback(async () => {
-    if (mutedTypes === null) return;
+    try {
+      const response = await fetch("/api/notifications");
+      if (!response.ok) return;
+      const body = (await response.json()) as {
+        notifications: NotificationData[] | null;
+        unreadCount: number | null;
+      };
 
-    // The badge count is queried separately rather than derived from these rows:
-    // this list is capped at ten, and the unread total is not. Both apply the same
-    // mute list, or the badge counts notifications the dropdown will not show.
-    const [rowsResult, countResult] = await Promise.all([
-      fetchNotificationRows(supabase, userId, 10, mutedTypes),
-      fetchUnreadCount(supabase, userId, mutedTypes),
-    ]);
-
-    if (!rowsResult.error) setNotifications(rowsResult.rows);
-    if (countResult.count !== null) setUnreadCount(countResult.count);
-  }, [supabase, userId, mutedTypes]);
+      // Null on either means the query failed. Leaving the previous value
+      // alone is deliberate: an empty list and a stale one are both better
+      // than clearing a badge that was right.
+      if (body.notifications) setNotifications(body.notifications);
+      if (body.unreadCount !== null) setUnreadCount(body.unreadCount);
+    } catch {
+      // A transient failure keeps whatever the bell already showed.
+    }
+  }, []);
 
   useEffect(() => {
     void fetchNotifications();

@@ -7,8 +7,10 @@ import type { NotificationData } from "@/lib/notificationData";
 vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
 vi.mock("@/lib/realtime", () => ({ shouldUseRealtime: () => false }));
 
-// The bell reads owner-only notification_prefs once on mount through the
-// private-profile RPC.
+// The bell no longer queries the database. It asks /api/notifications, which
+// resolves the reader from the session, reads their mute preference and
+// applies the same mute list to the list and to the badge. The stub client
+// remains because the bell still uses it for realtime and for mark-all-read.
 const storedPrefs = vi.hoisted(() => ({ value: null as unknown }));
 const supabaseStub = vi.hoisted(() => ({
   rpc: () =>
@@ -21,6 +23,11 @@ const supabaseStub = vi.hoisted(() => ({
       ],
       error: null,
     }),
+  channel: () => ({
+    on: () => ({ subscribe: () => ({}) }),
+    subscribe: () => ({}),
+  }),
+  removeChannel: () => Promise.resolve(),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => supabaseStub }));
@@ -66,12 +73,26 @@ const revision = notification({
   post_slug: "sickle-cell",
 });
 
+/**
+ * The route's contract, as the bell sees it: null on either field means the
+ * query failed, and the bell must leave what it already had rather than
+ * clearing it.
+ */
 function setup({
   rows = [follow],
   count = 1,
-}: { rows?: NotificationData[]; count?: number | null } = {}) {
-  data.fetchNotificationRows.mockResolvedValue({ rows, error: null });
+}: { rows?: NotificationData[] | null; count?: number | null } = {}) {
+  data.fetchNotificationRows.mockResolvedValue({ rows: rows ?? [], error: null });
   data.fetchUnreadCount.mockResolvedValue({ count, error: null });
+
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ notifications: rows, unreadCount: count }),
+    }))
+  );
+
   return render(<NotificationBell userId="u1" />);
 }
 
@@ -106,14 +127,13 @@ describe("unread badge", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the previous badge when the count query fails", async () => {
-    // A null count means "unknown", which must not be rendered as zero.
-    data.fetchNotificationRows.mockResolvedValue({ rows: [follow], error: null });
-    data.fetchUnreadCount.mockResolvedValue({ count: null, error: "offline" });
+  it("keeps the previous badge when the count is unknown", async () => {
+    // A null count means "unknown", which must not be rendered as zero. The
+    // route sends null for exactly that, so the contract is unchanged; only
+    // who computes it moved.
+    setup({ rows: [follow], count: null });
 
-    render(<NotificationBell userId="u1" />);
-
-    await waitFor(() => expect(data.fetchUnreadCount).toHaveBeenCalled());
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     expect(
       screen.getByRole("button", { name: "Notifications" })
     ).toBeInTheDocument();
@@ -262,22 +282,20 @@ describe("polling", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       setup();
-      await waitFor(() => expect(data.fetchNotificationRows).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
 
       const visibility = vi
         .spyOn(document, "visibilityState", "get")
         .mockReturnValue("hidden");
 
       await vi.advanceTimersByTimeAsync(90_000);
-      expect(data.fetchNotificationRows).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
 
       // ...and catches up as soon as the tab comes back.
       visibility.mockReturnValue("visible");
       document.dispatchEvent(new Event("visibilitychange"));
 
-      await waitFor(() =>
-        expect(data.fetchNotificationRows).toHaveBeenCalledTimes(2)
-      );
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
     } finally {
       vi.useRealTimers();
     }
@@ -285,44 +303,47 @@ describe("polling", () => {
 });
 
 describe("muted notification types", () => {
-  it("waits for preferences before its first fetch", async () => {
-    // Fetching first would flash notifications the reader has muted and then
-    // remove them a moment later.
+  it("makes one request, because the preference is resolved on the server", async () => {
+    // The bell used to read notification_prefs from the browser and wait for
+    // it before fetching, or it would flash notifications the reader had
+    // muted. /api/notifications reads the preference and applies it in the
+    // same request, so there is nothing left to wait for and no window in
+    // which muted rows can appear.
     storedPrefs.value = { inapp_likes: false };
     setup();
 
-    await waitFor(() => expect(data.fetchNotificationRows).toHaveBeenCalled());
-
-    expect(data.fetchNotificationRows).toHaveBeenCalledWith(
-      supabaseStub,
-      "u1",
-      10,
-      ["like"]
-    );
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith("/api/notifications");
   });
 
-  it("applies the same mute list to the badge count", async () => {
+  it("renders whatever count the server computed under the mute list", async () => {
+    // That the list and the badge apply the *same* mute list is now a property
+    // of the route and the repository, and is asserted where it lives:
+    // lib/db/notifications.neon.test.ts, "applies the same mute filter to the
+    // list and the count". What the bell owes is to render what it was given.
     storedPrefs.value = { inapp_follows: false };
-    setup();
+    setup({ rows: [], count: 7 });
 
-    await waitFor(() => expect(data.fetchUnreadCount).toHaveBeenCalled());
-
-    expect(data.fetchUnreadCount).toHaveBeenCalledWith(supabaseStub, "u1", [
-      "follow",
-      "author_subscribed",
-    ]);
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Notifications/ })
+      ).toHaveTextContent("7")
+    );
   });
 
-  it("mutes nothing for a reader with no stored preferences", async () => {
-    setup();
+  it("does no muting of its own, and renders every row it is given", async () => {
+    // What "no stored preferences mutes nothing" means is asserted directly on
+    // the pure function, in lib/notificationPreferences.test.ts. The bell's own
+    // obligation is the complement: it must not re-filter server output, or a
+    // reader's mute settings would be applied twice and disagree with the
+    // badge.
+    setup({ rows: [follow, revision], count: 2 });
 
-    await waitFor(() => expect(data.fetchNotificationRows).toHaveBeenCalled());
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
 
-    expect(data.fetchNotificationRows).toHaveBeenCalledWith(
-      supabaseStub,
-      "u1",
-      10,
-      []
-    );
+    const bell = screen.getByRole("button", { name: /Notifications/ });
+    await waitFor(() => expect(bell).toHaveTextContent("2"));
   });
 });

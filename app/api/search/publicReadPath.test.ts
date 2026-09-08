@@ -95,13 +95,13 @@ describe("the profiles visibility rule", () => {
     const shared = withoutComments(read("lib/db/profileVisibility.ts"));
 
     expect(repository).toMatch(/profileVisibleSql\(/);
-    expect(repository).toMatch(/visibleAuthorJoin\(/);
+    expect(repository).toMatch(/visibleProfileJoin\(/);
 
     // The two spellings of the rule differ in a way that matters: as a WHERE
     // clause it removes the row, as a JOIN condition it removes only the
     // author. Both live in one module so they cannot drift apart.
     expect(shared).toMatch(/export function profileVisibleSql/);
-    expect(shared).toMatch(/export function visibleAuthorJoin/);
+    expect(shared).toMatch(/export function visibleProfileJoin/);
     expect(shared).toMatch(/members_only/);
     expect(shared).toMatch(/suspended_at is null/);
   });

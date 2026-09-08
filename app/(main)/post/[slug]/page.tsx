@@ -48,7 +48,7 @@ import PostConversationView from "./PostConversationView";
 import DiscussionSection from "./DiscussionSection";
 import PostActionsRow from "./PostActionsRow";
 import { getCollaborationSummary } from "@/lib/collaboration";
-import { getMessageEligibility } from "@/lib/messaging";
+import { getMessageEligibility } from "@/lib/messagingEligibility";
 import { getEditorialTrustSummary } from "@/lib/editorialTrust";
 import { getPostQualitySummary } from "@/lib/postQuality";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";

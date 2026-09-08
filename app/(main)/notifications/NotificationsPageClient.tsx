@@ -20,10 +20,9 @@ import { trackActivationEvent } from "@/lib/activationEvents";
 import { formatRelativeTime } from "@/lib/utils";
 import NotificationItem from "./NotificationItem";
 import {
-  fetchNotificationRows,
   sectionsFromNotifications,
   type NotificationData,
-} from "@/lib/notificationData";
+} from "@/lib/notificationShape";
 import { isAuthorSubscriptionsUxV2Enabled } from "@/lib/featureFlags";
 
 interface NotificationsPageClientProps {
@@ -127,20 +126,29 @@ export default function NotificationsPageClient({
 
   const supabase = useMemo(() => createClient(), []);
 
+  // Read through the application rather than the database: a browser has no
+  // database credential once the database is Neon, and the reader's mute
+  // preference comes from a function that answers nothing over a direct
+  // connection. The route resolves the viewer from the session and applies the
+  // mute list, so neither is on this page's path any more.
   const refresh = useCallback(async () => {
     if (pendingWrites.current > 0) return;
-    const { rows, error } = await fetchNotificationRows(
-      supabase,
-      userId,
-      50,
-      mutedTypes
-    );
-    // Leave the currently-displayed notifications alone on a transient fetch
-    // failure rather than wiping them out with an empty result.
-    if (error) return;
-    if (pendingWrites.current > 0) return;
-    setNotifications(rows);
-  }, [supabase, userId, mutedTypes]);
+
+    try {
+      const response = await fetch("/api/notifications?limit=50");
+      if (!response.ok) return;
+      const body = (await response.json()) as {
+        notifications: NotificationData[] | null;
+      };
+      // Leave the currently-displayed notifications alone on a transient
+      // failure rather than wiping them out with an empty result.
+      if (!body.notifications) return;
+      if (pendingWrites.current > 0) return;
+      setNotifications(body.notifications);
+    } catch {
+      // Same: keep what is on screen.
+    }
+  }, []);
 
   // Polling — this page has no realtime subscription of its own, and `notifications`
   // stays out of the Realtime publication regardless of the shouldUseRealtime() flag

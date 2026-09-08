@@ -18,11 +18,15 @@ const ownerReadCallsites = [
   "app/(main)/settings/page.tsx",
   "app/(main)/notifications/page.tsx",
   "app/(main)/subscriptions/page.tsx",
-  "components/ui/NotificationBell.tsx",
   "app/(main)/page.tsx",
   // The onboarding owner read moved into the client when the identity-first
   // flow landed. The route file is now a thin wrapper that reads nothing.
   "app/(onboarding)/onboarding/OnboardingClient.tsx",
+  // The notification bell's owner read moved to the server: /api/notifications
+  // resolves the reader from the session, reads their mute preference and
+  // applies it in the same request. The bell now fetches from the application
+  // rather than holding a database credential of its own.
+  "app/api/notifications/route.ts",
 ].map((path) => readFileSync(resolve(process.cwd(), path), "utf8"));
 
 describe("Phase 0 profile-security migration", () => {
@@ -94,5 +98,23 @@ describe("Phase 0 profile-security migration", () => {
     for (const source of ownerReadCallsites) {
       expect(source).toMatch(/rpc\(\s*"get_my_profile_private"\s*\)/);
     }
+  });
+
+  it("keeps the notification bell off the private profile entirely", () => {
+    // The bell is a client component. It used to read notification_prefs from
+    // the browser through the RPC, which was safe under RLS and has no
+    // successor: after the migration there is no key a browser could hold.
+    // The read is now the server's, so the bell must not have come back to it.
+    const bell = readFileSync(
+      resolve(process.cwd(), "components/ui/NotificationBell.tsx"),
+      "utf8"
+    )
+      // Prose describing the move would otherwise read as the move being
+      // undone.
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+
+    expect(bell).not.toMatch(/get_my_profile_private/);
+    expect(bell).not.toMatch(/\.from\("/);
   });
 });
