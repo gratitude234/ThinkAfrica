@@ -42,6 +42,7 @@ const BASE: FeedListCriteria = {
   cursor: null,
   order: "recent",
   includeTopicKeys: false,
+  projection: "card",
   offset: 0,
   limit: 12,
 };

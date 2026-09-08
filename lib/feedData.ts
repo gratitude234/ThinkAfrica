@@ -167,6 +167,43 @@ async function listFeedPosts(
       cursor: null,
       order: "recent",
       includeTopicKeys: false,
+      projection: "card",
+      offset: 0,
+      ...criteria,
+    });
+    return rows as unknown as Array<Record<string, unknown>>;
+  } catch (error) {
+    throw new FeedDataError(operation, error);
+  }
+}
+
+/**
+ * The co-author arm, which needs to know which subscribed author matched in
+ * order to label the card. Otherwise identical to listFeedPosts.
+ */
+async function listFeedPostsWithCredits(
+  reader: FeedSupabaseClient,
+  operation: string,
+  criteria: Partial<FeedListCriteria> &
+    Pick<FeedListCriteria, "limit"> & {
+      coauthorUserIds: readonly string[];
+    }
+): Promise<Array<Record<string, unknown>>> {
+  try {
+    const rows = await feedListRepository(reader as never).listPostsWithCredits({
+      researchTypeExclusion: RESEARCH_TYPE_QUERY_EXCLUSION,
+      contentKind: null,
+      cutoff: null,
+      authorIds: null,
+      topicKeys: null,
+      requireCitation: false,
+      onlyResponses: false,
+      excludedAuthorIds: [],
+      excludedPostIds: [],
+      cursor: null,
+      order: "recent",
+      includeTopicKeys: false,
+      projection: "card",
       offset: 0,
       ...criteria,
     });
@@ -403,21 +440,13 @@ async function getExcludedCreditedPostIds(
 ): Promise<string[]> {
   if (excludedAuthorIds.length === 0) return [];
 
-  const result = (await reader
-    .from("post_authors")
-    .select("post_id")
-    .in("user_id", excludedAuthorIds)
-    .not("accepted_at", "is", null)) as SupabaseQueryResult<
-    Array<{ post_id: string }>
-  >;
-
-  return Array.from(
-    new Set(
-      expectRows(result, "load posts credited to excluded authors")
-        .map((row) => row.post_id)
-        .filter(Boolean)
-    )
-  );
+  try {
+    return await feedListRepository(reader as never).postIdsCreditedTo(
+      excludedAuthorIds
+    );
+  } catch (error) {
+    throw new FeedDataError("load posts credited to excluded authors", error);
+  }
 }
 
 async function applyViewerCommentCounts(
@@ -1115,22 +1144,20 @@ viewerClientOverride?: FeedSupabaseClient | null): Promise<FeedPageResult> {
     const matchedTopicsByPost = new Map<string, string[]>();
 
     if (includeTopics) {
-      let query = applyPostFilters(
-        reader.from("posts").select(POST_SELECT_WITH_TOPIC_KEYS),
+      const topicRows = await listFeedPosts(
+        reader,
+        "load topic subscription feed",
         {
-          type,
+          contentKind: contentKindCriterion(type),
           cutoff,
           excludedAuthorIds: excludedWithSelf,
           excludedPostIds: subscriptionExcludedPostIds,
+          topicKeys: subscribedTopics,
+          includeTopicKeys: true,
+          cursor: cursorPosition,
+          limit: candidateLimit,
         }
-      ).overlaps("topic_keys", subscribedTopics);
-      query = applyKeysetCursor(query, cursorPosition)
-        .order("published_at", { ascending: false })
-        .order("id", { ascending: false });
-      const result = (await query.limit(candidateLimit)) as SupabaseQueryResult<
-        Array<Record<string, unknown>>
-      >;
-      const topicRows = expectRows(result, "load topic subscription feed");
+      );
       for (const row of topicRows) {
         const id = row.id as string;
         rowsById.set(id, row);
@@ -1144,60 +1171,38 @@ viewerClientOverride?: FeedSupabaseClient | null): Promise<FeedPageResult> {
     }
 
     if (includeAuthors) {
-      let primaryQuery = applyPostFilters(
-        reader.from("posts").select(POST_SELECT),
-        {
-          type,
-          cutoff,
-          excludedAuthorIds: excludedWithSelf,
-          excludedPostIds: subscriptionExcludedPostIds,
-        }
-      ).in("author_id", subscribedAuthors);
-      primaryQuery = applyKeysetCursor(primaryQuery, cursorPosition)
-        .order("published_at", { ascending: false })
-        .order("id", { ascending: false });
-      // Query coauthor matches from posts, not from an arbitrarily limited
-      // slice of post_authors. The top-level recency order and cursor now pick
-      // the candidates, so prolific subscribed authors cannot have newer work
+      const sharedCriteria = {
+        contentKind: contentKindCriterion(type),
+        cutoff,
+        excludedAuthorIds: excludedWithSelf,
+        excludedPostIds: subscriptionExcludedPostIds,
+        cursor: cursorPosition,
+        limit: candidateLimit,
+      };
+      // Co-author matches come from posts, not from an arbitrarily limited
+      // slice of post_authors. The top-level recency order and cursor pick the
+      // candidates, so prolific subscribed authors cannot have newer work
       // silently omitted by an unordered credit lookup.
-      let coauthorQuery = applyPostFilters(
-        reader
-          .from("posts")
-          .select(
-            `${POST_SELECT}, subscription_author_credits:post_authors!inner(user_id, accepted_at)`
-          ),
-        {
-          type,
-          cutoff,
-          excludedAuthorIds: excludedWithSelf,
-          excludedPostIds: subscriptionExcludedPostIds,
-        }
-      )
-        .in("subscription_author_credits.user_id", subscribedAuthors)
-        .not("subscription_author_credits.accepted_at", "is", null);
-      coauthorQuery = applyKeysetCursor(coauthorQuery, cursorPosition)
-        .order("published_at", { ascending: false })
-        .order("id", { ascending: false });
-
-      const [primaryResult, coauthoredResult] = await Promise.all([
-        primaryQuery.limit(candidateLimit),
-        coauthorQuery.limit(candidateLimit),
-      ]);
-      const primaryRows = expectRows<Record<string, unknown>>(
-        primaryResult,
-        "load author subscription feed"
-      );
-      const coauthoredRows = expectRows<
-        Record<string, unknown> & {
-          subscription_author_credits?:
-            | Array<{ user_id?: string; accepted_at?: string | null }>
-            | { user_id?: string; accepted_at?: string | null }
-            | null;
-        }
-      >(
-        coauthoredResult,
-        "load subscribed coauthor posts"
-      );
+      const [primaryRows, coauthoredRows] = (await Promise.all([
+        listFeedPosts(reader, "load author subscription feed", {
+          ...sharedCriteria,
+          authorIds: subscribedAuthors,
+        }),
+        listFeedPostsWithCredits(reader, "load subscribed coauthor posts", {
+          ...sharedCriteria,
+          coauthorUserIds: subscribedAuthors,
+        }),
+      ])) as [
+        Array<Record<string, unknown>>,
+        Array<
+          Record<string, unknown> & {
+            subscription_author_credits?:
+              | Array<{ user_id?: string; accepted_at?: string | null }>
+              | { user_id?: string; accepted_at?: string | null }
+              | null;
+          }
+        >,
+      ];
 
       for (const row of primaryRows) {
         const id = row.id as string;
@@ -1478,19 +1483,17 @@ async function fetchCandidateArms(
 ): Promise<CandidateArms> {
   // One row past the window, so the last ranked page knows whether there is a
   // tail rather than guessing, and so the boundary is an actual row.
-  const recentResult = (await applyPostFilters(
-    reader.from("posts").select(selectColumns),
-    filters
-  )
-    .order("published_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(recentWindow + 1)) as SupabaseQueryResult<
-    Array<Record<string, unknown>>
-  >;
-  const recentRows = expectRows<Record<string, unknown>>(
-    recentResult,
-    "load ranked feed candidates"
-  );
+  const recentRows = await listFeedPosts(reader, "load ranked feed candidates", {
+    contentKind: contentKindCriterion(filters.type),
+    cutoff: filters.cutoff,
+    excludedAuthorIds: filters.excludedAuthorIds,
+    excludedPostIds: filters.excludedPostIds,
+    includeTopicKeys: selectColumns === POST_SELECT_WITH_TOPIC_KEYS,
+    // The tail's probe reads identities only. Widening this would refetch the
+    // whole ranked pool on every page past the ranking.
+    projection: selectColumns === CANDIDATE_IDENTITY_SELECT ? "identity" : "card",
+    limit: recentWindow + 1,
+  });
 
   const recentCandidates = recentRows.slice(0, recentWindow);
   const boundary = getRankedBoundary(recentCandidates, recentWindow);
@@ -1573,38 +1576,30 @@ async function fetchEvergreenCandidates(
     cutoff: latestIsoDate(filters.cutoff, isoDaysAgo(EVERGREEN_CANDIDATE_DAYS)),
   };
 
-  const reviewedQuery = applyKeysetCursor(
-    applyPostFilters(reader.from("posts").select(selectColumns), evergreenFilters),
-    boundary
-  )
-    .not("citation_id", "is", null)
-    .order("published_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(EVERGREEN_REVIEWED_LIMIT);
+  const evergreenCriteria = {
+    contentKind: contentKindCriterion(evergreenFilters.type),
+    cutoff: evergreenFilters.cutoff,
+    excludedAuthorIds: evergreenFilters.excludedAuthorIds,
+    excludedPostIds: evergreenFilters.excludedPostIds,
+    includeTopicKeys: selectColumns === POST_SELECT_WITH_TOPIC_KEYS,
+    projection: (selectColumns === CANDIDATE_IDENTITY_SELECT
+      ? "identity"
+      : "card") as "card" | "identity",
+    cursor: boundary,
+  };
 
-  const wellReadQuery = applyKeysetCursor(
-    applyPostFilters(reader.from("posts").select(selectColumns), evergreenFilters),
-    boundary
-  )
-    .order("read_count", { ascending: false })
-    .order("published_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(EVERGREEN_WELL_READ_LIMIT);
-
-  const [reviewedResult, wellReadResult] = (await Promise.all([
-    reviewedQuery,
-    wellReadQuery,
-  ])) as Array<SupabaseQueryResult<Array<Record<string, unknown>>>>;
-
-  const reviewedRows = expectRows<Record<string, unknown>>(
-    reviewedResult,
-    "load reviewed evergreen candidates"
-  );
-  const wellReadRows = expectRows<Record<string, unknown>>(
-    wellReadResult,
-    "load well-read evergreen candidates"
-  );
-
+  const [reviewedRows, wellReadRows] = await Promise.all([
+    listFeedPosts(reader, "load reviewed evergreen candidates", {
+      ...evergreenCriteria,
+      requireCitation: true,
+      limit: EVERGREEN_REVIEWED_LIMIT,
+    }),
+    listFeedPosts(reader, "load well read evergreen candidates", {
+      ...evergreenCriteria,
+      order: "well_read",
+      limit: EVERGREEN_WELL_READ_LIMIT,
+    }),
+  ]);
   // Reviewed first, so that when the trim below has to drop candidates it drops
   // the least-read of the popular arm rather than work that survived review.
   const byId = new Map<string, Record<string, unknown>>();
@@ -1659,26 +1654,20 @@ async function fetchRankedTail(
   // for a tail to contain.
   if (!options.boundary) return { posts: [], hasMore: false };
 
-  const tailQuery = applyKeysetCursor(
-    applyPostFilters(reader.from("posts").select(POST_SELECT), {
-      ...options.filters,
-      excludedPostIds: [
-        ...options.filters.excludedPostIds,
-        ...options.evergreenIds,
-      ],
-    }),
-    options.boundary
-  );
-
-  const tailResult = (await tailQuery
-    .order("published_at", { ascending: false })
-    .order("id", { ascending: false })
-    .range(options.offset, options.offset + options.pageSize)) as
-    SupabaseQueryResult<unknown[]>;
-
-  const raw = expectRows(tailResult, "load chronological feed tail") as Array<
-    Record<string, unknown>
-  >;
+  // One past the page, so hasMore is a fact. The PostgREST range was
+  // inclusive at both ends and fetched the same pageSize + 1 rows.
+  const raw = await listFeedPosts(reader, "load chronological feed tail", {
+    contentKind: contentKindCriterion(options.filters.type),
+    cutoff: options.filters.cutoff,
+    excludedAuthorIds: options.filters.excludedAuthorIds,
+    excludedPostIds: [
+      ...options.filters.excludedPostIds,
+      ...options.evergreenIds,
+    ],
+    cursor: options.boundary,
+    offset: options.offset,
+    limit: options.pageSize + 1,
+  });
   const page = raw.slice(0, options.pageSize);
 
   // Scoped to the rows this page actually serves. Asking about the ranked

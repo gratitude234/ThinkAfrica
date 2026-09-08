@@ -106,17 +106,64 @@ export interface FeedListCriteria {
   order: "recent" | "well_read";
   /** Whether the projection carries `topic_keys`. */
   includeTopicKeys: boolean;
+  /**
+   * How much of each row to read.
+   *
+   * `card` is everything a feed card renders. `identity` is enough to work
+   * out where the ranked pool ends and which ids the evergreen arms claimed,
+   * and nothing else: the tail needs both facts and none of the content behind
+   * them, and reading it would be 160 rows of article metadata fetched and
+   * dropped on every page past the ranking. There is a test for that.
+   */
+  projection: "card" | "identity";
   offset: number;
   limit: number;
 }
 
+/** A post plus the subscribed credits that matched it. */
+export type FeedPostWithCredits = FeedPostRow & {
+  subscription_author_credits:
+    | Array<{ user_id?: string; accepted_at?: string | null }>
+    | { user_id?: string; accepted_at?: string | null }
+    | null;
+};
+
 export interface FeedListRepository {
   /** One slice of the feed, as ids and card fields. */
   listPosts(criteria: FeedListCriteria): Promise<FeedPostRow[]>;
+  /**
+   * The same slice, restricted to posts carrying an accepted credit for one
+   * of `coauthorUserIds`, and carrying those credits back with it.
+   *
+   * A separate operation rather than a flag on `listPosts`, because the
+   * caller needs to know *which* subscribed author matched in order to label
+   * the card. `listPosts` deliberately does not return that: an `exists` is
+   * cheaper and is the right shape when the answer is only yes or no.
+   */
+  listPostsWithCredits(
+    criteria: FeedListCriteria
+  ): Promise<FeedPostWithCredits[]>;
+  /**
+   * Posts crediting any of these people as an accepted author.
+   *
+   * The feed excludes a blocked person's work, and filtering on
+   * `posts.author_id` alone would let them back in through a co-authored
+   * publication. This is that gap, computed once per page and fed to
+   * `excludedPostIds`.
+   */
+  postIdsCreditedTo(authorIds: readonly string[]): Promise<string[]>;
   readonly backend: "supabase" | "postgres";
 }
 
 // ── SQL ──────────────────────────────────────────────────────────────
+
+/**
+ * Enough of a candidate row to work out where the pool ends. Deliberately not
+ * a subset anyone can choose: two named projections, because the narrow one
+ * exists for one reason and widening it silently would undo it.
+ */
+const IDENTITY_COLUMNS = `
+    p.id, p.published_at, p.read_count, p.citation_id`;
 
 const BASE_COLUMNS = `
     p.id, p.title, p.slug, p.in_response_to, p.excerpt, p.type,
@@ -147,11 +194,15 @@ const BASE_COLUMNS = `
  */
 function listSql(
   order: "recent" | "well_read",
-  includeTopicKeys: boolean
+  includeTopicKeys: boolean,
+  projection: "card" | "identity" = "card"
 ): string {
-  const columns = includeTopicKeys
-    ? `${BASE_COLUMNS},\n    to_jsonb(p.topic_keys) as topic_keys`
-    : BASE_COLUMNS;
+  const columns =
+    projection === "identity"
+      ? IDENTITY_COLUMNS
+      : includeTopicKeys
+        ? `${BASE_COLUMNS},\n    to_jsonb(p.topic_keys) as topic_keys`
+        : BASE_COLUMNS;
 
   const ordering =
     order === "well_read"
@@ -207,15 +258,57 @@ function listSql(
 `;
 }
 
+/**
+ * The co-author arm, which needs the matching credits back as well as the post.
+ *
+ * Same predicate as `listSql`, with the credits aggregated rather than merely
+ * tested. Built by wrapping that statement so the two can never disagree about
+ * which posts qualify: the aggregate is a projection over the same rows, not a
+ * second definition of them.
+ */
+const CREDITS_SQL = `
+  select
+    listed.*,
+    coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'user_id', credit.user_id,
+        'accepted_at', credit.accepted_at
+      ))
+      from public.post_authors credit
+      where credit.post_id = listed.id
+        and credit.accepted_at is not null
+        and credit.user_id in (
+          select (jsonb_array_elements_text($5::text::jsonb))::uuid
+        )
+    ), '[]'::jsonb) as subscription_author_credits
+  from (${listSql("recent", false)}) as listed
+`;
+
+const CREDITED_POST_IDS_SQL = `
+  select distinct a.post_id
+  from public.post_authors a
+  where a.accepted_at is not null
+    and a.user_id in (select (jsonb_array_elements_text($1::text::jsonb))::uuid)
+`;
+
 /** Four statements, built once. The shape never depends on a request. */
 const STATEMENTS = {
   recent: listSql("recent", false),
   recentWithTopics: listSql("recent", true),
   wellRead: listSql("well_read", false),
   wellReadWithTopics: listSql("well_read", true),
+  recentIdentity: listSql("recent", false, "identity"),
+  wellReadIdentity: listSql("well_read", false, "identity"),
 } as const;
 
 function statementFor(criteria: FeedListCriteria): string {
+  if (criteria.projection === "identity") {
+    // topic_keys is never part of the identity projection: the arms that ask
+    // for it are the ones that read whole cards.
+    return criteria.order === "well_read"
+      ? STATEMENTS.wellReadIdentity
+      : STATEMENTS.recentIdentity;
+  }
   if (criteria.order === "well_read") {
     return criteria.includeTopicKeys
       ? STATEMENTS.wellReadWithTopics
@@ -240,6 +333,8 @@ const POST_SELECT =
 
 const POST_SELECT_WITH_TOPIC_KEYS = `${POST_SELECT}, topic_keys`;
 
+const IDENTITY_SELECT = "id, published_at, read_count, citation_id";
+
 const COAUTHOR_SELECT = `${POST_SELECT}, subscription_author_credits:post_authors!inner(user_id, accepted_at)`;
 
 export function createSupabaseFeedListRepository(
@@ -248,12 +343,46 @@ export function createSupabaseFeedListRepository(
   return {
     backend: "supabase",
 
+    async postIdsCreditedTo(authorIds) {
+      if (authorIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("post_authors")
+        .select("post_id")
+        .in("user_id", [...authorIds])
+        .not("accepted_at", "is", null);
+
+      if (error) {
+        const failure = new Error(
+          `credited post ids failed: ${error.message}`
+        ) as Error & { code?: string };
+        if (typeof error.code === "string" && error.code) {
+          failure.code = error.code;
+        }
+        throw failure;
+      }
+
+      return Array.from(
+        new Set(
+          ((data ?? []) as Array<{ post_id: string }>)
+            .map((row) => row.post_id)
+            .filter(Boolean)
+        )
+      );
+    },
+
+    async listPostsWithCredits(criteria) {
+      return (await this.listPosts(criteria)) as unknown as FeedPostWithCredits[];
+    },
+
     async listPosts(criteria) {
-      const select = criteria.coauthorUserIds
-        ? COAUTHOR_SELECT
-        : criteria.includeTopicKeys
-          ? POST_SELECT_WITH_TOPIC_KEYS
-          : POST_SELECT;
+      const select =
+        criteria.projection === "identity"
+          ? IDENTITY_SELECT
+          : criteria.coauthorUserIds
+            ? COAUTHOR_SELECT
+            : criteria.includeTopicKeys
+              ? POST_SELECT_WITH_TOPIC_KEYS
+              : POST_SELECT;
 
       let query = supabase
         .from("posts")
@@ -349,6 +478,42 @@ export function createPostgresFeedListRepository(
 ): FeedListRepository {
   return {
     backend: "postgres",
+
+    async postIdsCreditedTo(authorIds) {
+      if (authorIds.length === 0) return [];
+      const rows = await executor.query<{ post_id: string }>(
+        CREDITED_POST_IDS_SQL,
+        [JSON.stringify([...authorIds])]
+      );
+      return rows.map((row) => row.post_id);
+    },
+
+    async listPostsWithCredits(criteria) {
+      if (!criteria.coauthorUserIds) {
+        // The operation is defined by the restriction. Without it there are no
+        // credits to report, and returning posts with an empty credit list
+        // would look like "matched nothing" rather than "asked wrongly".
+        throw new Error(
+          "listPostsWithCredits requires coauthorUserIds; use listPosts instead"
+        );
+      }
+      return executor.query<FeedPostWithCredits>(CREDITS_SQL, [
+        criteria.researchTypeExclusion,
+        criteria.contentKind,
+        criteria.cutoff,
+        listParam(criteria.authorIds),
+        listParam(criteria.coauthorUserIds),
+        listParam(criteria.topicKeys),
+        listParam(criteria.excludedAuthorIds),
+        listParam(criteria.excludedPostIds),
+        criteria.cursor?.publishedAt ?? null,
+        criteria.cursor?.id ?? null,
+        criteria.offset,
+        criteria.limit,
+        criteria.requireCitation,
+        criteria.onlyResponses,
+      ]);
+    },
 
     async listPosts(criteria) {
       return executor.query<FeedPostRow>(statementFor(criteria), [
