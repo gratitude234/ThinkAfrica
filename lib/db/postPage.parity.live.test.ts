@@ -26,81 +26,9 @@ const { createSupabasePostPageRepository, createPostgresPostPageRepository } =
   await import("@/lib/db/postPage");
 const { adaptDriver } = await import("@/lib/db/postgres/executor");
 
+import { canonical, differences } from "@/lib/db/parityDiff";
+
 import type { PostPageRepository } from "@/lib/db/postPage";
-
-/** Sorted, so an ordering difference in a set-valued result is not reported as
- *  a content difference. Ordering is asserted separately where it matters. */
-function canonical(value: unknown): string {
-  return JSON.stringify(value, (_key, entry) => {
-    if (entry && typeof entry === "object" && !Array.isArray(entry)) {
-      return Object.fromEntries(
-        Object.entries(entry as Record<string, unknown>).sort(([a], [b]) =>
-          a.localeCompare(b)
-        )
-      );
-    }
-    return entry;
-  });
-}
-
-/** Timestamps: PostgREST returns `+00:00`, a driver returns a Date the mapper
- *  serialises as `Z`. Same instant, different spelling. */
-function sameInstant(a: unknown, b: unknown): boolean {
-  if (a === null || a === undefined) return b === null || b === undefined;
-  if (b === null || b === undefined) return false;
-  const left = new Date(a as string).getTime();
-  const right = new Date(b as string).getTime();
-  return Number.isNaN(left) || Number.isNaN(right)
-    ? String(a) === String(b)
-    : left === right;
-}
-
-const TIMESTAMP_KEYS = new Set([
-  "created_at",
-  "published_at",
-  "accepted_at",
-  "assigned_at",
-  "submitted_at",
-]);
-
-/** Field-by-field, with the two known-benign spellings reconciled. */
-function differences(left: unknown, right: unknown, path = ""): string[] {
-  if (Array.isArray(left) || Array.isArray(right)) {
-    if (!Array.isArray(left) || !Array.isArray(right)) {
-      return [`${path}: array on one side only`];
-    }
-    if (left.length !== right.length) {
-      return [`${path}: length ${left.length} vs ${right.length}`];
-    }
-    return left.flatMap((entry, index) =>
-      differences(entry, right[index], `${path}[${index}]`)
-    );
-  }
-
-  if (left && right && typeof left === "object" && typeof right === "object") {
-    const keys = new Set([
-      ...Object.keys(left as object),
-      ...Object.keys(right as object),
-    ]);
-    return [...keys].flatMap((key) =>
-      differences(
-        (left as Record<string, unknown>)[key],
-        (right as Record<string, unknown>)[key],
-        path ? `${path}.${key}` : key
-      )
-    );
-  }
-
-  const key = path.split(".").pop() ?? "";
-  if (TIMESTAMP_KEYS.has(key.replace(/\[\d+\]$/, ""))) {
-    return sameInstant(left, right) ? [] : [`${path}: ${left} vs ${right}`];
-  }
-
-  if ((left ?? null) !== (right ?? null)) {
-    return [`${path}: ${JSON.stringify(left)} vs ${JSON.stringify(right)}`];
-  }
-  return [];
-}
 
 describe.skipIf(!enabled)("post page: PostgREST vs PostgreSQL, same database", () => {
   let sql: Awaited<ReturnType<typeof open>>;
