@@ -30,33 +30,43 @@
 -- ===========================================================================
 -- SHAPE
 -- ===========================================================================
--- For each function this file creates an OVERLOAD taking p_user_id as its
--- first argument and moves the body there. The original signature is then
--- redefined as a one-line wrapper that calls the new one with auth.uid().
+-- For each function the body moves into a PRIVATE implementation taking
+-- p_user_id as its first argument. The existing public signature keeps its
+-- name, its arguments and its behaviour, and becomes a SECURITY DEFINER
+-- wrapper that derives the actor from auth.uid() and calls the private one.
 --
---   * Every existing caller keeps working, unchanged, against the same name
---     and the same argument names. PostgREST resolves an overload by the set
---     of argument names in the request body, so `{p_key, p_enabled}` still
---     reaches the old signature and `{p_user_id, p_key, p_enabled}` reaches
---     the new one.
+--   * Every existing caller keeps working, unchanged.
 --   * The logic exists once. A wrapper cannot drift from the body it calls.
---   * At the Better Auth cutover the wrappers are dropped in a later
---     migration and only the parameterised functions remain.
+--   * The direct-PostgreSQL repositories call the private implementation over
+--     a trusted connection, passing the viewer the server resolved.
 --
 -- ===========================================================================
--- THE TRANSITIONAL GUARD
+-- WHY THE IMPLEMENTATION IS PRIVATE, AND NOT A PUBLIC OVERLOAD
 -- ===========================================================================
--- The parameterised functions are SECURITY DEFINER and are granted to
--- `authenticated`, because that is the role the application's server actions
--- run as today. That means a caller could in principle pass someone else's id.
+-- An earlier draft of this file created the parameterised functions in
+-- `public` and granted them to `authenticated`, relying on a runtime guard to
+-- refuse a p_user_id that disagreed with auth.uid(). That guard had to exempt
+-- callers with no JWT, because a trusted server is the caller the parameter
+-- exists for -- and "no JWT" is not a property only a trusted server can have.
+-- It made impersonation a question about who can mint a token rather than a
+-- question about who is granted what.
 --
--- So while Supabase Auth is live, each one refuses a p_user_id that disagrees
--- with auth.uid(). service_role and other callers with no JWT (auth.uid() IS
--- NULL) are exempt: a trusted server is the caller the parameter exists for.
+-- So the explicit-id form is not reachable from a browser at all, by two
+-- independent mechanisms:
 --
--- assert_identity_claim() is that check, in one place. It is removed by the
--- cutover migration, at which point the grant narrows to the application role
--- and the server is the only thing that can reach these at all.
+--   1. It lives in `private`, and PostgREST exposes only `public`. There is
+--      no request that names it.
+--   2. `private` grants USAGE to `postgres` alone. `anon` and
+--      `authenticated` cannot resolve the schema, let alone execute in it.
+--
+-- The public wrapper is SECURITY DEFINER, so it reaches the private
+-- implementation as its owner. A caller needs no privilege in `private` for
+-- the wrapper to work, and gains none from it: the wrapper takes no user id,
+-- so there is nothing to forge.
+--
+-- `private.assert_identity_claim()` remains as defence in depth. It is no
+-- longer the thing standing between a browser and someone else's data; it is
+-- what makes a future grant mistake fail loudly instead of silently.
 
 BEGIN;
 
@@ -66,7 +76,7 @@ SET LOCAL lock_timeout = '5s';
 -- The shared guard
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.assert_identity_claim(p_user_id uuid)
+CREATE OR REPLACE FUNCTION private.assert_identity_claim(p_user_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
 STABLE
@@ -95,11 +105,12 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.assert_identity_claim(uuid) IS
-  'Transitional. While Supabase Auth is live, refuses a p_user_id that '
-  'disagrees with auth.uid(); a caller with no JWT (service_role, or a direct '
-  'connection) is trusted and the parameter wins. Removed at the Better Auth '
-  'cutover, when the grant narrows to the application role.';
+COMMENT ON FUNCTION private.assert_identity_claim(uuid) IS
+  'Defence in depth, not the primary control. The primary control is that '
+  'private is unreachable from PostgREST and ungranted to anon and '
+  'authenticated. This refuses a p_user_id that disagrees with auth.uid(); a '
+  'caller with no JWT (a direct connection) is trusted and the parameter '
+  'wins. Removed at the Better Auth cutover.';
 
 -- ===========================================================================
 -- Onboarding
@@ -107,7 +118,7 @@ COMMENT ON FUNCTION public.assert_identity_claim(uuid) IS
 
 -- --- get_my_onboarding_state -----------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.get_my_onboarding_state(p_user_id uuid)
+CREATE OR REPLACE FUNCTION private.get_my_onboarding_state_impl(p_user_id uuid)
 RETURNS TABLE (
   current_path text,
   work_category text,
@@ -124,7 +135,7 @@ AS $$
     preference.work_category,
     preference.updated_at
   FROM public.user_onboarding_preferences AS preference
-  WHERE preference.user_id = public.assert_identity_claim(p_user_id);
+  WHERE preference.user_id = private.assert_identity_claim(p_user_id);
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_my_onboarding_state()
@@ -139,12 +150,12 @@ SECURITY DEFINER
 SET search_path = ''
 ROWS 1
 AS $$
-  SELECT * FROM public.get_my_onboarding_state((SELECT auth.uid()));
+  SELECT * FROM private.get_my_onboarding_state_impl((SELECT auth.uid()));
 $$;
 
 -- --- save_onboarding_path --------------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.save_onboarding_path(
+CREATE OR REPLACE FUNCTION private.save_onboarding_path_impl(
   p_user_id uuid,
   p_current_path text
 )
@@ -154,7 +165,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_user_id uuid := public.assert_identity_claim(p_user_id);
+  v_user_id uuid := private.assert_identity_claim(p_user_id);
 BEGIN
   IF p_current_path NOT IN ('student', 'non_student') THEN
     RAISE EXCEPTION 'Choose a valid current path.' USING ERRCODE = '23514';
@@ -188,12 +199,12 @@ LANGUAGE sql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-  SELECT public.save_onboarding_path((SELECT auth.uid()), p_current_path);
+  SELECT private.save_onboarding_path_impl((SELECT auth.uid()), p_current_path);
 $$;
 
 -- --- save_onboarding_preferences -------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.save_onboarding_preferences(
+CREATE OR REPLACE FUNCTION private.save_onboarding_preferences_impl(
   p_user_id uuid,
   p_current_path text,
   p_work_category text
@@ -204,7 +215,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_user_id uuid := public.assert_identity_claim(p_user_id);
+  v_user_id uuid := private.assert_identity_claim(p_user_id);
 BEGIN
   IF p_current_path NOT IN ('student', 'non_student')
     OR (p_current_path = 'student' AND p_work_category IS NOT NULL)
@@ -246,14 +257,14 @@ LANGUAGE sql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-  SELECT public.save_onboarding_preferences(
+  SELECT private.save_onboarding_preferences_impl(
     (SELECT auth.uid()), p_current_path, p_work_category
   );
 $$;
 
 -- --- save_onboarding_topics ------------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.save_onboarding_topics(
+CREATE OR REPLACE FUNCTION private.save_onboarding_topics_impl(
   p_user_id uuid,
   p_interests text[]
 )
@@ -263,7 +274,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_user_id uuid := public.assert_identity_claim(p_user_id);
+  v_user_id uuid := private.assert_identity_claim(p_user_id);
   v_allowed CONSTANT text[] := ARRAY[
     'Public Health',
     'Economics & Development',
@@ -311,14 +322,14 @@ LANGUAGE sql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-  SELECT public.save_onboarding_topics((SELECT auth.uid()), p_interests);
+  SELECT private.save_onboarding_topics_impl((SELECT auth.uid()), p_interests);
 $$;
 
 -- ===========================================================================
 -- Notifications
 -- ===========================================================================
 
-CREATE OR REPLACE FUNCTION public.set_notification_preference(
+CREATE OR REPLACE FUNCTION private.set_notification_preference_impl(
   p_user_id uuid,
   p_key text,
   p_enabled boolean
@@ -326,10 +337,10 @@ CREATE OR REPLACE FUNCTION public.set_notification_preference(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
-  v_user_id uuid := public.assert_identity_claim(p_user_id);
+  v_user_id uuid := private.assert_identity_claim(p_user_id);
   v_preferences jsonb;
 BEGIN
   IF p_key NOT IN (
@@ -377,9 +388,9 @@ CREATE OR REPLACE FUNCTION public.set_notification_preference(
 RETURNS jsonb
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
-  SELECT public.set_notification_preference(
+  SELECT private.set_notification_preference_impl(
     (SELECT auth.uid()), p_key, p_enabled
   );
 $$;
@@ -388,17 +399,17 @@ $$;
 -- Engagement
 -- ===========================================================================
 
-CREATE OR REPLACE FUNCTION public.toggle_comment_vote(
+CREATE OR REPLACE FUNCTION private.toggle_comment_vote_impl(
   p_user_id uuid,
   p_comment_id uuid
 )
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
-  v_user_id uuid := public.assert_identity_claim(p_user_id);
+  v_user_id uuid := private.assert_identity_claim(p_user_id);
   v_voted boolean;
   v_inserted boolean;
   v_upvotes integer;
@@ -453,41 +464,51 @@ CREATE OR REPLACE FUNCTION public.toggle_comment_vote(p_comment_id uuid)
 RETURNS json
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
-  SELECT public.toggle_comment_vote((SELECT auth.uid()), p_comment_id);
+  SELECT private.toggle_comment_vote_impl((SELECT auth.uid()), p_comment_id);
 $$;
 
 -- ===========================================================================
 -- Grants
 -- ===========================================================================
--- Same posture as the originals: never anon, never PUBLIC. `authenticated` is
--- the role the application's server actions run as today, and
--- assert_identity_claim() is what stops that role naming someone else.
+-- The public wrappers keep exactly the posture the originals had: never anon,
+-- never PUBLIC, executable by authenticated and service_role. They take no
+-- user id, so a caller can only ever act as itself.
 --
--- At the Better Auth cutover these grants narrow to the application role, the
--- wrappers are dropped, and assert_identity_claim() goes with them.
+-- The private implementations are granted to nobody. They do not need a grant
+-- to be reachable by the wrappers, because a SECURITY DEFINER function runs as
+-- its owner. The REVOKEs below are therefore belt and braces, and they are
+-- written out so that a later reader can see the intent rather than infer it
+-- from a default.
 
-REVOKE ALL ON FUNCTION public.assert_identity_claim(uuid) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.assert_identity_claim(uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION private.assert_identity_claim(uuid) FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION private.get_my_onboarding_state_impl(uuid) FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION private.save_onboarding_path_impl(uuid, text) FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION private.save_onboarding_preferences_impl(uuid, text, text) FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION private.save_onboarding_topics_impl(uuid, text[]) FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION private.set_notification_preference_impl(uuid, text, boolean) FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION private.toggle_comment_vote_impl(uuid, uuid) FROM public, anon, authenticated;
 
-REVOKE ALL ON FUNCTION public.get_my_onboarding_state(uuid) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.get_my_onboarding_state(uuid) TO authenticated, service_role;
+-- The public wrappers, unchanged in posture from what they replace.
 
-REVOKE ALL ON FUNCTION public.save_onboarding_path(uuid, text) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.save_onboarding_path(uuid, text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.get_my_onboarding_state() FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.get_my_onboarding_state() TO authenticated, service_role;
 
-REVOKE ALL ON FUNCTION public.save_onboarding_preferences(uuid, text, text) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.save_onboarding_preferences(uuid, text, text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.save_onboarding_path(text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.save_onboarding_path(text) TO authenticated, service_role;
 
-REVOKE ALL ON FUNCTION public.save_onboarding_topics(uuid, text[]) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.save_onboarding_topics(uuid, text[]) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.save_onboarding_preferences(text, text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.save_onboarding_preferences(text, text) TO authenticated, service_role;
 
-REVOKE ALL ON FUNCTION public.set_notification_preference(uuid, text, boolean) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.set_notification_preference(uuid, text, boolean) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.save_onboarding_topics(text[]) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.save_onboarding_topics(text[]) TO authenticated, service_role;
 
-REVOKE ALL ON FUNCTION public.toggle_comment_vote(uuid, uuid) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.toggle_comment_vote(uuid, uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.set_notification_preference(text, boolean) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.set_notification_preference(text, boolean) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.toggle_comment_vote(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.toggle_comment_vote(uuid) TO authenticated, service_role;
 
 COMMIT;
 
@@ -500,10 +521,10 @@ COMMIT;
 -- from 20260824000001, 20260906000004 and 20260523000004 in the same
 -- transaction:
 --
---   DROP FUNCTION IF EXISTS public.toggle_comment_vote(uuid, uuid);
---   DROP FUNCTION IF EXISTS public.set_notification_preference(uuid, text, boolean);
---   DROP FUNCTION IF EXISTS public.save_onboarding_topics(uuid, text[]);
---   DROP FUNCTION IF EXISTS public.save_onboarding_preferences(uuid, text, text);
---   DROP FUNCTION IF EXISTS public.save_onboarding_path(uuid, text);
---   DROP FUNCTION IF EXISTS public.get_my_onboarding_state(uuid);
---   DROP FUNCTION IF EXISTS public.assert_identity_claim(uuid);
+--   DROP FUNCTION IF EXISTS private.toggle_comment_vote_impl(uuid, uuid);
+--   DROP FUNCTION IF EXISTS private.set_notification_preference_impl(uuid, text, boolean);
+--   DROP FUNCTION IF EXISTS private.save_onboarding_topics_impl(uuid, text[]);
+--   DROP FUNCTION IF EXISTS private.save_onboarding_preferences_impl(uuid, text, text);
+--   DROP FUNCTION IF EXISTS private.save_onboarding_path_impl(uuid, text);
+--   DROP FUNCTION IF EXISTS private.get_my_onboarding_state_impl(uuid);
+--   DROP FUNCTION IF EXISTS private.assert_identity_claim(uuid);
