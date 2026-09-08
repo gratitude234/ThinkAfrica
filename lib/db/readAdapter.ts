@@ -9,6 +9,16 @@ import {
   type FeedRepository,
 } from "@/lib/db/feed";
 import {
+  createPostgresProfileRecordRepository,
+  createSupabaseProfileRecordRepository,
+  type ProfileRecordRepository,
+} from "@/lib/db/profileRecord";
+import {
+  createPostgresProfilePageRepository,
+  createSupabaseProfilePageRepository,
+  type ProfilePageRepository,
+} from "@/lib/db/profilePage";
+import {
   createPostgresPostPageRepository,
   createSupabasePostPageRepository,
   type PostPageRepository,
@@ -43,7 +53,7 @@ import {
  * doing it this way round.
  */
 
-export const MIGRATABLE_READ_DOMAINS = ["post-page", "feed"] as const;
+export const MIGRATABLE_READ_DOMAINS = ["post-page", "feed", "profile-page"] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
 
@@ -106,4 +116,29 @@ export function feedRepository(
   return isReadDomainMigrated("feed")
     ? createPostgresFeedRepository(resolvePostgresExecutor())
     : createSupabaseFeedRepository(viewerClient ?? reader);
+}
+
+/** The public profile page. Its identity row already moved; this is the rest. */
+export function profilePageRepository(
+  supabase: SupabaseClient
+): ProfilePageRepository {
+  return isReadDomainMigrated("profile-page")
+    ? createPostgresProfilePageRepository(resolvePostgresExecutor())
+    : createSupabaseProfilePageRepository(supabase);
+}
+
+/**
+ * The public profile record: its counts, entry pages and topic index.
+ *
+ * Shares the `profile-page` domain with the header rather than taking one of
+ * its own, because the same public page loads both. Two switches would let one
+ * profile be served half from each transport, which is the state this
+ * migration is arranged to avoid.
+ */
+export function profileRecordRepository(
+  supabase: SupabaseClient
+): ProfileRecordRepository {
+  return isReadDomainMigrated("profile-page")
+    ? createPostgresProfileRecordRepository(resolvePostgresExecutor())
+    : createSupabaseProfileRecordRepository(supabase);
 }

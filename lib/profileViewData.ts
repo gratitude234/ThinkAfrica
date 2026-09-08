@@ -1,5 +1,6 @@
 import "server-only";
 import { getDatabase } from "@/lib/db";
+import { profilePageRepository } from "@/lib/db/readAdapter";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -292,72 +293,38 @@ export async function loadProfileViewerContext({
   const isOwnProfile = viewerId === profileId;
   const isStranger = Boolean(viewerId) && !isOwnProfile;
 
-  const [
-    followerResult,
-    followingResult,
-    followResult,
-    subscriptionResult,
-    blockResult,
-    messaging,
-  ] = await Promise.all([
-    supabase
-      .from("follows")
-      .select("following_id", { count: "exact", head: true })
-      .eq("following_id", profileId),
-    // Counted rather than stored, like the follower count above it. Both are
-    // head queries over the same index, and a denormalised counter would need
-    // a trigger and a reconciliation job to earn its keep.
-    supabase
-      .from("follows")
-      .select("follower_id", { count: "exact", head: true })
-      .eq("follower_id", profileId),
+  // Five PostgREST round trips become two statements: the counts the header
+  // states as facts, and the viewer's own relationship. A logged-out reader
+  // needs only the first, so the second is not issued at all.
+  const repository = profilePageRepository(supabase);
+
+  const [counts, relationship, messaging] = await Promise.all([
+    repository.relationshipCounts(profileId),
     isStranger
-      ? supabase
-          .from("follows")
-          .select("follower_id")
-          .eq("follower_id", viewerId as string)
-          .eq("following_id", profileId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    isAuthorSubscriptionsEnabled() && isStranger
-      ? supabase
-          .from("author_subscriptions")
-          .select("subscriber_id")
-          .eq("subscriber_id", viewerId as string)
-          .eq("author_id", profileId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    isStranger
-      ? supabase
-          .from("user_blocks")
-          .select("blocker_id")
-          .eq("blocker_id", viewerId as string)
-          .eq("blocked_id", profileId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
+      ? repository.viewerRelationship(profileId, viewerId as string, {
+          includeSubscription: isAuthorSubscriptionsEnabled(),
+        })
+      : Promise.resolve({
+          isFollowing: false,
+          isSubscribed: false,
+          isBlocked: false,
+        }),
     isStranger
       ? getMessageEligibility(supabase, viewerId as string, profileId)
       : Promise.resolve(null),
   ]);
 
   // The relationship counts are identity-critical: the header states them as
-  // facts. A failure here throws rather than printing zero followers for
-  // someone with thousands.
-  if (followerResult.error) {
-    throw queryFailure("follower count failed", followerResult.error.message);
-  }
-  if (followingResult.error) {
-    throw queryFailure("following count failed", followingResult.error.message);
-  }
-
+  // facts, so the repository throws rather than letting a failure print zero
+  // followers for someone with thousands.
   return {
     viewerId,
     isOwnProfile,
-    isFollowing: Boolean(followResult.data),
-    isSubscribed: Boolean(subscriptionResult.data),
-    isBlocked: Boolean(blockResult.data),
-    followerCount: followerResult.count ?? 0,
-    followingCount: followingResult.count ?? 0,
+    isFollowing: relationship.isFollowing,
+    isSubscribed: relationship.isSubscribed,
+    isBlocked: relationship.isBlocked,
+    followerCount: counts.followerCount,
+    followingCount: counts.followingCount,
     messaging,
   };
 }
@@ -380,13 +347,15 @@ export async function loadProfileOpportunityState({
   viewerId: string | null;
   isOwnProfile: boolean;
 }): Promise<ProfileOpportunityState> {
-  const { data, error } = await supabase
-    .from("talent_profiles")
-    .select("id, open_to_opportunities, visibility")
-    .eq("user_id", profileId)
-    .maybeSingle<{ id: string; open_to_opportunities: boolean; visibility: string }>();
-
-  if (error) throw queryFailure("opportunity state failed", error.message);
+  let data;
+  try {
+    data = await profilePageRepository(supabase).opportunityState(profileId);
+  } catch (error) {
+    throw queryFailure(
+      "opportunity state failed",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
 
   const visible = Boolean(
     data?.open_to_opportunities &&
@@ -417,16 +386,17 @@ export async function loadProfileFeaturedWork({
   supabase: SupabaseClient;
   profileId: string;
 }): Promise<ProfilePublication[]> {
-  const noteColumn = isFeaturedWorkNotesEnabled() ? ", feature_note" : "";
-  const { data, error } = await supabase
-    .from("profile_featured_posts")
-    .select(
-      `post_id, position${noteColumn}, posts!profile_featured_posts_post_id_fkey(${PUBLICATION_SELECT}, status)`
-    )
-    .eq("user_id", profileId)
-    .order("position", { ascending: true });
-
-  if (error) throw queryFailure("featured work failed", error.message);
+  let data;
+  try {
+    data = await profilePageRepository(supabase).featuredWork(profileId, {
+      includeNote: isFeaturedWorkNotesEnabled(),
+    });
+  } catch (error) {
+    throw queryFailure(
+      "featured work failed",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
 
   type FeaturedRow = {
     post_id: string;
@@ -482,40 +452,32 @@ export async function loadProfilePublications({
   const start = (page - 1) * pageSize;
   const limit = pageSize + 1;
 
-  const [ownedResult, coauthoredResult] = await Promise.all([
-    supabase
-      .from("posts")
-      .select(PUBLICATION_SELECT)
-      .eq("author_id", profileId)
-      .eq("status", "published")
-      .or(filter)
-      .order("published_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false })
-      .range(start, start + limit - 1),
-    supabase
-      .from("post_authors")
-      .select(`posts!post_authors_post_id_fkey(${PUBLICATION_SELECT}, status)`)
-      .eq("user_id", profileId)
-      .not("accepted_at", "is", null)
-      .order("accepted_at", { ascending: false })
-      .limit(start + limit),
-  ]);
-
-  if (ownedResult.error) {
-    throw queryFailure("publications failed", ownedResult.error.message);
-  }
-  if (coauthoredResult.error) {
-    throw queryFailure("co-authored publications failed", coauthoredResult.error.message);
+  // The two branches keep their existing, deliberately asymmetric bounds:
+  // owned is offset-paginated, co-authored takes from the top, and the merge
+  // below is unchanged. Reconciling them into one clean UNION would change
+  // which posts appear on page two, which is a product change rather than a
+  // refactor. See lib/db/profilePage.ts.
+  let branches;
+  try {
+    branches = await profilePageRepository(supabase).publicationBranches({
+      profileId,
+      contentKind,
+      legacyTypes: legacyTypesForContentKind(contentKind),
+      start,
+      limit,
+    });
+  } catch (error) {
+    throw queryFailure(
+      "publications failed",
+      error instanceof Error ? error.message : String(error)
+    );
   }
 
   const byId = new Map<string, ProfilePublication>();
-  for (const row of (ownedResult.data ?? []) as unknown as PublicationRow[]) {
+  for (const row of branches.owned as unknown as PublicationRow[]) {
     byId.set(row.id, toPublication(row, false));
   }
-  for (const wrapper of (coauthoredResult.data ?? []) as unknown as Array<{
-    posts: PublicationRow | PublicationRow[] | null;
-  }>) {
-    const row = Array.isArray(wrapper.posts) ? wrapper.posts[0] : wrapper.posts;
+  for (const row of branches.coauthored as unknown as PublicationRow[]) {
     if (!row || row.status !== "published" || row.author_id === profileId) continue;
     // The co-author branch cannot be filtered by PostgREST across the
     // embed, so the same resolver decides here. One definition either way.

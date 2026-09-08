@@ -204,6 +204,10 @@
     "lib/db/postWrites.ts",
     "lib/auth/viewer.ts",
     "lib/db/feed.ts",
-    "lib/db/readAdapter.ts"
+    "lib/db/readAdapter.ts",
+    "lib/db/profilePage.ts",
+    "lib/db/profileRecord.ts",
+    "lib/db/parityDiff.ts",
+    "lib/profileRecordData.ts"
   ]
 }

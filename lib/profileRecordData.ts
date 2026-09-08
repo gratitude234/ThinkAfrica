@@ -16,6 +16,7 @@ import {
   profileTopicKey,
   type DemonstratedTopic,
 } from "@/lib/profileTopics";
+import { profileRecordRepository } from "@/lib/db/readAdapter";
 import { sanitizePostExcerpt } from "@/lib/utils";
 
 export interface ProfileRecordPublication {
@@ -83,23 +84,6 @@ interface PostRow {
 
 
 /**
- * PostgREST's code for "I have no such function in the schema cache", which
- * is what an application deployed ahead of 20260907000001 gets back when it
- * asks for the v2 summary. Matched on the code rather than on the message,
- * because the message is prose and is localised by nobody in particular.
- */
-const PGRST_FUNCTION_NOT_FOUND = "PGRST202";
-
-function isMissingFunction(error: { code?: string | null; message?: string | null } | null) {
-  if (!error) return false;
-  if (error.code === PGRST_FUNCTION_NOT_FOUND) return true;
-  // A schema cache that has not reloaded reports the same absence as a 404
-  // with no code on some PostgREST versions. Narrow enough to be the same
-  // fact, not a catch-all for query failure.
-  return /could not find the function|does not exist/i.test(error.message ?? "");
-}
-
-/**
  * The record counts, including the Article / Post split when the database
  * can supply it.
  *
@@ -120,23 +104,17 @@ export async function loadProfileRecordSummary(
   profileId: string,
   includeResearch: boolean
 ): Promise<ProfileRecordSummary> {
-  const args = {
-    p_profile_id: profileId,
-    p_include_research: includeResearch,
-  };
+  // The v2-then-v1 fallback moved into the repository, which reproduces it on
+  // both backends. It is still two attempts, still matched on the code for
+  // "no such function" rather than on its prose, and a real failure still
+  // throws rather than reporting a profile with nothing on it.
+  const payload = await profileRecordRepository(supabase).recordSummary(
+    profileId,
+    includeResearch
+  );
 
-  const v2 = await supabase.rpc("get_public_profile_record_summary_v2", args);
-  if (!v2.error) {
-    return v2.data
-      ? normalizeProfileRecordSummary(v2.data)
-      : EMPTY_PROFILE_RECORD_SUMMARY;
-  }
-  if (!isMissingFunction(v2.error)) throw new Error(v2.error.message);
-
-  const v1 = await supabase.rpc("get_public_profile_record_summary", args);
-  if (v1.error) throw new Error(v1.error.message);
-  return v1.data
-    ? normalizeProfileRecordSummary(v1.data)
+  return payload
+    ? normalizeProfileRecordSummary(payload)
     : EMPTY_PROFILE_RECORD_SUMMARY;
 }
 
@@ -188,20 +166,12 @@ async function hydrateRecordEntries(
 ): Promise<ProfileRecordItem[]> {
   const publicationIds = entries.map((entry) => entry.entry_id);
 
-  const publicationResult =
-    publicationIds.length > 0
-      ? await supabase
-          .from("posts")
-          .select(
-            "id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, citation_id, published_version_id, created_at, published_at, cover_image_url, tags, post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))"
-          )
-          .in("id", publicationIds)
-      : { data: [], error: null };
-
-  if (publicationResult.error) throw new Error(publicationResult.error.message);
+  const posts = await profileRecordRepository(supabase).hydratePublications(
+    publicationIds
+  );
 
   const postsById = new Map(
-    ((publicationResult.data ?? []) as unknown as PostRow[]).map((post) => [
+    (posts as unknown as PostRow[]).map((post) => [
       post.id,
       post,
     ])
@@ -259,51 +229,41 @@ export async function loadProfileRecordPage({
   }
 
   const start = (page - 1) * pageSize;
-  const end = start + pageSize - 1;
-  let query = supabase
-    .from("profile_record_entries")
-    .select(
-      "profile_id, entry_id, entry_kind, occurred_at, is_coauthor, source_backed, citable",
-      { count: "exact" }
-    )
-    .eq("profile_id", profileId);
 
-  if (!includeResearch) query = query.neq("entry_kind", "research");
+  // The filter name maps to a set of entry kinds here rather than in the
+  // repository, because the mapping depends on whether research is being
+  // shown and that is this function's question, not the transport's.
+  const kinds =
+    filter === "publications"
+      ? includeResearch
+        ? ["publication", "research"]
+        : ["publication"]
+      : filter === "responses"
+        ? ["response"]
+        : filter === "research"
+          ? ["research"]
+          : null;
 
-  if (filter === "publications") {
-    query = includeResearch
-      ? query.in("entry_kind", ["publication", "research"])
-      : query.eq("entry_kind", "publication");
-  } else if (filter === "responses") {
-    query = query.eq("entry_kind", "response");
-  } else if (filter === "research") {
-    query = query.eq("entry_kind", "research");
-  }
+  const { entries, totalCount } = await profileRecordRepository(supabase).entries({
+    profileId,
+    kinds,
+    includeResearch,
+    // null, not false: these mean "do not filter on this at all", and an
+    // `= false` would exclude every entry the unfiltered view shows.
+    sourceBacked: quality === "source_backed" ? true : null,
+    citable: quality === "citable" ? true : null,
+    entryIds: entryIds ?? null,
+    start,
+    pageSize,
+  });
 
-  if (quality === "source_backed") {
-    query = query.eq("source_backed", true);
-  } else if (quality === "citable") {
-    query = query.eq("citable", true);
-  }
-
-  if (entryIds) query = query.in("entry_id", entryIds);
-
-  query = query
-    .order("occurred_at", { ascending: false })
-    .order("entry_id", { ascending: false })
-    .range(start, end);
-
-  const { data, error, count } = await query;
-  if (error) throw new Error(error.message);
-
-  const entries = (data ?? []) as unknown as RecordEntryRow[];
   return {
-    items: await hydrateRecordEntries(supabase, entries),
-    totalCount: count ?? 0,
+    items: await hydrateRecordEntries(supabase, entries as RecordEntryRow[]),
+    totalCount,
     page,
     pageSize,
     hasPreviousPage: page > 1,
-    hasNextPage: start + entries.length < (count ?? 0),
+    hasNextPage: start + entries.length < totalCount,
   };
 }
 
@@ -316,10 +276,6 @@ interface TopicPostRow {
   published_at?: string | null;
   created_at?: string | null;
   status?: string;
-}
-
-interface CoAuthoredTopicRow {
-  posts: TopicPostRow | TopicPostRow[] | null;
 }
 
 export interface ProfileTopicIndex {
@@ -391,36 +347,19 @@ export async function loadProfileTopicIndex({
   declaredInterests?: string[] | null;
   includeResearch: boolean;
 }): Promise<ProfileTopicIndex> {
-  const [ownedResult, coauthoredResult] = await Promise.all([
-    supabase
-      .from("posts")
-      .select(TOPIC_POST_SELECT)
-      .eq("author_id", profileId)
-      .eq("status", "published")
-      .order("published_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false })
-      .limit(TOPIC_SCAN_LIMIT),
-    supabase
-      .from("post_authors")
-      .select(`posts!post_authors_post_id_fkey(${TOPIC_POST_SELECT}, status)`)
-      .eq("user_id", profileId)
-      .not("accepted_at", "is", null)
-      // Co-authorship rows carry no date of their own, so this bound is on
-      // the acceptance order rather than on publication. Same purpose: a cap
-      // on how much history one profile view reads.
-      .order("accepted_at", { ascending: false })
-      .limit(TOPIC_SCAN_LIMIT),
-  ]);
-
-  if (ownedResult.error) throw new Error(ownedResult.error.message);
-  if (coauthoredResult.error) throw new Error(coauthoredResult.error.message);
+  // Co-authorship rows carry no date of their own, so that branch is bounded
+  // on acceptance order rather than on publication. Same purpose as the owned
+  // branch's bound: a cap on how much history one profile view reads.
+  const scan = await profileRecordRepository(supabase).topicPosts(
+    profileId,
+    TOPIC_SCAN_LIMIT
+  );
 
   const byId = new Map<string, TopicPostRow>();
-  for (const post of (ownedResult.data ?? []) as unknown as TopicPostRow[]) {
+  for (const post of scan.owned as unknown as TopicPostRow[]) {
     byId.set(post.id, post);
   }
-  for (const row of (coauthoredResult.data ?? []) as unknown as CoAuthoredTopicRow[]) {
-    const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
+  for (const post of scan.coauthored as unknown as TopicPostRow[]) {
     if (!post || post.status !== "published" || post.author_id === profileId) continue;
     if (!byId.has(post.id)) byId.set(post.id, post);
   }
