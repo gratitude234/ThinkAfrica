@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getCurrentUser } from "@/lib/serverAuth";
 import { createClient } from "@/lib/supabase/server";
 import {
   normalizeSearchQuery,
@@ -42,14 +43,21 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient();
 
+  // The viewer is resolved here, from the session, and passed down. It is
+  // never read from the request's own parameters: the people search and both
+  // author projections are governed by the profiles policy, and an identity a
+  // caller could choose would be an identity a caller could forge.
+  const user = await getCurrentUser();
+  const viewer = { viewerId: user?.id ?? null };
+
   try {
     if (scope === "overlay") {
       return NextResponse.json({
-        posts: await searchOverlayPosts(supabase, query),
+        posts: await searchOverlayPosts(supabase, query, viewer),
       });
     }
 
-    return NextResponse.json(await runSiteSearch(supabase, query));
+    return NextResponse.json(await runSiteSearch(supabase, query, viewer));
   } catch (error) {
     // The message names the failing query and is for the server log. What the
     // reader sees is an empty result and a retry, which is what a typeahead

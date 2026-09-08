@@ -9,6 +9,11 @@ import {
   type FeedRepository,
 } from "@/lib/db/feed";
 import {
+  createPostgresSearchRepository,
+  createSupabaseSearchRepository,
+  type SearchRepository,
+} from "@/lib/db/search";
+import {
   createPostgresProfileRecordRepository,
   createSupabaseProfileRecordRepository,
   type ProfileRecordRepository,
@@ -53,7 +58,12 @@ import {
  * doing it this way round.
  */
 
-export const MIGRATABLE_READ_DOMAINS = ["post-page", "feed", "profile-page"] as const;
+export const MIGRATABLE_READ_DOMAINS = [
+  "post-page",
+  "feed",
+  "profile-page",
+  "search",
+] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
 
@@ -141,4 +151,17 @@ export function profileRecordRepository(
   return isReadDomainMigrated("profile-page")
     ? createPostgresProfileRecordRepository(resolvePostgresExecutor())
     : createSupabaseProfileRecordRepository(supabase);
+}
+
+/**
+ * Search: the typeahead, the search page, and the tag sample.
+ *
+ * Every method takes the viewer id the server resolved, because the people
+ * search and both author projections are governed by the `profiles` policy
+ * that PostgREST was applying from the session. See lib/db/search.ts.
+ */
+export function searchRepository(supabase: SupabaseClient): SearchRepository {
+  return isReadDomainMigrated("search")
+    ? createPostgresSearchRepository(resolvePostgresExecutor())
+    : createSupabaseSearchRepository(supabase);
 }

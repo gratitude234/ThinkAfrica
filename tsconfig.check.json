@@ -208,6 +208,10 @@
     "lib/db/profilePage.ts",
     "lib/db/profileRecord.ts",
     "lib/db/parityDiff.ts",
+    "lib/db/search.ts",
+    "lib/db/profileVisibility.ts",
+    "lib/searchFilters.ts",
+    "lib/searchData.ts",
     "lib/profileRecordData.ts"
   ]
 }
