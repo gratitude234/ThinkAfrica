@@ -6,6 +6,7 @@ import { resolveContentKind, type ContentKind } from "@/lib/contentModel";
 import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/utils";
+import { loadResumableDrafts } from "@/lib/composerActions";
 
 interface ContinueDraftRowProps {
   userId: string | null;
@@ -98,22 +99,21 @@ export default function ContinueDraftRow({
       return null;
     };
 
-    try {
-      void createClient()
-        .from("posts")
-        .select("id, title, type, content_kind, updated_at")
-        .eq("author_id", userId)
-        .eq("status", "draft")
-        .order("updated_at", { ascending: false })
-        .limit(5)
-        .then(({ data, error }) => {
-          resolve(
-            error ? null : findResumable((data ?? []) as Array<Record<string, unknown>>)
-          );
-        }, () => resolve(null));
-    } catch {
-      resolve(null);
-    }
+    // Resolved server-side from the session rather than from the userId prop.
+    // A failed lookup resolves to null, which surfaces nothing: showing a
+    // stale or inaccessible draft would be worse than showing none.
+    void loadResumableDrafts().then(
+      (result) => {
+        resolve(
+          result.ok
+            ? findResumable(
+                result.data as unknown as Array<Record<string, unknown>>
+              )
+            : null
+        );
+      },
+      () => resolve(null)
+    );
 
     return () => {
       cancelled = true;

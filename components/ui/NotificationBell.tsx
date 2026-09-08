@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import Link from "next/link";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
-import { markAllNotificationsRead } from "@/lib/notificationMutations";
+import { markAllNotificationsReadAction } from "@/lib/notificationActions";
 import { markNotificationRead } from "@/lib/notificationRead";
 import { notificationHref, notificationMessage } from "@/lib/notificationCatalog";
 import NotificationAvatar from "@/components/notifications/NotificationAvatar";
@@ -198,7 +198,10 @@ export default function NotificationBell({ userId }: { userId: string }) {
     );
     setUnreadCount(0);
 
-    const { error } = await markAllNotificationsRead(supabase, userId);
+    // The viewer is the session's. This used to be a browser write against
+    // a member id the browser supplied, safe only because RLS refused a wrong
+    // one.
+    const { error } = await markAllNotificationsReadAction();
 
     // Previously this ignored the result entirely and cleared the badge even when
     // the write failed, leaving the UI asserting something the server disagreed with.

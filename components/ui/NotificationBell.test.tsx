@@ -45,7 +45,10 @@ vi.mock("@/lib/notificationData", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/notificationData")>()),
   ...data,
 }));
-vi.mock("@/lib/notificationMutations", () => mutations);
+// Same move: the bell calls the server action now.
+vi.mock("@/lib/notificationActions", () => ({
+  markAllNotificationsReadAction: mutations.markAllNotificationsRead,
+}));
 vi.mock("@/lib/notificationRead", () => readMutation);
 
 function notification(overrides: Partial<NotificationData>): NotificationData {

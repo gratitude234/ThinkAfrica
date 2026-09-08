@@ -21,7 +21,8 @@ const ownerReadCallsites = [
   "app/(main)/page.tsx",
   // The onboarding owner read moved into the client when the identity-first
   // flow landed. The route file is now a thin wrapper that reads nothing.
-  "app/(onboarding)/onboarding/OnboardingClient.tsx",
+  // The onboarding owner read is now server-side; see lib/onboardingActions.ts.
+  "lib/onboardingActions.ts",
   // The notification bell's owner read moved to the server: /api/notifications
   // resolves the reader from the session, reads their mute preference and
   // applies it in the same request. The bell now fetches from the application

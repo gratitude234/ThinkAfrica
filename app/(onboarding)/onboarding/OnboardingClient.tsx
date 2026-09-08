@@ -33,6 +33,7 @@ import {
 } from "@/lib/profileRecordMetrics";
 import { isProfileType, type ProfileType } from "@/lib/profileTypes";
 import { createClient } from "@/lib/supabase/client";
+import { loadOnboardingState } from "@/lib/onboardingActions";
 import {
   completeOnboarding,
   saveOnboardingIdentity,
@@ -198,53 +199,35 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
         trackActivationEvent({ event: "onboarding_started" });
       }
 
-      const [
-        profileResult,
-        privateProfileResult,
-        preferenceResult,
-        recordResult,
-      ] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select(
-            "full_name, profile_type, country, university, field_of_study, graduation_year, professional_title, organization_name, interests"
-          )
-          .eq("id", user.id)
-          .single(),
-        supabase.rpc("get_my_profile_private"),
-        supabase.rpc("get_my_onboarding_state"),
-        supabase.rpc("get_public_profile_record_summary", {
-          p_profile_id: user.id,
-          p_include_research: false,
-        }),
-      ]);
+      // One server call. The four reads it replaces ran against the anon key
+      // and leaned on RLS and two auth.uid() functions, neither of which has a
+      // successor once the browser holds no database credential.
+      const state = await loadOnboardingState();
 
       if (cancelled) return;
 
-      const privateProfile = normalizeMyPrivateProfile(privateProfileResult.data);
-      if (privateProfile?.onboarding_completed) {
+      if (!state.ok) {
+        // Deliberately not treated as "onboarding incomplete". An absent
+        // completion flag is falsy, so an outage would drop a long-standing
+        // member back into the setup wizard. Unknown is its own state.
+        setError(
+          state.reason === "unauthorized"
+            ? "Please sign in again to continue."
+            : "We couldn't load your profile. Please refresh and try again."
+        );
+        setReady(true);
+        return;
+      }
+
+      if (state.data.completed) {
         router.replace(
           requestedStepRef.current === "follow" ? "/explore?tab=people" : "/"
         );
         return;
       }
 
-      if (profileResult.error || !profileResult.data) {
-        setError("We couldn't load your profile. Please refresh and try again.");
-        setReady(true);
-        return;
-      }
-
-      if (recordResult.error) {
-        setError(
-          "We couldn't load your Intellectual Record. Please refresh and try again."
-        );
-        setReady(true);
-        return;
-      }
-
-      const profile = profileResult.data as ProfileSnapshot;
-      const storedPreference = normalizeOnboardingPreference(preferenceResult.data);
+      const profile = state.data.profile as ProfileSnapshot;
+      const storedPreference = normalizeOnboardingPreference(state.data.preference);
       const legacyProfileType: ProfileType | null = isProfileType(profile.profile_type)
         ? profile.profile_type
         : null;
@@ -255,7 +238,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
         INTEREST_OPTIONS.some((option) => option.label === interest)
       );
 
-      setUserId(user.id);
+      setUserId(state.data.userId);
       setFullName(profile.full_name?.trim() || "Your name");
       setCurrentPath(nextPath);
       setWorkCategory(nextCategory);
@@ -267,7 +250,7 @@ export default function OnboardingClient({ requestedStep }: OnboardingClientProp
       setOrganizationName(profile.organization_name ?? "");
       setInterests(nextInterests.slice(0, ONBOARDING_MAX_TOPICS));
 
-      const summary = normalizeProfileRecordSummary(recordResult.data);
+      const summary = normalizeProfileRecordSummary(state.data.record);
       setRecordStats({
         publicationCount: summary.publicationCount,
         sourceBackedCount: summary.sourceBackedCount,

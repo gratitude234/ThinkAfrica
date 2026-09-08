@@ -16,7 +16,14 @@ const mutations = vi.hoisted(() => ({
 }));
 const readMutation = vi.hoisted(() => ({ markNotificationRead: vi.fn() }));
 
-vi.mock("@/lib/notificationMutations", () => mutations);
+// The writes moved to server actions, which resolve the viewer themselves.
+// The stub names are unchanged so every assertion below still reads the same.
+vi.mock("@/lib/notificationActions", () => ({
+  markAllNotificationsReadAction: mutations.markAllNotificationsRead,
+  restoreUnreadAction: mutations.restoreUnread,
+  dismissNotificationAction: mutations.dismissNotification,
+  undismissNotificationAction: mutations.undismissNotification,
+}));
 vi.mock("@/lib/notificationRead", () => readMutation);
 
 vi.mock("@/lib/notificationData", async (importOriginal) => ({
@@ -204,7 +211,9 @@ describe("dismissing a notification", () => {
     await waitFor(() => {
       expect(screen.queryByText(/published a new Article/)).not.toBeInTheDocument();
     });
-    expect(mutations.dismissNotification).toHaveBeenCalledWith({}, "u1", "pub-1");
+    // The viewer is no longer an argument: the action resolves it from the
+    // session. What the browser still names is which row it means.
+    expect(mutations.dismissNotification).toHaveBeenCalledWith("pub-1");
 
     const toast = screen.getByRole("status");
     expect(within(toast).getByText("Notification dismissed")).toBeInTheDocument();
@@ -212,7 +221,7 @@ describe("dismissing a notification", () => {
     await userEvent.click(within(toast).getByRole("button", { name: "Undo" }));
 
     await waitFor(() => {
-      expect(mutations.undismissNotification).toHaveBeenCalledWith({}, "u1", "pub-1");
+      expect(mutations.undismissNotification).toHaveBeenCalledWith("pub-1");
     });
   });
 
@@ -252,7 +261,7 @@ describe("mark all read", () => {
     await userEvent.click(within(toast).getByRole("button", { name: "Undo" }));
 
     await waitFor(() => {
-      expect(mutations.restoreUnread).toHaveBeenCalledWith({}, "u1", [
+      expect(mutations.restoreUnread).toHaveBeenCalledWith([
         "follow-1",
         "pub-1",
       ]);

@@ -207,8 +207,24 @@ for (const absolute of files) {
 
   const original = readFileSync(absolute, "utf8");
   const source = withoutComments(original);
-  const reads = (source.match(/\.from\("[a-z_]+"\)/g) ?? []).length;
-  const rpcs = (source.match(/\.rpc\("[a-z_0-9]+"/g) ?? []).length;
+
+  // supabase.storage.from("bucket") is the storage API, not the database.
+  // Counting it made the avatar uploader look like a browser read for as long
+  // as this script has existed, which is exactly the sort of false positive
+  // that gets a registry ignored. lib/browserDatabaseBoundary.test.ts draws
+  // the same distinction, and the two must agree.
+  const countCalls = (pattern) => {
+    let total = 0;
+    for (const match of source.matchAll(pattern)) {
+      const before = source.slice(Math.max(0, match.index - 60), match.index);
+      if (/storage[\s\S]{0,10}$/.test(before)) continue;
+      total += 1;
+    }
+    return total;
+  };
+
+  const reads = countCalls(/\.from\("[a-z_]+"\)/g);
+  const rpcs = countCalls(/\.rpc\("[a-z_0-9]+"/g);
   if (reads + rpcs === 0) continue;
 
   // By rule, not by list: any client component that reads the database is

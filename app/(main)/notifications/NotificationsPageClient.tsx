@@ -10,11 +10,11 @@ import {
   type ActionInboxItem,
 } from "@/lib/actionInbox";
 import {
-  dismissNotification,
-  markAllNotificationsRead,
-  restoreUnread,
-  undismissNotification,
-} from "@/lib/notificationMutations";
+  dismissNotificationAction,
+  markAllNotificationsReadAction,
+  restoreUnreadAction,
+  undismissNotificationAction,
+} from "@/lib/notificationActions";
 import { markNotificationRead } from "@/lib/notificationRead";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { formatRelativeTime } from "@/lib/utils";
@@ -292,11 +292,7 @@ export default function NotificationsPageClient({
       );
 
       void runWrite(async () => {
-        const { error } = await dismissNotification(
-          supabase,
-          userId,
-          notificationId
-        );
+        const { error } = await dismissNotificationAction(notificationId);
 
         if (error) {
           setNotifications((current) =>
@@ -317,7 +313,7 @@ export default function NotificationsPageClient({
             actionLabel: "Undo",
             run: async () => {
               const result = await runWrite(() =>
-                undismissNotification(supabase, userId, notificationId)
+                undismissNotificationAction(notificationId)
               );
               if (result.error) {
                 setToast({ message: `Could not undo: ${result.error}` });
@@ -329,7 +325,7 @@ export default function NotificationsPageClient({
         });
       });
     },
-    [notifications, refresh, runWrite, supabase, userId]
+    [notifications, refresh, runWrite]
   );
 
   const handleMarkAllRead = useCallback(async () => {
@@ -342,7 +338,7 @@ export default function NotificationsPageClient({
 
     try {
       const { error, affectedIds } = await runWrite(() =>
-        markAllNotificationsRead(supabase, userId)
+        markAllNotificationsReadAction()
       );
 
       if (error) {
@@ -369,7 +365,7 @@ export default function NotificationsPageClient({
           actionLabel: "Undo",
           run: async () => {
             const result = await runWrite(() =>
-              restoreUnread(supabase, userId, undoableIds)
+              restoreUnreadAction(undoableIds)
             );
             if (result.error) {
               setToast({
@@ -394,7 +390,7 @@ export default function NotificationsPageClient({
     } finally {
       setMarkingAllRead(false);
     }
-  }, [notifications, refresh, runWrite, supabase, userId]);
+  }, [notifications, refresh, runWrite]);
 
   return (
     <>

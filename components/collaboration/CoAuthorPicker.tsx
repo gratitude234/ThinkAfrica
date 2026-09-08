@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { trackActivationEvent } from "@/lib/activationEvents";
+import { searchCoAuthors } from "@/lib/composerActions";
 
 export interface CoAuthorProfile {
   id: string;
@@ -40,20 +41,16 @@ export default function CoAuthorPicker({
     }
 
     setSearching(true);
-    const supabase = createClient();
     const timer = setTimeout(() => {
-      supabase
-        .from("profiles")
-        .select("id, username, full_name, university, field_of_study")
-        .ilike("username", `%${trimmed}%`)
-        .neq("id", userId)
-        .limit(6)
-        .then(({ data }) => {
-          const selected = new Set(value.map((coAuthor) => coAuthor.id));
-          const nextResults = ((data as CoAuthorProfile[] | null) ?? []).filter(
-            (profile) => !selected.has(profile.id)
-          );
-          setResults(nextResults);
+      // Searched server-side, which is what restores the profiles visibility
+      // rule: suspended and non-public members were hidden by RLS, and this
+      // query never filtered for them itself.
+      void searchCoAuthors(trimmed).then((result) => {
+        const selected = new Set(value.map((coAuthor) => coAuthor.id));
+        const nextResults = (
+          result.ok ? (result.data as CoAuthorProfile[]) : []
+        ).filter((profile) => !selected.has(profile.id));
+        setResults(nextResults);
           setSearching(false);
           trackActivationEvent({
             event: "coauthor_search_performed",

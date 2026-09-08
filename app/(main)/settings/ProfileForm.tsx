@@ -10,6 +10,7 @@ import AvatarUploader from "./AvatarUploader";
 import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import UniversitySelect from "@/components/ui/UniversitySelect";
 import { AFRICAN_COUNTRIES, inferCountryFromUniversity } from "@/lib/academicIdentity";
+import { checkUsernameAvailable } from "@/lib/composerActions";
 import {
   PROFILE_TYPE_OPTIONS,
   type ProfileType,
@@ -169,16 +170,16 @@ export default function ProfileForm({
       return;
     }
 
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("username", username)
-      .neq("id", profile.id)
-      .single();
-
-    setUsernameError(data ? "Username already taken" : null);
-  }, [username, profile.username, profile.id]);
+    // The viewer is the session's, so a caller cannot ask whether a name is
+    // free for somebody else. A failed check reports itself rather than
+    // reading as available.
+    const result = await checkUsernameAvailable(username);
+    if (!result.ok) {
+      setUsernameError("Couldn't check that username. Try again.");
+      return;
+    }
+    setUsernameError(result.data.taken ? "Username already taken" : null);
+  }, [username, profile.username]);
 
   const toggleInterest = (interest: string) => {
     setInterests((prev) =>

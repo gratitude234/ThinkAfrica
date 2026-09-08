@@ -14,6 +14,21 @@ import {
   type FeedRepository,
 } from "@/lib/db/feed";
 import {
+  createPostgresComposerRepository,
+  createSupabaseComposerRepository,
+  type ComposerRepository,
+} from "@/lib/db/composer";
+import {
+  createPostgresCollaborationRepository,
+  createSupabaseCollaborationRepository,
+  type CollaborationRepository,
+} from "@/lib/db/collaboration";
+import {
+  createPostgresMessagingRepository,
+  createSupabaseMessagingRepository,
+  type MessagingRepository,
+} from "@/lib/db/messaging";
+import {
   createPostgresNotificationsRepository,
   createSupabaseNotificationsRepository,
   type NotificationsRepository,
@@ -98,6 +113,9 @@ export const MIGRATABLE_READ_DOMAINS = [
   "dashboard",
   "bookmarks",
   "notifications",
+  "composer",
+  "collaboration",
+  "messaging",
 ] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
@@ -283,4 +301,34 @@ export function notificationsRepository(
   return isReadDomainMigrated("notifications")
     ? createPostgresNotificationsRepository(resolvePostgresExecutor())
     : createSupabaseNotificationsRepository(supabase);
+}
+
+/** The composer: drafts, revision history, and username availability. */
+export function composerRepository(supabase: SupabaseClient): ComposerRepository {
+  return isReadDomainMigrated("composer")
+    ? createPostgresComposerRepository(resolvePostgresExecutor())
+    : createSupabaseComposerRepository(supabase);
+}
+
+/** Finding somebody to invite as a co-author. */
+export function collaborationRepository(
+  supabase: SupabaseClient
+): CollaborationRepository {
+  return isReadDomainMigrated("collaboration")
+    ? createPostgresCollaborationRepository(resolvePostgresExecutor())
+    : createSupabaseCollaborationRepository(supabase);
+}
+
+/**
+ * Message threads and the unread badge.
+ *
+ * Every method takes the viewer, because membership is the whole of the access
+ * control here and `is_conversation_participant()` will not be applying it.
+ */
+export function messagingRepository(
+  supabase: SupabaseClient
+): MessagingRepository {
+  return isReadDomainMigrated("messaging")
+    ? createPostgresMessagingRepository(resolvePostgresExecutor())
+    : createSupabaseMessagingRepository(supabase);
 }

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import UniversitySelect from "@/components/ui/UniversitySelect";
 import Button from "@/components/ui/Button";
 import { completeProfileGate } from "@/app/(main)/settings/profileActions";
+import { checkUsernameAvailable } from "@/lib/composerActions";
 
 interface ProfileGateProfile {
   full_name: string | null;
@@ -65,15 +66,19 @@ export default function ProfileGate({
 
     setCheckingUsername(true);
     const timeoutId = window.setTimeout(async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("username", normalizedUsername)
-        .neq("id", userId)
-        .maybeSingle();
+      const result = await checkUsernameAvailable(normalizedUsername);
 
-      setUsernameError(data ? "Username already taken." : null);
+      // Three outcomes, not two. A check that could not run must not read as
+      // "available": the member would be sent into a submit that rejects them.
+      if (!result.ok) {
+        setUsernameError(
+          result.reason === "unauthorized"
+            ? "Sign in again to continue."
+            : "Couldn't check that username. Try again."
+        );
+      } else {
+        setUsernameError(result.data.taken ? "Username already taken." : null);
+      }
       setCheckingUsername(false);
     }, 300);
 

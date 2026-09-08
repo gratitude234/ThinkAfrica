@@ -14,6 +14,14 @@ const profilePage = read("app/(main)/[username]/page.tsx");
 const recordPage = read("app/(main)/[username]/record/page.tsx");
 const onboarding = read("app/(onboarding)/onboarding/OnboardingClient.tsx");
 
+// The onboarding *reads* moved to lib/onboardingActions.ts: the client used to
+// issue four requests against the anon key, and RLS plus two auth.uid()
+// functions made them safe. Neither has a successor once the browser holds no
+// database credential. What the client still owns is the rendering, so the
+// assertions are split between the two files rather than following the whole
+// screen to one of them.
+const onboardingReads = read("lib/onboardingActions.ts");
+
 describe("public profile zero states", () => {
   it("never offers the full record when the preview is empty", () => {
     // The preview arrives from profileViewData as a list rather than a page
@@ -111,6 +119,6 @@ describe("onboarding record preview", () => {
   });
 
   it("still reads the record summary from the shared RPC", () => {
-    expect(onboarding).toContain('rpc("get_public_profile_record_summary"');
+    expect(onboardingReads).toContain('rpc("get_public_profile_record_summary"');
   });
 });

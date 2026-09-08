@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { findOrCreateConversation } from "@/lib/messaging";
+import { openConversationWith } from "@/lib/conversationActions";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { toggleFollow } from "@/components/ui/followActions";
 import ResponseStartLink from "@/components/post/ResponseStartLink";
@@ -94,18 +94,15 @@ export default function CollaborationPanel({
 
     setMessageLoading(true);
     try {
-      const supabase = createClient();
-      const conversationId = await findOrCreateConversation(
-        supabase,
-        summary.viewerId,
-        summary.authorId
-      );
+      // The browser names the person; the server decides who is asking.
+      const opened = await openConversationWith(summary.authorId);
 
-      if (!conversationId) {
+      if (!opened.ok) {
         setMessageError("Unable to start this conversation.");
         setMessageLoading(false);
         return;
       }
+      const conversationId = opened.conversationId;
 
       trackActivationEvent({
         event: "message_started",

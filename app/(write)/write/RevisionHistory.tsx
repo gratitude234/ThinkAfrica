@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { contributionText } from "@/lib/contribution";
 import { captureRevisionNow } from "./revisionActions";
+import { loadPostRevisions } from "@/lib/composerActions";
 
 interface Revision {
   id: string;
@@ -62,19 +63,23 @@ export default function RevisionHistory({
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const supabase = createClient();
-    const { data, error: loadError } = await supabase
-      .from("post_revisions")
-      .select("id, title, excerpt, content, word_count, created_at")
-      .eq("post_id", postId)
-      .order("created_at", { ascending: false })
-      .limit(40);
+    // The browser names the post; the server decides whether this viewer may
+    // read it. The old query filtered on post_id alone and let the policy do
+    // the rest, which is the part that has no successor.
+    const result = await loadPostRevisions(postId);
     setLoading(false);
-    if (loadError) {
-      setError("Couldn't load your history.");
+
+    if (!result.ok) {
+      setError(
+        result.reason === "not-found"
+          ? "This post's history isn't available to you."
+          : "Couldn't load your history."
+      );
       return;
     }
-    setRevisions((data ?? []) as Revision[]);
+
+    setError(null);
+    setRevisions(result.data as Revision[]);
   }, [postId]);
 
   useEffect(() => {

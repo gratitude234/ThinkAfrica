@@ -8,26 +8,23 @@ import { describe, expect, it, vi } from "vitest";
  *  component asks for and what it does with the answer. */
 const deleted: { ids: string[][] } = { ids: [] };
 
-function mockSupabaseWithDrafts(
+/**
+ * The panel reads through a server action now, so the stub is the action.
+ * `loadFailed` is a state the component has to render differently from an
+ * empty list: a failed load that showed nothing would tell a writer their
+ * drafts were gone.
+ */
+function mockDraftsAction(
   drafts: Array<Record<string, unknown>>,
-  deleteError: string | null = null
+  deleteError: string | null = null,
+  loadFailed = false
 ) {
   deleted.ids = [];
-  vi.doMock("@/lib/supabase/client", () => ({
-    createClient: () => ({
-      auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              order: () => ({
-                limit: () => Promise.resolve({ data: drafts }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    }),
+  vi.doMock("@/lib/composerActions", () => ({
+    loadMyDrafts: async () =>
+      loadFailed
+        ? { ok: false, reason: "unavailable" }
+        : { ok: true, data: drafts },
   }));
   vi.doMock("./deleteActions", () => ({
     deleteOwnDraftPosts: async ({ postIds }: { postIds: string[] }) => {
@@ -62,7 +59,7 @@ async function openPanel(
   deleteError: string | null = null
 ) {
   vi.resetModules();
-  mockSupabaseWithDrafts(drafts, deleteError);
+  mockDraftsAction(drafts, deleteError);
   const { default: MyDraftsFresh } = await import("./MyDrafts");
   render(<MyDraftsFresh activeDraftId={null} />);
   await userEvent.click(await screen.findByText("My Drafts"));

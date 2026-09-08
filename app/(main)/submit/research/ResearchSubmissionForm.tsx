@@ -13,6 +13,7 @@ import {
 } from "@/lib/tags";
 import type { CoAuthorProfile } from "@/components/collaboration/CoAuthorPicker";
 import type { PostReferenceRecord } from "@/lib/types";
+import { searchCoAuthors } from "@/lib/composerActions";
 import {
   ensureResearchDraftForUpload,
   saveResearchDraft,
@@ -210,15 +211,12 @@ export default function ResearchSubmissionForm({
     }
 
     setSearchingCoAuthors(true);
-    const supabase = createClient();
     const timer = setTimeout(() => {
-      supabase
-        .from("profiles")
-        .select("id, username, full_name, university, field_of_study")
-        .ilike("username", `%${trimmed}%`)
-        .neq("id", userId)
-        .limit(6)
-        .then(({ data }) => {
+      // The same server search the composer's picker uses, which is what
+      // restores the profiles visibility rule: suspended and non-public
+      // members were hidden by RLS, and this query never filtered for them.
+      void searchCoAuthors(trimmed).then((result) => {
+          const data = result.ok ? result.data : [];
           const selected = new Set(coAuthors.map((coAuthor) => coAuthor.id));
           const nextResults = ((data as CoAuthorProfile[] | null) ?? []).filter(
             (profile) => !selected.has(profile.id)

@@ -209,25 +209,34 @@ export default function MessageThread({
 
     const poll = setInterval(async () => {
       const lastTs = messages.at(-1)?.created_at ?? new Date(0).toISOString();
-      const [{ data }, { data: participant }] = await Promise.all([
-        supabase
-          .from("messages")
-          .select("id, sender_id, content, created_at, deleted_at, edited_at")
-          .eq("conversation_id", conversationId)
-          .gt("created_at", lastTs)
-          .order("created_at", { ascending: true }),
-        otherUserId
-          ? supabase
-              .from("conversation_participants")
-              .select("last_read_at")
-              .eq("conversation_id", conversationId)
-              .eq("user_id", otherUserId)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-      ]);
-      if (data?.length) setMessages((prev) => [...prev, ...(data as Message[])]);
-      if (typeof participant?.last_read_at === "string") {
-        setLiveOtherLastReadAt(participant.last_read_at);
+
+      // Polled through the application. Membership is checked on the server:
+      // the old queries filtered on a conversation id from the URL and let
+      // is_conversation_participant() decide the rest, and that policy has no
+      // successor on a direct connection.
+      try {
+        const params = new URLSearchParams({ since: lastTs });
+        if (otherUserId) params.set("otherUserId", otherUserId);
+
+        const response = await fetch(
+          `/api/messages/${conversationId}/poll?${params.toString()}`
+        );
+        if (!response.ok) return;
+
+        const body = (await response.json()) as {
+          messages: Message[];
+          otherLastReadAt: string | null;
+        };
+
+        if (body.messages.length) {
+          setMessages((prev) => [...prev, ...body.messages]);
+        }
+        if (typeof body.otherLastReadAt === "string") {
+          setLiveOtherLastReadAt(body.otherLastReadAt);
+        }
+      } catch {
+        // A missed poll is the next poll's problem; the thread keeps what it
+        // has rather than clearing.
       }
     }, 12_000);
 

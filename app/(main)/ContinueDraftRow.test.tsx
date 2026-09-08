@@ -3,6 +3,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ContinueDraftRow from "./ContinueDraftRow";
 
+/**
+ * The row reads through a server action now, so the stub is the action rather
+ * than a Supabase query builder. `throwOnCreate` becomes a rejected call,
+ * which is the same thing the component has to survive: a lookup that does not
+ * answer must surface nothing rather than a stale draft.
+ */
 const queryResult = vi.hoisted(() => ({
   current: {
     data: null as Array<Record<string, unknown>> | null,
@@ -11,24 +17,11 @@ const queryResult = vi.hoisted(() => ({
   throwOnCreate: false,
 }));
 
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => {
-    if (queryResult.throwOnCreate) {
-      throw new Error("Your project's URL and API key are required");
-    }
-
-    const builder = {
-      select: () => builder,
-      eq: () => builder,
-      order: () => builder,
-      limit: () => builder,
-      then: (
-        resolve: (value: typeof queryResult.current) => unknown,
-        reject?: (reason: unknown) => unknown
-      ) => Promise.resolve(queryResult.current).then(resolve, reject),
-    };
-
-    return { from: () => builder };
+vi.mock("@/lib/composerActions", () => ({
+  loadResumableDrafts: async () => {
+    if (queryResult.throwOnCreate) throw new Error("unavailable");
+    if (queryResult.current.error) return { ok: false, reason: "unavailable" };
+    return { ok: true, data: queryResult.current.data ?? [] };
   },
 }));
 

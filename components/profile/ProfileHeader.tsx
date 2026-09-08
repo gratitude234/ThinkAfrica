@@ -11,7 +11,7 @@ import ContactInquiryModal from "@/components/profile/ContactInquiryModal";
 import ProfileIdentityPanel from "@/components/profile/ProfileIdentityPanel";
 import ProfileViewTracker from "@/components/profile/ProfileViewTracker";
 import ShareButton from "@/components/profile/ShareButton";
-import { findOrCreateConversation } from "@/lib/messaging";
+import { openConversationWith } from "@/lib/conversationActions";
 import type { PublicProfileIdentity } from "@/lib/profileIdentity";
 import {
   getProfileViewerState,
@@ -326,17 +326,15 @@ function MessageButton({
     setLoading(true);
     setError(null);
     try {
-      const supabase = createClient();
-      const conversationId = await findOrCreateConversation(
-        supabase,
-        currentUserId,
-        targetUserId
-      );
-      if (!conversationId) {
+      // The browser names the person; the server decides who is asking.
+      const opened = await openConversationWith(targetUserId);
+      if (!opened.ok) {
         setError("Unable to start conversation.");
         return;
       }
-      startOpeningThread(() => router.push(`/messages/${conversationId}`));
+      startOpeningThread(() =>
+        router.push(`/messages/${opened.conversationId}`)
+      );
     } catch (messageError) {
       setError(
         messageError instanceof Error

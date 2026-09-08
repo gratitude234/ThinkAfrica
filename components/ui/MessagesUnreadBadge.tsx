@@ -28,25 +28,22 @@ export default function MessagesUnreadBadge({
   );
 
   const fetchCount = useCallback(async () => {
-    const { data } = await supabase
-      .from("conversation_participants")
-      .select("last_read_at, conversations!inner(last_message_at)")
-      .eq("user_id", userId);
+    // Counted server-side, from the session's viewer rather than the userId
+    // prop. The comparison is unchanged: a conversation whose last message is
+    // newer than this member's read cursor, and one they have never read.
+    try {
+      const response = await fetch("/api/messages/unread");
+      if (!response.ok) return;
+      const body = (await response.json()) as { count: number | null };
 
-    const unread = ((data ?? []) as ParticipantRow[]).filter((row) => {
-      const conversation = Array.isArray(row.conversations)
-        ? row.conversations[0]
-        : row.conversations;
-
-      return (
-        !!conversation &&
-        new Date(conversation.last_message_at).getTime() >
-          new Date(row.last_read_at).getTime()
-      );
-    }).length;
-
-    setCount(unread);
-  }, [supabase, userId]);
+      // null means the count could not be taken. Leaving the badge as it was
+      // is deliberate: clearing it to zero would tell a member they have no
+      // messages during an outage.
+      if (typeof body.count === "number") setCount(body.count);
+    } catch {
+      // Same: keep whatever the badge already showed.
+    }
+  }, []);
 
   useEffect(() => {
     void fetchCount();

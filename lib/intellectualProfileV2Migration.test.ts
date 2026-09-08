@@ -10,7 +10,7 @@ const migration = readFileSync(
   "utf8"
 );
 const onboarding = readFileSync(
-  resolve(process.cwd(), "app/(onboarding)/onboarding/OnboardingClient.tsx"),
+  resolve(process.cwd(), "lib/onboardingActions.ts"),
   "utf8"
 );
 

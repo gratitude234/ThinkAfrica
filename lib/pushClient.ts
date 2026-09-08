@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import type { PushPermissionState } from "@/lib/pushPromptPolicy";
+import {
+  forgetPushSubscription,
+  persistPushSubscription,
+} from "@/lib/pushSubscriptionActions";
 
 const PUSH_OPERATION_TIMEOUT_MS = 10_000;
 
@@ -156,19 +160,17 @@ export async function subscribeCurrentDevice(userId: string): Promise<PushSubscr
       return { ok: false, code: "subscription_failed" };
     }
 
-    const supabase = createClient();
-    const { error } = await supabase.from("push_subscriptions").upsert(
-      {
-        user_id: userId,
-        endpoint: json.endpoint,
-        p256dh: json.keys.p256dh,
-        auth: json.keys.auth,
-        user_agent: navigator.userAgent,
-      },
-      { onConflict: "endpoint" }
-    );
+    // The browser produced the subscription; the server records it against
+    // the session's viewer. This used to write a row keyed on a userId the
+    // caller supplied, safe only because RLS refused a wrong one.
+    const persisted = await persistPushSubscription({
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+      userAgent: navigator.userAgent,
+    });
 
-    if (error) return { ok: false, code: "persistence_failed" };
+    if (!persisted.ok) return { ok: false, code: "persistence_failed" };
     return { ok: true, subscription, endpoint: json.endpoint, created };
   } catch (error) {
     return { ok: false, code: errorCode(error, "subscription_failed") };
@@ -197,14 +199,10 @@ export async function unsubscribeCurrentDevice(userId: string): Promise<PushUnsu
       return { ok: false, code: "unsubscribe_failed", localUnsubscribed: false };
     }
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("push_subscriptions")
-      .delete()
-      .eq("user_id", userId)
-      .eq("endpoint", endpoint);
-
-    if (error) {
+    // Scoped to the viewer as well as the endpoint, on the server. An
+    // endpoint identifies a device, never a person.
+    const forgotten = await forgetPushSubscription(endpoint);
+    if (!forgotten.ok) {
       return { ok: false, code: "database_cleanup_failed", localUnsubscribed: true };
     }
     return { ok: true, endpoint };
