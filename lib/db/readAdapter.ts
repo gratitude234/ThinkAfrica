@@ -4,6 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolvePostgresExecutor } from "@/lib/db/postgres/connection";
 import {
+  createPostgresFeedListRepository,
+  createSupabaseFeedListRepository,
+  type FeedListRepository,
+} from "@/lib/db/feedList";
+import {
   createPostgresFeedRepository,
   createSupabaseFeedRepository,
   type FeedRepository,
@@ -138,6 +143,19 @@ export function postPageRepository(
   return isReadDomainMigrated("post-page")
     ? createPostgresPostPageRepository(resolvePostgresExecutor())
     : createSupabasePostPageRepository(supabase);
+}
+
+/**
+ * The feed's post selection: which posts a slice contains.
+ *
+ * Shares the `feed` domain with the hydration below, because one feed page
+ * uses both and serving half of it from each transport is the state this
+ * migration is arranged to avoid.
+ */
+export function feedListRepository(reader: SupabaseClient): FeedListRepository {
+  return isReadDomainMigrated("feed")
+    ? createPostgresFeedListRepository(resolvePostgresExecutor())
+    : createSupabaseFeedListRepository(reader);
 }
 
 /**

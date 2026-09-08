@@ -188,6 +188,7 @@
     "lib/db/dashboard.ts",
     "lib/db/bookmarks.ts",
     "lib/db/notifications.ts",
+    "lib/db/feedList.ts",
     "lib/notificationData.ts",
     "lib/db/postVisibility.ts",
     "lib/blocking.ts",

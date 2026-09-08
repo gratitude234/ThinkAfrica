@@ -21,6 +21,8 @@ import {
   getFeedSurfaceReason,
   getPublicQualitySignals,
 } from "@/lib/postQuality";
+import { feedListRepository } from "@/lib/db/readAdapter";
+import type { FeedListCriteria } from "@/lib/db/feedList";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   isAuthorSubscriptionsUxV2Enabled,
@@ -131,6 +133,52 @@ export class FeedCursorError extends Error {
     super(message);
     this.name = "FeedCursorError";
   }
+}
+
+/**
+ * One slice of the feed, through the repository.
+ *
+ * `applyPostFilters` used to assemble a PostgREST query from the same set of
+ * restrictions; `listFeedPosts` takes them as named criteria instead. The
+ * defaults here are the "no restriction" values, so a caller states only what
+ * it actually narrows.
+ *
+ * A failure still arrives as a FeedDataError carrying the database's code, so
+ * a caller can tell an outage from an empty feed. That distinction was already
+ * lost once in this file and is asserted by its tests.
+ */
+async function listFeedPosts(
+  reader: FeedSupabaseClient,
+  operation: string,
+  criteria: Partial<FeedListCriteria> & Pick<FeedListCriteria, "limit">
+): Promise<Array<Record<string, unknown>>> {
+  try {
+    const rows = await feedListRepository(reader as never).listPosts({
+      researchTypeExclusion: RESEARCH_TYPE_QUERY_EXCLUSION,
+      contentKind: null,
+      cutoff: null,
+      authorIds: null,
+      coauthorUserIds: null,
+      topicKeys: null,
+      requireCitation: false,
+      onlyResponses: false,
+      excludedAuthorIds: [],
+      excludedPostIds: [],
+      cursor: null,
+      order: "recent",
+      includeTopicKeys: false,
+      offset: 0,
+      ...criteria,
+    });
+    return rows as unknown as Array<Record<string, unknown>>;
+  } catch (error) {
+    throw new FeedDataError(operation, error);
+  }
+}
+
+/** The content filter, as criteria. `type` of "all" means no restriction. */
+function contentKindCriterion(type: FeedContentFilter | null): string | null {
+  return type && type !== "all" ? type : null;
 }
 
 function expectRows<T>(
@@ -726,17 +774,14 @@ export async function fetchRecentResponsePage(
     MAX_FEED_PAGE_SIZE
   );
   const offset = (safePage - 1) * safePageSize;
-  const result = (await supabase
-    .from("posts")
-    .select(POST_SELECT)
-    .not("in_response_to", "is", null)
-    .eq("status", "published")
-    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-    .order("published_at", { ascending: false })
-    .order("id", { ascending: false })
-    .range(offset, offset + safePageSize)) as SupabaseQueryResult<unknown[]>;
-
-  const rows = expectRows(result, "load recent responses");
+  // One past the page, so hasMore is a fact rather than a guess. The
+  // PostgREST range was inclusive at both ends, which fetched the same
+  // pageSize + 1 rows.
+  const rows = await listFeedPosts(supabase, "load recent responses", {
+    onlyResponses: true,
+    offset,
+    limit: safePageSize + 1,
+  });
   const hasMore = rows.length > safePageSize;
   const rankingContext: RankingContext = {
     userId: viewerId,
@@ -782,16 +827,10 @@ async function fetchCitableFeedUncached(
     MAX_FEED_PAGE_SIZE
   );
 
-  const result = (await reader
-    .from("posts")
-    .select(POST_SELECT)
-    .eq("status", "published")
-    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-    .not("citation_id", "is", null)
-    .order("published_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(safePageSize)) as SupabaseQueryResult<unknown[]>;
-  const citableRows = expectRows(result, "load citable feed");
+  const citableRows = await listFeedPosts(reader, "load citable feed", {
+    requireCitation: true,
+    limit: safePageSize,
+  });
 
   // Phase 4A: this used to pad a short "Citable" shelf with
   // .in("type", ["research", "policy_brief"]) rows regardless of whether
@@ -1003,23 +1042,16 @@ viewerClientOverride?: FeedSupabaseClient | null): Promise<FeedPageResult> {
 
     const start = cursorPosition ? 0 : (safePage - 1) * safePageSize;
     const end = start + safePageSize;
-    let query = applyPostFilters(
-      reader.from("posts").select(POST_SELECT),
-      { type, cutoff, excludedAuthorIds: excluded, excludedPostIds }
-    ).in("author_id", visibleFollowedIds);
-    query = applyKeysetCursor(query, cursorPosition)
-      .order("published_at", { ascending: false })
-      .order("id", { ascending: false });
-    const result = (await (cursorPosition
-      ? query.limit(safePageSize + 1)
-      : query.range(start, end))) as SupabaseQueryResult<
-      Array<Record<string, unknown>>
-    >;
-
-    const raw = expectRows<Record<string, unknown>>(
-      result,
-      "load following feed"
-    );
+    const raw = await listFeedPosts(reader, "load following feed", {
+      contentKind: contentKindCriterion(type),
+      cutoff,
+      excludedAuthorIds: excluded,
+      excludedPostIds,
+      authorIds: visibleFollowedIds,
+      cursor: cursorPosition,
+      offset: cursorPosition ? 0 : start,
+      limit: safePageSize + 1,
+    });
     const deliveredRows = raw.slice(0, safePageSize);
     const hasMore = raw.length > safePageSize;
     const rankingContext: RankingContext = {
@@ -1266,20 +1298,15 @@ viewerClientOverride?: FeedSupabaseClient | null): Promise<FeedPageResult> {
   if (tab === "latest") {
     const start = cursorPosition ? 0 : (safePage - 1) * safePageSize;
     const end = start + safePageSize;
-    let query = applyPostFilters(
-      reader.from("posts").select(POST_SELECT),
-      { type, cutoff, excludedAuthorIds: excluded, excludedPostIds }
-    );
-    query = applyKeysetCursor(query, cursorPosition)
-      .order("published_at", { ascending: false })
-      .order("id", { ascending: false });
-    const result = (await (cursorPosition
-      ? query.limit(safePageSize + 1)
-      : query.range(start, end))) as SupabaseQueryResult<
-      Array<Record<string, unknown>>
-    >;
-
-    const raw = expectRows<Record<string, unknown>>(result, "load latest feed");
+    const raw = await listFeedPosts(reader, "load latest feed", {
+      contentKind: contentKindCriterion(type),
+      cutoff,
+      excludedAuthorIds: excluded,
+      excludedPostIds,
+      cursor: cursorPosition,
+      offset: cursorPosition ? 0 : start,
+      limit: safePageSize + 1,
+    });
     const deliveredRows = raw.slice(0, safePageSize);
     const hasMore = raw.length > safePageSize;
     const rankingContext: RankingContext = {
