@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { viewerStateRepository } from "@/lib/db/readAdapter";
+
 export async function getMessageEligibility(
   supabase: SupabaseClient,
   currentUserId: string,
@@ -9,12 +11,12 @@ export async function getMessageEligibility(
     return { eligible: false, reason: null };
   }
 
-  const { data: blocked } = await supabase.rpc("is_blocked_pair", {
-    user_a: currentUserId,
-    user_b: targetUserId,
-  });
+  const blocked = await viewerStateRepository(supabase).isBlockedPair(
+    currentUserId,
+    targetUserId
+  );
 
-  if (blocked === true) {
+  if (blocked) {
     // Deliberately no reason: blocking is never disclosed to the blocked side.
     return { eligible: false, reason: null };
   }

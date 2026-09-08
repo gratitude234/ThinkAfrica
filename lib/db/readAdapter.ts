@@ -9,6 +9,11 @@ import {
   type FeedRepository,
 } from "@/lib/db/feed";
 import {
+  createPostgresViewerStateRepository,
+  createSupabaseViewerStateRepository,
+  type ViewerStateRepository,
+} from "@/lib/db/viewerState";
+import {
   createPostgresCommentsRepository,
   createSupabaseCommentsRepository,
   type CommentsRepository,
@@ -69,6 +74,7 @@ export const MIGRATABLE_READ_DOMAINS = [
   "profile-page",
   "search",
   "comments",
+  "viewer-state",
 ] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
@@ -187,4 +193,20 @@ export function commentsRepository(
   return isReadDomainMigrated("comments")
     ? createPostgresCommentsRepository(resolvePostgresExecutor())
     : createSupabaseCommentsRepository(supabase);
+}
+
+/**
+ * The viewer's own state: blocks, and whether two people may message.
+ *
+ * Takes a client because the un-migrated path needs one. Every call site here
+ * reads through the admin client or a SECURITY DEFINER function, so no policy
+ * is being reproduced; see lib/db/viewerState.ts for why that is stated rather
+ * than assumed.
+ */
+export function viewerStateRepository(
+  supabase: SupabaseClient
+): ViewerStateRepository {
+  return isReadDomainMigrated("viewer-state")
+    ? createPostgresViewerStateRepository(resolvePostgresExecutor())
+    : createSupabaseViewerStateRepository(supabase);
 }

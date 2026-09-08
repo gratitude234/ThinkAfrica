@@ -1,6 +1,18 @@
 import "server-only";
 
+import { viewerStateRepository } from "@/lib/db/readAdapter";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+/**
+ * The repository, over the admin client on the un-migrated path.
+ *
+ * These reads have always used the service role: callers often hold one
+ * already, and the result feeds service-role queries that bypass RLS anyway.
+ * That is why no policy is reproduced on the PostgreSQL side.
+ */
+function repository() {
+  return viewerStateRepository(createAdminClient() as never);
+}
 
 /**
  * IDs the given user has blocked (blocker's view only). Uses the admin
@@ -14,23 +26,12 @@ export async function getBlockedUserIds(
   if (!userId) return [];
 
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("user_blocks")
-      .select("blocked_id")
-      .eq("blocker_id", userId);
-
-    if (error) {
-      console.error("[blocking] failed to load blocked user ids", error);
-      if (options.strict) {
-        throw new Error("Unable to apply blocked-user exclusions.");
-      }
-      return [];
-    }
-
-    return (data ?? []).map((row) => row.blocked_id as string);
+    return await repository().blockedUserIds(userId);
   } catch (error) {
-    if (options.strict) throw error;
+    console.error("[blocking] failed to load blocked user ids", error);
+    if (options.strict) {
+      throw new Error("Unable to apply blocked-user exclusions.");
+    }
     return [];
   }
 }
@@ -43,31 +44,12 @@ export async function getFeedExcludedUserIds(
   if (!userId) return [];
 
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("user_blocks")
-      .select("blocker_id, blocked_id")
-      .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
-
-    if (error) {
-      console.error("[blocking] failed to load feed block exclusions", error);
-      if (options.strict) {
-        throw new Error("Unable to apply feed block exclusions.");
-      }
-      return [];
-    }
-
-    return Array.from(
-      new Set(
-        (data ?? [])
-          .map((row) =>
-            row.blocker_id === userId ? row.blocked_id : row.blocker_id
-          )
-          .filter((id): id is string => Boolean(id && id !== userId))
-      )
-    );
+    return await repository().blockRelatedUserIds(userId);
   } catch (error) {
-    if (options.strict) throw error;
+    console.error("[blocking] failed to load feed block exclusions", error);
+    if (options.strict) {
+      throw new Error("Unable to apply feed block exclusions.");
+    }
     return [];
   }
 }
@@ -85,27 +67,12 @@ export async function getPostIdsWithExcludedAuthors(
   if (postIds.length === 0 || excludedAuthorIds.length === 0) return [];
 
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("post_authors")
-      .select("post_id")
-      .in("post_id", postIds)
-      .in("user_id", excludedAuthorIds)
-      .not("accepted_at", "is", null);
-
-    if (error) {
-      console.error("[blocking] failed to load excluded co-authored posts", error);
-      if (options.strict) {
-        throw new Error("Unable to apply co-author exclusions.");
-      }
-      return [];
-    }
-
-    return Array.from(
-      new Set((data ?? []).map((row) => row.post_id as string))
-    );
+    return await repository().postIdsWithAuthors(postIds, excludedAuthorIds);
   } catch (error) {
-    if (options.strict) throw error;
+    console.error("[blocking] failed to load excluded co-authored posts", error);
+    if (options.strict) {
+      throw new Error("Unable to apply co-author exclusions.");
+    }
     return [];
   }
 }
@@ -115,22 +82,9 @@ export async function isBlockedPair(userA: string, userB: string): Promise<boole
   if (!userA || !userB) return false;
 
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("user_blocks")
-      .select("blocker_id")
-      .or(
-        `and(blocker_id.eq.${userA},blocked_id.eq.${userB}),and(blocker_id.eq.${userB},blocked_id.eq.${userA})`
-      )
-      .limit(1);
-
-    if (error) {
-      console.error("[blocking] failed to check blocked pair", error);
-      return false;
-    }
-
-    return (data ?? []).length > 0;
-  } catch {
+    return await repository().isBlockedPair(userA, userB);
+  } catch (error) {
+    console.error("[blocking] failed to check blocked pair", error);
     return false;
   }
 }
