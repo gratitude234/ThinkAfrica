@@ -5,6 +5,8 @@ import type {
   ProfileIdentityRecord,
   ProfilesRepository,
 } from "@/lib/db/types";
+import { profileVisibleSql } from "@/lib/db/profileVisibility";
+
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
 import {
   toBoolean,
@@ -64,6 +66,7 @@ export const PROFILE_BY_USERNAME_SQL = `
   select${PROFILE_COLUMNS}
   from public.profiles as p
   where p.username = $1
+    and ${profileVisibleSql("p", "$2")}
   limit 2
 `;
 
@@ -74,6 +77,7 @@ export const PROFILE_BY_USERNAME_WITH_POSITIONING_SQL = `
     p.positioning_statement
   from public.profiles as p
   where p.username = $1
+    and ${profileVisibleSql("p", "$2")}
   limit 2
 `;
 
@@ -123,12 +127,18 @@ export function createPostgresProfilesRepository(
   executor: SqlExecutor
 ): ProfilesRepository {
   return {
-    async findIdentityByUsername(username: string) {
+    /**
+     * A profile nobody may see is not found, which is what RLS made this
+     * return through PostgREST: the policy hid the row and `maybeSingle()`
+     * answered null, so the page 404ed. Without the predicate a private
+     * profile would render here for anyone who guessed the username.
+     */
+    async findIdentityByUsername(username: string, viewerId: string | null) {
       let rows: Record<string, unknown>[];
       try {
         rows = await executor.query<Record<string, unknown>>(
           profileByUsernameSql(),
-          [username]
+          [username, viewerId]
         );
       } catch (error) {
         // Same shape as the Supabase implementation, so a reader of the logs

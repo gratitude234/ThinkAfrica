@@ -1,6 +1,7 @@
 import "server-only";
 import { getDatabase } from "@/lib/db";
 import { profilePageRepository } from "@/lib/db/readAdapter";
+import { getCurrentUser } from "@/lib/serverAuth";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -270,7 +271,14 @@ export async function loadProfileIdentity(
   _supabase: SupabaseClient,
   username: string
 ): Promise<ProfileIdentityRecord | null> {
-  return getDatabase().profiles.findIdentityByUsername(username);
+  // A profile nobody may see is not found. RLS made the PostgREST lookup
+  // return null and the page 404; without the viewer the direct lookup would
+  // render a private profile to whoever guessed the username.
+  const viewer = await getCurrentUser();
+  return getDatabase().profiles.findIdentityByUsername(
+    username,
+    viewer?.id ?? null
+  );
 }
 
 /**

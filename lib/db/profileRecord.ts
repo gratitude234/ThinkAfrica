@@ -39,6 +39,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { profileVisibleSql } from "@/lib/db/profileVisibility";
+
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
 
 // ── Shapes ───────────────────────────────────────────────────────────
@@ -129,7 +131,12 @@ export interface ProfileRecordRepository {
    */
   recordSummary(profileId: string, includeResearch: boolean): Promise<unknown>;
   entries(query: ProfileRecordEntryQuery): Promise<ProfileRecordEntryPage>;
-  hydratePublications(postIds: string[]): Promise<ProfileRecordPostRow[]>;
+  /** Takes the viewer: the co-author projection is governed by the profiles
+   *  policy that PostgREST applied from the session. */
+  hydratePublications(
+    postIds: string[],
+    viewerId: string | null
+  ): Promise<ProfileRecordPostRow[]>;
   topicPosts(
     profileId: string,
     limit: number
@@ -226,7 +233,9 @@ const HYDRATE_SQL = `
           )
         )
         from public.post_authors pa
-        left join public.profiles pr on pr.id = pa.user_id
+        left join public.profiles pr
+          on pr.id = pa.user_id
+         and ${profileVisibleSql("pr", "$2")}
         where pa.post_id = p.id
       ),
       '[]'::jsonb
@@ -382,7 +391,9 @@ export function createSupabaseProfileRecordRepository(
       };
     },
 
-    async hydratePublications(postIds) {
+    // Unused here: the request client carries the session and the database
+    // applies the policy.
+    async hydratePublications(postIds, _viewerId) {
       if (postIds.length === 0) return [];
       const result = await supabase
         .from("posts")
@@ -469,10 +480,11 @@ export function createPostgresProfileRecordRepository(
       };
     },
 
-    async hydratePublications(postIds) {
+    async hydratePublications(postIds, viewerId) {
       if (postIds.length === 0) return [];
       return executor.query<ProfileRecordPostRow>(HYDRATE_SQL, [
         JSON.stringify(postIds),
+        viewerId,
       ]);
     },
 

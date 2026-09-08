@@ -6,6 +6,8 @@ import {
   type PostRecord,
   type PostsRepository,
 } from "@/lib/db/types";
+import { visibleProfileJoin } from "@/lib/db/profileVisibility";
+
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
 import {
   toNumber,
@@ -52,6 +54,16 @@ import {
 const STATUS_PLACEHOLDERS = VISIBLE_POST_STATUSES.map(
   (_status, index) => `$${index + 2}`
 ).join(", ");
+
+/**
+ * The viewer, after the statuses.
+ *
+ * The post page reads through the *request* client, so PostgREST applied the
+ * profiles policy to this author embed: a post by a suspended or private
+ * member came back with a null author rather than with a name. A direct
+ * connection has no policy, so the join carries the rule itself.
+ */
+const VIEWER_PLACEHOLDER = `$${VISIBLE_POST_STATUSES.length + 2}`;
 export const POST_BY_SLUG_SQL = `
   select
     p.id,
@@ -96,7 +108,7 @@ export const POST_BY_SLUG_SQL = `
       )
     end as profiles
   from public.posts as p
-  left join public.profiles as author on author.id = p.author_id
+  ${visibleProfileJoin("author", "p.author_id", VIEWER_PLACEHOLDER)}
   where p.slug = $1
     and p.status in (${STATUS_PLACEHOLDERS})
   limit 2
@@ -146,7 +158,10 @@ export function createPostgresPostsRepository(
   executor: SqlExecutor
 ): PostsRepository {
   return {
-    async findBySlug(slug: string): Promise<PostRecord | null> {
+    async findBySlug(
+      slug: string,
+      viewerId: string | null
+    ): Promise<PostRecord | null> {
       let rows: Record<string, unknown>[];
       try {
         // Flat, all scalars. A nested array here is the bug this shape exists
@@ -154,6 +169,7 @@ export function createPostgresPostsRepository(
         rows = await executor.query<Record<string, unknown>>(POST_BY_SLUG_SQL, [
           slug,
           ...VISIBLE_POST_STATUSES,
+          viewerId,
         ]);
       } catch (error) {
         // Same shape as the Supabase implementation, so a reader of the logs

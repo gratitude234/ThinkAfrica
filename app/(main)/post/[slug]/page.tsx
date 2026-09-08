@@ -359,10 +359,10 @@ async function getSecondaryData(
     const [counts, collections, responsePage, related, neighbours] =
       await Promise.all([
         repository.counts(postId),
-        repository.collections(postId),
+        repository.collections(postId, viewerId),
         fetchResponsePage(supabase, postId, viewerId, RESPONSE_PAGE_SIZE * responsePages),
         isPublished && tags.length > 0
-          ? repository.related(postId, tags, 3)
+          ? repository.related(postId, tags, 3, viewerId)
           : Promise.resolve([]),
         isPublished && publishedAt
           ? repository.neighbours(postId, publishedAt)
@@ -536,8 +536,12 @@ async function ParentPostLink({
 }) {
   if (!parentPostId) return null;
   const supabase = await createClient();
+  // The viewer is resolved here rather than taken as a prop: the author
+  // projection on this banner is governed by the profiles policy, and a prop
+  // is something a caller can get wrong.
+  const viewer = await getCurrentUser();
   const parentPost = await postPageRepository(supabase)
-    .parentPost(parentPostId)
+    .parentPost(parentPostId, viewer?.id ?? null)
     .catch(() => null);
 
   if (!parentPost) return null;

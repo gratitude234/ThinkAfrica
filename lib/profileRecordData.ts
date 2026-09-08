@@ -17,6 +17,7 @@ import {
   type DemonstratedTopic,
 } from "@/lib/profileTopics";
 import { profileRecordRepository } from "@/lib/db/readAdapter";
+import { getCurrentUser } from "@/lib/serverAuth";
 import { sanitizePostExcerpt } from "@/lib/utils";
 
 export interface ProfileRecordPublication {
@@ -166,8 +167,12 @@ async function hydrateRecordEntries(
 ): Promise<ProfileRecordItem[]> {
   const publicationIds = entries.map((entry) => entry.entry_id);
 
+  // The co-author names on each record entry are governed by the profiles
+  // policy. Memoised for the render, so this is not an extra round trip.
+  const viewer = await getCurrentUser();
   const posts = await profileRecordRepository(supabase).hydratePublications(
-    publicationIds
+    publicationIds,
+    viewer?.id ?? null
   );
 
   const postsById = new Map(

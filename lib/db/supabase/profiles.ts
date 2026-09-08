@@ -32,7 +32,9 @@ export function profileIdentitySelect(): string {
 }
 
 export const supabaseProfilesRepository: ProfilesRepository = {
-  async findIdentityByUsername(username: string) {
+  // Unused, for the same reason as posts.findBySlug: RLS is applied by the
+  // request client. The PostgreSQL twin reproduces it explicitly.
+  async findIdentityByUsername(username: string, _viewerId: string | null) {
     const supabase = await createClient();
 
     const { data, error } = await supabase

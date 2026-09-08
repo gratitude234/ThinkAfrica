@@ -1,6 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getMessageEligibility = vi.hoisted(() => vi.fn());
+/**
+ * The loaders now resolve the viewer, because the profiles policy that
+ * PostgREST applied from the session has to be carried explicitly on a direct
+ * connection. `getCurrentUser` reads cookies, which a unit test has no request
+ * context for, so it is stubbed as the logged-out reader unless a test says
+ * otherwise.
+ */
+const currentUser = vi.hoisted(() => ({ value: null as { id: string } | null }));
+vi.mock("@/lib/serverAuth", () => ({
+  getCurrentUser: async () => currentUser.value,
+}));
+
 vi.mock("@/lib/messaging", () => ({ getMessageEligibility }));
 
 /**
@@ -147,7 +159,9 @@ describe("loadProfileIdentity: delegation to the database boundary", () => {
     await expect(loadProfileIdentity(client, "student1")).resolves.toEqual(
       PROFILE_ROW
     );
-    expect(findIdentityByUsername).toHaveBeenCalledWith("student1");
+    // The viewer travels with the username: the profiles policy decides whether
+    // this profile is found at all, and null is the logged-out reader.
+    expect(findIdentityByUsername).toHaveBeenCalledWith("student1", null);
   });
 
   it("returns null when the repository found nothing", async () => {

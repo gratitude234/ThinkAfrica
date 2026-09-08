@@ -183,6 +183,7 @@
     "lib/db/supabase/profiles.ts",
     "lib/db/postgres/profiles.ts",
     "lib/searchData.ts",
+    "lib/db/profileRecord.ts",
     "app/api/search/route.ts",
     "app/api/topics/route.ts",
     "components/ui/SearchOverlay.tsx",
@@ -212,6 +213,7 @@
     "lib/db/profileVisibility.ts",
     "lib/searchFilters.ts",
     "lib/searchData.ts",
+    "lib/db/profileRecord.ts",
     "lib/profileRecordData.ts"
   ]
 }

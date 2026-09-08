@@ -82,7 +82,7 @@ describe("the core post lookup", () => {
     // boundary knows which database answered. That is the property that lets
     // one domain move to Neon while the rest stay on Supabase.
     expect(loaderCode).toContain('from "@/lib/db"');
-    expect(loaderCode).toContain("getDatabase().posts.findBySlug(slug)");
+    expect(loaderCode).toContain("getDatabase().posts.findBySlug(slug,");
     expect(loaderCode).not.toContain("supabase");
     expect(loaderCode).not.toContain('.from("posts")');
   });

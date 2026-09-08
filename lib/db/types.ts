@@ -92,7 +92,10 @@ export interface PostsRepository {
    * checks become the whole of the authorization. Those checks live in
    * `PostPage()` and are pinned by lib/db/posts.authorization.test.ts.
    */
-  findBySlug(slug: string): Promise<PostRecord | null>;
+  findBySlug(
+    slug: string,
+    viewerId: string | null
+  ): Promise<PostRecord | null>;
 }
 
 /** Everything lib/db exposes, grouped by domain. One domain today; the shape
@@ -156,5 +159,8 @@ export interface ProfilesRepository {
    * no authorization of its own, and it is not the place to add any: a
    * private field would need a viewer, and this method has none by design.
    */
-  findIdentityByUsername(username: string): Promise<ProfileIdentityRecord | null>;
+  findIdentityByUsername(
+    username: string,
+    viewerId: string | null
+  ): Promise<ProfileIdentityRecord | null>;
 }

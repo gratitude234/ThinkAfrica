@@ -37,7 +37,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { FEATURE_FLAGS, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import { likeContainsPattern, orIlikeFilter } from "@/lib/searchFilters";
-import { profileVisibleSql, visibleAuthorJoin } from "@/lib/db/profileVisibility";
+import { profileVisibleSql, visibleProfileJoin } from "@/lib/db/profileVisibility";
 
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
 
@@ -142,7 +142,7 @@ const OVERLAY_SQL = `
       'username', a.username
     ) end as profiles
   from public.posts p
-  ${visibleAuthorJoin("a", "p", "$5")}
+  ${visibleProfileJoin("a", "p.author_id", "$5")}
   where p.status = 'published'
     and p.type <> $1::text
     and p.title ilike $2::text
@@ -176,7 +176,7 @@ const POSTS_SQL = `
       'university', a.university
     ) end as profiles
   from public.posts p
-  ${visibleAuthorJoin("a", "p", "$4")}
+  ${visibleProfileJoin("a", "p.author_id", "$4")}
   where p.status = 'published'
     and p.type <> $1::text
     and (p.title ilike $2::text or p.excerpt ilike $2::text)

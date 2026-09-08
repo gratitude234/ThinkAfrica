@@ -38,7 +38,11 @@ export const POST_CORE_SELECT = `
     `;
 
 export const supabasePostsRepository: PostsRepository = {
-  async findBySlug(slug: string): Promise<PostRecord | null> {
+  // The viewer is unused here: this client carries the session, so the
+  // profiles policy is applied by the database. The PostgreSQL twin has no
+  // policy and has to carry the same rule itself, which is why the argument
+  // exists at all.
+  async findBySlug(slug: string, _viewerId: string | null): Promise<PostRecord | null> {
     const supabase = await createClient();
 
     const { data, error } = await supabase

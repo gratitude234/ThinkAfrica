@@ -98,8 +98,34 @@ describe("POST_BY_SLUG_SQL", () => {
   it("outer-joins the author, matching the embedded PostgREST relationship", () => {
     // profiles!posts_author_id_fkey does not drop the post when the author row
     // is missing, so neither may this.
-    expect(POST_BY_SLUG_SQL).toMatch(/left join public\.profiles as author/);
+    expect(POST_BY_SLUG_SQL).toMatch(/left join public\.profiles author/);
     expect(POST_BY_SLUG_SQL).not.toMatch(/\binner join\b/i);
+  });
+
+  it("carries the profiles policy on the join, not in the where clause", () => {
+    // The post page reads through the request client, so PostgREST applied the
+    // profiles policy to this embed: a suspended or private author came back
+    // as null rather than as a name. A direct connection has no policy.
+    expect(POST_BY_SLUG_SQL).toMatch(/suspended_at is null/);
+    expect(POST_BY_SLUG_SQL).toMatch(/members_only/);
+
+    // On the join, so an invisible author hides the name. In the where clause
+    // it would hide the article, which is a different and much worse bug.
+    const join = POST_BY_SLUG_SQL.slice(
+      POST_BY_SLUG_SQL.indexOf("left join public.profiles author"),
+      POST_BY_SLUG_SQL.indexOf("where p.slug")
+    );
+    expect(join).toMatch(/suspended_at is null/);
+  });
+
+  it("takes the viewer as a parameter, never from auth.uid()", () => {
+    // auth.uid() returns null off Supabase, so a policy written in terms of it
+    // does not fail after the migration: it silently matches nothing.
+    expect(POST_BY_SLUG_SQL).not.toMatch(/auth\.uid\(\)/);
+    expect(POST_BY_SLUG_SQL).not.toMatch(/auth\.role\(\)/);
+    expect(POST_BY_SLUG_SQL).toMatch(
+      new RegExp(`\\$${VISIBLE_POST_STATUSES.length + 2}::uuid`)
+    );
   });
 
   it("asks for two rows so a duplicate slug is an error, not a coin toss", () => {
@@ -121,7 +147,7 @@ describe("POST_BY_SLUG_SQL", () => {
 describe("createPostgresPostsRepository", () => {
   it("sends the slug and the visible statuses", async () => {
     const { calls, executor } = fakeExecutor([fullRow]);
-    await createPostgresPostsRepository(executor).findBySlug("example-slug");
+    await createPostgresPostsRepository(executor).findBySlug("example-slug", null);
 
     expect(calls).toHaveLength(1);
     expect(calls[0].text).toBe(POST_BY_SLUG_SQL);
@@ -131,6 +157,8 @@ describe("createPostgresPostsRepository", () => {
       "pending",
       "pending_revision",
       "draft",
+      // The viewer, which the profiles policy on the author join reads.
+      null,
     ]);
     // Flat, all scalars. A nested array is precisely what a driver with no
     // type information cannot serialise.

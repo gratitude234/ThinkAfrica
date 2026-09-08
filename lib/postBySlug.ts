@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { getDatabase } from "@/lib/db";
+import { getCurrentUser } from "@/lib/serverAuth";
 
 /**
  * The one place a public post page reads its core row from the database.
@@ -42,7 +43,12 @@ export {
 import type { PostRecord } from "@/lib/db/types";
 
 async function loadPostBySlug(slug: string): Promise<PostRecord | null> {
-  const post = await getDatabase().posts.findBySlug(slug);
+  // The author embed is governed by the profiles policy, which PostgREST
+  // applied from the session and a direct connection has to carry. Both this
+  // and getCurrentUser are memoised for the render, so asking here costs
+  // nothing the page was not already paying.
+  const viewer = await getCurrentUser();
+  const post = await getDatabase().posts.findBySlug(slug, viewer?.id ?? null);
 
   // Off by default. Set POST_QUERY_DEBUG=1 to prove in production logs that a
   // single request produces exactly one of these lines per slug: two would

@@ -195,19 +195,34 @@ describe("toProfileIdentityRecord", () => {
 });
 
 describe("createPostgresProfilesRepository", () => {
-  it("sends the username as the only parameter", async () => {
+  it("sends the username and the viewer, and nothing else", async () => {
     const { calls, executor } = fakeExecutor([fullRow]);
 
     const profile = await createPostgresProfilesRepository(
       executor
-    ).findIdentityByUsername("student1");
+    ).findIdentityByUsername("student1", null);
 
     expect(profile?.username).toBe("student1");
     expect(calls).toHaveLength(1);
-    expect(calls[0].params).toEqual(["student1"]);
+    // The viewer is the second parameter, because the profiles policy decides
+    // whether this profile is found at all. Null is the logged-out reader.
+    expect(calls[0].params).toEqual(["student1", null]);
     // Flat and scalar. A nested array here is the class of bug that took every
     // post page down in Phase 3.
-    expect(calls[0].params.every((param) => typeof param === "string")).toBe(true);
+    expect(
+      calls[0].params.every(
+        (param) => param === null || typeof param === "string"
+      )
+    ).toBe(true);
+  });
+
+  it("carries the profiles policy, so a private profile is not found", () => {
+    // The rule PostgREST applied from the session, inlined. Without it the
+    // direct lookup renders a private profile to whoever guessed the username.
+    expect(profileByUsernameSql()).toMatch(/suspended_at is null/);
+    expect(profileByUsernameSql()).toMatch(/members_only/);
+    expect(profileByUsernameSql()).toMatch(/\$2::uuid/);
+    expect(profileByUsernameSql()).not.toMatch(/auth\.uid\(\)/);
   });
 
   it("returns null for a username that matched nothing", async () => {

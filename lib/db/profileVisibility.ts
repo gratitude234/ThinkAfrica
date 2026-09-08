@@ -59,20 +59,25 @@ export function profileVisibleSql(alias: string, viewerParam: string): string {
 }
 
 /**
- * The same rule as a JOIN condition for an author embed.
+ * The same rule as a JOIN condition for an embedded profile.
  *
  * Written as a separate helper because the difference matters: as a WHERE
- * clause an invisible profile removes the *post*, and as a JOIN condition it
- * removes only the author, leaving the post with a null author. PostgREST's
+ * clause an invisible profile removes the *row*, and as a JOIN condition it
+ * removes only the profile, leaving the row with a null author. PostgREST's
  * to-one embed did the second, so an embed that used the first would silently
- * drop published posts from a feed.
+ * drop published posts from a feed or a search.
+ *
+ * `foreignKey` is the expression naming the profile id, so this serves an
+ * author (`p.author_id`) and a co-author (`a.user_id`) alike. Like `alias`
+ * and `viewerParam` it is a SQL fragment the repository chooses, never a
+ * value from a request.
  */
-export function visibleAuthorJoin(
+export function visibleProfileJoin(
   alias: string,
-  postAlias: string,
+  foreignKey: string,
   viewerParam: string
 ): string {
   return `left join public.profiles ${alias}
-    on ${alias}.id = ${postAlias}.author_id
+    on ${alias}.id = ${foreignKey}
    and ${profileVisibleSql(alias, viewerParam)}`;
 }

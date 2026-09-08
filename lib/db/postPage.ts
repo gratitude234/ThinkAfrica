@@ -32,6 +32,11 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  profileVisibleSql,
+  visibleProfileJoin,
+} from "@/lib/db/profileVisibility";
+
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
 
 // ── Shapes ───────────────────────────────────────────────────────────
@@ -130,11 +135,17 @@ export interface PostPageViewerState {
 
 export interface PostPageRepository {
   counts(postId: string): Promise<PostPageCounts>;
-  collections(postId: string): Promise<PostPageCollections>;
+  /** Takes the viewer because the co-author projection is governed by the
+   *  profiles policy PostgREST applied from the session. Null is logged out. */
+  collections(
+    postId: string,
+    viewerId: string | null
+  ): Promise<PostPageCollections>;
   related(
     postId: string,
     tags: readonly string[],
-    limit: number
+    limit: number,
+    viewerId: string | null
   ): Promise<RelatedPost[]>;
   neighbours(
     postId: string,
@@ -142,7 +153,10 @@ export interface PostPageRepository {
   ): Promise<{ previous: NeighbourPost | null; next: NeighbourPost | null }>;
   /** The published post a response was written about, for the banner above
    *  it. Public: a response page shows it to everybody. */
-  parentPost(parentPostId: string): Promise<ParentPost | null>;
+  parentPost(
+    parentPostId: string,
+    viewerId: string | null
+  ): Promise<ParentPost | null>;
   /** Authenticated only. The viewer id comes from the server, never from the
    *  request body: these are the four booleans that decide whether the page
    *  shows "liked" and "following", and a caller-supplied id would let anybody
@@ -183,7 +197,9 @@ export function createSupabasePostPageRepository(
       };
     },
 
-    async collections(postId) {
+      // The viewer is unused on this side: the request client carries the
+      // session, so the profiles policy is applied by the database.
+    async collections(postId, _viewerId) {
       const [references, coAuthors, reviews, decisions, versions] = await Promise.all([
         supabase
           .from("post_references")
@@ -232,7 +248,9 @@ export function createSupabasePostPageRepository(
       };
     },
 
-    async related(postId, tags, limit) {
+      // The viewer is unused on this side: the request client carries the
+      // session, so the profiles policy is applied by the database.
+    async related(postId, tags, limit, _viewerId) {
       if (tags.length === 0) return [];
       const { data } = await supabase
         .from("posts")
@@ -281,7 +299,9 @@ export function createSupabasePostPageRepository(
       };
     },
 
-    async parentPost(parentPostId) {
+      // The viewer is unused on this side: the request client carries the
+      // session, so the profiles policy is applied by the database.
+    async parentPost(parentPostId, _viewerId) {
       const { data } = await supabase
         .from("posts")
         .select(
@@ -346,6 +366,22 @@ export function createSupabasePostPageRepository(
 // ── PostgreSQL ───────────────────────────────────────────────────────
 
 /**
+ * Where the viewer sits in each statement's parameter list.
+ *
+ * These three projections read through the *request* client on the PostgREST
+ * side, so the `profiles` policy applied to every one of them: a co-author, a
+ * related post's author or a parent post's author who is suspended or whose
+ * profile is not public came back as null rather than as a name. A direct
+ * connection has no policy and the join has to carry the rule.
+ *
+ * Each is a JOIN condition rather than a WHERE clause, which is the difference
+ * between hiding a name and deleting a published post from the page.
+ */
+const COAUTHOR_VIEWER = "$2";
+const RELATED_VIEWER = "$4";
+const PARENT_VIEWER = "$2";
+
+/**
  * Counts, as one row of scalar subqueries.
  *
  * PostgREST spends a round trip per `count: exact, head: true`. Postgres does
@@ -391,7 +427,7 @@ const COLLECTIONS_SQL = `
         ) order by a.display_order asc nulls last
       )
       from public.post_authors as a
-      left join public.profiles as p on p.id = a.user_id
+      ${visibleProfileJoin("p", "a.user_id", COAUTHOR_VIEWER)}
       where a.post_id = $1::uuid and a.accepted_at is not null
     ), '[]'::jsonb) as co_authors,
 
@@ -445,7 +481,7 @@ const RELATED_SQL = `
       'username', author.username
     ) end as profiles
   from public.posts as p
-  left join public.profiles as author on author.id = p.author_id
+  ${visibleProfileJoin("author", "p.author_id", RELATED_VIEWER)}
   where p.status = 'published'
     and p.id <> $1::uuid
     and p.tags && ARRAY(select jsonb_array_elements_text($2::text::jsonb))
@@ -511,7 +547,7 @@ const PARENT_POST_SQL = `
       'username', author.username
     ) end as profiles
   from public.posts as p
-  left join public.profiles as author on author.id = p.author_id
+  ${visibleProfileJoin("author", "p.author_id", PARENT_VIEWER)}
   where p.id = $1::uuid and p.status = 'published'
   limit 1
 `;
@@ -557,9 +593,10 @@ export function createPostgresPostPageRepository(
       };
     },
 
-    async collections(postId) {
+    async collections(postId, viewerId) {
       const [row] = await executor.query<Record<string, unknown>>(COLLECTIONS_SQL, [
         postId,
+        viewerId,
       ]);
       return {
         references: toArray<PostReferenceRow>(row?.references),
@@ -570,12 +607,13 @@ export function createPostgresPostPageRepository(
       };
     },
 
-    async related(postId, tags, limit) {
+    async related(postId, tags, limit, viewerId) {
       if (tags.length === 0) return [];
       const rows = await executor.query<Record<string, unknown>>(RELATED_SQL, [
         postId,
         JSON.stringify(tags),
         limit,
+        viewerId,
       ]);
 
       return rows.map((row) => ({
@@ -611,9 +649,10 @@ export function createPostgresPostPageRepository(
       return { previous: pick("previous"), next: pick("next") };
     },
 
-    async parentPost(parentPostId) {
+    async parentPost(parentPostId, viewerId) {
       const [row] = await executor.query<Record<string, unknown>>(PARENT_POST_SQL, [
         parentPostId,
+        viewerId,
       ]);
       if (!row) return null;
       return {
