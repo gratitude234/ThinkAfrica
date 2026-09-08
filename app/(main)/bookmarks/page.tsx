@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { PostCardData } from "@/components/post/PostCard";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import { createClient } from "@/lib/supabase/client";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 const POST_TYPE_FILTERS = [
   { label: "All", value: "all" },
@@ -52,51 +51,31 @@ export default function BookmarksPage() {
   useEffect(() => {
     const supabase = createClient();
 
+    // The list is fetched from the application, not from the database. The
+    // browser has no database credential after the migration, and a reading
+    // list is private, so the ownership check lives on the server where the
+    // session is. Auth is still read here only to redirect and to label the
+    // cards with the current viewer.
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) setCurrentUserId(user.id);
       if (!user) {
         window.location.href = "/login?redirectTo=/bookmarks";
         return;
       }
+      setCurrentUserId(user.id);
 
-      const { data } = await supabase
-        .from("bookmarks")
-        .select(
-          `post_id, posts!bookmarks_post_id_fkey (
-            id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url, citation_id, published_version_id,
-            profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
-            post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
-          )`
-        )
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      const mapped = (data ?? [])
-        .map((bookmark) => {
-          const post = Array.isArray(bookmark.posts)
-            ? bookmark.posts[0]
-            : bookmark.posts;
-          if (!post || (!FEATURE_FLAGS.research && post.type === "research")) return null;
-          return {
-            ...post,
-            profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
-            co_authors: Array.isArray((post as { post_authors?: unknown[] }).post_authors)
-              ? ((post as { post_authors?: Array<Record<string, unknown>> }).post_authors ?? [])
-                  .filter((row) => !!row.accepted_at)
-                  .filter((row) => row.user_id !== (post as { author_id?: string }).author_id)
-                  .map((row) => ({
-                    user_id: row.user_id as string,
-                    profile: Array.isArray(row.profile)
-                      ? (row.profile[0] as { username: string; full_name: string | null })
-                      : (row.profile as { username: string; full_name: string | null }),
-                  }))
-              : [],
-          } as PostCardData;
-        })
-        .filter(Boolean) as PostCardData[];
-
-      setAllPosts(mapped);
-      setLoading(false);
+      try {
+        const response = await fetch("/api/bookmarks");
+        if (!response.ok) throw new Error(String(response.status));
+        const body = (await response.json()) as { posts: PostCardData[] };
+        setAllPosts(body.posts ?? []);
+      } catch {
+        // An empty list and a failed load look the same to this page, which
+        // is the pre-existing behaviour: it rendered nothing when the query
+        // failed too. The route logs the reason.
+        setAllPosts([]);
+      } finally {
+        setLoading(false);
+      }
     });
   }, []);
 

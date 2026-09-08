@@ -1,6 +1,7 @@
 ﻿import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { dashboardRepository } from "@/lib/db/readAdapter";
 import { FEATURE_FLAGS, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import StatsBar from "./StatsBar";
 import PostsTable from "./PostsTable";
@@ -198,24 +199,16 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login?redirectTo=/dashboard");
 
-  // Fetch all posts by this user
-  const { data: postsRaw } = await supabase
-    .from("posts")
-    .select(
-      `
-      id, author_id, title, slug, content, excerpt, tags, type, content_kind, article_format, status, impression_count, view_count, read_count,
-      created_at, published_at, revision_due_at, citation_id, published_version_id,
-      current_round, in_response_to,
-      document_path, document_original_name, document_mime_type, document_size_bytes,
-      post_reviews(assigned_at, submitted_at, recommendation),
-      post_editor_decisions(decision, created_at),
-      post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
-      `
-    )
-    .eq("author_id", user.id)
-    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-    .order("created_at", { ascending: false });
+  // Every read on this page goes through the repository, which decides the
+  // backend. The viewer is user.id throughout and is never taken from the
+  // request: several of these tables are readable only by their owner, and
+  // that rule now lives in the SQL rather than in a policy.
+  const repository = dashboardRepository(
+    supabase as never,
+    RESEARCH_TYPE_QUERY_EXCLUSION
+  );
 
+  const postsRaw = await repository.myPosts(user.id);
   const postIds = (postsRaw ?? []).map((p) => p.id);
 
   let referenceCounts: Record<string, number> = {};
@@ -224,96 +217,28 @@ export default async function DashboardPage() {
   let likeCounts: Record<string, number> = {};
 
   if (postIds.length > 0) {
-    const [
-      { data: references },
-      { data: bookmarks },
-      { data: responses },
-      { data: likeCountRows },
-    ] = await Promise.all([
-      supabase.from("post_references").select("post_id").in("post_id", postIds),
-      supabase.from("bookmarks").select("post_id").in("post_id", postIds),
-      supabase
-        .from("posts")
-        .select("in_response_to")
-        .eq("status", "published")
-        .in("in_response_to", postIds),
-      supabase.from("post_like_counts").select("post_id, like_count").in("post_id", postIds),
-    ]);
-
-    referenceCounts = ((references ?? []) as Array<{ post_id: string | null }>).reduce(
-      (acc, row) => {
-        if (row.post_id) acc[row.post_id] = (acc[row.post_id] ?? 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-    bookmarkCounts = ((bookmarks ?? []) as Array<{ post_id: string | null }>).reduce(
-      (acc, row) => {
-        if (row.post_id) acc[row.post_id] = (acc[row.post_id] ?? 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-    responseCounts = (
-      (responses ?? []) as Array<{ in_response_to: string | null }>
-    ).reduce(
-      (acc, row) => {
-        if (row.in_response_to) {
-          acc[row.in_response_to] = (acc[row.in_response_to] ?? 0) + 1;
-        }
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-    likeCounts = (
-      (likeCountRows ?? []) as Array<{ post_id: string; like_count: number }>
-    ).reduce(
-      (acc, row) => {
-        acc[row.post_id] = row.like_count;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
+    // Four PostgREST calls become one statement, each branch keeping the
+    // visibility rule its own table carries. The bookmark branch is scoped to
+    // the viewer because the bookmarks policy is, and always has been: this
+    // number counts the viewer's own bookmarks of their own posts, not other
+    // people's. Reproduced rather than repaired.
+    ({ referenceCounts, bookmarkCounts, responseCounts, likeCounts } =
+      await repository.postStats(postIds, user.id));
   }
 
-  const [
-    { data: authorProfile },
-    { data: talentProfile },
-    { count: featuredWorkCount },
-  ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(
-        "username, full_name, country, university, field_of_study, professional_title, bio, interests, verified, verified_type, profile_type"
-      )
-      .eq("id", user.id)
-      .single(),
-    supabase
-      .from("talent_profiles")
-      .select(
-        "id, open_to_opportunities, opportunity_types, cv_url, linkedin_url, skills, visibility"
-      )
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    // Head-only count: the shared recommendation engine needs to know whether
-    // any Featured Work exists, not what it is.
-    supabase
-      .from("profile_featured_posts")
-      .select("post_id", { count: "exact", head: true })
-      .eq("user_id", user.id),
+  // The opportunity surfaces are gathered together because they belong
+  // together, not because they are needed: FEATURE_FLAGS.fellowshipsSection
+  // and talentMarketplace are both false, so every one of these renders
+  // nothing. They still run, exactly as before. Recorded as a finding rather
+  // than removed inside a migration.
+  const [authorProfile, featuredWorkCount, opportunities] = await Promise.all([
+    repository.myProfile(user.id),
+    repository.featuredWorkCount(user.id),
+    repository.opportunityState(user.id),
   ]);
 
-  const { data: opportunityInquiriesRaw } = talentProfile?.id
-      ? await supabase
-        .from("talent_inquiries")
-        .select(
-          "id, organization_name, contact_email, opportunity_type, role_title, timeline, commitment, fit_reason, message, status, read_at, created_at"
-        )
-        .eq("talent_id", talentProfile.id)
-        .neq("status", "archived")
-        .order("created_at", { ascending: false })
-        .limit(5)
-    : { data: [] };
+  const talentProfile = opportunities.talentProfile;
+  const opportunityInquiriesRaw = opportunities.inquiries;
 
   const activationState = await getActivationState(supabase, user.id);
   const retentionSummary = await getRetentionSummary(
@@ -322,19 +247,7 @@ export default async function DashboardPage() {
     activationState
   );
 
-  const { data: actionNotificationsRaw } = await supabase
-    .from("notifications")
-    .select(
-      `
-      id, type, read, created_at, actor_id, post_id, message, link,
-      actor:profiles!notifications_actor_id_fkey(full_name, username, avatar_url),
-      post:posts!notifications_post_id_fkey(title, slug)
-    `
-    )
-    .eq("user_id", user.id)
-    .eq("read", false)
-    .order("created_at", { ascending: false })
-    .limit(12);
+  const actionNotificationsRaw = await repository.unreadNotifications(user.id, 12);
 
   const actionNotifications = (actionNotificationsRaw ?? []).map((notification) => {
     const actor = Array.isArray(notification.actor)
@@ -360,46 +273,12 @@ export default async function DashboardPage() {
   });
   const actionInboxSummary = getActionInboxSummary(actionNotifications);
 
-  // Fellowship applications by this user
-  const { data: applicationsRaw } = await supabase
-    .from("fellowship_applications")
-    .select(
-      "id, status, applied_at, proof_post_id, review_note, reviewed_at, fellowships(id, title, deadline, opportunity_type, application_url)"
-    )
-    .eq("user_id", user.id)
-    .order("applied_at", { ascending: false });
-
-  const applicationProofIds = (applicationsRaw ?? [])
-    .map((application) => application.proof_post_id)
-    .filter(Boolean) as string[];
-  const { data: applicationProofPostsRaw } =
-    applicationProofIds.length > 0
-      ? await supabase
-          .from("posts")
-          .select("id, title, slug, type, citation_id")
-          .in("id", applicationProofIds)
-      : { data: [] };
+  const applicationsRaw = opportunities.applications;
   const applicationProofPosts = new Map(
-    (applicationProofPostsRaw ?? []).map((post) => [post.id, post])
+    opportunities.proofPosts.map((post) => [post.id as string, post])
   );
-
-  const [{ data: savedOpportunitiesRaw }, { data: openOpportunitiesRaw }] =
-    await Promise.all([
-      supabase
-        .from("saved_opportunities")
-        .select("fellowship_id, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("fellowships")
-        .select(
-          "id, title, sponsor_name, eligibility, deadline, opportunity_type, skills, location, featured"
-        )
-        .eq("status", "open")
-        .order("featured", { ascending: false })
-        .order("deadline", { ascending: true, nullsFirst: false })
-        .limit(12),
-    ]);
+  const savedOpportunitiesRaw = opportunities.savedOpportunities;
+  const openOpportunitiesRaw = opportunities.openOpportunities;
 
   const applications = (applicationsRaw ?? []).map((a) => ({
     ...a,
@@ -413,37 +292,15 @@ export default async function DashboardPage() {
     new Set((postsRaw ?? []).flatMap((post) => post.tags ?? []))
   ).slice(0, 8);
   const [
-    { data: pendingInvitesRaw },
-    { data: recentResponsesRaw },
-    { data: conversationParticipantsRaw },
+    pendingInvitesRaw,
+    recentResponsesRaw,
+    conversationParticipantsRaw,
     collaborationSuggestions,
     activityData,
   ] = await Promise.all([
-    supabase
-      .from("post_authors")
-      .select(
-        "post_id, invited_at, posts!post_authors_post_id_fkey(id, title, slug, profiles!posts_author_id_fkey(full_name, username))"
-      )
-      .eq("user_id", user.id)
-      .is("accepted_at", null)
-      .order("invited_at", { ascending: false })
-      .limit(3),
-    postIds.length > 0
-      ? supabase
-          .from("posts")
-          .select(
-            "id, title, slug, in_response_to, published_at, profiles!posts_author_id_fkey(username, full_name, avatar_url)"
-          )
-          .eq("status", "published")
-          .neq("author_id", user.id)
-          .in("in_response_to", postIds)
-          .order("published_at", { ascending: false })
-          .limit(3)
-      : Promise.resolve({ data: [] }),
-    supabase
-      .from("conversation_participants")
-      .select("last_read_at, conversations!inner(last_message_at)")
-      .eq("user_id", user.id),
+    repository.pendingInvites(user.id, 3),
+    repository.recentResponses(postIds, user.id, 3),
+    repository.conversationReadState(user.id),
     getCollaborationSuggestions(supabase, {
       currentUserId: user.id,
       university: authorProfile?.university ?? null,
@@ -453,27 +310,12 @@ export default async function DashboardPage() {
     }),
     // Private engagement history. Moved here from the public profile, where
     // it was fetched for every owner view but visible to nobody else.
-    Promise.all([
-      supabase
-        .from("likes")
-        .select("created_at, posts!likes_post_id_fkey(title, slug)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(10),
-      supabase
-        .from("posts")
-        .select("created_at, title, slug")
-        .eq("author_id", user.id)
-        .not("in_response_to", "is", null)
-        .eq("status", "published")
-        .order("created_at", { ascending: false })
-        .limit(10),
-    ]),
+    repository.engagementHistory(user.id, 10),
   ]);
 
-  const [likesResult, responsesResult] = activityData;
+  const { likes: likesResult, responses: responsesResult } = activityData;
   const recentActivity: RecentActivityItem[] = [
-    ...(likesResult.data ?? []).map((like) => {
+    ...likesResult.map((like) => {
       const post = Array.isArray(like.posts) ? like.posts[0] : like.posts;
       return {
         type: "like" as const,
@@ -482,7 +324,7 @@ export default async function DashboardPage() {
         created_at: like.created_at,
       };
     }),
-    ...(responsesResult.data ?? []).map((response) => ({
+    ...responsesResult.map((response) => ({
       type: "response" as const,
       description: response.title
         ? `Responded with "${response.title}"`
@@ -527,23 +369,16 @@ export default async function DashboardPage() {
     };
   });
 
-  const unreadMessageCount = ((conversationParticipantsRaw ?? []) as Array<{
-    last_read_at: string;
-    conversations:
-      | { last_message_at: string }
-      | { last_message_at: string }[]
-      | null;
-  }>).filter((row) => {
-    const conversation = Array.isArray(row.conversations)
-      ? row.conversations[0]
-      : row.conversations;
-
-    return (
-      !!conversation &&
-      new Date(conversation.last_message_at).getTime() >
-        new Date(row.last_read_at).getTime()
-    );
-  }).length;
+  // The repository flattens the embed, so the two shapes a PostgREST to-one
+  // relationship can return are resolved once rather than at every reader.
+  // A conversation with no last message is not unread, which is what the
+  // previous null check meant.
+  const unreadMessageCount = (conversationParticipantsRaw ?? []).filter(
+    (row) =>
+      row.last_message_at !== null &&
+      new Date(row.last_message_at).getTime() >
+        new Date(row.last_read_at ?? 0).getTime()
+  ).length;
 
   const pendingQueue = [...(postsRaw ?? [])]
     .filter((post) => post.status === "pending")

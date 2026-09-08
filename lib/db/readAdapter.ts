@@ -9,6 +9,16 @@ import {
   type FeedRepository,
 } from "@/lib/db/feed";
 import {
+  createPostgresBookmarksRepository,
+  createSupabaseBookmarksRepository,
+  type BookmarksRepository,
+} from "@/lib/db/bookmarks";
+import {
+  createPostgresDashboardRepository,
+  createSupabaseDashboardRepository,
+  type DashboardRepository,
+} from "@/lib/db/dashboard";
+import {
   createPostgresViewerStateRepository,
   createSupabaseViewerStateRepository,
   type ViewerStateRepository,
@@ -75,6 +85,8 @@ export const MIGRATABLE_READ_DOMAINS = [
   "search",
   "comments",
   "viewer-state",
+  "dashboard",
+  "bookmarks",
 ] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
@@ -209,4 +221,33 @@ export function viewerStateRepository(
   return isReadDomainMigrated("viewer-state")
     ? createPostgresViewerStateRepository(resolvePostgresExecutor())
     : createSupabaseViewerStateRepository(supabase);
+}
+
+/**
+ * The member dashboard.
+ *
+ * Takes the research exclusion sentinel as an argument rather than importing
+ * the flag, so the two backends cannot be built from different values, and so
+ * a test can state which one it means.
+ */
+export function dashboardRepository(
+  supabase: SupabaseClient,
+  researchTypeExclusion: string
+): DashboardRepository {
+  return isReadDomainMigrated("dashboard")
+    ? createPostgresDashboardRepository(
+        resolvePostgresExecutor(),
+        researchTypeExclusion
+      )
+    : createSupabaseDashboardRepository(supabase, researchTypeExclusion);
+}
+
+/** The member's saved posts. See lib/db/bookmarks.ts for why this moved to
+ *  the server rather than staying a browser query. */
+export function bookmarksRepository(
+  supabase: SupabaseClient
+): BookmarksRepository {
+  return isReadDomainMigrated("bookmarks")
+    ? createPostgresBookmarksRepository(resolvePostgresExecutor())
+    : createSupabaseBookmarksRepository(supabase);
 }

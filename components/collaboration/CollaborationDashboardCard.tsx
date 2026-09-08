@@ -13,7 +13,9 @@ interface PendingInvite {
 
 interface RecentResponse {
   id: string;
-  title: string;
+  /** posts.title is nullable, and always has been. The card renders nothing
+   *  for an untitled response, which is what it already did at runtime. */
+  title: string | null;
   slug: string;
   authorName: string;
   avatarUrl: string | null;
