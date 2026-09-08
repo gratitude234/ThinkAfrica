@@ -9,6 +9,11 @@ import {
   type FeedRepository,
 } from "@/lib/db/feed";
 import {
+  createPostgresCommentsRepository,
+  createSupabaseCommentsRepository,
+  type CommentsRepository,
+} from "@/lib/db/comments";
+import {
   createPostgresSearchRepository,
   createSupabaseSearchRepository,
   type SearchRepository,
@@ -63,6 +68,7 @@ export const MIGRATABLE_READ_DOMAINS = [
   "feed",
   "profile-page",
   "search",
+  "comments",
 ] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
@@ -164,4 +170,21 @@ export function searchRepository(supabase: SupabaseClient): SearchRepository {
   return isReadDomainMigrated("search")
     ? createPostgresSearchRepository(resolvePostgresExecutor())
     : createSupabaseSearchRepository(supabase);
+}
+
+/**
+ * The comment thread.
+ *
+ * Takes the viewer because two policies govern what a thread contains: the
+ * comments rule hides moderated rows from everyone but their author and an
+ * admin, and the profiles rule hides suspended and private commenters' names.
+ * PostgREST applied both from the session; a direct connection carries them
+ * itself. See lib/db/comments.ts.
+ */
+export function commentsRepository(
+  supabase: SupabaseClient
+): CommentsRepository {
+  return isReadDomainMigrated("comments")
+    ? createPostgresCommentsRepository(resolvePostgresExecutor())
+    : createSupabaseCommentsRepository(supabase);
 }

@@ -46,6 +46,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { commentVisibleSql } from "@/lib/db/commentVisibility";
+
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
 
 // ── Shapes ───────────────────────────────────────────────────────────
@@ -197,21 +199,13 @@ const HYDRATE_SQL = `
           (select count(*) from public.post_references r where r.post_id = i.id)
         ),
 
-        -- The RLS SELECT policy on comments, written out. A moderated comment
-        -- is hidden from everyone except its author and an admin.
+        -- The RLS SELECT policy on comments, shared with the comment thread
+        -- so the feed's count and the thread's list cannot disagree about
+        -- what a visible comment is. See lib/db/commentVisibility.ts.
         'comment_count', (
           select count(*) from public.comments c
           where c.post_id = i.id
-            and (
-              c.hidden_at is null
-              or ($3::uuid is not null and c.author_id = $3::uuid)
-              -- is_admin(), inlined. Its whole body is this lookup on
-              -- auth.uid(), which a direct connection does not have.
-              or exists (
-                select 1 from public.profiles pr
-                where pr.id = $3::uuid and pr.role = 'admin'
-              )
-            )
+            and ${commentVisibleSql("c", "$3")}
         ),
 
         'response_count', (
