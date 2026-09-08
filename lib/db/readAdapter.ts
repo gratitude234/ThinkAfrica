@@ -9,6 +9,11 @@ import {
   type FeedRepository,
 } from "@/lib/db/feed";
 import {
+  createPostgresNotificationsRepository,
+  createSupabaseNotificationsRepository,
+  type NotificationsRepository,
+} from "@/lib/db/notifications";
+import {
   createPostgresBookmarksRepository,
   createSupabaseBookmarksRepository,
   type BookmarksRepository,
@@ -87,6 +92,7 @@ export const MIGRATABLE_READ_DOMAINS = [
   "viewer-state",
   "dashboard",
   "bookmarks",
+  "notifications",
 ] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
@@ -250,4 +256,13 @@ export function bookmarksRepository(
   return isReadDomainMigrated("bookmarks")
     ? createPostgresBookmarksRepository(resolvePostgresExecutor())
     : createSupabaseBookmarksRepository(supabase);
+}
+
+/** The notification inbox and its badge. Writes are unaffected. */
+export function notificationsRepository(
+  supabase: SupabaseClient
+): NotificationsRepository {
+  return isReadDomainMigrated("notifications")
+    ? createPostgresNotificationsRepository(resolvePostgresExecutor())
+    : createSupabaseNotificationsRepository(supabase);
 }
