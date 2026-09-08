@@ -133,7 +133,12 @@ describe("the comment count", () => {
     expect(commentsLoaderCode).not.toContain("countComments");
     expect(commentsLoaderCode).toContain("totalCount");
     expect(discussion).toContain("totalCount={commentCount}");
-    expect((pageCode.match(/countComments\(/g) ?? []).length).toBe(1);
+
+    // The count now arrives with the other three page counts rather than from
+    // its own round trip, and the page must not go back for it a second time:
+    // the point of the counts query is that four counts cost one statement.
+    expect(pageCode).not.toContain("countComments(");
+    expect((pageCode.match(/counts\.commentCount/g) ?? []).length).toBe(1);
   });
 });
 

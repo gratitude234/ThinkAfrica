@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { postPageRepository } from "@/lib/db/readAdapter";
 import {
   getPostAuthor,
   getPostBySlug,
@@ -42,7 +43,6 @@ import ReportButton from "@/components/moderation/ReportButton";
 import CredibilityPanel from "@/components/post/CredibilityPanel";
 import type { PostCardData } from "@/components/post/PostCard";
 import { RESPONSE_PAGE_SIZE, fetchResponsePage } from "@/lib/feedData";
-import { countComments } from "@/lib/commentThread";
 import EditorialTrustPanel from "@/components/editorial/EditorialTrustPanel";
 import PostConversationView from "./PostConversationView";
 import DiscussionSection from "./DiscussionSection";
@@ -349,85 +349,44 @@ async function getSecondaryData(
     relatedResult,
     previousPostResult,
     nextPostResult,
-  ] = await Promise.all([
-    supabase
-      .from("likes")
-      .select("*", { count: "exact", head: true })
-      .eq("post_id", postId),
-    supabase
-      .from("post_references")
-      .select("*")
-      .eq("post_id", postId)
-      .order("display_order", { ascending: true }),
-    supabase
-      .from("post_authors")
-      .select(
-        "user_id, display_order, corresponding_author, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name)"
-      )
-      .eq("post_id", postId)
-      .not("accepted_at", "is", null)
-      .order("display_order", { ascending: true }),
-    fetchResponsePage(supabase, postId, viewerId, RESPONSE_PAGE_SIZE * responsePages),
-    supabase
-      .from("post_reviews")
-      .select("assigned_at, submitted_at, recommendation, round")
-      .eq("post_id", postId)
-      .is("removed_at", null),
-    supabase
-      .from("post_editor_decisions")
-      .select("decision, created_at, round")
-      .eq("post_id", postId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("post_versions")
-      .select("id, version_kind, round, created_at")
-      .eq("post_id", postId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("posts")
-      .select("*", { count: "exact", head: true })
-      .eq("in_response_to", postId)
-      .eq("status", "published"),
-    countComments(supabase, postId),
-    supabase
-      .from("bookmarks")
-      .select("*", { count: "exact", head: true })
-      .eq("post_id", postId),
-    isPublished && tags.length > 0
-      ? supabase
-          .from("posts")
-          .select(
-            "id, title, slug, type, content_kind, article_format, published_at, created_at, cover_image_url, profiles!posts_author_id_fkey (full_name, username)"
-          )
-          .eq("status", "published")
-          .neq("id", postId)
-          .overlaps("tags", tags)
-          .order("published_at", { ascending: false })
-          .limit(3)
-      : Promise.resolve({ data: [], error: null }),
-    isPublished && publishedAt
-      ? supabase
-          .from("posts")
-          .select("id, title, slug")
-          .eq("status", "published")
-          .neq("id", postId)
-          .lt("published_at", publishedAt)
-          .order("published_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    isPublished && publishedAt
-      ? supabase
-          .from("posts")
-          .select("id, title, slug")
-          .eq("status", "published")
-          .neq("id", postId)
-          .gt("published_at", publishedAt)
-          .order("published_at", { ascending: true })
-          .limit(1)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-  ]);
+  ] = await (async () => {
+    // Fifteen PostgREST round trips became four statements against the same
+    // database. The repository decides which backend answers; see
+    // lib/db/readAdapter.ts. Responses still go through fetchResponsePage,
+    // which belongs to the feed domain and moves with it.
+    const repository = postPageRepository(supabase);
+
+    const [counts, collections, responsePage, related, neighbours] =
+      await Promise.all([
+        repository.counts(postId),
+        repository.collections(postId),
+        fetchResponsePage(supabase, postId, viewerId, RESPONSE_PAGE_SIZE * responsePages),
+        isPublished && tags.length > 0
+          ? repository.related(postId, tags, 3)
+          : Promise.resolve([]),
+        isPublished && publishedAt
+          ? repository.neighbours(postId, publishedAt)
+          : Promise.resolve({ previous: null, next: null }),
+      ]);
+
+    // Shaped to what the page below already destructures, so the rendering
+    // code is untouched by the move.
+    return [
+      { count: counts.likeCount },
+      { data: collections.references },
+      { data: collections.coAuthors },
+      responsePage,
+      { data: collections.reviews },
+      { data: collections.decisions },
+      { data: collections.versions },
+      { count: counts.responseCount },
+      counts.commentCount,
+      { count: counts.bookmarkCount },
+      { data: related },
+      { data: neighbours.previous },
+      { data: neighbours.next },
+    ] as const;
+  })();
 
   const coAuthors = ((coAuthorsRaw ?? []) as Array<
     Omit<CoAuthorRecord, "profile"> & {
@@ -506,45 +465,22 @@ async function getViewerData({
     };
   }
 
-  const [
-    { data: existingLike },
-    { data: existingBookmark },
-    { data: followData },
-    { data: subscriptionData },
-    messageEligibility,
-  ] = await Promise.all([
-    supabase
-      .from("likes")
-      .select("user_id")
-      .eq("post_id", postId)
-      .eq("user_id", userId)
-      .maybeSingle(),
-    supabase
-      .from("bookmarks")
-      .select("user_id")
-      .eq("post_id", postId)
-      .eq("user_id", userId)
-      .maybeSingle(),
-    authorId
-      ? supabase
-          .from("follows")
-          .select("follower_id")
-          .eq("follower_id", userId)
-          .eq("following_id", authorId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    isAuthorSubscriptionsEnabled() && authorId
-      ? supabase
-          .from("author_subscriptions")
-          .select("subscriber_id")
-          .eq("subscriber_id", userId)
-          .eq("author_id", authorId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
+  // Four maybeSingle() round trips became four `exists` in one row. The
+  // viewer id is the one the server resolved; a direct connection has no
+  // auth.uid() to fall back on, which is the point.
+  const [viewerState, messageEligibility] = await Promise.all([
+    postPageRepository(supabase).viewerState(postId, userId, authorId ?? null),
     authorId
       ? getMessageEligibility(supabase, userId, authorId)
       : Promise.resolve(null),
   ]);
+
+  const existingLike = viewerState.liked;
+  const existingBookmark = viewerState.bookmarked;
+  const followData = viewerState.following;
+  // The subscription flag is still gated by the feature flag, which the
+  // repository has no opinion about.
+  const subscriptionData = isAuthorSubscriptionsEnabled() && viewerState.subscribed;
 
   return {
     userLiked: Boolean(existingLike),
@@ -600,16 +536,11 @@ async function ParentPostLink({
 }) {
   if (!parentPostId) return null;
   const supabase = await createClient();
-  const { data: parentPost, error } = await supabase
-    .from("posts")
-    .select(
-      "id, title, slug, content_kind, type, profiles!posts_author_id_fkey (full_name, username)"
-    )
-    .eq("id", parentPostId)
-    .eq("status", "published")
-    .maybeSingle();
+  const parentPost = await postPageRepository(supabase)
+    .parentPost(parentPostId)
+    .catch(() => null);
 
-  if (error || !parentPost) return null;
+  if (!parentPost) return null;
 
   // A titleless Post has no title to show, but it does have an author -- so
   // name it "Post by Ada Obi" rather than the anonymous "this post".
