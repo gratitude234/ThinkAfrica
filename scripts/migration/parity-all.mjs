@@ -130,7 +130,7 @@ const results = [];
  */
 function classify(output) {
   const transport =
-    /TypeError: fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|EAI_AGAIN/.test(
+    /TypeError: fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|CONNECT_TIMEOUT|socket hang up|EAI_AGAIN|ENOTFOUND|getaddrinfo|EPIPE/.test(
       output
     );
   const disagreement = /AssertionError/.test(output);

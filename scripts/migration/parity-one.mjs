@@ -37,7 +37,7 @@ const env = { ...process.env, SUPABASE_DIRECT_URL: resolved.url };
 /** A transport failure, as opposed to a comparison that disagreed. */
 function isTransient(output) {
   const transport =
-    /TypeError: fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|EAI_AGAIN/.test(
+    /TypeError: fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|CONNECT_TIMEOUT|socket hang up|EAI_AGAIN|ENOTFOUND|getaddrinfo|EPIPE/.test(
       output
     );
   const disagreement = /AssertionError/.test(output);
