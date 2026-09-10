@@ -309,14 +309,28 @@ describe.skipIf(!enabled)("feed: PostgREST vs PostgreSQL, same database", () => 
     if (ids.length === 0) return;
 
     const [rest, direct] = await Promise.all([
-      hydrateRest.hydrate({ postIds: ids, authorIds: authors, viewer: null }),
-      hydrateSql.hydrate({ postIds: ids, authorIds: authors, viewer: null }),
+      hydrateRest.hydrate({ postIds: ids, authorIds: authors, viewer: { id: null } }),
+      hydrateSql.hydrate({ postIds: ids, authorIds: authors, viewer: { id: null } }),
     ]);
 
-    const byId = <T extends { post_id?: string; id?: string }>(rows: T[]) =>
-      Object.fromEntries(rows.map((row) => [row.post_id ?? row.id, row]));
+    // Keyed by an explicit accessor rather than by guessing at a field name.
+    // The previous helper read post_id ?? id, and FeedPostCounts has neither:
+    // its key is postId. Every row therefore collapsed onto the single key
+    // "undefined", so the comparison checked one arbitrary row and passed.
+    const byKey = <T>(rows: readonly T[], key: (row: T) => string) =>
+      Object.fromEntries(rows.map((row) => [key(row), row]));
 
-    expect(differences(byId(rest.counts), byId(direct.counts))).toEqual([]);
-    expect(differences(byId(rest.profiles), byId(direct.profiles))).toEqual([]);
+    expect(
+      differences(
+        byKey(rest.counts, (row) => row.postId),
+        byKey(direct.counts, (row) => row.postId)
+      )
+    ).toEqual([]);
+    expect(
+      differences(
+        byKey(rest.profiles, (row) => row.id),
+        byKey(direct.profiles, (row) => row.id)
+      )
+    ).toEqual([]);
   });
 });

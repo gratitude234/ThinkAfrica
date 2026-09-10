@@ -118,8 +118,8 @@ describe.skipIf(!enabled)("post page: PostgREST vs PostgreSQL, same database", (
     const mismatches: string[] = [];
     for (const testCase of cases) {
       const [rest, direct] = await Promise.all([
-        viaRest.collections(testCase.id),
-        viaSql.collections(testCase.id),
+        viaRest.collections(testCase.id, null),
+        viaSql.collections(testCase.id, null),
       ]);
 
       // Ordering is part of the contract for references, co-authors,
@@ -149,8 +149,8 @@ describe.skipIf(!enabled)("post page: PostgREST vs PostgreSQL, same database", (
     for (const testCase of cases) {
       if (testCase.tags.length === 0) continue;
       const [rest, direct] = await Promise.all([
-        viaRest.related(testCase.id, testCase.tags, 3),
-        viaSql.related(testCase.id, testCase.tags, 3),
+        viaRest.related(testCase.id, testCase.tags, 3, null),
+        viaSql.related(testCase.id, testCase.tags, 3, null),
       ]);
 
       // `published_at desc` can tie, and neither side promises a tiebreak, so
@@ -192,8 +192,8 @@ describe.skipIf(!enabled)("post page: PostgREST vs PostgreSQL, same database", (
     const mismatches: string[] = [];
     for (const testCase of cases.slice(0, 5)) {
       const [rest, direct] = await Promise.all([
-        viaRest.parentPost(testCase.id),
-        viaSql.parentPost(testCase.id),
+        viaRest.parentPost(testCase.id, null),
+        viaSql.parentPost(testCase.id, null),
       ]);
       mismatches.push(...differences(rest, direct, `${testCase.id}.parent`));
     }
@@ -205,8 +205,8 @@ describe.skipIf(!enabled)("post page: PostgREST vs PostgreSQL, same database", (
     if (rows.length > 0) {
       const id = String((rows[0] as Record<string, unknown>).id);
       const [rest, direct] = await Promise.all([
-        viaRest.parentPost(id),
-        viaSql.parentPost(id),
+        viaRest.parentPost(id, null),
+        viaSql.parentPost(id, null),
       ]);
       if (rest !== null || direct !== null) {
         mismatches.push(`unpublished parent leaked: ${canonical(rest)} vs ${canonical(direct)}`);
