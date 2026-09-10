@@ -22,14 +22,40 @@ export function sameInstant(a: unknown, b: unknown): boolean {
     : left === right;
 }
 
+/**
+ * Every timestamp column the repositories project, so that one instant spelled
+ * two ways is not reported as a difference.
+ *
+ * Derived from the `_at` columns actually named in lib/db rather than added
+ * one at a time as each is hit: an incomplete list makes a harness report a
+ * benign spelling as a mismatch, which costs an investigation and teaches
+ * whoever runs it to distrust the result. `updated_at` was missing and did
+ * exactly that.
+ *
+ * Only equality of *instant* is relaxed. A different time is still a
+ * difference, and a key not listed here is compared as a string.
+ */
 export const TIMESTAMP_KEYS = new Set([
-  "created_at",
-  "published_at",
   "accepted_at",
+  "applied_at",
   "assigned_at",
-  "submitted_at",
+  "created_at",
+  "deleted_at",
+  "dismissed_at",
+  "edited_at",
+  "hidden_at",
+  "invited_at",
+  "last_message_at",
+  "last_read_at",
   "occurred_at",
+  "published_at",
+  "read_at",
+  "removed_at",
+  "revision_due_at",
+  "submitted_at",
+  "suspended_at",
   "synced_at",
+  "updated_at",
 ]);
 
 /**

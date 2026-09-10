@@ -163,7 +163,7 @@ describe.skipIf(!enabled)("adapter parity against live databases", () => {
               return (data as PostRecord | null) ?? null;
             }),
           sql
-            .unsafe(POST_BY_SLUG_SQL, [slug, ...VISIBLE_POST_STATUSES])
+            .unsafe(POST_BY_SLUG_SQL, [slug, ...VISIBLE_POST_STATUSES, null])
             .then((rows) => {
               const list = rows as unknown as Record<string, unknown>[];
               if (list.length > 1) {
@@ -319,7 +319,7 @@ describe.skipIf(!enabled)("adapter parity against live databases", () => {
               if (error) throw new Error(`supabase: ${error.message}`);
               return (data as ProfileIdentityRecord | null) ?? null;
             }),
-          sql.unsafe(profileByUsernameSql(), [username]).then((rows) => {
+          sql.unsafe(profileByUsernameSql(), [username, null]).then((rows) => {
             const list = rows as unknown as Record<string, unknown>[];
             if (list.length > 1) {
               throw new Error(`postgres: username matched ${list.length} rows`);

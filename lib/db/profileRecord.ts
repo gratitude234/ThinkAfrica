@@ -153,9 +153,18 @@ export interface ProfileRecordRepository {
  * `::text::jsonb` double cast is what stops it inferring an OID and encoding
  * an already-encoded string a second time.
  *
- * `count(*) over ()` reproduces PostgREST's `count: "exact"`: the total before
- * `limit`, computed in the same pass rather than in a second statement that
- * could see a different set of rows.
+ * The total is counted over the filtered set and joined to the page, rather
+ * than taken from `count(*) over ()`.
+ *
+ * That window is empty when the page is: at `offset 10` on a profile with ten
+ * entries the page returns no rows, so there is no window to read a count
+ * from, and the total came back as zero. PostgREST's `count: "exact"` reports
+ * ten, because the count is of the filtered set and not of the page. Live
+ * parity found the difference, on the last page, which is exactly where
+ * `hasNextPage` is decided.
+ *
+ * `left join lateral` keeps it one statement and one snapshot: the count row
+ * always exists, and the page columns are null when the page is empty.
  *
  * The ordering carries no `nulls` clause because the PostgREST call it
  * replaces carries none either, so both get PostgreSQL's default of nulls
@@ -163,33 +172,47 @@ export interface ProfileRecordRepository {
  * clarification.
  */
 const ENTRIES_SQL = `
-  select
-    e.profile_id,
-    e.entry_id,
-    e.entry_kind,
-    e.occurred_at,
-    e.is_coauthor,
-    e.source_backed,
-    e.citable,
-    count(*) over () as total_count
-  from public.profile_record_entries e
-  where e.profile_id = $1::uuid
-    and ($2::boolean or e.entry_kind <> 'research')
-    and (
-      $3::text is null
-      or e.entry_kind in (select jsonb_array_elements_text($3::text::jsonb))
-    )
-    and ($4::boolean is null or e.source_backed = $4::boolean)
-    and ($5::boolean is null or e.citable = $5::boolean)
-    and (
-      $6::text is null
-      or e.entry_id in (
-        select (jsonb_array_elements_text($6::text::jsonb))::uuid
+  with filtered as (
+    select
+      e.profile_id,
+      e.entry_id,
+      e.entry_kind,
+      e.occurred_at,
+      e.is_coauthor,
+      e.source_backed,
+      e.citable
+    from public.profile_record_entries e
+    where e.profile_id = $1::uuid
+      and ($2::boolean or e.entry_kind <> 'research')
+      and (
+        $3::text is null
+        or e.entry_kind in (select jsonb_array_elements_text($3::text::jsonb))
       )
-    )
-  order by e.occurred_at desc, e.entry_id desc
-  limit $7::int
-  offset $8::int
+      and ($4::boolean is null or e.source_backed = $4::boolean)
+      and ($5::boolean is null or e.citable = $5::boolean)
+      and (
+        $6::text is null
+        or e.entry_id in (
+          select (jsonb_array_elements_text($6::text::jsonb))::uuid
+        )
+      )
+  )
+  select
+    counted.total_count,
+    page.profile_id,
+    page.entry_id,
+    page.entry_kind,
+    page.occurred_at,
+    page.is_coauthor,
+    page.source_backed,
+    page.citable
+  from (select count(*) as total_count from filtered) as counted
+  left join lateral (
+    select * from filtered
+    order by filtered.occurred_at desc, filtered.entry_id desc
+    limit $7::int
+    offset $8::int
+  ) as page on true
 `;
 
 /**
@@ -472,11 +495,16 @@ export function createPostgresProfileRecordRepository(
         query.start,
       ]);
 
+      // One row always comes back, carrying the total. Its page columns are
+      // null when the page is empty, which is how the last page is told apart
+      // from a profile with no entries at all.
+      const total = result.length === 0 ? 0 : Number(result[0].total_count);
+
       return {
-        entries: result.map(({ total_count: _ignored, ...entry }) => entry),
-        // `count(*) over ()` is a bigint, which arrives as a string. No rows
-        // means no window to read it from, and no matches is zero.
-        totalCount: result.length === 0 ? 0 : Number(result[0].total_count),
+        entries: result
+          .filter((row) => row.entry_id !== null)
+          .map(({ total_count: _ignored, ...entry }) => entry),
+        totalCount: total,
       };
     },
 

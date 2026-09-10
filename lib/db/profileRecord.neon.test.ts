@@ -282,7 +282,7 @@ describe.skipIf(!enabled)("profile record reads against PostgreSQL", () => {
   // ── hydration ──────────────────────────────────────────────────────
 
   it("returns an empty array for no ids, without going to the database", async () => {
-    expect(await repository.hydratePublications([])).toEqual([]);
+    expect(await repository.hydratePublications([], null)).toEqual([]);
   });
 
   it("returns one row per requested post, and no others", async () => {
@@ -293,7 +293,7 @@ describe.skipIf(!enabled)("profile record reads against PostgreSQL", () => {
     const ids = page.entries.map((entry) => entry.entry_id);
     if (ids.length === 0) return;
 
-    const posts = await repository.hydratePublications(ids);
+    const posts = await repository.hydratePublications(ids, null);
     expect(posts.length).toBeLessThanOrEqual(ids.length);
     for (const post of posts) {
       expect(ids).toContain(post.id);
@@ -309,7 +309,7 @@ describe.skipIf(!enabled)("profile record reads against PostgreSQL", () => {
     const ids = page.entries.map((entry) => entry.entry_id);
     if (ids.length === 0) return;
 
-    const posts = await repository.hydratePublications(ids);
+    const posts = await repository.hydratePublications(ids, null);
     for (const post of posts) {
       // PostgREST gives [] for an empty embed. A null here would reach
       // normalizePost's `?? []` and pass silently, so assert the shape.
@@ -327,7 +327,7 @@ describe.skipIf(!enabled)("profile record reads against PostgreSQL", () => {
     );
     if (!row) return;
 
-    const [post] = await repository.hydratePublications([row.post_id]);
+    const [post] = await repository.hydratePublications([row.post_id], null);
     if (!post) return;
 
     const authors = post.post_authors ?? [];

@@ -287,9 +287,12 @@ describe.skipIf(!enabled)("public profile: PostgREST vs PostgreSQL, same databas
       const ids = page.entries.map((entry) => entry.entry_id);
       if (ids.length === 0) continue;
 
+      // Both sides take the viewer: the co-author projection is governed by
+      // the profiles policy. Null is the logged-out reader, which is what
+      // this comparison is about. The harness predates that parameter.
       const [rest, direct] = await Promise.all([
-        recordRest.hydratePublications(ids),
-        recordSql.hydratePublications(ids),
+        recordRest.hydratePublications(ids, null),
+        recordSql.hydratePublications(ids, null),
       ]);
 
       // `in` has no defined order on either side, and the caller indexes by

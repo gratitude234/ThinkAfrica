@@ -171,6 +171,48 @@ export interface PostPageRepository {
 
 // ── Supabase (the existing behaviour, gathered in one place) ─────────
 
+/**
+ * A result, or an error. Never an absence standing in for one.
+ *
+ * Every method on the Supabase side of this repository used to destructure
+ * `{ data }` or read `.count ?? 0` and drop `.error`. A post page served by a
+ * slow PostgREST therefore rendered zero comments, zero likes, no co-authors
+ * and no references, and reported success.
+ *
+ * Live parity is what found it: the PostgreSQL side counted two comments and
+ * the PostgREST side counted none, because its request had failed and nobody
+ * looked. A comparison cannot tell "no rows" from "no answer" if one side
+ * refuses to say which it had.
+ */
+function fail(error: unknown, label: string): never {
+  const source = error as { message?: unknown };
+  throw new Error(
+    `${label}: ${typeof source.message === "string" ? source.message : "database error"}`
+  );
+}
+
+function rows<T>(result: { data?: unknown; error?: unknown }, label: string): T[] {
+  if (result.error) fail(result.error, label);
+  return (result.data ?? []) as T[];
+}
+
+/** `null` stays a valid answer here: it means no row, not no answer. */
+function maybeRow<T>(
+  result: { data?: unknown; error?: unknown },
+  label: string
+): T | null {
+  if (result.error) fail(result.error, label);
+  return (result.data ?? null) as T | null;
+}
+
+function count(
+  result: { count?: number | null; error?: unknown },
+  label: string
+): number {
+  if (result.error) fail(result.error, label);
+  return result.count ?? 0;
+}
+
 export function createSupabasePostPageRepository(
   supabase: SupabaseClient
 ): PostPageRepository {
@@ -190,10 +232,10 @@ export function createSupabasePostPageRepository(
       ]);
 
       return {
-        likeCount: likes.count ?? 0,
-        bookmarkCount: bookmarks.count ?? 0,
-        commentCount: comments.count ?? 0,
-        responseCount: responses.count ?? 0,
+        likeCount: count(likes, "like count"),
+        bookmarkCount: count(bookmarks, "bookmark count"),
+        commentCount: count(comments, "comment count"),
+        responseCount: count(responses, "response count"),
       };
     },
 
@@ -235,16 +277,16 @@ export function createSupabasePostPageRepository(
         Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
 
       return {
-        references: (references.data ?? []) as PostReferenceRow[],
-        coAuthors: ((coAuthors.data ?? []) as Array<Record<string, unknown>>).map(
+        references: rows<PostReferenceRow>(references, "post references"),
+        coAuthors: rows<Record<string, unknown>>(coAuthors, "co-authors").map(
           (row) => ({
             ...(row as unknown as CoAuthorRow),
             profile: firstProfile(row.profile) as CoAuthorRow["profile"],
           })
         ),
-        reviews: (reviews.data ?? []) as ReviewRow[],
-        decisions: (decisions.data ?? []) as EditorDecisionRow[],
-        versions: (versions.data ?? []) as VersionRow[],
+        reviews: rows<ReviewRow>(reviews, "post reviews"),
+        decisions: rows<EditorDecisionRow>(decisions, "editor decisions"),
+        versions: rows<VersionRow>(versions, "post versions"),
       };
     },
 
@@ -252,7 +294,7 @@ export function createSupabasePostPageRepository(
       // session, so the profiles policy is applied by the database.
     async related(postId, tags, limit, _viewerId) {
       if (tags.length === 0) return [];
-      const { data } = await supabase
+      const result = await supabase
         .from("posts")
         .select(
           "id, title, slug, type, content_kind, article_format, published_at, created_at, cover_image_url, profiles!posts_author_id_fkey (full_name, username)"
@@ -263,7 +305,7 @@ export function createSupabasePostPageRepository(
         .order("published_at", { ascending: false })
         .limit(limit);
 
-      return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+      return rows<Record<string, unknown>>(result, "related posts").map((row) => ({
         ...(row as unknown as RelatedPost),
         profiles: (Array.isArray(row.profiles)
           ? (row.profiles[0] ?? null)
@@ -294,15 +336,15 @@ export function createSupabasePostPageRepository(
       ]);
 
       return {
-        previous: (previous.data as NeighbourPost | null) ?? null,
-        next: (next.data as NeighbourPost | null) ?? null,
+        previous: maybeRow<NeighbourPost>(previous, "previous post"),
+        next: maybeRow<NeighbourPost>(next, "next post"),
       };
     },
 
       // The viewer is unused on this side: the request client carries the
       // session, so the profiles policy is applied by the database.
     async parentPost(parentPostId, _viewerId) {
-      const { data } = await supabase
+      const result = await supabase
         .from("posts")
         .select(
           "id, title, slug, content_kind, type, profiles!posts_author_id_fkey (full_name, username)"
@@ -311,8 +353,9 @@ export function createSupabasePostPageRepository(
         .eq("status", "published")
         .maybeSingle();
 
+      const data = maybeRow<Record<string, unknown>>(result, "parent post");
       if (!data) return null;
-      const row = data as Record<string, unknown>;
+      const row = data;
       return {
         ...(row as unknown as ParentPost),
         profiles: (Array.isArray(row.profiles)
@@ -353,11 +396,13 @@ export function createSupabasePostPageRepository(
           : Promise.resolve({ data: null }),
       ]);
 
+      // A failed lookup is not "not liked". Rendering an empty heart
+      // because the request failed invites the reader to like it again.
       return {
-        liked: Boolean(like.data),
-        bookmarked: Boolean(bookmark.data),
-        following: Boolean(follow.data),
-        subscribed: Boolean(subscription.data),
+        liked: maybeRow(like, "viewer like") !== null,
+        bookmarked: maybeRow(bookmark, "viewer bookmark") !== null,
+        following: maybeRow(follow, "viewer follow") !== null,
+        subscribed: maybeRow(subscription, "viewer subscription") !== null,
       };
     },
   };

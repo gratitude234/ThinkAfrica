@@ -107,7 +107,7 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     );
     if (rows.length === 0) return;
 
-    const collections = await repository.collections(rows[0].id);
+    const collections = await repository.collections(rows[0].id, null);
     for (const [name, value] of Object.entries(collections)) {
       expect(Array.isArray(value), `${name} should be an array`).toBe(true);
     }
@@ -122,7 +122,7 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     );
     if (rows.length === 0) return;
 
-    const { references } = await repository.collections(rows[0].id);
+    const { references } = await repository.collections(rows[0].id, null);
     expect(references.length).toBeGreaterThan(1);
 
     const orders = references.map((entry) => entry.display_order ?? 0);
@@ -142,7 +142,7 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     );
     if (rows.length === 0) return;
 
-    const { coAuthors } = await repository.collections(rows[0].id);
+    const { coAuthors } = await repository.collections(rows[0].id, null);
     expect(coAuthors.length).toBeGreaterThan(0);
 
     // PostgREST returns a one-to-one embed as an object or a one-element
@@ -160,7 +160,7 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     );
     if (rows.length === 0) return;
 
-    const { coAuthors } = await repository.collections(rows[0].id);
+    const { coAuthors } = await repository.collections(rows[0].id, null);
     for (const entry of coAuthors) {
       expect(entry.accepted_at).not.toBeNull();
     }
@@ -173,7 +173,7 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     );
     if (rows.length === 0) return;
 
-    const { reviews } = await repository.collections(rows[0].id);
+    const { reviews } = await repository.collections(rows[0].id, null);
     const [expected] = await executor.query<{ count: string }>(
       `select count(*)::int as count from public.post_reviews
        where post_id = $1::uuid and removed_at is null`,
@@ -192,7 +192,7 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     if (rows.length === 0) return;
 
     const tags = (rows[0].tags as string[]) ?? [];
-    const related = await repository.related(rows[0].id, tags, 3);
+    const related = await repository.related(rows[0].id, tags, 3, null);
 
     expect(related.length).toBeLessThanOrEqual(3);
     for (const entry of related) {
@@ -205,7 +205,7 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
 
   it("returns no related posts when the post has no tags", async () => {
     const post = await anyPublishedPost();
-    expect(await repository.related(post.id, [], 3)).toEqual([]);
+    expect(await repository.related(post.id, [], 3, null)).toEqual([]);
   }, 60_000);
 
   it("returns neighbours on the correct sides of the timestamp", async () => {
@@ -240,11 +240,11 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
        where status <> 'published' limit 1`
     );
     if (rows.length > 0) {
-      expect(await repository.parentPost(rows[0].id)).toBeNull();
+      expect(await repository.parentPost(rows[0].id, null)).toBeNull();
     }
 
     const published = await anyPublishedPost();
-    const parent = await repository.parentPost(published.id);
+    const parent = await repository.parentPost(published.id, null);
     expect(parent?.id).toBe(published.id);
     expect(Array.isArray(parent?.profiles)).toBe(false);
   }, 60_000);

@@ -39,6 +39,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { toTimestampString } from "@/lib/db/postgres/normalise";
 import { commentVisibleSql } from "@/lib/db/commentVisibility";
 import { visibleProfileJoin } from "@/lib/db/profileVisibility";
 import type { CommentSort } from "@/lib/commentSort";
@@ -267,6 +268,28 @@ export function createSupabaseCommentsRepository(
 
 // ── PostgreSQL ───────────────────────────────────────────────────────
 
+/**
+ * postgres.js returns a timestamptz as a Date even with `fetch_types: false`:
+ * it has built-in parsers for the well-known OIDs and does not need the
+ * server's catalogue to use them. `CommentRow.created_at` is declared as a
+ * string, and PostgREST gives a string, so the rows have to be brought back to
+ * that shape.
+ *
+ * This is not cosmetic. The thread's keyset cursor is built by interpolating
+ * `created_at` into a string, so a Date produced
+ * `"Mon Aug 10 2026 07:58:00 GMT+0100 (West Africa Time)"` and the next page
+ * failed with `invalid input syntax for type timestamp with time zone`. Live
+ * parity found it; the behavioural proof did not, because it never round
+ * tripped a cursor between the two backends.
+ */
+function normaliseRow(row: CommentRow): CommentRow {
+  return {
+    ...row,
+    created_at: toTimestampString(row.created_at) as string,
+    updated_at: toTimestampString(row.updated_at),
+  };
+}
+
 export function createPostgresCommentsRepository(
   executor: SqlExecutor
 ): CommentsRepository {
@@ -286,20 +309,24 @@ export function createPostgresCommentsRepository(
       // driver cannot supply one either: Postgres refuses the statement with
       // "could not determine data type of parameter", and the thread fails to
       // load. Caught by the behavioural proof rather than in production.
-      return query.sort === "top"
-        ? executor.query<CommentRow>(TOP_LEVEL_TOP_SQL, [
-            ...shared,
-            query.cursorUpvotes,
-          ])
-        : executor.query<CommentRow>(TOP_LEVEL_NEW_SQL, shared);
+      const rowsBack =
+        query.sort === "top"
+          ? await executor.query<CommentRow>(TOP_LEVEL_TOP_SQL, [
+              ...shared,
+              query.cursorUpvotes,
+            ])
+          : await executor.query<CommentRow>(TOP_LEVEL_NEW_SQL, shared);
+
+      return rowsBack.map(normaliseRow);
     },
 
     async replies(parentIds, viewerId) {
       if (parentIds.length === 0) return [];
-      return executor.query<CommentRow>(REPLIES_SQL, [
+      const rowsBack = await executor.query<CommentRow>(REPLIES_SQL, [
         JSON.stringify(parentIds),
         viewerId,
       ]);
+      return rowsBack.map(normaliseRow);
     },
 
     async votedCommentIds(commentIds, voterId) {
