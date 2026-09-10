@@ -240,15 +240,23 @@ describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
         // Neither side orders. is_conversation_participant() is satisfied by
         // this query's own `user_id = <viewer>` filter, so a service-role read
         // returns the same participations.
-        const key = (list: typeof rest) =>
-          canonical(
-            [...list]
-              .map((entry) => `${entry.last_read_at}|${entry.last_message_at}`)
-              .sort()
+        //
+        // Sorted by instant and compared with the shared differences(), not by
+        // interpolating the two columns into a string. PostgREST spells an
+        // instant `...256468+00:00` and the driver spells the same one
+        // `...256Z`, so string equality reported a mismatch on rows that
+        // agreed, and printed "1 vs 1" while doing it.
+        const order = (list: typeof rest) =>
+          [...list].sort(
+            (a, b) =>
+              new Date(a.last_read_at ?? 0).getTime() -
+                new Date(b.last_read_at ?? 0).getTime() ||
+              new Date(a.last_message_at ?? 0).getTime() -
+                new Date(b.last_message_at ?? 0).getTime()
           );
-        if (key(rest) !== key(direct)) {
-          mismatches.push(`${row.id}: ${rest.length} vs ${direct.length}`);
-        }
+        mismatches.push(
+          ...differences(order(rest), order(direct), `${row.id}.cursors`)
+        );
       }
       expect(mismatches).toEqual([]);
     });

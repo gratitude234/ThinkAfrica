@@ -235,7 +235,12 @@ const PUBLICATION_BRANCHES_SQL = `
   select
     m.branch, m.id, m.author_id, m.title, m.slug, m.in_response_to, m.excerpt,
     m.type, m.content_kind, m.article_format, to_jsonb(m.tags) as tags,
-    m.citation_id, m.created_at, m.published_at, m.cover_image_url, m.status,
+    m.citation_id, m.created_at, m.published_at, m.cover_image_url,
+    -- The owned branch's PostgREST projection does not carry status: only
+    -- the co-authored branch needs it, because only that one is filtered on
+    -- it in TypeScript. Returning it on both is more than the contract
+    -- promises, and parity is right to call that a difference.
+    case when m.branch = 'owned' then null else m.status end as status,
     case when rc.post_id is null then null
       else jsonb_build_object('reference_count', rc.reference_count) end
       as post_reference_counts
@@ -290,7 +295,15 @@ function toPublicationRow(row: Record<string, unknown>): ProfilePublicationRow {
     created_at: toIso(row.created_at) ?? "",
     published_at: toIso(row.published_at),
     cover_image_url: (row.cover_image_url as string | null) ?? null,
-    ...(row.status === undefined ? {} : { status: String(row.status) }),
+    // Null counts as absent, not as a value. The UNION has to project a
+    // `status` column for both branches, and the owned branch sets it null
+    // because the PostgREST projection it mirrors does not select status at
+    // all. Testing only for undefined sent that null through String(), so an
+    // owned row came back carrying the four-character string "null", which a
+    // consumer comparing against "published" would read as unpublished.
+    ...(row.status === undefined || row.status === null
+      ? {}
+      : { status: String(row.status) }),
     post_reference_counts:
       (row.post_reference_counts as ProfilePublicationRow["post_reference_counts"]) ??
       null,
@@ -460,10 +473,27 @@ export function createSupabaseProfilePageRepository(
           .maybeSingle(),
       ]);
 
+      // A failed lookup is not "not following". Rendering a Follow button
+      // to somebody who already follows invites a duplicate, and rendering
+      // an unblocked profile to somebody who blocked it is worse. Live
+      // parity found this: the direct read saw the follow edge and this one
+      // reported false, because its request had failed and nobody looked.
+      if (follow.error) {
+        throw new Error(`follow state failed: ${follow.error.message}`);
+      }
+      if (subscription.error) {
+        throw new Error(
+          `subscription state failed: ${subscription.error.message}`
+        );
+      }
+      if (block.error) {
+        throw new Error(`block state failed: ${block.error.message}`);
+      }
+
       return {
-        isFollowing: Boolean(follow.data),
-        isSubscribed: Boolean(subscription.data),
-        isBlocked: Boolean(block.data),
+        isFollowing: follow.data !== null,
+        isSubscribed: subscription.data !== null,
+        isBlocked: block.data !== null,
       };
     },
 

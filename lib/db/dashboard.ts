@@ -35,6 +35,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { toTimestampString } from "@/lib/db/postgres/normalise";
 import { postReferenceVisibleSql, postVisibleSql } from "@/lib/db/postVisibility";
 import { visibleProfileJoin } from "@/lib/db/profileVisibility";
 
@@ -938,10 +939,20 @@ export function createPostgresDashboardRepository(
     },
 
     async conversationReadState(viewerId) {
-      return executor.query<{
-        last_read_at: string | null;
-        last_message_at: string | null;
-      }>(CONVERSATION_READ_SQL, [viewerId]);
+      // Normalised rather than returned as the driver hands them over. These
+      // are `timestamptz` columns, so postgres.js produces Date objects while
+      // the contract and the PostgREST implementation both say string. The
+      // one consumer today writes `new Date(row.last_read_at ?? 0)`, which
+      // tolerates either, so nothing is visibly broken; the next consumer to
+      // call .slice() or .startsWith() on it would be.
+      const rows = await executor.query<Record<string, unknown>>(
+        CONVERSATION_READ_SQL,
+        [viewerId]
+      );
+      return rows.map((row) => ({
+        last_read_at: toTimestampString(row.last_read_at),
+        last_message_at: toTimestampString(row.last_message_at),
+      }));
     },
 
     async opportunityState(viewerId) {

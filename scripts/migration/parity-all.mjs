@@ -82,10 +82,15 @@ try {
 }
 
 try {
+  // A real query, not the root document. The root answers 401 to a request
+  // carrying only an apikey, which says nothing about whether PostgREST can
+  // serve data: it is a decision about that request. What the harnesses need
+  // is a table read, so that is what is probed.
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`,
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/posts?select=id&limit=1`,
     {
-      headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY },
+      headers: { apikey: anon, Authorization: `Bearer ${anon}` },
       signal: AbortSignal.timeout(15_000),
     }
   );
@@ -112,20 +117,81 @@ console.log("\nComparing PostgREST and PostgreSQL against the same database.\n")
 
 const results = [];
 
+/**
+ * A socket that dropped is not a disagreement.
+ *
+ * This loop used to report every non-zero exit as "a comparison disagreed".
+ * PostgREST drops connections under sustained load from these harnesses, so
+ * whole domains were recorded as parity failures when nothing had disagreed,
+ * and the table was then read as evidence about the database. Only a run whose
+ * output carries a transport error and no assertion failure is retried, and a
+ * run that still cannot reach PostgREST is reported as BLOCKED rather than
+ * counted as either a pass or a failure.
+ */
+function classify(output) {
+  const transport =
+    /TypeError: fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|EAI_AGAIN/.test(
+      output
+    );
+  const disagreement = /AssertionError/.test(output);
+  return { transport, disagreement };
+}
+
+const ATTEMPTS = Number(process.env.PARITY_ATTEMPTS ?? 3);
+
 for (const { domain, file, partial } of DOMAINS) {
   console.log(`\n──────── ${domain} ────────`);
-  const run = spawnSync(
-    process.execPath,
-    ["node_modules/vitest/vitest.mjs", "run", file, "--reporter=verbose"],
-    { stdio: "inherit", env: { ...process.env, SUPABASE_DIRECT_URL: direct } }
-  );
 
-  const status = run.status ?? 1;
-  results.push({
-    domain,
-    verdict: status === 0 ? (partial ? "PASS (partial)" : "PASS") : "FAIL",
-    note: status === 0 ? (partial ?? "") : "a comparison disagreed",
-  });
+  let status = 1;
+  let output = "";
+
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+    const run = spawnSync(
+      process.execPath,
+      ["node_modules/vitest/vitest.mjs", "run", file, "--reporter=verbose"],
+      {
+        encoding: "utf8",
+        env: { ...process.env, SUPABASE_DIRECT_URL: direct },
+        maxBuffer: 64 * 1024 * 1024,
+      }
+    );
+
+    output = `${run.stdout ?? ""}${run.stderr ?? ""}`;
+    status = run.status ?? 1;
+    process.stdout.write(output);
+
+    if (status === 0) break;
+
+    const { transport, disagreement } = classify(output);
+    if (!transport || disagreement || attempt === ATTEMPTS) break;
+
+    const pause = 5000 * 2 ** (attempt - 1);
+    console.log(
+      `  attempt ${attempt}: transport failure, no disagreement. ` +
+        `Retrying in ${pause / 1000}s.`
+    );
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pause);
+  }
+
+  if (status === 0) {
+    results.push({
+      domain,
+      verdict: partial ? "PASS (partial)" : "PASS",
+      note: partial ?? "",
+    });
+    continue;
+  }
+
+  const { transport, disagreement } = classify(output);
+  results.push(
+    transport && !disagreement
+      ? {
+          domain,
+          verdict: "BLOCKED",
+          note: `could not reach PostgREST after ${ATTEMPTS} attempts; nothing disagreed`,
+        }
+      : { domain, verdict: "FAIL", note: "a comparison disagreed" }
+  );
 }
 
 // ── the table ──────────────────────────────────────────────────────────────
@@ -140,11 +206,24 @@ for (const row of results) {
 console.log("\n=================================================\n");
 
 const failed = results.filter((row) => row.verdict === "FAIL");
+const blocked = results.filter((row) => row.verdict === "BLOCKED");
+
 if (failed.length) {
   console.error(
     `${failed.length} domain(s) FAILED. Do not enable any of them.\n`
   );
   process.exit(1);
+}
+
+if (blocked.length) {
+  // Blocked is not green. The comparison did not happen, so the domain has no
+  // parity evidence and must not be enabled on the strength of this run.
+  console.error(
+    `${blocked.length} domain(s) BLOCKED: PostgREST could not be reached. ` +
+      "Nothing disagreed, and nothing was proved either. Re-run those " +
+      "domains before treating them as covered.\n"
+  );
+  process.exit(2);
 }
 
 console.log(

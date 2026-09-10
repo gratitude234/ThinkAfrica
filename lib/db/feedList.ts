@@ -46,6 +46,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { toTimestampString } from "@/lib/db/postgres/normalise";
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
 
 // ── Shapes ───────────────────────────────────────────────────────────
@@ -164,6 +165,31 @@ export interface FeedListRepository {
  */
 const IDENTITY_COLUMNS = `
     p.id, p.published_at, p.read_count, p.citation_id`;
+
+/**
+ * The two `timestamptz` columns, as the strings this contract promises.
+ *
+ * `tags` is already `to_jsonb` and the numeric columns arrive as numbers, so
+ * these two are the whole gap. postgres.js hands back a Date for a timestamp
+ * and `FeedPostRow` says string. That difference is not cosmetic here: the
+ * caller feeds `published_at` straight back in as a keyset cursor, the
+ * PostgREST arm interpolates the cursor into an `or=` filter, and a Date
+ * stringifies there as "Wed Sep 09 2026 11:18:00 GMT+0100 (West Africa Time)",
+ * which PostgreSQL rejects with 22007. Live parity caught it; no type did.
+ *
+ * Null stays null rather than becoming a string, and a projection that does
+ * not carry a column keeps not carrying it, so an `identity` row does not grow
+ * a `created_at` it never selected.
+ */
+function normaliseRows<T>(rows: ReadonlyArray<Record<string, unknown>>): T[] {
+  return rows.map((row) => {
+    const next: Record<string, unknown> = { ...row };
+    for (const key of ["created_at", "published_at"]) {
+      if (key in next) next[key] = toTimestampString(next[key]);
+    }
+    return next as T;
+  });
+}
 
 const BASE_COLUMNS = `
     p.id, p.title, p.slug, p.in_response_to, p.excerpt, p.type,
@@ -497,7 +523,7 @@ export function createPostgresFeedListRepository(
           "listPostsWithCredits requires coauthorUserIds; use listPosts instead"
         );
       }
-      return executor.query<FeedPostWithCredits>(CREDITS_SQL, [
+      return normaliseRows<FeedPostWithCredits>(await executor.query(CREDITS_SQL, [
         criteria.researchTypeExclusion,
         criteria.contentKind,
         criteria.cutoff,
@@ -512,11 +538,11 @@ export function createPostgresFeedListRepository(
         criteria.limit,
         criteria.requireCitation,
         criteria.onlyResponses,
-      ]);
+      ]));
     },
 
     async listPosts(criteria) {
-      return executor.query<FeedPostRow>(statementFor(criteria), [
+      return normaliseRows<FeedPostRow>(await executor.query(statementFor(criteria), [
         criteria.researchTypeExclusion,
         criteria.contentKind,
         criteria.cutoff,
@@ -531,7 +557,7 @@ export function createPostgresFeedListRepository(
         criteria.limit,
         criteria.requireCitation,
         criteria.onlyResponses,
-      ]);
+      ]));
     },
   };
 }
