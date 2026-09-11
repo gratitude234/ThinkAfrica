@@ -171,3 +171,43 @@ Not in scope, and not to be started as a consequence of parity passing:
 - **`get_my_profile_private` has no parameterised caller yet.** The migration
   creates the implementation; wiring the repositories to it is a separate
   change, gated on Step 2 verifying.
+
+## Why a parity domain sometimes reports BLOCKED
+
+`parity-all.mjs` occasionally records a domain, usually `post-page`, as BLOCKED
+with a transport failure. Measured 2026-09-11, this is a fault on the machine
+running the harness, not on Supabase.
+
+Requests to PostgREST were issued in batches at increasing parallelism:
+
+| Parallelism | Succeeded | Failed |
+|---|---|---|
+| 1 | 4 | 0 |
+| 2 | 8 | 0 |
+| 5 | 18 | 2 |
+| 10 | 39 | 1 |
+| 20 | 79 | 1 |
+
+The failures are `ERR_SSL_TLSV1_ALERT_DECRYPT_ERROR`,
+`ERR_SSL_SSL/TLS_ALERT_ILLEGAL_PARAMETER` and `UND_ERR_SOCKET`. Those are TLS
+record and handshake failures, and some connections fail while others opened at
+the same instant succeed, which is not a shape a server produces: TLS
+termination at Supabase would fail consistently or not at all. It is the
+signature of something on this side decrypting and re-encrypting the
+connection, which is what endpoint security software and corporate proxies do.
+
+Two further observations point the same way. The system resolver is a stub at
+`127.0.0.1` that refuses direct DNS queries while Cloudflare and Google answer
+the same names instantly, and the one `getaddrinfo ENOTFOUND` seen during a
+parity run is consistent with that stub. A sequential burst of thirty requests
+had no failures at all, median latency 210ms.
+
+What this means in practice:
+
+- It does **not** affect production. Vercel reaching Supabase does not traverse
+  this machine's TLS stack.
+- It does **not** invalidate a PASS. A domain that passed, passed.
+- It **does** mean a BLOCKED verdict should be re-run rather than investigated,
+  and that is why BLOCKED exits 2 and is reported separately from FAIL.
+- `post-page` is affected most because it issues the most requests, so it has
+  the most chances to hit a failure. Which of its reads fails changes every run.
