@@ -281,8 +281,8 @@ describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
       // dashboard.neon.test.ts asserts both rules directly, and the harness
       // says out loud that it has not confirmed them against PostgREST.
       console.log(
-        `[parity BLOCKED] dashboard.postStats reference and bookmark branches ` +
-          `need an authenticated session (${row.refs} references, ${row.marks} bookmarks in scope)`
+        `[parity COVERED ELSEWHERE] dashboard.postStats reference and bookmark branches ` +
+          `are compared against the policies in authenticated.parity.live.test.ts (${row.refs} references, ${row.marks} bookmarks in scope)`
       );
       expect(true).toBe(true);
     });
@@ -294,7 +294,7 @@ describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
       // between a service-role read and a member's read exactly when a post is
       // unpublished or a profile is hidden.
       console.log(
-        "[parity BLOCKED] dashboard.pendingInvites, recentResponses, " +
+        "[parity COVERED ELSEWHERE] dashboard.pendingInvites, recentResponses, " +
           "unreadNotifications and engagementHistory embed policy-governed rows"
       );
       expect(true).toBe(true);
@@ -441,7 +441,7 @@ describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
 
     it("records the actor projection as uncomparable", async () => {
       console.log(
-        "[parity BLOCKED] notifications.list actor embed is governed by the " +
+        "[parity COVERED ELSEWHERE] notifications.list actor embed is governed by the " +
           "profiles policy and needs an authenticated session"
       );
       expect(true).toBe(true);

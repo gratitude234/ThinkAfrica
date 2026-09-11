@@ -39,7 +39,15 @@ const DOMAINS = [
     domain: "dashboard + bookmarks + notifications",
     file: "lib/db/viewerDomains.parity.live.test.ts",
     partial:
-      "some reads need an authenticated session; see the BLOCKED lines in its output",
+      "six session-bound reads are covered by the authenticated harness below",
+  },
+  {
+    // The reads the harness above cannot compare, because a service-role read
+    // bypasses the policies that decide them. Compared against the policies
+    // themselves instead, with the member impersonated read-only inside a
+    // rolled-back transaction.
+    domain: "authenticated (policies vs repositories)",
+    file: "lib/db/authenticated.parity.live.test.ts",
   },
 ];
 
