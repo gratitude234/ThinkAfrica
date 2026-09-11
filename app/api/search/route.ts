@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { readBackendHeaders } from "@/lib/db/readBackendHeader";
+
 import { getCurrentUser } from "@/lib/serverAuth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -37,7 +39,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       scope === "overlay"
         ? { posts: [] }
-        : { posts: [], people: [], opportunities: [] }
+        : { posts: [], people: [], opportunities: [] },
+      { headers: readBackendHeaders("search") }
     );
   }
 
@@ -52,17 +55,23 @@ export async function GET(request: NextRequest) {
 
   try {
     if (scope === "overlay") {
-      return NextResponse.json({
-        posts: await searchOverlayPosts(supabase, query, viewer),
-      });
+      return NextResponse.json(
+        { posts: await searchOverlayPosts(supabase, query, viewer) },
+        { headers: readBackendHeaders("search") }
+      );
     }
 
-    return NextResponse.json(await runSiteSearch(supabase, query, viewer));
+    return NextResponse.json(await runSiteSearch(supabase, query, viewer), {
+      headers: readBackendHeaders("search"),
+    });
   } catch (error) {
     // The message names the failing query and is for the server log. What the
     // reader sees is an empty result and a retry, which is what a typeahead
     // should do with a transient failure anyway.
     console.error("[api/search] failed", error);
-    return NextResponse.json({ error: "Search is unavailable." }, { status: 503 });
+    return NextResponse.json(
+      { error: "Search is unavailable." },
+      { status: 503, headers: readBackendHeaders("search") }
+    );
   }
 }
