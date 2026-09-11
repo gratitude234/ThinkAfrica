@@ -34,6 +34,14 @@ and the final copy cannot run.
 
 ---
 
+> **Steps 1 and 2 are blocked, and the order below is under revision.**
+> Supavisor transaction mode stalls when concurrent demand exceeds the pool
+> size, which is the normal shape of serverless traffic. Reads pointed at it
+> would hang rather than error. The measurement and the options are in
+> `docs/supavisor-transaction-mode-stall.md`. The likely resolution is to skip
+> Steps 1 and 2 against Supabase entirely and enable reads only after the
+> database is on Neon, which passes the same test every time.
+
 ## Step 1. Search canary
 
 ```
