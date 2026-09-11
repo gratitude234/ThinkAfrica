@@ -222,6 +222,7 @@
     "lib/db/feed.ts",
     "lib/db/readAdapter.ts",
     "lib/db/profilePage.ts",
+    "app/api/migration-status/route.ts",
     "lib/db/readBackendHeader.test.ts",
     "lib/db/readBackendHeader.ts",
     "proxy.ts",
