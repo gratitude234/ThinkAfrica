@@ -1,0 +1,155 @@
+# Why this workflow exists
+#
+# The final Supabase to Neon copy failed four times from a laptop: twice with
+# ECONNRESET part-way through restoring 126 deferrable constraints, once with
+# the load transaction rolling back, and once with the schema application
+# itself dropping mid-statement. Between failures a single query answered
+# fine, so nothing looked broken.
+#
+# runner-readiness.mjs explains it. That machine takes 43 seconds against
+# Supabase and 68 against Neon to run 150 trivial statements, which is 290ms
+# and 470ms per round trip. The copy's long statement sequences sit exposed
+# for minutes, so any transient drop lands inside an operation rather than
+# between two.
+#
+# A hosted runner has single-digit millisecond round trips to both. Nothing
+# about the migration scripts changes; only where they run.
+#
+# Why two modes
+#
+# "prepare" resets Neon and applies the schema. It needs no production write
+# freeze, because it copies no data.
+#
+# "copy" takes the data. It MUST run with the production write freeze on, or
+# the snapshot is taken from a moving database and the drift check that
+# follows compares against a source that has moved again. Both gates are
+# enforced below rather than trusted.
+
+name: Neon migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "prepare = reset Neon and apply schema. copy = take the data (needs the write freeze ON)."
+        required: true
+        type: choice
+        options:
+          - prepare
+          - copy
+      confirm:
+        description: 'Type the mode again to confirm. "prepare" DROPS everything on Neon.'
+        required: true
+        type: string
+
+concurrency:
+  # Two of these at once would have one resetting Neon while the other loads it.
+  group: neon-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      DATABASE_URL_DIRECT: ${{ secrets.NEON_DATABASE_URL_DIRECT }}
+
+    steps:
+      - name: Refuse a mistyped confirmation
+        run: |
+          if [ "${{ inputs.mode }}" != "${{ inputs.confirm }}" ]; then
+            echo "confirm did not match mode. Nothing ran."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # Supabase is PostgreSQL 17.6 and Neon is 18.6. pg_dump refuses to dump a
+      # server newer than itself, and ubuntu-latest ships the 16 client, so the
+      # default toolchain cannot dump Supabase at all. Install 18 explicitly.
+      - name: Install PostgreSQL 18 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+          echo "PGBIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
+          /usr/lib/postgresql/18/bin/pg_dump --version
+
+      # The gate. It exercises the shapes that actually failed, not a ping, and
+      # fails a host whose round trips are slow enough to make a mid-operation
+      # drop likely.
+      - name: Prove this runner can hold both connections
+        run: node scripts/migration/runner-readiness.mjs --rounds 3 --gap 10
+
+      - name: Reset Neon and apply the schema
+        if: inputs.mode == 'prepare'
+        run: |
+          node scripts/migration/reset-neon.mjs --yes
+          node scripts/migration/apply-schema.mjs
+          node scripts/migration/verify-schema.mjs
+
+      # Enforced, not assumed. A copy taken from a moving database is internally
+      # consistent and missing whatever arrived mid-run, and that is invisible
+      # afterwards: verify-data compares against a Supabase that has moved on
+      # again and reports what looks like a copy bug.
+      - name: Require the production write freeze
+        if: inputs.mode == 'copy'
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            https://www.indegenius.africa/api/activation)
+          echo "POST /api/activation -> HTTP $code"
+          if [ "$code" != "503" ]; then
+            echo "The production write freeze is NOT on. Set MIGRATION_WRITE_FREEZE=1,"
+            echo "redeploy, and run this again."
+            exit 1
+          fi
+          node scripts/migration/freeze-check.mjs --window 90
+
+      - name: Copy the data
+        if: inputs.mode == 'copy'
+        run: |
+          node scripts/migration/copy-data.mjs
+          node scripts/migration/reset-sequences.mjs
+
+      - name: Verify
+        if: inputs.mode == 'copy'
+        run: |
+          node scripts/migration/verify-data.mjs
+          node scripts/migration/drift-check.mjs
+
+      - name: Prove the repositories still agree with Neon
+        if: inputs.mode == 'copy'
+        run: node scripts/migration/neon-verify.mjs
+
+      # Kept whatever happened, because a failed run's output is the reason to
+      # keep it. Named files only, never the directory: out/ also holds
+      # data.sql, which is 10.6 MB of production user data, and an artifact is
+      # downloadable by anyone with repository access. The files listed here
+      # are counts, digests and catalogue metadata, with no row contents.
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-${{ inputs.mode }}-${{ github.run_id }}
+          path: |
+            scripts/migration/out/manifest.json
+            scripts/migration/out/measurement.json
+            scripts/migration/out/data-verification.json
+            scripts/migration/out/*.tsv
+          retention-days: 30
+          if-no-files-found: ignore
