@@ -1,10 +1,21 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { APP_DOMAIN } from "@/lib/site";
+import { FREEZE_RESPONSE, shouldRefuseWrite } from "@/lib/writeFreeze";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host")?.toLowerCase();
+
+  // The migration write freeze, checked before anything else so that no code
+  // path reaches a database during it. Off unless MIGRATION_WRITE_FREEZE says
+  // otherwise, which production does not set. See lib/writeFreeze.ts.
+  if (shouldRefuseWrite(request.method, pathname)) {
+    return NextResponse.json(FREEZE_RESPONSE.body, {
+      status: FREEZE_RESPONSE.status,
+      headers: FREEZE_RESPONSE.headers,
+    });
+  }
 
   // TODO(gratitude): confirm production domain — APP_DOMAIN is a placeholder until then.
   if (host === APP_DOMAIN) {
