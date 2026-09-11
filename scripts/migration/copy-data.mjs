@@ -193,9 +193,29 @@ try {
   const load = psql(neonUrl, ["--single-transaction", "-f", DATA]);
   const errors = load.stderr.split(/\r?\n/).filter((line) => /ERROR|FATAL/.test(line));
 
+  // The restore has to run whether or not the load worked, or the database is
+  // left with its triggers off. But it must not be allowed to *mask* a load
+  // failure: it issues 126 DDL statements over one connection, and when that
+  // connection drops the ECONNRESET propagates first and the load's own error
+  // is never printed. That happened twice, and both times the visible symptom
+  // was a network error while the real event was the load rolling back.
+  let restoreError = null;
   console.log("restoring constraints and triggers ...");
-  await setForeignKeysDeferrable(false);
-  await setUserTriggers(true);
+  try {
+    await setForeignKeysDeferrable(false);
+    await setUserTriggers(true);
+  } catch (error) {
+    restoreError = error;
+    console.error(
+      `\n  restore step failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    console.error(
+      "  Triggers and deferrable constraints may still be off. Re-run from\n" +
+        "  reset-neon.mjs rather than repairing by hand."
+    );
+  }
 
   if (load.status !== 0 || errors.length > 0) {
     console.error(`\nload FAILED (exit ${load.status}, ${errors.length} SQL errors)`);
@@ -214,6 +234,15 @@ try {
       "\n  The transaction rolled back, so the target is unchanged. Retry with:\n" +
         "    node scripts/migration/copy-data.mjs"
     );
+    process.exit(1);
+  }
+
+  // A load that worked but could not be sealed is not a usable database, and
+  // saying "load ok" here would send the next step at a target whose triggers
+  // are off.
+  if (restoreError) {
+    console.error("\nThe data loaded, but constraints and triggers were not restored.");
+    console.error("Re-run from reset-neon.mjs.");
     process.exit(1);
   }
 
