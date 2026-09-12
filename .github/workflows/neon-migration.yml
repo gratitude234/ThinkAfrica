@@ -67,6 +67,21 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      # This file lives on the default branch so GitHub will show the manual
+      # trigger at all: workflow_dispatch is only offered for workflows present
+      # on the default branch. The migration scripts it runs do NOT live there,
+      # they are on migration/neon-preview, and running against the wrong ref
+      # would otherwise fail several steps later with a missing-module error
+      # that says nothing about the cause.
+      - name: Refuse a ref without the migration scripts
+        run: |
+          if [ ! -f scripts/migration/copy-data.mjs ]; then
+            echo "Ref '${{ github.ref_name }}' does not contain the migration scripts."
+            echo "Re-run this workflow with branch: migration/neon-preview"
+            exit 1
+          fi
+          echo "Running against ${{ github.ref_name }}"
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
