@@ -79,7 +79,10 @@ export function psqlQuery(url, sql, extraArgs = []) {
   return psql(url, ["-At", "-c", sql, ...extraArgs], url);
 }
 
-export function pgDump(url, args) {
+export function pgDump(url, args, options = {}) {
   const { pgDump: binary } = pgTools();
-  return run(binary, args, url);
+  // `options` exists for `timeout`. The copy calls this without one, as it
+  // always has. The readiness gate passes one, because a dump that hangs
+  // must fail rather than hold the job until GitHub cancels it.
+  return run(binary, args, url, options);
 }

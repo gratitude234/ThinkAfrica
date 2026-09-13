@@ -125,7 +125,17 @@ export function describe(url) {
  * routinely embeds the host, the user and sometimes the password.
  */
 export function redact(error) {
-  const message = error instanceof Error ? error.message : String(error);
+  // Four call sites pass `{ message: stderr }` rather than an Error, and until
+  // this accepted that shape they printed "[object Object]" in place of the
+  // reason: the pg_dump failure in copy-data.mjs and dump-schema.mjs, and the
+  // stderr tail copy-data prints when psql loses its connection mid-load,
+  // which exists precisely to explain that failure.
+  const message =
+    error instanceof Error
+      ? error.message
+      : error !== null && typeof error === "object" && "message" in error
+        ? String(error.message)
+        : String(error);
   return message
     .replace(/\b[a-z0-9._-]+:[^\s@]+@[^\s/]+/gi, "<credentials redacted>")
     .replace(/\b[a-z0-9-]+\.[a-z0-9-]+\.(?:aws|azure|gcp)\.neon\.tech\b/gi, "<neon host>")

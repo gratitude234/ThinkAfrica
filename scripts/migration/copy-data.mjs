@@ -45,7 +45,7 @@ import {
   resolveSupabaseUrl,
 } from "./env.mjs";
 import { pgDump, psql } from "./pg.mjs";
-import { EXCLUDED_TABLE_DATA } from "./policy.mjs";
+import { dataDumpArgs, EXCLUDED_TABLE_DATA } from "./policy.mjs";
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "out");
 const DATA = join(OUT, "data.sql");
@@ -152,19 +152,9 @@ try {
   assertDumperNewerThan(Math.floor(Number(num) / 10000));
 
   console.log("\ndumping data (COPY format, dependency order) ...");
-  const dump = pgDump(supabaseUrl, [
-    "--data-only",
-    "--schema=public",
-    "--schema=private",
-    "--no-owner",
-    "--no-privileges",
-    // COPY rather than INSERT is pg_dump's default and is what we want: an
-    // order of magnitude faster, and the blocks are emitted so that parents
-    // precede children.
-    "--no-comments",
-    // Schema migrates, data does not. See policy.mjs for why each one.
-    ...EXCLUDED_TABLE_DATA.map((entry) => "--exclude-table-data=" + entry.table),
-  ]);
+  // Shared with runner-readiness.mjs, which runs the same dump before the
+  // freeze to prove a host can finish it. See dataDumpArgs() in policy.mjs.
+  const dump = pgDump(supabaseUrl, dataDumpArgs());
   for (const entry of EXCLUDED_TABLE_DATA) {
     console.log("  data excluded: " + entry.table);
     console.log("    " + entry.reason);

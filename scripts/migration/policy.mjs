@@ -40,3 +40,31 @@ export const EXCLUDED_TABLE_DATA = [
 export const EXCLUDED_TABLE_DATA_NAMES = new Set(
   EXCLUDED_TABLE_DATA.map((entry) => entry.table)
 );
+
+/**
+ * The arguments for the production data dump.
+ *
+ * One definition, because two scripts run this dump and they have to be the
+ * same operation. `copy-data.mjs` runs it for real. `runner-readiness.mjs`
+ * runs it first, discarding the output, to prove a host can complete the
+ * source half of the copy before anyone applies the production write freeze.
+ * A readiness dump with different flags would be evidence about a different
+ * dump: fewer tables, or INSERT rather than COPY, is a different load on the
+ * connection and a different duration, and the gate would pass on a shape the
+ * copy never uses.
+ */
+export function dataDumpArgs() {
+  return [
+    "--data-only",
+    "--schema=public",
+    "--schema=private",
+    "--no-owner",
+    "--no-privileges",
+    // COPY rather than INSERT is pg_dump's default and is what we want: an
+    // order of magnitude faster, and the blocks are emitted so that parents
+    // precede children.
+    "--no-comments",
+    // Schema migrates, data does not. See EXCLUDED_TABLE_DATA for why.
+    ...EXCLUDED_TABLE_DATA.map((entry) => "--exclude-table-data=" + entry.table),
+  ];
+}
