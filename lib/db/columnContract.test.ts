@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -36,13 +36,14 @@ import { describe, expect, it } from "vitest";
  * for not scanning the SQL is on `repositorySources` below.
  */
 
-const schema = readFileSync(
-  resolve(process.cwd(), "scripts/migration/out/schema.raw.sql"),
-  "utf8"
+const CATALOGUE = resolve(
+  process.cwd(),
+  "scripts/migration/out/schema.raw.sql"
 );
+const haveCatalogue = existsSync(CATALOGUE);
 
 /** table name -> its columns, from the catalogue's CREATE TABLE blocks. */
-function readColumns(): Map<string, Set<string>> {
+function readColumns(schema: string): Map<string, Set<string>> {
   const tables = new Map<string, Set<string>>();
   const pattern = /CREATE TABLE public\.(\w+) \(([\s\S]*?)\n\);/g;
 
@@ -63,16 +64,41 @@ function readColumns(): Map<string, Set<string>> {
   return tables;
 }
 
-const TABLES = readColumns();
+/**
+ * Read once, and only from inside a test that actually runs.
+ *
+ * This was a module-level read, which throws ENOENT during collection on any
+ * clean checkout because out/ is gitignored. A thrown collection is a failed
+ * file reporting "no tests", not a skip, and it is what broke CI. Note that
+ * moving it into a describe.skipIf factory would not have been enough either:
+ * Vitest still runs the factory to discover the tests it is about to skip.
+ *
+ * Set REQUIRE_MIGRATION_ARTIFACTS=1 to turn a missing catalogue into a failure
+ * rather than a skip, so these assertions are enforced wherever the dump is
+ * supposed to exist.
+ */
+let catalogueCache: {
+  tables: Map<string, Set<string>>;
+  views: Set<string>;
+} | null = null;
 
-/** Views project columns too, and a repository may read one. Their columns are
- *  not in a CREATE TABLE block, so a reference to a view is not checked here
- *  rather than being guessed at. */
-const VIEWS = new Set(
-  [...schema.matchAll(/CREATE(?: OR REPLACE)? VIEW public\.(\w+)/g)].map(
-    (match) => match[1]
-  )
-);
+function catalogue() {
+  if (!catalogueCache) {
+    const schema = readFileSync(CATALOGUE, "utf8");
+    catalogueCache = {
+      tables: readColumns(schema),
+      // Views project columns too, and a repository may read one. Their
+      // columns are not in a CREATE TABLE block, so a reference to a view is
+      // not checked here rather than being guessed at.
+      views: new Set(
+        [...schema.matchAll(/CREATE(?: OR REPLACE)? VIEW public\.(\w+)/g)].map(
+          (match) => match[1]
+        )
+      ),
+    };
+  }
+  return catalogueCache;
+}
 
 /**
  * The files whose PostgREST selects are checked.
@@ -163,7 +189,10 @@ function selectPairs(source: string): Array<{ table: string; columns: string[] }
   return pairs;
 }
 
-describe("every column a PostgREST select names", () => {
+describe("the PostgREST select scanner", () => {
+  // Needs no catalogue, so it still runs on a clean checkout. If the
+  // pattern stopped matching, the catalogue check below would pass on
+  // anything, and a vacuous guard is worse than an absent one.
   it("finds selects to check, so the scan is not vacuous", () => {
     const pairs = repositorySources().flatMap(({ source }) =>
       selectPairs(withoutComments(source))
@@ -172,15 +201,27 @@ describe("every column a PostgREST select names", () => {
     expect(pairs.length).toBeGreaterThan(8);
   });
 
+  it("has the catalogue when the run requires it", () => {
+    if (process.env.REQUIRE_MIGRATION_ARTIFACTS !== "1") return;
+    expect(
+      haveCatalogue,
+      "REQUIRE_MIGRATION_ARTIFACTS=1 but scripts/migration/out/schema.raw.sql " +
+        "is missing. Run scripts/migration/dump-schema.mjs first."
+    ).toBe(true);
+  });
+});
+
+describe.skipIf(!haveCatalogue)("every column a PostgREST select names", () => {
   it("exists in the production catalogue", () => {
+    const { tables, views } = catalogue();
     const unknown: string[] = [];
 
     for (const { file, source } of repositorySources()) {
       for (const { table, columns } of selectPairs(withoutComments(source))) {
-        const known = TABLES.get(table);
+        const known = tables.get(table);
         // A view projects its columns rather than declaring them, so it is
         // outside this check rather than guessed at.
-        if (!known || VIEWS.has(table)) continue;
+        if (!known || views.has(table)) continue;
 
         for (const column of columns) {
           if (!known.has(column)) unknown.push(`${file}: ${table}.${column}`);
@@ -194,7 +235,8 @@ describe("every column a PostgREST select names", () => {
   });
 
   it("knows which relations are views, and does not guess at their columns", () => {
-    expect(VIEWS.size).toBeGreaterThan(0);
-    expect(VIEWS.has("profile_record_entries")).toBe(true);
+    const { views } = catalogue();
+    expect(views.size).toBeGreaterThan(0);
+    expect(views.has("profile_record_entries")).toBe(true);
   });
 });

@@ -100,24 +100,57 @@ describe("splitStatements", () => {
  * When a real dump is present, assert the properties the transformation
  * depends on. Skipped rather than failed when it is not: `out/` is gitignored
  * and a checkout will not have one.
+ *
+ * Every read below is lazy, and that is load-bearing rather than tidy.
+ * `describe.skipIf` marks the tests inside as skipped, but Vitest still runs
+ * the describe factory to discover them, so a `readFileSync` in the factory
+ * body throws ENOENT during collection on any clean checkout. That is a failed
+ * file with "no tests", not a skip, and it is what broke CI: the guard
+ * announced itself as skippable and then crashed before the skip applied.
+ *
+ * Set REQUIRE_MIGRATION_ARTIFACTS=1 to turn a missing artifact into a failure
+ * instead of a skip. The Neon migration workflow sets it immediately after
+ * generating the dump, so these assertions are enforced where the artifacts
+ * are supposed to exist rather than only on a developer machine.
  */
 const RAW = join(process.cwd(), "scripts", "migration", "out", "schema.raw.sql");
 const NEON = join(process.cwd(), "scripts", "migration", "out", "schema.neon.sql");
 const havePipelineOutput = existsSync(RAW) && existsSync(NEON);
 
+describe("the schema pipeline artifacts", () => {
+  it("are present when the run requires them", () => {
+    if (process.env.REQUIRE_MIGRATION_ARTIFACTS !== "1") return;
+    expect(
+      havePipelineOutput,
+      "REQUIRE_MIGRATION_ARTIFACTS=1 but out/schema.raw.sql or out/schema.neon.sql is missing. " +
+        "Run dump-schema.mjs then transform-schema.mjs first."
+    ).toBe(true);
+  });
+});
+
+/** Read once, and only from inside a test that actually runs. */
+let pipeline: { neon: string; raw: string; executable: string } | null = null;
+function schemaPipeline() {
+  if (!pipeline) {
+    const neon = readFileSync(NEON, "utf8");
+    pipeline = {
+      neon,
+      raw: readFileSync(RAW, "utf8"),
+      // Comments and string literals removed: the check is about what the
+      // schema depends on, not what it talks about.
+      executable: neon
+        .split(/\r?\n/)
+        .filter((line) => !line.trim().startsWith("--"))
+        .join("\n")
+        .replace(/'(?:[^']|'')*'/g, "''"),
+    };
+  }
+  return pipeline;
+}
+
 describe.skipIf(!havePipelineOutput)("the generated Neon schema", () => {
-  const neon = readFileSync(NEON, "utf8");
-
-  /** Comments and string literals removed: the check is about what the schema
-   *  depends on, not what it talks about. */
-  const executable = neon
-    .split(/\r?\n/)
-    .filter((line) => !line.trim().startsWith("--"))
-    .join("\n")
-    .replace(/'(?:[^']|'')*'/g, "''");
-
   it("splits the real dump into every CREATE FUNCTION it contains", () => {
-    const raw = readFileSync(RAW, "utf8");
+    const { raw } = schemaPipeline();
     const statements = splitStatements(raw);
     const declared = (raw.match(/^CREATE FUNCTION /gm) ?? []).length;
     const split = statements.filter((s: string) =>
@@ -127,6 +160,7 @@ describe.skipIf(!havePipelineOutput)("the generated Neon schema", () => {
   });
 
   it("references no provider-owned schema", () => {
+    const { executable } = schemaPipeline();
     for (const [label, pattern] of [
       ["auth.users", /auth\.users/],
       ["vault", /\bvault\./],
@@ -139,6 +173,7 @@ describe.skipIf(!havePipelineOutput)("the generated Neon schema", () => {
   });
 
   it("carries the auth compatibility shim, and no auth tables", () => {
+    const { executable } = schemaPipeline();
     expect(executable).toContain("CREATE SCHEMA IF NOT EXISTS auth");
     expect(executable).toContain("CREATE OR REPLACE FUNCTION auth.uid()");
     expect(executable).toContain("CREATE OR REPLACE FUNCTION auth.role()");
@@ -146,6 +181,7 @@ describe.skipIf(!havePipelineOutput)("the generated Neon schema", () => {
   });
 
   it("creates the PostgREST role placeholders as NOLOGIN", () => {
+    const { executable } = schemaPipeline();
     for (const role of ["anon", "authenticated", "service_role"]) {
       expect(executable).toContain(`CREATE ROLE ${role} NOLOGIN NOINHERIT`);
     }
@@ -155,6 +191,7 @@ describe.skipIf(!havePipelineOutput)("the generated Neon schema", () => {
   });
 
   it("leaves the authorization expressions untouched", () => {
+    const { neon } = schemaPipeline();
     // The whole point of the shim: 178 auth.uid() call sites survive verbatim,
     // so the policies stay diffable against Supabase.
     expect((neon.match(/auth\.uid\(\)/g) ?? []).length).toBeGreaterThan(100);

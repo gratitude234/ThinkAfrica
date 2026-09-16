@@ -62,6 +62,21 @@ jobs:
         # The suite carries the guards that would otherwise only fail in
         # production: the browser write boundary, the server action contract,
         # the migration contracts, and the adapter parity rules.
+        #
+        # Two suites need scripts/migration/out/schema.raw.sql and
+        # schema.neon.sql, which are gitignored build products of
+        # dump-schema.mjs and transform-schema.mjs. They are NOT generated
+        # here, and that is deliberate rather than an omission: dump-schema
+        # needs SUPABASE_DB_URL and a pg_dump binary, and this tier runs on
+        # pull requests from forks, where a production connection string must
+        # never be in scope and where GitHub would withhold the secret anyway,
+        # turning the tier that must never skip into one that always fails.
+        #
+        # So those suites skip cleanly when the artifacts are absent, and the
+        # Neon migration workflow runs them with REQUIRE_MIGRATION_ARTIFACTS=1
+        # against a dump it has just generated. The skip is the contract, not
+        # a weakening of it; what was broken was that a missing artifact threw
+        # during collection instead, which reports as a failed file.
         run: npm test
 
       - name: Build
