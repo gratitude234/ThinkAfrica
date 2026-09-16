@@ -1,5 +1,9 @@
 import type { EmailSenderKey } from "@/lib/emailSenders";
-import type { BroadcastAudienceKey, BroadcastStatus } from "@/lib/broadcasts";
+import {
+  isRetiredBroadcastAudience,
+  type BroadcastAudienceKey,
+  type BroadcastStatus,
+} from "@/lib/broadcasts";
 
 /**
  * The send state machine.
@@ -74,6 +78,7 @@ export type SendFailureReason =
   | "empty_body"
   | "no_recipients"
   | "too_many_recipients"
+  | "audience_retired"
   | "segment_missing"
   | "segment_stale"
   | "already_dispatched"
@@ -338,6 +343,17 @@ export async function sendBroadcast(
       ok: false,
       reason: "empty_body",
       message: "Write a message before sending.",
+    };
+  }
+
+  // A retired audience still has a segment row, but nothing keeps it current,
+  // so it may be fresh enough to pass the staleness check while addressing
+  // the wrong people. Refused before anything is claimed.
+  if (isRetiredBroadcastAudience(row.audienceKey)) {
+    return {
+      ok: false,
+      reason: "audience_retired",
+      message: "This audience has been retired. Choose another audience, then send.",
     };
   }
 

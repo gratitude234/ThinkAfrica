@@ -81,7 +81,7 @@ export default function SideRail({
       // surface you would lose your place behind, and containment made the page
       // stop dead under the pointer on short windows. Chaining keeps one gesture
       // meaning one thing wherever it lands.
-      className="hidden xl:sticky xl:top-[var(--app-sticky-offset)] xl:block xl:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] xl:self-start xl:overflow-y-auto"
+      className="hidden md:sticky md:top-[var(--app-sticky-offset)] md:block md:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] md:self-start md:overflow-y-auto"
     >
       <nav aria-label="Sections" className="flex flex-col gap-0.5">
         <RailLink

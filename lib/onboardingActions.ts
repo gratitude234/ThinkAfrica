@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
  * fields the two steps prefill, and whether the member already finished.
  *
  * The publishing reset, Phase 2G, cut this from four reads to two. The
- * onboarding path preference and the Intellectual Record summary went with
+ * onboarding path preference and the retired profile-record summary went with
  * the steps that used them.
  *
  * ## The distinction this exists to preserve

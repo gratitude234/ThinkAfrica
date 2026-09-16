@@ -1,579 +1,72 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import Footer from "@/components/ui/Footer";
-import PostCover from "@/components/post/PostCover";
-import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
-import {
-  loadLandingData,
-  TOPICS_DISPLAY_LIMIT,
-  type LandingPost,
-  type LandingPostRaw,
-} from "./landingData";
-import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import { getContentKindLabel, resolveContentKind } from "@/lib/contentModel";
-import LandingTrackedLink from "./LandingTrackedLink";
-import LandingAnimations from "./LandingAnimations";
+import { BRAND_SEO_DESCRIPTION } from "@/lib/brand";
 import LandingNav from "./LandingNav";
-import {
-  BRAND_DESCRIPTION,
-  BRAND_PROMISE,
-  BRAND_SEO_DESCRIPTION,
-  BRAND_TAGLINE,
-} from "@/lib/brand";
-import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
-
-// ── Types ────────────────────────────────────────────────────────────
-
-
-/**
- * Rendered per request, not at build time.
- *
- * This page is the front door and it reads four things out of Supabase. As a
- * statically generated page that read ran during `next build`, which meant a
- * deployment could only succeed while the database was responsive. On
- * 2026-09-07 it was not: Next killed the page build at 60 seconds, retried
- * three times, and failed the deployment. An identical redeploy two minutes
- * later succeeded.
- *
- * A build must not depend on a third party being fast. The data is still
- * cached for five minutes, in the Data Cache rather than the Route Cache, so
- * a visitor still does not pay for four round trips. See ./landingData.ts.
- */
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Build Your Intellectual Identity",
+  title: { absolute: "Indegenius | Read. Write. Follow. Discover." },
   description: BRAND_SEO_DESCRIPTION,
-  alternates: { canonical: canonicalPath("/landing") },
-  openGraph: {
-    title: `Indegenius | ${BRAND_PROMISE}`,
-    description: BRAND_SEO_DESCRIPTION,
-    url: absoluteUrl("/landing"),
-    siteName: SITE_NAME,
-    images: [{ url: absoluteUrl(DEFAULT_OG_IMAGE), width: 1200, height: 630 }],
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `Indegenius | ${BRAND_PROMISE}`,
-    description: BRAND_SEO_DESCRIPTION,
-    images: [absoluteUrl(DEFAULT_OG_IMAGE)],
-  },
 };
 
-// ── Static data ──────────────────────────────────────────────────────
+const FEATURES = [
+  ["Read", "Find Posts and Articles from writers across Africa and beyond."],
+  ["Write", "Publish a short Post or a long-form Article."],
+  ["Follow", "Keep up with writers whose work matters to you."],
+  ["Discover", "Browse topics, search publications, and meet new writers."],
+] as const;
 
-const VALUE_PROPS = [
-  {
-    num: "01",
-    numStyle: "bg-emerald-100 text-emerald-600",
-    title: "Discover ideas worth engaging with",
-    desc: "Read Posts and Articles from people developing ideas through evidence, argument, and public contribution.",
-  },
-  {
-    num: "02",
-    numStyle: "bg-amber-100 text-amber-700",
-    title: "Build a body of work",
-    desc: "Bring your Posts and Articles together in one evidence-backed Intellectual Record.",
-  },
-  {
-    num: "03",
-    numStyle: "bg-purple-100 text-purple-700",
-    title: "Test ideas in public",
-    desc: "Move from reading into writing, and turn your questions and counterpoints into work on your Intellectual Record.",
-  },
-];
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-function typeBadge(post: LandingPost): { classes: string; label: string } {
-  const kind = resolveContentKind(post);
-  return {
-    classes:
-      kind === "article"
-        ? "bg-gold-tint text-gold-ink"
-        : "bg-green-tint text-emerald-brand",
-    label: getContentKindLabel(kind),
-  };
-}
-
-/** Titleless lightweight Post: lead with the excerpt instead of a blank/fabricated headline. */
-function postHeadline(post: LandingPost): string {
+export default function LandingPage() {
   return (
-    getPostDisplayTitle(post) ?? post.excerpt?.trim() ?? getPostMetadataTitle(post, post.profiles)
-  );
-}
-
-function relativeDate(dateStr: string | null): string {
-  if (!dateStr) return "";
-  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
-  if (days === 0) return "Today";
-  if (days === 1) return "1d ago";
-  if (days < 7)  return `${days}d ago`;
-  if (days < 14) return "1w ago";
-  return `${Math.floor(days / 7)}w ago`;
-}
-
-function authorLine(post: LandingPost) {
-  const p = post.profiles;
-  return {
-    name: p?.full_name ?? p?.username ?? "Indegenius",
-    university: p?.university ?? null,
-  };
-}
-
-
-// ── Page ─────────────────────────────────────────────────────────────
-
-export default async function LandingPage() {
-  // Never rejects. An unreachable database renders the page with empty
-  // strips rather than an error, and says so in the server log.
-  const { postsRaw, postCount, userCount, topics } = await loadLandingData();
-
-  const posts: LandingPost[] = postsRaw
-    .map((p) => ({
-      ...p,
-      profiles: Array.isArray(p.profiles) ? (p.profiles[0] ?? null) : p.profiles,
-    }));
-
-  const [leadPost = null, ...rest] = posts;
-  const railPosts  = rest.slice(0, 3);
-  const gridPosts  = posts.slice(0, 4);
-  const primaryHref = leadPost ? `/post/${leadPost.slug}` : "/?guest=1";
-
-  const displayPostCount = postCount;
-  const displayUserCount = userCount;
-
-  const stats = [
-    ...(displayUserCount > 0
-      ? [{ value: displayUserCount, suffix: "", label: "Registered profiles" }]
-      : []),
-    ...(displayPostCount > 0
-      ? [{ value: displayPostCount, suffix: "", label: "Published contributions" }]
-      : []),
-  ];
-
-  return (
-    <div className="landing-page">
+    <div className="min-h-screen bg-canvas text-ink">
       <LandingNav />
-      <LandingAnimations />
-      <RetentionEventTracker
-        event="landing_viewed"
-        metadata={{ source: "landing", postCount: displayPostCount, visiblePosts: posts.length }}
-      />
-
-      {/* ── Hero ──────────────────────────────────────────────────── */}
-      <section className="border-b border-gray-200 py-8 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid items-center gap-7 lg:grid-cols-[1fr_440px] lg:gap-16">
-
-            {/* Copy */}
-            <div>
-              <div className="hero-animate hero-eyebrow mb-4 flex items-center gap-2.5 sm:mb-6">
-                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-brand" />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
-                  {BRAND_TAGLINE}
-                </span>
-              </div>
-
-              <h1 className="hero-animate hero-h1 max-w-[11ch] font-display text-[40px] leading-[1.02] tracking-normal text-ink sm:max-w-none sm:text-[64px]">
-                {BRAND_PROMISE}
-              </h1>
-
-              <p className="hero-animate hero-sub mt-4 mb-6 max-w-[480px] text-[15px] leading-[1.65] text-ink-muted sm:mt-6 sm:mb-9 sm:text-lg">
-                {BRAND_DESCRIPTION}
-              </p>
-
-              {leadPost ? (
-                <LandingTrackedLink
-                  href={`/post/${leadPost.slug}`}
-                  event="landing_read_clicked"
-                  metadata={{ source: "mobile_featured_read", postId: leadPost.id }}
-                  className="hero-animate mb-6 grid grid-cols-[88px_1fr] items-stretch gap-3 border-y border-gray-200 py-3.5 lg:hidden"
-                >
-                  <PostCover
-                    src={leadPost.cover_image_url}
-                    alt={getPostDisplayTitle(leadPost)}
-                    content_kind={leadPost.content_kind}
-                    sizes="88px"
-                    className="h-[92px] rounded-[10px]"
-                    imageClassName="object-cover"
-                  />
-                  <div className="min-w-0 py-0.5">
-                    <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-emerald-600">
-                      Featured read
-                    </p>
-                    <h2 className="font-display line-clamp-2 text-[18px] font-semibold leading-snug text-ink">
-                      {postHeadline(leadPost)}
-                    </h2>
-                    <p className="mt-2 line-clamp-1 text-xs text-ink-muted">
-                      {authorLine(leadPost).name}
-                      {authorLine(leadPost).university
-                        ? ` / ${authorLine(leadPost).university}`
-                        : ""}
-                    </p>
-                  </div>
-                </LandingTrackedLink>
-              ) : null}
-
-              <div className="hero-animate hero-ctas grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
-                <LandingTrackedLink
-                  href={primaryHref}
-                  event="landing_read_clicked"
-                  metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, contentKind: leadPost?.content_kind ?? null, position: "primary" }}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-5 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[#0E4B37] sm:px-7 sm:text-base"
-                >
-                  Explore ideas
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-                </LandingTrackedLink>
-                <LandingTrackedLink
-                  href="/signup"
-                  event="landing_signup_clicked"
-                  metadata={{ source: "hero_secondary" }}
-                  className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-3.5 text-[15px] font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:px-7 sm:text-base"
-                >
-                  Start your Intellectual Record
-                </LandingTrackedLink>
-              </div>
-
-              {/* Social proof */}
-              <div className="hero-animate hero-proof mt-6 flex items-start gap-3 sm:mt-8 sm:items-center sm:gap-4">
-                <div className="flex">
-                  {[
-                    { i: "A", c: "bg-emerald-100 text-emerald-800" },
-                    { i: "K", c: "bg-purple-100 text-purple-800" },
-                    { i: "F", c: "bg-amber-100 text-amber-800" },
-                    { i: "N", c: "bg-blue-100 text-blue-800" },
-                  ].map(({ i, c }, idx) => (
-                    <div
-                      key={i}
-                      className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border-2 border-white text-xs font-semibold ${c} ${idx > 0 ? "-ml-2" : ""}`}
-                    >
-                      {i}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-sm leading-snug text-ink-muted">
-                  {displayUserCount > 0 ? (
-                    <>
-                      <strong className="text-ink">
-                        {displayUserCount.toLocaleString()}
-                      </strong>{" "}
-                      registered profiles on Indegenius
-                    </>
-                  ) : (
-                    "Explore Posts and Articles already live on Indegenius"
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {/* Reading rail */}
-            <div className="hero-animate hero-rail hidden rounded-2xl border border-gray-200 bg-white p-3 lg:block">
-              <div className="mb-3 flex items-center justify-between px-1">
-                <span className="text-[13px] font-semibold text-ink">Start reading</span>
-                <LandingTrackedLink
-                  href="/?guest=1"
-                  event="landing_read_clicked"
-                  metadata={{ source: "rail_browse_all" }}
-                  className="text-xs font-semibold text-emerald-600 hover:underline"
-                >
-                  Browse all →
-                </LandingTrackedLink>
-              </div>
-
-              {leadPost ? (
-                <>
-                  {/* Lead card */}
-                  <LandingTrackedLink
-                    href={`/post/${leadPost.slug}`}
-                    event="landing_read_clicked"
-                    metadata={{ source: "hero_rail", postId: leadPost.id, position: "lead" }}
-                    className="mb-2 block overflow-hidden rounded-[10px] border border-gray-200 transition-shadow hover:shadow-md"
-                  >
-                    <PostCover
-                      src={leadPost.cover_image_url}
-                      alt={getPostDisplayTitle(leadPost)}
-                      content_kind={leadPost.content_kind}
-                      sizes="440px"
-                      className="h-[156px] border-b border-gray-100"
-                      imageClassName="object-cover"
-                    />
-                    <div className="p-3.5">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${typeBadge(leadPost).classes}`}>
-                          {typeBadge(leadPost).label}
-                        </span>
-                        <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Read</span>
-                      </div>
-                      <h2 className="mb-1.5 line-clamp-2 font-display text-[17px] font-semibold leading-snug text-ink">
-                        {postHeadline(leadPost)}
-                      </h2>
-                      <p className="text-[11px] text-ink-muted">
-                        {authorLine(leadPost).name}
-                        {authorLine(leadPost).university ? ` / ${authorLine(leadPost).university}` : ""}
-                      </p>
-                    </div>
-                  </LandingTrackedLink>
-
-                  {/* Compact rail items */}
-                  {railPosts.map((post, i) => {
-                    const badge  = typeBadge(post);
-                    const author = authorLine(post);
-                    return (
-                      <LandingTrackedLink
-                        key={post.id}
-                        href={`/post/${post.slug}`}
-                        event="landing_read_clicked"
-                        metadata={{ source: "hero_rail", postId: post.id, position: `rail_${i + 1}` }}
-                        className="hero-compact mb-1.5 last:mb-0 flex items-center gap-3 rounded-[10px] border border-gray-200 bg-canvas px-3 py-2.5"
-                      >
-                        <span className={`inline-flex flex-shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>
-                          {badge.label}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-ink">{postHeadline(post)}</p>
-                          <p className="mt-0.5 text-[11px] text-ink-muted">
-                            {author.name}{author.university ? ` · ${author.university}` : ""}
-                          </p>
-                        </div>
-                      </LandingTrackedLink>
-                    );
-                  })}
-                </>
-              ) : (
-                <div className="rounded-xl border border-dashed border-gray-200 p-5">
-                  <p className="text-sm font-semibold text-gray-900">Browse latest ideas</p>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-500">
-                    Read as a guest, then sign up when you want to follow writers or respond.
-                  </p>
-                  <LandingTrackedLink
-                    href="/?guest=1"
-                    event="landing_read_clicked"
-                    metadata={{ source: "rail_empty" }}
-                    className="mt-4 inline-flex rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-[#0E4B37]"
-                  >
-                    Browse latest
-                  </LandingTrackedLink>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats bar ─────────────────────────────────────────────── */}
-      {stats.length > 0 ? (
-        <div id="stats-bar" className="border-b border-gray-200 bg-white py-4 sm:py-5">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 gap-y-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:divide-x sm:divide-gray-200">
-              {stats.map(({ value, suffix, label }) => (
-                <div key={label} className="stat-item px-3 py-1 text-center sm:px-10">
-                  <div className="font-display text-[26px] font-bold tracking-[-0.02em] text-ink sm:text-[30px]" data-target={value}>
-                    {value >= 1000 ? value.toLocaleString() : value}{suffix}
-                  </div>
-                  <div className="mx-auto mt-1 max-w-[9rem] text-[11px] font-medium leading-snug text-gray-500 sm:text-xs">{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* ── Latest posts ──────────────────────────────────────────── */}
-      {gridPosts.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-          <div className="section-head mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-                Real work, real bylines
-              </p>
-              <h2 className="font-display text-[28px] font-medium text-ink sm:text-[32px]">Latest contributions</h2>
-            </div>
-            <LandingTrackedLink
-              href="/?guest=1"
-              event="landing_read_clicked"
-              metadata={{ source: "latest_browse_all" }}
-              className="text-sm font-semibold text-emerald-600 hover:underline"
-            >
-              Browse all →
-            </LandingTrackedLink>
-          </div>
-
-          <div id="post-grid" className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {gridPosts.map((post, i) => {
-              const badge       = typeBadge(post);
-              const author      = authorLine(post);
-              const isWide      = i === 0;
-              const displayTitle = getPostDisplayTitle(post);
-
-              return (
-                <LandingTrackedLink
-                  key={post.id}
-                  href={`/post/${post.slug}`}
-                  event="landing_read_clicked"
-                  metadata={{ source: "latest_grid", postId: post.id, position: `grid_${i + 1}` }}
-                  className={`post-card block overflow-hidden rounded-xl border border-gray-200 bg-white ${isWide ? "md:col-span-2" : ""}`}
-                >
-                  {isWide ? (
-                    <div className="grid md:grid-cols-[280px_1fr]">
-                      <PostCover
-                        src={post.cover_image_url}
-                        alt={displayTitle}
-                        content_kind={post.content_kind}
-                        sizes="(max-width: 768px) 100vw, 280px"
-                        className="h-[188px] border-b border-gray-100 md:h-full md:min-h-[240px] md:border-b-0 md:border-r"
-                        imageClassName="object-cover"
-                      />
-                      <div className="flex flex-col justify-between p-5 sm:p-6">
-                        <div>
-                          <div className="mb-2.5 flex items-center">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
-                          </div>
-                          <h2 className="mb-2 line-clamp-3 font-display text-[20px] font-semibold leading-snug text-ink sm:text-[22px]">{postHeadline(post)}</h2>
-                          {displayTitle && post.excerpt && (
-                            <p className="mb-3 line-clamp-2 text-sm leading-relaxed text-ink-muted">{post.excerpt}</p>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3 text-xs text-ink-muted">
-                          <span className="font-medium text-gray-700">{author.name}</span>
-                          {author.university && <><span>·</span><span>{author.university}</span></>}
-                          {post.published_at && <><span>·</span><span>{relativeDate(post.published_at)}</span></>}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <PostCover
-                        src={post.cover_image_url}
-                        alt={displayTitle}
-                        content_kind={post.content_kind}
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                        className="h-[150px] border-b border-gray-100"
-                        imageClassName="object-cover"
-                      />
-                      <div className="p-4">
-                        <div className="mb-2.5">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${badge.classes}`}>{badge.label}</span>
-                        </div>
-                        <h2 className="mb-2 line-clamp-2 font-display text-[17px] font-semibold leading-snug text-ink">{postHeadline(post)}</h2>
-                        {displayTitle && post.excerpt && (
-                          <p className="mb-3 line-clamp-2 text-[13px] leading-relaxed text-ink-muted">{post.excerpt}</p>
-                        )}
-                        <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3 text-xs text-ink-muted">
-                          <span className="font-medium text-gray-700">{author.name}</span>
-                          {author.university && <><span>·</span><span>{author.university}</span></>}
-                          {post.published_at && <><span>·</span><span>{relativeDate(post.published_at)}</span></>}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </LandingTrackedLink>
-              );
-            })}
+      <main>
+        <section className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-brand">
+            Publishing, kept simple
+          </p>
+          <h1 className="font-display mt-5 max-w-4xl text-5xl font-semibold leading-[1.02] tracking-tight sm:text-7xl">
+            Read. Write. Follow. Discover.
+          </h1>
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-ink-muted">
+            Indegenius is a place to publish ideas, read thoughtful work, and
+            follow the writers and topics you care about.
+          </p>
+          <div className="mt-9 flex flex-wrap gap-3">
+            <Link href="/signup" className="rounded-xl bg-emerald-brand px-6 py-3 text-sm font-semibold text-white hover:bg-[#0E4B37]">
+              Start writing
+            </Link>
+            <Link href="/explore" className="rounded-xl border border-card-border bg-white px-6 py-3 text-sm font-semibold text-ink hover:border-gray-300">
+              Explore publications
+            </Link>
           </div>
         </section>
-      )}
 
-      {/* ── Topics ────────────────────────────────────────────────── */}
-      {topics.length > 0 && (
-        <section className="border-y border-gray-200 bg-white py-12 sm:py-14">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="section-head mb-6 flex items-end justify-between">
-              <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">Browse by topic</p>
-                <h2 className="font-display text-[24px] font-medium text-ink sm:text-[26px]">Find ideas that interest you</h2>
-              </div>
-            </div>
-            <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div id="topics-grid" className="flex w-max gap-2.5 sm:w-auto sm:flex-wrap">
-              {topics.map(({ tag, count }) => (
-                <LandingTrackedLink
-                  key={tag}
-                  href={`/topics/${encodeURIComponent(tag)}`}
-                  event="landing_read_clicked"
-                  metadata={{ source: "topics_grid", topic: tag }}
-                  className="topic-pill inline-flex min-h-9 shrink-0 cursor-pointer items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[13px] font-medium text-gray-700 transition-[border-color,background-color,color,box-shadow] duration-150 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-brand focus-visible:ring-offset-1"
-                >
-                  {tag}
-                  <span className="ml-1.5 text-[11px] text-ink-muted">{count}</span>
-                </LandingTrackedLink>
-              ))}
-            </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── Value props ───────────────────────────────────────────── */}
-      <section className="border-b border-gray-200 bg-white py-12 sm:py-14">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-12 text-center">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">How it works</p>
-            <h2 className="font-display text-[30px] font-medium text-ink sm:text-[36px]">How your intellectual identity grows</h2>
-          </div>
-          <div id="value-grid" className="grid grid-cols-1 divide-y md:grid-cols-3 md:divide-x md:divide-y-0 divide-gray-200">
-            {VALUE_PROPS.map(({ num, numStyle, title, desc }, i) => (
-              <div
-                key={num}
-                className={`value-item py-10 ${i === 0 ? "md:pr-10" : i === 1 ? "md:px-10" : "md:pl-10"}`}
-              >
-                <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl ${numStyle}`}>
-                  <span className="font-display text-[28px] font-bold leading-none">{num}</span>
-                </div>
-                <h3 className="mb-2.5 text-[18px] font-semibold text-ink">{title}</h3>
-                <p className="text-sm leading-[1.7] text-ink-muted">{desc}</p>
-              </div>
+        <section className="border-y border-card-border bg-white">
+          <div className="mx-auto grid max-w-6xl gap-px bg-card-border sm:grid-cols-2 lg:grid-cols-4">
+            {FEATURES.map(([title, description]) => (
+              <article key={title} className="bg-white p-7">
+                <h2 className="font-display text-2xl font-semibold">{title}</h2>
+                <p className="mt-3 text-sm leading-6 text-ink-muted">{description}</p>
+              </article>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── Dual CTA ──────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-        <div id="dual-cta" className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <div className="cta-card rounded-2xl bg-gray-900 px-6 py-8 text-white sm:px-10 sm:py-11">
-            <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For readers</p>
-            <h2 className="mb-3 font-display text-[30px] font-medium leading-[1.1]">
-              Explore ideas worth engaging with
-            </h2>
-            <p className="mb-7 text-[15px] leading-relaxed opacity-80">
-              No account needed to read. Browse Posts and Articles from
-              young people who actively engage with ideas.
-            </p>
-            <LandingTrackedLink
-              href="/?guest=1"
-              event="landing_read_clicked"
-              metadata={{ source: "dual_cta_readers" }}
-              className="inline-flex items-center gap-1.5 rounded-[10px] bg-emerald-brand px-7 py-3 text-[15px] font-medium text-white transition-colors hover:bg-[#0E4B37]"
-            >
-              Browse as guest
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-            </LandingTrackedLink>
-          </div>
-
-          <div className="cta-card rounded-2xl bg-emerald-brand px-6 py-8 text-white sm:px-10 sm:py-11">
-            <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.18em] opacity-65">For contributors</p>
-            <h2 className="mb-3 font-display text-[30px] font-medium leading-[1.1]">
-              Build your Intellectual Record
-            </h2>
-            <p className="mb-7 text-[15px] leading-relaxed opacity-80">
-              Claim your handle, complete your profile, and publish your first idea.
-              Your contributions create a public record of what you write, argue, research, and contribute.
-            </p>
-            <LandingTrackedLink
-              href="/signup"
-              event="landing_signup_clicked"
-              metadata={{ source: "dual_cta_writers" }}
-              className="inline-flex items-center gap-1.5 rounded-[10px] bg-white px-7 py-3 text-[15px] font-medium text-emerald-600 transition-colors hover:bg-emerald-50"
-            >
-              Start your record
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-            </LandingTrackedLink>
-          </div>
-        </div>
-      </section>
-
-      <Footer landing />
+        <section className="mx-auto max-w-4xl px-5 py-20 text-center sm:px-8">
+          <h2 className="font-display text-3xl font-semibold sm:text-4xl">
+            Your writing belongs together.
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-ink-muted">
+            Your profile shows your Posts and Articles. Drafts stay private until
+            you choose to publish.
+          </p>
+          <Link href="/write" className="mt-8 inline-flex rounded-xl bg-ink px-6 py-3 text-sm font-semibold text-white">
+            Write on Indegenius
+          </Link>
+        </section>
+      </main>
+      <Footer />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +17,7 @@ import {
   validateCitationReferences,
 } from "@/lib/postReferences";
 import { resolveReferenceCitations } from "@/lib/citationResolution";
-import { isCredibilityGraphEnabled } from "@/lib/featureFlags";
+import { isReferenceResolutionEnabled } from "@/lib/featureFlags";
 import { recordActivationEvent } from "@/lib/activationServer";
 import { requireNotSuspended } from "@/lib/suspension";
 import { resolveContentKind } from "@/lib/contentModel";
@@ -97,7 +97,7 @@ async function syncReferences(
   // Resolve internal reference URLs to the works they point at, so a citation
   // edge exists the moment the author saves rather than waiting for a
   // backfill. Gated: the column is added by 20260827000001.
-  const resolved = isCredibilityGraphEnabled()
+  const resolved = isReferenceResolutionEnabled()
     ? await resolveReferenceCitations(supabase, normalized, {
         appUrl: process.env.NEXT_PUBLIC_APP_URL,
         citingPostId: postId,
@@ -147,7 +147,7 @@ async function syncReferences(
       doi: reference.doi,
       raw: reference.raw,
       // The original url is preserved above; this is the resolved relation.
-      ...(isCredibilityGraphEnabled()
+      ...(isReferenceResolutionEnabled()
         ? { referenced_post_id: reference.referenced_post_id }
         : {}),
     };
@@ -409,7 +409,7 @@ export async function publishContribution(input: {
   }
 
   revalidatePath("/");
-  revalidatePath("/dashboard");
+  revalidatePath("/[username]", "page");
   revalidatePath(`/post/${slug}`);
   await recordActivationEvent({
     supabase,

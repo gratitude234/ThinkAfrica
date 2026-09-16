@@ -148,43 +148,6 @@ describe.skipIf(!enabled)("viewer state against PostgreSQL", () => {
     ).toEqual([]);
   });
 
-  it("finds posts credited to an excluded co-author, accepted only", async () => {
-    const repository = createPostgresViewerStateRepository(executor);
-
-    const [row] = await executor.query<{ post_id: string; user_id: string }>(
-      `select a.post_id::text as post_id, a.user_id::text as user_id
-       from public.post_authors a
-       where a.accepted_at is not null limit 1`
-    );
-    if (!row) return;
-
-    const found = await repository.postIdsWithAuthors([row.post_id], [row.user_id]);
-    expect(found).toEqual([row.post_id]);
-
-    const [pending] = await executor.query<{ post_id: string; user_id: string }>(
-      `select a.post_id::text as post_id, a.user_id::text as user_id
-       from public.post_authors a
-       where a.accepted_at is null limit 1`
-    );
-    if (pending) {
-      // An unaccepted invitation is not a credit, so it must not exclude the
-      // post. Dropping the accepted_at filter would hide work nobody wrote.
-      expect(
-        await repository.postIdsWithAuthors([pending.post_id], [pending.user_id])
-      ).toEqual([]);
-    }
-  });
-
-  it("returns nothing when either list is empty, without going to the database", async () => {
-    const repository = createPostgresViewerStateRepository({
-      query: async () => {
-        throw new Error("should not have been called");
-      },
-    });
-    expect(await repository.postIdsWithAuthors([], ["x"])).toEqual([]);
-    expect(await repository.postIdsWithAuthors(["x"], [])).toEqual([]);
-  });
-
   it("reports a blocked pair in both directions, from one block", async () => {
     await inRollback(async (repository, executorTx) => {
       const [a, b] = await twoMembers(executorTx);

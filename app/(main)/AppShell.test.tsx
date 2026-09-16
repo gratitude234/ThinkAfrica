@@ -26,18 +26,41 @@ function renderShell(pathname: string, showGuestBanner = false) {
   return { ...result, main: result.container.querySelector("main") };
 }
 
-const railRoutes = ["/", "/explore", "/notifications", "/settings"];
-const suppressedRoutes = [
+const railRoutes = [
+  "/",
+  "/explore",
+  "/notifications",
+  "/settings",
   "/post/a-published-piece",
+  "/admin",
   "/admin/moderation",
-  "/about",
 ];
+const suppressedRoutes = ["/about", "/edit/a-published-piece"];
 
 describe("AppShell", () => {
   it.each(railRoutes)("renders the rail on %s", (pathname) => {
     renderShell(pathname);
     expect(screen.getByRole("navigation", { name: "Sections" })).toBeInTheDocument();
   });
+
+  // The top bar is utilities only. Without the rail, a signed-in reader on an
+  // article or an admin on desktop had the logo and nothing else to go back by.
+  it.each(["/post/a-published-piece", "/admin/moderation"])(
+    "keeps the canonical destinations reachable on %s",
+    (pathname) => {
+      const { main } = renderShell(pathname);
+      const rail = screen.getByRole("navigation", { name: "Sections" });
+
+      expect(Array.from(rail.children).map((item) => item.textContent)).toEqual([
+        "Home",
+        "Explore",
+        "Write",
+        "Notifications",
+        "Profile",
+      ]);
+      expect(main?.className).toMatch(/\bmd:grid\b/);
+    }
+  );
 
   it.each(suppressedRoutes)("suppresses the rail on %s", (pathname) => {
     renderShell(pathname);
@@ -47,22 +70,25 @@ describe("AppShell", () => {
   });
 
   // jsdom has no layout engine, so the responsive geometry is a class contract.
+  // The rail is the desktop primary navigation from md, where the bottom bar
+  // hands off, and it widens to its full column at xl.
   it("widens the container and becomes a grid only on rail routes", () => {
     const { main } = renderShell("/");
-    expect(main?.className).toMatch(/\bxl:grid\b/);
-    expect(main?.className).toMatch(/xl:max-w-\[1480px\]/);
+    expect(main?.className).toMatch(/\bmd:grid\b/);
+    expect(main?.className).toMatch(/md:max-w-\[1480px\]/);
+    expect(main?.className).toMatch(/md:grid-cols-\[160px_minmax\(0,1fr\)\]/);
     expect(main?.className).toMatch(/xl:grid-cols-\[184px_minmax\(0,1fr\)\]/);
   });
 
   it("leaves suppressed routes at the original container width", () => {
-    const { main } = renderShell("/admin/moderation");
-    expect(main?.className).not.toMatch(/\bxl:grid\b/);
-    expect(main?.className).not.toMatch(/xl:max-w-/);
+    const { main } = renderShell("/about");
+    expect(main?.className).not.toMatch(/\b(?:md|xl):grid\b/);
+    expect(main?.className).not.toMatch(/(?:md|xl):max-w-/);
     expect(main?.className).toMatch(/max-w-\[1240px\]/);
   });
 
   it("always wraps content in a min-w-0 column so wide children cannot blow out the track", () => {
-    for (const pathname of ["/", "/admin/moderation"]) {
+    for (const pathname of ["/", "/admin/moderation", "/about"]) {
       const { unmount } = renderShell(pathname);
       expect(screen.getByText("page content").closest(".min-w-0")).not.toBeNull();
       unmount();

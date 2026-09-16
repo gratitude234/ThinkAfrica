@@ -9,7 +9,7 @@
  * inconsistency this fixes.
  *
  * The publishing reset, Phase 2G, removed the demonstrated-topics index that
- * used to live here with the Intellectual Record it fed.
+ * used to live here with the retired profile-scoring system it fed.
  */
 export function formatInterestLabel(interest: string) {
   const label = interest.trim();

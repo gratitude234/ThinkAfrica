@@ -45,13 +45,6 @@ export interface ViewerStateRepository {
   /** Ids in either direction of a block, for public-content eligibility. */
   blockRelatedUserIds(userId: string): Promise<string[]>;
   /**
-   * Which of these posts credit any of these people as an accepted author.
-   *
-   * Closes the gap where filtering on `posts.author_id` alone would let a
-   * blocked person back onto the page through a co-authored publication.
-   */
-  postIdsWithAuthors(postIds: string[], authorIds: string[]): Promise<string[]>;
-  /**
    * True when either has blocked the other. Messaging eligibility was its only
    * caller and went with messaging in Phase 2E; the check stays because
    * blocking does.
@@ -85,13 +78,7 @@ const BLOCK_RELATED_SQL = `
         is distinct from $1::uuid
 `;
 
-const POSTS_WITH_AUTHORS_SQL = `
-  select distinct a.post_id
-  from public.post_authors a
-  where a.post_id in (select (jsonb_array_elements_text($1::text::jsonb))::uuid)
-    and a.user_id in (select (jsonb_array_elements_text($2::text::jsonb))::uuid)
-    and a.accepted_at is not null
-`;
+
 
 /**
  * The database function, called rather than reimplemented.
@@ -152,24 +139,6 @@ export function createSupabaseViewerStateRepository(
       );
     },
 
-    async postIdsWithAuthors(postIds, authorIds) {
-      if (postIds.length === 0 || authorIds.length === 0) return [];
-      const result = await supabase
-        .from("post_authors")
-        .select("post_id")
-        .in("post_id", postIds)
-        .in("user_id", authorIds)
-        .not("accepted_at", "is", null);
-
-      return Array.from(
-        new Set(
-          rows<{ post_id: string }>(result, "excluded co-authored posts").map(
-            (row) => row.post_id
-          )
-        )
-      );
-    },
-
     async isBlockedPair(userA, userB) {
       const { data, error } = await supabase.rpc("is_blocked_pair", {
         user_a: userA,
@@ -202,15 +171,6 @@ export function createPostgresViewerStateRepository(
         [userId]
       );
       return result.map((row) => row.other_id);
-    },
-
-    async postIdsWithAuthors(postIds, authorIds) {
-      if (postIds.length === 0 || authorIds.length === 0) return [];
-      const result = await executor.query<{ post_id: string }>(
-        POSTS_WITH_AUTHORS_SQL,
-        [JSON.stringify(postIds), JSON.stringify(authorIds)]
-      );
-      return result.map((row) => row.post_id);
     },
 
     async isBlockedPair(userA, userB) {

@@ -5,7 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { absoluteUrl } from "@/lib/email";
 
 export type PushPreferenceKey =
-  | "push_published"
   | "push_comments"
   | "push_likes"
   | "push_follows";
@@ -24,8 +23,7 @@ export type TestPushResult =
 
 // Shared cooldown for bursty, many-senders-to-one-recipient events (comments,
 // likes, follows) so a recipient can't be buzzed repeatedly within a short
-// window regardless of which event type triggered it. Not used by editorial
-// decisions, which are already low-frequency.
+// window regardless of which event type triggered it.
 export const ENGAGEMENT_PUSH_COOLDOWN_MS = 30 * 60 * 1000;
 
 type PushSendInput = {

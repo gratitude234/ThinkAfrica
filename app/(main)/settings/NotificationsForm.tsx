@@ -22,18 +22,9 @@ interface BaseNotificationPrefs {
   email_comments: boolean;
   email_follows: boolean;
   email_likes: boolean;
-  email_responses: boolean;
-  email_published: boolean;
   email_account_security: boolean;
   email_announcements: boolean;
-  email_review_assigned: boolean;
-  email_review_started: boolean;
-  email_review_reminder: boolean;
-  email_co_author_invite: boolean;
-  email_co_author_accepted: boolean;
-  email_co_author_declined: boolean;
 
-  push_published: boolean;
   push_comments: boolean;
   push_likes: boolean;
   push_follows: boolean;
@@ -51,17 +42,12 @@ const EMAIL_ROWS: { key: keyof NotificationPrefs; label: string; description: st
   { key: "email_comments", label: "New comments", description: "When someone comments on your post" },
   { key: "email_follows", label: "New followers", description: "When someone follows you" },
   { key: "email_likes", label: "New likes", description: "When someone likes your post" },
-  { key: "email_published", label: "Post published", description: "When your submitted post is published" },
-  { key: "email_account_security", label: "Account and trust updates", description: "Verification, role, and account status emails" },
+  { key: "email_account_security", label: "Account and security", description: "Security and account status emails" },
   { key: "email_announcements", label: "Indegenius announcements", description: "Occasional letters from the Indegenius team about the platform and what is changing" },
-  { key: "email_review_assigned", label: "Review assignments", description: "When you're assigned to review a submission" },
-  { key: "email_review_started", label: "Your submission is under review", description: "When your submission's first reviewer is assigned" },
-  { key: "email_review_reminder", label: "Review reminders", description: "A reminder if your review has been pending for a while" },
 
 ];
 
 const PUSH_ROWS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
-  { key: "push_published", label: "Submission decisions", description: "Browser push when your submission is published, rejected, or sent back for revision" },
   { key: "push_comments", label: "Comments", description: "Browser push when someone comments on your post or replies to your comment" },
   { key: "push_likes", label: "Likes", description: "Browser push when someone likes your post" },
   { key: "push_follows", label: "New followers", description: "Browser push when someone follows you" },
@@ -248,9 +234,8 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
         <div>
           <h2 className="mb-1 text-base font-semibold text-gray-900">In the app</h2>
           <p className="mb-4 text-xs text-gray-500">
-            What shows up in your notifications inbox and the bell. Anything that
-            needs a response from you (review requests, invitations, editorial and
-            account decisions) always comes through and is not listed here.
+            Choose which social activity appears in your notifications. Moderation,
+            safety, and account notices always come through.
           </p>
           <div className="space-y-3">
             {IN_APP_PREF_GROUPS.map((group) =>

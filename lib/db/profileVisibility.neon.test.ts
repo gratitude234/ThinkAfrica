@@ -27,7 +27,6 @@ vi.mock("server-only", () => ({}));
 const neonUrl = process.env.DATABASE_URL;
 const enabled = Boolean(neonUrl && neonUrl.includes(".neon.tech"));
 
-const { createPostgresPostPageRepository } = await import("@/lib/db/postPage");
 const { createPostgresProfilesRepository } = await import(
   "@/lib/db/postgres/profiles"
 );
@@ -158,43 +157,6 @@ describe.skipIf(!enabled)("the profiles policy, on every migrated read", () => {
       // have 404ed a published post because its author was suspended.
       expect(record).not.toBeNull();
       expect(record!.profiles).toBeNull();
-    });
-  });
-
-  it("nulls a co-author on the post page without dropping the co-authorship", async () => {
-    await inRollback(async (tx) => {
-      const executor = adaptDriver(tx as never);
-      const repository = createPostgresPostPageRepository(executor);
-
-      const [row] = await executor.query<{ post_id: string; user_id: string }>(
-        `select a.post_id::text as post_id, a.user_id::text as user_id
-         from public.post_authors a
-         join public.profiles p on p.id = a.user_id
-         where a.accepted_at is not null
-         limit 1`
-      );
-      if (!row) return;
-
-      const before = await repository.collections(row.post_id, null);
-      const beforeEntry = before.coAuthors.find(
-        (entry) => entry.user_id === row.user_id
-      );
-      expect(beforeEntry).toBeDefined();
-
-      await executor.query(
-        `update public.profiles set suspended_at = now() where id = $1::uuid`,
-        [row.user_id]
-      );
-
-      const after = await repository.collections(row.post_id, null);
-      const afterEntry = after.coAuthors.find(
-        (entry) => entry.user_id === row.user_id
-      );
-
-      // Still a co-author, with no name. The distinction matters: dropping the
-      // row would change the author count and the corresponding-author flag.
-      expect(afterEntry).toBeDefined();
-      expect(afterEntry!.profile).toBeNull();
     });
   });
 

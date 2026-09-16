@@ -180,8 +180,6 @@ export function isAccountNavActive(
   const ownProfile = username ? `/${username}` : null;
 
   return (
-    matchesRoute(pathname, "/me") ||
-    matchesRoute(pathname, "/dashboard") ||
     matchesRoute(pathname, "/bookmarks") ||
     matchesRoute(pathname, "/settings") ||
     (ownProfile ? matchesRoute(pathname, ownProfile) : false)

@@ -15,7 +15,11 @@ vi.mock("@/lib/useSignOut", () => ({
 
 const writer = { id: "user-1", email: "writer@example.com" } as User;
 
-describe("NavUserMenu profile destination", () => {
+function menuLabels() {
+  return screen.getAllByRole("menuitem").map((item) => item.textContent);
+}
+
+describe("NavUserMenu", () => {
   beforeEach(() => {
     signOutState.signOut.mockReset();
     signOutState.signOut.mockResolvedValue(true);
@@ -23,45 +27,36 @@ describe("NavUserMenu profile destination", () => {
     signOutState.error = null;
   });
 
-  it("links directly to the public profile when a usable username exists", () => {
+  it("names the account and leaves Profile to the rail and the bottom bar", () => {
     render(
       <NavUserMenu
         user={writer}
-        profile={{
-          username: "writer",
-          full_name: "A Writer",
-          avatar_url: null,
-        }}
+        profile={{ username: "writer", full_name: "A Writer", avatar_url: null }}
       />
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
 
-    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
-      "href",
-      "/writer"
-    );
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(screen.getByText("A Writer")).toBeInTheDocument();
+    expect(screen.getByText("@writer")).toBeInTheDocument();
+    expect(menuLabels()).toEqual(["Bookmarks", "Settings", "Sign out"]);
     expect(screen.queryByText("Intellectual Record")).not.toBeInTheDocument();
+    expect(screen.queryByText("Writing dashboard")).not.toBeInTheDocument();
   });
 
-  it("falls back to Settings when the username cannot be used as a profile route", () => {
+  it("shows no handle when the username cannot be used as a profile route", () => {
     render(
       <NavUserMenu
         user={writer}
-        profile={{
-          username: "bad username",
-          full_name: "A Writer",
-          avatar_url: null,
-        }}
+        profile={{ username: "bad username", full_name: "A Writer", avatar_url: null }}
       />
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
 
-    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
-      "href",
-      "/settings"
-    );
+    expect(screen.queryByText(/^@/)).not.toBeInTheDocument();
+    expect(menuLabels()).toEqual(["Bookmarks", "Settings", "Sign out"]);
   });
 
   it("keeps the account actions and drops the editorial review queue", () => {
@@ -75,20 +70,56 @@ describe("NavUserMenu profile destination", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
 
-    expect(screen.getByRole("link", { name: "Bookmarks" })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: "Bookmarks" })).toHaveAttribute(
       "href",
       "/bookmarks"
     );
-    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: "Settings" })).toHaveAttribute(
       "href",
       "/settings"
     );
-    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: "Admin" })).toHaveAttribute(
       "href",
       "/admin"
     );
-    expect(screen.queryByRole("link", { name: "Review" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Review" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("offers Admin only to an admin", () => {
+    render(
+      <NavUserMenu
+        user={writer}
+        profile={{ username: "writer", full_name: "A Writer", avatar_url: null }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
+
+    expect(screen.queryByRole("menuitem", { name: "Admin" })).not.toBeInTheDocument();
+  });
+
+  it("offers a guest sign in and sign up instead of a menu", () => {
+    render(<NavUserMenu user={null} profile={null} />);
+
+    expect(screen.queryByRole("button", { name: "Open account menu" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "Get started" })).toHaveAttribute("href", "/signup");
+  });
+
+  it("closes on Escape", () => {
+    render(
+      <NavUserMenu
+        user={writer}
+        profile={{ username: "writer", full_name: "A Writer", avatar_url: null }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
   it("shows pending and failed sign-out states inside the menu", () => {
@@ -106,7 +137,7 @@ describe("NavUserMenu profile destination", () => {
     signOutState.isSigningOut = true;
     rerender(<NavUserMenu {...props} />);
     expect(
-      screen.getByRole("button", { name: "Signing out…" })
+      screen.getByRole("menuitem", { name: "Signing out…" })
     ).toBeDisabled();
 
     signOutState.isSigningOut = false;

@@ -6,10 +6,9 @@ import type { AppRole } from "@/lib/types";
 
 export type AdminCapability =
   | "admin.full"
-  | "review.assigned"
+  | "users.manage"
   | "users.verify"
   | "moderation.manage"
-  | "analytics.view"
   | "communications.manage"
   | "communications.send_as_executive";
 
@@ -32,10 +31,10 @@ export type AdminNavItem = {
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
-    href: "/admin/verification",
-    title: "Contributor Verification",
-    description: "Verify contributors and manage reviewer/editor roles.",
-    capability: "users.verify",
+    href: "/admin/users",
+    title: "Users",
+    description: "Find accounts and review account status.",
+    capability: "users.manage",
   },
   {
     href: "/admin/moderation",
@@ -44,29 +43,19 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     capability: "moderation.manage",
   },
   {
-    href: "/admin/analytics",
-    title: "Analytics",
-    description: "Review platform activity and growth signals.",
-    capability: "analytics.view",
-  },
-  {
     href: "/admin/communications",
     title: "Communications",
-    description: "Compose and broadcast email to the Indegenius community.",
+    description: "Send platform announcements to the community.",
     capability: "communications.manage",
   },
 ];
 
 const FULL_ADMIN_CAPABILITIES: AdminCapability[] = [
   "admin.full",
-  "review.assigned",
+  "users.manage",
   "users.verify",
   "moderation.manage",
-  "analytics.view",
   "communications.manage",
-  // Sending as a named executive is deliberately its own capability: a
-  // moderator who can run the platform's own announcements still should not be
-  // able to write to the community as the founder.
   "communications.send_as_executive",
 ];
 
@@ -74,30 +63,14 @@ export function getAdminCapabilitiesForRole(
   role: AppRole,
   isBootstrapAdmin: boolean
 ): AdminCapability[] {
-  if (isBootstrapAdmin || role === "admin") {
-    return FULL_ADMIN_CAPABILITIES;
-  }
-
-  if (role === "editor") {
-    return ["review.assigned"];
-  }
-
-  if (role === "reviewer") {
-    return ["review.assigned"];
-  }
-
-  return [];
+  return isBootstrapAdmin || role === "admin" ? FULL_ADMIN_CAPABILITIES : [];
 }
 
 export function canAccessAdminHubForRole(
   role: AppRole | null | undefined,
   isBootstrapAdmin: boolean
 ) {
-  const capabilities = getAdminCapabilitiesForRole(role ?? "student", isBootstrapAdmin);
-  return ADMIN_NAV_ITEMS.some(
-    (item) =>
-      capabilities.includes("admin.full") || capabilities.includes(item.capability)
-  );
+  return getAdminCapabilitiesForRole(role ?? "student", isBootstrapAdmin).length > 0;
 }
 
 export function hasCapability(
@@ -105,10 +78,7 @@ export function hasCapability(
   capability: AdminCapability
 ) {
   if (!context) return false;
-  return (
-    context.capabilities.includes("admin.full") ||
-    context.capabilities.includes(capability)
-  );
+  return context.capabilities.includes("admin.full") || context.capabilities.includes(capability);
 }
 
 export function getVisibleAdminNavItems(context: AdminContext) {
@@ -116,8 +86,7 @@ export function getVisibleAdminNavItems(context: AdminContext) {
 }
 
 export function hasAdminHubAccess(context: AdminContext | null) {
-  if (!context) return false;
-  return getVisibleAdminNavItems(context).length > 0;
+  return Boolean(context && getVisibleAdminNavItems(context).length > 0);
 }
 
 export async function getAdminContext(): Promise<AdminContext | null> {
@@ -126,9 +95,7 @@ export async function getAdminContext(): Promise<AdminContext | null> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -154,38 +121,25 @@ export async function getAdminContext(): Promise<AdminContext | null> {
 
 export async function requireCapability(capability: AdminCapability) {
   const context = await getAdminContext();
-
-  if (!context) {
-    throw new AdminAccessError("You must be signed in.", 401);
-  }
-
+  if (!context) throw new AdminAccessError("You must be signed in.", 401);
   if (!hasCapability(context, capability)) {
     throw new AdminAccessError("You do not have permission to access this admin area.", 403);
   }
-
   return context;
 }
 
 export async function requireAdminHubAccess() {
   const context = await getAdminContext();
-
-  if (!context) {
-    throw new AdminAccessError("You must be signed in.", 401);
-  }
-
+  if (!context) throw new AdminAccessError("You must be signed in.", 401);
   if (!hasAdminHubAccess(context)) {
     throw new AdminAccessError("You do not have admin access.", 403);
   }
-
   return context;
 }
 
 export async function createAdminActionClient(capability: AdminCapability) {
   const context = await requireCapability(capability);
-  return {
-    admin: createAdminClient(),
-    context,
-  };
+  return { admin: createAdminClient(), context };
 }
 
 export async function recordAdminAuditEvent(input: {

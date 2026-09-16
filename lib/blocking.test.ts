@@ -3,7 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getBlockedUserIds,
   getFeedExcludedUserIds,
-  getPostIdsWithExcludedAuthors,
 } from "./blocking";
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
@@ -38,29 +37,6 @@ describe("blocking feed exclusions", () => {
     ).rejects.toThrow("Unable to apply blocked-user exclusions");
 
     errorSpy.mockRestore();
-  });
-
-  it("deduplicates posts credited to an excluded accepted coauthor", async () => {
-    mockedAdminClient.mockReturnValue({
-      from: vi.fn(() =>
-        queryResult({
-          data: [
-            { post_id: "post-1" },
-            { post_id: "post-1" },
-            { post_id: "post-2" },
-          ],
-          error: null,
-        })
-      ),
-    } as never);
-
-    await expect(
-      getPostIdsWithExcludedAuthors(
-        ["post-1", "post-2"],
-        ["blocked-author"],
-        { strict: true }
-      )
-    ).resolves.toEqual(["post-1", "post-2"]);
   });
 
   it("excludes users on either side of a block from the feed", async () => {

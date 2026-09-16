@@ -7,9 +7,6 @@
  * and it caught these constants.
  */
 
-/** Drafts shown in the composer's sidebar. */
-export const MY_DRAFTS_LIMIT = 30;
-
 /** Enough to find one resumable draft past any that are unsuitable. */
 export const RESUMABLE_LIMIT = 5;
 

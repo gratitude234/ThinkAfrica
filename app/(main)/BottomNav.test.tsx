@@ -121,13 +121,9 @@ describe("BottomNav account label and safe areas", () => {
   });
 
   it("keeps Profile selected throughout the signed-in account area", () => {
-    for (const pathname of [
-      "/me",
-      "/writer",
-      "/dashboard",
-      "/bookmarks",
-      "/settings",
-    ]) {
+    // /me and /dashboard are server redirects to the profile now, so a reader
+    // is never on either long enough for the bar to light anything.
+    for (const pathname of ["/writer", "/bookmarks", "/settings"]) {
       navigationState.pathname = pathname;
       const { unmount } = render(
         <BottomNav username="writer" userId="user-1" />

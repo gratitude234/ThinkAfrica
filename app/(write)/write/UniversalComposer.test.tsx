@@ -67,7 +67,6 @@ vi.mock("./editActions", () => ({
 vi.mock("@/components/ui/CoverImageUploader", () => ({ default: () => <button type="button">Add cover</button> }));
 vi.mock("@/components/ui/TagInput", () => ({ default: () => <input aria-label="Topics" /> }));
 vi.mock("@/components/post/ReferencesPanel", () => ({ default: () => <div>Sources panel</div> }));
-vi.mock("./MyDrafts", () => ({ default: () => <div>Drafts panel</div> }));
 vi.mock("./RevisionHistory", () => ({ default: () => <div>History panel</div> }));
 vi.mock("@/components/ui/ProfileGate", () => ({ default: () => null }));
 vi.mock("next/image", () => ({ default: (props: { alt: string }) => <div role="img" aria-label={props.alt} /> }));
@@ -302,14 +301,13 @@ describe("UniversalComposer canvas polish", () => {
     );
   }
 
-  it("offers other drafts only while this canvas is still empty", () => {
+  it("keeps the canvas to this piece, and leaves managing drafts to the profile", () => {
+    // The in-composer drafts list went with the writing dashboard in the final
+    // UI simplification. An owner manages drafts from the Drafts tab.
     open();
-    expect(screen.getByText("Drafts panel")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Publication body"), { target: { value: "<p>Now writing.</p>" } });
-
-    // Switching drafts mid-sentence is a hazard, so the door closes.
-    expect(screen.queryByText("Drafts panel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /drafts/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /drafts/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Continue where you left off/i)).not.toBeInTheDocument();
   });
 
   it("gives sources a place in the toolbar rather than a line in the drawer", () => {

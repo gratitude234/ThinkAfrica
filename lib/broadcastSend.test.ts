@@ -593,6 +593,21 @@ describe("refusing an untrustworthy audience", () => {
     expect(test.calls.sendResendBroadcast).not.toHaveBeenCalled();
   });
 
+  it("refuses a draft addressed to a retired audience before claiming anything", async () => {
+    // The retired segment may still look fresh, which is exactly why the
+    // staleness check is not enough on its own.
+    const checkSendPrecondition = vi.fn(async () => ({ ok: true as const, recipientCount: 40 }));
+    const test = harness(row({ audienceKey: "verified" }), { checkSendPrecondition });
+
+    const result = await sendBroadcast("bc-1", "admin-1", test.deps);
+
+    expect(result).toMatchObject({ ok: false, reason: "audience_retired" });
+    expect(checkSendPrecondition).not.toHaveBeenCalled();
+    expect(test.calls.claimForCampaign).not.toHaveBeenCalled();
+    expect(test.calls.sendResendBroadcast).not.toHaveBeenCalled();
+    expect(test.state.current.status).toBe("draft");
+  });
+
   it("blocks a send to an empty audience", async () => {
     const test = harness(row(), {
       checkSendPrecondition: async () => ({ ok: true, recipientCount: 0 }),

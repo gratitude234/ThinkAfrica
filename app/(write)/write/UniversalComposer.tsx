@@ -30,7 +30,6 @@ import {
   discardPublishedEditDraft,
   savePublishedEditDraft,
 } from "./editActions";
-import MyDrafts from "./MyDrafts";
 import ArticlePreview, { readingMinutes } from "./ArticlePreview";
 import RevisionHistory, { type RestoredRevision } from "./RevisionHistory";
 
@@ -566,7 +565,7 @@ export default function UniversalComposer({
         const result = await publishContribution({ draftId: draftIdRef.current, snapshot });
         if (result.error || !result.slug) throw new Error(result.error ?? "We couldn't publish this.");
         localStorage.removeItem(localKeyRef.current);
-        router.replace(`/post/${result.slug}?justPublished=1&live=1`);
+        router.replace(`/post/${result.slug}?justPublished=1`);
       }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "We couldn't finish this publication.");
@@ -696,7 +695,6 @@ export default function UniversalComposer({
   // rather than leaving the writer to guess.
   const feedSummary = snapshot.excerpt.trim() || deriveContributionExcerpt(snapshot.content);
   const minutes = readingMinutes(wordCount);
-  const canResumeOtherDrafts = mode !== "published-edit" && !hasMeaningfulContribution(snapshot);
 
   return (
     <div className={`${mode === "published-edit" ? "fixed inset-0 z-[70]" : "min-h-dvh"} bg-surface text-ink`}>
@@ -839,17 +837,6 @@ export default function UniversalComposer({
           onSelectionUpdate={handleSelectionUpdate}
           onImageUploadingChange={setImageUploading}
         />
-
-        {/* Resuming another piece is offered only while this canvas is still
-            empty. Once there is writing here, switching drafts mid-sentence is
-            a hazard rather than a convenience. */}
-        {/* mb-24 keeps the last row clear of the sticky toolbar, which
-            otherwise floats over the bottom of an expanded list. */}
-        {canResumeOtherDrafts ? (
-          <div className="mb-24 mt-10">
-            <MyDrafts activeDraftId={draftId} variant="panel" />
-          </div>
-        ) : null}
 
         {/* Six controls, which is what fits at a 44px touch target inside the
             canvas measure on the narrowest phone still in common use. Anything

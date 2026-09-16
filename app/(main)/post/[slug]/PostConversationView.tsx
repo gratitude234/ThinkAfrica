@@ -14,7 +14,6 @@ interface ConversationAuthor {
   id: string;
   username: string;
   full_name: string | null;
-  university: string | null;
   avatar_url: string | null;
 }
 
@@ -31,8 +30,6 @@ interface ConversationPost {
 }
 
 interface ConversationSecondary {
-  likeCount: number;
-  commentCount: number;
   references: Array<{
     id: string;
     title: string | null;
@@ -42,17 +39,14 @@ interface ConversationSecondary {
     doi: string | null;
     url: string | null;
   }>;
-  coAuthors: Array<{
-    user_id: string;
-    profile: { username: string; full_name: string | null } | null;
-  }>;
+  commentCount: number;
+  likeCount: number;
+  bookmarkCount: number;
   relatedPosts: Array<{
     id: string;
     title: string | null;
     slug: string;
-    content_kind?: string | null;
-    type?: string | null;
-    profiles?: { full_name: string | null; username: string | null } | null;
+    profiles: { full_name: string | null; username: string } | null;
   }>;
 }
 
@@ -77,7 +71,7 @@ interface PostConversationViewProps {
 /**
  * The detail page for a short, titleless Post — a conversation view, not a
  * publication template: content, one actions row, then the comments. The
- * article/research kinds keep their own richer templates in page.tsx.
+ * Articles keep the long-form reading template in page.tsx.
  */
 export default async function PostConversationView({
   post,
@@ -152,17 +146,10 @@ export default async function PostConversationView({
               >
                 {authorName}
               </Link>
-              {author.university ? (
-                <p className="truncate text-byline leading-5 text-ink-muted">{author.university}</p>
-              ) : null}
               <p className="text-meta leading-5 text-ink-muted">
                 {formatRelativeTime(post.published_at ?? post.created_at)}
               </p>
-              {secondary.coAuthors.length > 0 ? (
-                <p className="mt-0.5 text-meta leading-5 text-ink-muted">
-                  With {secondary.coAuthors.map((item) => item.profile?.full_name || `@${item.profile?.username}`).filter(Boolean).join(", ")}
-                </p>
-              ) : null}
+              
             </div>
           </div>
           {isOwnPost ? null : (

@@ -16,10 +16,10 @@ interface AppShellProps {
 const MAIN_BASE =
   "mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-6 md:pb-16 lg:px-8";
 
-// The container only widens on rail routes. Every suppressed route -- post
-// pages, admin -- stays at 1240px and is pixel-identical to
-// before the rail existed, which is what keeps their full-bleed layouts intact.
-const MAIN_WITH_RAIL = `${MAIN_BASE} xl:grid xl:max-w-[1480px] xl:grid-cols-[184px_minmax(0,1fr)] xl:items-start xl:gap-7`;
+// The container only widens on rail routes. A suppressed route -- /about and
+// the writing focus modes -- stays at 1240px and is pixel-identical to before
+// the rail existed, which is what keeps its full-bleed layout intact.
+const MAIN_WITH_RAIL = `${MAIN_BASE} md:grid md:max-w-[1480px] md:grid-cols-[160px_minmax(0,1fr)] md:items-start md:gap-5 xl:grid-cols-[184px_minmax(0,1fr)] xl:gap-7`;
 
 /**
  * Client shell around the (main) content column.

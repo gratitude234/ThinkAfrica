@@ -52,7 +52,6 @@ const fullRow = {
   current_round: 2,
   revision_due_at: null,
   in_response_to: null,
-  audio_summary_url: null,
   document_path: null,
   document_original_name: null,
   document_mime_type: null,

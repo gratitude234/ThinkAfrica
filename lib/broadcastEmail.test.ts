@@ -1,3 +1,4 @@
+import { BRAND_TAGLINE } from "@/lib/brand";
 import { describe, expect, it } from "vitest";
 import {
   RESEND_UNSUBSCRIBE_MERGE_TAG,
@@ -75,7 +76,7 @@ describe("buildBroadcastEmailHtml", () => {
     expect(html).toContain("<!doctype html>");
     expect(html).toContain("Building the next chapter of Indegenius");
     expect(html).toContain("A note to the community.");
-    expect(html).toContain("Africa&#39;s First Intellectual Social Network");
+    expect(html).toContain(BRAND_TAGLINE.replace("'", "&#39;"));
   });
 
   it("uses the preview text as the inbox preheader", () => {

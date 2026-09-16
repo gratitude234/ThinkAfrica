@@ -53,7 +53,6 @@ export interface PostRecord {
   impression_count: number | null;
   read_count: number | null;
   cover_image_url: string | null;
-  audio_summary_url: string | null;
   /** PostgREST returns an embedded one-to-one either as an object or as a
    *  single-element array depending on how it resolves the relationship. The
    *  Postgres adapter always builds an object. `getPostAuthor` absorbs both. */

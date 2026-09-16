@@ -98,16 +98,31 @@ describe("deleteOwnDraftPosts", () => {
     if (!result.ok) expect(result.error).toMatch(/at most 50/);
   });
 
-  it("says why a submission was refused, without naming a trigger", async () => {
+  it("refuses a piece that is not a deletable draft, in current-product language", async () => {
     plan.mockResolvedValue({ plan: { deletable: [], refused: [OTHER], missing: [] } });
 
     const result = await deleteOwnDraftPosts({ postIds: [OTHER] });
 
     expect(result).toEqual({
       ok: false,
-      error: "Only drafts can be deleted. Withdraw a submission instead of deleting it.",
+      error: "This draft can’t be deleted right now.",
     });
+    // No trigger name, and nothing from the retired review workflow.
+    if (!result.ok) expect(result.error).not.toMatch(/withdraw|submission|review|trigger/i);
     expect(runDelete).not.toHaveBeenCalled();
+  });
+
+  it("uses the plural when a sweep is refused as a whole", async () => {
+    plan.mockResolvedValue({
+      plan: { deletable: [], refused: [OTHER, OWNED_DRAFT], missing: [] },
+    });
+
+    const result = await deleteOwnDraftPosts({ postIds: [OTHER, OWNED_DRAFT] });
+
+    expect(result).toEqual({
+      ok: false,
+      error: "These drafts can’t be deleted right now.",
+    });
   });
 
   it("gives one answer for a missing post and for someone else's", async () => {

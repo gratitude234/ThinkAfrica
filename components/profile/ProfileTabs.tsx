@@ -1,27 +1,27 @@
 import Link from "next/link";
 import {
-  PROFILE_TABS,
+  OWNER_PROFILE_TABS,
   PROFILE_TAB_LABELS,
+  PUBLIC_PROFILE_TABS,
   profileTabHref,
   type ProfileTab,
 } from "@/lib/profileTabs";
 
-/**
- * Posts, Articles and About. Plain links, so every tab is an address a reader
- * can share, and `scroll={false}` so switching tabs does not jump the page
- * back above the header.
- */
 export default function ProfileTabs({
   username,
   active,
+  isOwnProfile,
 }: {
   username: string;
   active: ProfileTab;
+  isOwnProfile: boolean;
 }) {
+  const tabs = isOwnProfile ? OWNER_PROFILE_TABS : PUBLIC_PROFILE_TABS;
+
   return (
-    <nav aria-label="Profile" className="border-b border-card-border">
-      <ul className="-mb-px flex gap-6">
-        {PROFILE_TABS.map((tab) => {
+    <nav aria-label="Profile" className="overflow-x-auto border-b border-card-border">
+      <ul className="-mb-px flex min-w-max gap-6">
+        {tabs.map((tab) => {
           const current = tab === active;
           return (
             <li key={tab}>

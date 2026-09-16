@@ -15,8 +15,6 @@ export interface PublicProfileIdentity {
   avatar_url: string | null;
   /** The member's own headline. Stored in `profiles.professional_title`. */
   professional_title?: string | null;
-  verified: boolean;
-  verified_type: string | null;
 }
 
 /** A headline is one line under a name, not a paragraph. */

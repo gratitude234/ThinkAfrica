@@ -8,7 +8,8 @@ vi.mock("server-only", () => ({}));
  * This is not live same-database parity. It proves the SQL does what the
  * PostgREST calls did: the right relations, the visibility rules that RLS was
  * carrying, the shapes `lib/profileViewData.ts` consumes, and the two
- * deliberate infidelities documented in `lib/db/profilePage.ts`. Agreement
+ * deliberate infidelities documented in `lib/db/profilePage.ts`, and the
+ * owner-only Drafts read. Agreement
  * with PostgREST on the same rows at the same instant is
  * `profilePage.parity.live.test.ts`, which needs Supabase reachable.
  *
@@ -109,38 +110,39 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
   }
 
   /**
-   * A profile with accepted co-authorship, and a kind whose filter that work
-   * survives. Without the kind the co-authored branch comes back empty and
-   * every assertion over it passes by looping zero times.
+   * A member credited as an accepted co-author on somebody else's published
+   * work, and the ids of that work. Co-authoring is retired, so none of it may
+   * appear on this member's profile.
    */
-  async function someCoauthor() {
-    const candidates = await executor.query<{ user_id: string }>(
-      `select distinct pa.user_id::text as user_id
+  async function someCreditedMember() {
+    const rows = await executor.query<{ user_id: string; post_id: string }>(
+      `select pa.user_id::text as user_id, pa.post_id::text as post_id
        from public.post_authors pa
        join public.posts p on p.id = pa.post_id
        where pa.accepted_at is not null
          and p.status = 'published'
          and pa.user_id <> p.author_id
-       limit 5`
+       limit 20`
     );
+    const [first] = rows;
+    if (!first) return null;
+    return {
+      id: first.user_id,
+      creditedPostIds: rows
+        .filter((row) => row.user_id === first.user_id)
+        .map((row) => row.post_id),
+    };
+  }
 
-    for (const candidate of candidates) {
-      for (const kind of KINDS) {
-        const branches = await repository.publicationBranches({
-          profileId: candidate.user_id,
-          contentKinds: [kind],
-          start: 0,
-          limit: 5,
-        });
-        if (branches.coauthored.length > 0) {
-          return {
-            id: candidate.user_id,
-            contentKinds: [kind],
-          };
-        }
-      }
-    }
-    return null;
+  /** A member with at least one draft. */
+  async function someDraftOwner() {
+    const [row] = await executor.query<{ id: string }>(
+      `select p.author_id::text as id
+       from public.posts p
+       where p.status = 'draft' and p.author_id is not null
+       limit 1`
+    );
+    return row?.id ?? null;
   }
 
   // ── counts ─────────────────────────────────────────────────────────
@@ -263,24 +265,23 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
     }
   });
 
-  it("excludes the profile's own posts from the co-authored branch", async () => {
-    const coauthor = await someCoauthor();
-    if (!coauthor) return;
+  it("lists none of somebody else's publications a profile was credited on", async () => {
+    const member = await someCreditedMember();
+    if (!member) return;
 
-    const { coauthored } = await repository.publicationBranches({
-      profileId: coauthor.id,
-      contentKinds: coauthor.contentKinds,
-      start: 0,
-      limit: 10,
-    });
+    for (const kind of KINDS) {
+      const branches = await repository.publicationBranches({
+        profileId: member.id,
+        contentKinds: [kind],
+        start: 0,
+        limit: 50,
+      });
 
-    expect(coauthored.length).toBeGreaterThan(0);
-    for (const post of coauthored) {
-      // Selected and not filtered on, because the caller drops anything that
-      // is not published and anything the profile authored itself. The branch
-      // has to hand over the evidence for both.
-      expect(typeof post.status).toBe("string");
-      expect(typeof post.author_id).toBe("string");
+      expect(branches.coauthored).toEqual([]);
+      for (const post of branches.owned) {
+        expect(post.author_id).toBe(member.id);
+        expect(member.creditedPostIds).not.toContain(post.id);
+      }
     }
   });
 
@@ -294,32 +295,50 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
     expect(branches).toEqual({ owned: [], coauthored: [] });
   });
 
-  it("keeps the co-authored branch bounded from the top, not offset", async () => {
-    const coauthor = await someCoauthor();
-    if (!coauthor) return;
+  it("offset-paginates the owned branch, so page two continues page one", async () => {
+    const author = await someAuthor();
+    if (!author) return;
 
-    const firstPage = await repository.publicationBranches({
-      profileId: coauthor.id,
-      contentKinds: coauthor.contentKinds,
-      start: 0,
-      limit: 1,
-    });
-    const secondPage = await repository.publicationBranches({
-      profileId: coauthor.id,
-      contentKinds: coauthor.contentKinds,
-      start: 1,
-      limit: 1,
-    });
+    const input = { profileId: author.id, contentKinds: author.contentKinds, limit: 1 };
+    const firstPage = await repository.publicationBranches({ ...input, start: 0 });
+    const secondPage = await repository.publicationBranches({ ...input, start: 1 });
+    if (secondPage.owned.length === 0) return;
 
-    // This is the documented quirk, asserted so that "fixing" it is a failing
-    // test rather than a silent change to what page two shows. The co-authored
-    // branch takes start + limit from the top on both pages, so page two's
-    // branch is a superset of page one's rather than the next slice.
-    expect(firstPage.coauthored.length).toBeLessThanOrEqual(
-      secondPage.coauthored.length
+    expect(secondPage.owned[0]?.id).not.toBe(firstPage.owned[0]?.id);
+    expect(firstPage.coauthored).toEqual([]);
+    expect(secondPage.coauthored).toEqual([]);
+  });
+
+  // ── owner drafts ───────────────────────────────────────────────────
+
+  it("gives the owner only their own drafts, newest edit first", async () => {
+    const owner = await someDraftOwner();
+    if (!owner) return;
+
+    const drafts = await repository.ownerDrafts({ profileId: owner, viewerId: owner });
+    expect(drafts.length).toBeGreaterThan(0);
+
+    const truth = await executor.query<{ id: string }>(
+      `select id::text as id from public.posts
+       where author_id = $1::uuid and status = 'draft'`,
+      [owner]
     );
-    if (firstPage.coauthored.length > 0) {
-      expect(secondPage.coauthored[0]?.id).toBe(firstPage.coauthored[0]?.id);
+    expect(drafts.map((draft) => draft.id).sort()).toEqual(
+      truth.map((row) => row.id).sort()
+    );
+
+    const edited = drafts.map((draft) => Date.parse(draft.updated_at));
+    for (let i = 1; i < edited.length; i += 1) {
+      expect(edited[i]).toBeLessThanOrEqual(edited[i - 1]);
     }
+  });
+
+  it("gives anyone but the owner no drafts at all", async () => {
+    const owner = await someDraftOwner();
+    if (!owner) return;
+
+    await expect(
+      repository.ownerDrafts({ profileId: owner, viewerId: NO_SUCH_PROFILE })
+    ).resolves.toEqual([]);
   });
 });

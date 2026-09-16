@@ -28,23 +28,13 @@ const prefs: NotificationPrefs = {
   inapp_likes: true,
   inapp_comments: true,
   inapp_follows: true,
-  inapp_collaboration: true,
 
   email_comments: true,
   email_follows: true,
   email_likes: true,
-  email_responses: true,
-  email_published: true,
   email_account_security: true,
   email_announcements: true,
-  email_review_assigned: true,
-  email_review_started: true,
-  email_review_reminder: true,
-  email_co_author_invite: true,
-  email_co_author_accepted: true,
-  email_co_author_declined: true,
 
-  push_published: true,
   push_comments: true,
   push_likes: true,
   push_follows: true,
@@ -61,7 +51,7 @@ describe("NotificationsForm", () => {
     await waitFor(() => {
       expect(screen.getByText("This browser does not support push notifications.")).toBeInTheDocument();
     });
-    for (const label of ["Submission decisions", "Comments", "Likes", "New followers"]) {
+    for (const label of ["Comments", "Likes", "New followers"]) {
       expect(screen.getByRole("switch", { name: `Push: ${label}` })).toBeEnabled();
     }
   });

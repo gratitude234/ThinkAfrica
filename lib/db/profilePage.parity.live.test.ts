@@ -162,4 +162,30 @@ describe.skipIf(!enabled)("public profile: PostgREST vs PostgreSQL, same databas
     }
     expect(mismatches).toEqual([]);
   });
+
+  it("agrees on the owner's drafts, and on refusing them to anyone else", async () => {
+    // The service-role client bypasses RLS, so this compares the repositories'
+    // own owner check and filters, which is the whole authorization on the
+    // direct path.
+    const mismatches: string[] = [];
+    for (const id of profiles) {
+      const [rest, direct] = await Promise.all([
+        pageRest.ownerDrafts({ profileId: id, viewerId: id }),
+        pageSql.ownerDrafts({ profileId: id, viewerId: id }),
+      ]);
+      mismatches.push(
+        ...differences(rest, direct).map((line) => `${id} drafts: ${line}`)
+      );
+
+      const stranger = "00000000-0000-0000-0000-000000000000";
+      const [restStranger, directStranger] = await Promise.all([
+        pageRest.ownerDrafts({ profileId: id, viewerId: stranger }),
+        pageSql.ownerDrafts({ profileId: id, viewerId: stranger }),
+      ]);
+      if (restStranger.length > 0 || directStranger.length > 0) {
+        mismatches.push(`${id} drafts leaked to a stranger`);
+      }
+    }
+    expect(mismatches).toEqual([]);
+  });
 });

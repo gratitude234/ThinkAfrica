@@ -23,10 +23,9 @@ import {
   type ExplorePrimaryFilter,
 } from "./exploreFilters";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
-import { formatRelativeTime } from "@/lib/utils";
 
 const EXPLORE_DESCRIPTION =
-  "Discover posts, articles, topics, and people building evidence-backed Intellectual Records on Indegenius.";
+  "Discover posts, articles, topics, and writers on Indegenius.";
 
 /**
  * No `revalidate` here. This route reads the session through
@@ -305,17 +304,6 @@ function TopicInterlude({ topics }: { topics: DiscoverData["topics"] }) {
   );
 }
 
-/**
- * Why this writer is on the list, in the reader's terms: a topic they share,
- * or that they published recently. Nothing about where they study, and no
- * score.
- */
-function personSignal(person: DiscoverPerson) {
-  if (person.sharedTopic) return `Writes about ${person.sharedTopic}`;
-  if (person.lastPublishedAt) return `Published ${formatRelativeTime(person.lastPublishedAt)}`;
-  return null;
-}
-
 function PersonCard({
   person,
   currentUserId,
@@ -323,8 +311,6 @@ function PersonCard({
   person: DiscoverPerson;
   currentUserId: string | null;
 }) {
-  const signal = personSignal(person);
-
   return (
     <div className="flex min-h-[92px] items-center gap-3 rounded-xl border border-card-border bg-card p-4">
       <Link href={`/${person.username}`} className="shrink-0">
@@ -343,11 +329,6 @@ function PersonCard({
         <p className="mt-0.5 truncate text-meta text-ink-muted">
           @{person.username}
         </p>
-        {signal ? (
-          <p className="mt-1.5 inline-flex rounded-full bg-canvas px-2 py-0.5 text-meta font-medium text-ink-soft">
-            {signal}
-          </p>
-        ) : null}
       </div>
       {currentUserId ? (
         <FollowButton
@@ -453,7 +434,7 @@ function WritersRailCard({
                   </p>
                 </Link>
                 <p className="truncate text-meta text-ink-muted">
-                  {personSignal(person) ?? `@${person.username}`}
+                  @{person.username}
                 </p>
               </div>
               {currentUserId ? (
@@ -512,7 +493,7 @@ function ForYouSection({
         title={signedIn ? "Recommended reads" : "Active on Indegenius now"}
         subtitle={
           signedIn
-            ? "Ranked with your interests, follows, and engagement signals."
+            ? "Posts and articles selected for you."
             : "Popular community work you can read before signing in."
         }
       />
@@ -544,7 +525,7 @@ function TrendingSection({
       <FilterBar activeTab="trending" activePrimary={activePrimary} />
       <SectionHeading
         title="Trending this week"
-        subtitle="Recent posts with the strongest engagement and freshness signals, the same for everyone."
+        subtitle="Recent posts and articles readers are engaging with."
       />
       <ExploreFeed
         tab="trending"
@@ -606,7 +587,7 @@ function PeopleSection({
     <>
       <SectionHeading
         title="Writers to follow"
-        subtitle={data.peopleReason}
+        subtitle="Writers publishing on Indegenius."
       />
       <PeopleGrid people={data.people} currentUserId={userId} />
     </>

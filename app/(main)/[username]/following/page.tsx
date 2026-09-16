@@ -26,7 +26,7 @@ export default async function FollowingPage({ params }: PageProps) {
   const { data: followsRaw, error } = await supabase
     .from("follows")
     .select(
-      "following_id, profiles!follows_following_id_fkey(id, username, full_name, university, avatar_url)"
+      "following_id, profiles!follows_following_id_fkey(id, username, full_name, avatar_url)"
     )
     .eq("follower_id", profile.id);
 
@@ -83,7 +83,6 @@ export default async function FollowingPage({ params }: PageProps) {
                   </p>
                   <p className="truncate text-sm text-ink-muted">
                     @{person.username}
-                    {person.university ? ` · ${person.university}` : ""}
                   </p>
                 </div>
               </Link>

@@ -2,14 +2,13 @@
 
 import { composerRepository } from "@/lib/db/readAdapter";
 import {
-  MY_DRAFTS_LIMIT,
   RESUMABLE_LIMIT,
   REVISION_LIMIT,
 } from "@/lib/composerLimits";
 import { getCurrentUser } from "@/lib/serverAuth";
 import { createClient } from "@/lib/supabase/server";
 
-import type { DraftRow, ResumableDraftRow, RevisionRow } from "@/lib/db/composer";
+import type { ResumableDraftRow, RevisionRow } from "@/lib/db/composer";
 
 /**
  * The composer's reads, on the server.
@@ -39,22 +38,6 @@ const UNAUTHORIZED = { ok: false, reason: "unauthorized" } as const;
 const UNAVAILABLE = { ok: false, reason: "unavailable" } as const;
 
 
-
-export async function loadMyDrafts(): Promise<ComposerResult<DraftRow[]>> {
-  const user = await getCurrentUser();
-  if (!user) return UNAUTHORIZED;
-
-  try {
-    const supabase = await createClient();
-    return {
-      ok: true,
-      data: await composerRepository(supabase).myDrafts(user.id, MY_DRAFTS_LIMIT),
-    };
-  } catch (error) {
-    console.error("[composer] drafts failed", error);
-    return UNAVAILABLE;
-  }
-}
 
 export async function loadResumableDrafts(): Promise<
   ComposerResult<ResumableDraftRow[]>

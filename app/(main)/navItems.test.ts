@@ -88,9 +88,6 @@ describe("isAccountNavActive", () => {
   const signedIn = { userId: "user-1", username: "ada" };
 
   it.each([
-    ["/me", true],
-    ["/me/drafts", true],
-    ["/dashboard", true],
     ["/bookmarks", true],
     ["/settings", true],
     // The viewer's own profile counts as an account surface...
@@ -112,7 +109,6 @@ describe("isAccountNavActive", () => {
 
   it("skips the profile match when the username is unknown", () => {
     const noUsername = { userId: "user-1", username: null };
-    expect(isAccountNavActive("/dashboard", noUsername)).toBe(true);
     expect(isAccountNavActive("/someone-else", noUsername)).toBe(false);
   });
 });

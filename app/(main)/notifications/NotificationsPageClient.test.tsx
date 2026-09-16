@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import NotificationsPageClient from "./NotificationsPageClient";
@@ -54,6 +54,8 @@ const publication = notification({
   message: "Yusuph Sebasi published a new Article: The Burden Of Sickle Cell Disease",
   link: "/post/sickle-cell",
 });
+/** A historic editorial notification. The review workflow is retired, so the
+ *  row is ordinary activity and its stored review copy never renders. */
 const revision = notification({
   id: "rev-1",
   type: "revision_requested",
@@ -76,112 +78,139 @@ beforeEach(() => {
 });
 
 describe("the filter row", () => {
-  it("opens on All and offers no Subscriptions filter", () => {
+  it("offers All and Unread, and nothing else", () => {
+    render(<NotificationsPageClient notifications={[follow, publication, revision]} />);
+
+    const group = screen.getByRole("group", { name: "Filter notifications" });
+    expect(
+      within(group)
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+    ).toEqual(["All", "Unread (3)"]);
+
+    for (const retired of [/^Review/, /^Activity/, /Subscriptions/, /Needs attention/]) {
+      expect(screen.queryByRole("button", { name: retired })).not.toBeInTheDocument();
+    }
+  });
+
+  it("opens on All", () => {
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
+
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^Unread/ })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+
+  it("counts unread on the Unread chip and follows it as rows are read", async () => {
     render(
       <NotificationsPageClient
-        userId="u1"
-        mutedTypes={[]}
-        notifications={[follow, publication]}
+        notifications={[follow, publication, notification({ id: "read-1", read: true })]}
       />
     );
 
-    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Unread (2)" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("link", { name: /published a new Article/ }));
+
+    expect(screen.getByRole("button", { name: "Unread (1)" })).toBeInTheDocument();
+  });
+
+  it("marks the active chip for assistive technology, and filters to unread rows", async () => {
+    render(
+      <NotificationsPageClient
+        notifications={[follow, notification({ id: "read-1", read: true, message: "An old one" })]}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Unread/ }));
+
+    expect(screen.getByRole("button", { name: /^Unread/ })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
-    expect(screen.queryByRole("button", { name: /Subscriptions/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Needs attention/ })).not.toBeInTheDocument();
-    // A historic publication alert is still in the inbox, as activity.
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(/started following your work/)).toBeInTheDocument();
+    expect(screen.queryByText("An old one")).not.toBeInTheDocument();
+  });
+});
+
+describe("follow and publication notifications", () => {
+  it("renders both as activity rows, each with its own destination", () => {
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
+
+    expect(screen.getByText(/started following your work/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /published a new Article/ })).toHaveAttribute(
+      "href",
+      "/post/sickle-cell"
+    );
+  });
+
+  it("files a historic review notification as ordinary activity, once, with no hero", () => {
+    render(<NotificationsPageClient notifications={[revision, follow, publication]} />);
+
+    expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Reviewer feedback/)).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText(/There is an update related to The Burden Of Sickle Cell Disease/)
+    ).toHaveLength(1);
+    expect(screen.getByText(/started following your work/)).toBeInTheDocument();
     expect(screen.getByText(/published a new Article/)).toBeInTheDocument();
   });
 });
 
-describe("needs-attention hero", () => {
-  it("does not promote passive activity into a Needs attention banner", () => {
-    // The reported bug: a single new follower rendered as a full-width
-    // "NEEDS ATTENTION / New follower" hero with a primary CTA.
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
+describe("the header", () => {
+  it("links to notification settings", () => {
+    render(<NotificationsPageClient notifications={[follow]} />);
 
-    expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/settings?tab=notifications"
+    );
   });
 
-  it("renders an actionable notification exactly once", async () => {
-    render(
-      <NotificationsPageClient
-        userId="u1"
-        mutedTypes={[]}
-        notifications={[revision, follow, publication]}
-      />
-    );
+  it("offers Mark all read only while something is unread", () => {
+    const { unmount } = render(<NotificationsPageClient notifications={[follow]} />);
+    expect(screen.getByRole("button", { name: "Mark all read" })).toBeInTheDocument();
+    unmount();
 
-    expect(screen.getByText("Needs attention")).toBeInTheDocument();
-
-    // Previously the same notification appeared in the hero *and* again in the
-    // list below, so the page read as a duplicate of itself.
-    expect(screen.getAllByText(/Reviewer feedback is ready/)).toHaveLength(1);
-  });
-
-  it("keeps the rest of the inbox in the list below the hero", () => {
-    render(
-      <NotificationsPageClient
-        userId="u1"
-        mutedTypes={[]}
-        notifications={[revision, follow, publication]}
-      />
-    );
-
-    expect(screen.getByText(/started following your work/)).toBeInTheDocument();
-    expect(screen.getByText(/published a new Article/)).toBeInTheDocument();
-  });
-
-  it("does not contradict the hero with an all-caught-up panel", () => {
-    render(<NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[revision]} />);
-
-    expect(screen.getByText("Needs attention")).toBeInTheDocument();
-    expect(screen.queryByText("No notifications yet")).not.toBeInTheDocument();
-    expect(screen.queryByText("Nothing in this view.")).not.toBeInTheDocument();
+    render(<NotificationsPageClient notifications={[notification({ id: "read-1", read: true })]} />);
+    expect(screen.queryByRole("button", { name: "Mark all read" })).not.toBeInTheDocument();
   });
 });
 
 describe("marking a single notification read", () => {
   it("persists the read and updates the unread count", async () => {
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
 
-    expect(screen.getByText("2 new notifications")).toBeInTheDocument();
+    expect(screen.getByText("2 unread notifications")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("link", { name: /published a new Article/ }));
 
     await waitFor(() => {
       expect(readMutation.markNotificationRead).toHaveBeenCalledWith("pub-1");
     });
-    // Singular, not "1 new notifications".
-    expect(screen.getByText("1 new notification")).toBeInTheDocument();
+    // Singular, not "1 unread notifications".
+    expect(screen.getByText("1 unread notification")).toBeInTheDocument();
   });
 
   it("restores the unread state when the write fails", async () => {
     readMutation.markNotificationRead.mockRejectedValue(new Error("denied"));
 
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
 
     await userEvent.click(screen.getByRole("link", { name: /published a new Article/ }));
 
     await waitFor(() => {
-      expect(screen.getByText("2 new notifications")).toBeInTheDocument();
+      expect(screen.getByText("2 unread notifications")).toBeInTheDocument();
     });
   });
 });
 
 describe("dismissing a notification", () => {
   it("removes the row and offers an undo", async () => {
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
 
     await userEvent.click(
       screen.getByRole("button", { name: /Dismiss notification: Yusuph Sebasi published/ })
@@ -207,9 +236,7 @@ describe("dismissing a notification", () => {
   it("puts the row back when the dismiss write fails", async () => {
     mutations.dismissNotification.mockResolvedValue({ error: "offline" });
 
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
 
     await userEvent.click(
       screen.getByRole("button", { name: /Dismiss notification: Yusuph Sebasi published/ })
@@ -224,14 +251,12 @@ describe("dismissing a notification", () => {
 
 describe("mark all read", () => {
   it("offers an undo scoped to the rows the database actually changed", async () => {
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
 
     await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
 
     await waitFor(() => {
-      expect(screen.getByText("All caught up")).toBeInTheDocument();
+      expect(screen.getByText("You are all caught up.")).toBeInTheDocument();
     });
 
     const toast = screen.getByRole("status");
@@ -240,10 +265,7 @@ describe("mark all read", () => {
     await userEvent.click(within(toast).getByRole("button", { name: "Undo" }));
 
     await waitFor(() => {
-      expect(mutations.restoreUnread).toHaveBeenCalledWith([
-        "follow-1",
-        "pub-1",
-      ]);
+      expect(mutations.restoreUnread).toHaveBeenCalledWith(["follow-1", "pub-1"]);
     });
   });
 
@@ -253,9 +275,7 @@ describe("mark all read", () => {
       conflict: true,
     });
 
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
 
     await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
     const toast = await screen.findByRole("status");
@@ -266,6 +286,7 @@ describe("mark all read", () => {
         /some of those notifications have newer activity/
       );
     });
+    expect(screen.getByRole("status")).not.toHaveTextContent(/duplicate key/);
   });
 
   it("restores the unread state when the bulk write fails", async () => {
@@ -274,139 +295,93 @@ describe("mark all read", () => {
       affectedIds: [],
     });
 
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
 
     await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
 
     await waitFor(() => {
-      expect(screen.getByText("2 new notifications")).toBeInTheDocument();
+      expect(screen.getByText("2 unread notifications")).toBeInTheDocument();
     });
     expect(screen.getByRole("status")).toHaveTextContent(/Failed to mark/);
   });
 });
 
-describe("filter chips", () => {
-  it("only advertises counts for items the list can actually show", async () => {
-    render(
-      <NotificationsPageClient
-        userId="u1"
-        mutedTypes={[]}
-        notifications={[revision, follow, publication]}
-      />
-    );
+describe("refreshing", () => {
+  it("catches up when the reader returns to the tab", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ notifications: [publication] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
-    // `revision` is in the hero, so the Review chip must not claim it.
-    expect(screen.getByRole("button", { name: "Review" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Unread (2)" })
-    ).toBeInTheDocument();
-  });
+    try {
+      render(<NotificationsPageClient notifications={[follow]} />);
 
-  it("counts every chip by the same rule", async () => {
-    // "Needs attention" used to count unread only while the category chips counted
-    // read and unread alike, so the same items were advertised twice by two rules.
-    render(
-      <NotificationsPageClient
-        userId="u1"
-        mutedTypes={[]}
-        notifications={[follow, publication, notification({ id: "read-1", read: true })]}
-      />
-    );
+      await act(async () => {
+        fireEvent(document, new Event("visibilitychange"));
+      });
 
-    expect(screen.getByRole("button", { name: "All (3)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Unread (2)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Activity (3)" })).toBeInTheDocument();
-  });
-
-  it("marks the active chip for assistive technology", async () => {
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
-
-    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: /Activity/ }));
-
-    expect(screen.getByRole("button", { name: /Activity/ })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
-    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
-      "aria-pressed",
-      "false"
-    );
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith("/api/notifications?limit=50");
+      });
+      await waitFor(() => {
+        expect(screen.getByText(/published a new Article/)).toBeInTheDocument();
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
-describe("the caught-up dead end", () => {
+describe("the empty and caught-up states", () => {
+  it("says there is nothing yet when the inbox is empty", () => {
+    render(<NotificationsPageClient notifications={[]} />);
+
+    expect(screen.getByText("No notifications yet")).toBeInTheDocument();
+    expect(screen.getByText("You are all caught up.")).toBeInTheDocument();
+  });
+
   it("opens on everything rather than on unread", () => {
     // Defaulting to unread meant a fully-read inbox opened on an empty state while
     // its notifications sat in the database, unreachable by any filter.
     render(
       <NotificationsPageClient
-        userId="u1"
-        mutedTypes={[]}
         notifications={[notification({ id: "read-1", read: true, message: "An old one" })]}
       />
     );
 
     expect(screen.getByText("An old one")).toBeInTheDocument();
-    expect(screen.queryByText("Nothing in this view.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No notifications yet")).not.toBeInTheDocument();
   });
 
   it("still shows the inbox after marking everything read", async () => {
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
+    render(<NotificationsPageClient notifications={[follow, publication]} />);
 
     await userEvent.click(screen.getByRole("button", { name: "Mark all read" }));
 
     await waitFor(() => {
-      expect(screen.getByText("All caught up")).toBeInTheDocument();
+      expect(screen.getByText("You are all caught up.")).toBeInTheDocument();
     });
     // The rows are still on screen -- they are read, not gone.
     expect(screen.getByText(/started following your work/)).toBeInTheDocument();
     expect(screen.getByText(/published a new Article/)).toBeInTheDocument();
   });
 
-  it("offers a way out of an empty filter", async () => {
-    render(
-      <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: /^Review/ }));
-    expect(screen.getByText("Nothing in this view.")).toBeInTheDocument();
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "Show all notifications" })
-    );
-
-    expect(screen.getByText(/started following your work/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
-  });
-
-  it("says caught up rather than empty when only unread is filtered out", async () => {
+  it("says caught up rather than empty when only unread is filtered out, and All brings the inbox back", async () => {
     render(
       <NotificationsPageClient
-        userId="u1"
-        mutedTypes={[]}
-        notifications={[notification({ id: "read-1", read: true })]}
+        notifications={[notification({ id: "read-1", read: true, message: "An old one" })]}
       />
     );
 
     await userEvent.click(screen.getByRole("button", { name: /^Unread/ }));
 
+    expect(screen.getByText("No unread notifications")).toBeInTheDocument();
     expect(screen.getByText("You are all caught up.")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Your inbox still has 1 notification\./)
-    ).toBeInTheDocument();
+    expect(screen.queryByText("No notifications yet")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "All" }));
+
+    expect(screen.getByText("An old one")).toBeInTheDocument();
   });
 });

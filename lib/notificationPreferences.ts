@@ -26,9 +26,6 @@ export interface InAppNotificationPrefs {
   inapp_likes: boolean;
   inapp_comments: boolean;
   inapp_follows: boolean;
-  /** LEGACY COMPATIBILITY — existing co-authored publications. Still stored in
-   *  notification_prefs, but no setting offers it: nothing it muted is sent. */
-  inapp_collaboration: boolean;
 }
 
 export interface InAppPrefGroup {
@@ -64,7 +61,6 @@ export const IN_APP_PREF_DEFAULTS: InAppNotificationPrefs = {
   inapp_likes: true,
   inapp_comments: true,
   inapp_follows: true,
-  inapp_collaboration: true,
 };
 
 /**

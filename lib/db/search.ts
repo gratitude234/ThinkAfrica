@@ -51,7 +51,6 @@ export interface SearchPostResult {
   profiles: {
     username: string;
     full_name: string | null;
-    university: string | null;
   } | null;
 }
 
@@ -67,7 +66,6 @@ export interface SearchPersonResult {
   id: string;
   username: string;
   full_name: string | null;
-  university: string | null;
   avatar_url: string | null;
 }
 
@@ -145,8 +143,7 @@ const POSTS_SQL = `
     p.published_at,
     case when a.id is null then null else jsonb_build_object(
       'username', a.username,
-      'full_name', a.full_name,
-      'university', a.university
+      'full_name', a.full_name
     ) end as profiles
   from public.posts p
   ${visibleProfileJoin("a", "p.author_id", "$3")}
@@ -168,13 +165,11 @@ const PEOPLE_SQL = `
     p.id,
     p.username,
     p.full_name,
-    p.university,
     p.avatar_url
   from public.profiles p
   where (
       p.username ilike $1::text
       or p.full_name ilike $1::text
-      or p.university ilike $1::text
     )
     and ${profileVisibleSql("p", "$3")}
   limit $2::int
@@ -234,7 +229,7 @@ const OVERLAY_SELECT =
   "id, title, slug, content_kind, profiles!posts_author_id_fkey(full_name, username)";
 
 const POST_SELECT =
-  "id, title, slug, excerpt, content_kind, published_at, profiles!posts_author_id_fkey(username, full_name, university)";
+  "id, title, slug, excerpt, content_kind, published_at, profiles!posts_author_id_fkey(username, full_name)";
 
 export function createSupabaseSearchRepository(
   supabase: SupabaseClient
@@ -280,8 +275,8 @@ export function createSupabaseSearchRepository(
     async people(query, options) {
       const result = await supabase
         .from("profiles")
-        .select("id, username, full_name, university, avatar_url")
-        .or(orIlikeFilter(["username", "full_name", "university"], query))
+        .select("id, username, full_name, avatar_url")
+        .or(orIlikeFilter(["username", "full_name"], query))
         .limit(options.limit);
 
       return rows<SearchPersonResult>(result, "people search failed");

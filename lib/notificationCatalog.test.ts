@@ -103,10 +103,27 @@ describe("priority ordering", () => {
     }
   });
 
-  it("ranks work that needs doing above passive activity", () => {
-    expect(priorityOf("revision_requested")).toBeLessThan(priorityOf("comment"));
-    expect(priorityOf("review_reminder")).toBeLessThan(priorityOf("review_assigned"));
-    expect(priorityOf("co_author_invite")).toBeLessThan(priorityOf("co_author_accepted"));
+  it("files retired workflow and collaboration rows as ordinary history", () => {
+    for (const type of [
+      "revision_requested",
+      "review_reminder",
+      "review_assigned",
+      "review_started",
+      "post_approved",
+      "post_rejected",
+      "co_author_invite",
+      "co_author_accepted",
+      "co_author_declined",
+      "research_collaboration_request",
+      "research_collaboration_accepted",
+      "research_collaboration_declined",
+    ]) {
+      expect(describeNotificationType(type)).toMatchObject({
+        category: "activity",
+        actionable: false,
+      });
+    }
+    expect(describeNotificationType("post_approved").label).toBe("Published");
     expect(priorityOf("follow")).toBeLessThan(priorityOf("like"));
   });
 });
@@ -175,6 +192,16 @@ describe("notificationMessage", () => {
       notificationMessage({ type: "like", message: null, actor: null })
     ).toBe("Someone liked your work.");
   });
+
+  it("does not surface stored review-era copy from historic rows", () => {
+    expect(
+      notificationMessage({
+        type: "post_approved",
+        message: "Your submission was approved by the editorial team.",
+        post_title: null,
+      })
+    ).toBe("your work has been published.");
+  });
 });
 
 describe("notificationHref", () => {
@@ -235,7 +262,10 @@ describe("icons and tones", () => {
     }
   });
 
-  it("reserves the critical tone for trust-and-safety and rejections", () => {
+  it("reserves the critical tone for trust and safety", () => {
+    // Rejections and declined co-author invitations used to be critical too.
+    // Both are retired workflows whose historic rows now render as neutral
+    // activity.
     const critical = Object.entries(NOTIFICATION_DESCRIPTORS)
       .filter(([, descriptor]) => descriptor.tone === "critical")
       .map(([type]) => type)
@@ -243,11 +273,12 @@ describe("icons and tones", () => {
 
     expect(critical).toEqual([
       "account_suspended",
-      "co_author_declined",
       "moderation_comment_hidden",
       "moderation_post_removed",
-      "post_rejected",
     ]);
+    for (const retired of ["post_rejected", "co_author_declined"]) {
+      expect(describeNotificationType(retired).tone, retired).toBe("neutral");
+    }
   });
 
   it("does not tint routine activity", () => {

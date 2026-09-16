@@ -15,7 +15,7 @@ import {
  *
  * The publishing reset, Phase 2G, replaced the four-step identity
  * questionnaire (student or not, school or work category, 3 to 5 required
- * topics, an Intellectual Record preview). Nothing here asks what someone is.
+ * topics, and a retired profile-record preview). Nothing here asks what someone is.
  */
 export const ONBOARDING_STEPS = ["profile", "topics"] as const;
 

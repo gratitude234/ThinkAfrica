@@ -19,11 +19,12 @@ import { sanitizePostExcerpt } from "@/lib/utils";
 /**
  * The server-side data layer for a writer's profile.
  *
- * A profile is a header and one of three tabs (see lib/profileTabs.ts). The
- * header needs the identity row, the two relationship counts and, for a
- * signed-in stranger, their relationship to the profile. Posts and Articles
- * each add one page of that kind. About adds nothing: everything it shows is
- * on the identity row.
+ * A profile is a header and one of its tabs (see lib/profileTabs.ts): Posts,
+ * Articles and About for everyone, and Drafts for the owner. The header needs
+ * the identity row, the two relationship counts and, for a signed-in
+ * stranger, their relationship to the profile. Posts and Articles each add one
+ * page of that kind, and Drafts adds the owner's drafts. About adds nothing:
+ * everything it shows is on the identity row.
  *
  * Two rules the callers depend on.
  *
@@ -74,12 +75,22 @@ export interface ProfilePublicationPage {
   hasNextPage: boolean;
 }
 
+/** One of the owner's drafts, shaped for the Drafts tab. */
+export interface ProfileDraft {
+  id: string;
+  title: string | null;
+  kind: ProfilePublicationKind;
+  updatedAt: string;
+}
+
 export interface ProfileViewData {
   profile: ProfileIdentityRecord;
   viewer: ProfileViewerContext;
   tab: ProfileTab;
-  /** Present for Posts and Articles, null for About. */
+  /** Present for Posts and Articles, null for Drafts and About. */
   publications: ProfilePublicationPage | null;
+  /** Present only on the owner's Drafts tab. */
+  drafts: ProfileDraft[] | null;
 }
 
 /**
@@ -180,11 +191,8 @@ export async function loadProfileViewerContext({
 /**
  * One page of a writer's Posts or Articles.
  *
- * LEGACY COMPATIBILITY: existing co-authored publications. Co-authoring is
- * retired, but a piece somebody was credited on still shows on their profile,
- * so accepted credits are unioned in and deduplicated. The two branches keep
- * their established bounds (owned is offset-paginated, co-authored is taken
- * from the top); see lib/db/profilePage.ts.
+ * A writer profile shows publications primarily authored by that writer.
+ * Co-authoring is retired and no longer affects profile publication lists.
  */
 export async function loadProfilePublications({
   supabase,
@@ -224,13 +232,6 @@ export async function loadProfilePublications({
   for (const row of branches.owned) {
     byId.set(row.id, toPublication(row, kind, false));
   }
-  for (const row of branches.coauthored) {
-    if (!row || row.status !== "published" || row.author_id === profileId) continue;
-    // The co-authored branch cannot be filtered across the embed, so the same
-    // classifier the tabs are defined by decides here.
-    if (profilePublicationKind(row) !== kind) continue;
-    if (!byId.has(row.id)) byId.set(row.id, toPublication(row, kind, true));
-  }
 
   const ordered = [...byId.values()].sort((left, right) => {
     const leftAt = left.publishedAt ?? left.createdAt;
@@ -249,8 +250,45 @@ export async function loadProfilePublications({
 }
 
 /**
+ * The owner's Drafts tab. Owner-only on two levels: the route asks only when
+ * the signed-in viewer is the profile, and the repository answers empty for
+ * anyone else without querying. A stranger forcing `?view=drafts` never
+ * reaches a drafts query at all.
+ */
+export async function loadProfileDrafts({
+  supabase,
+  profileId,
+  viewerId,
+}: {
+  supabase: SupabaseClient;
+  profileId: string;
+  viewerId: string;
+}): Promise<ProfileDraft[]> {
+  if (profileId !== viewerId) return [];
+
+  let rows;
+  try {
+    rows = await profilePageRepository(supabase).ownerDrafts({ profileId, viewerId });
+  } catch (error) {
+    throw queryFailure(
+      "drafts failed",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    kind: profilePublicationKind(row) ?? "post",
+    updatedAt: row.updated_at,
+  }));
+}
+
+/**
  * The one entry point the route needs. Wave 1 is the identity row and the
- * session; wave 2 is the viewer context and, on a list tab, one page of it.
+ * session; wave 2 is the viewer context and, on a list tab, one page of it,
+ * or on the owner's Drafts tab, their drafts. Drafts requested by anyone but
+ * the owner fall back to the default tab before anything is loaded.
  */
 export async function loadProfileView({
   supabase,
@@ -270,21 +308,37 @@ export async function loadProfileView({
 
   if (!profile) return null;
 
-  const [viewerContext, publications] = await Promise.all([
+  const isOwnProfile = viewer?.id === profile.id;
+  const effectiveTab = tab === "drafts" && !isOwnProfile ? DEFAULT_PROFILE_TAB : tab;
+
+  const [viewerContext, publications, drafts] = await Promise.all([
     loadProfileViewerContext({
       supabase,
       profileId: profile.id,
       viewerId: viewer?.id ?? null,
     }),
-    tab === "about"
+    effectiveTab === "about" || effectiveTab === "drafts"
       ? Promise.resolve(null)
       : loadProfilePublications({
           supabase,
           profileId: profile.id,
-          kind: PROFILE_TAB_KIND[tab],
+          kind: PROFILE_TAB_KIND[effectiveTab],
           page,
         }),
+    effectiveTab === "drafts" && viewer
+      ? loadProfileDrafts({
+          supabase,
+          profileId: profile.id,
+          viewerId: viewer.id,
+        })
+      : Promise.resolve(null),
   ]);
 
-  return { profile, viewer: viewerContext, tab, publications };
+  return {
+    profile,
+    viewer: viewerContext,
+    tab: effectiveTab,
+    publications,
+    drafts,
+  };
 }

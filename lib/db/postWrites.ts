@@ -191,7 +191,6 @@ const COLUMN_KINDS: Record<string, ColumnKind> = {
   content: "text",
   excerpt: "text",
   cover_image_url: "text",
-  audio_summary_url: "text",
   content_kind: "text",
   status: "text",
   author_id: "uuid",

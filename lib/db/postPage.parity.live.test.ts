@@ -119,24 +119,15 @@ describe.skipIf(!enabled)("post page: PostgREST vs PostgreSQL, same database", (
         viaSql.collections(testCase.id, null),
       ]);
 
-      // Ordering is part of the contract for references, co-authors,
-      // decisions and versions, so these are compared positionally.
-      for (const key of ["references", "coAuthors", "decisions", "versions"] as const) {
-        mismatches.push(
-          ...differences(rest[key], direct[key], `${testCase.id}.${key}`)
-        );
-      }
-
-      // Reviews have no ORDER BY on either side, so only the set is defined.
-      const sortReviews = (list: unknown[]) =>
-        [...list].sort((a, b) => canonical(a).localeCompare(canonical(b)));
+      // Ordering is part of the contract for references, so they are
+      // compared positionally. The co-author, review, decision and version
+      // collections went in the final UI simplification.
       mismatches.push(
-        ...differences(
-          sortReviews(rest.reviews),
-          sortReviews(direct.reviews),
-          `${testCase.id}.reviews`
-        )
+        ...differences(rest.references, direct.references, `${testCase.id}.references`)
       );
+      if (canonical(Object.keys(rest)) !== canonical(Object.keys(direct))) {
+        mismatches.push(`${testCase.id} collection keys differ`);
+      }
     }
     expect(mismatches, mismatches.join("\n")).toEqual([]);
   }, 300_000);

@@ -117,28 +117,6 @@ function MoreMenu({
 }
 
 /**
- * The platform's own confirmation that an account belongs to who it says, set
- * by an admin. The name of the state is the accessible name, on the element
- * itself, so touch and keyboard users get it too.
- */
-function VerifiedMark({ profile }: { profile: PublicProfileIdentity }) {
-  if (!profile.verified) return null;
-  const label = profile.verified_type
-    ? `Verified ${profile.verified_type}`
-    : "Verified profile";
-  return (
-    <span
-      role="img"
-      aria-label={label}
-      title={label}
-      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-[11px] font-bold leading-none text-white"
-    >
-      ✓
-    </span>
-  );
-}
-
-/**
  * A writer's profile header: photo, name, username, an optional headline or
  * bio, the two relationship counts, and what the reader can do.
  *
@@ -228,7 +206,6 @@ export default function ProfileHeader({
                 >
                   {displayName}
                 </h1>
-                <VerifiedMark profile={profile} />
               </div>
               <p className="mt-1 text-sm text-ink-muted [overflow-wrap:anywhere]">
                 @{profile.username}

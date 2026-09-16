@@ -235,10 +235,10 @@ function ExploreFeedEmptyState({
     detail = "Nothing matches this content type right now. Try another filter.";
   } else if (signedIn) {
     heading = "Nothing to show here yet.";
-    detail = "Follow topics and writers to sharpen what Explore surfaces.";
+    detail = "Follow writers or browse topics to find more publications.";
   } else {
     heading = "Nothing to show here yet.";
-    detail = "Sign in to get recommendations shaped by what you read.";
+    detail = "Sign in to follow writers and save publications.";
   }
 
   return (

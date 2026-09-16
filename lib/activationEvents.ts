@@ -1,15 +1,4 @@
-/**
- * The activation vocabulary: events something in the product still emits.
- *
- * The publishing reset cut this from 63 names to 42 in Phase 2F, to 30 in
- * Phase 2G and to 26 in Phase 2H. Gone are the events of retired products and
- * nudges (research, quality coaching, the weekly digest, push prompts,
- * next-action cards, the Home tab switch), the Intellectual Record profile's
- * recognition, expertise and brief events, the profile Command Center's view,
- * preview and feature note events, the AI topic suggestion events, and the
- * author subscription and subscription nudge events. Follow is recorded as
- * writer_followed. Historic rows keep their names.
- */
+/** Events emitted by live actions in the focused publishing product. */
 export type ActivationEventName =
   // Signup and onboarding.
   | "signup_completed"
@@ -24,14 +13,12 @@ export type ActivationEventName =
   | "comment_submitted"
   | "writer_followed"
   | "search_performed"
-  | "dashboard_viewed"
   // Explore.
   | "discover_viewed"
   | "discover_tab_changed"
   | "discover_item_clicked"
   // Notifications, and the call to action on a notification or a published toast.
   | "notification_opened"
-  | "next_action_clicked"
   // The signed-out landing page.
   | "landing_viewed"
   | "landing_read_clicked"
@@ -59,7 +46,6 @@ const VIEW_EVENTS = new Set<ActivationEventName>([
   "post_opened",
   "discover_viewed",
   "home_viewed",
-  "dashboard_viewed",
   "landing_viewed",
 ]);
 

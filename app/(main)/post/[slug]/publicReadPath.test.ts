@@ -49,16 +49,9 @@ describe("the public published post page", () => {
       (match) => match[1]
     );
 
-    // The two that remain guard access to an *unpublished* post: is the viewer
-    // an assigned reviewer, or an invited co-author. A logged-out reader on a
-    // published post never reaches them.
-    expect(calls.sort()).toEqual(["post_authors", "post_reviews"]);
-
-    const guard = pageSource.slice(
-      pageSource.indexOf('post.status === "pending"')
-    );
-    expect(guard).toContain('.from("post_reviews")');
-    expect(guard).toContain('.from("post_authors")');
+    // Editorial review and co-authoring are retired. The page carries no
+    // direct PostgREST exception path for unpublished work.
+    expect(calls).toEqual([]);
   });
 
   it("loads the post and its page data through the repositories", () => {

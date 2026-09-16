@@ -9,8 +9,11 @@ import {
   defaultSenderKey,
   formatBroadcastDate,
   formatRecipientCount,
+  RETIRED_BROADCAST_AUDIENCES,
   getBroadcastAudience,
   isBroadcastEditable,
+  isCurrentBroadcastAudience,
+  isRetiredBroadcastAudience,
   isExecutiveSender,
   subjectGuidance,
   type BroadcastAudienceKey,
@@ -85,15 +88,37 @@ describe("composer sender options", () => {
 });
 
 describe("audiences", () => {
-  it("offers the six initial audiences", () => {
+  it("offers five audiences, and no verified audience", () => {
+    // Verified users went with verified prestige in the final UI
+    // simplification.
     expect(BROADCAST_AUDIENCES.map((audience) => audience.key)).toEqual([
       "all",
       "active",
       "authors",
-      "verified",
       "new",
       "selected",
     ]);
+  });
+
+  it("still names a retired audience, so a broadcast that used it renders", () => {
+    // The admin list and detail pages resolve every stored broadcast's
+    // audience. Throwing here would take the whole communications page down
+    // for one historic row.
+    const audience = getBroadcastAudience("verified");
+
+    expect(audience.label).toBe("Verified users");
+    expect(audience.isStanding).toBe(false);
+    expect(isRetiredBroadcastAudience("verified")).toBe(true);
+    expect(isCurrentBroadcastAudience("verified")).toBe(false);
+    expect(RETIRED_BROADCAST_AUDIENCES.map((item) => item.key)).toEqual(["verified"]);
+  });
+
+  it("treats every offered audience as current and none as retired", () => {
+    for (const audience of BROADCAST_AUDIENCES) {
+      expect(isCurrentBroadcastAudience(audience.key)).toBe(true);
+      expect(isRetiredBroadcastAudience(audience.key)).toBe(false);
+    }
+    expect(isCurrentBroadcastAudience("everyone")).toBe(false);
   });
 
   it("resolves an audience by key", () => {
@@ -118,13 +143,7 @@ describe("audiences", () => {
   });
 
   it("provisions a Resend segment for exactly the standing audiences", () => {
-    expect(STANDING_AUDIENCE_KEYS).toEqual([
-      "all",
-      "active",
-      "authors",
-      "verified",
-      "new",
-    ]);
+    expect(STANDING_AUDIENCE_KEYS).toEqual(["all", "active", "authors", "new"]);
   });
 
   it("refuses an audience that does not exist", () => {

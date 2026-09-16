@@ -10,8 +10,9 @@ import {
 } from "@/lib/broadcastEmail";
 import { htmlToPlainText } from "@/lib/broadcastText";
 import {
-  BROADCAST_AUDIENCES,
   allowedBroadcastSenderKeys,
+  isCurrentBroadcastAudience,
+  isRetiredBroadcastAudience,
   type BroadcastAudienceKey,
 } from "@/lib/broadcasts";
 import {
@@ -49,7 +50,7 @@ function isSenderKey(value: string): value is EmailSenderKey {
 }
 
 function isAudienceKey(value: string): value is BroadcastAudienceKey {
-  return BROADCAST_AUDIENCES.some((audience) => audience.key === value);
+  return isCurrentBroadcastAudience(value);
 }
 
 /**
@@ -89,7 +90,11 @@ export async function saveBroadcastDraft(input: ComposerInput) {
     const { context, senderKey } = await authorize(input.senderKey);
 
     if (!isAudienceKey(input.audienceKey)) {
-      return failure("Unknown audience.");
+      return failure(
+        isRetiredBroadcastAudience(input.audienceKey)
+          ? "This audience has been retired. Choose another audience."
+          : "Unknown audience."
+      );
     }
 
     const draft = {

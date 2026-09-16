@@ -122,12 +122,12 @@ describe("SideRail", () => {
     expect(mocks.push).toHaveBeenCalledWith("/write");
   });
 
-  it("is hidden below the xl breakpoint", () => {
+  it("is hidden below the md breakpoint, where the bottom bar takes over", () => {
     // jsdom has no layout engine, so the responsive contract is asserted on the
     // utility classes, as elsewhere in this suite.
     const { container } = renderRail();
     const rail = container.querySelector("aside");
-    expect(rail).toHaveClass("hidden", "xl:block");
+    expect(rail).toHaveClass("hidden", "md:block");
   });
 
   // Every sticky aside in the app pins at the nav's live offset + 1rem, so
@@ -135,7 +135,7 @@ describe("SideRail", () => {
   it("pins at the shared sticky offset", () => {
     const { container } = renderRail();
     const rail = container.querySelector("aside");
-    expect(rail).toHaveClass("xl:top-[var(--app-sticky-offset)]");
+    expect(rail).toHaveClass("md:top-[var(--app-sticky-offset)]");
     expect(rail?.className).not.toMatch(/transition-\[top\]/);
   });
 
@@ -144,7 +144,7 @@ describe("SideRail", () => {
   it("lets a wheel gesture chain from the rail into the page", () => {
     const { container } = renderRail();
     const rail = container.querySelector("aside");
-    expect(rail).toHaveClass("xl:overflow-y-auto");
+    expect(rail).toHaveClass("md:overflow-y-auto");
     expect(rail?.className).not.toMatch(/overscroll/);
   });
 });

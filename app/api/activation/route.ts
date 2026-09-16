@@ -19,12 +19,10 @@ const ALLOWED_EVENTS = new Set<ActivationEventName>([
   "comment_submitted",
   "writer_followed",
   "search_performed",
-  "dashboard_viewed",
   "discover_viewed",
   "discover_tab_changed",
   "discover_item_clicked",
   "notification_opened",
-  "next_action_clicked",
   "landing_viewed",
   "landing_read_clicked",
   "landing_signup_clicked",
@@ -42,7 +40,6 @@ const ANONYMOUS_VIEW_EVENTS = new Set<ActivationEventName>([
   "post_opened",
   "discover_viewed",
   "home_viewed",
-  "dashboard_viewed",
   "landing_viewed",
 ]);
 
