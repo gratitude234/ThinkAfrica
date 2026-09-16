@@ -278,45 +278,93 @@ export function createSupabaseFeedRepository(
         getVisibleCommentCountsByPostId,
       } = await import("@/lib/postCounts");
 
+      // Hydration is decoration around an already-successful post list. A
+      // timeout loading likes, bookmarks, comment counts or author chrome must
+      // not turn twelve perfectly readable posts into "Couldn't load your
+      // feed". Each optional branch therefore fails soft and the card falls
+      // back to zero/false/null for that field. The primary list query remains
+      // strict in feedList.ts, so a real failure to load posts still surfaces.
+      //
+      // This also matters during a Supabase incident: the old Promise.all made
+      // the first rejected aggregate reject the entire hydration wave. Worse,
+      // postCounts then tried a raw-row fallback after some gateway failures,
+      // adding more pressure while the service was already timing out.
+      const loadProfiles = async () =>
+        authors.length
+          ? rows<FeedAuthorProfile>(
+              (await supabase
+                .from("profiles")
+                .select(
+                  "id, username, full_name, university, avatar_url, verified, verified_type"
+                )
+                .in("id", authors)) as { data?: unknown; error?: unknown }
+            )
+          : [];
+
+      const loadViewerLikes = async () =>
+        ids.length && viewer.id
+          ? rows<{ post_id: string }>(
+              (await supabase
+                .from("likes")
+                .select("post_id")
+                .eq("user_id", viewer.id)
+                .in("post_id", ids)) as { data?: unknown; error?: unknown }
+            )
+          : [];
+
+      const loadViewerBookmarks = async () =>
+        ids.length && viewer.id
+          ? rows<{ post_id: string }>(
+              (await supabase
+                .from("bookmarks")
+                .select("post_id")
+                .eq("user_id", viewer.id)
+                .in("post_id", ids)) as { data?: unknown; error?: unknown }
+            )
+          : [];
+
       const [
-        likeCounts,
-        bookmarkCounts,
-        commentCounts,
-        profiles,
-        viewerLikes,
-        viewerBookmarks,
-      ] = await Promise.all([
+        likeCountsResult,
+        bookmarkCountsResult,
+        commentCountsResult,
+        profilesResult,
+        viewerLikesResult,
+        viewerBookmarksResult,
+      ] = await Promise.allSettled([
         getLikeCountsByPostId(supabase as never, ids),
         getBookmarkCountsByPostId(supabase as never, ids),
         getVisibleCommentCountsByPostId(supabase as never, ids),
-        authors.length
-          ? supabase
-              .from("profiles")
-              .select(
-                "id, username, full_name, university, avatar_url, verified, verified_type"
-              )
-              .in("id", authors)
-          : Promise.resolve({ data: [] }),
-        ids.length && viewer.id
-          ? supabase.from("likes").select("post_id").eq("user_id", viewer.id).in("post_id", ids)
-          : Promise.resolve({ data: [] }),
-        ids.length && viewer.id
-          ? supabase
-              .from("bookmarks")
-              .select("post_id")
-              .eq("user_id", viewer.id)
-              .in("post_id", ids)
-          : Promise.resolve({ data: [] }),
-      ]);
+        loadProfiles(),
+        loadViewerLikes(),
+        loadViewerBookmarks(),
+      ] as const);
 
-      const profileRows = rows<FeedAuthorProfile>(
-        profiles as { data?: unknown; error?: unknown }
+      function valueOr<T>(
+        result: PromiseSettledResult<T>,
+        label: string,
+        fallback: T
+      ): T {
+        if (result.status === "fulfilled") return result.value;
+        console.warn(
+          `[feed-hydration] ${label} unavailable; rendering cards without it`,
+          result.reason
+        );
+        return fallback;
+      }
+
+      const likeCounts = valueOr(likeCountsResult, "like counts", {});
+      const bookmarkCounts = valueOr(
+        bookmarkCountsResult,
+        "bookmark counts",
+        {}
       );
-      const likeRows = rows<{ post_id: string }>(
-        viewerLikes as { data?: unknown; error?: unknown }
-      );
-      const bookmarkRows = rows<{ post_id: string }>(
-        viewerBookmarks as { data?: unknown; error?: unknown }
+      const commentCounts = valueOr(commentCountsResult, "comment counts", {});
+      const profileRows = valueOr(profilesResult, "author profiles", []);
+      const likeRows = valueOr(viewerLikesResult, "viewer likes", []);
+      const bookmarkRows = valueOr(
+        viewerBookmarksResult,
+        "viewer bookmarks",
+        []
       );
 
       const likedSet = new Set(likeRows.map((row) => row.post_id));

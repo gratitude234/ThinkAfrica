@@ -45,10 +45,17 @@ export default async function TopicPage({ params }: PageProps) {
   if (!postsRaw) notFound();
 
   const postIds = postsRaw.map((post) => post.id);
-  const commentCounts =
-    postIds.length > 0
-      ? await getVisibleCommentCountsByPostId(supabase, postIds)
-      : ({} as Record<string, number>);
+  let commentCounts: Record<string, number> = {};
+  if (postIds.length > 0) {
+    try {
+      commentCounts = await getVisibleCommentCountsByPostId(supabase, postIds);
+    } catch (error) {
+      // Comment totals are card decoration, not the topic page itself. Keep the
+      // publications visible during a transient Data API failure and render a
+      // conservative zero rather than turning the whole topic into an error.
+      console.warn("[topic] comment counts unavailable; rendering zero counts", error);
+    }
+  }
 
   const posts: PostCardData[] = postsRaw.map((row) => {
     const profile = (Array.isArray(row.profiles) ? row.profiles[0] : row.profiles) as

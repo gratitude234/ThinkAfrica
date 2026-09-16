@@ -12,6 +12,7 @@
     "lib/blocking.ts",
     "lib/suspension.ts",
     "lib/feedData.ts",
+    "lib/postCounts.ts",
     "lib/suggestedPeople.ts",
     "lib/discoverData.ts",
     "lib/adminAccess.ts",
