@@ -14,9 +14,11 @@
  * through the Supabase dashboard and a feed that breaks between deploying the
  * code and running the migration is not an acceptable intermediate state.
  *
- * The fallback is also what preserves correctness: the aggregate read fails
- * soft, and the row count it falls back to still throws on a genuine database
- * failure rather than reporting zero.
+ * The fallback is deliberately narrow: it is used only when the aggregate is
+ * genuinely absent (deployment/migration lag). Gateway failures, timeouts and
+ * permission errors are propagated instead of immediately launching a second,
+ * heavier query at the same unhealthy service. Feed hydration can then choose
+ * to degrade those optional counters without hiding a database incident.
  */
 
 interface SupabaseQueryResult<T> {
@@ -54,26 +56,54 @@ export function resetPostCountWarnings() {
   reportedFallbacks.clear();
 }
 
-function expectRows<T>(result: SupabaseQueryResult<T[]>, operation: string): T[] {
-  if (result.error) {
-    const source = result.error as { message?: unknown; code?: unknown } | null;
-    const detail =
-      typeof source?.message === "string" && source.message.trim()
-        ? source.message
+function countFailure(errorLike: unknown, operation: string) {
+  const source = errorLike as { message?: unknown; code?: unknown } | null;
+  const detail =
+    typeof source?.message === "string" && source.message.trim()
+      ? source.message
+      : errorLike instanceof Error && errorLike.message.trim()
+        ? errorLike.message
         : "Unknown database error";
-    const error = new Error(`Count query failed (${operation}): ${detail}`) as Error & {
-      operation: string;
-      code?: string;
-      cause: unknown;
-    };
-    error.name = "PostCountError";
-    error.operation = operation;
-    error.code =
-      typeof source?.code === "string" && source.code ? source.code : undefined;
-    error.cause = result.error;
-    throw error;
-  }
+  const error = new Error(`Count query failed (${operation}): ${detail}`) as Error & {
+    operation: string;
+    code?: string;
+    cause: unknown;
+  };
+  error.name = "PostCountError";
+  error.operation = operation;
+  error.code =
+    typeof source?.code === "string" && source.code ? source.code : undefined;
+  error.cause = errorLike;
+  return error;
+}
+
+function expectRows<T>(result: SupabaseQueryResult<T[]>, operation: string): T[] {
+  if (result.error) throw countFailure(result.error, operation);
   return result.data ?? [];
+}
+
+function errorCode(error: unknown): string | undefined {
+  const source = error as { code?: unknown; cause?: unknown } | null;
+  if (typeof source?.code === "string" && source.code) return source.code;
+  const cause = source?.cause as { code?: unknown } | null | undefined;
+  return typeof cause?.code === "string" && cause.code ? cause.code : undefined;
+}
+
+/**
+ * Only a genuinely absent aggregate is allowed to fall back to row counting.
+ *
+ * A timeout, permission failure, gateway outage or stale schema cache is NOT a
+ * migration-lag signal. Falling back after one of those errors immediately
+ * fires a second (and usually more expensive) query at the same sick service,
+ * which is exactly the retry storm the global Supabase timeout is designed to
+ * avoid.
+ */
+function isMissingAggregateTable(error: unknown): boolean {
+  return ["PGRST205", "42P01"].includes(errorCode(error) ?? "");
+}
+
+function isMissingCommentAggregate(error: unknown): boolean {
+  return ["PGRST202", "42883"].includes(errorCode(error) ?? "");
 }
 
 /**
@@ -106,8 +136,8 @@ export async function getCountsByPostId(
 
 /**
  * Reads one of the maintained counter tables. Returns null (rather than an
- * empty object) when the aggregate cannot be read at all, so the caller can
- * tell "no counts available here" apart from "every count is genuinely zero".
+ * empty object) only when the aggregate is genuinely absent, so the caller can
+ * use the migration-lag fallback. Operational failures are thrown.
  */
 async function readAggregateCounts(
   supabase: CountableClient,
@@ -124,8 +154,11 @@ async function readAggregateCounts(
     >;
 
     if (result.error) {
-      reportFallbackOnce(table, result.error);
-      return null;
+      if (isMissingAggregateTable(result.error)) {
+        reportFallbackOnce(table, result.error);
+        return null;
+      }
+      throw countFailure(result.error, `read ${table}`);
     }
     // A working aggregate answers with an array, empty at worst. Anything else
     // means the table is not there yet, which is the migration-lag case.
@@ -143,8 +176,11 @@ async function readAggregateCounts(
     if (postIds.length > 0 && Object.keys(counts).length === 0) return null;
     return counts;
   } catch (error) {
-    reportFallbackOnce(table, error);
-    return null;
+    if (isMissingAggregateTable(error)) {
+      reportFallbackOnce(table, error);
+      return null;
+    }
+    throw error;
   }
 }
 
@@ -226,7 +262,11 @@ export async function getVisibleCommentCountsByPostId(
         { p_post_ids: postIds }
       );
       if (error) {
-        reportFallbackOnce("count_visible_comments_by_post", error);
+        if (isMissingCommentAggregate(error)) {
+          reportFallbackOnce("count_visible_comments_by_post", error);
+        } else {
+          throw countFailure(error, "count visible comments");
+        }
       } else if (Array.isArray(data)) {
         const counts: Record<string, number> = {};
         for (const row of data as Array<Record<string, unknown>>) {
@@ -238,7 +278,11 @@ export async function getVisibleCommentCountsByPostId(
         return counts;
       }
     } catch (error) {
-      reportFallbackOnce("count_visible_comments_by_post", error);
+      if (isMissingCommentAggregate(error)) {
+        reportFallbackOnce("count_visible_comments_by_post", error);
+      } else {
+        throw error;
+      }
     }
   }
 

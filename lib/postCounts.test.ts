@@ -82,6 +82,37 @@ describe("getBookmarkCountsByPostId", () => {
     ).rejects.toMatchObject({ operation: "count bookmarks", code: "XX000" });
   });
 
+  it("does not turn an aggregate outage into a second raw-row query", async () => {
+    const supabase = client({
+      post_bookmark_counts: {
+        data: null,
+        error: { code: "PGRST002", message: "schema cache unavailable" },
+      },
+      bookmarks: { data: [{ post_id: "post-1" }], error: null },
+    });
+
+    await expect(
+      getBookmarkCountsByPostId(supabase as never, ["post-1"])
+    ).rejects.toMatchObject({ operation: "read post_bookmark_counts", code: "PGRST002" });
+    expect(supabase.asked).toEqual(["post_bookmark_counts"]);
+  });
+
+  it("still falls back when PostgREST says the aggregate table genuinely does not exist", async () => {
+    const supabase = client({
+      post_bookmark_counts: {
+        data: null,
+        error: { code: "PGRST205", message: "table not found" },
+      },
+      bookmarks: { data: [{ post_id: "post-1" }], error: null },
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(
+      getBookmarkCountsByPostId(supabase as never, ["post-1"])
+    ).resolves.toEqual({ "post-1": 1 });
+    expect(supabase.asked).toEqual(["post_bookmark_counts", "bookmarks"]);
+  });
+
   it("asks nothing at all for an empty id list", async () => {
     const supabase = client();
 

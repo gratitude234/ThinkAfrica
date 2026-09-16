@@ -311,14 +311,27 @@ async function applyViewerCommentCounts(
   posts: PostCardData[]
 ): Promise<PostCardData[]> {
   if (posts.length === 0) return posts;
-  const counts = await getVisibleCommentCountsByPostId(
-    viewerClient,
-    posts.map((post) => post.id)
-  );
-  return posts.map((post) => ({
-    ...post,
-    comment_count: counts[post.id] ?? 0,
-  }));
+
+  try {
+    const counts = await getVisibleCommentCountsByPostId(
+      viewerClient,
+      posts.map((post) => post.id)
+    );
+    return posts.map((post) => ({
+      ...post,
+      comment_count: counts[post.id] ?? 0,
+    }));
+  } catch (error) {
+    // Public feed cards may come from the service-role cache, whose cached
+    // comment total is not a viewer-safe fallback. If the viewer-specific
+    // count cannot be loaded, show zero rather than failing the whole feed or
+    // accidentally surfacing a count that includes moderated comments.
+    console.warn(
+      "[feed-hydration] viewer comment counts unavailable; rendering zero counts",
+      error
+    );
+    return posts.map((post) => ({ ...post, comment_count: 0 }));
+  }
 }
 
 /**
