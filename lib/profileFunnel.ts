@@ -2,49 +2,34 @@ import {
   trackActivationEvent,
   type ActivationEventName,
 } from "@/lib/activationEvents";
+import type { ProfilePublicationKind } from "@/lib/profileTabs";
 
 /**
- * The profile conversion funnel.
+ * The profile conversion funnel: profile view, then work opened, then follow
+ * completed. It rides the activation-event pipeline rather than a third-party
+ * analytics dependency: same POST to /api/activation, same server-side
+ * allowlist, same authenticated-caller trust boundary.
  *
- * profile view -> work opened -> follow completed or opportunity inquiry
- * submitted. It rides the existing activation-event pipeline rather than a
- * third-party analytics dependency: same POST to /api/activation, same
- * server-side allowlist, same authenticated-caller trust boundary.
+ * The publishing reset, Phase 2G, cut it back to these three steps. The
+ * recognition, demonstrated-expertise and profile-brief events went with the
+ * sections that emitted them, and nothing replaces them.
  *
  * Payloads carry identifiers and state only. No display name, no email, no
- * biography, no positioning statement, nothing an author wrote.
+ * biography, nothing an author wrote.
  */
 export const PROFILE_FUNNEL_EVENTS = [
   "profile_viewed",
   "profile_work_opened",
   "profile_follow_completed",
-  "profile_inquiry_opened",
-  "profile_inquiry_submitted",
-  // Phase 3: recognition and briefs are new places the same funnel starts.
-  "profile_recognition_opened",
-  "profile_recognition_source_opened",
-  "profile_expertise_topic_opened",
-  "profile_brief_viewed",
-  "profile_brief_work_opened",
-  "profile_brief_contact_started",
 ] as const;
 
 export type ProfileFunnelEvent = (typeof PROFILE_FUNNEL_EVENTS)[number];
 
-/**
- * Where on the profile the action happened. Kept to the surfaces that can
- * actually start or advance the funnel, so a value is always answerable from
- * the page rather than guessed.
- */
+/** Where on the profile the action happened. */
 export const PROFILE_FUNNEL_SURFACES = [
   "profile_header",
-  "featured_work",
-  "latest_record",
-  "full_record",
-  "sticky_bar",
-  "recognition",
-  "demonstrated_expertise",
-  "profile_brief",
+  "profile_posts",
+  "profile_articles",
 ] as const;
 
 export type ProfileFunnelSurface = (typeof PROFILE_FUNNEL_SURFACES)[number];
@@ -56,8 +41,8 @@ export type ProfileFunnelSurface = (typeof PROFILE_FUNNEL_SURFACES)[number];
  */
 export type ProfileViewerState = "anonymous" | "authenticated" | "owner";
 
-/** The kinds of entry a reader can open from a profile. */
-export type ProfileWorkKind = "publication" | "response" | "research";
+/** The kinds of work a reader can open from a profile. */
+export type ProfileWorkKind = ProfilePublicationKind;
 
 export function getProfileViewerState({
   viewerId,

@@ -138,7 +138,7 @@ export async function removeReportedPost(reportId: string) {
       user_id: post.author_id,
       type: "moderation_post_removed",
       message: `${postLabel} was removed for breaking our community guidelines.`,
-      link: "/editorial-standards",
+      link: "/terms",
       post_id: post.id,
       read: false,
     });
@@ -154,7 +154,7 @@ export async function removeReportedPost(reportId: string) {
       title: "Post removed",
       intro: `${postLabel} was removed because it breaks our community guidelines. If you believe this was a mistake, reply to this email.`,
       ctaLabel: "Read our guidelines",
-      ctaPath: "/editorial-standards",
+      ctaPath: "/terms",
       idempotencyKey: `moderation:post_removed:${post.id}`,
       preferenceKey: "email_account_security",
     });
@@ -251,7 +251,7 @@ export async function hideReportedComment(reportId: string) {
       user_id: comment.author_id,
       type: "moderation_comment_hidden",
       message: "One of your comments was hidden for breaking our community guidelines.",
-      link: "/editorial-standards",
+      link: "/terms",
       comment_id: comment.id,
       read: false,
     });
@@ -365,8 +365,8 @@ export async function suspendUser(input: {
       user_id: input.userId,
       type: "account_suspended",
       message:
-        "Your account has been suspended. You can still browse, but posting, commenting, and messaging are disabled.",
-      link: "/editorial-standards",
+        "Your account has been suspended. You can still browse, but publishing and commenting are disabled.",
+      link: "/terms",
       read: false,
     });
 
@@ -379,9 +379,9 @@ export async function suspendUser(input: {
       subject: "Your Indegenius account has been suspended",
       preview: "Your account has been suspended by our moderation team.",
       title: "Account suspended",
-      intro: `Your account has been suspended for breaking our community guidelines (${reason}). You can still browse Indegenius, but posting, commenting, and messaging are disabled. If you believe this was a mistake, reply to this email.`,
+      intro: `Your account has been suspended for breaking our community guidelines (${reason}). You can still browse Indegenius, but publishing and commenting are disabled. If you believe this was a mistake, reply to this email.`,
       ctaLabel: "Read our guidelines",
-      ctaPath: "/editorial-standards",
+      ctaPath: "/terms",
       idempotencyKey: `moderation:suspend:${input.userId}:${new Date().toISOString().slice(0, 10)}`,
       preferenceKey: "email_account_security",
     });

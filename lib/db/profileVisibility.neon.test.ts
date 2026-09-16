@@ -6,9 +6,9 @@ vi.mock("server-only", () => ({}));
  * BEHAVIOURAL PROOF that every migrated read carrying an author projection
  * reproduces the `profiles` SELECT policy, against real PostgreSQL.
  *
- * This exists because the policy was missed once. The post page, the profile
- * identity lookup and the profile record all read through the *request*
- * client, so PostgREST applied
+ * This exists because the policy was missed once. The post page and the
+ * profile identity lookup both read through the *request* client, so
+ * PostgREST applied
  *
  *     id = auth.uid()
  *     OR (suspended_at IS NULL AND can_view_profile(id, privacy_settings))
@@ -28,9 +28,6 @@ const neonUrl = process.env.DATABASE_URL;
 const enabled = Boolean(neonUrl && neonUrl.includes(".neon.tech"));
 
 const { createPostgresPostPageRepository } = await import("@/lib/db/postPage");
-const { createPostgresProfileRecordRepository } = await import(
-  "@/lib/db/profileRecord"
-);
 const { createPostgresProfilesRepository } = await import(
   "@/lib/db/postgres/profiles"
 );
@@ -198,37 +195,6 @@ describe.skipIf(!enabled)("the profiles policy, on every migrated read", () => {
       // row would change the author count and the corresponding-author flag.
       expect(afterEntry).toBeDefined();
       expect(afterEntry!.profile).toBeNull();
-    });
-  });
-
-  it("nulls a co-author in the profile record's hydration", async () => {
-    await inRollback(async (tx) => {
-      const executor = adaptDriver(tx as never);
-      const repository = createPostgresProfileRecordRepository(executor);
-
-      const [row] = await executor.query<{ post_id: string; user_id: string }>(
-        `select a.post_id::text as post_id, a.user_id::text as user_id
-         from public.post_authors a
-         join public.profiles p on p.id = a.user_id
-         limit 1`
-      );
-      if (!row) return;
-
-      await executor.query(
-        `update public.profiles set privacy_settings =
-           '{"profile_visibility": "private"}'::jsonb
-         where id = $1::uuid`,
-        [row.user_id]
-      );
-
-      const [post] = await repository.hydratePublications([row.post_id], null);
-      if (!post) return;
-
-      const entry = (post.post_authors ?? []).find(
-        (author) => author.user_id === row.user_id
-      );
-      expect(entry).toBeDefined();
-      expect(entry!.profile).toBeNull();
     });
   });
 

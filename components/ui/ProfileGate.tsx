@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import UniversitySelect from "@/components/ui/UniversitySelect";
 import Button from "@/components/ui/Button";
 import { completeProfileGate } from "@/app/(main)/settings/profileActions";
 import { checkUsernameAvailable } from "@/lib/composerActions";
@@ -37,11 +36,9 @@ export default function ProfileGate({
 }: ProfileGateProps) {
   const hasFullName = Boolean(initialProfile?.full_name?.trim());
   const hasUsername = Boolean(initialProfile?.username?.trim());
-  const hasUniversity = Boolean(initialProfile?.university?.trim());
 
   const [fullName, setFullName] = useState(initialProfile?.full_name ?? "");
   const [username, setUsername] = useState(initialProfile?.username ?? "");
-  const [university, setUniversity] = useState(initialProfile?.university ?? "");
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,7 +47,6 @@ export default function ProfileGate({
     if (!open) return;
     setFullName(initialProfile?.full_name ?? "");
     setUsername(initialProfile?.username ?? "");
-    setUniversity(initialProfile?.university ?? "");
     setUsernameError(null);
   }, [initialProfile, open]);
 
@@ -105,9 +101,9 @@ export default function ProfileGate({
       username: hasUsername
         ? (initialProfile?.username ?? "")
         : username.trim().toLowerCase().replace(/\s+/g, ""),
-      university: hasUniversity
-        ? (initialProfile?.university ?? null)
-        : university.trim() || null,
+      // Carried through untouched for the composer's own state. The gate asks
+      // for a name and a username only.
+      university: initialProfile?.university ?? null,
     };
 
     // The server resolves the viewer from the session, so this gate can no
@@ -115,7 +111,6 @@ export default function ProfileGate({
     const result = await completeProfileGate({
       fullName: payload.full_name,
       username: payload.username,
-      university: payload.university,
     });
 
     setSaving(false);
@@ -189,15 +184,6 @@ export default function ProfileGate({
               {usernameError ? (
                 <p className="mt-1 text-xs text-red-500">{usernameError}</p>
               ) : null}
-            </div>
-          ) : null}
-
-          {!hasUniversity ? (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                University
-              </label>
-              <UniversitySelect value={university} onChange={setUniversity} />
             </div>
           ) : null}
 

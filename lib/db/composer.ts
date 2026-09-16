@@ -38,9 +38,7 @@ export interface DraftRow {
   title: string | null;
   excerpt: string | null;
   word_count: number | null;
-  type: string;
   content_kind: string | null;
-  article_format: string | null;
   updated_at: string;
 }
 
@@ -48,7 +46,6 @@ export interface DraftRow {
 export interface ResumableDraftRow {
   id: string;
   title: string | null;
-  type: string;
   content_kind: string | null;
   updated_at: string;
 }
@@ -87,8 +84,8 @@ export interface ComposerRepository {
 
 const MY_DRAFTS_SQL = `
   select
-    p.id, p.title, p.excerpt, p.word_count, p.type,
-    p.content_kind, p.article_format, p.updated_at
+    p.id, p.title, p.excerpt, p.word_count,
+    p.content_kind, p.updated_at
   from public.posts p
   where p.author_id = $1::uuid
     and p.status = 'draft'
@@ -97,7 +94,7 @@ const MY_DRAFTS_SQL = `
 `;
 
 const RESUMABLE_SQL = `
-  select p.id, p.title, p.type, p.content_kind, p.updated_at
+  select p.id, p.title, p.content_kind, p.updated_at
   from public.posts p
   where p.author_id = $1::uuid
     and p.status = 'draft'
@@ -157,8 +154,8 @@ function rows<T>(result: { data?: unknown; error?: unknown }, label: string): T[
 }
 
 const DRAFT_SELECT =
-  "id, title, excerpt, word_count, type, content_kind, article_format, updated_at";
-const RESUMABLE_SELECT = "id, title, type, content_kind, updated_at";
+  "id, title, excerpt, word_count, content_kind, updated_at";
+const RESUMABLE_SELECT = "id, title, content_kind, updated_at";
 const REVISION_SELECT = "id, title, excerpt, content, word_count, created_at";
 
 // ── Supabase ─────────────────────────────────────────────────────────

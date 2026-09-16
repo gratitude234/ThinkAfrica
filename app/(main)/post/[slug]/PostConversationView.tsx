@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import UserAvatar from "@/components/ui/UserAvatar";
-import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
+import FollowButton from "@/components/ui/FollowButton";
 import ReportButton from "@/components/moderation/ReportButton";
 import BackLink from "@/components/ui/BackLink";
 import PostImage from "@/components/post/PostImage";
-import type { PostCardData } from "@/components/post/PostCard";
 import PublishedToast from "./PublishedToast";
 import PostActionsRow from "./PostActionsRow";
 import DiscussionSection from "./DiscussionSection";
@@ -24,20 +22,16 @@ interface ConversationPost {
   id: string;
   slug: string;
   title: string | null;
-  type: string;
+  content_kind?: string | null;
   status: string;
   created_at: string;
   published_at: string | null;
   cover_image_url: string | null;
   tags: string[] | null;
-  in_response_to: string | null;
 }
 
 interface ConversationSecondary {
   likeCount: number;
-  responseCount: number;
-  responseCards: PostCardData[];
-  responsesHasMore: boolean;
   commentCount: number;
   references: Array<{
     id: string;
@@ -66,7 +60,6 @@ interface ConversationViewer {
   userLiked: boolean;
   userBookmarked: boolean;
   userFollowsAuthor: boolean;
-  userSubscribedToAuthor: boolean;
 }
 
 interface PostConversationViewProps {
@@ -77,44 +70,13 @@ interface PostConversationViewProps {
   sanitizedExcerpt: string | null;
   authorName: string;
   metadataTitle: string;
-  responsePages: number;
   secondaryDataPromise: Promise<ConversationSecondary>;
   viewerDataPromise: Promise<ConversationViewer>;
 }
 
-async function ParentContextLine({ parentPostId }: { parentPostId: string }) {
-  const supabase = await createClient();
-  const { data: parent } = await supabase
-    .from("posts")
-    .select("title, slug, content_kind, type, profiles!posts_author_id_fkey (full_name, username)")
-    .eq("id", parentPostId)
-    .eq("status", "published")
-    .maybeSingle();
-
-  if (!parent) return null;
-
-  // The author is right there in the row; "this post" named nobody and nothing.
-  const parentProfile = Array.isArray(parent.profiles)
-    ? (parent.profiles[0] ?? null)
-    : (parent.profiles ?? null);
-
-  return (
-    <p className="mb-4 text-sm text-ink-muted">
-      <span aria-hidden="true">↩ </span>
-      Responding to{" "}
-      <Link
-        href={`/post/${parent.slug}`}
-        className="font-semibold text-ink-soft hover:text-emerald-brand hover:underline"
-      >
-        {getPostMetadataTitle(parent, parentProfile)}
-      </Link>
-    </p>
-  );
-}
-
 /**
  * The detail page for a short, titleless Post — a conversation view, not a
- * publication template: content, one actions row, then the responses. The
+ * publication template: content, one actions row, then the comments. The
  * article/research kinds keep their own richer templates in page.tsx.
  */
 export default async function PostConversationView({
@@ -125,7 +87,6 @@ export default async function PostConversationView({
   sanitizedExcerpt,
   authorName,
   metadataTitle,
-  responsePages,
   secondaryDataPromise,
   viewerDataPromise,
 }: PostConversationViewProps) {
@@ -143,7 +104,7 @@ export default async function PostConversationView({
     <div className="mx-auto max-w-[640px] pb-20">
       <PublishedToast
         postId={post.id}
-        postType={post.type}
+        contentKind={post.content_kind ?? null}
         title={metadataTitle}
         slug={post.slug}
         username={author?.username ?? ""}
@@ -205,13 +166,11 @@ export default async function PostConversationView({
             </div>
           </div>
           {isOwnPost ? null : (
-            <AuthorRelationshipControls
-              authorId={author.id}
+            <FollowButton
+              followingId={author.id}
               authorName={authorName}
               currentUserId={userId}
               initialFollowing={viewer.userFollowsAuthor}
-              initialSubscribed={viewer.userSubscribedToAuthor}
-              variant="icon"
               source="post_header"
               postId={post.id}
             />
@@ -220,9 +179,6 @@ export default async function PostConversationView({
       ) : null}
 
       <div className="mt-7">
-        {post.in_response_to ? (
-          <ParentContextLine parentPostId={post.in_response_to} />
-        ) : null}
         {/* Titleless Posts render no heading at all rather than a fabricated
             one -- but a Post that does carry a title showed it in the feed and
             nowhere here, which also left the page with no h1. */}
@@ -239,7 +195,7 @@ export default async function PostConversationView({
           <PostImage
             src={post.cover_image_url}
             alt="Image attached to this post"
-            type={post.type}
+            content_kind={post.content_kind}
             sizes="(max-width: 680px) calc(100vw - 32px), 640px"
             priority
             wrapperClassName="mt-5"
@@ -282,7 +238,6 @@ export default async function PostConversationView({
           initialLiked={viewer.userLiked}
           initialLikeCount={secondary.likeCount}
           initialBookmarked={viewer.userBookmarked}
-          responseCount={secondary.responseCount}
           commentCount={secondary.commentCount}
         />
         {userId && author && !isOwnPost ? (
@@ -316,10 +271,6 @@ export default async function PostConversationView({
         postId={post.id}
         userId={userId}
         userProfileId={userId}
-        responseCount={secondary.responseCount}
-        responseCards={secondary.responseCards}
-        responsesHasMore={secondary.responsesHasMore}
-        nextResponsePage={responsePages + 1}
         isPublished={isPublished}
         commentCount={secondary.commentCount}
       />

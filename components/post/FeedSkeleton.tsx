@@ -51,34 +51,12 @@ function ArticleSkeletonCard({ withCover = false }: { withCover?: boolean }) {
   );
 }
 
-/**
- * Research: metadata-first title/authors/abstract + manuscript line. The
- * preview column is `sm`-only, matching the real card, which drops it on
- * phones so the title can use the full width.
- */
-function ResearchSkeletonCard() {
-  return (
-    <article className={CARD_SHELL}>
-      <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_170px] sm:items-start sm:gap-5">
-        <div className="min-w-0">
-          <Block className="h-2.5 w-16" />
-          <Block className="mt-2 h-5 w-4/5" />
-          <Block className="mt-2 h-3 w-2/5" />
-          <Block className="mt-2.5 h-3.5 w-full" />
-        </div>
-        <div className="hidden aspect-[3/4] rounded-[10px] bg-divider sm:block" />
-      </div>
-      <div className="mt-3 h-10 rounded-lg bg-divider/60" />
-    </article>
-  );
-}
-
-type SkeletonVariant = "post" | "article" | "article-cover" | "research";
+type SkeletonVariant = "post" | "article" | "article-cover";
 
 const SEQUENCE: SkeletonVariant[] = ["post", "article-cover", "article", "post"];
 
 /**
- * A restrained mix of Post/Article/Research skeletons (never one repeated
+ * A restrained mix of Post/Article skeletons (never one repeated
  * generic card) so the Home loading state resembles the real feed and
  * doesn't imply every card has a cover image.
  *
@@ -95,7 +73,6 @@ export default function FeedSkeleton({ count = 4 }: { count?: number }) {
     <div aria-hidden="true" className="animate-pulse motion-reduce:animate-none">
       {items.map((variant, index) => {
         if (variant === "post") return <PostSkeletonCard key={index} />;
-        if (variant === "research") return <ResearchSkeletonCard key={index} />;
         return <ArticleSkeletonCard key={index} withCover={variant === "article-cover"} />;
       })}
     </div>

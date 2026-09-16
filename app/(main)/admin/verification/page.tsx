@@ -44,7 +44,6 @@ export default async function AdminVerificationPage() {
     full_name: string | null;
     username: string;
     university: string | null;
-    points: number;
     verified: boolean;
     verified_type: string | null;
     role: AppRole;
@@ -53,13 +52,15 @@ export default async function AdminVerificationPage() {
   if (eligibleIds.length > 0) {
     const { data } = await supabase
       .from("profiles")
-      .select(
-        "id, full_name, username, university, points, verified, verified_type, role"
-      )
-      .in("id", eligibleIds)
-      .order("points", { ascending: false });
+      .select("id, full_name, username, university, verified, verified_type, role")
+      .in("id", eligibleIds);
 
-    profiles = (data ?? []) as typeof profiles;
+    // Most published first. Points no longer order anything.
+    profiles = ((data ?? []) as typeof profiles).sort(
+      (left, right) =>
+        (authorMap[right.id] ?? 0) - (authorMap[left.id] ?? 0) ||
+        left.username.localeCompare(right.username)
+    );
   }
 
   const alreadyVerified = profiles.filter((profile) => profile.verified);
@@ -113,7 +114,7 @@ export default async function AdminVerificationPage() {
                 </div>
                 <p className="text-xs text-gray-400">
                   @{profile.username} · {profile.university} ·{" "}
-                  {authorMap[profile.id]} posts · {profile.points} pts
+                  {authorMap[profile.id]} posts
                 </p>
               </div>
               <VerificationActions

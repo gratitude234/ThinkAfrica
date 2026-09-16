@@ -1,5 +1,10 @@
 # Intellectual Profile V2 contract
 
+> **Changed since this was written.** Responses are retired (publishing reset,
+> Phase 2C). The record no longer offers a `responses` filter; an entry the
+> database view classifies as `response` is shown and counted as a
+> publication.
+
 Last updated: 2026-08-26
 
 ## Purpose

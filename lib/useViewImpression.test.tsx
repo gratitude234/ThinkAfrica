@@ -87,14 +87,14 @@ describe("useViewImpression", () => {
 
     rerender(
       <Harness
-        surface="latest"
+        surface="following"
         exposure={{
           ...exposure,
           exposureId: "request-2:1:post-1",
           feedSessionId: "request-1",
           requestId: "request-2",
-          surface: "latest",
-          candidateSource: "latest",
+          surface: "following",
+          candidateSource: "followed_author",
         }}
       />
     );

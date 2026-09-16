@@ -1,35 +1,26 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { isProfilePositioningEnabled } from "@/lib/featureFlags";
 import type {
   ProfileIdentityRecord,
   ProfilesRepository,
 } from "@/lib/db/types";
 
 /**
- * The production implementation of the public profile read: the same PostgREST
- * query `lib/profileViewData.ts` has always run, moved behind the repository
- * interface without a filter changing.
+ * The production implementation of the public profile read: one PostgREST
+ * query behind the repository interface.
  *
  * This is the default and stays the default until the domain is cut over
  * deliberately.
  */
 
-const PROFILE_BASE_SELECT =
-  "id, username, full_name, country, university, field_of_study, graduation_year, is_alumni, bio, avatar_url, cover_image_url, verified, verified_type, interests, profile_type, professional_title, organization_name, organization_website";
-
 /**
- * The positioning column is named only once its migration has been applied.
- * Production is confirmed to have it; the gate stays because preview and local
- * environments are not guaranteed to, and PostgREST rejects the whole select
- * over one unknown column name. See isProfilePositioningEnabled.
+ * Exactly the columns a writer's profile renders. The publishing reset, Phase
+ * 2G, dropped the persona, positioning, organisation, cover and alumni columns
+ * from it, and added `created_at` for the joined date on About.
  */
-export function profileIdentitySelect(): string {
-  return isProfilePositioningEnabled()
-    ? `${PROFILE_BASE_SELECT}, positioning_statement`
-    : PROFILE_BASE_SELECT;
-}
+export const PROFILE_IDENTITY_SELECT =
+  "id, username, full_name, bio, avatar_url, professional_title, country, university, field_of_study, graduation_year, interests, verified, verified_type, created_at";
 
 export const supabaseProfilesRepository: ProfilesRepository = {
   // Unused, for the same reason as posts.findBySlug: RLS is applied by the
@@ -39,7 +30,7 @@ export const supabaseProfilesRepository: ProfilesRepository = {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select(profileIdentitySelect())
+      .select(PROFILE_IDENTITY_SELECT)
       .eq("username", username)
       .maybeSingle();
 

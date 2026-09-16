@@ -72,9 +72,6 @@ import type { NotificationsRepository } from "@/lib/db/notifications";
 
 vi.setConfig({ testTimeout: 180_000 });
 
-/** Matches nothing, which is what the sentinel does when research is on. */
-const NO_EXCLUSION = "__no_such_post_type__";
-
 describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
   let sql: Awaited<ReturnType<typeof open>>;
   let executor: SqlExecutor;
@@ -102,13 +99,13 @@ describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
       auth: { persistSession: false, autoRefreshToken: false },
     }) as never;
 
-    dashRest = createSupabaseDashboardRepository(client, NO_EXCLUSION);
+    dashRest = createSupabaseDashboardRepository(client);
     markRest = createSupabaseBookmarksRepository(client);
     noteRest = createSupabaseNotificationsRepository(client);
 
     sql = await open();
     executor = adaptDriver(sql as never);
-    dashSql = createPostgresDashboardRepository(executor, NO_EXCLUSION);
+    dashSql = createPostgresDashboardRepository(executor);
     markSql = createPostgresBookmarksRepository(executor);
     noteSql = createPostgresNotificationsRepository(executor);
   }, 180_000);
@@ -177,33 +174,7 @@ describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
       expect(mismatches).toEqual([]);
     });
 
-    it("agrees on a member's own profile row", async () => {
-      const authors = await someAuthors();
-      const mismatches: string[] = [];
-      for (const author of authors) {
-        const [rest, direct] = await Promise.all([
-          dashRest.myProfile(author.id),
-          dashSql.myProfile(author.id),
-        ]);
-        mismatches.push(
-          ...differences(rest, direct).map((line) => `${author.id}: ${line}`)
-        );
-      }
-      expect(mismatches).toEqual([]);
-    });
-
-    it("agrees on the featured work count", async () => {
-      const authors = await someAuthors();
-      for (const author of authors) {
-        const [rest, direct] = await Promise.all([
-          dashRest.featuredWorkCount(author.id),
-          dashSql.featuredWorkCount(author.id),
-        ]);
-        expect(rest).toBe(direct);
-      }
-    });
-
-    it("agrees on the response and like stat branches", async () => {
+    it("agrees on the like stat branch", async () => {
       const authors = await someAuthors(1);
       if (authors.length === 0) return;
       const author = authors[0];
@@ -217,49 +188,11 @@ describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
         dashSql.postStats(ids, author.id),
       ]);
 
-      // Only these two branches. `responses` filters status = 'published' and
-      // `post_like_counts` is USING (true), so neither gains anything from a
-      // session. The other two are asserted as BLOCKED below.
-      expect(differences(rest.responseCounts, direct.responseCounts)).toEqual([]);
+      // Only this branch. `post_like_counts` is USING (true), so it gains
+      // nothing from a session. The other two are asserted as BLOCKED below.
       expect(differences(rest.likeCounts, direct.likeCounts)).toEqual([]);
     });
 
-    it("agrees on the conversation read cursors, as a set", async () => {
-      const rows = await executor.query<{ id: string }>(
-        `select user_id::text as id from public.conversation_participants
-         group by user_id limit 3`
-      );
-
-      const mismatches: string[] = [];
-      for (const row of rows) {
-        const [rest, direct] = await Promise.all([
-          dashRest.conversationReadState(row.id),
-          dashSql.conversationReadState(row.id),
-        ]);
-
-        // Neither side orders. is_conversation_participant() is satisfied by
-        // this query's own `user_id = <viewer>` filter, so a service-role read
-        // returns the same participations.
-        //
-        // Sorted by instant and compared with the shared differences(), not by
-        // interpolating the two columns into a string. PostgREST spells an
-        // instant `...256468+00:00` and the driver spells the same one
-        // `...256Z`, so string equality reported a mismatch on rows that
-        // agreed, and printed "1 vs 1" while doing it.
-        const order = (list: typeof rest) =>
-          [...list].sort(
-            (a, b) =>
-              new Date(a.last_read_at ?? 0).getTime() -
-                new Date(b.last_read_at ?? 0).getTime() ||
-              new Date(a.last_message_at ?? 0).getTime() -
-                new Date(b.last_message_at ?? 0).getTime()
-          );
-        mismatches.push(
-          ...differences(order(rest), order(direct), `${row.id}.cursors`)
-        );
-      }
-      expect(mismatches).toEqual([]);
-    });
   });
 
   // ── dashboard: session-bound reads ─────────────────────────────────
@@ -283,19 +216,6 @@ describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
       console.log(
         `[parity COVERED ELSEWHERE] dashboard.postStats reference and bookmark branches ` +
           `are compared against the policies in authenticated.parity.live.test.ts (${row.refs} references, ${row.marks} bookmarks in scope)`
-      );
-      expect(true).toBe(true);
-    });
-
-    it("records the embedded projections as uncomparable", async () => {
-      // pendingInvites embeds a post whose status the query does not
-      // constrain; recentResponses, unreadNotifications and engagementHistory
-      // embed a profile governed by the profiles policy. All four differ
-      // between a service-role read and a member's read exactly when a post is
-      // unpublished or a profile is hidden.
-      console.log(
-        "[parity COVERED ELSEWHERE] dashboard.pendingInvites, recentResponses, " +
-          "unreadNotifications and engagementHistory embed policy-governed rows"
       );
       expect(true).toBe(true);
     });

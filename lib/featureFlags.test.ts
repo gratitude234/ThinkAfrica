@@ -1,24 +1,38 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isAuthorSubscriptionsUxV2Enabled, isResearchEnabled } from "./featureFlags";
+import * as featureFlags from "./featureFlags";
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("Author Subscriptions UX V2 release gate", () => {
-  it("stays off until Author, Topic, and UX V2 flags are all enabled", () => {
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED", "1");
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED", "1");
-
-    expect(isAuthorSubscriptionsUxV2Enabled()).toBe(false);
-
-    vi.stubEnv("NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED", "1");
-    expect(isAuthorSubscriptionsUxV2Enabled()).toBe(true);
+describe("subscription release gates", () => {
+  it("are gone with author and topic subscriptions, so nothing can turn one back on", () => {
+    for (const gate of [
+      "isAuthorSubscriptionsEnabled",
+      "isAuthorSubscriptionsUxV2Enabled",
+      "isTopicSubscriptionsEnabled",
+    ]) {
+      expect(gate in featureFlags, gate).toBe(false);
+    }
   });
 });
 
-describe("Research release gate", () => {
-  it("keeps Research unavailable until the product switch is restored", () => {
-    expect(isResearchEnabled()).toBe(false);
+describe("retired section switches", () => {
+  it("are gone with the products they hid, so nothing can turn one back on", () => {
+    expect("FEATURE_FLAGS" in featureFlags).toBe(false);
+    expect("isEnabled" in featureFlags).toBe(false);
+  });
+});
+
+describe("Research", () => {
+  it("is removed as a product, so there is no switch to turn it back on", () => {
+    expect("isResearchEnabled" in featureFlags).toBe(false);
+  });
+
+  it("no longer needs a query exclusion, because no research row exists", () => {
+    // 20260915000005 normalized all five legacy research rows into Articles
+    // and 20260915000006 made the value unwritable, so the filter every post
+    // query used to carry has nothing to exclude.
+    expect("RESEARCH_TYPE_QUERY_EXCLUSION" in featureFlags).toBe(false);
   });
 });

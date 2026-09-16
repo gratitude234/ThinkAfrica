@@ -19,16 +19,6 @@ import {
   type ComposerRepository,
 } from "@/lib/db/composer";
 import {
-  createPostgresCollaborationRepository,
-  createSupabaseCollaborationRepository,
-  type CollaborationRepository,
-} from "@/lib/db/collaboration";
-import {
-  createPostgresMessagingRepository,
-  createSupabaseMessagingRepository,
-  type MessagingRepository,
-} from "@/lib/db/messaging";
-import {
   createPostgresNotificationsRepository,
   createSupabaseNotificationsRepository,
   type NotificationsRepository,
@@ -58,11 +48,6 @@ import {
   createSupabaseSearchRepository,
   type SearchRepository,
 } from "@/lib/db/search";
-import {
-  createPostgresProfileRecordRepository,
-  createSupabaseProfileRecordRepository,
-  type ProfileRecordRepository,
-} from "@/lib/db/profileRecord";
 import {
   createPostgresProfilePageRepository,
   createSupabaseProfilePageRepository,
@@ -114,9 +99,15 @@ export const MIGRATABLE_READ_DOMAINS = [
   "bookmarks",
   "notifications",
   "composer",
-  "collaboration",
-  "messaging",
 ] as const;
+
+/**
+ * Domains whose product was removed. Messaging went in the publishing reset,
+ * Phase 2E. An environment still listing one is not a typo, so it is ignored
+ * rather than refused: refusing would take every read down on deploy for a
+ * domain that no longer has a read to move.
+ */
+export const RETIRED_READ_DOMAINS = ["messaging"] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
 
@@ -132,6 +123,7 @@ export function resolveMigratedReadDomains(
   for (const entry of value.split(",")) {
     const name = entry.trim();
     if (name === "") continue;
+    if ((RETIRED_READ_DOMAINS as readonly string[]).includes(name)) continue;
     if (!known.has(name)) {
       throw new Error(
         `READ_MIGRATED_DOMAINS contains an unknown domain "${name}". ` +
@@ -194,29 +186,17 @@ export function feedRepository(
     : createSupabaseFeedRepository(viewerClient ?? reader);
 }
 
-/** The public profile page. Its identity row already moved; this is the rest. */
+/**
+ * The public profile page: relationship counts, the viewer's relationship, and
+ * the Posts and Articles lists. Its identity row already moved. The Intellectual
+ * Record repository that shared this domain went in Phase 2G.
+ */
 export function profilePageRepository(
   supabase: SupabaseClient
 ): ProfilePageRepository {
   return isReadDomainMigrated("profile-page")
     ? createPostgresProfilePageRepository(resolvePostgresExecutor())
     : createSupabaseProfilePageRepository(supabase);
-}
-
-/**
- * The public profile record: its counts, entry pages and topic index.
- *
- * Shares the `profile-page` domain with the header rather than taking one of
- * its own, because the same public page loads both. Two switches would let one
- * profile be served half from each transport, which is the state this
- * migration is arranged to avoid.
- */
-export function profileRecordRepository(
-  supabase: SupabaseClient
-): ProfileRecordRepository {
-  return isReadDomainMigrated("profile-page")
-    ? createPostgresProfileRecordRepository(resolvePostgresExecutor())
-    : createSupabaseProfileRecordRepository(supabase);
 }
 
 /**
@@ -250,7 +230,7 @@ export function commentsRepository(
 }
 
 /**
- * The viewer's own state: blocks, and whether two people may message.
+ * The viewer's own state: who has blocked whom.
  *
  * Takes a client because the un-migrated path needs one. Every call site here
  * reads through the admin client or a SECURITY DEFINER function, so no policy
@@ -268,20 +248,16 @@ export function viewerStateRepository(
 /**
  * The member dashboard.
  *
- * Takes the research exclusion sentinel as an argument rather than importing
- * the flag, so the two backends cannot be built from different values, and so
- * a test can state which one it means.
+ * It used to take the research exclusion sentinel as an argument, so the two
+ * backends could not be built from different values. There is no exclusion to
+ * pass: Phase 2I normalized the rows it filtered and made the value unwritable.
  */
 export function dashboardRepository(
-  supabase: SupabaseClient,
-  researchTypeExclusion: string
+  supabase: SupabaseClient
 ): DashboardRepository {
   return isReadDomainMigrated("dashboard")
-    ? createPostgresDashboardRepository(
-        resolvePostgresExecutor(),
-        researchTypeExclusion
-      )
-    : createSupabaseDashboardRepository(supabase, researchTypeExclusion);
+    ? createPostgresDashboardRepository(resolvePostgresExecutor())
+    : createSupabaseDashboardRepository(supabase);
 }
 
 /** The member's saved posts. See lib/db/bookmarks.ts for why this moved to
@@ -308,27 +284,4 @@ export function composerRepository(supabase: SupabaseClient): ComposerRepository
   return isReadDomainMigrated("composer")
     ? createPostgresComposerRepository(resolvePostgresExecutor())
     : createSupabaseComposerRepository(supabase);
-}
-
-/** Finding somebody to invite as a co-author. */
-export function collaborationRepository(
-  supabase: SupabaseClient
-): CollaborationRepository {
-  return isReadDomainMigrated("collaboration")
-    ? createPostgresCollaborationRepository(resolvePostgresExecutor())
-    : createSupabaseCollaborationRepository(supabase);
-}
-
-/**
- * Message threads and the unread badge.
- *
- * Every method takes the viewer, because membership is the whole of the access
- * control here and `is_conversation_participant()` will not be applying it.
- */
-export function messagingRepository(
-  supabase: SupabaseClient
-): MessagingRepository {
-  return isReadDomainMigrated("messaging")
-    ? createPostgresMessagingRepository(resolvePostgresExecutor())
-    : createSupabaseMessagingRepository(supabase);
 }

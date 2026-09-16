@@ -29,7 +29,6 @@ function renderActions(userId: string | null = "user-1") {
       initialLiked={false}
       initialLikeCount={4}
       initialBookmarked={false}
-      responseCount={3}
       contentKind="post"
     />
   );
@@ -138,7 +137,6 @@ describe("FeedEngagementActions", () => {
         initialLiked={false}
         initialLikeCount={0}
         initialBookmarked={false}
-        responseCount={0}
         commentCount={0}
         contentKind="post"
       />
@@ -146,7 +144,7 @@ describe("FeedEngagementActions", () => {
 
     expect(screen.getByRole("button", { name: "Like this item" })).not.toHaveTextContent("0");
     const discussionLink = screen.getByRole("link", {
-      name: "0 in this discussion",
+      name: "0 comments",
     });
     expect(discussionLink).not.toHaveTextContent("0");
     expect(discussionLink).toHaveAttribute(

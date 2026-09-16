@@ -195,7 +195,6 @@ describe("the application", () => {
     const callers = [
       "components/ui/NotificationBell.tsx",
       "app/(main)/settings/page.tsx",
-      "app/(main)/subscriptions/page.tsx",
       "app/api/notifications/route.ts",
     ];
     for (const caller of callers) {

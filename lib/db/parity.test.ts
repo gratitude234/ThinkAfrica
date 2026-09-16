@@ -257,16 +257,19 @@ describe("live counters", () => {
     expect(result.differences.map((d) => d.field)).toEqual(["view_count"]);
   });
 
-  it("compares counters production does not move exactly", () => {
-    // current_round is editorial, document_size_bytes is a file property.
-    // Neither changes because somebody read the page.
+  it("treats every counter it still compares as reader-driven", () => {
+    // It used to compare current_round and document_size_bytes exactly,
+    // because neither moved when somebody read the page. Phase 2I removed both
+    // from the post record along with the review cycle and the research
+    // document, so the three that remain are all reader-driven and a
+    // Supabase-ahead gap on any of them is drift rather than a difference.
     const result = comparePostRecords(
       "s",
-      { ...postgrestRow, current_round: 2 } as never,
-      toPostRecord({ ...sqlRow, current_round: 1 })
+      { ...postgrestRow, view_count: 99 } as never,
+      toPostRecord({ ...sqlRow, view_count: 12 })
     );
-    expect(result.matches).toBe(false);
-    expect(result.drift).toEqual([]);
+    expect(result.matches).toBe(true);
+    expect(result.drift.map((entry) => entry.field)).toEqual(["view_count"]);
   });
 
   it("reports drift in the formatted report rather than hiding it", () => {
@@ -288,21 +291,17 @@ describe("compareProfileRecords", () => {
     id: "author-1",
     username: "student1",
     full_name: "A Student",
+    bio: null,
+    avatar_url: null,
+    professional_title: "Policy researcher",
     country: "Nigeria",
     university: "University of Lagos",
     field_of_study: "Political Science",
     graduation_year: 2028,
-    is_alumni: false,
-    bio: null,
-    avatar_url: null,
-    cover_image_url: null,
+    interests: ["governance"],
     verified: true,
     verified_type: "institution",
-    interests: ["governance"],
-    profile_type: "student",
-    professional_title: null,
-    organization_name: null,
-    organization_website: null,
+    created_at: "2026-01-05T09:30:00+00:00",
   };
 
   it("matches when the two adapters answered the same", () => {
@@ -362,34 +361,6 @@ describe("compareProfileRecords", () => {
       interests: "{governance}" as unknown as string[],
     });
     expect(result.matches).toBe(false);
-  });
-
-  it("fails when one side selected the positioning column and the other did not", () => {
-    // Same flag, read in two places. A null value on one side and no key on the
-    // other is the shape of that bug.
-    const result = compareProfileRecords(
-      "student1",
-      { ...supabaseProfile, positioning_statement: null },
-      { ...supabaseProfile }
-    );
-    expect(result.matches).toBe(false);
-    expect(result.differences[0].field).toBe("positioning_statement (presence)");
-  });
-
-  it("compares the positioning value when both selected it", () => {
-    const same = compareProfileRecords(
-      "student1",
-      { ...supabaseProfile, positioning_statement: "Building X" },
-      { ...supabaseProfile, positioning_statement: "Building X" }
-    );
-    expect(same.matches).toBe(true);
-
-    const differs = compareProfileRecords(
-      "student1",
-      { ...supabaseProfile, positioning_statement: "Building X" },
-      { ...supabaseProfile, positioning_statement: null }
-    );
-    expect(differs.matches).toBe(false);
   });
 
   it("has no drift bucket to hide a difference in", () => {

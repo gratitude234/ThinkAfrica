@@ -12,7 +12,8 @@ import { describe, expect, it } from "vitest";
  * answers a select naming an unknown column with a 400, and the caller
  * destructured `{ data }` and dropped `error`, so the applications list has
  * silently been empty for as long as the line has been there. Nothing logged,
- * nothing rendered wrong, nothing to notice.
+ * nothing rendered wrong, nothing to notice. That read has since been removed
+ * along with the opportunity products, in the publishing reset's Phase 2D.
  *
  * It is the same shape as the `positioning_statement` problem the project
  * already documents: a select naming a column that does not exist is rejected
@@ -195,43 +196,5 @@ describe("every column a PostgREST select names", () => {
   it("knows which relations are views, and does not guess at their columns", () => {
     expect(VIEWS.size).toBeGreaterThan(0);
     expect(VIEWS.has("profile_record_entries")).toBe(true);
-  });
-});
-
-describe("the applications read, after the fix", () => {
-  const dashboard = readFileSync(
-    resolve(process.cwd(), "lib/db/dashboard.ts"),
-    "utf8"
-  );
-  // SQL comments included: the module documents that reviewed_at is absent,
-  // and that sentence must not read as the column coming back.
-  const executable = withoutComments(dashboard);
-
-  it("no longer names reviewed_at on either backend", () => {
-    expect(executable).not.toMatch(/reviewed_at/);
-  });
-
-  it("still returns the columns the applications list renders", () => {
-    for (const column of [
-      "status",
-      "applied_at",
-      "proof_post_id",
-      "review_note",
-    ]) {
-      expect(executable, `applications must still select ${column}`).toContain(
-        column
-      );
-    }
-  });
-
-  it("surfaces a query failure instead of returning an empty list", () => {
-    // The original discarded `error` and destructured `data`, so a 400 became
-    // an empty array that looked like a member with no applications. The
-    // repository's rows() helper throws, and this is the assertion that keeps
-    // it doing so.
-    expect(executable).toMatch(
-      /rows<DashboardApplicationRow>\(\s*\n?\s*applications,/
-    );
-    expect(executable).toContain("throw new Error(");
   });
 });

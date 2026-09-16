@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
-import type { PushPermissionState } from "@/lib/pushPromptPolicy";
 import {
   forgetPushSubscription,
   persistPushSubscription,
 } from "@/lib/pushSubscriptionActions";
+
+export type PushPermissionState = "default" | "denied" | "granted";
 
 const PUSH_OPERATION_TIMEOUT_MS = 10_000;
 

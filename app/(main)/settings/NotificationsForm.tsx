@@ -1,10 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  saveNotificationPrefs,
-  setNotificationPreference,
-} from "./profileActions";
+import { useCallback, useEffect, useState } from "react";
+import { saveNotificationPrefs } from "./profileActions";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import {
   getCurrentPushDeviceState,
@@ -13,16 +10,6 @@ import {
   subscribeCurrentDevice,
   unsubscribeCurrentDevice,
 } from "@/lib/pushClient";
-import {
-  recordPushPermissionDenied,
-  recordPushPermissionRestored,
-  type PushPermissionState,
-} from "@/lib/pushPromptPolicy";
-import {
-  loadPushNudgeState,
-  savePushNudgeState,
-  setPushNudgeDisabled,
-} from "@/lib/pushNudgeStorage";
 import Button from "@/components/ui/Button";
 import Toast from "@/components/ui/Toast";
 import { sendCurrentDeviceTestPush } from "./pushActions";
@@ -30,20 +17,14 @@ import {
   IN_APP_PREF_GROUPS,
   type InAppNotificationPrefs,
 } from "@/lib/notificationPreferences";
-import { isAuthorSubscriptionsUxV2Enabled } from "@/lib/featureFlags";
-import type { NotificationPreferenceKey } from "@/lib/publicationDelivery";
-export type { NotificationPreferenceKey } from "@/lib/publicationDelivery";
 
 interface BaseNotificationPrefs {
   email_comments: boolean;
   email_follows: boolean;
   email_likes: boolean;
   email_responses: boolean;
-  email_messages: boolean;
   email_published: boolean;
-  email_digest: boolean;
   email_account_security: boolean;
-  email_profile_reminders: boolean;
   email_announcements: boolean;
   email_review_assigned: boolean;
   email_review_started: boolean;
@@ -51,16 +32,11 @@ interface BaseNotificationPrefs {
   email_co_author_invite: boolean;
   email_co_author_accepted: boolean;
   email_co_author_declined: boolean;
-  email_opportunity_inquiry: boolean;
-  email_author_publications: boolean;
 
   push_published: boolean;
-  push_messages: boolean;
   push_comments: boolean;
   push_likes: boolean;
   push_follows: boolean;
-  push_daily_brief: boolean;
-  push_author_publications: boolean;
 
 }
 
@@ -75,32 +51,20 @@ const EMAIL_ROWS: { key: keyof NotificationPrefs; label: string; description: st
   { key: "email_comments", label: "New comments", description: "When someone comments on your post" },
   { key: "email_follows", label: "New followers", description: "When someone follows you" },
   { key: "email_likes", label: "New likes", description: "When someone likes your post" },
-  { key: "email_responses", label: "Responses to your posts", description: "When someone writes a response to your post" },
-  { key: "email_messages", label: "New messages", description: "When someone sends you a direct message" },
   { key: "email_published", label: "Post published", description: "When your submitted post is published" },
-  { key: "email_digest", label: "Weekly digest", description: "A weekly summary of top content" },
   { key: "email_account_security", label: "Account and trust updates", description: "Verification, role, and account status emails" },
-  { key: "email_profile_reminders", label: "Profile reminders", description: "Occasional reminders to complete your public profile" },
   { key: "email_announcements", label: "Indegenius announcements", description: "Occasional letters from the Indegenius team about the platform and what is changing" },
   { key: "email_review_assigned", label: "Review assignments", description: "When you're assigned to review a submission" },
   { key: "email_review_started", label: "Your submission is under review", description: "When your submission's first reviewer is assigned" },
   { key: "email_review_reminder", label: "Review reminders", description: "A reminder if your review has been pending for a while" },
-  { key: "email_co_author_invite", label: "Co-author invitations", description: "When someone invites you to co-author a post" },
-  { key: "email_co_author_accepted", label: "Co-author invitation accepted", description: "When someone accepts your co-author invitation" },
-  { key: "email_co_author_declined", label: "Co-author invitation declined", description: "When someone declines your co-author invitation" },
-  { key: "email_opportunity_inquiry", label: "Opportunity inquiries", description: "When an organization sends you an opportunity inquiry" },
-  { key: "email_author_publications", label: "Subscribed author publications", description: "Articles from authors you explicitly subscribe to" },
 
 ];
 
 const PUSH_ROWS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
   { key: "push_published", label: "Submission decisions", description: "Browser push when your submission is published, rejected, or sent back for revision" },
-  { key: "push_messages", label: "Direct messages", description: "Browser push when someone sends you a direct message" },
   { key: "push_comments", label: "Comments", description: "Browser push when someone comments on your post or replies to your comment" },
   { key: "push_likes", label: "Likes", description: "Browser push when someone likes your post" },
   { key: "push_follows", label: "New followers", description: "Browser push when someone follows you" },
-  { key: "push_daily_brief", label: "Daily brief", description: "One browser push a day with today's top post" },
-  { key: "push_author_publications", label: "Subscribed author publications", description: "Browser push for Articles from subscribed authors" },
 
 ];
 
@@ -121,18 +85,11 @@ const TEST_ERROR_MESSAGES = {
 export default function NotificationsForm({ profileId, notificationPrefs }: Props) {
   const [prefs, setPrefs] = useState<NotificationPrefs>(notificationPrefs);
   const [saving, setSaving] = useState(false);
-  const [switchStatus, setSwitchStatus] = useState<
-    Partial<Record<NotificationPreferenceKey, "saving" | "saved" | "error">>
-  >({});
-  const switchRequestRef = useRef<
-    Partial<Record<NotificationPreferenceKey, number>>
-  >({});
   const [toast, setToast] = useState<string | null>(null);
   const [pushState, setPushState] = useState<PushState>("checking");
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
   const [endpoint, setEndpoint] = useState<string | null>(null);
-  const autoSave = isAuthorSubscriptionsUxV2Enabled();
 
   const refreshDeviceState = useCallback(async () => {
     setPushState("checking");
@@ -159,16 +116,6 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
     void refreshDeviceState();
   }, [refreshDeviceState]);
 
-  function syncNudgePermission(permission: PushPermissionState) {
-    const current = loadPushNudgeState(profileId, null, permission);
-    savePushNudgeState(
-      profileId,
-      permission === "denied"
-        ? recordPushPermissionDenied(current)
-        : recordPushPermissionRestored(current)
-    );
-  }
-
   function trackDeviceOperation(operation: string, result: string, errorCode: string | null = null) {
     trackActivationEvent({
       event: "push_device_operation",
@@ -184,34 +131,9 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
     setToast(result.ok ? "Preferences saved." : result.error);
   };
 
-  const updatePreference = async (
-    key: NotificationPreferenceKey,
-    nextValue: boolean
-  ) => {
-    if (!autoSave) {
-      setPrefs((current) => ({ ...current, [key]: nextValue }));
-      return;
-    }
-
-    const previousValue = prefs[key];
-    const requestId = (switchRequestRef.current[key] ?? 0) + 1;
-    switchRequestRef.current[key] = requestId;
+  // Switches change local state; Save preferences writes them all at once.
+  const updatePreference = (key: keyof NotificationPrefs, nextValue: boolean) => {
     setPrefs((current) => ({ ...current, [key]: nextValue }));
-    setSwitchStatus((current) => ({ ...current, [key]: "saving" }));
-
-    // Still one key at a time through the RPC, which writes inside the jsonb
-    // without a read-modify-write, so two switches flipped in quick succession
-    // do not overwrite each other. What changed is that the server resolves
-    // who is flipping it.
-    const result = await setNotificationPreference({ key, enabled: nextValue });
-    if (switchRequestRef.current[key] !== requestId) return;
-
-    if (!result.ok) {
-      setPrefs((current) => ({ ...current, [key]: previousValue }));
-      setSwitchStatus((current) => ({ ...current, [key]: "error" }));
-      return;
-    }
-    setSwitchStatus((current) => ({ ...current, [key]: "saved" }));
   };
 
   const subscribe = async (requestPermission: boolean) => {
@@ -220,7 +142,6 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
     try {
       if (requestPermission) {
         const permission = await requestPushPermission();
-        syncNudgePermission(permission);
         trackActivationEvent({
           event: "push_permission_resolved",
           source: "settings",
@@ -238,8 +159,6 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
         setPushError(getPushOperationErrorMessage(result.code));
         return;
       }
-      syncNudgePermission("granted");
-      setPushNudgeDisabled(profileId, false);
       setEndpoint(result.endpoint);
       setPushState("active");
       setToast("Push notifications enabled on this device.");
@@ -262,8 +181,6 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
         setPushError(getPushOperationErrorMessage(result.code));
         return;
       }
-      const current = loadPushNudgeState(profileId, null, Notification.permission);
-      savePushNudgeState(profileId, { ...current, disabledByUser: true });
       setEndpoint(null);
       setPushState(Notification.permission === "denied" ? "denied" : Notification.permission === "default" ? "default" : "unsubscribed");
       if (!result.ok) setPushError(getPushOperationErrorMessage(result.code));
@@ -298,36 +215,18 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
     channel: "Email" | "Push" | "In-app"
   ) {
     const value = prefs[key];
-    const preferenceKey = key as NotificationPreferenceKey;
-    const status = switchStatus[preferenceKey];
     return (
       <div key={key} className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
         <div className="min-w-0 pr-3">
           <p className="text-sm font-medium text-gray-800">{label}</p>
           <p className="mt-0.5 text-xs text-gray-500">{description}</p>
-          {autoSave && status ? (
-            <p
-              className={`mt-1 text-xs ${
-                status === "error" ? "text-red-600" : "text-gray-500"
-              }`}
-              role={status === "error" ? "alert" : "status"}
-              aria-live="polite"
-            >
-              {status === "saving"
-                ? "Saving…"
-                : status === "saved"
-                  ? "Saved"
-                  : "Could not save. Restored."}
-            </p>
-          ) : null}
         </div>
         <button
           type="button"
           role="switch"
           aria-label={`${channel}: ${label}`}
           aria-checked={value}
-          aria-busy={status === "saving" || undefined}
-          onClick={() => void updatePreference(preferenceKey, !value)}
+          onClick={() => updatePreference(key, !value)}
           className="relative inline-flex h-11 w-12 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
           <span
@@ -346,51 +245,6 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
   return (
     <>
       <div className="max-w-2xl space-y-6">
-        {autoSave ? (
-          <section
-            id="publication-subscriptions"
-            className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-              Publication subscriptions
-            </p>
-            <h2 className="mt-1 text-base font-semibold text-gray-900">
-              How new work reaches you
-            </h2>
-            <div className="mt-4 space-y-3">
-              <div className="rounded-xl border border-emerald-100 bg-white px-4 py-3">
-                <p className="text-sm font-medium text-gray-800">In-app</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  Always on for Posts and Articles from your
-                  subscriptions.
-                </p>
-              </div>
-              {renderToggleRow(
-                {
-                  key: "email_author_publications",
-                  label: "Email",
-                  description: "Articles from subscribed writers",
-                },
-                "Email"
-              )}
-              {renderToggleRow(
-                {
-                  key: "push_author_publications",
-                  label: "Push",
-                  description: `Articles · ${
-                    pushState === "active"
-                      ? "enabled on this device"
-                      : pushState === "unsupported"
-                        ? "unsupported on this device"
-                        : "this device is not enabled"
-                  }`,
-                },
-                "Push"
-              )}
-            </div>
-          </section>
-        ) : null}
-
         <div>
           <h2 className="mb-1 text-base font-semibold text-gray-900">In the app</h2>
           <p className="mb-4 text-xs text-gray-500">
@@ -411,9 +265,7 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
         <div>
           <h2 className="mb-4 text-base font-semibold text-gray-900">Email</h2>
           <div className="space-y-3">
-            {EMAIL_ROWS.filter(
-              (row) => !autoSave || row.key !== "email_author_publications"
-            ).map((row) => renderToggleRow(row, "Email"))}
+            {EMAIL_ROWS.map((row) => renderToggleRow(row, "Email"))}
           </div>
         </div>
 
@@ -459,17 +311,13 @@ export default function NotificationsForm({ profileId, notificationPrefs }: Prop
 
           {pushError ? <p className="mb-3 text-sm text-red-600" role="alert">{pushError}</p> : null}
           <div className="space-y-3">
-            {PUSH_ROWS.filter(
-              (row) => !autoSave || row.key !== "push_author_publications"
-            ).map((row) => renderToggleRow(row, "Push"))}
+            {PUSH_ROWS.map((row) => renderToggleRow(row, "Push"))}
           </div>
         </div>
 
-        {!autoSave ? (
-          <div className="flex justify-end pt-2">
-            <Button loading={saving} onClick={handleSave}>Save preferences</Button>
-          </div>
-        ) : null}
+        <div className="flex justify-end pt-2">
+          <Button loading={saving} onClick={handleSave}>Save preferences</Button>
+        </div>
       </div>
       {toast ? <Toast message={toast} onDone={() => setToast(null)} /> : null}
     </>

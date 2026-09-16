@@ -31,7 +31,6 @@ import {
 const TIMESTAMP_FIELDS = [
   "created_at",
   "published_at",
-  "revision_due_at",
 ] as const satisfies readonly (keyof PostRecord)[];
 
 const AUTHOR_FIELDS = [
@@ -87,8 +86,6 @@ const COUNTER_FIELDS = [
   "view_count",
   "impression_count",
   "read_count",
-  "current_round",
-  "document_size_bytes",
 ] as const satisfies readonly (keyof PostRecord)[];
 
 /**
@@ -110,8 +107,9 @@ const COUNTER_FIELDS = [
  *     wrong, and that fails.
  *
  * A Supabase-ahead gap is reported as drift so it stays visible, rather than
- * being silently dropped. `current_round` and `document_size_bytes` are not
- * reader-driven and are compared exactly.
+ * being silently dropped. Every counter compared here is now reader-driven:
+ * `current_round` and `document_size_bytes` belonged to the review cycle and
+ * the research document, and the post record no longer carries either.
  */
 const LIVE_COUNTER_FIELDS = new Set<string>([
   "view_count",
@@ -125,19 +123,11 @@ const SCALAR_FIELDS = [
   "slug",
   "content",
   "excerpt",
-  "type",
   "content_kind",
-  "article_format",
   "status",
   "author_id",
   "cover_image_url",
-  "citation_id",
-  "published_version_id",
-  "in_response_to",
   "audio_summary_url",
-  "document_path",
-  "document_original_name",
-  "document_mime_type",
 ] as const satisfies readonly (keyof PostRecord)[];
 
 function sameArray(a: unknown, b: unknown): boolean {
@@ -242,7 +232,7 @@ export function comparePostRecords(
  *
  * Separate from the post comparison rather than generic over both, because
  * what counts as an acceptable difference is domain knowledge, not a type
- * parameter. Three rules that are specific to this row:
+ * parameter. Two rules that are specific to this row:
  *
  *   - **No live counters.** Nothing on a profile is incremented by readers
  *     browsing the site, so there is no legitimate drift and every difference
@@ -251,34 +241,28 @@ export function comparePostRecords(
  *   - **An empty `interests` and a NULL one are different answers**, meaning
  *     "chose no topics" and "never answered". The profile page renders them
  *     differently, so unlike `posts.tags` they are not flattened together.
- *   - **`positioning_statement` is compared by presence as well as by value.**
- *     Both adapters gate the column on the same flag, so one side carrying the
- *     key while the other omits it means the gate is being read differently in
- *     two places, which is a real defect even when the value is null.
  */
 
 const PROFILE_SCALAR_FIELDS = [
   "id",
   "username",
   "full_name",
+  "bio",
+  "avatar_url",
+  "professional_title",
   "country",
   "university",
   "field_of_study",
-  "bio",
-  "avatar_url",
-  "cover_image_url",
   "verified_type",
-  "profile_type",
-  "professional_title",
-  "organization_name",
-  "organization_website",
+  // Both adapters produce the JSON text PostgREST serialises, so a strict
+  // comparison is correct rather than brittle.
+  "created_at",
 ] as const satisfies readonly (keyof ProfileIdentityRecord)[];
 
 /** Compared strictly. A driver handing back "t" instead of true would put a
  *  verification badge on an unverified member, so `"t" !== true` failing is
  *  the point rather than something to normalise away. */
 const PROFILE_BOOLEAN_FIELDS = [
-  "is_alumni",
   "verified",
 ] as const satisfies readonly (keyof ProfileIdentityRecord)[];
 
@@ -339,26 +323,6 @@ export function compareProfileRecords(
         field: "interests",
         supabase: supabase.interests,
         postgres: postgres.interests,
-      });
-    }
-
-    const leftHasPositioning = "positioning_statement" in supabase;
-    const rightHasPositioning = "positioning_statement" in postgres;
-    if (leftHasPositioning !== rightHasPositioning) {
-      differences.push({
-        field: "positioning_statement (presence)",
-        supabase: leftHasPositioning ? "selected" : "not selected",
-        postgres: rightHasPositioning ? "selected" : "not selected",
-      });
-    } else if (
-      leftHasPositioning &&
-      (supabase.positioning_statement ?? null) !==
-        (postgres.positioning_statement ?? null)
-    ) {
-      differences.push({
-        field: "positioning_statement",
-        supabase: supabase.positioning_statement ?? null,
-        postgres: postgres.positioning_statement ?? null,
       });
     }
   }

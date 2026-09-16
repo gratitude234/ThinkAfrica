@@ -36,84 +36,45 @@ const CATEGORIES = {
  * form applied in production.
  */
 const RPC_BLOCKED = new Set([
-  "lib/activation.ts",
   "lib/discoverData.ts",
-  "lib/profileCommandCenterData.ts",
-  "lib/retention.ts",
-  "app/(main)/page.tsx",
+  "lib/profileSettingsData.ts",
   "app/(main)/settings/page.tsx",
-  "app/(main)/subscriptions/page.tsx",
 ]);
 
 /** Normal product, reachable, not yet migrated, not blocked by anything. */
 const NON_CRITICAL = new Set([
-  "lib/collaboration.ts",
   "lib/postEngagementServer.ts",
   "lib/suggestedPeople.ts",
-  "lib/publicationDistribution.ts",
   "lib/push.ts",
-  "app/(main)/leaderboard/page.tsx",
-  "app/(main)/campus/page.tsx",
-  "app/(main)/opportunities/page.tsx",
-  "app/(main)/fellowships/page.tsx",
-  "app/(main)/fellowships/[id]/page.tsx",
   "app/(main)/edit/[slug]/page.tsx",
   "app/(write)/write/page.tsx",
-  "app/(main)/messages/[id]/page.tsx",
   "app/(main)/publication/[citationId]/page.tsx",
   "app/(main)/topics/[tag]/page.tsx",
   "app/(main)/discover/page.tsx",
-  "app/(main)/responses/page.tsx",
   "app/(main)/onboarding/page.tsx",
   "app/sitemap.ts",
-  "lib/profileRecord.ts",
-  "lib/reviewWorkflow.ts",
   "lib/notificationRead.ts",
   "lib/activationServer.ts",
-  "lib/opportunityMatch.ts",
   "lib/postQuality.ts",
   // Normal product pages and helpers, reachable, none on a migrated journey.
-  "lib/responsePost.ts",
   "lib/citationResolution.ts",
-  "lib/citationId.ts",
   "lib/postCounts.ts",
-  "lib/readerSignals.ts",
-  "lib/messaging.ts",
   "lib/pushClient.ts",
   "app/(main)/topics/page.tsx",
-  "app/(main)/policy/page.tsx",
-  "app/(main)/partners/page.tsx",
-  "app/(main)/alumni/page.tsx",
-  "app/(main)/talent/page.tsx",
   "app/(main)/me/page.tsx",
   "app/(main)/layout.tsx",
   "app/(main)/[username]/followers/page.tsx",
   "app/(main)/[username]/following/page.tsx",
-  "app/(main)/[username]/record/page.tsx",
+  // Home's viewer context (interests, follows, blocks), read on the request
+  // client beside the feed list. Added in Phase 2F.
+  "lib/feedViewer.ts",
   "app/(main)/post/[slug]/page.tsx",
   "app/(main)/post/[slug]/PostConversationView.tsx",
   "app/(marketing)/landing/landingData.ts",
-  // Ambassadors is behind FEATURE_FLAGS.ambassadors, which is false, but the
-  // route is still reachable: lib/featureFlags.ts says a route stays reachable
-  // unless it reads its own flag. Not dead, so not filed as dead.
-  "app/(main)/ambassadors/page.tsx",
-  "app/(main)/ambassadors/apply/page.tsx",
-  "app/(main)/ambassadors/dashboard/page.tsx",
-  "app/(main)/messages/page.tsx",
-  "app/(main)/messages/layout.tsx",
-  "lib/dailyBrief.ts",
-  // Behind NEXT_PUBLIC_CREDIBILITY_GRAPH_ENABLED, which is unset, but the
-  // module is still imported and reachable, so it is not filed as dead.
-  "lib/credibilityGraphData.ts",
-  // Unlisted share links. Public but token-gated, and not on a migrated
-  // journey.
-  "app/draft/[token]/page.tsx",
-  "app/r/p/[token]/route.ts",
 ]);
 
 /** Server-side, but not a product read: moderation, deletion, mail, access. */
 const OPERATIONAL = new Set([
-  "app/(main)/stats/page.tsx",
   "lib/adminAccess.ts",
   "lib/postDeletion.ts",
   "lib/suspension.ts",
@@ -159,6 +120,8 @@ function isWritePath(file) {
     /actions\.ts$/.test(file) ||
     file.includes("Actions.ts") ||
     file.includes("Mutations.ts") ||
+    // Reads the member's own row to decide whether onboarding may complete.
+    file === "lib/onboardingCompletion.ts" ||
     file.includes("/api/") ||
     file.includes("proxy.ts")
   );
@@ -169,11 +132,9 @@ const MIGRATED = new Map([
   ["lib/postBySlug.ts", "post-page"],
   ["lib/feedData.ts", "feed"],
   ["lib/profileViewData.ts", "profile-page"],
-  ["lib/profileRecordData.ts", "profile-page"],
   ["lib/searchData.ts", "search"],
   ["lib/commentThread.ts", "comments"],
   ["lib/blocking.ts", "viewer-state"],
-  ["lib/messagingEligibility.ts", "viewer-state"],
   ["lib/notificationData.ts", "notifications"],
   ["app/(main)/dashboard/page.tsx", "dashboard"],
   ["app/(main)/bookmarks/page.tsx", "bookmarks"],

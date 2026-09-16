@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import HomeFeedCard from "./HomeFeedCard";
 import type { PostCardData } from "./PostCard";
+import type { HomeFeedTab } from "@/lib/homeFeedTabs";
 import { useViewImpression } from "@/lib/useViewImpression";
 
 export default function HomeFeedCardImpression({
@@ -13,7 +14,7 @@ export default function HomeFeedCardImpression({
 }: {
   post: PostCardData;
   currentUserId: string | null;
-  surface: "home" | "following" | "subscriptions" | "topics" | "latest";
+  surface: HomeFeedTab;
   priority?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -24,7 +25,6 @@ export default function HomeFeedCardImpression({
       <HomeFeedCard
         post={post}
         currentUserId={currentUserId}
-        surface={surface}
         priority={priority}
       />
     </div>

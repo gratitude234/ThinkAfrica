@@ -1,17 +1,19 @@
-import type { ContentKind } from "@/lib/contentModel";
+import { CONTENT_KIND_LABELS, type ContentKind } from "@/lib/contentModel";
 
 export type GuestAuthIntent = "like" | "save" | "respond" | "create";
 
-const CONTENT_KIND_LABEL: Record<ContentKind, string> = {
-  post: "Post",
-  article: "Article",
-  research: "Research",
-};
-
-/** Human-facing label for a content kind -- never the raw DB value. */
+/**
+ * Human-facing label for a content kind -- never the raw DB value.
+ *
+ * Reads the labels off lib/contentModel.ts rather than keeping a second copy,
+ * which is how this one still said "Research" after the product stopped having
+ * it. Null rather than a generic fallback is load-bearing here: the callers
+ * below choose between "Sign in to like this Post" and "Sign in to like this",
+ * and a fallback label would produce "Sign in to like this Content".
+ */
 export function getContentKindLabel(contentKind?: ContentKind | null): string | null {
   if (!contentKind) return null;
-  return CONTENT_KIND_LABEL[contentKind] ?? null;
+  return CONTENT_KIND_LABELS[contentKind] ?? null;
 }
 
 export interface GuestAuthCopy {
@@ -41,7 +43,7 @@ export function getGuestAuthCopy(
       };
     case "respond":
       return {
-        title: "Sign in to respond",
+        title: "Sign in to comment",
         description: GENERIC_DESCRIPTION,
       };
     case "create":

@@ -82,9 +82,7 @@ describe.skipIf(!enabled)("feed hydration against PostgreSQL", () => {
       for (const key of [
         "likeCount",
         "bookmarkCount",
-        "referenceCount",
         "commentCount",
-        "responseCount",
       ] as const) {
         expect(typeof entry[key], `${key} should be a number`).toBe("number");
       }
@@ -114,10 +112,10 @@ describe.skipIf(!enabled)("feed hydration against PostgreSQL", () => {
   it("falls back to counting rows when an aggregate has no row", async () => {
     const rows = await executor.query<{ id: string; direct: string }>(
       `select p.id::text as id,
-              (select count(*) from public.post_references r where r.post_id = p.id) as direct
+              (select count(*) from public.bookmarks b where b.post_id = p.id) as direct
        from public.posts p
-       where not exists (select 1 from public.post_reference_counts rc where rc.post_id = p.id)
-         and exists (select 1 from public.post_references r where r.post_id = p.id)
+       where not exists (select 1 from public.post_bookmark_counts bc where bc.post_id = p.id)
+         and exists (select 1 from public.bookmarks b where b.post_id = p.id)
        limit 1`
     );
     if (rows.length === 0) return;
@@ -127,26 +125,7 @@ describe.skipIf(!enabled)("feed hydration against PostgreSQL", () => {
       authorIds: [],
       viewer: { id: null },
     });
-    expect(counts[0].referenceCount).toBe(Number(rows[0].direct));
-  }, 60_000);
-
-  it("counts only published responses", async () => {
-    const rows = await executor.query<{ id: string; published: string }>(
-      `select p.id::text as id,
-              (select count(*) from public.posts r
-                where r.in_response_to = p.id and r.status = 'published') as published
-       from public.posts p
-       where exists (select 1 from public.posts r where r.in_response_to = p.id)
-       limit 1`
-    );
-    if (rows.length === 0) return;
-
-    const { counts } = await repository.hydrate({
-      postIds: [rows[0].id],
-      authorIds: [],
-      viewer: { id: null },
-    });
-    expect(counts[0].responseCount).toBe(Number(rows[0].published));
+    expect(counts[0].bookmarkCount).toBe(Number(rows[0].direct));
   }, 60_000);
 
   it("hides a moderated comment from a stranger, shows it to its author", async () => {
@@ -296,38 +275,13 @@ describe.skipIf(!enabled)("feed hydration against PostgreSQL", () => {
     }
   }, 60_000);
 
-  it("returns accepted co-authors only, ordered", async () => {
-    const rows = await executor.query<{ id: string }>(
-      `select post_id::text as id from public.post_authors
-       where accepted_at is not null limit 1`
-    );
-    if (rows.length === 0) return;
-
-    const { coAuthors } = await repository.hydrate({
-      postIds: [rows[0].id],
-      authorIds: [],
-      viewer: { id: null },
-    });
-
-    expect(coAuthors.length).toBeGreaterThan(0);
-    const orders = coAuthors.map((entry) => entry.display_order ?? 0);
-    expect([...orders].sort((a, b) => a - b)).toEqual(orders);
-
-    const [{ count }] = await executor.query<{ count: string }>(
-      `select count(*)::int as count from public.post_authors
-       where post_id = $1::uuid and accepted_at is not null`,
-      [rows[0].id]
-    );
-    expect(coAuthors.length).toBe(Number(count));
-  }, 60_000);
-
   it("returns empty structures for an empty request", async () => {
     const result = await repository.hydrate({
       postIds: [],
       authorIds: [],
       viewer: { id: null },
     });
-    expect(result).toEqual({ counts: [], profiles: [], coAuthors: [] });
+    expect(result).toEqual({ counts: [], profiles: [] });
   }, 60_000);
 });
 

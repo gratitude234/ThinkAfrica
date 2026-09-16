@@ -28,12 +28,9 @@ import {
  * PostgREST-specific, which is why it lives here rather than in lib/db/types.
  */
 export const POST_CORE_SELECT = `
-      id, title, slug, content, excerpt, type, content_kind, article_format, tags, status, author_id,
-      created_at, published_at, view_count, impression_count, read_count, cover_image_url, citation_id,
-      published_version_id, current_round, revision_due_at,
-      in_response_to,
+      id, title, slug, content, excerpt, content_kind, tags, status, author_id,
+      created_at, published_at, view_count, impression_count, read_count, cover_image_url,
       audio_summary_url,
-      document_path, document_original_name, document_mime_type, document_size_bytes,
       profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url, verified, verified_type)
     `;
 

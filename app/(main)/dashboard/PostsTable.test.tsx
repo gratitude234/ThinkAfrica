@@ -32,18 +32,13 @@ vi.mock("@/app/(write)/write/deleteActions", () => ({
   },
 }));
 
-const withdrawSubmissionMock = vi.fn();
-vi.mock("@/app/(write)/write/actions", () => ({
-  withdrawSubmission: (...args: unknown[]) => withdrawSubmissionMock(...args),
-}));
-
 function draftPost(overrides: Partial<DashboardPost> = {}): DashboardPost {
   return {
     id: "post-1",
     author_id: "user-1",
     title: "My draft",
     slug: "my-draft",
-    type: "essay",
+    content_kind: "article",
     status: "draft",
     impression_count: 0,
     view_count: 0,
@@ -60,7 +55,7 @@ function pendingSubmission(overrides: Partial<DashboardPost> = {}): DashboardPos
     id: "post-2",
     title: "My policy brief",
     slug: "my-policy-brief",
-    type: "policy_brief",
+    content_kind: "article",
     status: "pending",
     ...overrides,
   });
@@ -129,60 +124,66 @@ describe("PostsTable delete", () => {
     expect(deleteCalls).toEqual([]);
   });
 
-  it("never offers Delete for a pending/pending_revision submission -- only Withdraw", () => {
+  it("offers neither Delete nor Withdraw for a legacy pending submission", () => {
     render(<PostsTable posts={[pendingSubmission()]} userId="user-1" />);
 
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Withdraw" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Withdraw" })).not.toBeInTheDocument();
   });
 });
 
-describe("PostsTable withdraw", () => {
-  it("marks the row withdrawn (not removed) and shows no toast when withdrawal succeeds", async () => {
-    withdrawSubmissionMock.mockResolvedValue({ error: null });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+describe("PostsTable legacy review workflow", () => {
+  it("offers only drafts and published work as filters", () => {
+    render(<PostsTable posts={[draftPost()]} userId="user-1" />);
 
-    render(<PostsTable posts={[pendingSubmission()]} userId="user-1" />);
-
-    await userEvent.click(screen.getByRole("button", { name: "Withdraw" }));
-
-    await waitFor(() => {
-      // Status badge specifically -- the tab filter bar also has a
-      // "withdrawn" button, so a bare text match would be ambiguous.
-      expect(screen.getByText("withdrawn", { selector: "span" })).toBeInTheDocument();
-    });
-    // The row survives withdrawal, unlike a delete.
-    expect(screen.getByText("My policy brief")).toBeInTheDocument();
-    expect(withdrawSubmissionMock).toHaveBeenCalledWith({ postId: "post-2" });
+    for (const name of ["pending", "pending revision", "rejected", "withdrawn"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole("button", { name: "published" })).toBeInTheDocument();
   });
 
-  it("keeps the row pending and shows an error toast when withdrawal is rejected", async () => {
-    withdrawSubmissionMock.mockResolvedValue({
-      error: "Only a submission awaiting or in revision can be withdrawn.",
-    });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("opens a formerly locked publication for editing, like any other", () => {
+    // It used to offer View, because guard_locked_post_write refused a write
+    // to a publication that had been through review. 20260915000007 retired
+    // that lock, so the author edits their own work.
+    render(
+      <PostsTable
+        posts={[
+          draftPost({
+            id: "post-3",
+            title: "An accepted brief",
+            slug: "an-accepted-brief",
+            content_kind: "article",
+            status: "published",
+            published_at: "2026-07-18T00:00:00.000Z",
+          }),
+        ]}
+        userId="user-1"
+      />
+    );
 
-    render(<PostsTable posts={[pendingSubmission()]} userId="user-1" />);
-
-    await userEvent.click(screen.getByRole("button", { name: "Withdraw" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Only a submission awaiting or in revision can be withdrawn.")
-      ).toBeInTheDocument();
-    });
-    expect(screen.queryByText("withdrawn", { selector: "span" })).not.toBeInTheDocument();
-    // Status label for a still-pending policy brief, unchanged by the rejection.
-    expect(screen.getByText("Under review", { selector: "span" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Edit" })).toHaveAttribute(
+      "href",
+      "/edit/an-accepted-brief"
+    );
   });
 
-  it("does nothing when the confirm dialog is dismissed", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("labels each row with its kind, and never a genre", () => {
+    render(
+      <PostsTable
+        posts={[
+          draftPost({ content_kind: "article" }),
+          draftPost({ id: "post-4", slug: "a-post", content_kind: "post" }),
+        ]}
+        userId="user-1"
+      />
+    );
 
-    render(<PostsTable posts={[pendingSubmission()]} userId="user-1" />);
-
-    await userEvent.click(screen.getByRole("button", { name: "Withdraw" }));
-
-    expect(withdrawSubmissionMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Article")).toBeInTheDocument();
+    expect(screen.getByText("Post")).toBeInTheDocument();
+    for (const gone of ["Essay", "Policy Brief", "Research", "Blog"]) {
+      expect(screen.queryByText(gone), gone).not.toBeInTheDocument();
+    }
   });
 });

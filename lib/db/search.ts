@@ -3,7 +3,7 @@ import "server-only";
 /**
  * Search, as PostgreSQL.
  *
- * Four business operations, one per surface, plus the tag sample the topic
+ * Three business operations, one per surface, plus the tag sample the topic
  * list is derived from. No generic filter builder: the PostgREST grammar these
  * replace was itself the source of a correctness bug, and reproducing the
  * grammar rather than the intent would carry it forward.
@@ -14,7 +14,6 @@ import "server-only";
  *
  * `posts` is filtered to `status = 'published'` by these queries themselves,
  * so the posts policy adds nothing and the direct read returns the same rows.
- * `fellowships` is `USING (true)`, so it adds nothing either.
  *
  * `profiles` is the exception and it is not a small one. Its policy hides
  * suspended members and honours `privacy_settings -> profile_visibility`, and
@@ -35,7 +34,6 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { FEATURE_FLAGS, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import { likeContainsPattern, orIlikeFilter } from "@/lib/searchFilters";
 import { profileVisibleSql, visibleProfileJoin } from "@/lib/db/profileVisibility";
 
@@ -48,11 +46,7 @@ export interface SearchPostResult {
   title: string | null;
   slug: string;
   excerpt: string | null;
-  type: string;
   content_kind: string | null;
-  article_format: string | null;
-  citation_id: string | null;
-  published_version_id: string | null;
   published_at: string | null;
   profiles: {
     username: string;
@@ -74,15 +68,7 @@ export interface SearchPersonResult {
   username: string;
   full_name: string | null;
   university: string | null;
-  points: number | null;
   avatar_url: string | null;
-}
-
-export interface SearchOpportunityResult {
-  id: string;
-  title: string;
-  sponsor_name: string | null;
-  deadline: string | null;
 }
 
 /** One published post's tags, which is all the topic count reads. */
@@ -106,11 +92,6 @@ export interface SearchRepository {
     query: string,
     options: { viewerId: string | null; limit: number }
   ): Promise<SearchPersonResult[]>;
-  /** Open fellowships, soonest deadline first. */
-  opportunities(
-    query: string,
-    options: { limit: number }
-  ): Promise<SearchOpportunityResult[]>;
   /** The sample the trending topics are counted from. */
   publishedTagSample(limit: number): Promise<TagSampleRow[]>;
   readonly backend: "supabase" | "postgres";
@@ -119,11 +100,16 @@ export interface SearchRepository {
 // ── SQL ──────────────────────────────────────────────────────────────
 
 /**
- * `$3` is "research is enabled". When it is, the content-kind clause is
- * skipped entirely, which is what the caller's `if (!FEATURE_FLAGS.research)`
- * did. `content_kind is null` has to pass through either way, because most
- * posts have no content_kind at all and excluding them would empty the
- * typeahead.
+ * The typeahead used to carry a research exclusion twice over, once on `type`
+ * and once on `content_kind`, with a `content_kind is null` escape so that
+ * posts predating the column were not swallowed by it. None of that is
+ * reachable: every row carries a canonical content_kind of 'post' or 'article'
+ * and the database refuses any other value (20260915000006).
+ *
+ * That also settles a disagreement this file used to document: the typeahead
+ * excluded research and the search page did not, so the two surfaces answered
+ * differently for the same query. They now agree, because there is nothing to
+ * disagree about.
  *
  * No ORDER BY, deliberately. See the note at the top of this file.
  */
@@ -132,29 +118,20 @@ const OVERLAY_SQL = `
     p.id,
     p.title,
     p.slug,
-    p.type,
     p.content_kind,
-    p.article_format,
-    p.citation_id,
-    p.published_version_id,
     case when a.id is null then null else jsonb_build_object(
       'full_name', a.full_name,
       'username', a.username
     ) end as profiles
   from public.posts p
-  ${visibleProfileJoin("a", "p.author_id", "$5")}
+  ${visibleProfileJoin("a", "p.author_id", "$3")}
   where p.status = 'published'
-    and p.type <> $1::text
-    and p.title ilike $2::text
-    and ($3::boolean or p.content_kind is null or p.content_kind <> 'research')
-  limit $4::int
+    and p.title ilike $1::text
+  limit $2::int
 `;
 
 /**
- * Title or excerpt. The content-kind exclusion the typeahead applies is
- * deliberately absent here, because it is absent from the call this replaces:
- * the two surfaces have always disagreed about research, and reconciling them
- * would change what the search page returns.
+ * Title or excerpt.
  *
  * `published_at desc` with no nulls clause, so nulls come first, as they did.
  */
@@ -164,11 +141,7 @@ const POSTS_SQL = `
     p.title,
     p.slug,
     p.excerpt,
-    p.type,
     p.content_kind,
-    p.article_format,
-    p.citation_id,
-    p.published_version_id,
     p.published_at,
     case when a.id is null then null else jsonb_build_object(
       'username', a.username,
@@ -176,12 +149,11 @@ const POSTS_SQL = `
       'university', a.university
     ) end as profiles
   from public.posts p
-  ${visibleProfileJoin("a", "p.author_id", "$4")}
+  ${visibleProfileJoin("a", "p.author_id", "$3")}
   where p.status = 'published'
-    and p.type <> $1::text
-    and (p.title ilike $2::text or p.excerpt ilike $2::text)
+    and (p.title ilike $1::text or p.excerpt ilike $1::text)
   order by p.published_at desc
-  limit $3::int
+  limit $2::int
 `;
 
 /**
@@ -197,7 +169,6 @@ const PEOPLE_SQL = `
     p.username,
     p.full_name,
     p.university,
-    p.points,
     p.avatar_url
   from public.profiles p
   where (
@@ -206,17 +177,6 @@ const PEOPLE_SQL = `
       or p.university ilike $1::text
     )
     and ${profileVisibleSql("p", "$3")}
-  limit $2::int
-`;
-
-/** `nullsFirst: false` under an ascending order is PostgreSQL's default, and
- *  is spelled out here because the PostgREST call spelled it out. */
-const OPPORTUNITIES_SQL = `
-  select f.id, f.title, f.sponsor_name, f.deadline
-  from public.fellowships f
-  where f.status = 'open'
-    and (f.title ilike $1::text or f.sponsor_name ilike $1::text)
-  order by f.deadline asc nulls last
   limit $2::int
 `;
 
@@ -271,10 +231,10 @@ function toTags(value: unknown): string[] | null {
 // ── Supabase ─────────────────────────────────────────────────────────
 
 const OVERLAY_SELECT =
-  "id, title, slug, type, content_kind, article_format, citation_id, published_version_id, profiles!posts_author_id_fkey(full_name, username)";
+  "id, title, slug, content_kind, profiles!posts_author_id_fkey(full_name, username)";
 
 const POST_SELECT =
-  "id, title, slug, excerpt, type, content_kind, article_format, citation_id, published_version_id, published_at, profiles!posts_author_id_fkey(username, full_name, university)";
+  "id, title, slug, excerpt, content_kind, published_at, profiles!posts_author_id_fkey(username, full_name, university)";
 
 export function createSupabaseSearchRepository(
   supabase: SupabaseClient
@@ -283,16 +243,11 @@ export function createSupabaseSearchRepository(
     backend: "supabase",
 
     async overlayPosts(query, options) {
-      let request = supabase
+      const request = supabase
         .from("posts")
         .select(OVERLAY_SELECT)
         .eq("status", "published")
-        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
         .ilike("title", likeContainsPattern(query));
-
-      if (!FEATURE_FLAGS.research) {
-        request = request.or("content_kind.is.null,content_kind.neq.research");
-      }
 
       const result = await request.limit(options.limit);
       return rows<Record<string, unknown>>(result, "overlay search failed").map(
@@ -309,7 +264,6 @@ export function createSupabaseSearchRepository(
         .from("posts")
         .select(POST_SELECT)
         .eq("status", "published")
-        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
         .or(orIlikeFilter(["title", "excerpt"], query))
         .order("published_at", { ascending: false })
         .limit(options.limit);
@@ -326,23 +280,11 @@ export function createSupabaseSearchRepository(
     async people(query, options) {
       const result = await supabase
         .from("profiles")
-        .select("id, username, full_name, university, points, avatar_url")
+        .select("id, username, full_name, university, avatar_url")
         .or(orIlikeFilter(["username", "full_name", "university"], query))
         .limit(options.limit);
 
       return rows<SearchPersonResult>(result, "people search failed");
-    },
-
-    async opportunities(query, options) {
-      const result = await supabase
-        .from("fellowships")
-        .select("id, title, sponsor_name, deadline")
-        .eq("status", "open")
-        .or(orIlikeFilter(["title", "sponsor_name"], query))
-        .order("deadline", { ascending: true, nullsFirst: false })
-        .limit(options.limit);
-
-      return rows<SearchOpportunityResult>(result, "opportunity search failed");
     },
 
     async publishedTagSample(limit) {
@@ -367,9 +309,7 @@ export function createPostgresSearchRepository(
 
     async overlayPosts(query, options) {
       const result = await executor.query<Record<string, unknown>>(OVERLAY_SQL, [
-        RESEARCH_TYPE_QUERY_EXCLUSION,
         likeContainsPattern(query),
-        FEATURE_FLAGS.research,
         options.limit,
         options.viewerId,
       ]);
@@ -378,7 +318,6 @@ export function createPostgresSearchRepository(
 
     async posts(query, options) {
       const result = await executor.query<Record<string, unknown>>(POSTS_SQL, [
-        RESEARCH_TYPE_QUERY_EXCLUSION,
         likeContainsPattern(query),
         options.limit,
         options.viewerId,
@@ -393,13 +332,6 @@ export function createPostgresSearchRepository(
         options.viewerId,
       ]);
       return result;
-    },
-
-    async opportunities(query, options) {
-      return executor.query<SearchOpportunityResult>(OPPORTUNITIES_SQL, [
-        likeContainsPattern(query),
-        options.limit,
-      ]);
     },
 
     async publishedTagSample(limit) {

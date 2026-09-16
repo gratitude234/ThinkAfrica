@@ -5,63 +5,37 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { shouldUseRealtime } from "@/lib/realtime";
 import Toast from "@/components/ui/Toast";
-import {
-  formatDate,
-  POST_POINTS,
-  POST_TYPE_LABELS,
-  type PostType,
-} from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { getPostDisplayTitle } from "@/lib/postDisplay";
-import {
-  getArticleFormatLabel,
-  getContentKindLabel,
-  resolveArticleFormat,
-  resolveContentKind,
-} from "@/lib/contentModel";
-import { withdrawSubmission } from "@/app/(write)/write/actions";
+import { getContentKindLabel, resolveContentKind } from "@/lib/contentModel";
 import { deleteOwnDraftPosts } from "@/app/(write)/write/deleteActions";
 
-export interface DashboardPostReview {
-  assigned_at: string;
-  submitted_at: string | null;
-  recommendation: string | null;
-}
-
-export interface DashboardEditorDecision {
-  decision: string;
-  created_at: string;
-}
-
+/**
+ * A row of the writer's own work.
+ *
+ * Phase 2I removed what the retired review workflow put here: the reviews and
+ * editor decisions, the citation and published-version evidence, the revision
+ * due date, the round counter, the research document fields and the position
+ * in the editorial queue. A writer's dashboard lists what they wrote, what
+ * state it is in, and how it is doing.
+ */
 export interface DashboardPost {
   id: string;
   author_id?: string;
   title: string | null;
   slug: string;
-  type: string;
   content_kind?: string | null;
-  article_format?: string | null;
   status: string;
-  citation_id?: string | null;
-  published_version_id?: string | null;
-  current_round?: number | null;
-  document_path?: string | null;
-  document_original_name?: string | null;
-  document_mime_type?: string | null;
-  document_size_bytes?: number | null;
   impression_count: number;
   view_count: number;
   read_count: number;
   like_count: number;
   created_at: string;
   published_at: string | null;
-  revision_due_at?: string | null;
-  post_reviews?: DashboardPostReview[];
-  post_editor_decisions?: DashboardEditorDecision[];
   co_authors?: Array<{
     user_id: string;
     profile: { username: string; full_name: string | null } | null;
   }>;
-  queuePosition?: number | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -73,15 +47,9 @@ const STATUS_COLORS: Record<string, string> = {
   withdrawn: "bg-gray-100 text-gray-500",
 };
 
-const TABS = [
-  "all",
-  "published",
-  "pending",
-  "pending_revision",
-  "draft",
-  "rejected",
-  "withdrawn",
-] as const;
+// Posts and Articles are drafts or published. Rows left in a status the
+// retired review workflow produced still appear under All.
+const TABS = ["all", "published", "draft"] as const;
 type Tab = (typeof TABS)[number];
 
 function normalizePost(
@@ -93,19 +61,8 @@ function normalizePost(
     author_id: record.author_id ?? existing?.author_id,
     title: record.title ?? existing?.title ?? "Untitled",
     slug: record.slug ?? existing?.slug ?? "",
-    type: record.type ?? existing?.type ?? "blog",
+    content_kind: record.content_kind ?? existing?.content_kind ?? "post",
     status: record.status ?? existing?.status ?? "draft",
-    citation_id: record.citation_id ?? existing?.citation_id ?? null,
-    published_version_id:
-      record.published_version_id ?? existing?.published_version_id ?? null,
-    current_round: record.current_round ?? existing?.current_round ?? 1,
-    document_path: record.document_path ?? existing?.document_path ?? null,
-    document_original_name:
-      record.document_original_name ?? existing?.document_original_name ?? null,
-    document_mime_type:
-      record.document_mime_type ?? existing?.document_mime_type ?? null,
-    document_size_bytes:
-      record.document_size_bytes ?? existing?.document_size_bytes ?? null,
     impression_count:
       record.impression_count ?? existing?.impression_count ?? 0,
     view_count: record.view_count ?? existing?.view_count ?? 0,
@@ -113,12 +70,7 @@ function normalizePost(
     like_count: existing?.like_count ?? 0,
     created_at: record.created_at ?? existing?.created_at ?? new Date().toISOString(),
     published_at: record.published_at ?? existing?.published_at ?? null,
-    revision_due_at: record.revision_due_at ?? existing?.revision_due_at ?? null,
-    post_reviews: record.post_reviews ?? existing?.post_reviews ?? [],
-    post_editor_decisions:
-      record.post_editor_decisions ?? existing?.post_editor_decisions ?? [],
     co_authors: record.co_authors ?? existing?.co_authors ?? [],
-    queuePosition: record.queuePosition ?? existing?.queuePosition ?? null,
   };
 }
 
@@ -131,7 +83,6 @@ export default function PostsTable({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
   const [rows, setRows] = useState<DashboardPost[]>(posts);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const statusMapRef = useRef<Map<string, string>>(new Map());
@@ -144,43 +95,7 @@ export default function PostsTable({
   const filtered =
     activeTab === "all" ? rows : rows.filter((p) => p.status === activeTab);
 
-  const getStatusLabel = (post: DashboardPost) => {
-    const reviewedType = post.type === "research" || post.type === "policy_brief";
-    if (reviewedType && post.status === "pending") return "Under review";
-    if (reviewedType && post.status === "pending_revision") return "Revision requested";
-    if (reviewedType && post.status === "rejected") return "Declined";
-    return post.status.replace("_", " ");
-  };
-
-  const getReviewStatus = (post: DashboardPost) => {
-    if (post.status === "pending_revision") {
-      const dueDate = post.revision_due_at
-        ? new Date(post.revision_due_at).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })
-        : null;
-      return dueDate
-        ? `Revision requested - due ${dueDate}`
-        : "Revision requested";
-    }
-
-    if (post.status !== "pending") return null;
-
-    const reviews = post.post_reviews ?? [];
-    const decisions = post.post_editor_decisions ?? [];
-
-    if (reviews.some((review) => !review.submitted_at)) {
-      return "In review - awaiting reviewer feedback";
-    }
-
-    if (reviews.length > 0 && decisions.length === 0) {
-      return "In review - editor deciding";
-    }
-
-    return "In review - awaiting assignment";
-  };
+  const getStatusLabel = (post: DashboardPost) => post.status.replace("_", " ");
 
   useEffect(() => {
     if (!shouldUseRealtime()) {
@@ -243,10 +158,7 @@ export default function PostsTable({
           });
 
           if (previousStatus === "pending" && record.status === "published") {
-            const points = POST_POINTS[(record.type as PostType) ?? "blog"] ?? 0;
-            setToastMessage(
-              `\uD83C\uDF89 Post published! +${points} points earned`
-            );
+            setToastMessage("\uD83C\uDF89 Post published!");
           }
         }
       )
@@ -289,30 +201,6 @@ export default function PostsTable({
 
     statusMapRef.current.delete(id);
     setRows((prev) => prev.filter((post) => !result.data.deleted.includes(post.id)));
-  };
-
-  const handleWithdraw = async (id: string) => {
-    if (
-      !confirm(
-        "Withdraw this submission? It will stop being reviewed, but your draft content, references, and review history stay intact -- this is not the same as deleting it."
-      )
-    ) {
-      return;
-    }
-
-    setWithdrawingId(id);
-    const { error } = await withdrawSubmission({ postId: id });
-    setWithdrawingId(null);
-
-    if (error) {
-      setToastMessage(error);
-      return;
-    }
-
-    statusMapRef.current.set(id, "withdrawn");
-    setRows((prev) =>
-      prev.map((post) => (post.id === id ? { ...post, status: "withdrawn" } : post))
-    );
   };
 
   return (
@@ -377,37 +265,15 @@ export default function PostsTable({
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((post) => {
-                  const reviewedPublication =
-                    post.status === "published" &&
-                    (post.type === "research" || post.type === "policy_brief");
-                  const reviewStatus = getReviewStatus(post);
-                  const resolvedKind = resolveContentKind(post);
-                  const formatLabel = getArticleFormatLabel(resolveArticleFormat(post));
-                  const typeLabel =
-                    resolvedKind === "article"
-                      ? formatLabel
-                        ? `${getContentKindLabel(resolvedKind)} · ${formatLabel}`
-                        : getContentKindLabel(resolvedKind)
-                      : (POST_TYPE_LABELS[post.type as PostType] ?? post.type);
+                  const kindLabel = getContentKindLabel(resolveContentKind(post));
+                  // Every publication a writer owns is editable now. The
+                  // read-only branch here existed for publications the database
+                  // locked after review, and that lock was retired in
+                  // 20260915000007_retire_review_publication_locks.sql.
                   const actionHref =
-                    post.type === "research" &&
-                    (post.status === "draft" || post.status === "pending_revision")
-                      ? `/submit/research?draft=${post.id}`
-                      : post.status === "draft"
+                    post.status === "draft"
                       ? `/write?draft=${post.id}`
-                      : reviewedPublication && post.citation_id
-                        ? `/publication/${post.citation_id}`
-                        : `/edit/${post.slug}`;
-                  // A withdrawn (or otherwise no-longer-editable) research
-                  // submission still routes to /submit/research -- that form
-                  // now shows a read-only banner and disables Save/Submit
-                  // for it -- but the link here should say "View", not
-                  // "Edit", so it isn't misleading before the user even
-                  // opens it.
-                  const isEditableEntry =
-                    post.type !== "research" ||
-                    post.status === "draft" ||
-                    post.status === "pending_revision";
+                      : `/edit/${post.slug}`;
                   return (
                     <tr key={post.id} className="hover:bg-canvas transition-colors">
                       <td className="px-4 py-3 max-w-[200px]">
@@ -427,28 +293,9 @@ export default function PostsTable({
                               .join(", ")}
                           </p>
                         ) : null}
-                        {post.type === "research" ? (
-                          <p className="mt-1 truncate text-xs text-purple-600">
-                            {post.document_path
-                              ? `PDF attached${post.document_original_name ? ` / ${post.document_original_name}` : ""}`
-                              : "PDF missing"}
-                          </p>
-                        ) : null}
-                        {reviewStatus ? (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                              {reviewStatus}
-                            </span>
-                            {post.queuePosition ? (
-                              <span className="rounded-full bg-gray-50 px-2 py-0.5 text-xs text-gray-500">
-                                Position ~{post.queuePosition} in review queue
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : null}
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
-                        <span className="text-gray-500 text-xs">{typeLabel}</span>
+                        <span className="text-gray-500 text-xs">{kindLabel}</span>
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -478,7 +325,7 @@ export default function PostsTable({
                             href={actionHref}
                             className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
                           >
-                            {reviewedPublication || !isEditableEntry ? "View" : "Edit"}
+                            Edit
                           </Link>
                           {post.status === "draft" && (
                             <button
@@ -487,15 +334,6 @@ export default function PostsTable({
                               className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
                             >
                               {deletingId === post.id ? "Deleting" : "Delete"}
-                            </button>
-                          )}
-                          {(post.status === "pending" || post.status === "pending_revision") && (
-                            <button
-                              onClick={() => handleWithdraw(post.id)}
-                              disabled={withdrawingId === post.id}
-                              className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
-                            >
-                              {withdrawingId === post.id ? "Withdrawing" : "Withdraw"}
                             </button>
                           )}
                         </div>

@@ -45,7 +45,6 @@ export interface PostPageCounts {
   likeCount: number;
   bookmarkCount: number;
   commentCount: number;
-  responseCount: number;
 }
 
 export interface PostReferenceRow {
@@ -100,9 +99,7 @@ export interface RelatedPost {
   id: string;
   title: string | null;
   slug: string;
-  type: string;
   content_kind: string | null;
-  article_format: string | null;
   published_at: string | null;
   created_at: string;
   cover_image_url: string | null;
@@ -117,20 +114,10 @@ export interface PostPageCollections {
   versions: VersionRow[];
 }
 
-export interface ParentPost {
-  id: string;
-  title: string | null;
-  slug: string;
-  content_kind: string | null;
-  type: string;
-  profiles: { full_name: string | null; username: string } | null;
-}
-
 export interface PostPageViewerState {
   liked: boolean;
   bookmarked: boolean;
   following: boolean;
-  subscribed: boolean;
 }
 
 export interface PostPageRepository {
@@ -151,12 +138,6 @@ export interface PostPageRepository {
     postId: string,
     publishedAt: string
   ): Promise<{ previous: NeighbourPost | null; next: NeighbourPost | null }>;
-  /** The published post a response was written about, for the banner above
-   *  it. Public: a response page shows it to everybody. */
-  parentPost(
-    parentPostId: string,
-    viewerId: string | null
-  ): Promise<ParentPost | null>;
   /** Authenticated only. The viewer id comes from the server, never from the
    *  request body: these are the four booleans that decide whether the page
    *  shows "liked" and "following", and a caller-supplied id would let anybody
@@ -220,22 +201,16 @@ export function createSupabasePostPageRepository(
     backend: "supabase",
 
     async counts(postId) {
-      const [likes, bookmarks, comments, responses] = await Promise.all([
+      const [likes, bookmarks, comments] = await Promise.all([
         supabase.from("likes").select("*", { count: "exact", head: true }).eq("post_id", postId),
         supabase.from("bookmarks").select("*", { count: "exact", head: true }).eq("post_id", postId),
         supabase.from("comments").select("id", { count: "exact", head: true }).eq("post_id", postId),
-        supabase
-          .from("posts")
-          .select("*", { count: "exact", head: true })
-          .eq("in_response_to", postId)
-          .eq("status", "published"),
       ]);
 
       return {
         likeCount: count(likes, "like count"),
         bookmarkCount: count(bookmarks, "bookmark count"),
         commentCount: count(comments, "comment count"),
-        responseCount: count(responses, "response count"),
       };
     },
 
@@ -297,7 +272,7 @@ export function createSupabasePostPageRepository(
       const result = await supabase
         .from("posts")
         .select(
-          "id, title, slug, type, content_kind, article_format, published_at, created_at, cover_image_url, profiles!posts_author_id_fkey (full_name, username)"
+          "id, title, slug, content_kind, published_at, created_at, cover_image_url, profiles!posts_author_id_fkey (full_name, username)"
         )
         .eq("status", "published")
         .neq("id", postId)
@@ -341,31 +316,8 @@ export function createSupabasePostPageRepository(
       };
     },
 
-      // The viewer is unused on this side: the request client carries the
-      // session, so the profiles policy is applied by the database.
-    async parentPost(parentPostId, _viewerId) {
-      const result = await supabase
-        .from("posts")
-        .select(
-          "id, title, slug, content_kind, type, profiles!posts_author_id_fkey (full_name, username)"
-        )
-        .eq("id", parentPostId)
-        .eq("status", "published")
-        .maybeSingle();
-
-      const data = maybeRow<Record<string, unknown>>(result, "parent post");
-      if (!data) return null;
-      const row = data;
-      return {
-        ...(row as unknown as ParentPost),
-        profiles: (Array.isArray(row.profiles)
-          ? (row.profiles[0] ?? null)
-          : (row.profiles ?? null)) as ParentPost["profiles"],
-      };
-    },
-
     async viewerState(postId, viewerId, authorId) {
-      const [like, bookmark, follow, subscription] = await Promise.all([
+      const [like, bookmark, follow] = await Promise.all([
         supabase
           .from("likes")
           .select("user_id")
@@ -386,14 +338,6 @@ export function createSupabasePostPageRepository(
               .eq("following_id", authorId)
               .maybeSingle()
           : Promise.resolve({ data: null }),
-        authorId
-          ? supabase
-              .from("author_subscriptions")
-              .select("subscriber_id")
-              .eq("subscriber_id", viewerId)
-              .eq("author_id", authorId)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
       ]);
 
       // A failed lookup is not "not liked". Rendering an empty heart
@@ -402,7 +346,6 @@ export function createSupabasePostPageRepository(
         liked: maybeRow(like, "viewer like") !== null,
         bookmarked: maybeRow(bookmark, "viewer bookmark") !== null,
         following: maybeRow(follow, "viewer follow") !== null,
-        subscribed: maybeRow(subscription, "viewer subscription") !== null,
       };
     },
   };
@@ -424,21 +367,18 @@ export function createSupabasePostPageRepository(
  */
 const COAUTHOR_VIEWER = "$2";
 const RELATED_VIEWER = "$4";
-const PARENT_VIEWER = "$2";
 
 /**
  * Counts, as one row of scalar subqueries.
  *
  * PostgREST spends a round trip per `count: exact, head: true`. Postgres does
- * not need four connections to count four things.
+ * not need three connections to count three things.
  */
 const COUNTS_SQL = `
   select
     (select count(*) from public.likes where post_id = $1::uuid) as like_count,
     (select count(*) from public.bookmarks where post_id = $1::uuid) as bookmark_count,
-    (select count(*) from public.comments where post_id = $1::uuid) as comment_count,
-    (select count(*) from public.posts
-      where in_response_to = $1::uuid and status = 'published') as response_count
+    (select count(*) from public.comments where post_id = $1::uuid) as comment_count
 `;
 
 /**
@@ -519,7 +459,7 @@ const COLLECTIONS_SQL = `
  */
 const RELATED_SQL = `
   select
-    p.id, p.title, p.slug, p.type, p.content_kind, p.article_format,
+    p.id, p.title, p.slug, p.content_kind,
     p.published_at, p.created_at, p.cover_image_url,
     case when author.id is null then null else jsonb_build_object(
       'full_name', author.full_name,
@@ -576,25 +516,7 @@ const VIEWER_STATE_SQL = `
             where post_id = $1::uuid and user_id = $2::uuid) as bookmarked,
     case when $3::uuid is null then false else exists(
       select 1 from public.follows
-        where follower_id = $2::uuid and following_id = $3::uuid) end as following,
-    case when $3::uuid is null then false else exists(
-      select 1 from public.author_subscriptions
-        where subscriber_id = $2::uuid and author_id = $3::uuid) end as subscribed
-`;
-
-/** The parent of a response. Published only: an unpublished parent must not
- *  be named on a public page. */
-const PARENT_POST_SQL = `
-  select
-    p.id, p.title, p.slug, p.content_kind, p.type,
-    case when author.id is null then null else jsonb_build_object(
-      'full_name', author.full_name,
-      'username', author.username
-    ) end as profiles
-  from public.posts as p
-  ${visibleProfileJoin("author", "p.author_id", PARENT_VIEWER)}
-  where p.id = $1::uuid and p.status = 'published'
-  limit 1
+        where follower_id = $2::uuid and following_id = $3::uuid) end as following
 `;
 
 function toNumber(value: unknown): number {
@@ -634,7 +556,6 @@ export function createPostgresPostPageRepository(
         likeCount: toNumber(row?.like_count),
         bookmarkCount: toNumber(row?.bookmark_count),
         commentCount: toNumber(row?.comment_count),
-        responseCount: toNumber(row?.response_count),
       };
     },
 
@@ -665,9 +586,7 @@ export function createPostgresPostPageRepository(
         id: String(row.id),
         title: (row.title as string | null) ?? null,
         slug: String(row.slug),
-        type: String(row.type),
         content_kind: (row.content_kind as string | null) ?? null,
-        article_format: (row.article_format as string | null) ?? null,
         published_at: toIso(row.published_at),
         created_at: toIso(row.created_at) ?? "",
         cover_image_url: (row.cover_image_url as string | null) ?? null,
@@ -694,22 +613,6 @@ export function createPostgresPostPageRepository(
       return { previous: pick("previous"), next: pick("next") };
     },
 
-    async parentPost(parentPostId, viewerId) {
-      const [row] = await executor.query<Record<string, unknown>>(PARENT_POST_SQL, [
-        parentPostId,
-        viewerId,
-      ]);
-      if (!row) return null;
-      return {
-        id: String(row.id),
-        title: (row.title as string | null) ?? null,
-        slug: String(row.slug),
-        content_kind: (row.content_kind as string | null) ?? null,
-        type: String(row.type),
-        profiles: (row.profiles ?? null) as ParentPost["profiles"],
-      };
-    },
-
     async viewerState(postId, viewerId, authorId) {
       const [row] = await executor.query<Record<string, unknown>>(VIEWER_STATE_SQL, [
         postId,
@@ -721,7 +624,6 @@ export function createPostgresPostPageRepository(
         liked: row?.liked === true,
         bookmarked: row?.bookmarked === true,
         following: row?.following === true,
-        subscribed: row?.subscribed === true,
       };
     },
   };

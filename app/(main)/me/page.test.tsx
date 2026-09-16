@@ -82,13 +82,13 @@ describe("MePage", () => {
     expect(state.redirect).toHaveBeenCalledWith("/settings");
   });
 
-  it("renders the Intellectual Record entry and standard account destinations", async () => {
+  it("renders the profile entry and standard account destinations", async () => {
     await renderPage();
 
     expect(screen.getByRole("heading", { name: "A Writer" })).toBeInTheDocument();
-    expect(screen.getByText("Your Intellectual Record")).toBeInTheDocument();
+    expect(screen.queryByText(/Intellectual Record/)).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Open Intellectual Record" })
+      screen.getByRole("link", { name: "View profile" })
     ).toHaveAttribute("href", "/writer");
     expect(screen.getByRole("link", { name: /My writing/ })).toHaveAttribute(
       "href",
@@ -106,39 +106,36 @@ describe("MePage", () => {
     expect(screen.queryByRole("link", { name: /Admin/ })).not.toBeInTheDocument();
   });
 
-  it("offers profile completion when the username is unusable", async () => {
+  it("sends a member with an unusable username to Edit profile, with no completion prompt", async () => {
     state.profile = { ...standardProfile, username: "bad username" };
 
     await renderPage();
 
     expect(
-      screen.getByRole("link", { name: "Complete profile" })
-    ).toHaveAttribute("href", "/settings");
+      screen.getByRole("link", { name: "Edit profile" })
+    ).toHaveAttribute("href", "/settings/profile");
+    expect(screen.queryByText(/Complete profile/)).not.toBeInTheDocument();
     expect(screen.getByText("writer@example.com")).toBeInTheDocument();
   });
 
-  it("shows Review to reviewers without exposing Admin", async () => {
+  it("offers reviewers no Review link, because editorial review is retired", async () => {
     state.profile = { ...standardProfile, role: "reviewer" };
 
     await renderPage();
 
-    expect(screen.getByRole("link", { name: /Review/ })).toHaveAttribute(
-      "href",
-      "/review"
-    );
+    expect(screen.queryByRole("link", { name: /Review/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Admin/ })).not.toBeInTheDocument();
   });
 
-  it("shows both Review and Admin to editors", async () => {
+  it("shows editors neither Admin nor Review, now the Featured Posts tool is retired", async () => {
+    // Featured Posts was the only admin area an editor could open. Phase 2F
+    // removed it, so the hub would have nothing to show them.
     state.profile = { ...standardProfile, role: "editor" };
 
     await renderPage();
 
-    expect(screen.getByRole("link", { name: /Review/ })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Admin/ })).toHaveAttribute(
-      "href",
-      "/admin"
-    );
+    expect(screen.queryByRole("link", { name: /Review/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Admin/ })).not.toBeInTheDocument();
   });
 
   it("honors bootstrap admin access without granting reviewer access", async () => {

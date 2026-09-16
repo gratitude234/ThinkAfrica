@@ -43,9 +43,7 @@ export interface PostRecord {
   slug: string;
   content: string | null;
   excerpt: string | null;
-  type: string;
   content_kind?: string | null;
-  article_format?: string | null;
   tags: string[] | null;
   status: string;
   author_id: string;
@@ -55,16 +53,7 @@ export interface PostRecord {
   impression_count: number | null;
   read_count: number | null;
   cover_image_url: string | null;
-  citation_id: string | null;
-  published_version_id: string | null;
-  current_round: number | null;
-  revision_due_at: string | null;
-  in_response_to: string | null;
   audio_summary_url: string | null;
-  document_path: string | null;
-  document_original_name: string | null;
-  document_mime_type: string | null;
-  document_size_bytes: number | null;
   /** PostgREST returns an embedded one-to-one either as an object or as a
    *  single-element array depending on how it resolves the relationship. The
    *  Postgres adapter always builds an object. `getPostAuthor` absorbs both. */
@@ -112,14 +101,16 @@ export interface Database {
 // ---------------------------------------------------------------------------
 
 /**
- * The public identity of a member, as a profile page renders it.
+ * The public identity of a member, as a writer's profile renders it.
  *
- * Deliberately the *public* projection and nothing more. `notification_prefs`,
- * `privacy_settings` and `secondary_profile_types` are absent because they are
- * viewer-private or self-editable, and moving a private read behind an adapter
- * before its authorization semantics are explicit is exactly what the Phase 4
- * brief says not to do. They stay on the Supabase path until they have their
- * own contract.
+ * Deliberately the *public* projection and nothing more. `notification_prefs`
+ * and `privacy_settings` are absent because they are viewer-private, and
+ * moving a private read behind an adapter before its authorization semantics
+ * are explicit is exactly what the Phase 4 brief says not to do.
+ *
+ * The publishing reset, Phase 2G, took the persona type, the positioning
+ * statement, the organisation, the cover image and the alumni flag out of it.
+ * Their columns are still in the database; nothing on a profile reads them.
  *
  * Mirrors `ProfileIdentityRecord` in lib/profileViewData.ts, which re-exports
  * this so no caller has to move.
@@ -128,25 +119,21 @@ export interface ProfileIdentityRecord {
   id: string;
   username: string;
   full_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  /** The member's own headline, shown under their name. */
+  professional_title: string | null;
+  /** Location, on About. */
   country: string | null;
+  /** Education, on About. Ordinary optional facts, never a requirement. */
   university: string | null;
   field_of_study: string | null;
   graduation_year: number | null;
-  is_alumni: boolean;
-  bio: string | null;
-  avatar_url: string | null;
-  cover_image_url: string | null;
+  interests: string[] | null;
   verified: boolean;
   verified_type: string | null;
-  interests: string[] | null;
-  profile_type: string | null;
-  professional_title: string | null;
-  organization_name: string | null;
-  organization_website: string | null;
-  /** Present only when NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED is set. The
-   *  column exists in production; the gate stays because preview and local
-   *  environments are not guaranteed to have it. */
-  positioning_statement?: string | null;
+  /** When the member joined, as the ISO string PostgREST serialises. */
+  created_at: string;
 }
 
 export interface ProfilesRepository {

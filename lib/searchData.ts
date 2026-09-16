@@ -60,7 +60,6 @@ export {
 export { firstAuthor } from "@/lib/db/search";
 
 export type {
-  SearchOpportunityResult,
   SearchOverlayResult,
   SearchPersonResult,
   SearchPostResult,
@@ -69,7 +68,6 @@ export type {
 export const OVERLAY_RESULT_LIMIT = 6;
 export const POST_RESULT_LIMIT = 15;
 export const PEOPLE_RESULT_LIMIT = 8;
-export const OPPORTUNITY_RESULT_LIMIT = 6;
 
 /** How many published posts the tag list is derived from. The same 500 the
  *  browser used to read; the number is what the trending counts mean. */
@@ -128,15 +126,6 @@ export async function searchPeople(
   });
 }
 
-export async function searchOpportunities(
-  supabase: SupabaseClient,
-  query: string
-) {
-  return searchRepository(supabase).opportunities(query, {
-    limit: OPPORTUNITY_RESULT_LIMIT,
-  });
-}
-
 /**
  * Every topic in use, most used first.
  *
@@ -185,19 +174,18 @@ export function topicKeysFromCounts(topics: readonly TopicCount[]): string[] {
   return [...keys].sort((a, b) => a.localeCompare(b));
 }
 
-/** Everything the search page asks for. Three bounded statements rather than
- *  one combined query: they return three unrelated shapes, and a single
- *  statement producing all three would be harder to audit than the thing it
- *  replaced. On the migrated path they share one pooled connection. */
+/** Everything the search page asks for. Two bounded statements rather than
+ *  one combined query: they return unrelated shapes, and a single statement
+ *  producing both would be harder to audit than the thing it replaced. On the
+ *  migrated path they share one pooled connection. */
 export async function runSiteSearch(
   supabase: SupabaseClient,
   query: string,
   viewer: SearchViewer
 ) {
-  const [posts, people, opportunities] = await Promise.all([
+  const [posts, people] = await Promise.all([
     searchPosts(supabase, query, viewer),
     searchPeople(supabase, query, viewer),
-    searchOpportunities(supabase, query),
   ]);
-  return { posts, people, opportunities };
+  return { posts, people };
 }

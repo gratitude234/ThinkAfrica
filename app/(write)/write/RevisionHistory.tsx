@@ -98,9 +98,6 @@ export default function RevisionHistory({
       tags: [],
       coverImageUrl: "",
       references: [],
-      collaborators: [],
-      inResponseToId: null,
-      promptId: null,
     } });
     if (captured.error) {
       setRestoringId(null);

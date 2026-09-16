@@ -1,6 +1,10 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { INTEREST_LABELS } from "@/lib/interests";
+import { getOnboardingProfileError } from "@/lib/onboarding";
+import { completeOwnOnboarding } from "@/lib/onboardingCompletion";
+import { profileUpdateMessage, updateOwnProfile } from "@/lib/profileMutations";
+import { normalizeProfileUsername } from "@/lib/profileUsername";
 import {
   fail,
   ok,
@@ -8,143 +12,87 @@ import {
   type ActionResult,
   NOT_SIGNED_IN,
 } from "@/lib/serverActions";
+import { createClient } from "@/lib/supabase/server";
 
 /**
- * The onboarding writes, moved out of the browser.
+ * The onboarding writes: the profile step, the topics step, and completion.
  *
- * These four are `SECURITY DEFINER` functions that derive the acting member
- * from `auth.uid()`, so a forged argument was never the risk: the risk is that
- * the browser holds a Supabase client at all, and that `auth.uid()` returns
- * NULL the day the database stops being Supabase. Behind a server action the
- * first problem is gone now and the second becomes a one-line change when
- * supabase/migrations/20260909000001_parameterize_identity_rpcs.sql is applied
- * and these start passing `p_user_id`.
+ * The publishing reset, Phase 2G, replaced the four identity RPCs this file
+ * used to call (path, identity, topics and completion). The two profile
+ * writes now go through `updateOwnProfile`, the same column allowlist every
+ * other profile edit uses, and write only what the steps collect. Nothing
+ * here writes a persona, a school, a work category or an onboarding path, and
+ * nothing clears a value an older flow stored.
  *
- * The RPCs still do their own validation, and it is still the validation that
- * decides: the checks here exist so a bad request is a sentence rather than a
- * PostgREST error string, not so the database can stop checking.
- *
- * Deliberately still the viewer's own Supabase client rather than the service
- * role, so `auth.uid()` inside each function resolves to the same member and
- * RLS stays underneath.
+ * The viewer is resolved from the session in every action. No action takes a
+ * profile id.
  */
 
-const PATHS = ["student", "non_student"] as const;
-
-function rpcFailure(context: string, error: { message?: string } | null) {
-  console.error(`[onboarding] ${context} failed`, error);
-}
-
-export async function saveOnboardingPath(input: {
-  currentPath: string;
-}): Promise<ActionResult<null>> {
+export async function saveOnboardingProfile(input: {
+  fullName: string;
+  username: string;
+  bio: string;
+}): Promise<ActionResult<{ username: string }>> {
   const viewer = await requireViewer();
   if (!viewer) return fail(NOT_SIGNED_IN);
 
-  if (!(PATHS as readonly string[]).includes(input.currentPath)) {
-    return fail("Choose whether you are currently a student.");
-  }
+  const draft = {
+    fullName: String(input.fullName ?? ""),
+    username: String(input.username ?? ""),
+    bio: String(input.bio ?? ""),
+  };
+  const problem = getOnboardingProfileError(draft);
+  if (problem) return fail(problem);
 
+  const username = normalizeProfileUsername(draft.username);
   const supabase = await createClient();
-  const { error } = await supabase.rpc("save_onboarding_path", {
-    p_current_path: input.currentPath,
+  const result = await updateOwnProfile(supabase, {
+    viewerId: viewer.userId,
+    patch: {
+      full_name: draft.fullName.trim(),
+      username,
+      bio: draft.bio.trim(),
+    },
   });
+  if (!result.ok) return fail(profileUpdateMessage(result.failure));
 
-  if (error) {
-    rpcFailure("save_onboarding_path", error);
-    return fail("We couldn't save your choice. Please try again.");
-  }
-  return ok();
-}
-
-export interface SaveOnboardingIdentityInput {
-  currentPath: string;
-  workCategory: string | null;
-  country: string;
-  university: string | null;
-  fieldOfStudy: string | null;
-  graduationYear: number | null;
-  professionalTitle: string | null;
-  organizationName: string | null;
-}
-
-export async function saveOnboardingIdentity(
-  input: SaveOnboardingIdentityInput
-): Promise<ActionResult<null>> {
-  const viewer = await requireViewer();
-  if (!viewer) return fail(NOT_SIGNED_IN);
-
-  if (!(PATHS as readonly string[]).includes(input.currentPath)) {
-    return fail("Choose whether you are currently a student.");
-  }
-  if (
-    input.graduationYear !== null &&
-    (!Number.isInteger(input.graduationYear) ||
-      input.graduationYear < 2015 ||
-      input.graduationYear > 2040)
-  ) {
-    return fail("Choose a valid graduation year.");
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("save_onboarding_identity", {
-    p_current_path: input.currentPath,
-    p_work_category: input.workCategory,
-    p_country: input.country,
-    p_university: input.university,
-    p_field_of_study: input.fieldOfStudy,
-    p_graduation_year: input.graduationYear,
-    p_professional_title: input.professionalTitle,
-    p_organization_name: input.organizationName,
-  });
-
-  if (error) {
-    rpcFailure("save_onboarding_identity", error);
-    return fail("We couldn't save your profile details. Please try again.");
-  }
-  return ok();
+  return ok({ username });
 }
 
 export async function saveOnboardingTopics(input: {
   interests: string[];
-}): Promise<ActionResult<null>> {
+}): Promise<ActionResult<{ interests: string[] }>> {
   const viewer = await requireViewer();
   if (!viewer) return fail(NOT_SIGNED_IN);
 
-  const interests = [...new Set(input.interests ?? [])].filter(
-    (interest): interest is string =>
-      typeof interest === "string" && interest.trim().length > 0
-  );
-  // The function's own allowlist is the authority on which topics are real.
-  // This only bounds the size, so an obviously wrong request does not become a
-  // database exception the UI has to translate.
-  if (interests.length < 3 || interests.length > 5) {
-    return fail("Choose 3 to 5 topics.");
+  const requested = Array.isArray(input.interests) ? input.interests : [];
+  const interests = [...new Set(requested)];
+  // Any number, including none: topics are optional. What is offered is the
+  // curated list, so anything else is a malformed request rather than a topic.
+  if (interests.some((interest) => typeof interest !== "string" || !INTEREST_LABELS.includes(interest))) {
+    return fail("Choose topics from the list.");
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("save_onboarding_topics", {
-    p_interests: interests,
+  const result = await updateOwnProfile(supabase, {
+    viewerId: viewer.userId,
+    patch: { interests },
   });
+  if (!result.ok) return fail(profileUpdateMessage(result.failure));
 
-  if (error) {
-    rpcFailure("save_onboarding_topics", error);
-    return fail("We couldn't save your topics. Please try again.");
-  }
-  return ok();
+  return ok({ interests });
 }
 
 export async function completeOnboarding(): Promise<ActionResult<null>> {
   const viewer = await requireViewer();
   if (!viewer) return fail(NOT_SIGNED_IN);
 
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("complete_onboarding");
-
-  if (error) {
-    rpcFailure("complete_onboarding", error);
+  const result = await completeOwnOnboarding(viewer.userId);
+  if (!result.ok) {
     return fail(
-      "We couldn't finish your setup. Your information is saved, so you can try again."
+      result.reason === "incomplete_profile"
+        ? "Add your name and a username first."
+        : "We couldn't finish your setup. Your information is saved, so you can try again."
     );
   }
   return ok();

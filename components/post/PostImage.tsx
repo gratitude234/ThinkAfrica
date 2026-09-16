@@ -7,18 +7,16 @@ import PostCover from "./PostCover";
 interface PostImageProps {
   src: string;
   alt: string;
-  type?: string | null;
+  /** Post or Article, for the placeholder PostCover falls back to. */
   content_kind?: string | null;
-  article_format?: string | null;
   sizes?: string;
   priority?: boolean;
   /** Styling for the image box itself (width, radius, background). */
   className?: string;
   /** Styling for the tappable wrapper (spacing around the image). */
   wrapperClassName?: string;
-  /** Feed keeps Post media natural, Article thumbnails editorially cropped,
-   *  and Research previews paper-shaped and contained. */
-  variant?: "natural" | "feed" | "feed-thumbnail" | "research-preview";
+  /** Feed keeps Post media natural and Article thumbnails editorially cropped. */
+  variant?: "natural" | "feed" | "feed-thumbnail";
 }
 
 /**
@@ -29,9 +27,7 @@ interface PostImageProps {
 export default function PostImage({
   src,
   alt,
-  type,
   content_kind,
-  article_format,
   sizes,
   priority,
   className = "",
@@ -47,15 +43,9 @@ export default function PostImage({
   }, []);
 
   const isEditorialCrop = variant === "feed-thumbnail";
-  const isResearchPreview = variant === "research-preview";
-  const aspectClass =
-    isEditorialCrop
-      ? "aspect-[4/3] sm:aspect-[16/10]"
-      : isResearchPreview
-        ? "aspect-[3/4]"
-        : "";
+  const aspectClass = isEditorialCrop ? "aspect-[4/3] sm:aspect-[16/10]" : "";
   const heightGuard = variant === "feed" ? "max-h-[72svh] sm:max-h-[720px]" : "";
-  const fit = isEditorialCrop ? "cover" : isResearchPreview ? "contain" : "natural";
+  const fit = isEditorialCrop ? "cover" : "natural";
 
   return (
     <>
@@ -69,9 +59,7 @@ export default function PostImage({
         <PostCover
           src={src}
           alt={alt}
-          type={type}
           content_kind={content_kind}
-          article_format={article_format}
           sizes={sizes}
           priority={priority}
           fit={fit}

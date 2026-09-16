@@ -4,16 +4,13 @@ vi.mock("server-only", () => ({}));
 
 const {
   deleteDraftPost,
-  editorialDecision,
   GENERIC_REFUSAL,
   postMutationMessage,
   publishOwnDraft,
   removePost,
-  resubmitRevision,
-  submitPostForReview,
+  restorePost,
   transitionPost,
   updatePostContent,
-  withdrawSubmission,
 } = await import("@/lib/postMutations");
 
 import type { PostActor } from "@/lib/postPolicy";
@@ -37,7 +34,6 @@ import type { PostStatus } from "@/lib/types";
 
 const AUTHOR = "author-1";
 const author: PostActor = { kind: "author", userId: AUTHOR };
-const editor: PostActor = { kind: "editor", userId: "editor-1" };
 const admin: PostActor = { kind: "admin", userId: "admin-1" };
 
 interface Recorded {
@@ -63,9 +59,7 @@ function makeClient(options: {
       id: "post-1",
       author_id: AUTHOR,
       status: "draft",
-      type: "essay",
       content_kind: "article",
-      article_format: "standard",
       citation_id: null,
       published_version_id: null,
     },
@@ -193,24 +187,22 @@ describe("the statement restates what the policy authorized", () => {
     expect(filters.author_id).toBe(AUTHOR);
   });
 
-  it("does not constrain author_id for an editor, who legitimately writes others' rows", async () => {
+  it("does not constrain author_id for an admin, who writes rows they do not own", async () => {
     const { client, calls } = makeClient({
       snapshot: {
         id: "post-1",
         author_id: AUTHOR,
-        status: "pending",
-        type: "research",
-        content_kind: "research",
-        article_format: null,
+        status: "published",
+        content_kind: "article",
         citation_id: null,
         published_version_id: null,
       },
     });
-    await editorialDecision({ supabase: client, actor: editor }, "post-1", "reject");
+    await removePost({ supabase: client, actor: admin }, "post-1");
 
     const filters = Object.fromEntries(writeOf(calls)!.filters);
     expect(filters.author_id).toBeUndefined();
-    expect(filters.status).toBe("pending");
+    expect(filters.status).toBe("published");
   });
 
   it("scopes an author's delete to their own draft", async () => {
@@ -232,32 +224,19 @@ describe("no write is issued when the policy refuses", () => {
     run: (client: never) => Promise<unknown>;
   }> = [
     {
-      name: "self-publishing a research paper",
-      snapshot: { status: "draft", type: "research" },
-      run: (client) => publishOwnDraft({ supabase: client, actor: author }, "post-1"),
-    },
-    {
-      name: "editing a locked accepted publication",
-      snapshot: { status: "published", type: "research" },
-      run: (client) =>
-        updatePostContent({ supabase: client, actor: author }, "post-1", {
-          title: "Rewritten",
-        }),
-    },
-    {
-      name: "hard-deleting a submitted paper",
-      snapshot: { status: "pending", type: "research" },
+      name: "hard-deleting a published post",
+      snapshot: { status: "published" },
       run: (client) => deleteDraftPost({ supabase: client, actor: author }, "post-1"),
     },
     {
       name: "resurrecting a withdrawn submission",
-      snapshot: { status: "withdrawn", type: "research" },
+      snapshot: { status: "withdrawn" },
       run: (client) =>
-        resubmitRevision({ supabase: client, actor: author }, "post-1"),
+        transitionPost({ supabase: client, actor: author }, "post-1", "published"),
     },
     {
       name: "mutating a removed post",
-      snapshot: { status: "removed", type: "essay" },
+      snapshot: { status: "removed" },
       run: (client) =>
         updatePostContent({ supabase: client, actor: author }, "post-1", {
           title: "Sneaky",
@@ -265,21 +244,34 @@ describe("no write is issued when the policy refuses", () => {
     },
     {
       name: "writing citation_id directly",
-      snapshot: { status: "draft", type: "essay" },
+      snapshot: { status: "draft" },
       run: (client) =>
         updatePostContent({ supabase: client, actor: author }, "post-1", {
           citation_id: "INDEGENIUS-9",
         }),
     },
     {
-      name: "an author performing an editorial decision",
-      snapshot: { status: "pending", type: "research" },
+      name: "reclassifying through an ordinary content edit",
+      snapshot: { status: "draft" },
       run: (client) =>
-        editorialDecision({ supabase: client, actor: author }, "post-1", "reject"),
+        updatePostContent({ supabase: client, actor: author }, "post-1", {
+          content_kind: "post",
+        }),
     },
     {
-      name: "a stranger editing somebody's draft",
-      snapshot: { status: "draft", type: "essay", author_id: "someone-else" },
+      name: "submitting for review, which is no longer a transition",
+      snapshot: { status: "draft" },
+      run: (client) =>
+        transitionPost({ supabase: client, actor: author }, "post-1", "pending"),
+    },
+    {
+      name: "an author removing their own post, which is moderation",
+      snapshot: { status: "published" },
+      run: (client) => removePost({ supabase: client, actor: author }, "post-1"),
+    },
+    {
+      name: "a stranger editing a draft they do not own",
+      snapshot: { status: "draft", author_id: "someone-else" },
       run: (client) =>
         updatePostContent({ supabase: client, actor: author }, "post-1", {
           title: "Not mine",
@@ -293,8 +285,7 @@ describe("no write is issued when the policy refuses", () => {
         snapshot: {
           id: "post-1",
           author_id: AUTHOR,
-          content_kind: null,
-          article_format: null,
+          content_kind: "article",
           citation_id: null,
           published_version_id: null,
           ...testCase.snapshot,
@@ -315,7 +306,7 @@ describe("no write is issued when the policy refuses", () => {
 describe("the flows the product actually performs still succeed", () => {
   const ok = async (
     status: PostStatus,
-    type: string,
+    contentKind: string,
     actor: PostActor,
     run: (client: never) => Promise<{ ok: boolean }>
   ) => {
@@ -324,49 +315,44 @@ describe("the flows the product actually performs still succeed", () => {
         id: "post-1",
         author_id: AUTHOR,
         status,
-        type,
-        content_kind: type === "research" ? "research" : "article",
-        article_format: null,
+        content_kind: contentKind,
         citation_id: null,
         published_version_id: null,
       },
     });
     const result = await run(client as never);
-    expect(result.ok, `${actor.kind} ${status} ${type}`).toBe(true);
+    expect(result.ok, actor.kind + " " + status + " " + contentKind).toBe(true);
   };
 
-  it("publishes an ordinary draft", () =>
-    ok("draft", "essay", author, (client) =>
+  it("publishes an Article draft", () =>
+    ok("draft", "article", author, (client) =>
       publishOwnDraft({ supabase: client, actor: author }, "post-1")
     ));
 
-  it("submits a research draft for review", () =>
-    ok("draft", "research", author, (client) =>
-      submitPostForReview({ supabase: client, actor: author }, "post-1")
+  it("publishes a Post draft", () =>
+    ok("draft", "post", author, (client) =>
+      publishOwnDraft({ supabase: client, actor: author }, "post-1")
     ));
 
-  it("resubmits after revision", () =>
-    ok("pending_revision", "research", author, (client) =>
-      resubmitRevision({ supabase: client, actor: author }, "post-1")
-    ));
-
-  it("withdraws a submission", () =>
-    ok("pending", "research", author, (client) =>
-      withdrawSubmission({ supabase: client, actor: author }, "post-1")
-    ));
-
-  it("lets an editor request a revision", () =>
-    ok("pending", "research", editor, (client) =>
-      editorialDecision({ supabase: client, actor: editor }, "post-1", "request_revision")
+  it("edits a published post, which review used to lock", () =>
+    ok("published", "article", author, (client) =>
+      updatePostContent({ supabase: client, actor: author }, "post-1", {
+        title: "Corrected after publication",
+      })
     ));
 
   it("lets an admin remove a post", () =>
-    ok("published", "essay", admin, (client) =>
+    ok("published", "article", admin, (client) =>
       removePost({ supabase: client, actor: admin }, "post-1")
     ));
 
-  it("edits a draft's content", () =>
-    ok("draft", "essay", author, (client) =>
+  it("lets an admin restore a removed post", () =>
+    ok("removed", "article", admin, (client) =>
+      restorePost({ supabase: client, actor: admin }, "post-1")
+    ));
+
+  it("edits draft content", () =>
+    ok("draft", "article", author, (client) =>
       updatePostContent({ supabase: client, actor: author }, "post-1", {
         title: "Edited",
         content: "<p>x</p>",
@@ -427,9 +413,9 @@ describe("what the reader is told", () => {
     const message = postMutationMessage({
       kind: "refused",
       refusal: "delete_non_draft",
-      reason: "Only drafts can be deleted directly. Withdraw a submission instead.",
+      reason: "Only drafts can be deleted directly.",
     });
-    expect(message).toContain("Withdraw a submission");
+    expect(message).toContain("Only drafts can be deleted directly.");
   });
 
   it("never puts a database message in front of a reader", () => {
@@ -463,7 +449,7 @@ describe("no status change can ride along with a content edit", () => {
 
   it("only ever writes the status a named transition chose", async () => {
     const { client, calls } = makeClient({});
-    await transitionPost({ supabase: client, actor: author }, "post-1", "pending");
-    expect(writeOf(calls)!.patch).toMatchObject({ status: "pending" });
+    await transitionPost({ supabase: client, actor: author }, "post-1", "published");
+    expect(writeOf(calls)!.patch).toMatchObject({ status: "published" });
   });
 });

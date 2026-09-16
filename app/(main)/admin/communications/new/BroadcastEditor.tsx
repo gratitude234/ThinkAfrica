@@ -255,7 +255,7 @@ export default function BroadcastEditor({
                 setLinkUrl("");
               }
             }}
-            placeholder="indegenius.africa/opportunities"
+            placeholder="indegenius.africa/explore"
             className="min-w-0 flex-1 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-ink placeholder:text-gray-400 focus:border-emerald-brand/40 focus:outline-none"
           />
           <button

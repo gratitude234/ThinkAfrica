@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { canAccessAdminHubForRole } from "@/lib/adminAccess";
 import { getUsableProfileUsername } from "@/lib/profileUsername";
-import { canReview } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/lib/types";
 
@@ -11,7 +10,7 @@ type HubLink = {
   label: string;
   description: string;
   href: string;
-  icon: "writing" | "bookmarks" | "settings" | "review" | "admin";
+  icon: "writing" | "bookmarks" | "settings" | "admin";
 };
 
 const ACCOUNT_LINKS: HubLink[] = [
@@ -42,7 +41,6 @@ function HubIcon({ icon }: { icon: HubLink["icon"] }) {
     bookmarks: "M6 4.75A1.75 1.75 0 017.75 3h8.5A1.75 1.75 0 0118 4.75V21l-6-3-6 3V4.75z",
     settings:
       "M12 15.25a3.25 3.25 0 100-6.5 3.25 3.25 0 000 6.5zM19.4 15a1.7 1.7 0 00.34 1.88l.06.06-1.92 3.32-.08-.02a1.7 1.7 0 00-1.8.64l-.04.06h-3.84l-.04-.07a1.7 1.7 0 00-1.8-.63l-.08.02-1.92-3.32.06-.06A1.7 1.7 0 008.6 15l-.02-.08-1.92-3.32.02-.08A1.7 1.7 0 008.34 9.6l-.06-.06 1.92-3.32.08.02a1.7 1.7 0 001.8-.63l.04-.07h3.84l.04.07a1.7 1.7 0 001.8.63l.08-.02 1.92 3.32-.06.06a1.7 1.7 0 00-.34 1.88l.02.08 1.92 3.32-.02.08z",
-    review: "M5 4h14v16H5V4zm3 5 2.2 2.2L16 6.5M8 15h8",
     admin: "M12 3l7 3v5c0 4.6-2.9 8.3-7 10-4.1-1.7-7-5.4-7-10V6l7-3zm-2 8 1.5 1.5L15 9",
   } satisfies Record<HubLink["icon"], string>;
 
@@ -120,23 +118,12 @@ export default async function MePage() {
     user.email?.split("@")[0] ||
     "Indegenius member";
   const role = (profile.role ?? "student") as AppRole;
-  const canAccessReview = canReview(role);
   const isBootstrapAdmin = Boolean(
     process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL
   );
   const canAccessAdmin = canAccessAdminHubForRole(role, isBootstrapAdmin);
   const links: HubLink[] = [
     ...ACCOUNT_LINKS,
-    ...(canAccessReview
-      ? [
-          {
-            label: "Review",
-            description: "Open your assigned editorial review queue.",
-            href: "/review",
-            icon: "review" as const,
-          },
-        ]
-      : []),
     ...(canAccessAdmin
       ? [
           {
@@ -148,7 +135,7 @@ export default async function MePage() {
         ]
       : []),
   ];
-  const profileHref = username ? `/${username}` : "/settings";
+  const profileHref = username ? `/${username}` : "/settings/profile";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -169,9 +156,6 @@ export default async function MePage() {
               <p className="mt-0.5 truncate text-sm text-gray-500">
                 {username ? `@${username}` : user.email}
               </p>
-              <p className="mt-1 text-xs font-semibold text-emerald-700">
-                Your Intellectual Record
-              </p>
             </div>
           </div>
 
@@ -179,7 +163,7 @@ export default async function MePage() {
             href={profileHref}
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
           >
-            {username ? "Open Intellectual Record" : "Complete profile"}
+            {username ? "View profile" : "Edit profile"}
           </Link>
         </div>
       </section>

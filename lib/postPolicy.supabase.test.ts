@@ -112,21 +112,21 @@ describe.skipIf(!enabled)("the policy against real production rows", () => {
       editorialOnly?: boolean;
     }> = [
       { from: "draft", to: "published", actor: "author", site: "write/actions.ts" },
-      { from: "draft", to: "pending", actor: "author", site: "submit/research/actions.ts" },
+      { from: "draft", to: "pending", actor: "author", site: "retired editorial review (legacy rows only)" },
       {
         from: "pending_revision",
         to: "pending",
         actor: "author",
-        site: "edit/[slug]/actions.ts",
+        site: "retired editorial review (legacy rows only)",
       },
       {
         from: "pending",
         to: "pending_revision",
         actor: "editor",
-        site: "admin/review/actions.ts",
+        site: "retired editorial review (legacy rows only)",
       },
-      { from: "pending", to: "rejected", actor: "editor", site: "admin/review/actions.ts" },
-      { from: "pending", to: "published", actor: "system", site: "publishReviewedPost()" },
+      { from: "pending", to: "rejected", actor: "editor", site: "retired editorial review (legacy rows only)" },
+      { from: "pending", to: "published", actor: "system", site: "retired editorial review (legacy rows only)" },
       {
         from: "pending",
         to: "withdrawn",

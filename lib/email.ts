@@ -20,20 +20,15 @@ export type NotificationPreferenceKey =
   | "email_follows"
   | "email_likes"
   | "email_responses"
-  | "email_messages"
   | "email_published"
-  | "email_digest"
   | "email_account_security"
-  | "email_profile_reminders"
   | "email_announcements"
   | "email_review_assigned"
   | "email_review_started"
   | "email_review_reminder"
   | "email_co_author_invite"
   | "email_co_author_accepted"
-  | "email_co_author_declined"
-  | "email_opportunity_inquiry"
-  | "email_author_publications";
+  | "email_co_author_declined";
 
 export type EmailSendResult =
   | { ok: true; id: string | null }

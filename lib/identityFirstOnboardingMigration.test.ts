@@ -9,20 +9,11 @@ const migration = readFileSync(
   ),
   "utf8"
 );
-const client = readFileSync(
-  resolve(process.cwd(), "app/(onboarding)/onboarding/OnboardingClient.tsx"),
-  "utf8"
-);
-const onboardingActions = readFileSync(
-  resolve(process.cwd(), "app/(onboarding)/onboarding/actions.ts"),
-  "utf8"
-);
-// The settings form used to call save_onboarding_preferences itself. The call
-// moved into the server action when the profile write did.
-const profileSettings = readFileSync(
-  resolve(process.cwd(), "app/(main)/settings/profileActions.ts"),
-  "utf8"
-);
+// The application stopped calling these functions in the publishing reset,
+// Phase 2G, when onboarding became a profile step and an optional topics step.
+// They stay in the database until the cleanup phase, so the migration's own
+// guarantees are still asserted here. lib/simpleWriterProfile.test.ts asserts
+// that nothing calls them.
 
 describe("identity-first onboarding migration", () => {
   it("keeps work categories owner-only and outside the public profile projection", () => {
@@ -42,21 +33,5 @@ describe("identity-first onboarding migration", () => {
     expect(migration).toContain("p_current_path = 'student'");
     expect(migration).toContain("v_user_id, 'non_student', p_work_category");
     expect(migration).toContain("COALESCE(cardinality(v_interests), 0) NOT BETWEEN 3 AND 5");
-  });
-
-  it("finishes through the existing atomic RPC without a follow or push step", () => {
-    // The call moved into a server action when onboarding's writes left the
-    // browser. It is still the same atomic RPC, and still the only step.
-    expect(onboardingActions).toContain('supabase.rpc("complete_onboarding")');
-    expect(client).toContain("completeOnboarding()");
-    expect(client).toContain("Publish your first idea");
-    expect(client).toContain("Explore ideas first");
-    expect(client).not.toContain("NotificationPermissionPrompt");
-    expect(client).not.toContain("FollowButton");
-  });
-
-  it("keeps recommendation preferences editable when profile roles change", () => {
-    expect(profileSettings).toContain("deriveLegacyOnboardingPreference(profileType)");
-    expect(profileSettings).toContain('"save_onboarding_preferences"');
   });
 });

@@ -2,29 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * The PostgREST profile read, held to the two things the profile page depends
- * on and one thing the deployment depends on.
+ * on and one thing the projection depends on.
  *
- * The null-versus-error distinction used to live in lib/profileViewData.ts and
- * is tested here now, because this is where the query is. A null row with no
- * error is an answer: no such username. A null row with an error is a failure
- * wearing the same clothes, and reading the second as the first is what told
- * every visitor that every member's profile did not exist while Supabase was
- * unresponsive.
+ * A null row with no error is an answer: no such username. A null row with an
+ * error is a failure wearing the same clothes, and reading the second as the
+ * first is what once told every visitor that every member's profile did not
+ * exist while Supabase was unresponsive.
  *
- * The third is the positioning gate. PostgREST rejects an entire select over
- * one unknown column name, so naming a column whose migration has not been
- * applied does not degrade the profile, it removes it.
+ * The third is the projection itself. A select is a public surface, and a
+ * widened one is how a private or retired column reaches a page without
+ * anybody deciding that it should.
  */
 
 vi.mock("server-only", () => ({}));
-
-const positioningEnabled = vi.hoisted(() => vi.fn(() => false));
-vi.mock("@/lib/featureFlags", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/featureFlags")>(
-    "@/lib/featureFlags"
-  );
-  return { ...actual, isProfilePositioningEnabled: positioningEnabled };
-});
 
 interface QueryLogEntry {
   table: string;
@@ -68,7 +58,7 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-const { supabaseProfilesRepository, profileIdentitySelect } = await import(
+const { supabaseProfilesRepository, PROFILE_IDENTITY_SELECT } = await import(
   "@/lib/db/supabase/profiles"
 );
 
@@ -76,48 +66,48 @@ const PROFILE_ROW = {
   id: "author-1",
   username: "student1",
   full_name: "A Student",
+  bio: null,
+  avatar_url: null,
+  professional_title: "Policy researcher",
   country: "Nigeria",
   university: "University of Lagos",
   field_of_study: "Political Science",
   graduation_year: 2028,
-  is_alumni: false,
-  bio: null,
-  avatar_url: null,
-  cover_image_url: null,
+  interests: null,
   verified: false,
   verified_type: null,
-  interests: null,
-  profile_type: "student",
-  professional_title: null,
-  organization_name: null,
-  organization_website: null,
+  created_at: "2026-01-05T09:30:00+00:00",
 };
 
 beforeEach(() => {
   queryLog.length = 0;
   answer = { data: null, error: null };
-  positioningEnabled.mockReturnValue(false);
 });
 
-describe("profileIdentitySelect", () => {
-  it("leaves the positioning column out until its migration is applied", () => {
-    expect(profileIdentitySelect()).not.toContain("positioning_statement");
+describe("PROFILE_IDENTITY_SELECT", () => {
+  const columns = PROFILE_IDENTITY_SELECT.split(",").map((column) => column.trim());
+
+  it("asks for exactly what a writer's profile renders", () => {
+    expect(columns).toEqual(Object.keys(PROFILE_ROW));
   });
 
-  it("names it once the flag says the column exists", () => {
-    positioningEnabled.mockReturnValue(true);
-    expect(profileIdentitySelect()).toContain("positioning_statement");
-  });
-
-  it("asks for no column the profile page does not render", () => {
-    // A select is a projection, and a widened one is how a private column
-    // reaches a public page without anybody deciding that it should.
-    const columns = profileIdentitySelect()
-      .split(",")
-      .map((column) => column.trim());
-    expect(columns).not.toContain("signup_email");
-    expect(columns).not.toContain("email");
-    expect(columns).not.toContain("role");
+  it("names no private column and no retired one", () => {
+    for (const column of [
+      "signup_email",
+      "email",
+      "role",
+      "privacy_settings",
+      "positioning_statement",
+      "profile_type",
+      "secondary_profile_types",
+      "organization_name",
+      "organization_website",
+      "cover_image_url",
+      "is_alumni",
+      "open_to_mentoring",
+    ]) {
+      expect(columns).not.toContain(column);
+    }
   });
 });
 
@@ -126,12 +116,14 @@ describe("supabaseProfilesRepository.findIdentityByUsername", () => {
     answer = { data: PROFILE_ROW, error: null };
 
     const profile = await supabaseProfilesRepository.findIdentityByUsername(
-      "student1"
+      "student1",
+      null
     );
 
     expect(profile).toEqual(PROFILE_ROW);
     expect(queryLog).toHaveLength(1);
     expect(queryLog[0].table).toBe("profiles");
+    expect(queryLog[0].select).toBe(PROFILE_IDENTITY_SELECT);
     expect(queryLog[0].filters).toEqual([["username", "student1"]]);
     // Not `.single()`, which turns an absent profile into an error, and not
     // `.limit(1)`, which would quietly serve one of two rows if the unique
@@ -143,7 +135,7 @@ describe("supabaseProfilesRepository.findIdentityByUsername", () => {
     answer = { data: null, error: null };
 
     await expect(
-      supabaseProfilesRepository.findIdentityByUsername("nobody")
+      supabaseProfilesRepository.findIdentityByUsername("nobody", null)
     ).resolves.toBeNull();
   });
 
@@ -151,7 +143,7 @@ describe("supabaseProfilesRepository.findIdentityByUsername", () => {
     answer = { data: null, error: { message: "connection timed out" } };
 
     await expect(
-      supabaseProfilesRepository.findIdentityByUsername("student1")
+      supabaseProfilesRepository.findIdentityByUsername("student1", null)
     ).rejects.toThrow(/Failed to load profile/);
   });
 
@@ -164,7 +156,7 @@ describe("supabaseProfilesRepository.findIdentityByUsername", () => {
     // The message is for the server log. What the reader sees is the route's
     // error boundary, which never prints this.
     await expect(
-      supabaseProfilesRepository.findIdentityByUsername("student1")
+      supabaseProfilesRepository.findIdentityByUsername("student1", null)
     ).rejects.toThrow(/^Failed to load profile "student1"\.$/);
   });
 });

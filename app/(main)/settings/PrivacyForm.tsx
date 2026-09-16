@@ -7,7 +7,6 @@ import { savePrivacySettings } from "./profileActions";
 
 export interface PrivacySettings {
   profile_visibility: "public" | "members_only";
-  allow_messages: "everyone" | "followers_only" | "nobody";
   show_in_directory: boolean;
 }
 
@@ -25,13 +24,12 @@ export default function PrivacyForm({ privacySettings }: Props) {
 
   const handleSave = async () => {
     setSaving(true);
-    // The server rebuilds the settings object from three validated values
+    // The server rebuilds the settings object from the validated values
     // rather than writing this one through, so nothing can ride along into the
     // jsonb column, and it resolves the viewer from the session rather than
     // being handed a profile id.
     const result = await savePrivacySettings({
       profileVisibility: settings.profile_visibility,
-      allowMessages: settings.allow_messages,
       showInDirectory: settings.show_in_directory,
     });
     setSaving(false);
@@ -65,35 +63,11 @@ export default function PrivacyForm({ privacySettings }: Props) {
           </select>
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Who can start a conversation with you
-          </label>
-          <select
-            value={settings.allow_messages}
-            onChange={(e) =>
-              setSettings((s) => ({
-                ...s,
-                allow_messages: e.target.value as PrivacySettings["allow_messages"],
-              }))
-            }
-            className={INPUT_STYLES}
-          >
-            <option value="everyone">Everyone</option>
-            <option value="followers_only">Followers only</option>
-            <option value="nobody">No one</option>
-          </select>
-          <p className="mt-1.5 text-xs text-gray-500">
-            This controls new conversations. Block a member to stop messages in an
-            existing conversation.
-          </p>
-        </div>
-
         <div className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3">
           <div>
             <p className="text-sm font-medium text-gray-800">Show in directory</p>
             <p className="mt-0.5 text-xs text-gray-500">
-              Appear in member and alumni directory searches.
+              Appear in member directory searches.
             </p>
           </div>
           <button

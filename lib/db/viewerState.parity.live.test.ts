@@ -4,14 +4,14 @@ vi.mock("server-only", () => ({}));
 
 /**
  * PostgREST and PostgreSQL, reading the SAME production database, for the
- * viewer's own state: blocks, and whether two people may message.
+ * viewer's own state: blocks.
  *
  * LIVE SAME-DATABASE PARITY.
  *
  * ## Which client, and why the service role is faithful here
  *
- * `lib/blocking.ts` reads through the admin client, and
- * `getMessageEligibility` calls a SECURITY DEFINER function. Neither has ever
+ * `lib/blocking.ts` reads through the admin client and, for a blocked pair, a
+ * SECURITY DEFINER function. Neither has ever
  * been subject to RLS, so the service role is what production uses rather than
  * a convenience for the harness.
  *

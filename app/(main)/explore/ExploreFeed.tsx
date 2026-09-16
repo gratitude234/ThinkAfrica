@@ -7,10 +7,7 @@ import type { PostCardData } from "@/components/post/PostCard";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import {
   filterPostsByExplore,
-  getGenreFilterLabel,
   getPrimaryFilterLabel,
-  isGenreRefinementActive,
-  type ExploreGenreFilter,
   type ExplorePrimaryFilter,
 } from "./exploreFilters";
 
@@ -28,7 +25,6 @@ interface ExploreFeedProps {
   initialHasMore: boolean;
   initialNextCursor: string | null;
   primary: ExplorePrimaryFilter;
-  genre: ExploreGenreFilter;
   signedIn: boolean;
   surface: string;
   /** Rendered after the third card, once the reading run has begun. */
@@ -63,7 +59,6 @@ export default function ExploreFeed({
   initialHasMore,
   initialNextCursor,
   primary,
-  genre,
   signedIn,
   surface,
   interlude,
@@ -120,23 +115,14 @@ export default function ExploreFeed({
     }
   }, [cursor, hasMore, loading, page, primary, surface, tab]);
 
-  // The primary filter is applied by the query. Only the Article genre refines
-  // in memory, so it is the only axis that can empty an otherwise full page.
-  const visible = filterPostsByExplore(posts, primary, genre);
-  const genreRefining = isGenreRefinementActive(primary, genre);
+  // The filter is pushed down to the query, so this is a safety net against a
+  // page that returned something the filter excludes rather than a second,
+  // in-memory filtering pass.
+  const visible = filterPostsByExplore(posts, primary);
 
   if (visible.length === 0) {
     return (
-      <ExploreFeedEmptyState
-        primary={primary}
-        genre={genre}
-        signedIn={signedIn}
-        genreRefining={genreRefining}
-        loadedCount={posts.length}
-        hasMore={hasMore}
-        loading={loading}
-        onLoadMore={loadMore}
-      />
+      <ExploreFeedEmptyState primary={primary} signedIn={signedIn} />
     );
   }
 
@@ -154,14 +140,6 @@ export default function ExploreFeed({
           {interlude && index === interludeIndex ? interlude : null}
         </div>
       ))}
-
-      {genreRefining && hasMore ? (
-        <p className="px-1 pb-3 pt-1 text-meta text-ink-muted">
-          Showing {visible.length} {getGenreFilterLabel(genre).toLowerCase()}{" "}
-          {visible.length === 1 ? "match" : "matches"} in the {posts.length}{" "}
-          Articles loaded so far.
-        </p>
-      ) : null}
 
       <ExploreFeedFooter
         hasMore={hasMore}
@@ -242,37 +220,18 @@ function ExploreFeedFooter({
  */
 function ExploreFeedEmptyState({
   primary,
-  genre,
   signedIn,
-  genreRefining,
-  loadedCount,
-  hasMore,
-  loading,
-  onLoadMore,
 }: {
   primary: ExplorePrimaryFilter;
-  genre: ExploreGenreFilter;
   signedIn: boolean;
-  genreRefining: boolean;
-  loadedCount: number;
-  hasMore: boolean;
-  loading: boolean;
-  onLoadMore: () => void;
 }) {
   const filtered = primary !== "all";
-  const genreLabel = getGenreFilterLabel(genre);
-  const primaryLabel = getPrimaryFilterLabel(primary);
 
   let heading: string;
   let detail: string;
 
-  if (genreRefining) {
-    heading = `No ${genreLabel} articles in this batch.`;
-    detail = hasMore
-      ? `${loadedCount} Articles are loaded so far. Genre is descriptive metadata, so it narrows what is already here rather than the search itself.`
-      : `None of the ${loadedCount} published Articles carry the ${genreLabel} genre yet.`;
-  } else if (filtered) {
-    heading = `No ${primaryLabel} published yet.`;
+  if (filtered) {
+    heading = `No ${getPrimaryFilterLabel(primary)} published yet.`;
     detail = "Nothing matches this content type right now. Try another filter.";
   } else if (signedIn) {
     heading = "Nothing to show here yet.";
@@ -287,16 +246,6 @@ function ExploreFeedEmptyState({
       <p className="text-byline font-medium text-ink">{heading}</p>
       <p className="mx-auto mt-1.5 max-w-md text-meta text-ink-muted">{detail}</p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
-        {genreRefining && hasMore ? (
-          <button
-            type="button"
-            onClick={onLoadMore}
-            disabled={loading}
-            className={PRIMARY_ACTION_CLASS}
-          >
-            {loading ? "Loading..." : "Load more Articles"}
-          </button>
-        ) : null}
         {filtered ? (
           <Link href="/explore" className={SECONDARY_ACTION_CLASS}>
             Clear filters

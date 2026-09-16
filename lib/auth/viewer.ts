@@ -104,13 +104,12 @@ export async function resolveViewer(): Promise<Viewer | null> {
  * The mapping is deliberately narrow. `system` is never produced here: it is
  * the editorial machinery's own capability, granted in code at the call site
  * that runs it, and a viewer must never be able to become one by having a
- * role. A reviewer is not an editor for the purposes of post writes, because
- * `canReview` and `canPublish` are different questions and only the second one
- * decides a lifecycle transition.
+ * role. An editor is no longer a distinct post actor: the editorial decision
+ * operations went with the review workflow in Phase 2I, so there is no post
+ * transition an editor may make that an author or an admin may not.
  */
 export function actorFor(viewer: Viewer): PostActor {
   if (viewer.role === "admin") return { kind: "admin", userId: viewer.userId };
-  if (viewer.role === "editor") return { kind: "editor", userId: viewer.userId };
   return { kind: "author", userId: viewer.userId };
 }
 

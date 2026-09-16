@@ -206,8 +206,8 @@ describe.skipIf(!enabled)("adapter parity against live databases", () => {
   it("returns behaviourally identical profiles for a representative set of usernames", async () => {
     const { createClient } = await import("@supabase/supabase-js");
     const { default: postgres } = await import("postgres");
-    const { profileIdentitySelect } = await import("@/lib/db/supabase/profiles");
-    const { profileByUsernameSql, toProfileIdentityRecord } = await import(
+    const { PROFILE_IDENTITY_SELECT } = await import("@/lib/db/supabase/profiles");
+    const { PROFILE_BY_USERNAME_SQL, toProfileIdentityRecord } = await import(
       "@/lib/db/postgres/profiles"
     );
     const { compareProfileRecords } = await import("@/lib/db/parity");
@@ -281,13 +281,8 @@ describe.skipIf(!enabled)("adapter parity against live databases", () => {
       await collect("verified profile", () =>
         withinSnapshot().eq("verified", true).limit(2)
       );
-      await collect("alumni", () =>
-        withinSnapshot().eq("is_alumni", true).limit(1)
-      );
-      await collect("organization", () =>
-        withinSnapshot()
-          .eq("profile_type", "organization")
-          .limit(1)
+      await collect("profile with a headline", () =>
+        withinSnapshot().not("professional_title", "is", null).limit(1)
       );
       await collect("any profile", () =>
         withinSnapshot().limit(2)
@@ -312,14 +307,14 @@ describe.skipIf(!enabled)("adapter parity against live databases", () => {
         const [left, right] = await Promise.all([
           supabase
             .from("profiles")
-            .select(profileIdentitySelect())
+            .select(PROFILE_IDENTITY_SELECT)
             .eq("username", username)
             .maybeSingle()
             .then(({ data, error }) => {
               if (error) throw new Error(`supabase: ${error.message}`);
               return (data as ProfileIdentityRecord | null) ?? null;
             }),
-          sql.unsafe(profileByUsernameSql(), [username, null]).then((rows) => {
+          sql.unsafe(PROFILE_BY_USERNAME_SQL, [username, null]).then((rows) => {
             const list = rows as unknown as Record<string, unknown>[];
             if (list.length > 1) {
               throw new Error(`postgres: username matched ${list.length} rows`);

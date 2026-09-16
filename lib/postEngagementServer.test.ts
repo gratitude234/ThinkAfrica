@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { handlePostEngagement } from "./postEngagementServer";
-import { createFeaturedExposure } from "./feedExposure";
+import { prepareFeedPageForClient } from "./feedExposure";
 import { createPostEngagementToken } from "./postEngagementToken";
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
@@ -31,7 +31,6 @@ function engagementToken(ageSeconds = 60) {
 describe("post engagement server", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED", "1");
     vi.stubEnv("FEED_EXPOSURE_SIGNING_SECRET", "test-feed-signing-secret");
     vi.stubEnv("POST_ENGAGEMENT_SIGNING_SECRET", "test-engagement-secret");
     mockedServerClient.mockResolvedValue({
@@ -43,7 +42,7 @@ describe("post engagement server", () => {
     } as never);
   });
 
-  it("rejects an unsigned view before querying delivery attribution", async () => {
+  it("rejects an unsigned view before querying anything", async () => {
     const admin = {
       from: vi.fn(),
       rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
@@ -53,7 +52,7 @@ describe("post engagement server", () => {
     const response = await handlePostEngagement(
       new NextRequest("http://localhost/api/posts/work/view", {
         method: "POST",
-        body: JSON.stringify({ deliveryToken: "guessable" }),
+        body: JSON.stringify({}),
         headers: { "content-type": "application/json" },
       }),
       Promise.resolve({ slug: "work" }),
@@ -65,48 +64,16 @@ describe("post engagement server", () => {
     expect(admin.rpc).not.toHaveBeenCalled();
   });
 
-  it("updates the matched delivery once a valid long-form read qualifies", async () => {
-    const delivery = selectOne({
-      id: "delivery-id",
-      event_id: "event-id",
-      channel: "email",
-      status: "sent",
-      matched_author_ids: ["author-id"],
-    });
-    const event = selectOne({ post_id: "post-id" });
+  it("records a qualified long-form read against the posts table alone", async () => {
     const post = selectOne({
       id: "post-id",
       slug: "work",
       status: "published",
       content: Array.from({ length: 601 }, () => "word").join(" "),
     });
-    let deliveryCalls = 0;
-    let deliveryPatch: Record<string, unknown> | null = null;
-    const updatedFilters: Array<[string, unknown]> = [];
-    const updateBuilder: Record<string, unknown> = {};
-    updateBuilder.eq = vi.fn((column: string, value: unknown) => {
-      updatedFilters.push([column, value]);
-      return updateBuilder;
-    });
-    updateBuilder.is = vi.fn(async (column: string, value: unknown) => {
-      updatedFilters.push([column, value]);
-      return { error: null };
-    });
-
     const admin = {
       rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
       from: vi.fn((table: string) => {
-        if (table === "publication_deliveries") {
-          deliveryCalls += 1;
-          if (deliveryCalls === 1) return delivery;
-          return {
-            update: vi.fn((patch: Record<string, unknown>) => {
-              deliveryPatch = patch;
-              return updateBuilder;
-            }),
-          };
-        }
-        if (table === "publication_events") return event;
         if (table === "posts") return post;
         throw new Error(`Unexpected table ${table}`);
       }),
@@ -117,6 +84,7 @@ describe("post engagement server", () => {
       new NextRequest("http://localhost/api/posts/work/read", {
         method: "POST",
         body: JSON.stringify({
+          // A retired tracked-delivery link still carries this. It is ignored.
           deliveryToken: "123e4567-e89b-42d3-a456-426614174000",
           engagementToken: engagementToken(),
           readSeconds: 30,
@@ -134,91 +102,11 @@ describe("post engagement server", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(admin.rpc).toHaveBeenCalledWith(
-      "record_post_engagement",
-      expect.objectContaining({
-        engagement_metadata: expect.objectContaining({
-          engagementTokenId: expect.any(String),
-          distribution: {
-            source: "author_subscription",
-            deliveryId: "delivery-id",
-            channel: "email",
-          },
-        }),
-      })
-    );
-    expect(deliveryPatch).toEqual({
-      viewed_at: expect.any(String),
-      qualified_read_at: expect.any(String),
+    expect(admin.from.mock.calls.map((call) => call[0])).toEqual(["posts"]);
+    const rpcInput = admin.rpc.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(rpcInput.engagement_metadata).toEqual({
+      engagementTokenId: expect.any(String),
     });
-    expect(updatedFilters).toContainEqual(["id", "delivery-id"]);
-    expect(updatedFilters).toContainEqual(["qualified_read_at", null]);
-  });
-
-  it("attributes a topic-only delivery to the topic subscription source", async () => {
-    const delivery = selectOne({
-      id: "topic-delivery-id",
-      event_id: "event-id",
-      channel: "in_app",
-      status: "sent",
-      matched_author_ids: [],
-    });
-    const event = selectOne({ post_id: "post-id" });
-    const post = selectOne({
-      id: "post-id",
-      slug: "work",
-      status: "published",
-      content: "A short publication.",
-    });
-    const updateBuilder = {
-      eq: vi.fn(),
-      is: vi.fn().mockResolvedValue({ error: null }),
-    };
-    updateBuilder.eq.mockReturnValue(updateBuilder);
-
-    let deliveryCalls = 0;
-    const admin = {
-      rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
-      from: vi.fn((table: string) => {
-        if (table === "publication_deliveries") {
-          deliveryCalls += 1;
-          if (deliveryCalls === 1) return delivery;
-          return { update: vi.fn(() => updateBuilder) };
-        }
-        if (table === "publication_events") return event;
-        if (table === "posts") return post;
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    };
-    mockedAdminClient.mockReturnValue(admin as never);
-
-    const response = await handlePostEngagement(
-      new NextRequest("http://localhost/api/posts/work/view", {
-        method: "POST",
-        body: JSON.stringify({
-          deliveryToken: "123e4567-e89b-42d3-a456-426614174000",
-          engagementToken: engagementToken(),
-        }),
-        headers: { "content-type": "application/json" },
-      }),
-      Promise.resolve({ slug: "work" }),
-      "view"
-    );
-
-    expect(response.status).toBe(200);
-    expect(admin.rpc).toHaveBeenCalledWith(
-      "record_post_engagement",
-      expect.objectContaining({
-        engagement_metadata: expect.objectContaining({
-          engagementTokenId: expect.any(String),
-          distribution: {
-            source: "topic_subscription",
-            deliveryId: "topic-delivery-id",
-            channel: "in_app",
-          },
-        }),
-      })
-    );
   });
 
   it("uses authoritative word count to reject an under-threshold long-form read", async () => {
@@ -411,20 +299,38 @@ describe("post engagement server", () => {
       rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
     };
     mockedAdminClient.mockReturnValue(admin as never);
-    const exposure = createFeaturedExposure(
-      "post-id",
-      "work",
-      "recommended",
-      "request-verified",
-      "session-verified",
-      new Date().toISOString()
-    );
+    const exposure = prepareFeedPageForClient(
+      {
+        posts: [
+          {
+            id: "post-id",
+            slug: "work",
+            title: "Work",
+            excerpt: null,
+            type: "blog",
+            tags: [],
+            created_at: new Date().toISOString(),
+            published_at: new Date().toISOString(),
+            profiles: null,
+          },
+        ],
+        hasMore: false,
+      },
+      {
+        tab: "home",
+        page: 1,
+        pageSize: 12,
+        rankedWindow: 120,
+        requestId: "request-verified",
+        feedSessionId: "session-verified",
+      }
+    ).posts[0].feed_exposure;
 
     const response = await handlePostEngagement(
       new NextRequest("http://localhost/api/posts/work/impression", {
         method: "POST",
         body: JSON.stringify({
-          surface: "home_featured",
+          surface: "home",
           metadata: exposure,
         }),
         headers: { "content-type": "application/json" },
@@ -441,8 +347,8 @@ describe("post engagement server", () => {
           postId: "post-id",
           slug: "work",
           requestId: "request-verified",
-          candidateSource: "featured_recommended",
-          surface: "home_featured",
+          candidateSource: "for_you_ranked",
+          surface: "home",
         }),
       })
     );
@@ -456,17 +362,12 @@ describe("post engagement server", () => {
     mockedAdminClient.mockReturnValue(admin as never);
     const surfaces = [
       "home",
-      "home_featured",
       "following",
-      "subscriptions",
-      "topics",
-      "latest",
       "feed",
       "bookmarks",
       "explore-for-you",
       "explore-trending",
       "explore-citable",
-      "responses",
       "topic",
     ];
 

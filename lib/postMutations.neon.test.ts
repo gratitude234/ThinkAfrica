@@ -54,7 +54,6 @@ describe.skipIf(!enabled)("the mutation domain against Neon", () => {
   let ready: Promise<void>;
 
   const author = (): PostActor => ({ kind: "author", userId: authorId });
-  const editor: PostActor = { kind: "editor", userId: "00000000-0000-4000-8000-00000000ed17" };
   const admin: PostActor = { kind: "admin", userId: "00000000-0000-4000-8000-0000000000ad" };
 
   /** The context the domain takes. `supabase` is never touched: the repository
@@ -107,7 +106,6 @@ describe.skipIf(!enabled)("the mutation domain against Neon", () => {
       slug: `rehearsal-${Math.random().toString(36).slice(2, 12)}`,
       content: "<p>body</p>",
       excerpt: "excerpt",
-      type: "essay",
       content_kind: "article",
       status: "draft",
       tags: ["governance", "policy"],
@@ -184,84 +182,18 @@ describe.skipIf(!enabled)("the mutation domain against Neon", () => {
     expect(await statusOf(id)).toBeNull();
   });
 
-  it("submits research for review", async () => {
-    const id = await seed({ type: "research", content_kind: "research" });
-    const result = await mutations.submitPostForReview(context(author()), id);
-    expect(result.ok).toBe(true);
-    expect(await statusOf(id)).toBe("pending");
-  });
-
-  it("resubmits a revision", async () => {
-    const id = await seed({
-      type: "research",
-      content_kind: "research",
-      status: "pending_revision",
-    });
-    const result = await mutations.resubmitRevision(context(author()), id, {
-      current_round: 3,
+  it("edits a published post, which review used to lock", async () => {
+    const id = await seed({ status: "published" });
+    const result = await mutations.updatePostContent(context(author()), id, {
+      title: "Edited after publication",
     });
     expect(result.ok).toBe(true);
-    expect(await statusOf(id)).toBe("pending");
 
-    const rows = await tx.query<{ current_round: number }>(
-      "select current_round from public.posts where id = $1::uuid",
+    const rows = await tx.query<{ title: string }>(
+      "select title from public.posts where id = $1::uuid",
       [id]
     );
-    expect(Number(rows[0].current_round)).toBe(3);
-  });
-
-  it("withdraws a submission", async () => {
-    const id = await seed({ type: "research", content_kind: "research", status: "pending" });
-    const result = await mutations.withdrawSubmission(context(author()), id);
-    expect(result.ok).toBe(true);
-    expect(await statusOf(id)).toBe("withdrawn");
-  });
-
-  it("lets an editor request a revision", async () => {
-    const id = await seed({ type: "research", content_kind: "research", status: "pending" });
-    const result = await mutations.editorialDecision(
-      context(editor),
-      id,
-      "request_revision",
-      { revision_due_at: new Date().toISOString() }
-    );
-    expect(result.ok).toBe(true);
-    expect(await statusOf(id)).toBe("pending_revision");
-  });
-
-  it("lets an editor reject", async () => {
-    const id = await seed({ type: "research", content_kind: "research", status: "pending" });
-    const result = await mutations.editorialDecision(context(editor), id, "reject");
-    expect(result.ok).toBe(true);
-    expect(await statusOf(id)).toBe("rejected");
-  });
-
-  it("lets an editor publish an approved post", async () => {
-    const id = await seed({ status: "pending" });
-    const result = await mutations.publishApprovedPost(context(editor), id);
-    expect(result.ok).toBe(true);
-    expect(await statusOf(id)).toBe("published");
-  });
-
-  it("features one post and unfeatures every other, in one transaction", async () => {
-    const first = await seed({ status: "published", featured: true });
-    const second = await seed({ status: "published" });
-
-    const result = await mutations.featurePostExclusively(context(admin), second, true);
-    expect(result.ok).toBe(true);
-
-    const rows = await tx.query<{ id: string; featured: boolean }>(
-      "select id::text as id, featured from public.posts where id = any(array[$1::uuid, $2::uuid])",
-      [first, second]
-    );
-    const byId = new Map(rows.map((row) => [row.id, row.featured]));
-    expect(byId.get(second)).toBe(true);
-    expect(byId.get(first)).toBe(false);
-
-    const [{ count }] = await tx.query<{ count: string }>(
-      "select count(*)::int as count from public.posts where featured = true"
-    );
-    expect(Number(count)).toBe(1);
+    expect(rows[0].title).toBe("Edited after publication");
   });
 
   it("removes and restores a post", async () => {
@@ -279,51 +211,45 @@ describe.skipIf(!enabled)("the mutation domain against Neon", () => {
   // ── Forbidden ────────────────────────────────────────────────────
 
   it("refuses every forbidden write, and changes nothing", async () => {
-    const research = await seed({ type: "research", content_kind: "research" });
-    const accepted = await seed({
-      type: "research",
-      content_kind: "research",
-      status: "published",
-    });
-    const pending = await seed({ status: "pending" });
-    const withdrawn = await seed({
-      type: "research",
-      content_kind: "research",
-      status: "withdrawn",
-    });
+    const draft = await seed();
+    const published = await seed({ status: "published" });
+    const withdrawn = await seed({ status: "withdrawn" });
     const removed = await seed({ status: "removed" });
-    const publishedEssay = await seed({ status: "published" });
 
     const attempts: Array<[string, Promise<{ ok: boolean }>]> = [
       [
-        "self-publish research",
-        mutations.publishOwnDraft(context(author()), research),
-      ],
-      [
         "direct citation_id write",
-        mutations.updatePostContent(context(author()), research, {
+        mutations.updatePostContent(context(author()), draft, {
           citation_id: "INDEGENIUS-FORGED",
         }),
       ],
       [
         "direct published_version_id write",
-        mutations.updatePostContent(context(author()), research, {
+        mutations.updatePostContent(context(author()), draft, {
           published_version_id: "00000000-0000-4000-8000-000000000001",
         }),
       ],
       [
-        "edit an accepted publication",
-        mutations.updatePostContent(context(author()), accepted, {
-          title: "Rewritten after acceptance",
+        "reclassify through an ordinary content edit",
+        mutations.updatePostContent(context(author()), draft, {
+          content_kind: "post",
+        }),
+      ],
+      [
+        "write the legacy type the database now derives",
+        mutations.updateDraftComposition(context(author()), draft, {
+          type: "essay",
         }),
       ],
       [
         "hard-delete a non-draft",
-        mutations.deleteDraftPost(context(author()), pending),
+        mutations.deleteDraftPost(context(author()), published),
       ],
       [
-        "resurrect a withdrawn submission",
-        mutations.resubmitRevision(context(author()), withdrawn),
+        "mutate a withdrawn submission",
+        mutations.updatePostContent(context(author()), withdrawn, {
+          title: "Resurrected",
+        }),
       ],
       [
         "mutate a removed post",
@@ -332,8 +258,12 @@ describe.skipIf(!enabled)("the mutation domain against Neon", () => {
         }),
       ],
       [
-        "illegal review-state transition",
-        mutations.transitionPost(context(author()), publishedEssay, "draft"),
+        "unpublish by transition",
+        mutations.transitionPost(context(author()), published, "draft"),
+      ],
+      [
+        "submit for review, which is no longer a transition",
+        mutations.transitionPost(context(author()), draft, "pending"),
       ],
     ];
 
@@ -347,18 +277,17 @@ describe.skipIf(!enabled)("the mutation domain against Neon", () => {
 
     // And nothing moved. The refusals happen before any statement, so the
     // rows are exactly as seeded.
-    expect(await statusOf(research)).toBe("draft");
-    expect(await statusOf(accepted)).toBe("published");
-    expect(await statusOf(pending)).toBe("pending");
+    expect(await statusOf(draft)).toBe("draft");
+    expect(await statusOf(published)).toBe("published");
     expect(await statusOf(withdrawn)).toBe("withdrawn");
     expect(await statusOf(removed)).toBe("removed");
-    expect(await statusOf(publishedEssay)).toBe("published");
 
-    const rows = await tx.query<{ citation_id: string | null }>(
-      "select citation_id from public.posts where id = $1::uuid",
-      [research]
+    const rows = await tx.query<{ citation_id: string | null; title: string }>(
+      "select citation_id, title from public.posts where id = $1::uuid",
+      [draft]
     );
     expect(rows[0].citation_id).toBeNull();
+    expect(rows[0].title).toBe("Rehearsal post");
   }, 120_000);
 
   it("refuses a stranger writing to somebody else's post", async () => {

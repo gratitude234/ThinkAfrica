@@ -26,7 +26,6 @@ export default function GuestBanner() {
     "debates",
     "discover",
     "fellowships",
-    "leaderboard",
     "login",
     "messages",
     "notifications",
@@ -38,7 +37,6 @@ export default function GuestBanner() {
     "review",
     "settings",
     "signup",
-    "stats",
     "talent",
     "terms",
     "topics",
@@ -74,7 +72,7 @@ export default function GuestBanner() {
             Sign up
           </Link>{" "}
           {isReadingPost
-            ? "to save this post or write a response."
+            ? "to save this post or join the conversation."
             : "to follow writers and save posts."}
         </p>
         <button

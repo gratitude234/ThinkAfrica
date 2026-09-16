@@ -1,106 +1,50 @@
+/**
+ * The activation vocabulary: events something in the product still emits.
+ *
+ * The publishing reset cut this from 63 names to 42 in Phase 2F, to 30 in
+ * Phase 2G and to 26 in Phase 2H. Gone are the events of retired products and
+ * nudges (research, quality coaching, the weekly digest, push prompts,
+ * next-action cards, the Home tab switch), the Intellectual Record profile's
+ * recognition, expertise and brief events, the profile Command Center's view,
+ * preview and feature note events, the AI topic suggestion events, and the
+ * author subscription and subscription nudge events. Follow is recorded as
+ * writer_followed. Historic rows keep their names.
+ */
 export type ActivationEventName =
+  // Signup and onboarding.
   | "signup_completed"
   | "onboarding_started"
   | "onboarding_completed"
   | "onboarding_step_completed"
   | "interest_selected"
-  | "writer_followed"
-  | "author_subscription_created"
-  | "author_subscription_removed"
-  | "author_subscription_nudge_shown"
-  | "author_subscription_nudge_action"
+  // The publishing loop: open Home, read, write, publish, comment, follow, search.
+  | "home_viewed"
   | "post_opened"
+  | "post_submitted"
+  | "comment_submitted"
+  | "writer_followed"
   | "search_performed"
+  | "dashboard_viewed"
+  // Explore.
   | "discover_viewed"
   | "discover_tab_changed"
   | "discover_item_clicked"
-  | "draft_started"
-  | "publish_drawer_opened"
-  | "post_submitted"
-
-  | "home_viewed"
-  | "home_tab_changed"
-  | "dashboard_viewed"
-  | "next_action_clicked"
+  // Notifications, and the call to action on a notification or a published toast.
   | "notification_opened"
-  | "weekly_digest_previewed"
-  | "quality_check_viewed"
-  | "quality_check_completed"
-  | "reference_added"
-  | "comment_submitted"
-  | "response_started"
+  | "next_action_clicked"
+  // The signed-out landing page.
   | "landing_viewed"
   | "landing_read_clicked"
   | "landing_signup_clicked"
+  // The public profile funnel (lib/profileFunnel.ts).
   | "profile_viewed"
   | "profile_work_opened"
   | "profile_follow_completed"
-  | "profile_inquiry_opened"
-  | "profile_inquiry_submitted"
-  | "profile_command_center_viewed"
+  // One section of Edit profile saved (app/(main)/settings/profile/useSectionSave.ts).
   | "profile_section_saved"
-  | "profile_preview_opened"
-  | "profile_next_action_clicked"
-  | "profile_feature_note_saved"
-  | "profile_recognition_opened"
-  | "profile_recognition_source_opened"
-  | "profile_expertise_topic_opened"
-  | "opportunity_outcome_submitted"
-  | "opportunity_outcome_verified"
-  | "opportunity_outcome_visibility_changed"
-  | "profile_brief_viewed"
-  | "profile_brief_work_opened"
-  | "profile_brief_contact_started"
-  | "profile_brief_created"
-  | "profile_brief_revoked"
-  | "opportunity_profile_viewed"
-  | "opportunity_profile_updated"
-  | "opportunity_readiness_viewed"
-  | "opportunity_filter_used"
-  | "opportunity_inquiry_started"
-  | "opportunity_inquiry_submitted"
-  | "opportunity_inquiry_status_updated"
-  | "opportunity_listing_opened"
-  | "opportunity_apply_started"
-  | "opportunity_apply_submitted"
-  | "opportunity_saved"
-  | "opportunity_unsaved"
-  | "opportunity_profile_setup_cta_clicked"
-  | "fellowship_opened"
-  | "fellowship_application_submitted"
-  | "collaboration_panel_viewed"
-  | "collaboration_cta_clicked"
-  | "coauthor_search_performed"
-  | "coauthor_invite_sent"
-  | "coauthor_invite_accepted"
-  | "coauthor_invite_declined"
-  | "message_started"
-  | "message_sent"
-  | "response_thread_opened"
-  | "campus_hub_viewed"
-  | "campus_prompt_opened"
-  | "campus_prompt_published"
-  | "ambassador_activity_logged"
-  | "ambassador_application_submitted"
-  | "research_hub_viewed"
-  | "research_project_viewed"
-  | "research_proposal_created"
-  | "research_project_status_changed"
-  | "research_update_published"
-  | "research_asset_added"
-  | "research_profile_updated"
-  | "research_collaboration_request_created"
-  | "research_collaboration_request_accepted"
-  | "research_collaboration_request_declined"
-  | "push_nudge_shown"
-  | "push_nudge_action"
+  // Push delivery on this device, from Settings.
   | "push_permission_resolved"
-  | "push_device_operation"
-  | "ai_topic_suggestion_requested"
-  | "ai_topic_suggestion_succeeded"
-  | "ai_topic_suggestion_failed"
-  | "ai_topic_suggestion_selected"
-  | "topic_selection_skipped";
+  | "push_device_operation";
 
 interface ActivationEventPayload {
   event: ActivationEventName;
@@ -112,25 +56,11 @@ interface ActivationEventPayload {
 const VIEW_EVENT_DEDUPE_MS = 10 * 60 * 1000;
 const VIEW_EVENTS = new Set<ActivationEventName>([
   "profile_viewed",
-  "profile_brief_viewed",
-  "profile_command_center_viewed",
   "post_opened",
   "discover_viewed",
   "home_viewed",
   "dashboard_viewed",
   "landing_viewed",
-  "opportunity_profile_viewed",
-  "opportunity_readiness_viewed",
-  "opportunity_listing_opened",
-  "fellowship_opened",
-  "collaboration_panel_viewed",
-  "response_thread_opened",
-  "campus_hub_viewed",
-  "research_hub_viewed",
-  "research_project_viewed",
-  "weekly_digest_previewed",
-  "quality_check_viewed",
-  "author_subscription_nudge_shown",
 ]);
 
 function hashActivationKey(value: string) {

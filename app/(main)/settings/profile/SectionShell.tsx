@@ -2,19 +2,17 @@
 
 import type { ReactNode } from "react";
 import {
-  PROFILE_SECTION_DEFINITIONS,
-  type ProfileSectionKey,
-} from "@/lib/profileCommandCenter";
+  PROFILE_SETTINGS_SECTION_DEFINITIONS,
+  type ProfileSettingsSection,
+} from "@/lib/profileSettings";
 import type { SectionStatus } from "./useSectionSave";
 
 /**
- * One section of the Command Center: a heading, its fields, and its own save.
+ * One section of Edit profile: a heading, its fields, and its own save.
  *
- * Section-level saves rather than one page-level button, because the page
- * spans nine unrelated concerns across three tables. A single Save would make
- * an author who only wanted to fix a typo in their bio re-submit their
- * opportunity visibility too, and would make one failure ambiguous about what
- * did and did not persist.
+ * Section-level saves rather than one page-level button, because a member who
+ * only wanted to fix a typo in their bio should not re-submit their visibility
+ * settings too, and one failure should be unambiguous about what persisted.
  */
 export function SaveStateMessage({
   status,
@@ -67,7 +65,7 @@ export default function SectionShell({
   canSave = true,
   footnote,
 }: {
-  section: ProfileSectionKey;
+  section: ProfileSettingsSection;
   children: ReactNode;
   onSave?: () => void;
   status: SectionStatus;
@@ -76,7 +74,7 @@ export default function SectionShell({
   canSave?: boolean;
   footnote?: ReactNode;
 }) {
-  const definition = PROFILE_SECTION_DEFINITIONS[section];
+  const definition = PROFILE_SETTINGS_SECTION_DEFINITIONS[section];
   const messageId = `${section}-save-state`;
 
   return (
@@ -116,10 +114,6 @@ export default function SectionShell({
             {status === "saving" ? "Saving…" : saveLabel}
           </button>
         </div>
-      ) : footnote ? (
-        <p className="mt-6 border-t border-card-border pt-4 text-xs leading-5 text-ink-muted">
-          {footnote}
-        </p>
       ) : null}
     </section>
   );

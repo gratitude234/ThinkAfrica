@@ -5,7 +5,6 @@ import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicTopicCounts, type TopicCount } from "@/lib/discoverData";
-import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 
 /**
  * The public landing page's data, and the rule that it can never take the site
@@ -41,14 +40,11 @@ export type LandingPost = {
   id: string;
   title: string | null;
   slug: string;
-  type: string;
   content_kind?: string | null;
-  article_format?: string | null;
   excerpt: string | null;
   cover_image_url: string | null;
   view_count: number | null;
   published_at: string | null;
-  featured?: boolean | null;
   profiles: {
     username: string | null;
     full_name: string | null;
@@ -102,20 +98,17 @@ export async function fetchLandingData(
       supabase
         .from("posts")
         .select(
-          `id, title, slug, type, content_kind, article_format, excerpt, cover_image_url, view_count, published_at, featured,
+          `id, title, slug, content_kind, excerpt, cover_image_url, view_count, published_at,
            profiles!posts_author_id_fkey (username, full_name, university)`
         )
         .eq("status", "published")
-        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-        .order("featured", { ascending: false })
         .order("view_count", { ascending: false })
         .order("published_at", { ascending: false })
         .limit(7),
       supabase
         .from("posts")
         .select("id", { count: "exact", head: true })
-        .eq("status", "published")
-        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION),
+        .eq("status", "published"),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       getPublicTopicCounts(supabase),
     ]);

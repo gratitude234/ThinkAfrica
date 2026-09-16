@@ -1,11 +1,7 @@
 "use server";
 
+import { composerRepository } from "@/lib/db/readAdapter";
 import {
-  collaborationRepository,
-  composerRepository,
-} from "@/lib/db/readAdapter";
-import {
-  COAUTHOR_RESULT_LIMIT,
   MY_DRAFTS_LIMIT,
   RESUMABLE_LIMIT,
   REVISION_LIMIT,
@@ -13,7 +9,6 @@ import {
 import { getCurrentUser } from "@/lib/serverAuth";
 import { createClient } from "@/lib/supabase/server";
 
-import type { CoAuthorCandidate } from "@/lib/db/collaboration";
 import type { DraftRow, ResumableDraftRow, RevisionRow } from "@/lib/db/composer";
 
 /**
@@ -141,39 +136,6 @@ export async function checkUsernameAvailable(
     };
   } catch (error) {
     console.error("[composer] username check failed", error);
-    return UNAVAILABLE;
-  }
-}
-
-/**
- * Members who could be invited as co-authors.
- *
- * Honours the profiles visibility rule, which the browser query relied on RLS
- * for, and excludes the viewer using the session rather than a prop.
- */
-export async function searchCoAuthors(
-  query: string
-): Promise<ComposerResult<CoAuthorCandidate[]>> {
-  const user = await getCurrentUser();
-  if (!user) return UNAUTHORIZED;
-
-  const trimmed = query.trim();
-  if (trimmed.length < 2) return { ok: true, data: [] };
-
-  try {
-    const supabase = await createClient();
-    return {
-      ok: true,
-      data: await collaborationRepository(supabase).searchEligibleCoauthors({
-        query: trimmed,
-        viewerId: user.id,
-        limit: COAUTHOR_RESULT_LIMIT,
-      }),
-    };
-  } catch (error) {
-    // Not an empty list: a writer told "nobody by that name" concludes the
-    // person has no account and invites them by email instead.
-    console.error("[composer] co-author search failed", error);
     return UNAVAILABLE;
   }
 }

@@ -52,9 +52,6 @@ export interface PostWriteRepository {
     expect: PostWriteExpectation
   ): Promise<number>;
 
-  /** Clears `featured` everywhere. Returns rows affected. */
-  clearFeatured(): Promise<number>;
-
   /**
    * Runs several dependent statements atomically.
    *
@@ -103,7 +100,7 @@ export function resolveWriteAdapter(
 // ── Supabase ─────────────────────────────────────────────────────────
 
 const SNAPSHOT_COLUMNS =
-  "id, author_id, status, type, content_kind, article_format, citation_id, published_version_id";
+  "id, author_id, status, content_kind, citation_id, published_version_id";
 
 export function createSupabaseWriteRepository(
   supabase: SupabaseClient
@@ -161,17 +158,6 @@ export function createSupabaseWriteRepository(
       return (data ?? []).length;
     },
 
-    async clearFeatured() {
-      const { data, error } = await supabase
-        .from("posts")
-        .update({ featured: false })
-        .eq("featured", true)
-        .select("id");
-
-      if (error) throw new Error(error.message);
-      return (data ?? []).length;
-    },
-
     async transaction(run) {
       // Ordering, not atomicity. See the interface.
       return run(repository);
@@ -206,24 +192,16 @@ const COLUMN_KINDS: Record<string, ColumnKind> = {
   excerpt: "text",
   cover_image_url: "text",
   audio_summary_url: "text",
-  document_path: "text",
-  document_original_name: "text",
-  document_mime_type: "text",
-  type: "text",
   content_kind: "text",
-  article_format: "text",
   status: "text",
-  citation_id: "text",
   author_id: "uuid",
-  in_response_to: "uuid",
-  published_version_id: "uuid",
-  current_round: "int",
-  document_size_bytes: "int",
-  featured: "bool",
   published_at: "timestamptz",
-  revision_due_at: "timestamptz",
   tags: "text[]",
-  research_keywords: "text[]",
+  // Neither is writable by an author (lib/postPolicy.ts refuses both in either
+  // direction), and no operation writes them. Mapped anyway, so a `system`
+  // write would be sent correctly rather than hitting the throw below.
+  citation_id: "text",
+  published_version_id: "uuid",
 };
 
 /** The placeholder expression for one column, and the value to bind. */
@@ -281,7 +259,7 @@ export function createPostgresWriteRepository(
 
     async loadState(postId) {
       const rows = await executor.query<Record<string, unknown>>(
-        `select id, author_id, status, type, content_kind, article_format,
+        `select id, author_id, status, content_kind,
                 citation_id, published_version_id
          from public.posts
          where id = $1::uuid
@@ -299,9 +277,7 @@ export function createPostgresWriteRepository(
         id: String(row.id),
         author_id: String(row.author_id),
         status: row.status as PostStatus,
-        type: String(row.type),
         content_kind: (row.content_kind as string | null) ?? null,
-        article_format: (row.article_format as string | null) ?? null,
         citation_id: (row.citation_id as string | null) ?? null,
         published_version_id: (row.published_version_id as string | null) ?? null,
       };
@@ -375,13 +351,6 @@ export function createPostgresWriteRepository(
       const rows = await executor.query<{ id: string }>(
         `delete from public.posts where ${where} returning id`,
         params
-      );
-      return rows.length;
-    },
-
-    async clearFeatured() {
-      const rows = await executor.query<{ id: string }>(
-        `update public.posts set featured = false where featured = true returning id`
       );
       return rows.length;
     },

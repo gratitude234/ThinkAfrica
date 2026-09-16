@@ -199,9 +199,8 @@ describe.skipIf(!enabled)("viewer state against PostgreSQL", () => {
         [a.id, b.id]
       );
 
-      // Messaging eligibility is symmetric: one block stops the conversation
-      // whichever end asks. Blocking is never disclosed to the blocked side,
-      // which is why the caller returns no reason.
+      // A block is symmetric: it counts whichever end asks. Blocking is never
+      // disclosed to the blocked side.
       expect(await repository.isBlockedPair(a.id, b.id)).toBe(true);
       expect(await repository.isBlockedPair(b.id, a.id)).toBe(true);
     });

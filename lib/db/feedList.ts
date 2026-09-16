@@ -3,24 +3,28 @@ import "server-only";
 /**
  * The feed's post selection, as PostgreSQL.
  *
- * `lib/db/feed.ts` already moved the *hydration*: the counts, authors and
- * co-authors every card needs once the ids are known. This is the other half,
- * the query that decides which posts a slice of the feed contains.
+ * `lib/db/feed.ts` already moved the *hydration*: the counts and authors every
+ * card needs once the ids are known. This is the other half, the query that
+ * decides which posts a slice of the feed contains.
  *
  * Same production database, not Neon. What changes is the transport.
  *
  * ## One operation, not a query builder
  *
  * Every list in `lib/feedData.ts` is the same selection with a different set of
- * restrictions: two projections, two orderings, and a WHERE clause assembled
- * from a fixed vocabulary. So this is one business operation, `listPosts`,
- * taking those restrictions as named criteria.
+ * restrictions, so this is one business operation, `listPosts`, taking those
+ * restrictions as named criteria. The criteria are the dimensions the feed
+ * actually varies (whose posts, which kind, how recent, who is excluded, where
+ * the cursor is), each a fact about the product rather than a PostgREST verb.
+ * Nothing here takes a column name, an operator, or a fragment of SQL from its
+ * caller.
  *
- * That is deliberately not a generic filter builder. The criteria are the
- * dimensions the feed actually varies (whose posts, which kind, how recent,
- * which topics, who is excluded, where the cursor is), each of them a fact
- * about the product rather than a PostgREST verb. Nothing here takes a column
- * name, an operator, or a fragment of SQL from its caller.
+ * The publishing reset, Phase 2F, removed the criteria only retired feed modes
+ * used: co-author credit matching, topic-subscription overlap, the
+ * citation-only arm, the read-count ordering and the identity-only projection.
+ * Phase 2I removed the research exclusion every feed query used to carry, and
+ * the columns a card no longer reads: the legacy `type`, the `article_format`
+ * genre, the response parent, and the research document fields.
  *
  * ## The reader has always been the admin client
  *
@@ -30,18 +34,13 @@ import "server-only";
  * themselves, which is what actually keeps unpublished work out. Stated here
  * because the absence of a policy check is what a missed one looks like.
  *
- * ## Two translations worth naming
+ * ## The keyset cursor
  *
- * The keyset cursor was a PostgREST `or=` filter spelling out
+ * The cursor was a PostgREST `or=` filter spelling out
  * `published_at < x OR (published_at = x AND id < y)`. That is the row
  * comparison `(published_at, id) < (x, y)`, and it is written as one here: the
  * same predicate, and no longer assembled by interpolating values into a
  * string.
- *
- * The co-author credit filter was `post_authors!inner(...)` with a filter on
- * the embed. An inner embed keeps a post when at least one credit matches,
- * without multiplying the post by its credits, so the faithful translation is
- * `exists`, not a join.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -55,11 +54,8 @@ export interface FeedPostRow {
   id: string;
   title: string | null;
   slug: string;
-  in_response_to: string | null;
   excerpt: string | null;
-  type: string;
   content_kind: string | null;
-  article_format: string | null;
   tags: string[] | null;
   created_at: string;
   published_at: string | null;
@@ -68,13 +64,7 @@ export interface FeedPostRow {
   read_count: number | null;
   word_count: number | null;
   cover_image_url: string | null;
-  citation_id: string | null;
-  published_version_id: string | null;
-  document_original_name: string | null;
-  document_mime_type: string | null;
-  document_size_bytes: number | null;
   author_id: string | null;
-  topic_keys?: string[] | null;
 }
 
 export interface FeedCursor {
@@ -83,67 +73,23 @@ export interface FeedCursor {
 }
 
 export interface FeedListCriteria {
-  /** The sentinel that matches nothing when Research is enabled. */
-  researchTypeExclusion: string;
-  /** One of the three top-level content kinds, or null for all of them. */
+  /** One of the top-level content kinds, or null for all of them. */
   contentKind: string | null;
   /** Earliest `published_at` to admit, or null for no floor. */
   cutoff: string | null;
   /** Restrict to these authors. Null is no restriction; an empty array is
    *  never passed, because the caller returns an empty page instead. */
   authorIds: readonly string[] | null;
-  /** Keep posts carrying an accepted credit for any of these people. */
-  coauthorUserIds: readonly string[] | null;
-  /** Keep posts whose topic keys overlap these. */
-  topicKeys: readonly string[] | null;
-  /** Keep only posts with a citation id, for the reviewed-evergreen arm. */
-  requireCitation: boolean;
-  /** Keep only responses, for the responses shelf. */
-  onlyResponses: boolean;
   excludedAuthorIds: readonly string[];
   excludedPostIds: readonly string[];
   cursor: FeedCursor | null;
-  /** `recent` is published_at then id. `well_read` puts read_count first. */
-  order: "recent" | "well_read";
-  /** Whether the projection carries `topic_keys`. */
-  includeTopicKeys: boolean;
-  /**
-   * How much of each row to read.
-   *
-   * `card` is everything a feed card renders. `identity` is enough to work
-   * out where the ranked pool ends and which ids the evergreen arms claimed,
-   * and nothing else: the tail needs both facts and none of the content behind
-   * them, and reading it would be 160 rows of article metadata fetched and
-   * dropped on every page past the ranking. There is a test for that.
-   */
-  projection: "card" | "identity";
   offset: number;
   limit: number;
 }
 
-/** A post plus the subscribed credits that matched it. */
-export type FeedPostWithCredits = FeedPostRow & {
-  subscription_author_credits:
-    | Array<{ user_id?: string; accepted_at?: string | null }>
-    | { user_id?: string; accepted_at?: string | null }
-    | null;
-};
-
 export interface FeedListRepository {
-  /** One slice of the feed, as ids and card fields. */
+  /** One slice of the feed, newest first, as ids and card fields. */
   listPosts(criteria: FeedListCriteria): Promise<FeedPostRow[]>;
-  /**
-   * The same slice, restricted to posts carrying an accepted credit for one
-   * of `coauthorUserIds`, and carrying those credits back with it.
-   *
-   * A separate operation rather than a flag on `listPosts`, because the
-   * caller needs to know *which* subscribed author matched in order to label
-   * the card. `listPosts` deliberately does not return that: an `exists` is
-   * cheaper and is the right shape when the answer is only yes or no.
-   */
-  listPostsWithCredits(
-    criteria: FeedListCriteria
-  ): Promise<FeedPostWithCredits[]>;
   /**
    * Posts crediting any of these people as an accepted author.
    *
@@ -159,14 +105,6 @@ export interface FeedListRepository {
 // ── SQL ──────────────────────────────────────────────────────────────
 
 /**
- * Enough of a candidate row to work out where the pool ends. Deliberately not
- * a subset anyone can choose: two named projections, because the narrow one
- * exists for one reason and widening it silently would undo it.
- */
-const IDENTITY_COLUMNS = `
-    p.id, p.published_at, p.read_count, p.citation_id`;
-
-/**
  * The two `timestamptz` columns, as the strings this contract promises.
  *
  * `tags` is already `to_jsonb` and the numeric columns arrive as numbers, so
@@ -177,9 +115,7 @@ const IDENTITY_COLUMNS = `
  * stringifies there as "Wed Sep 09 2026 11:18:00 GMT+0100 (West Africa Time)",
  * which PostgreSQL rejects with 22007. Live parity caught it; no type did.
  *
- * Null stays null rather than becoming a string, and a projection that does
- * not carry a column keeps not carrying it, so an `identity` row does not grow
- * a `created_at` it never selected.
+ * Null stays null rather than becoming a string.
  */
 function normaliseRows<T>(rows: ReadonlyArray<Record<string, unknown>>): T[] {
   return rows.map((row) => {
@@ -191,123 +127,53 @@ function normaliseRows<T>(rows: ReadonlyArray<Record<string, unknown>>): T[] {
   });
 }
 
-const BASE_COLUMNS = `
-    p.id, p.title, p.slug, p.in_response_to, p.excerpt, p.type,
-    p.content_kind, p.article_format, to_jsonb(p.tags) as tags,
-    p.created_at, p.published_at, p.view_count, p.impression_count,
-    p.read_count, p.word_count, p.cover_image_url, p.citation_id,
-    p.published_version_id, p.document_original_name, p.document_mime_type,
-    p.document_size_bytes, p.author_id`;
-
 /**
  * Every restriction is a nullable parameter tested in the predicate, so the
- * statement is one constant per projection and ordering rather than a string
- * assembled per request.
+ * statement is one constant rather than a string assembled per request.
  *
  * The array parameters arrive as JSON text: `postgres.js` runs with
  * `fetch_types: false` and cannot serialise an array, and the `::text::jsonb`
  * double cast is what stops it inferring an OID and encoding an
  * already-encoded string a second time.
  *
- *  $1  research type exclusion       $8  excluded post ids (json)
- *  $2  content kind                  $9  cursor published_at
- *  $3  cutoff                       $10  cursor id
- *  $4  author ids (json)            $11  offset
- *  $5  co-author user ids (json)    $12  limit
- *  $6  topic keys (json)
- *  $7  excluded author ids (json)   $13  require citation
- *                                  $14  only responses
+ *  $1  content kind                 $6  cursor published_at
+ *  $2  cutoff                       $7  cursor id
+ *  $3  author ids (json)            $8  offset
+ *  $4  excluded author ids (json)   $9  limit
+ *  $5  excluded post ids (json)
  */
-function listSql(
-  order: "recent" | "well_read",
-  includeTopicKeys: boolean,
-  projection: "card" | "identity" = "card"
-): string {
-  const columns =
-    projection === "identity"
-      ? IDENTITY_COLUMNS
-      : includeTopicKeys
-        ? `${BASE_COLUMNS},\n    to_jsonb(p.topic_keys) as topic_keys`
-        : BASE_COLUMNS;
-
-  const ordering =
-    order === "well_read"
-      ? "order by p.read_count desc, p.published_at desc, p.id desc"
-      : "order by p.published_at desc, p.id desc";
-
-  return `
-  select${columns}
+const LIST_SQL = `
+  select
+    p.id, p.title, p.slug, p.excerpt,
+    p.content_kind, to_jsonb(p.tags) as tags,
+    p.created_at, p.published_at, p.view_count, p.impression_count,
+    p.read_count, p.word_count, p.cover_image_url, p.author_id
   from public.posts p
   where p.status = 'published'
-    and p.type <> $1::text
-    and ($2::text is null or p.content_kind = $2::text)
-    and ($3::timestamptz is null or p.published_at >= $3::timestamptz)
+    and ($1::text is null or p.content_kind = $1::text)
+    and ($2::timestamptz is null or p.published_at >= $2::timestamptz)
+    and (
+      $3::text is null
+      or p.author_id in (select (jsonb_array_elements_text($3::text::jsonb))::uuid)
+    )
     and (
       $4::text is null
-      or p.author_id in (select (jsonb_array_elements_text($4::text::jsonb))::uuid)
+      or p.author_id is null
+      or p.author_id not in (
+        select (jsonb_array_elements_text($4::text::jsonb))::uuid
+      )
     )
     and (
       $5::text is null
-      or exists (
-        select 1 from public.post_authors credit
-        where credit.post_id = p.id
-          and credit.accepted_at is not null
-          and credit.user_id in (
-            select (jsonb_array_elements_text($5::text::jsonb))::uuid
-          )
-      )
+      or p.id not in (select (jsonb_array_elements_text($5::text::jsonb))::uuid)
     )
     and (
-      $6::text is null
-      or p.topic_keys && array(select jsonb_array_elements_text($6::text::jsonb))
+      $6::timestamptz is null
+      or (p.published_at, p.id) < ($6::timestamptz, $7::uuid)
     )
-    and (
-      $7::text is null
-      or p.author_id is null
-      or p.author_id not in (
-        select (jsonb_array_elements_text($7::text::jsonb))::uuid
-      )
-    )
-    and (
-      $8::text is null
-      or p.id not in (select (jsonb_array_elements_text($8::text::jsonb))::uuid)
-    )
-    and (
-      $9::timestamptz is null
-      or (p.published_at, p.id) < ($9::timestamptz, $10::uuid)
-    )
-    and ($13::boolean is false or p.citation_id is not null)
-    and ($14::boolean is false or p.in_response_to is not null)
-  ${ordering}
-  offset $11::int
-  limit $12::int
-`;
-}
-
-/**
- * The co-author arm, which needs the matching credits back as well as the post.
- *
- * Same predicate as `listSql`, with the credits aggregated rather than merely
- * tested. Built by wrapping that statement so the two can never disagree about
- * which posts qualify: the aggregate is a projection over the same rows, not a
- * second definition of them.
- */
-const CREDITS_SQL = `
-  select
-    listed.*,
-    coalesce((
-      select jsonb_agg(jsonb_build_object(
-        'user_id', credit.user_id,
-        'accepted_at', credit.accepted_at
-      ))
-      from public.post_authors credit
-      where credit.post_id = listed.id
-        and credit.accepted_at is not null
-        and credit.user_id in (
-          select (jsonb_array_elements_text($5::text::jsonb))::uuid
-        )
-    ), '[]'::jsonb) as subscription_author_credits
-  from (${listSql("recent", false)}) as listed
+  order by p.published_at desc, p.id desc
+  offset $8::int
+  limit $9::int
 `;
 
 const CREDITED_POST_IDS_SQL = `
@@ -316,34 +182,6 @@ const CREDITED_POST_IDS_SQL = `
   where a.accepted_at is not null
     and a.user_id in (select (jsonb_array_elements_text($1::text::jsonb))::uuid)
 `;
-
-/** Four statements, built once. The shape never depends on a request. */
-const STATEMENTS = {
-  recent: listSql("recent", false),
-  recentWithTopics: listSql("recent", true),
-  wellRead: listSql("well_read", false),
-  wellReadWithTopics: listSql("well_read", true),
-  recentIdentity: listSql("recent", false, "identity"),
-  wellReadIdentity: listSql("well_read", false, "identity"),
-} as const;
-
-function statementFor(criteria: FeedListCriteria): string {
-  if (criteria.projection === "identity") {
-    // topic_keys is never part of the identity projection: the arms that ask
-    // for it are the ones that read whole cards.
-    return criteria.order === "well_read"
-      ? STATEMENTS.wellReadIdentity
-      : STATEMENTS.recentIdentity;
-  }
-  if (criteria.order === "well_read") {
-    return criteria.includeTopicKeys
-      ? STATEMENTS.wellReadWithTopics
-      : STATEMENTS.wellRead;
-  }
-  return criteria.includeTopicKeys
-    ? STATEMENTS.recentWithTopics
-    : STATEMENTS.recent;
-}
 
 /** `null` for "do not restrict", never an empty array: an empty `in` list is
  *  the one that quietly matches everything. */
@@ -355,13 +193,7 @@ function listParam(values: readonly string[] | null | undefined): string | null 
 // ── Supabase ─────────────────────────────────────────────────────────
 
 const POST_SELECT =
-  "id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url, citation_id, published_version_id, document_original_name, document_mime_type, document_size_bytes, author_id";
-
-const POST_SELECT_WITH_TOPIC_KEYS = `${POST_SELECT}, topic_keys`;
-
-const IDENTITY_SELECT = "id, published_at, read_count, citation_id";
-
-const COAUTHOR_SELECT = `${POST_SELECT}, subscription_author_credits:post_authors!inner(user_id, accepted_at)`;
+  "id, title, slug, excerpt, content_kind, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url, author_id";
 
 export function createSupabaseFeedListRepository(
   supabase: SupabaseClient
@@ -396,25 +228,11 @@ export function createSupabaseFeedListRepository(
       );
     },
 
-    async listPostsWithCredits(criteria) {
-      return (await this.listPosts(criteria)) as unknown as FeedPostWithCredits[];
-    },
-
     async listPosts(criteria) {
-      const select =
-        criteria.projection === "identity"
-          ? IDENTITY_SELECT
-          : criteria.coauthorUserIds
-            ? COAUTHOR_SELECT
-            : criteria.includeTopicKeys
-              ? POST_SELECT_WITH_TOPIC_KEYS
-              : POST_SELECT;
-
       let query = supabase
         .from("posts")
-        .select(select)
-        .eq("status", "published")
-        .neq("type", criteria.researchTypeExclusion);
+        .select(POST_SELECT)
+        .eq("status", "published");
 
       if (criteria.contentKind) {
         query = query.eq("content_kind", criteria.contentKind);
@@ -445,29 +263,12 @@ export function createSupabaseFeedListRepository(
       if (criteria.authorIds) {
         query = query.in("author_id", [...criteria.authorIds]);
       }
-      if (criteria.coauthorUserIds) {
-        query = query
-          .in("subscription_author_credits.user_id", [...criteria.coauthorUserIds])
-          .not("subscription_author_credits.accepted_at", "is", null);
-      }
-      if (criteria.topicKeys) {
-        query = query.overlaps("topic_keys", [...criteria.topicKeys]);
-      }
-      if (criteria.requireCitation) {
-        query = query.not("citation_id", "is", null);
-      }
-      if (criteria.onlyResponses) {
-        query = query.not("in_response_to", "is", null);
-      }
       if (criteria.cursor) {
         query = query.or(
           `published_at.lt.${criteria.cursor.publishedAt},and(published_at.eq.${criteria.cursor.publishedAt},id.lt.${criteria.cursor.id})`
         );
       }
 
-      if (criteria.order === "well_read") {
-        query = query.order("read_count", { ascending: false });
-      }
       query = query
         .order("published_at", { ascending: false })
         .order("id", { ascending: false });
@@ -514,49 +315,17 @@ export function createPostgresFeedListRepository(
       return rows.map((row) => row.post_id);
     },
 
-    async listPostsWithCredits(criteria) {
-      if (!criteria.coauthorUserIds) {
-        // The operation is defined by the restriction. Without it there are no
-        // credits to report, and returning posts with an empty credit list
-        // would look like "matched nothing" rather than "asked wrongly".
-        throw new Error(
-          "listPostsWithCredits requires coauthorUserIds; use listPosts instead"
-        );
-      }
-      return normaliseRows<FeedPostWithCredits>(await executor.query(CREDITS_SQL, [
-        criteria.researchTypeExclusion,
-        criteria.contentKind,
-        criteria.cutoff,
-        listParam(criteria.authorIds),
-        listParam(criteria.coauthorUserIds),
-        listParam(criteria.topicKeys),
-        listParam(criteria.excludedAuthorIds),
-        listParam(criteria.excludedPostIds),
-        criteria.cursor?.publishedAt ?? null,
-        criteria.cursor?.id ?? null,
-        criteria.offset,
-        criteria.limit,
-        criteria.requireCitation,
-        criteria.onlyResponses,
-      ]));
-    },
-
     async listPosts(criteria) {
-      return normaliseRows<FeedPostRow>(await executor.query(statementFor(criteria), [
-        criteria.researchTypeExclusion,
+      return normaliseRows<FeedPostRow>(await executor.query(LIST_SQL, [
         criteria.contentKind,
         criteria.cutoff,
         listParam(criteria.authorIds),
-        listParam(criteria.coauthorUserIds),
-        listParam(criteria.topicKeys),
         listParam(criteria.excludedAuthorIds),
         listParam(criteria.excludedPostIds),
         criteria.cursor?.publishedAt ?? null,
         criteria.cursor?.id ?? null,
         criteria.offset,
         criteria.limit,
-        criteria.requireCitation,
-        criteria.onlyResponses,
       ]));
     },
   };

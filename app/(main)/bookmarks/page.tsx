@@ -5,11 +5,12 @@ import type { PostCardData } from "@/components/post/PostCard";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import { createClient } from "@/lib/supabase/client";
 
-const POST_TYPE_FILTERS = [
+// Two kinds and All. These used to be Blog, Essay and Policy, which named
+// the legacy type rather than anything the product has.
+const KIND_FILTERS = [
   { label: "All", value: "all" },
-  { label: "Blog", value: "blog" },
-  { label: "Essay", value: "essay" },
-  { label: "Policy", value: "policy_brief" },
+  { label: "Posts", value: "post" },
+  { label: "Articles", value: "article" },
 ];
 
 function BookmarkSkeletons() {
@@ -37,8 +38,8 @@ function BookmarkSkeletons() {
   );
 }
 
-function typeLabel(filter: string) {
-  const match = POST_TYPE_FILTERS.find((item) => item.value === filter);
+function kindLabel(filter: string) {
+  const match = KIND_FILTERS.find((item) => item.value === filter);
   return match?.label.toLowerCase() ?? "filtered";
 }
 
@@ -82,7 +83,7 @@ export default function BookmarksPage() {
   const filtered =
     filter === "all"
       ? allPosts
-      : allPosts.filter((post) => post.type === filter);
+      : allPosts.filter((post) => post.content_kind === filter);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -118,11 +119,11 @@ export default function BookmarksPage() {
       ) : (
         <>
           <div className="mb-6 flex flex-wrap gap-2">
-            {POST_TYPE_FILTERS.map((item) => {
+            {KIND_FILTERS.map((item) => {
               const count =
                 item.value === "all"
                   ? allPosts.length
-                  : allPosts.filter((post) => post.type === item.value).length;
+                  : allPosts.filter((post) => post.content_kind === item.value).length;
 
               if (item.value !== "all" && count === 0) return null;
 
@@ -146,10 +147,10 @@ export default function BookmarksPage() {
           {filtered.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-gray-500">
               <p className="text-lg font-medium">
-                No {typeLabel(filter)} bookmarks
+                No {kindLabel(filter)} bookmarks
               </p>
               <p className="mt-1 text-sm">
-                Save a {typeLabel(filter)} to find it here later.
+                Save a {kindLabel(filter)} to find it here later.
               </p>
             </div>
           ) : (

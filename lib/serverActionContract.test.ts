@@ -42,7 +42,10 @@ const serverActionFiles = ROOTS.flatMap((root) => walk(join(REPO, root)))
 
 describe('"use server" modules', () => {
   it("are found, so a broken scan is not a pass", () => {
-    expect(serverActionFiles.length).toBeGreaterThan(30);
+    // A floor, not a count. The publishing reset removed whole products and
+    // their actions with them (29 modules remained after Phase 2D), so this
+    // only has to be high enough that a scan finding nothing cannot pass.
+    expect(serverActionFiles.length).toBeGreaterThan(20);
   });
 
   it("export only async functions and types", () => {
@@ -73,14 +76,11 @@ describe('"use server" modules', () => {
     // ones Phase 2 wrote. An argument is something a browser can choose, and
     // RLS is what currently makes a forged one harmless.
     //
-    // The three exceptions are named because they are not actor ids: they
-    // identify the *other* party in a two-party operation, and each one is
-    // authorized against the session on the server.
+    // The exceptions are named because they are not actor ids: they identify
+    // the *other* party in a two-party operation, and each one is authorized
+    // against the session on the server.
     const ALLOWED = new Map([
       ["components/ui/followActions.ts", ["followingId", "authorId"]],
-      ["app/(main)/[username]/actions.ts", ["authorId"]],
-      ["components/profile/opportunityInquiryActions.ts", ["talentUserId"]],
-      ["app/(main)/dashboard/opportunityInquiryActions.ts", ["talentUserId"]],
       // An admin verifying or suspending somebody names that somebody. The
       // acting admin is still resolved from the session, by requireCapability.
       ["app/(main)/admin/verification/actions.ts", ["userId"]],

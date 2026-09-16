@@ -1,8 +1,7 @@
 import "server-only";
 
 /**
- * The viewer's own state: who they have blocked, who has blocked them, and
- * whether a pair of people may message each other.
+ * The viewer's own state: who they have blocked, and who has blocked them.
  *
  * Same production database, not Neon. What changes is the transport.
  *
@@ -52,7 +51,11 @@ export interface ViewerStateRepository {
    * blocked person back onto the page through a co-authored publication.
    */
   postIdsWithAuthors(postIds: string[], authorIds: string[]): Promise<string[]>;
-  /** True when either has blocked the other. */
+  /**
+   * True when either has blocked the other. Messaging eligibility was its only
+   * caller and went with messaging in Phase 2E; the check stays because
+   * blocking does.
+   */
   isBlockedPair(userA: string, userB: string): Promise<boolean>;
   readonly backend: "supabase" | "postgres";
 }

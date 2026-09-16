@@ -37,26 +37,10 @@ export default async function AdminIndexPage() {
   const visibleLinks = getVisibleAdminNavItems(context);
 
   const [
-    { count: pendingEditorialCount },
-    { count: pendingApplicationsCount },
-    { count: pendingAmbassadorsCount },
     { count: pendingReportsCount },
     { data: publishedAuthorRows },
     { data: recentAuditRows },
   ] = await Promise.all([
-    admin
-      .from("posts")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending")
-      .eq("type", "policy_brief"),
-    admin
-      .from("fellowship_applications")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending"),
-    admin
-      .from("campus_ambassadors")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending"),
     admin
       .from("reports")
       .select("id", { count: "exact", head: true })
@@ -92,35 +76,17 @@ export default async function AdminIndexPage() {
           Operations Dashboard
         </h1>
         <p className="mt-2 text-sm text-gray-500">
-          Capability-based admin access for editorial, user trust, opportunities,
-          and platform operations.
+          Capability-based admin access for editorial, user trust, and platform
+          operations.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          href="/admin/review"
-          label="Editorial queue"
-          value={pendingEditorialCount ?? 0}
-          helper="Policy briefs awaiting action"
-        />
-        <StatCard
-          href="/admin/fellowships"
-          label="Applications"
-          value={pendingApplicationsCount ?? 0}
-          helper="Opportunity applications pending review"
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
         <StatCard
           href="/admin/verification"
           label="Verification candidates"
           value={verificationCandidates.size}
           helper="Contributors with 3+ published posts"
-        />
-        <StatCard
-          href="/admin/ambassadors"
-          label="Ambassador requests"
-          value={pendingAmbassadorsCount ?? 0}
-          helper="Campus ambassador requests pending"
         />
         <StatCard
           href="/admin/moderation"

@@ -1,12 +1,16 @@
+import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FEED_ALGORITHM_VERSION,
   prepareFeedPageForClient,
   verifyFeedExposureMetadata,
+  type FeedExposure,
 } from "./feedExposure";
 import type { PostCardData } from "@/components/post/PostCard";
 
-function post(id: string): PostCardData {
+const SECRET = "test-feed-signing-secret";
+
+function post(id: string, overrides: Partial<PostCardData> = {}): PostCardData {
   return {
     id,
     title: `Post ${id}`,
@@ -18,11 +22,9 @@ function post(id: string): PostCardData {
     created_at: "2026-08-18T10:00:00.000Z",
     published_at: "2026-08-18T10:00:00.000Z",
     score: 91,
-    quality_score: 73,
     impression_count: 100,
     read_count: 20,
     view_count: 40,
-    reference_count: 3,
     bookmark_count: 5,
     profiles: {
       username: "amara",
@@ -30,14 +32,37 @@ function post(id: string): PostCardData {
       university: null,
       avatar_url: null,
     },
+    ...overrides,
   };
+}
+
+/** The server's own canonical form, for forging an exposure in a test. */
+function sign(exposure: Omit<FeedExposure, "signature">) {
+  return createHmac("sha256", SECRET)
+    .update(
+      JSON.stringify([
+        exposure.postId,
+        exposure.slug,
+        exposure.exposureId,
+        exposure.feedSessionId,
+        exposure.requestId,
+        exposure.algorithmVersion,
+        exposure.experimentVariant,
+        exposure.surface,
+        exposure.candidateSource,
+        exposure.position,
+        exposure.page,
+        exposure.servedAt,
+      ])
+    )
+    .digest("base64url");
 }
 
 describe("prepareFeedPageForClient", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-18T13:00:00.000Z"));
-    vi.stubEnv("FEED_EXPOSURE_SIGNING_SECRET", "test-feed-signing-secret");
+    vi.stubEnv("FEED_EXPOSURE_SIGNING_SECRET", SECRET);
   });
 
   afterEach(() => {
@@ -47,7 +72,7 @@ describe("prepareFeedPageForClient", () => {
 
   it("strips ranking-only fields and adds experiment-grade exposure context", () => {
     const result = prepareFeedPageForClient(
-      { posts: [post("a")], hasMore: true },
+      { posts: [post("a", { candidate_source: "for_you_ranked" })], hasMore: true },
       {
         tab: "home",
         page: 2,
@@ -58,11 +83,16 @@ describe("prepareFeedPageForClient", () => {
       }
     );
 
-    expect(result.posts[0]).not.toHaveProperty("score");
-    expect(result.posts[0]).not.toHaveProperty("quality_score");
-    expect(result.posts[0]).not.toHaveProperty("impression_count");
-    expect(result.posts[0]).not.toHaveProperty("read_count");
-    expect(result.posts[0]).not.toHaveProperty("view_count");
+    for (const field of [
+      "score",
+      "impression_count",
+      "read_count",
+      "view_count",
+      "bookmark_count",
+      "candidate_source",
+    ]) {
+      expect(result.posts[0]).not.toHaveProperty(field);
+    }
     expect(result.posts[0].feed_exposure).toEqual({
       postId: "a",
       slug: "post-a",
@@ -84,11 +114,11 @@ describe("prepareFeedPageForClient", () => {
     expect(result.hasMore).toBe(true);
   });
 
-  it("rejects tampered or cross-post exposure attribution", () => {
+  it("attributes Following to the writers followed, and rejects tampering", () => {
     const result = prepareFeedPageForClient(
       { posts: [post("a")], hasMore: false },
       {
-        tab: "latest",
+        tab: "following",
         page: 1,
         pageSize: 12,
         rankedWindow: 120,
@@ -98,6 +128,7 @@ describe("prepareFeedPageForClient", () => {
     );
     const exposure = result.posts[0].feed_exposure!;
 
+    expect(exposure.candidateSource).toBe("followed_author");
     expect(verifyFeedExposureMetadata(exposure, "post-a")).not.toBeNull();
     expect(
       verifyFeedExposureMetadata({ ...exposure, position: 99 }, "post-a")
@@ -105,7 +136,7 @@ describe("prepareFeedPageForClient", () => {
     expect(verifyFeedExposureMetadata(exposure, "different-post")).toBeNull();
   });
 
-  it("marks home pages beyond the ranked window as chronological tail", () => {
+  it("marks For You pages beyond the ranked window as the date-ordered tail", () => {
     const result = prepareFeedPageForClient(
       { posts: [post("tail")], hasMore: false },
       {
@@ -118,5 +149,36 @@ describe("prepareFeedPageForClient", () => {
     );
 
     expect(result.posts[0].feed_exposure?.candidateSource).toBe("for_you_tail");
+  });
+
+  it("accepts no exposure from a retired surface, even one correctly signed", () => {
+    const { signature: _signature, ...served } = prepareFeedPageForClient(
+      { posts: [post("a")], hasMore: false },
+      {
+        tab: "home",
+        page: 1,
+        pageSize: 12,
+        rankedWindow: 120,
+        requestId: "request-retired",
+        servedAt: new Date().toISOString(),
+      }
+    ).posts[0].feed_exposure!;
+
+    // The forging helper matches the server, so a failure below is the
+    // allowlist refusing the value rather than a bad signature.
+    expect(verifyFeedExposureMetadata({ ...served, signature: sign(served) }, "post-a")).not.toBeNull();
+
+    for (const retired of [
+      { surface: "latest", candidateSource: "latest" },
+      { surface: "subscriptions", candidateSource: "subscription" },
+      { surface: "home_featured", candidateSource: "featured_editorial" },
+      { surface: "home", candidateSource: "for_you_evergreen" },
+      { surface: "home", candidateSource: "for_you_ranked", algorithmVersion: "feed-v2.1.0" },
+    ]) {
+      const forged = { ...served, ...retired } as Omit<FeedExposure, "signature">;
+      expect(
+        verifyFeedExposureMetadata({ ...forged, signature: sign(forged) }, "post-a")
+      ).toBeNull();
+    }
   });
 });

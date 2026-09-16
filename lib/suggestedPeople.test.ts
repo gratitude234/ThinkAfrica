@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { getSuggestedPeople } from "./suggestedPeople";
+import { getRecentWriters, getSuggestedPeople } from "./suggestedPeople";
 
 interface ProfileRow {
   id: string;
   username: string;
   full_name: string | null;
-  university: string | null;
-  field_of_study: string | null;
   avatar_url: string | null;
-  points: number | null;
   interests: string[] | null;
-  profile_type: string | null;
+}
+
+interface PostRow {
+  author_id: string;
+  published_at: string;
 }
 
 function profile(id: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -18,24 +19,26 @@ function profile(id: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
     id,
     username: `user-${id}`,
     full_name: `User ${id}`,
-    university: "Ibadan",
-    field_of_study: "Economics",
     avatar_url: null,
-    points: 120,
     interests: [],
-    profile_type: "professional",
     ...overrides,
   };
 }
 
-function createSupabase(profiles: ProfileRow[]) {
+/**
+ * A client that answers `profiles` with the rows given, narrowed by `in` and
+ * `overlaps` the way PostgREST would, and `posts` with the publications given.
+ */
+function createSupabase(profiles: ProfileRow[], posts: PostRow[] = []) {
   const tablesQueried: string[] = [];
   const notCalls: Array<[string, string, string]> = [];
   const selects: string[] = [];
+  const orders: Array<[string, string]> = [];
 
   const supabase = {
     from(table: string) {
       tablesQueried.push(table);
+      let rows: unknown[] = table === "posts" ? posts : profiles;
 
       const builder: Record<string, unknown> = {
         select(columns: string) {
@@ -45,13 +48,21 @@ function createSupabase(profiles: ProfileRow[]) {
         eq() {
           return builder;
         },
-        in() {
+        neq() {
           return builder;
         },
-        overlaps() {
+        in(_column: string, values: string[]) {
+          rows = (rows as ProfileRow[]).filter((row) => values.includes(row.id));
           return builder;
         },
-        order() {
+        overlaps(_column: string, values: string[]) {
+          rows = (rows as ProfileRow[]).filter((row) =>
+            (row.interests ?? []).some((interest) => values.includes(interest))
+          );
+          return builder;
+        },
+        order(column: string) {
+          orders.push([table, column]);
           return builder;
         },
         not(column: string, operator: string, value: string) {
@@ -59,7 +70,7 @@ function createSupabase(profiles: ProfileRow[]) {
           return builder;
         },
         limit(count: number) {
-          return Promise.resolve({ data: profiles.slice(0, count) });
+          return Promise.resolve({ data: rows.slice(0, count) });
         },
       };
 
@@ -67,21 +78,20 @@ function createSupabase(profiles: ProfileRow[]) {
     },
   };
 
-  return { supabase, tablesQueried, notCalls, selects };
+  return { supabase, tablesQueried, notCalls, selects, orders };
 }
 
 describe("getSuggestedPeople exclusion filters", () => {
   it("sends one not-in clause instead of one neq per excluded id", async () => {
     const followedIds = Array.from({ length: 40 }, (_, index) => `f${index}`);
-    const { supabase, notCalls } = createSupabase([profile("a")]);
+    const { supabase, notCalls } = createSupabase([profile("a", { interests: ["Law"] })]);
 
     await getSuggestedPeople(supabase, {
       currentUserId: "me",
-      university: null,
-      fieldOfStudy: null,
+      interests: ["Law"],
       followedIds,
       excludedUserIds: [],
-      limit: 8,
+      limit: 1,
     });
 
     // 41 ids (40 follows + self) fit in a single chunked clause. The old
@@ -97,15 +107,14 @@ describe("getSuggestedPeople exclusion filters", () => {
 
   it("chunks very large exclusion lists rather than emitting one huge clause", async () => {
     const followedIds = Array.from({ length: 250 }, (_, index) => `f${index}`);
-    const { supabase, notCalls } = createSupabase([profile("a")]);
+    const { supabase, notCalls } = createSupabase([profile("a", { interests: ["Law"] })]);
 
     await getSuggestedPeople(supabase, {
       currentUserId: "me",
-      university: null,
-      fieldOfStudy: null,
+      interests: ["Law"],
       followedIds,
       excludedUserIds: [],
-      limit: 8,
+      limit: 1,
     });
 
     // 251 ids at 100 per clause.
@@ -114,19 +123,39 @@ describe("getSuggestedPeople exclusion filters", () => {
   });
 
   it("de-duplicates ids that appear in both the follow and block lists", async () => {
-    const { supabase, notCalls } = createSupabase([profile("a")]);
+    const { supabase, notCalls } = createSupabase([profile("a", { interests: ["Law"] })]);
 
     await getSuggestedPeople(supabase, {
       currentUserId: "me",
-      university: null,
-      fieldOfStudy: null,
+      interests: ["Law"],
       followedIds: ["shared", "only-followed"],
       excludedUserIds: ["shared", "only-blocked"],
-      limit: 8,
+      limit: 1,
     });
 
     const ids = notCalls[0][2].replace(/^\(|\)$/g, "").split(",");
     expect(ids).toEqual(["me", "shared", "only-followed", "only-blocked"]);
+  });
+
+  it("never suggests a followed, blocked or recently publishing excluded writer", async () => {
+    const { supabase } = createSupabase(
+      [profile("followed"), profile("blocked"), profile("fresh")],
+      [
+        { author_id: "followed", published_at: "2026-09-10T00:00:00Z" },
+        { author_id: "blocked", published_at: "2026-09-09T00:00:00Z" },
+        { author_id: "me", published_at: "2026-09-08T00:00:00Z" },
+        { author_id: "fresh", published_at: "2026-09-07T00:00:00Z" },
+      ]
+    );
+
+    const { suggestions } = await getSuggestedPeople(supabase, {
+      currentUserId: "me",
+      followedIds: ["followed"],
+      excludedUserIds: ["blocked"],
+      limit: 1,
+    });
+
+    expect(suggestions.map((person) => person.id)).toEqual(["fresh"]);
   });
 });
 
@@ -136,8 +165,6 @@ describe("getSuggestedPeople query reuse", () => {
 
     await getSuggestedPeople(supabase, {
       currentUserId: "me",
-      university: null,
-      fieldOfStudy: null,
       followedIds: ["f1"],
       excludedUserIds: ["b1"],
       limit: 8,
@@ -153,8 +180,6 @@ describe("getSuggestedPeople query reuse", () => {
 
     await getSuggestedPeople(supabase, {
       currentUserId: "me",
-      university: null,
-      fieldOfStudy: null,
       limit: 8,
     });
 
@@ -163,91 +188,106 @@ describe("getSuggestedPeople query reuse", () => {
   });
 });
 
-describe("getSuggestedPeople result shape", () => {
-  it("carries field_of_study and points so a suggestion has a reason to follow", async () => {
-    const { supabase, selects } = createSupabase([
-      profile("a", { field_of_study: "Public Health", points: 980 }),
-    ]);
-
-    const { suggestions } = await getSuggestedPeople(supabase, {
-      currentUserId: "me",
-      university: null,
-      fieldOfStudy: null,
-      followedIds: [],
-      excludedUserIds: [],
-      limit: 8,
-    });
-
-    // These two used to be dropped from the select and re-stubbed as null by
-    // callers, which left a signed-in viewer with a less informative person
-    // card than a signed-out one.
-    expect(selects[0]).toContain("field_of_study");
-    expect(selects[0]).toContain("points");
-    expect(suggestions[0].field_of_study).toBe("Public Health");
-    expect(suggestions[0].points).toBe(980);
-  });
-
-  it("reports the university-and-field match as the reason when one is found", async () => {
-    const { supabase } = createSupabase([profile("a")]);
-
-    const { reason } = await getSuggestedPeople(supabase, {
-      currentUserId: "me",
-      university: "Ibadan",
-      fieldOfStudy: "Economics",
-      followedIds: [],
-      excludedUserIds: [],
-      limit: 8,
-    });
-
-    expect(reason).toBe("From your university and field");
-  });
-
-  it("puts topic relevance ahead of points", async () => {
-    const { supabase } = createSupabase([
-      profile("popular", { points: 5000, interests: ["Agriculture & Food Systems"] }),
-      profile("relevant", { points: 25, interests: ["Governance & Policy"] }),
-    ]);
+describe("getSuggestedPeople ranking", () => {
+  it("puts shared topics first, then recent publication, then the username", async () => {
+    const { supabase } = createSupabase(
+      [
+        profile("recent", { username: "zed" }),
+        profile("topic", { username: "yan", interests: ["Governance & Policy"] }),
+        profile("quiet", { username: "abe" }),
+        profile("older", { username: "bea" }),
+      ],
+      [
+        { author_id: "recent", published_at: "2026-09-12T00:00:00Z" },
+        { author_id: "older", published_at: "2026-08-01T00:00:00Z" },
+      ]
+    );
 
     const { suggestions, reason } = await getSuggestedPeople(supabase, {
       currentUserId: "me",
-      university: null,
-      fieldOfStudy: null,
       interests: ["Governance & Policy"],
-      currentPath: "non_student",
-      workCategory: "policy_community",
       followedIds: [],
       excludedUserIds: [],
-      limit: 2,
+      limit: 4,
     });
 
-    expect(suggestions[0].id).toBe("relevant");
+    expect(suggestions.map((person) => person.id)).toEqual(["topic", "recent", "older", "quiet"]);
+    expect(suggestions[0].sharedTopic).toBe("Governance & Policy");
+    expect(suggestions[1].lastPublishedAt).toBe("2026-09-12T00:00:00Z");
     expect(reason).toBe("Writing about your topics");
   });
 
-  it("combines school and topic relevance for students", async () => {
-    const { supabase } = createSupabase([
-      profile("topic-only", {
-        university: "Lagos",
-        interests: ["Economics & Development"],
-      }),
-      profile("school-topic", {
-        university: "Ibadan",
-        interests: ["Economics & Development"],
-      }),
+  it("says Published recently when no shared topic leads the list", async () => {
+    const { supabase } = createSupabase(
+      [profile("a")],
+      [{ author_id: "a", published_at: "2026-09-12T00:00:00Z" }]
+    );
+
+    const { reason } = await getSuggestedPeople(supabase, {
+      currentUserId: "me",
+      followedIds: [],
+      excludedUserIds: [],
+      limit: 1,
+    });
+
+    expect(reason).toBe("Published recently");
+  });
+
+  it("falls back to a stable list when nobody has published or shares a topic", async () => {
+    const { supabase, orders } = createSupabase([
+      profile("b", { username: "bola" }),
+      profile("a", { username: "ade" }),
     ]);
 
     const { suggestions, reason } = await getSuggestedPeople(supabase, {
       currentUserId: "me",
-      university: "Ibadan",
-      fieldOfStudy: "Economics",
-      interests: ["Economics & Development"],
-      currentPath: "student",
       followedIds: [],
       excludedUserIds: [],
       limit: 2,
     });
 
-    expect(suggestions[0].id).toBe("school-topic");
-    expect(reason).toBe("From your school and topics");
+    expect(suggestions.map((person) => person.username)).toEqual(["ade", "bola"]);
+    expect(reason).toBe("Writers on Indegenius");
+    expect(orders).toContainEqual(["profiles", "username"]);
+  });
+});
+
+describe("getSuggestedPeople and the retired signals", () => {
+  it("selects, orders and matches on no points, university, field or profile type", async () => {
+    const { supabase, selects, orders } = createSupabase(
+      [profile("a", { interests: ["Law"] })],
+      [{ author_id: "a", published_at: "2026-09-12T00:00:00Z" }]
+    );
+
+    await getSuggestedPeople(supabase, {
+      currentUserId: "me",
+      interests: ["Law"],
+      followedIds: [],
+      excludedUserIds: [],
+      limit: 8,
+    });
+
+    for (const columns of [...selects, ...orders.map(([, column]) => column)]) {
+      expect(columns).not.toMatch(/points|university|field_of_study|profile_type/);
+    }
+  });
+});
+
+describe("getRecentWriters", () => {
+  it("lists the newest publishers once each, newest first", async () => {
+    const { supabase } = createSupabase(
+      [profile("a"), profile("b")],
+      [
+        { author_id: "b", published_at: "2026-09-12T00:00:00Z" },
+        { author_id: "a", published_at: "2026-09-11T00:00:00Z" },
+        { author_id: "b", published_at: "2026-09-10T00:00:00Z" },
+      ]
+    );
+
+    const { suggestions, reason } = await getRecentWriters(supabase, { limit: 8 });
+
+    expect(suggestions.map((person) => person.id)).toEqual(["b", "a"]);
+    expect(suggestions[0].lastPublishedAt).toBe("2026-09-12T00:00:00Z");
+    expect(reason).toBe("Published recently");
   });
 });

@@ -4,41 +4,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import PostFeed from "@/components/post/PostFeed";
 import FeedSkeleton from "@/components/post/FeedSkeleton";
-
 import type { PostCardData } from "@/components/post/PostCard";
-import type { FeedContentFilter, FeedTimeframe } from "@/lib/feedData";
-import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
-import type { HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
-import HomeFeaturedLeadImpression from "@/components/post/HomeFeaturedLeadImpression";
+import {
+  HOME_FEED_TAB_LABELS,
+  visibleHomeFeedTabs,
+  type HomeFeedTab,
+} from "@/lib/homeFeedTabs";
 import HomeGuestNotice from "./HomeGuestNotice";
 import FeedEmptyState from "./FeedEmptyState";
 import FeedErrorState from "./FeedErrorState";
-import CreateTrigger from "./CreateTrigger";
 import { useStickySubnav } from "@/lib/useStickySubnav";
 import { useAppChrome } from "./AppChromeProvider";
-import { trackActivationEvent } from "@/lib/activationEvents";
 
-type TabKey = "home" | "following" | "subscriptions" | "topics" | "latest";
 const EMPTY_POSTS: PostCardData[] = [];
+const PAGE_SIZE = 12;
 
-const CREATE_CTA_CLASS =
+const CTA_CLASS =
   "inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
-const SECONDARY_CTA_CLASS =
-  "inline-flex min-h-11 items-center rounded-lg border border-divider bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
-
-const TAB_ORDER = [
-  "home",
-  "following",
-  "subscriptions",
-  "topics",
-  "latest",
-] as const;
-
-const CONTENT_KIND_PLURAL: Record<Exclude<FeedContentFilter, "all">, string> = {
-  post: "Posts",
-  article: "Articles",
-  research: "Research",
-};
 
 interface FeedResponse {
   posts: PostCardData[];
@@ -61,61 +43,29 @@ interface FeedCacheEntry extends FeedResponse {
   emptyPageCount: number;
 }
 
-function feedCacheKey(
-  tab: TabKey,
-  type: FeedContentFilter,
-  timeframe: FeedTimeframe,
-  source: SubscriptionFeedSource
-) {
-  return `${tab}:${type}:${timeframe}:${tab === "subscriptions" ? source : "all"}`;
-}
-
-function buildFeedUrl(
-  tab: TabKey,
-  type: FeedContentFilter,
-  timeframe: FeedTimeframe,
-  source: SubscriptionFeedSource
-) {
+function buildFeedUrl(tab: HomeFeedTab) {
   const params = new URLSearchParams(window.location.search);
-  params.set("tab", tab);
-  if (type === "all") {
-    params.delete("type");
+  if (tab === "following") {
+    params.set("tab", "following");
   } else {
-    params.set("type", type);
+    params.delete("tab");
   }
-  if (timeframe === "all") {
-    params.delete("timeframe");
-  } else {
-    params.set("timeframe", timeframe);
-  }
-  if (tab === "subscriptions" && source !== "all") {
-    params.set("source", source);
-  } else {
-    params.delete("source");
-  }
-
   const query = params.toString();
   return query ? `/?${query}` : "/";
 }
 
 async function fetchFeed(
-  tab: TabKey,
-  type: FeedContentFilter,
-  timeframe: FeedTimeframe,
+  tab: HomeFeedTab,
   page: number,
-  source: SubscriptionFeedSource,
   feedSessionId: string,
-  cursor?: string | null
+  cursor: string | null
 ): Promise<FeedResponse> {
   const params = new URLSearchParams();
   params.set("tab", tab);
   params.set("page", page.toString());
-  params.set("pageSize", "12");
+  params.set("pageSize", String(PAGE_SIZE));
   params.set("session", feedSessionId);
   if (cursor) params.set("cursor", cursor);
-  if (type !== "all") params.set("type", type);
-  if (timeframe !== "all") params.set("timeframe", timeframe);
-  if (tab === "subscriptions") params.set("source", source);
 
   const response = await fetch(`/api/feed?${params.toString()}`, {
     cache: "no-store",
@@ -147,62 +97,44 @@ export function EndStateCard() {
   );
 }
 
+/** What each mode says when it has nothing to show. One line, one link. */
+export function HomeFeedEmptyState({ tab }: { tab: HomeFeedTab }) {
+  if (tab === "following") {
+    return (
+      <FeedEmptyState
+        title="Follow writers to see their Posts and Articles here."
+        cta={
+          <Link href="/explore?tab=people" className={CTA_CLASS}>
+            Explore writers
+          </Link>
+        }
+      />
+    );
+  }
+  return <FeedEmptyState title="No publications to show yet." />;
+}
+
 export default function PostsFeedTabs({
   initialTab,
-  initialType,
-  initialTimeframe,
   initialPosts,
   initialHasMore,
   initialNextCursor = null,
   initialLoadFailed = false,
-  initialSubscriptionSource = "all",
-  showFollowingTab,
-  showTopicsTab = false,
-  showSubscriptionsTab = false,
-
-  peopleSuggestions,
-  peopleSuggestionReason,
-  prioritizePeopleSuggestions,
   currentUserId,
-  featuredPost,
 }: {
-  initialTab: TabKey;
-  initialType: FeedContentFilter;
-  initialTimeframe: FeedTimeframe;
+  initialTab: HomeFeedTab;
   initialPosts: PostCardData[];
   initialHasMore: boolean;
   initialNextCursor?: string | null;
   initialLoadFailed?: boolean;
-  initialSubscriptionSource?: SubscriptionFeedSource;
-  showFollowingTab: boolean;
-  showTopicsTab?: boolean;
-  showSubscriptionsTab?: boolean;
-
-  peopleSuggestions: {
-    id: string;
-    username: string;
-    full_name: string | null;
-    university: string | null;
-    avatar_url: string | null;
-  }[];
-  peopleSuggestionReason?: string;
-  prioritizePeopleSuggestions?: boolean;
   currentUserId: string | null;
-  featuredPost?: HomeFeaturedPost | null;
 }) {
-  const { mode: chromeMode, navHeight, revealChrome } = useAppChrome();
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
-  const [typeFilter, setTypeFilter] = useState<FeedContentFilter>(initialType);
-  const [timeframe, setTimeframe] = useState<FeedTimeframe>(initialTimeframe);
-  const [subscriptionSource, setSubscriptionSource] =
-    useState<SubscriptionFeedSource>(initialSubscriptionSource);
-  const [feedCache, setFeedCache] = useState<Record<string, FeedCacheEntry>>(() => ({
-    [feedCacheKey(
-      initialTab,
-      initialType,
-      initialTimeframe,
-      initialSubscriptionSource
-    )]: {
+  const { navHeight, revealChrome } = useAppChrome();
+  const [activeTab, setActiveTab] = useState<HomeFeedTab>(initialTab);
+  const [feedCache, setFeedCache] = useState<
+    Partial<Record<HomeFeedTab, FeedCacheEntry>>
+  >(() => ({
+    [initialTab]: {
       posts: initialPosts,
       hasMore: initialHasMore,
       nextCursor: initialNextCursor,
@@ -213,7 +145,7 @@ export default function PostsFeedTabs({
   const [isSwitching, setIsSwitching] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   // Two distinct failure modes: initialError replaces the panel with a
-  // full retry state (nothing loaded yet for this tab/filter), while
+  // full retry state (nothing loaded yet for this tab), while
   // paginationError leaves every already-loaded card in place and only
   // adds a compact inline retry banner at the bottom.
   const [initialError, setInitialError] = useState(initialLoadFailed);
@@ -229,6 +161,10 @@ export default function PostsFeedTabs({
   const activeRequestRef = useRef(0);
   const loadMoreRequestRef = useRef(0);
 
+  const tabs = visibleHomeFeedTabs(Boolean(currentUserId));
+  // A guest has For You alone, and one mode is not presented as a choice.
+  const showTabs = tabs.length > 1;
+
   // Lets the control strip retreat off the top with the nav rather than
   // staying glued there once the nav is gone.
   useStickySubnav(stripRef, feedTopRef);
@@ -239,19 +175,10 @@ export default function PostsFeedTabs({
     if (incomingFeedSessionId) {
       feedSessionIdRef.current = incomingFeedSessionId;
     }
-    const nextKey = feedCacheKey(
-      initialTab,
-      initialType,
-      initialTimeframe,
-      initialSubscriptionSource
-    );
     setActiveTab(initialTab);
-    setTypeFilter(initialType);
-    setTimeframe(initialTimeframe);
-    setSubscriptionSource(initialSubscriptionSource);
     setFeedCache((current) => ({
       ...current,
-      [nextKey]: {
+      [initialTab]: {
         posts: initialPosts,
         hasMore: initialHasMore,
         nextCursor: initialNextCursor,
@@ -268,70 +195,21 @@ export default function PostsFeedTabs({
     initialLoadFailed,
     initialNextCursor,
     initialPosts,
-    initialSubscriptionSource,
     initialTab,
-    initialTimeframe,
-    initialType,
   ]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const currentType = params.get("type");
-    const canonicalType = initialType === "all" ? null : initialType;
-    if (currentType === canonicalType) return;
-
-    if (canonicalType) params.set("type", canonicalType);
-    else params.delete("type");
-    const query = params.toString();
-    window.history.replaceState(
-      null,
-      "",
-      query ? `${window.location.pathname}?${query}` : window.location.pathname
-    );
-  }, [initialType]);
-
-  const syncUrl = useCallback(
-    (
-      nextTab: TabKey,
-      nextType: FeedContentFilter,
-      nextTimeframe: FeedTimeframe,
-      nextSource: SubscriptionFeedSource
-    ) => {
-      window.history.replaceState(
-        null,
-        "",
-        buildFeedUrl(nextTab, nextType, nextTimeframe, nextSource)
-      );
-    },
-    []
-  );
-
   const requestFeedPage = useCallback(
-    (
-      nextTab: TabKey,
-      nextType: FeedContentFilter,
-      nextTimeframe: FeedTimeframe,
-      nextPage: number,
-      nextSource: SubscriptionFeedSource,
-      nextCursor: string | null = null
-    ) => {
-      const key = feedCacheKey(
-        nextTab,
-        nextType,
-        nextTimeframe,
-        nextSource
-      );
-      const cursor = nextTab === "home" ? null : nextCursor;
-      const requestKey = `${key}:${nextPage}:${cursor ?? "offset"}`;
+    (tab: HomeFeedTab, page: number, nextCursor: string | null = null) => {
+      // For You pages its fixed ranked window by number. Following continues
+      // from the server's keyset cursor.
+      const cursor = tab === "home" ? null : nextCursor;
+      const requestKey = `${tab}:${page}:${cursor ?? "offset"}`;
       const existing = inFlightRef.current.get(requestKey);
       if (existing) return existing;
 
       const request = fetchFeed(
-        nextTab,
-        nextType,
-        nextTimeframe,
-        nextPage,
-        nextSource,
+        tab,
+        page,
         feedSessionIdRef.current,
         cursor
       ).finally(() => {
@@ -344,18 +222,12 @@ export default function PostsFeedTabs({
   );
 
   const writeFeedPage = useCallback(
-    (
-      key: string,
-      result: FeedResponse,
-      nextPage: number,
-      append: boolean
-    ) => {
+    (tab: HomeFeedTab, result: FeedResponse, page: number, append: boolean) => {
       setFeedCache((current) => {
-        const previous = current[key];
+        const previous = current[tab];
 
-        // Chronological tabs normally continue from a keyset cursor; ranked
-        // Home still pages its fixed score window by index. ID dedupe remains
-        // a final defense for retries and older clients using offset fallback.
+        // ID dedupe is a final defense for retries, and for a post published
+        // between two requests sliding a page window.
         const carried = append ? (previous?.posts ?? []) : [];
         const seen = new Set(carried.map((post) => post.id));
         const added = result.posts.filter((post) => {
@@ -370,18 +242,18 @@ export default function PostsFeedTabs({
         // in a row is the end of the feed however it got that way.
         const emptyPageCount =
           added.length === 0
-            ? nextPage === 1
+            ? page === 1
               ? 1
               : (previous?.emptyPageCount ?? 0) + 1
             : 0;
 
         return {
           ...current,
-          [key]: {
+          [tab]: {
             posts: append ? [...carried, ...added] : added,
             hasMore: result.hasMore,
             nextCursor: result.nextCursor ?? null,
-            page: nextPage,
+            page,
             emptyPageCount,
           },
         };
@@ -392,10 +264,7 @@ export default function PostsFeedTabs({
 
   const reloadFeed = useCallback(
     async (
-      nextTab: TabKey,
-      nextType: FeedContentFilter,
-      nextTimeframe: FeedTimeframe,
-      nextSource: SubscriptionFeedSource,
+      tab: HomeFeedTab,
       {
         requestId,
         showError,
@@ -406,24 +275,11 @@ export default function PostsFeedTabs({
         showSkeleton: boolean;
       }
     ) => {
-      const key = feedCacheKey(
-        nextTab,
-        nextType,
-        nextTimeframe,
-        nextSource
-      );
       if (showSkeleton) setIsSwitching(true);
       if (showError) setInitialError(false);
       try {
-        const result = await requestFeedPage(
-          nextTab,
-          nextType,
-          nextTimeframe,
-          1,
-          nextSource,
-          null
-        );
-        writeFeedPage(key, result, 1, false);
+        const result = await requestFeedPage(tab, 1, null);
+        writeFeedPage(tab, result, 1, false);
       } catch {
         if (activeRequestRef.current === requestId && showError) {
           setInitialError(true);
@@ -438,10 +294,9 @@ export default function PostsFeedTabs({
   );
 
   // Switching tabs swaps the entire list underneath a scroll position that was
-  // meaningful for the old one. Landing five screens deep in a different (often
-  // shorter) feed is what makes the tabs feel stuck. Snap back to the top of
-  // the feed -- but only when the reader is already below it, so switching
-  // tabs from the top of the page never yanks the viewport.
+  // meaningful for the old one. Snap back to the top of the feed, but only when
+  // the reader is already below it, so switching from the top of the page never
+  // yanks the viewport.
   const scrollFeedToTop = useCallback(() => {
     const anchor = feedTopRef.current;
     if (!anchor || typeof window === "undefined") return;
@@ -449,109 +304,65 @@ export default function PostsFeedTabs({
     // The measured height, not the live offset. This scroll always moves
     // upward, and an upward scroll is exactly what brings the nav back -- so by
     // the time the tab's new cards are on screen there is a full nav bar at the
-    // top again, and the marker has to land below it. Reserving only the
-    // retreated offset (0) would park the strip's natural position at the very
-    // top, where the revealed nav then overlaps the first card.
+    // top again, and the marker has to land below it.
     revealChrome({ immediate: true });
     const target = Math.max(
       window.scrollY + anchor.getBoundingClientRect().top - navHeight,
       0
     );
     if (window.scrollY <= target) return;
-    // Instant, not smooth: a tab switch should already be at the top by the
-    // time the new cards paint, not animating past the old ones.
-    //
-    // "instant", not "auto". Per CSSOM View, "auto" does not mean "no
-    // animation" -- it means "defer to the computed scroll-behavior", and
-    // globals.css sets `html { scroll-behavior: smooth }` for everyone who
-    // has not asked for reduced motion. So this call was animating the whole
-    // way back up, past every card the reader was trying to leave, which is
-    // exactly what the line above says it must not do.
+    // "instant", not "auto". Per CSSOM View, "auto" defers to the computed
+    // scroll-behavior, and globals.css sets `html { scroll-behavior: smooth }`
+    // for everyone who has not asked for reduced motion, so "auto" animated
+    // the reader back up past every card they were trying to leave.
     window.scrollTo({ top: target, behavior: "instant" });
   }, [navHeight, revealChrome]);
 
-  const updateState = useCallback(
-    (
-      nextTab: TabKey,
-      nextType: FeedContentFilter,
-      nextTimeframe: FeedTimeframe,
-      nextSource: SubscriptionFeedSource = subscriptionSource
-    ) => {
-      const nextKey = feedCacheKey(
-        nextTab,
-        nextType,
-        nextTimeframe,
-        nextSource
-      );
-      const hasCachedFeed = Boolean(feedCache[nextKey]);
+  const selectTab = useCallback(
+    (nextTab: HomeFeedTab) => {
+      const hasCachedFeed = Boolean(feedCache[nextTab]);
       const requestId = activeRequestRef.current + 1;
       activeRequestRef.current = requestId;
-      // Invalidate any pagination request owned by the previous tab/filter.
-      // Its result may still warm that old cache key, but it cannot change the
-      // loading or error state for the newly active view.
+      // Invalidate any pagination request owned by the previous tab. Its
+      // result may still warm that tab's cache, but it cannot change the
+      // loading or error state for the newly active one.
       loadMoreRequestRef.current += 1;
 
-      if (nextTab !== activeTab) {
-        trackActivationEvent({
-          event: "home_tab_changed",
-          metadata: {
-            fromTab: activeTab,
-            toTab: nextTab,
-            feedSessionId: feedSessionIdRef.current,
-          },
-        });
-      }
-
       setActiveTab(nextTab);
-      setTypeFilter(nextType);
-      setTimeframe(nextTimeframe);
-      setSubscriptionSource(nextSource);
       setInitialError(false);
       setPaginationError(false);
       setIsLoadingMore(false);
       setIsSwitching(!hasCachedFeed);
       scrollFeedToTop();
-      syncUrl(nextTab, nextType, nextTimeframe, nextSource);
-      void reloadFeed(nextTab, nextType, nextTimeframe, nextSource, {
+      window.history.replaceState(null, "", buildFeedUrl(nextTab));
+      void reloadFeed(nextTab, {
         requestId,
         showError: !hasCachedFeed,
         showSkeleton: !hasCachedFeed,
       });
     },
-    [
-      activeTab,
-      feedCache,
-      reloadFeed,
-      scrollFeedToTop,
-      subscriptionSource,
-      syncUrl,
-    ]
+    [feedCache, reloadFeed, scrollFeedToTop]
   );
 
   const retryInitial = useCallback(() => {
     const requestId = activeRequestRef.current + 1;
     activeRequestRef.current = requestId;
-    void reloadFeed(activeTab, typeFilter, timeframe, subscriptionSource, {
+    void reloadFeed(activeTab, {
       requestId,
       showError: true,
       showSkeleton: true,
     });
-  }, [activeTab, typeFilter, timeframe, subscriptionSource, reloadFeed]);
+  }, [activeTab, reloadFeed]);
 
   const loadMore = useCallback(async () => {
-    const key = feedCacheKey(
-      activeTab,
-      typeFilter,
-      timeframe,
-      subscriptionSource
-    );
-    const currentFeed = feedCache[key];
+    const currentFeed = feedCache[activeTab];
     if (isSwitching || isLoadingMore || !currentFeed?.hasMore) return;
     // The sentinel is 400px tall in effect and re-arms on every cache write, so
     // a `hasMore` that never turns false would page forever. Three pages that
     // added nothing is the same signal the end-state card reads.
     if (currentFeed.emptyPageCount >= 3) return;
 
+    const tab = activeTab;
     const requestId = loadMoreRequestRef.current + 1;
     loadMoreRequestRef.current = requestId;
     setIsLoadingMore(true);
@@ -559,30 +370,24 @@ export default function PostsFeedTabs({
     try {
       const nextPage = currentFeed.page + 1;
       const result = await requestFeedPage(
-        activeTab,
-        typeFilter,
-        timeframe,
+        tab,
         nextPage,
-        subscriptionSource,
         currentFeed.nextCursor ?? null
       );
-      writeFeedPage(key, result, nextPage, true);
+      writeFeedPage(tab, result, nextPage, true);
     } catch (error) {
       if (loadMoreRequestRef.current === requestId) {
         if (
           error instanceof FeedRequestError &&
           error.code === "INVALID_CURSOR"
         ) {
-          // Cursors are intentionally version/context-bound. After a deploy or
-          // context change, clear the rejected cursor so Retry can fall back to
-          // the same page number instead of repeating a permanent 400.
+          // Cursors are intentionally version/context-bound. After a deploy,
+          // clear the rejected cursor so Retry can fall back to the same page
+          // number instead of repeating a permanent 400.
           setFeedCache((current) => {
-            const entry = current[key];
+            const entry = current[tab];
             if (!entry) return current;
-            return {
-              ...current,
-              [key]: { ...entry, nextCursor: null },
-            };
+            return { ...current, [tab]: { ...entry, nextCursor: null } };
           });
         }
         setPaginationError(true);
@@ -598,17 +403,11 @@ export default function PostsFeedTabs({
     isLoadingMore,
     isSwitching,
     requestFeedPage,
-    subscriptionSource,
-    timeframe,
-    typeFilter,
     writeFeedPage,
   ]);
 
   useEffect(() => {
-    const currentFeed =
-      feedCache[
-        feedCacheKey(activeTab, typeFilter, timeframe, subscriptionSource)
-      ];
+    const currentFeed = feedCache[activeTab];
     if (!sentinelRef.current || !currentFeed?.hasMore || isSwitching) return;
     if (currentFeed.emptyPageCount >= 3) return;
 
@@ -623,19 +422,11 @@ export default function PostsFeedTabs({
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [
-    activeTab,
-    feedCache,
-    isSwitching,
-    loadMore,
-    subscriptionSource,
-    timeframe,
-    typeFilter,
-  ]);
+  }, [activeTab, feedCache, isSwitching, loadMore]);
 
-  // Track whether the control strip is currently pinned, so its bottom edge
-  // only appears while cards are actually passing beneath it -- a permanent
-  // shadow reads as a bar floating over nothing when the page is at rest.
+  // Track whether the tab strip is currently pinned, so its shadow only
+  // appears while cards are actually passing beneath it -- a permanent shadow
+  // reads as a bar floating over nothing when the page is at rest.
   //
   // feedTopRef is the non-sticky marker just above the strip, so it leaves the
   // viewport at exactly the moment the strip pins. Watching it costs one
@@ -646,10 +437,8 @@ export default function PostsFeedTabs({
 
     // Deliberately the measured height, frozen at mount, rather than the live
     // --app-nav-offset: this gates the strip's shadow, not its position, and
-    // rebuilding the observer on every hide/reveal would fire a fresh initial
-    // callback each time and flicker it. With the nav retreated the shadow
-    // turns on a little early, which is past the point anyone is looking.
-    const navHeight =
+    // rebuilding the observer on every hide/reveal would flicker it.
+    const measuredNavHeight =
       Number.parseFloat(
         getComputedStyle(document.documentElement).getPropertyValue("--app-nav-height")
       ) || 0;
@@ -659,128 +448,54 @@ export default function PostsFeedTabs({
         const entry = entries[0];
         if (entry) setIsPinned(!entry.isIntersecting);
       },
-      { rootMargin: `-${navHeight}px 0px 0px 0px`, threshold: 0 }
+      { rootMargin: `-${measuredNavHeight}px 0px 0px 0px`, threshold: 0 }
     );
 
     observer.observe(anchor);
     return () => observer.disconnect();
   }, []);
 
-  const activeKey = feedCacheKey(
-    activeTab,
-    typeFilter,
-    timeframe,
-    subscriptionSource
-  );
-  const currentFeed = feedCache[activeKey];
+  const currentFeed = feedCache[activeTab];
   const posts = currentFeed?.posts ?? EMPTY_POSTS;
   const hasMore = currentFeed?.hasMore ?? false;
   const emptyPageCount = currentFeed?.emptyPageCount ?? 0;
   const showSkeleton = isSwitching && !currentFeed;
-  const showFeaturedLead =
-    activeTab === "home" && typeFilter === "all" && Boolean(featuredPost) && !initialError && !showSkeleton;
-  // The featured lead already shows this record above the feed -- don't
-  // render it a second time in the list immediately below it.
-  const visiblePosts = showFeaturedLead
-    ? posts.filter((candidate) => candidate.id !== featuredPost?.id)
-    : posts;
-  const hasVisibleContent = showFeaturedLead || visiblePosts.length > 0;
-  const showEmpty = !initialError && !showSkeleton && !hasVisibleContent;
-  const showFeedList =
-    !initialError && !showSkeleton && visiblePosts.length > 0;
+  const showEmpty = !initialError && !showSkeleton && posts.length === 0;
+  const showFeedList = !initialError && !showSkeleton && posts.length > 0;
   const showEndState =
-    hasVisibleContent &&
+    posts.length > 0 &&
     !initialError &&
     !showSkeleton &&
     !isLoadingMore &&
     (!hasMore || emptyPageCount >= 3);
 
-  const resetFilterToAll = () => updateState(activeTab, "all", timeframe);
-
-  const visibleTabs = TAB_ORDER.filter(
-    (tab) =>
-      (tab !== "following" || showFollowingTab) &&
-      (tab !== "topics" || showTopicsTab) &&
-      (tab !== "subscriptions" || showSubscriptionsTab)
-  );
-
   /**
-   * Arrow-key navigation for the tablist. The row already declared
-   * `role="tablist"` and `role="tab"`, which tells assistive technology that
-   * Left/Right move between tabs -- but nothing implemented it, so a keyboard
-   * user got the promise without the behaviour and had to Tab through every
-   * control instead. Paired with the roving `tabIndex` below, which takes the
-   * inactive tabs out of the Tab sequence so the whole row is one stop.
-   *
-   * Activation follows focus, matching what a click already does.
+   * Arrow-key navigation for the tablist, paired with the roving `tabIndex`
+   * below, which takes the inactive tab out of the Tab sequence so the whole
+   * row is one stop. Activation follows focus, matching what a click does.
    */
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const currentIndex = visibleTabs.indexOf(activeTab);
+    const currentIndex = tabs.indexOf(activeTab);
     if (currentIndex === -1) return;
 
     let nextIndex: number | null = null;
     if (event.key === "ArrowRight") {
-      nextIndex = (currentIndex + 1) % visibleTabs.length;
+      nextIndex = (currentIndex + 1) % tabs.length;
     } else if (event.key === "ArrowLeft") {
-      nextIndex = (currentIndex - 1 + visibleTabs.length) % visibleTabs.length;
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
     } else if (event.key === "Home") {
       nextIndex = 0;
     } else if (event.key === "End") {
-      nextIndex = visibleTabs.length - 1;
+      nextIndex = tabs.length - 1;
     }
 
     if (nextIndex === null) return;
     event.preventDefault();
-    const nextTab = visibleTabs[nextIndex];
+    const nextTab = tabs[nextIndex];
     if (!nextTab || nextTab === activeTab) return;
     document.getElementById(`feed-tab-${nextTab}`)?.focus();
-    updateState(nextTab, typeFilter, timeframe);
+    selectTab(nextTab);
   };
-
-  let emptyTitle = "No content yet.";
-  let emptyBody = "Be the first to share your ideas with Africa.";
-  let emptyCta = (
-    <CreateTrigger userId={currentUserId} className={CREATE_CTA_CLASS}>
-      Create
-    </CreateTrigger>
-  );
-
-  if (typeFilter !== "all") {
-    const kindLabel = CONTENT_KIND_PLURAL[typeFilter];
-    emptyTitle = `No ${kindLabel} here yet.`;
-    emptyBody = "Try All to see everything in this feed.";
-    emptyCta = (
-      <button type="button" onClick={resetFilterToAll} className={SECONDARY_CTA_CLASS}>
-        View all
-      </button>
-    );
-  } else if (activeTab === "following") {
-    emptyTitle = "No posts from writers you follow yet.";
-    emptyBody = "Follow writers to build a feed around the ideas you care about.";
-    emptyCta = (
-      <Link href="/explore?tab=people" className={CREATE_CTA_CLASS}>
-        Explore writers
-      </Link>
-    );
-  } else if (activeTab === "topics") {
-    emptyTitle = "No posts from your subscribed topics yet.";
-    emptyBody =
-      "Subscribe to topics to build a feed around the subjects you care about.";
-    emptyCta = (
-      <Link href="/topics" className={CREATE_CTA_CLASS}>
-        Explore topics
-      </Link>
-    );
-  } else if (activeTab === "subscriptions") {
-    emptyTitle = "No publications from your subscriptions yet.";
-    emptyBody =
-      "Subscribe to writers or topics to build a feed around the ideas you care about.";
-    emptyCta = (
-      <Link href="/subscriptions" className={CREATE_CTA_CLASS}>
-        Manage subscriptions
-      </Link>
-    );
-  }
 
   return (
     <div>
@@ -790,60 +505,31 @@ export default function PostsFeedTabs({
           document -- the sticky wrapper's own rect lies once it is pinned. */}
       <div ref={feedTopRef} aria-hidden="true" />
 
-      {/* Tabs and filter chips pin together as one block. Splitting them let
-          the chips slide up under the tabs, which read as the header breaking
-          apart mid-scroll. Each row is fully opaque (not bg-white/95) so cards
-          passing beneath don't ghost through whichever rows are showing.
+      {/* Pinned beneath the nav while the nav is there, and at the very top of
+          the viewport once it isn't. The sticky offset comes from the shared
+          [data-app-context-nav] rule, which tracks the nav's live occupancy.
 
-          Pinned beneath the nav while the nav is there, and at the very top of
-          the viewport once it isn't: scrolling down hands the entire screen to
-          the posts, scrolling up brings tabs, chips and nav back together in
-          one movement. The sticky offset comes from the shared
-          [data-app-context-nav] rule, which tracks the nav's live occupancy --
-          pinning at a fixed offset and translating the strip up instead would
-          leave its reserved flow space behind, where it is no use to anyone.
-
-          The wrapper paints nothing and swallows no taps; each row carries its
-          own full-bleed background and padding. Backgrounding the wrapper
-          would put a white band where the filter row collapses away, and
-          padding it inset those backgrounds from the screen edge, leaving
-          gutters for cards to ghost through.
-
-          The bottom edge only appears once pinned: without it a card sliding
-          under the strip looked sliced rather than layered. The border is
-          always in the box (transparent at rest) so gaining it costs no 1px
-          reflow. */}
-      <div
-        ref={stripRef}
-        data-app-context-nav=""
-        data-app-chrome-motion=""
-        className="pointer-events-none z-30 -mx-4 mb-3 w-[calc(100%+2rem)] sm:mx-0 sm:w-full"
-      >
+          The wrapper paints nothing and swallows no taps; the tab row carries
+          its own full-bleed background and padding, so cards passing beneath
+          have no transparent gutter to ghost through. The bottom border is
+          always in the box, so gaining the shadow once pinned costs no reflow. */}
+      {showTabs ? (
         <div
-          data-app-context-primary=""
-          className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-divider bg-card px-4 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden ${
-            isPinned && chromeMode === "compact"
-              ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
-              : ""
-          }`}
-          role="tablist"
-          aria-label="Choose feed"
-          onKeyDown={handleTabKeyDown}
+          ref={stripRef}
+          data-app-context-nav=""
+          data-app-chrome-motion=""
+          className="pointer-events-none z-30 -mx-4 mb-3 w-[calc(100%+2rem)] sm:mx-0 sm:w-full"
         >
-          {visibleTabs.map((tab) => {
-            const label =
-              tab === "home"
-                ? currentUserId
-                  ? "For you"
-                  : "Discover"
-                : tab === "following"
-                  ? "Following"
-                  : tab === "subscriptions"
-                    ? "Subscribed"
-                  : tab === "topics"
-                    ? "Topics"
-                    : "Latest";
-            return (
+          <div
+            data-app-context-primary=""
+            className={`pointer-events-auto flex gap-1 overflow-x-auto overscroll-x-contain border-b border-divider bg-card px-4 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden ${
+              isPinned ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
+            }`}
+            role="tablist"
+            aria-label="Choose feed"
+            onKeyDown={handleTabKeyDown}
+          >
+            {tabs.map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -852,101 +538,27 @@ export default function PostsFeedTabs({
                 aria-controls="home-feed-panel"
                 aria-selected={activeTab === tab}
                 tabIndex={activeTab === tab ? 0 : -1}
-                onClick={() => updateState(tab, typeFilter, timeframe)}
-                // Underline only. These carried a `bg-green-tint/70` fill as
-                // well, which made the active tab read as a pressed button
-                // sitting in a box -- the same doubled-signal problem the feed
-                // cards had, and the reason two stacked control rows looked
-                // like two competing systems. The underline was already here
-                // and is sufficient on its own; X and Medium both settled on
-                // exactly this for the same job. Tabs are navigation, not an
-                // action, so they should be the quietest thing on the page.
+                onClick={() => selectTab(tab)}
+                // Underline only. Tabs are navigation, not an action, so they
+                // should be the quietest thing on the page.
                 className={`-mb-px min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-byline font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold sm:px-4 ${
                   activeTab === tab
                     ? "border-emerald-brand text-ink"
                     : "border-transparent text-ink-muted hover:text-ink"
                 }`}
               >
-                {label}
+                {HOME_FEED_TAB_LABELS[tab]}
               </button>
-            );
-          })}
-        </div>
-
-        <div
-          data-app-context-expanded=""
-          data-app-chrome-motion=""
-          aria-hidden={chromeMode === "compact" || undefined}
-          inert={chromeMode === "compact" || undefined}
-          className={`pointer-events-auto border-b bg-card ${
-            isPinned && chromeMode === "expanded"
-              ? "border-divider shadow-[0_1px_12px_rgb(0,0,0,0.08)]"
-              : "border-transparent"
-          }`}
-        >
-          {/* Both wrappers are load-bearing. The outer one is the grid row the
-              shared rule clips to nothing (its overflow:hidden comes from
-              there); the inner one holds the padding, which a border-box row
-              cannot collapse below. */}
-          <div>
-            <div className="px-4 pb-1 sm:px-0">
-              {activeTab === "subscriptions" ? (
-                <div
-                  className="flex gap-2 overflow-x-auto pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                  aria-label="Filter subscriptions"
-                >
-                  {(["all", "authors", "topics"] as const).map((source) => (
-                    <button
-                      key={source}
-                      type="button"
-                      aria-pressed={subscriptionSource === source}
-                      onClick={() =>
-                        updateState(activeTab, typeFilter, timeframe, source)
-                      }
-                      className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
-                        subscriptionSource === source
-                          ? "border-emerald-brand bg-emerald-brand text-white"
-                          : "border-divider bg-card text-ink-muted hover:border-emerald-ink hover:text-emerald-ink"
-                      }`}
-                    >
-                      {source}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              {/* The All / Posts / Articles / Research chips used to sit here.
-                  They now live only on Explore, which already offered the same
-                  four filters plus a genre refinement (General / Essay /
-                  Policy Brief) that this row never had -- so this was the
-                  weaker of two copies, charging every visitor a second row of
-                  chrome for a filter most of them never touch.
-
-                  Splitting it that way also splits the job cleanly: Home is
-                  where you go to be surprised, Explore is where you go looking
-                  for something specific, and narrowing to one content kind is
-                  a seeking action. `/?type=` links hand off to Explore (see
-                  app/(main)/page.tsx) so old bookmarks keep their intent.
-
-                  `typeFilter` is deliberately still threaded through this
-                  component. The feed API and fetchFeedPage still accept a
-                  content filter, the empty states still describe one, and the
-                  prop is still part of this component's contract -- home just
-                  never sets it to anything but "all" now. Ripping the plumbing
-                  out is a separate, larger change. */}
-            </div>
+            ))}
           </div>
         </div>
-      </div>
-
-      {showFeaturedLead && featuredPost ? (
-        <HomeFeaturedLeadImpression post={featuredPost} />
       ) : null}
 
       <div
         id="home-feed-panel"
-        role="tabpanel"
-        aria-labelledby={`feed-tab-${activeTab}`}
+        {...(showTabs
+          ? { role: "tabpanel", "aria-labelledby": `feed-tab-${activeTab}` }
+          : { "aria-label": "Publications" })}
         aria-busy={showSkeleton || isLoadingMore}
       >
         {initialError ? (
@@ -954,25 +566,19 @@ export default function PostsFeedTabs({
         ) : showSkeleton ? (
           <FeedSkeleton />
         ) : showEmpty ? (
-          <FeedEmptyState title={emptyTitle} body={emptyBody} cta={emptyCta} />
+          <HomeFeedEmptyState tab={activeTab} />
         ) : showFeedList ? (
           <PostFeed
-            posts={visiblePosts}
-            activeTab={activeTab}
-      
-            peopleSuggestions={peopleSuggestions}
-            peopleSuggestionReason={peopleSuggestionReason}
-            prioritizePeopleSuggestions={prioritizePeopleSuggestions}
+            posts={posts}
+            surface={activeTab}
             currentUserId={currentUserId}
-            prioritizeFirstPost={!showFeaturedLead}
           />
         ) : null}
       </div>
 
       {/* The same skeleton the first load uses, rather than a line of grey
-          text. It holds the height the incoming cards will occupy instead of
-          collapsing to one row, so the scroll position stays put when they
-          land, and it keeps the two loading states looking like one product. */}
+          text. It holds the height the incoming cards will occupy, so the
+          scroll position stays put when they land. */}
       {isLoadingMore ? (
         <>
           <span className="sr-only" role="status" aria-live="polite">

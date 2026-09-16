@@ -22,7 +22,7 @@ import { BRAND_PROMISE } from "@/lib/brand";
 const PROOF_ITEMS = [
   "Build a public record of your ideas",
   "Publish Posts and Articles",
-  "Respond, review, and collaborate",
+  "Comment on and share what you read",
 ];
 
 type VerificationType = "signup" | "magiclink";

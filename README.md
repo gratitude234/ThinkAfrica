@@ -31,8 +31,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-Keep `DAILY_BRIEF_DRY_RUN=1` until the target environment, recipient query, push credentials, and scheduled job have been verified.
-
 ### 3. Prepare the database safely
 
 The database is maintained through the ordered files in `supabase/migrations/`. The `supabase/schema*.sql` files are historical snapshots and are **not** sufficient setup instructions for the current application. Files in `supabase/pending/` are release candidates and are deliberately excluded from the executable migration ledger.

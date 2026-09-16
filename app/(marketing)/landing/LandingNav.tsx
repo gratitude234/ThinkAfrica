@@ -10,7 +10,6 @@ export default function LandingNav() {
   const scrolled = useHasScrolled();
   const navLinks = [
     { label: "Explore", href: "/explore" },
-    { label: "Opportunities", href: "/opportunities" },
     { label: "About", href: "/about" },
   ];
 

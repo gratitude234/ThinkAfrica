@@ -410,7 +410,7 @@ if (queryErrors > 0) {
 const SUPABASE_TRANSPORT = /fetch failed|ECONNRESET|socket hang up|ETIMEDOUT/i;
 
 const SUPABASE_ONLY_LOADERS =
-  /follower count failed|following count failed|opportunity state failed|featured work failed|publications failed|co-authored publications failed|profile record|topic index|comments failed|responses|reference counts/i;
+  /follower count failed|following count failed|featured work failed|publications failed|co-authored publications failed|profile record|topic index|comments failed|responses|reference counts/i;
 
 const SUPABASE_ATTRIBUTABLE = (line) =>
   /SupabaseTimeoutError|FeedDataError|PostgrestError|supabase\.co|postgrest/i.test(line) ||

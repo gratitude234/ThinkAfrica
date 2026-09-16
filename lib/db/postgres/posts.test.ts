@@ -209,7 +209,6 @@ describe("toPostRecord", () => {
     const record = toPostRecord(fullRow);
     expect(record.created_at).toBe("2026-09-01T10:00:00.000Z");
     expect(record.published_at).toBe("2026-09-02T10:00:00.000Z");
-    expect(record.revision_due_at).toBeNull();
   });
 
   it("numbers the counters a driver may hand back as strings", () => {
@@ -217,7 +216,6 @@ describe("toPostRecord", () => {
     expect(record.view_count).toBe(12);
     expect(record.impression_count).toBe(40);
     expect(record.read_count).toBeNull();
-    expect(record.document_size_bytes).toBe(2048);
   });
 
   it("produces an author the shared normaliser accepts", () => {

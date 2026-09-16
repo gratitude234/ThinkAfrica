@@ -3,7 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const SUSPENDED_ERROR =
-  "Your account is currently suspended. You can browse but cannot post, comment, or message.";
+  "Your account is currently suspended. You can browse but cannot publish or comment.";
 
 export async function getSuspension(userId: string): Promise<{
   suspendedAt: string | null;

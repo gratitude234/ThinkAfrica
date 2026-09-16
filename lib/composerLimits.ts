@@ -14,5 +14,3 @@ export const MY_DRAFTS_LIMIT = 30;
 export const RESUMABLE_LIMIT = 5;
 
 export const REVISION_LIMIT = 40;
-
-export const COAUTHOR_RESULT_LIMIT = 6;

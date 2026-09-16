@@ -21,14 +21,14 @@ const enabled = Boolean(neonUrl && neonUrl.includes(".neon.tech"));
 const { createPostgresProfilePageRepository } = await import("@/lib/db/profilePage");
 const { adaptDriver } = await import("@/lib/db/postgres/executor");
 
-import { legacyTypesForContentKind, type ContentKind } from "@/lib/contentModel";
+import type { ProfilePublicationKind } from "@/lib/profileTabs";
 
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
 import type { ProfilePageRepository } from "@/lib/db/profilePage";
 
 const NO_SUCH_PROFILE = "00000000-0000-0000-0000-000000000000";
 
-const KINDS: ContentKind[] = ["article", "post", "research"];
+const KINDS: ProfilePublicationKind[] = ["article", "post"];
 
 // A cold pooled connection can take longer than the 5s default before the
 // first statement returns, and every test here starts with a real round trip.
@@ -66,9 +66,9 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
    * publication filter actually matches.
    *
    * The kind is not optional and there is no "all": `publicationBranches`
-   * reproduces `contentKindFilter`, which is an equality on `content_kind`
-   * with a fallback to the legacy `type`. Asking for a kind nothing carries
-   * is a valid empty answer, so a test that passed one would prove nothing.
+   * selects on `content_kind` alone, which is what a profile tab is. Asking
+   * for a kind nothing carries is a valid empty answer, so a test that passed
+   * one would prove nothing.
    */
   async function someAuthor() {
     const [row] = await executor.query<{ id: string }>(
@@ -84,13 +84,12 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
     for (const kind of KINDS) {
       const branches = await repository.publicationBranches({
         profileId: row.id,
-        contentKind: kind,
-        legacyTypes: legacyTypesForContentKind(kind),
+        contentKinds: [kind],
         start: 0,
         limit: 1,
       });
       if (branches.owned.length > 0) {
-        return { id: row.id, contentKind: kind, legacyTypes: legacyTypesForContentKind(kind) };
+        return { id: row.id, contentKinds: [kind] };
       }
     }
     return null;
@@ -129,16 +128,14 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
       for (const kind of KINDS) {
         const branches = await repository.publicationBranches({
           profileId: candidate.user_id,
-          contentKind: kind,
-          legacyTypes: legacyTypesForContentKind(kind),
+          contentKinds: [kind],
           start: 0,
           limit: 5,
         });
         if (branches.coauthored.length > 0) {
           return {
             id: candidate.user_id,
-            contentKind: kind,
-            legacyTypes: legacyTypesForContentKind(kind),
+            contentKinds: [kind],
           };
         }
       }
@@ -189,15 +186,10 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
     const author = await someAuthorId();
     if (!author) return;
 
-    const relationship = await repository.viewerRelationship(
-      author,
-      NO_SUCH_PROFILE,
-      { includeSubscription: true }
-    );
+    const relationship = await repository.viewerRelationship(author, NO_SUCH_PROFILE);
 
     expect(relationship).toEqual({
       isFollowing: false,
-      isSubscribed: false,
       isBlocked: false,
     });
   });
@@ -209,9 +201,7 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
     );
     if (!edge) return;
 
-    const forward = await repository.viewerRelationship(edge.following, edge.follower, {
-      includeSubscription: false,
-    });
+    const forward = await repository.viewerRelationship(edge.following, edge.follower);
     expect(forward.isFollowing).toBe(true);
 
     // And not the other way round, unless they genuinely follow back.
@@ -220,104 +210,8 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
        where follower_id = $1::uuid and following_id = $2::uuid`,
       [edge.following, edge.follower]
     );
-    const reverse = await repository.viewerRelationship(edge.follower, edge.following, {
-      includeSubscription: false,
-    });
+    const reverse = await repository.viewerRelationship(edge.follower, edge.following);
     expect(reverse.isFollowing).toBe(Number(back.n) > 0);
-  });
-
-  it("does not ask about subscriptions when the flag says not to", async () => {
-    const author = await someAuthorId();
-    if (!author) return;
-
-    const relationship = await repository.viewerRelationship(author, NO_SUCH_PROFILE, {
-      includeSubscription: false,
-    });
-
-    // The flag gates a table that may not carry the row yet. Off means the
-    // answer is a constant false, never a query that could fail.
-    expect(relationship.isSubscribed).toBe(false);
-  });
-
-  // ── opportunity state ──────────────────────────────────────────────
-
-  it("returns null for a profile with no talent row", async () => {
-    expect(await repository.opportunityState(NO_SUCH_PROFILE)).toBeNull();
-  });
-
-  it("returns the talent row's own fields, not a rewritten shape", async () => {
-    const [row] = await executor.query<{ user_id: string }>(
-      `select user_id::text as user_id from public.talent_profiles limit 1`
-    );
-    if (!row) return;
-
-    const state = await repository.opportunityState(row.user_id);
-    expect(state).not.toBeNull();
-    expect(typeof state!.id).toBe("string");
-    expect(typeof state!.open_to_opportunities).toBe("boolean");
-    expect(typeof state!.visibility).toBe("string");
-  });
-
-  // ── featured work ──────────────────────────────────────────────────
-
-  it("returns an empty array for a profile that has featured nothing", async () => {
-    const featured = await repository.featuredWork(NO_SUCH_PROFILE, {
-      includeNote: false,
-    });
-    expect(featured).toEqual([]);
-  });
-
-  it("returns featured work in position order, with the post attached", async () => {
-    const [row] = await executor.query<{ user_id: string }>(
-      `select user_id::text as user_id
-       from public.profile_featured_posts
-       group by user_id having count(*) > 1 limit 1`
-    );
-    if (!row) return;
-
-    const featured = await repository.featuredWork(row.user_id, { includeNote: false });
-    expect(featured.length).toBeGreaterThan(1);
-
-    const positions = featured.map((entry) => entry.position);
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
-
-    for (const entry of featured) {
-      expect(typeof entry.post_id).toBe("string");
-      // The join is a LEFT JOIN, so a dangling selection is null rather than
-      // a dropped row. Either is a valid answer; a missing key is not.
-      expect(entry).toHaveProperty("posts");
-    }
-  });
-
-  it("keeps a featured selection whose post is no longer published", async () => {
-    const [row] = await executor.query<{ user_id: string; post_id: string }>(
-      `select f.user_id::text as user_id, f.post_id::text as post_id
-       from public.profile_featured_posts f
-       join public.posts p on p.id = f.post_id
-       where p.status <> 'published'
-       limit 1`
-    );
-    if (!row) return;
-
-    // Documented in lib/db/profilePage.ts: a member can feature a post and
-    // later unpublish it. The row stays and the caller decides.
-    const featured = await repository.featuredWork(row.user_id, { includeNote: false });
-    expect(featured.map((entry) => entry.post_id)).toContain(row.post_id);
-    const entry = featured.find((candidate) => candidate.post_id === row.post_id);
-    expect(entry?.posts?.status).toBeDefined();
-    expect(entry?.posts?.status).not.toBe("published");
-  });
-
-  it("omits the note column entirely when the flag is off", async () => {
-    const [row] = await executor.query<{ user_id: string }>(
-      `select user_id::text as user_id from public.profile_featured_posts limit 1`
-    );
-    if (!row) return;
-
-    const without = await repository.featuredWork(row.user_id, { includeNote: false });
-    // Not "note is null": the column is not selected at all, because before
-    // 20260826000002 is applied naming it is an error rather than a null.
-    expect(without.every((entry) => !("feature_note" in entry))).toBe(true);
   });
 
   // ── publications ───────────────────────────────────────────────────
@@ -328,8 +222,7 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
 
     const branches = await repository.publicationBranches({
       profileId: author.id,
-      contentKind: author.contentKind,
-      legacyTypes: author.legacyTypes,
+      contentKinds: author.contentKinds,
       start: 0,
       limit: 10,
     });
@@ -355,8 +248,7 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
 
     const { owned } = await repository.publicationBranches({
       profileId: author.id,
-      contentKind: author.contentKind,
-      legacyTypes: author.legacyTypes,
+      contentKinds: author.contentKinds,
       start: 0,
       limit: 20,
     });
@@ -371,33 +263,13 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
     }
   });
 
-  it("returns tags as an array, never as a Postgres literal string", async () => {
-    const author = await someAuthor();
-    if (!author) return;
-
-    const { owned } = await repository.publicationBranches({
-      profileId: author.id,
-      contentKind: author.contentKind,
-      legacyTypes: author.legacyTypes,
-      start: 0,
-      limit: 10,
-    });
-
-    // Both Phase 3 production failures were array columns. fetch_types: false
-    // means nothing else catches this.
-    for (const post of owned) {
-      if (post.tags !== null) expect(Array.isArray(post.tags)).toBe(true);
-    }
-  });
-
   it("excludes the profile's own posts from the co-authored branch", async () => {
     const coauthor = await someCoauthor();
     if (!coauthor) return;
 
     const { coauthored } = await repository.publicationBranches({
       profileId: coauthor.id,
-      contentKind: coauthor.contentKind,
-      legacyTypes: coauthor.legacyTypes,
+      contentKinds: coauthor.contentKinds,
       start: 0,
       limit: 10,
     });
@@ -415,8 +287,7 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
   it("returns empty branches for a profile with no content", async () => {
     const branches = await repository.publicationBranches({
       profileId: NO_SUCH_PROFILE,
-      contentKind: "article",
-      legacyTypes: legacyTypesForContentKind("article"),
+      contentKinds: ["article"],
       start: 0,
       limit: 10,
     });
@@ -429,15 +300,13 @@ describe.skipIf(!enabled)("public profile reads against PostgreSQL", () => {
 
     const firstPage = await repository.publicationBranches({
       profileId: coauthor.id,
-      contentKind: coauthor.contentKind,
-      legacyTypes: coauthor.legacyTypes,
+      contentKinds: coauthor.contentKinds,
       start: 0,
       limit: 1,
     });
     const secondPage = await repository.publicationBranches({
       profileId: coauthor.id,
-      contentKind: coauthor.contentKind,
-      legacyTypes: coauthor.legacyTypes,
+      contentKinds: coauthor.contentKinds,
       start: 1,
       limit: 1,
     });

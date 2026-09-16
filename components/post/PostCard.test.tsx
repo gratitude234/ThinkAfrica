@@ -1,11 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import PostCard, { type PostCardData } from "@/components/post/PostCard";
-
-vi.mock("@/lib/featureFlags", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/featureFlags")>();
-  return { ...actual, FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, research: true } };
-});
 
 function basePost(overrides: Partial<PostCardData> = {}): PostCardData {
   return {
@@ -13,7 +8,7 @@ function basePost(overrides: Partial<PostCardData> = {}): PostCardData {
     title: null,
     slug: "my-post",
     excerpt: null,
-    type: "blog",
+    content_kind: "post",
     tags: [],
     created_at: "2026-07-17T00:00:00.000Z",
     published_at: "2026-07-17T00:00:00.000Z",
@@ -37,15 +32,15 @@ describe("PostCard", () => {
 
     const { container } = render(<PostCard post={post} />);
 
-    // No <h2> heading at all -- an empty <h2></h2> is exactly what we must not render.
+    // No <h2> heading at all: an empty <h2></h2> is exactly what we must not render.
     expect(container.querySelector("h2")).toBeNull();
     expect(screen.getByText("A quick thought worth sharing with everyone.")).toBeInTheDocument();
     expect(screen.getByText("Post")).toBeInTheDocument();
   });
 
-  it("still shows the title for a legacy titled blog", () => {
+  it("still shows the title for a titled Post, of which production has 40", () => {
     const post = basePost({
-      type: "blog",
+      content_kind: "post",
       title: "My old blog post",
       excerpt: "Some excerpt text.",
     });
@@ -54,11 +49,12 @@ describe("PostCard", () => {
 
     expect(screen.getByRole("heading", { level: 2, name: "My old blog post" })).toBeInTheDocument();
     expect(screen.getByText("Some excerpt text.")).toBeInTheDocument();
+    expect(screen.getByText("Post")).toBeInTheDocument();
   });
 
-  it("shows the title for an article as before", () => {
+  it("shows the title for an Article", () => {
     const post = basePost({
-      type: "essay",
+      content_kind: "article",
       title: "An Essay Worth Reading",
     });
 
@@ -67,72 +63,64 @@ describe("PostCard", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "An Essay Worth Reading" })
     ).toBeInTheDocument();
+    expect(screen.getByText("Article")).toBeInTheDocument();
   });
 
-  it("labels a brand-new generic Article as 'Article', not 'Essay', on the feed card", () => {
+  it("labels an Article with no genre suffix", () => {
     const post = basePost({
-      type: "essay",
       content_kind: "article",
-      article_format: null,
       title: "A new generic article",
     });
 
     render(<PostCard post={post} />);
 
     expect(screen.getByText("Article")).toBeInTheDocument();
-    expect(screen.queryByText("Essay")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Essay/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Policy Brief/)).not.toBeInTheDocument();
+  });
+});
+
+describe("PostCard retired review and citation identity", () => {
+  it("never shows Reviewed, Citable or a genre on any card", () => {
+    render(
+      <PostCard
+        post={basePost({
+          content_kind: "article",
+          title: "A formerly accepted policy brief",
+        })}
+      />
+    );
+
+    for (const gone of ["Reviewed", "Citable", "Research", "Policy Brief", "Essay"]) {
+      expect(screen.queryByText(new RegExp(gone)), gone).not.toBeInTheDocument();
+    }
   });
 
-  it("still labels a legacy Essay as 'Article · Essay' on the feed card", () => {
-    const post = basePost({
-      type: "essay",
-      content_kind: "article",
-      article_format: "essay",
-      title: "A legacy essay",
-    });
+  it("renders a legacy Research publication as an ordinary Article card", () => {
+    // The five research rows were normalized into Articles by
+    // 20260915000005, so what used to render nothing now renders the card the
+    // piece has always deserved.
+    render(
+      <PostCard
+        post={basePost({ content_kind: "article", title: "A cited research paper" })}
+      />
+    );
 
-    render(<PostCard post={post} />);
-
-    expect(screen.getByText("Article · Essay")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "A cited research paper" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Article")).toBeInTheDocument();
   });
 
-  it("does not show a Reviewed badge for a policy brief that hasn't actually completed review yet", () => {
-    const post = basePost({
-      type: "policy_brief",
-      title: "A submitted policy brief",
-      citation_id: null,
-      published_version_id: null,
-    });
+  it("renders a card even when the classification cannot be read, rather than nothing", () => {
+    // A reader who followed a link deserves the piece, not a blank.
+    render(
+      <PostCard post={basePost({ content_kind: null, title: "An unreadable kind" })} />
+    );
 
-    render(<PostCard post={post} />);
-
-    expect(screen.queryByText("Reviewed")).not.toBeInTheDocument();
-  });
-
-  it("shows Reviewed once a policy brief has an accepted published version, evidence-based", () => {
-    const post = basePost({
-      type: "policy_brief",
-      title: "An accepted policy brief",
-      citation_id: null,
-      published_version_id: "11111111-1111-1111-1111-111111111111",
-    });
-
-    render(<PostCard post={post} />);
-
-    expect(screen.getByText("Reviewed")).toBeInTheDocument();
-  });
-
-  it("shows Citable rather than Reviewed once a citation_id exists", () => {
-    const post = basePost({
-      type: "research",
-      title: "A cited research paper",
-      citation_id: "IND-2026-000123",
-      published_version_id: "11111111-1111-1111-1111-111111111111",
-    });
-
-    render(<PostCard post={post} />);
-
-    expect(screen.getByText("Citable")).toBeInTheDocument();
-    expect(screen.queryByText("Reviewed")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "An unreadable kind" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Post")).toBeInTheDocument();
   });
 });

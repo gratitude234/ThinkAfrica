@@ -27,10 +27,10 @@ export default async function AdminLayout({
           You don&apos;t have access to this page.
         </p>
         <Link
-          href="/review"
+          href="/"
           className="mt-5 inline-flex rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-emerald-200 hover:text-emerald-700"
         >
-          Open reviewer portal
+          Back to Home
         </Link>
       </div>
     );

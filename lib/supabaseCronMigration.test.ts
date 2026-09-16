@@ -13,8 +13,9 @@ const sql = readFileSync(migrationPath, "utf8");
 // The original scheduler is applied history and is read here as history: it is
 // asserted for the structural guarantees that no later migration revisits
 // (extensions, the private schema, Vault resolution, retention). The job set it
-// installed has since changed, so that lives in the current-set test below
-// rather than here.
+// installed has since changed, so the current set is asserted against the
+// newest definitions in
+// supabase/migrations/dailyBriefCronRemovalMigration.test.ts.
 const expectedJobs = new Map([
   ["indegenius-daily-brief", "0 8 * * *"],
   ["indegenius-review-reminders", "0 9 * * *"],

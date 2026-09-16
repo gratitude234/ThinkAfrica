@@ -5,7 +5,6 @@ import NotificationsPageClient from "./NotificationsPageClient";
 import type { NotificationData } from "@/lib/notificationData";
 
 vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
-vi.mock("./actions", () => ({ respondToCoAuthorInvite: vi.fn() }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 
 const mutations = vi.hoisted(() => ({
@@ -76,15 +75,8 @@ beforeEach(() => {
   mutations.undismissNotification.mockResolvedValue({ error: null });
 });
 
-describe("subscription UX V2 defaults", () => {
-  function enableV2() {
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED", "1");
-    vi.stubEnv("NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED", "1");
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED", "1");
-  }
-
-  it("opens on Subscriptions when publication alerts exist and no task is pending", () => {
-    enableV2();
+describe("the filter row", () => {
+  it("opens on All and offers no Subscriptions filter", () => {
     render(
       <NotificationsPageClient
         userId="u1"
@@ -93,27 +85,14 @@ describe("subscription UX V2 defaults", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: /Subscriptions/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
+    expect(screen.queryByRole("button", { name: /Subscriptions/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Needs attention/ })).not.toBeInTheDocument();
+    // A historic publication alert is still in the inbox, as activity.
     expect(screen.getByText(/published a new Article/)).toBeInTheDocument();
-    expect(screen.queryByText(/started following your work/)).not.toBeInTheDocument();
-  });
-
-  it("opens on Needs attention when a real task is pending", () => {
-    enableV2();
-    render(
-      <NotificationsPageClient
-        userId="u1"
-        mutedTypes={[]}
-        notifications={[revision, publication]}
-      />
-    );
-
-    expect(
-      screen.getByRole("button", { name: /Needs attention/ })
-    ).toHaveAttribute("aria-pressed", "true");
   });
 });
 
@@ -400,7 +379,7 @@ describe("the caught-up dead end", () => {
       <NotificationsPageClient userId="u1" mutedTypes={[]} notifications={[follow, publication]} />
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /Responses/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Review/ }));
     expect(screen.getByText("Nothing in this view.")).toBeInTheDocument();
 
     await userEvent.click(

@@ -5,7 +5,6 @@ describe("getContentKindLabel", () => {
   it("capitalizes known content kinds", () => {
     expect(getContentKindLabel("post")).toBe("Post");
     expect(getContentKindLabel("article")).toBe("Article");
-    expect(getContentKindLabel("research")).toBe("Research");
   });
 
   it("returns null for no content kind", () => {
@@ -21,7 +20,7 @@ describe("getGuestAuthCopy", () => {
   });
 
   it("builds the save title from the content kind", () => {
-    expect(getGuestAuthCopy("save", "research").title).toBe("Sign in to save this Research");
+    expect(getGuestAuthCopy("save", "article").title).toBe("Sign in to save this Article");
   });
 
   it("falls back to a generic title when no content kind is given", () => {
@@ -30,7 +29,7 @@ describe("getGuestAuthCopy", () => {
   });
 
   it("uses fixed copy for respond and create, ignoring content kind", () => {
-    expect(getGuestAuthCopy("respond").title).toBe("Sign in to respond");
+    expect(getGuestAuthCopy("respond").title).toBe("Sign in to comment");
     expect(getGuestAuthCopy("create").title).toBe("Sign in to publish");
   });
 });

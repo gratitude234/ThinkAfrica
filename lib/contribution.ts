@@ -1,14 +1,7 @@
+import { contentKindForTitle } from "@/lib/contentModel";
 import type { PostReferenceRecord } from "@/lib/types";
 
 export type ComposerMode = "new" | "draft" | "published-edit";
-
-export interface ContributionCollaborator {
-  id: string;
-  username: string;
-  full_name: string | null;
-  university?: string | null;
-  field_of_study?: string | null;
-}
 
 export interface ContributionSnapshot {
   title: string;
@@ -17,9 +10,6 @@ export interface ContributionSnapshot {
   tags: string[];
   coverImageUrl: string;
   references: PostReferenceRecord[];
-  collaborators: ContributionCollaborator[];
-  inResponseToId: string | null;
-  promptId: string | null;
 }
 
 export function hasMeaningfulContribution(snapshot: ContributionSnapshot) {
@@ -34,8 +24,7 @@ export function hasMeaningfulContribution(snapshot: ContributionSnapshot) {
       snapshot.excerpt.trim() ||
       snapshot.tags.length ||
       snapshot.coverImageUrl.trim() ||
-      snapshot.references.length ||
-      snapshot.collaborators.length
+      snapshot.references.length
   );
 }
 
@@ -59,8 +48,7 @@ export function deservesCloudDraft(snapshot: ContributionSnapshot) {
     snapshot.excerpt.trim() ||
     snapshot.tags.length ||
     snapshot.coverImageUrl.trim() ||
-    snapshot.references.length ||
-    snapshot.collaborators.length
+    snapshot.references.length
   ) {
     return true;
   }
@@ -110,19 +98,18 @@ export function deriveContributionExcerpt(content: string, maxLength = 240) {
   return `${text.slice(0, maxLength).replace(/\s+\S*$/, "")}…`;
 }
 
+/**
+ * What a contribution is, and what gets persisted about it.
+ *
+ * `content_kind` alone. The legacy `type` and `article_format` this used to
+ * dual-write are derived and nulled by the database now
+ * (20260915000006_canonical_post_classification.sql), so writing them here
+ * would be a second place that could disagree about a piece's classification.
+ */
 export function derivePresentationClassification(title: string | null | undefined) {
   const normalizedTitle = title?.trim() || null;
-  return normalizedTitle
-    ? {
-        title: normalizedTitle,
-        type: "essay" as const,
-        content_kind: "article" as const,
-        article_format: null,
-      }
-    : {
-        title: null,
-        type: "blog" as const,
-        content_kind: "post" as const,
-        article_format: null,
-      };
+  return {
+    title: normalizedTitle,
+    content_kind: contentKindForTitle(normalizedTitle),
+  };
 }

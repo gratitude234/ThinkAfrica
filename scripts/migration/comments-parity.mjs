@@ -5,8 +5,7 @@
  *   node scripts/migration/profile-parity.mjs
  *
  * This is LIVE SAME-DATABASE PARITY, and it is a different claim from the
- * behavioural proofs in lib/db/profilePage.neon.test.ts and
- * lib/db/profileRecord.neon.test.ts. Both sides here see identical rows at the
+ * behavioural proofs in lib/db/profilePage.neon.test.ts. Both sides here see identical rows at the
  * same instant, so a difference is a difference in the query rather than in
  * the data. The Neon comparison can never say that, because Neon is a copy
  * taken at a different time.

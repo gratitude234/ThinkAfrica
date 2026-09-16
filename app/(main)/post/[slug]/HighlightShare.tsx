@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 interface HighlightShareProps {
   containerId: string;
-  postSlug: string;
-  postId: string;
 }
 
 interface TooltipState {
@@ -15,14 +12,10 @@ interface TooltipState {
   left: number;
 }
 
-export default function HighlightShare({ containerId, postSlug, postId }: HighlightShareProps) {
+export default function HighlightShare({ containerId }: HighlightShareProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [copied, setCopied] = useState(false);
-  // The composer is a heavy client bundle, so the tooltip lingers after the
-  // tap while it loads. Reflect that instead of leaving the action inert.
-  const [isOpeningComposer, startOpeningComposer] = useTransition();
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const container = document.getElementById(containerId);
@@ -113,13 +106,6 @@ export default function HighlightShare({ containerId, postSlug, postId }: Highli
 
   if (!tooltip) return null;
 
-  const handleReply = () => {
-    sessionStorage.setItem("write_response_quote", tooltip.text);
-    startOpeningComposer(() => {
-      router.push(`/write?response_to=${postSlug}&inResponseTo=${postId}`);
-    });
-  };
-
   return (
     <div
       ref={tooltipRef}
@@ -133,19 +119,6 @@ export default function HighlightShare({ containerId, postSlug, postId }: Highli
       {/* min-h-11 throughout: this is now reachable by touch, where the old
           text-xs targets were well under the 44px floor. */}
       <div className="flex items-center">
-        <button
-          type="button"
-          onClick={handleReply}
-          disabled={isOpeningComposer}
-          aria-busy={isOpeningComposer || undefined}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 font-medium transition-colors hover:text-emerald-300 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-inset"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4" />
-          </svg>
-          {isOpeningComposer ? "Opening…" : "Reply to this"}
-        </button>
-        <span aria-hidden="true" className="h-5 w-px bg-white/20" />
         <button
           type="button"
           onClick={async () => {

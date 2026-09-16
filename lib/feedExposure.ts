@@ -8,19 +8,14 @@ import type {
   FeedTabKey,
 } from "@/lib/feedData";
 
-// v2.1: the For You candidate pool gained an evergreen arm, the ranker gained
-// per-viewer fatigue and learned affinity, and impressions changed meaning
-// (deduped per actor per day rather than per surface). Exposures logged under
-// v2.0.0 are not comparable with these, which is the entire reason this string
-// exists.
-export const FEED_ALGORITHM_VERSION = "feed-v2.1.0";
+// v3: the publishing reset (Phase 2F) cut For You down to relevance,
+// engagement and freshness over the newest window, with no evergreen arms,
+// learned affinity or fatigue, and removed the featured lead and the Latest,
+// Subscribed and Topics tabs. Exposures logged under v2 are not comparable
+// with these, which is the entire reason this string exists.
+export const FEED_ALGORITHM_VERSION = "feed-v3.0.0";
 
-export type FeedCandidateSource =
-  | FeedCandidateArm
-  | "followed_author"
-  | "subscription"
-  | "subscribed_topic"
-  | "latest";
+export type FeedCandidateSource = FeedCandidateArm | "followed_author";
 
 export interface FeedExposure {
   postId: string;
@@ -30,8 +25,8 @@ export interface FeedExposure {
   requestId: string;
   algorithmVersion: string;
   experimentVariant: "ranking_v2";
-  surface: FeedTabKey | "home_featured";
-  candidateSource: FeedCandidateSource | "featured_editorial" | "featured_recommended" | "featured_latest";
+  surface: FeedTabKey;
+  candidateSource: FeedCandidateSource;
   position: number;
   page: number;
   servedAt: string;
@@ -44,26 +39,12 @@ const FEED_EXPOSURE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
 const FEED_EXPOSURE_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const SAFE_EXPOSURE_ID = /^[A-Za-z0-9:_-]{1,256}$/;
 const SAFE_POST_ID = /^[A-Za-z0-9_-]{1,128}$/;
-const CANDIDATE_SOURCES = new Set<FeedExposure["candidateSource"]>([
+const CANDIDATE_SOURCES = new Set<FeedCandidateSource>([
   "for_you_ranked",
-  "for_you_evergreen",
   "for_you_tail",
   "followed_author",
-  "subscription",
-  "subscribed_topic",
-  "latest",
-  "featured_editorial",
-  "featured_recommended",
-  "featured_latest",
 ]);
-const EXPOSURE_SURFACES = new Set<FeedExposure["surface"]>([
-  "home",
-  "following",
-  "subscriptions",
-  "topics",
-  "latest",
-  "home_featured",
-]);
+const EXPOSURE_SURFACES = new Set<FeedTabKey>(["home", "following"]);
 
 function getSigningSecret(): string | null {
   return (
@@ -119,10 +100,8 @@ function parseUnsignedExposure(value: unknown): UnsignedFeedExposure | null {
     !SAFE_EXPOSURE_ID.test(source.requestId) ||
     source.algorithmVersion !== FEED_ALGORITHM_VERSION ||
     source.experimentVariant !== "ranking_v2" ||
-    !EXPOSURE_SURFACES.has(source.surface as FeedExposure["surface"]) ||
-    !CANDIDATE_SOURCES.has(
-      source.candidateSource as FeedExposure["candidateSource"]
-    ) ||
+    !EXPOSURE_SURFACES.has(source.surface as FeedTabKey) ||
+    !CANDIDATE_SOURCES.has(source.candidateSource as FeedCandidateSource) ||
     typeof source.position !== "number" ||
     !Number.isSafeInteger(source.position) ||
     source.position < 0 ||
@@ -144,8 +123,8 @@ function parseUnsignedExposure(value: unknown): UnsignedFeedExposure | null {
     requestId: source.requestId,
     algorithmVersion: FEED_ALGORITHM_VERSION,
     experimentVariant: "ranking_v2",
-    surface: source.surface as FeedExposure["surface"],
-    candidateSource: source.candidateSource as FeedExposure["candidateSource"],
+    surface: source.surface as FeedTabKey,
+    candidateSource: source.candidateSource as FeedCandidateSource,
     position: source.position,
     page: source.page,
     servedAt: new Date(servedAtMs).toISOString(),
@@ -185,14 +164,10 @@ export function verifyFeedExposureMetadata(
 }
 
 /**
- * Where a card came from, when the card itself does not say.
- *
- * The For You feed now labels each row with the arm that supplied it, because
- * page arithmetic can no longer tell: the evergreen arm sits inside the ranked
- * stream rather than after it, and the ranked stream's length varies with how
- * much evergreen inventory exists. This remains the answer for the
- * chronological tabs, where the surface and the source are the same fact, and
- * the fallback for a ranked page whose rows predate the label.
+ * Where a card came from, when the card itself does not say. For You labels
+ * each row with the part of the feed that supplied it; this is the answer for
+ * Following, where the surface and the source are the same fact, and the
+ * fallback for a For You row without a label.
  */
 function getCandidateSource(
   tab: FeedTabKey,
@@ -200,15 +175,8 @@ function getCandidateSource(
   pageSize: number,
   rankedWindow: number
 ): FeedCandidateSource {
-  if (tab === "home") {
-    return (page - 1) * pageSize < rankedWindow
-      ? "for_you_ranked"
-      : "for_you_tail";
-  }
   if (tab === "following") return "followed_author";
-  if (tab === "topics") return "subscribed_topic";
-  if (tab === "subscriptions") return "subscription";
-  return "latest";
+  return (page - 1) * pageSize < rankedWindow ? "for_you_ranked" : "for_you_tail";
 }
 
 function resolveCandidateSource(
@@ -224,15 +192,13 @@ function resolveCandidateSource(
 function stripRankingInternals(post: PostCardData): PostCardData {
   const {
     score: _score,
-    quality_score: _qualityScore,
     impression_count: _impressions,
     read_count: _reads,
     view_count: _views,
-    reference_count: _references,
     bookmark_count: _bookmarks,
-    // Which arm supplied the card is server bookkeeping. It travels on the
-    // signed exposure, where it cannot be edited, not as a loose field on the
-    // card, where it could be.
+    // Which part of the feed supplied the card is server bookkeeping. It
+    // travels on the signed exposure, where it cannot be edited, not as a
+    // loose field on the card, where it could be.
     candidate_source: _candidateSource,
     ...card
   } = post;
@@ -289,34 +255,4 @@ export function prepareFeedPageForClient(
       };
     }),
   };
-}
-
-export function createFeaturedExposure(
-  postId: string,
-  slug: string,
-  provenance: "editorial" | "recommended" | "latest",
-  requestId = crypto.randomUUID(),
-  feedSessionId = requestId,
-  servedAt = new Date().toISOString()
-): FeedExposure {
-  const exposure: UnsignedFeedExposure = {
-    postId,
-    slug,
-    exposureId: `${requestId}:0:${postId}`,
-    feedSessionId,
-    requestId,
-    algorithmVersion: FEED_ALGORITHM_VERSION,
-    experimentVariant: "ranking_v2",
-    surface: "home_featured",
-    candidateSource:
-      provenance === "editorial"
-        ? "featured_editorial"
-        : provenance === "latest"
-          ? "featured_latest"
-          : "featured_recommended",
-    position: 0,
-    page: 1,
-    servedAt,
-  };
-  return { ...exposure, signature: signExposure(exposure) };
 }

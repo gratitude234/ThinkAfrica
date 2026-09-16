@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { bookmarksRepository } from "@/lib/db/readAdapter";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { getCurrentUser } from "@/lib/serverAuth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -31,16 +30,8 @@ export async function GET() {
   try {
     const posts = await bookmarksRepository(supabase).list(user.id);
 
-    // The research filter stays where the page had it, applied to the result
-    // rather than to the query: a bookmark on a research post is still a
-    // bookmark, and the flag decides whether it is shown, not whether it is
-    // kept.
-    const visible = FEATURE_FLAGS.research
-      ? posts
-      : posts.filter((post) => post.type !== "research");
-
     return NextResponse.json({
-      posts: visible.map((post) => ({
+      posts: posts.map((post) => ({
         ...post,
         co_authors: (post.post_authors ?? [])
           .filter((row) => !!row.accepted_at)

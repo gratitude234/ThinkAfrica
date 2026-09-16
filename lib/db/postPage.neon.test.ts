@@ -84,16 +84,13 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
       `select
          (select count(*) from public.likes where post_id = $1::uuid) as l,
          (select count(*) from public.bookmarks where post_id = $1::uuid) as b,
-         (select count(*) from public.comments where post_id = $1::uuid) as c,
-         (select count(*) from public.posts
-           where in_response_to = $1::uuid and status = 'published') as r`,
+         (select count(*) from public.comments where post_id = $1::uuid) as c`,
       [post.id]
     );
 
     expect(counts.likeCount).toBe(Number(expected.l));
     expect(counts.bookmarkCount).toBe(Number(expected.b));
     expect(counts.commentCount).toBe(Number(expected.c));
-    expect(counts.responseCount).toBe(Number(expected.r));
   }, 60_000);
 
   it("returns every collection as an array, even when empty", async () => {
@@ -234,21 +231,6 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     }
   }, 60_000);
 
-  it("returns a parent post only when it is published", async () => {
-    const rows = await executor.query<{ id: string; status: string }>(
-      `select id::text as id, status from public.posts
-       where status <> 'published' limit 1`
-    );
-    if (rows.length > 0) {
-      expect(await repository.parentPost(rows[0].id, null)).toBeNull();
-    }
-
-    const published = await anyPublishedPost();
-    const parent = await repository.parentPost(published.id, null);
-    expect(parent?.id).toBe(published.id);
-    expect(Array.isArray(parent?.profiles)).toBe(false);
-  }, 60_000);
-
   it("reports viewer state as booleans, and false for an unknown author", async () => {
     const post = await anyPublishedPost();
     const [profile] = await executor.query<{ id: string }>(
@@ -261,7 +243,6 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     }
     // No author id means no relationship to have.
     expect(state.following).toBe(false);
-    expect(state.subscribed).toBe(false);
   }, 60_000);
 
   it("reflects a like that exists, inside a rolled-back transaction", async () => {

@@ -74,9 +74,7 @@ export async function planPostDeletion(
 
   const { data, error } = await supabase
     .from("posts")
-    .select(
-      "id, author_id, status, type, content_kind, article_format, citation_id, published_version_id"
-    )
+    .select("id, author_id, status, content_kind, citation_id, published_version_id")
     .in("id", requested);
 
   if (error) {

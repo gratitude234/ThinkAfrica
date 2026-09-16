@@ -25,24 +25,13 @@ import type { FeedListCriteria, FeedListRepository } from "@/lib/db/feedList";
 
 vi.setConfig({ testTimeout: 60_000 });
 
-/** Matches nothing, which is what the sentinel does when research is on. */
-const NO_EXCLUSION = "__no_such_post_type__";
-
 const BASE: FeedListCriteria = {
-  researchTypeExclusion: NO_EXCLUSION,
   contentKind: null,
   cutoff: null,
   authorIds: null,
-  coauthorUserIds: null,
-  topicKeys: null,
-  requireCitation: false,
-  onlyResponses: false,
   excludedAuthorIds: [],
   excludedPostIds: [],
   cursor: null,
-  order: "recent",
-  includeTopicKeys: false,
-  projection: "card",
   offset: 0,
   limit: 12,
 };
@@ -105,16 +94,11 @@ describe.skipIf(!enabled)("the feed's selection against PostgreSQL", () => {
     }
   });
 
-  it("omits topic_keys unless asked, and returns it as an array when asked", async () => {
-    const without = await repository.listPosts(BASE);
-    for (const row of without) expect(row.topic_keys).toBeUndefined();
-
-    const withKeys = await repository.listPosts({
-      ...BASE,
-      includeTopicKeys: true,
-    });
-    for (const row of withKeys) {
-      if (row.topic_keys != null) expect(Array.isArray(row.topic_keys)).toBe(true);
+  it("carries no citation or topic-subscription columns", async () => {
+    for (const row of await repository.listPosts(BASE)) {
+      expect(row).not.toHaveProperty("citation_id");
+      expect(row).not.toHaveProperty("published_version_id");
+      expect(row).not.toHaveProperty("topic_keys");
     }
   });
 
@@ -135,18 +119,14 @@ describe.skipIf(!enabled)("the feed's selection against PostgreSQL", () => {
     for (const row of rows) expect(row.content_kind).toBe(kind.content_kind);
   });
 
-  it("applies the research exclusion sentinel", async () => {
-    const [type] = await executor.query<{ type: string }>(
-      `select type from public.posts where status = 'published' limit 1`
-    );
-    if (!type) return;
-
-    const rows = await repository.listPosts({
-      ...BASE,
-      researchTypeExclusion: type.type,
-      limit: 30,
-    });
-    expect(rows.some((row) => row.type === type.type)).toBe(false);
+  // The research exclusion sentinel this used to exercise went with Phase 2I.
+  // Every published row is a Post or an Article, so the feed selects on the
+  // kind alone and there is nothing left to exclude.
+  it("returns only canonical content kinds", async () => {
+    const rows = await repository.listPosts({ ...BASE, limit: 30 });
+    for (const row of rows) {
+      expect(["post", "article"]).toContain(row.content_kind);
+    }
   });
 
   it("applies the timeframe cutoff", async () => {
@@ -175,57 +155,6 @@ describe.skipIf(!enabled)("the feed's selection against PostgreSQL", () => {
     });
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) expect(row.author_id).toBe(author.id);
-  });
-
-  it("keeps posts credited to a subscribed co-author, without duplicating them", async () => {
-    const [credit] = await executor.query<{ user_id: string }>(
-      `select a.user_id::text as user_id
-       from public.post_authors a
-       join public.posts p on p.id = a.post_id
-       where a.accepted_at is not null and p.status = 'published'
-       group by a.user_id order by count(*) desc limit 1`
-    );
-    if (!credit) return;
-
-    const rows = await repository.listPosts({
-      ...BASE,
-      coauthorUserIds: [credit.user_id],
-      limit: 30,
-    });
-    expect(rows.length).toBeGreaterThan(0);
-
-    // An inner embed keeps a post when a credit matches; it does not multiply
-    // the post by its credits. A join here instead of an exists would return
-    // the same article twice.
-    expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
-  });
-
-  it("keeps only posts whose topics overlap", async () => {
-    const [row] = await executor.query<{ key: string }>(
-      `select k as key from public.posts p, unnest(p.topic_keys) as k
-       where p.status = 'published' limit 1`
-    );
-    if (!row) return;
-
-    const rows = await repository.listPosts({
-      ...BASE,
-      topicKeys: [row.key],
-      includeTopicKeys: true,
-      limit: 30,
-    });
-    expect(rows.length).toBeGreaterThan(0);
-    for (const post of rows) {
-      expect(post.topic_keys ?? []).toContain(row.key);
-    }
-  });
-
-  it("keeps only citable posts when asked", async () => {
-    const rows = await repository.listPosts({
-      ...BASE,
-      requireCitation: true,
-      limit: 30,
-    });
-    for (const row of rows) expect(row.citation_id).not.toBeNull();
   });
 
   it("excludes blocked authors", async () => {
@@ -319,21 +248,6 @@ describe.skipIf(!enabled)("the feed's selection against PostgreSQL", () => {
   it("returns the first page when there is no cursor", async () => {
     const rows = await repository.listPosts({ ...BASE, limit: 3 });
     expect(rows.length).toBeGreaterThan(0);
-  });
-
-  // ── ordering and paging ────────────────────────────────────────────
-
-  it("orders by read count first under the well-read ordering", async () => {
-    const rows = await repository.listPosts({
-      ...BASE,
-      order: "well_read",
-      limit: 20,
-    });
-    for (let i = 1; i < rows.length; i += 1) {
-      expect(rows[i].read_count ?? 0).toBeLessThanOrEqual(
-        rows[i - 1].read_count ?? 0
-      );
-    }
   });
 
   it("offsets without overlapping the previous page", async () => {

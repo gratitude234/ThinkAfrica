@@ -14,7 +14,7 @@ export default function HomeGuestNotice() {
   return (
     <div className="mb-4 flex items-center gap-3 rounded-xl border border-green-wash-border bg-green-tint px-3.5 py-3">
       <p className="min-w-0 flex-1 text-[13px] leading-snug text-ink">
-        Browsing as a guest. Sign in to like, save, respond, and publish.
+        Browsing as a guest. Sign in to like, comment, save and publish.
       </p>
       <button
         type="button"

@@ -21,7 +21,7 @@ import {
  *
  * Two scopes rather than two routes, because they are the same search with
  * different appetites: `overlay` is the command-palette typeahead (titles, six
- * results) and `full` is the search page (posts, people and opportunities).
+ * results) and `full` is the search page (posts and people).
  * Splitting them into separate files would duplicate the query normalisation,
  * which is the part that must not differ between them.
  */
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       scope === "overlay"
         ? { posts: [] }
-        : { posts: [], people: [], opportunities: [] },
+        : { posts: [], people: [] },
       { headers: readBackendHeaders("search") }
     );
   }

@@ -18,12 +18,27 @@ import type { PostStatus } from "@/lib/types";
  * trigger returns before evaluating a single check. It does not fail closed
  * the way an RLS policy does: RLS compares against a NULL `auth.uid()` and
  * denies, whereas this bypass is written as an inequality and an unrecognised
- * role satisfies it. Every protection in those 117 lines is therefore absent
- * on Neon, and absent in the permissive direction.
+ * role satisfies it. Every protection in the trigger is therefore absent on
+ * Neon, and absent in the permissive direction.
  *
- * So the rules move here, where they hold regardless of which database is
+ * So the rules live here, where they hold regardless of which database is
  * underneath and regardless of who the connecting role is. The trigger stays
  * as a Supabase-side backstop; it is no longer what anything depends on.
+ *
+ * ## What Phase 2I removed
+ *
+ * The review workflow's half of this module, because the workflow is gone from
+ * the product and, as of 20260915000007, from the database. That means: the
+ * editorial types, the rule that an author may not publish research or a policy
+ * brief, the lock on a publication that had been accepted, the frozen
+ * classification window while a submission sat in review, withdrawal, and the
+ * `LIVE_POLICY`/`REPO_POLICY` pair that existed only to model a disagreement
+ * about those rules between the live trigger and the repository's migrations.
+ * There is nothing left for them to disagree about, so the options argument is
+ * gone from every function rather than kept as an empty object.
+ *
+ * What survives is what the database still enforces: drafts-only delete,
+ * immutable citation evidence, and the removed and withdrawn locks.
  *
  * ## What this module is not
  *
@@ -36,15 +51,6 @@ import type { PostStatus } from "@/lib/types";
  * The pipeline it belongs to lives in `lib/postMutations.ts`:
  *
  *     viewer identity -> load post -> THIS -> repository -> row-count check
- *
- * ## Fidelity
- *
- * Ported from the LIVE definition read out of `pg_catalog`, not from
- * `supabase/migrations/`. The live trigger matches neither file in the
- * repository: it is missing three checks that `20260720000001` defines. Those
- * three are implemented here and flagged `REPO_ONLY`, off by default, because
- * turning them on changes production behaviour and that is a product decision
- * rather than a migration one. See `docs/post-write-rules.md`.
  */
 
 // ── Actors ───────────────────────────────────────────────────────────
@@ -52,15 +58,16 @@ import type { PostStatus } from "@/lib/types";
 /**
  * Who is asking, resolved by the server. Never sent by a browser.
  *
- * `system` is the editorial and moderation machinery: `publishReviewedPost()`,
- * `recordEditorDecision()`, the moderation actions. On Supabase those run
- * under the service role and bypass the trigger; here they are named, so the
- * exemption is a stated capability rather than a side effect of which key
- * happened to be in scope.
+ * `system` is the moderation machinery. On Supabase it runs under the service
+ * role and bypasses the trigger; here it is named, so the exemption is a stated
+ * capability rather than a side effect of which key happened to be in scope.
+ *
+ * There is no `editor`. It existed for the editorial decision operations, and
+ * with those retired there is no transition any editor may make that an author
+ * or an admin may not.
  */
 export type PostActor =
   | { kind: "author"; userId: string }
-  | { kind: "editor"; userId: string }
   | { kind: "admin"; userId: string }
   | { kind: "system" };
 
@@ -70,9 +77,14 @@ export interface PostStateSnapshot {
   id: string;
   author_id: string;
   status: PostStatus;
-  type: string;
   content_kind: string | null;
-  article_format: string | null;
+  /**
+   * Both are evidence the retired acceptance workflow ran, and both stay
+   * immutable to an authenticated write. Two published rows carry a
+   * `citation_id`, `/publication/[citationId]` still resolves old citation URLs
+   * through it, and an author clearing one would break a link somebody else
+   * published. See `checkWorkflowEvidence`.
+   */
   citation_id: string | null;
   published_version_id: string | null;
 }
@@ -93,15 +105,11 @@ export type PostWriteRefusal =
   | "role_required"
   | "protected_field"
   | "illegal_transition"
-  | "locked_publication"
   | "removed_post"
   | "withdrawn_post"
-  | "self_publish_reviewed"
   | "citation_id_forbidden"
   | "published_version_id_forbidden"
-  | "classification_frozen"
-  | "delete_non_draft"
-  | "withdraw_not_eligible";
+  | "delete_non_draft";
 
 export type PolicyDecision =
   | { allowed: true }
@@ -111,31 +119,6 @@ const allow: PolicyDecision = { allowed: true };
 
 function deny(refusal: PostWriteRefusal, reason: string): PolicyDecision {
   return { allowed: false, refusal, reason };
-}
-
-// ── Content classification ───────────────────────────────────────────
-
-/**
- * The types whose publication is an editorial act rather than an author's.
- *
- * Matches the live trigger exactly: `NEW.type IN ('research','policy_brief')`.
- * The repository's later version routes this through
- * `effective_content_kind()` so a row carrying `content_kind = 'research'`
- * counts too. Production does not, so neither does this by default; see
- * `REPO_ONLY_RULES`.
- */
-export const EDITORIAL_POST_TYPES = ["research", "policy_brief"] as const;
-
-export function requiresEditorialPublication(
-  post: Pick<PostStateSnapshot, "type" | "content_kind">,
-  options: PostPolicyOptions = {}
-): boolean {
-  if ((EDITORIAL_POST_TYPES as readonly string[]).includes(post.type)) return true;
-  // Only when the repo-only widening is switched on. Live production checks
-  // `type` alone, and a row can carry content_kind='research' with a
-  // non-research type.
-  if (options.classifyByContentKind && post.content_kind === "research") return true;
-  return false;
 }
 
 // ── Protected columns ────────────────────────────────────────────────
@@ -151,6 +134,11 @@ export function requiresEditorialPublication(
  * `status` is deliberately absent. Status moves through the named transition
  * operations, never through a content edit, which is what stops a single
  * UPDATE from reclassifying a row and publishing it in one statement.
+ *
+ * Phase 2I removed the research document columns and `research_keywords`, which
+ * belonged to a submission form that no longer exists, and `in_response_to`,
+ * which is now write-refused outright: a stored parent on a legacy draft is
+ * data the product keeps, not a field anything may set.
  */
 export const AUTHOR_EDITABLE_POST_COLUMNS = [
   "title",
@@ -160,14 +148,6 @@ export const AUTHOR_EDITABLE_POST_COLUMNS = [
   "cover_image_url",
   "tags",
   "audio_summary_url",
-  "document_path",
-  "document_original_name",
-  "document_mime_type",
-  "document_size_bytes",
-  "in_response_to",
-  // The research submission form keeps its keywords apart from tags. Author
-  // content like any other field here.
-  "research_keywords",
 ] as const;
 
 export type AuthorEditablePostColumn =
@@ -177,90 +157,45 @@ export type AuthorEditablePostColumn =
  * What the composer may additionally write while a piece is still being
  * composed.
  *
- * Classification is genuinely the author's to choose: deciding that a draft is
- * an essay rather than a blog post, or a research paper rather than either, is
- * the act of writing it. The trigger agrees, and this is worth being precise
- * about because it looks like a hole and is not: `guard_locked_post_write`
- * freezes classification only while a submission sits in `pending` or
- * `pending_revision`, and only in the repository's version at that. A draft's
- * type has never been locked.
- *
- * `current_round` and `revision_due_at` are here because the composer resets
- * them when a piece enters review, which is bookkeeping that belongs to the
- * same statement.
+ * One column: `content_kind`. Deciding that a piece is an Article rather than a
+ * Post is the act of giving it a title, and the composer derives it through
+ * `derivePresentationClassification`. The legacy `type` and `article_format`
+ * are absent because the application does not write them at all any more: the
+ * database derives `type` from `content_kind` and forces `article_format` to
+ * null (20260915000006).
  *
  * `status` is deliberately still absent. Composition and publication remain
  * different acts.
  */
 export const COMPOSABLE_POST_COLUMNS = [
   ...AUTHOR_EDITABLE_POST_COLUMNS,
-  "type",
   "content_kind",
-  "article_format",
-  "current_round",
-  "revision_due_at",
 ] as const;
 
 export type ComposablePostColumn = (typeof COMPOSABLE_POST_COLUMNS)[number];
 
 /**
- * Curation, which is neither content nor lifecycle.
- *
- * `featured` decides what appears on the review desk's front page. It is not
- * part of guard_locked_post_write's rules, because a trigger that fires on
- * every write has no way to say "an editor may set this and an author may
- * not". It is here so that every write to `posts` goes through one door.
- */
-export const CURATION_POST_COLUMNS = ["featured"] as const;
-
-export function checkCuration(actor: PostActor): PolicyDecision {
-  if (actor.kind === "author") {
-    return deny(
-      "role_required",
-      "Featuring a post is an editorial decision."
-    );
-  }
-  return allow;
-}
-
-const CLASSIFICATION_COLUMNS = [
-  "type",
-  "content_kind",
-  "article_format",
-] as const;
-
-/**
  * The only columns a named transition may carry alongside the status.
  *
- * A transition writes more than `status`: publishing stamps `published_at`,
- * entering review resets the round and the revision deadline. That bookkeeping
- * has to travel in the same statement or the row is briefly inconsistent.
- *
- * It is an allowlist for the same reason everything else here is. Without it,
- * `extra` would be a general patch parameter hiding behind a named operation,
- * and `citation_id` would be one keystroke from being writable again.
- * `published_version_id` is permitted here only so a transition can write the
- * null it already holds; `checkWorkflowEvidence` still refuses any actual
- * change for anyone but `system`.
+ * Publishing stamps `published_at`, and that bookkeeping has to travel in the
+ * same statement or the row is briefly inconsistent. It is an allowlist for the
+ * same reason everything else here is: without it, `extra` would be a general
+ * patch parameter hiding behind a named operation.
  */
 export const TRANSITION_BOOKKEEPING_COLUMNS = [
   "published_at",
-  "current_round",
-  "revision_due_at",
-  "published_version_id",
-  "citation_id",
   "slug",
 ] as const;
 
 /**
  * Columns an authenticated write may never set, whatever else it is doing.
  *
- * The first four are the ones the trigger names. The rest are here because
- * they are the evidence other parts of the product trust:
- * `lib/contentModel.ts` reads `citation_id` and `published_version_id` as
- * proof that a workflow completed, and `role`/`verified` on the author side
- * have the same character. A field that proves something must not be writable
- * by the party it proves something about.
+ * `citation_id` and `published_version_id` are the evidence the retired
+ * workflow completed, and `/publication/[citationId]` still reads the first.
+ * The classification columns are here because the database owns them now: an
+ * ordinary edit that named `content_kind` would be changing what a piece is
+ * without going through the composer, and `type` and `article_format` are
+ * derived rather than written.
  */
 export const NEVER_AUTHOR_WRITABLE_POST_COLUMNS = [
   "status",
@@ -268,15 +203,19 @@ export const NEVER_AUTHOR_WRITABLE_POST_COLUMNS = [
   "citation_id",
   "published_version_id",
   "published_at",
-  "current_round",
-  "revision_due_at",
   "type",
   "content_kind",
   "article_format",
+  "in_response_to",
   "view_count",
   "impression_count",
   "read_count",
+  // DATABASE DEFERRED: posts.featured has had no application reader or writer
+  // since Phase 2F. It stays refused here until the column is dropped.
   "featured",
+  // DATABASE DEFERRED: both belonged to the review cycle. Nothing writes them.
+  "current_round",
+  "revision_due_at",
 ] as const;
 
 export interface RejectedFields {
@@ -327,80 +266,28 @@ export function partitionPostPatch(patch: Record<string, unknown>): {
  * Derived from the flows that exist today, not from what a lifecycle diagram
  * ought to contain. Each entry names the call site that proves it:
  *
- *   draft -> draft                  author   composer autosave
- *   draft -> published              author   app/(write)/write/actions.ts, non-editorial types only
- *   draft -> pending                author   app/(main)/submit/research/actions.ts
- *   pending -> pending              author   edit while awaiting review (content only)
- *   pending -> pending_revision     system   app/(main)/admin/review/actions.ts
- *   pending -> published            system   publishReviewedPost()
- *   pending -> rejected             system   app/(main)/admin/review/actions.ts
- *   pending -> withdrawn            author   withdraw_post_submission()
- *   pending_revision -> pending     author   app/(main)/edit/[slug]/actions.ts (resubmit)
- *   pending_revision -> pending_revision  author   edit during revision
- *   pending_revision -> withdrawn   author   withdraw_post_submission()
- *   published -> published          author   edit a published post, non-editorial types only
- *   * -> removed                    admin    app/(main)/admin/moderation/actions.ts
+ *   draft -> draft        author   composer autosave
+ *   draft -> published    author   app/(write)/write/actions.ts
+ *   published -> published author  editing a published post
+ *   * -> removed          admin    app/(main)/admin/moderation/actions.ts
+ *   removed -> published  admin    moderation reversing itself
  *
- * Everything absent from this table is forbidden. In particular there is no
- * transition out of `removed`, `withdrawn` or `rejected`, and none into
- * `draft` from anywhere: un-rejecting or un-withdrawing a submission would
- * re-enter review with retired reviewer assignments and a stale editorial
- * history, and no flow in the product does it.
+ * Everything absent is forbidden. Phase 2I removed every transition belonging
+ * to the review cycle: into `pending`, out of `pending` or `pending_revision`,
+ * and into `withdrawn` or `rejected`. Those four statuses survive only as
+ * sources of a moderation removal, because production still holds one `pending`
+ * row and nothing in the product can move it anywhere else.
  */
 export interface TransitionRule {
   from: PostStatus;
   to: PostStatus;
   actors: ReadonlyArray<PostActor["kind"]>;
-  /** When true, the transition is refused for research and policy briefs. */
-  forbiddenForEditorialTypes?: boolean;
-  /** When true, the transition is ONLY available to research and policy
-   *  briefs. Withdrawal is the only one: there is nothing to withdraw from
-   *  for content that never entered review. */
-  editorialTypesOnly?: boolean;
 }
 
 export const POST_TRANSITIONS: readonly TransitionRule[] = [
   { from: "draft", to: "draft", actors: ["author", "system"] },
-  {
-    from: "draft",
-    to: "published",
-    actors: ["author", "system"],
-    // The rule the trigger states first: an author may not publish work whose
-    // publication is an editorial decision.
-    forbiddenForEditorialTypes: true,
-  },
-  { from: "draft", to: "pending", actors: ["author", "system"] },
-
-  { from: "pending", to: "pending", actors: ["author", "system"] },
-  { from: "pending", to: "pending_revision", actors: ["editor", "admin", "system"] },
-  { from: "pending", to: "published", actors: ["editor", "admin", "system"] },
-  { from: "pending", to: "rejected", actors: ["editor", "admin", "system"] },
-  {
-    from: "pending",
-    to: "withdrawn",
-    actors: ["author", "system"],
-    editorialTypesOnly: true,
-  },
-
-  { from: "pending_revision", to: "pending_revision", actors: ["author", "system"] },
-  { from: "pending_revision", to: "pending", actors: ["author", "system"] },
-  { from: "pending_revision", to: "published", actors: ["editor", "admin", "system"] },
-  { from: "pending_revision", to: "rejected", actors: ["editor", "admin", "system"] },
-  {
-    from: "pending_revision",
-    to: "withdrawn",
-    actors: ["author", "system"],
-    editorialTypesOnly: true,
-  },
-
-  {
-    from: "published",
-    to: "published",
-    actors: ["author", "system"],
-    // A published research paper or policy brief is locked after acceptance
-    // so its citation record stays stable.
-    forbiddenForEditorialTypes: true,
-  },
+  { from: "draft", to: "published", actors: ["author", "system"] },
+  { from: "published", to: "published", actors: ["author", "system"] },
 
   { from: "draft", to: "removed", actors: ["admin", "system"] },
   { from: "pending", to: "removed", actors: ["admin", "system"] },
@@ -416,8 +303,8 @@ export const POST_TRANSITIONS: readonly TransitionRule[] = [
   { from: "removed", to: "published", actors: ["admin", "system"] },
 ];
 
-/** Terminal for the author and the editorial side. `removed` is reversible by
- *  moderation and by nothing else; `withdrawn` is reversible by nobody. */
+/** Terminal for the author. `removed` is reversible by moderation and by
+ *  nobody else; `withdrawn` is reversible by nobody. */
 export const TERMINAL_POST_STATUSES: readonly PostStatus[] = [
   "removed",
   "withdrawn",
@@ -430,36 +317,6 @@ export function findTransition(
   return POST_TRANSITIONS.find((rule) => rule.from === from && rule.to === to);
 }
 
-// ── Options ──────────────────────────────────────────────────────────
-
-/**
- * The three checks that exist in `supabase/migrations/20260720000001` and in
- * `lib/contentModel.test.ts`, but NOT in the live database.
- *
- * They are implemented and default to off, so this module reproduces
- * production exactly until somebody decides otherwise. Turning them on is a
- * one-line change and a product decision, not a migration one.
- *
- * See `docs/post-write-rules.md` for what production permits today and what
- * the repository intended.
- */
-export interface PostPolicyOptions {
-  /** Freeze type/content_kind/article_format while a submission is in review,
-   *  and restrict its status moves to the author-legitimate subset. */
-  freezeClassificationInReview?: boolean;
-  /** Treat `content_kind = 'research'` as editorial even when `type` is not. */
-  classifyByContentKind?: boolean;
-}
-
-/** Production, exactly as it behaves today. */
-export const LIVE_POLICY: PostPolicyOptions = {};
-
-/** What `20260720000001` intended. Not active anywhere yet. */
-export const REPO_POLICY: PostPolicyOptions = {
-  freezeClassificationInReview: true,
-  classifyByContentKind: true,
-};
-
 // ── The rules ────────────────────────────────────────────────────────
 
 function isOwner(actor: PostActor, post: PostStateSnapshot): boolean {
@@ -467,28 +324,29 @@ function isOwner(actor: PostActor, post: PostStateSnapshot): boolean {
 }
 
 function isPrivileged(actor: PostActor): boolean {
-  return actor.kind === "editor" || actor.kind === "admin" || actor.kind === "system";
+  return actor.kind === "admin" || actor.kind === "system";
 }
 
 /**
  * May this actor write to this post at all, before considering what the write
  * says?
  *
- * The three unconditional locks come first, because they hold even for the
- * owner and even for an edit that changes nothing interesting.
+ * The two unconditional locks come first, because they hold even for the owner
+ * and even for an edit that changes nothing interesting. There used to be a
+ * third, on a publication that had been through review; an author's own
+ * published work is ordinarily editable now.
  */
 export function canWriteToPost(
   actor: PostActor,
-  post: PostStateSnapshot,
-  options: PostPolicyOptions = LIVE_POLICY
+  post: PostStateSnapshot
 ): PolicyDecision {
   if (!isOwner(actor, post) && !isPrivileged(actor)) {
     return deny("not_owner", "The viewer does not own this post.");
   }
 
-  // Moderation removed it. The author and the editorial side do not touch it
-  // again: an author editing their way out of a moderation decision is the
-  // failure this prevents, and an editor has no moderation authority.
+  // Moderation removed it. The author does not touch it again: an author
+  // editing their way out of a moderation decision is the failure this
+  // prevents.
   //
   // Moderation itself does, which is why `admin` is not on this list. That is
   // not a weakening: the trigger exempts service_role entirely, and restoring
@@ -504,25 +362,12 @@ export function canWriteToPost(
     return deny("removed_post", "This post was removed and cannot be modified.");
   }
 
-  // Terminal in the same way, and for a sharper reason: flipping a withdrawn
-  // submission back to pending would resurrect it outside any resubmission
-  // flow, with retired reviewer assignments and a stale editorial history.
+  // Terminal in the same way. No submission can reach this status any more, so
+  // this protects the rows that already carry it rather than a live flow.
   if (post.status === "withdrawn" && actor.kind !== "system") {
     return deny(
       "withdrawn_post",
       "This submission was withdrawn and cannot be modified."
-    );
-  }
-
-  // Locked after acceptance so the citation record stays stable.
-  if (
-    post.status === "published" &&
-    requiresEditorialPublication(post, options) &&
-    !isPrivileged(actor)
-  ) {
-    return deny(
-      "locked_publication",
-      "This publication is locked after acceptance and cannot be modified directly."
     );
   }
 
@@ -533,9 +378,9 @@ export function canWriteToPost(
  * The two columns that are evidence a workflow completed.
  *
  * Rejected in either direction: setting, clearing and replacing are all
- * refused. `lib/contentModel.ts` treats a non-null value as proof of formal
- * review, so an author who can write one can award themselves a citation, and
- * an author who can clear one can erase somebody else's.
+ * refused. An author who can write one can award themselves a citation, and an
+ * author who can clear one can break the `/publication/[citationId]` redirect
+ * that still resolves somebody else's published link.
  */
 export function checkWorkflowEvidence(
   actor: PostActor,
@@ -547,7 +392,7 @@ export function checkWorkflowEvidence(
   if ("citation_id" in patch && patch.citation_id !== post.citation_id) {
     return deny(
       "citation_id_forbidden",
-      "citation_id can only be assigned by the editorial acceptance workflow."
+      "citation_id belongs to the retired editorial workflow and cannot be changed."
     );
   }
   if (
@@ -556,7 +401,7 @@ export function checkWorkflowEvidence(
   ) {
     return deny(
       "published_version_id_forbidden",
-      "published_version_id can only be assigned by the editorial acceptance workflow."
+      "published_version_id belongs to the retired editorial workflow and cannot be changed."
     );
   }
   return allow;
@@ -566,95 +411,21 @@ export interface TransitionRequest {
   actor: PostActor;
   post: PostStateSnapshot;
   nextStatus: PostStatus;
-  /** Only for a request that also changes classification, which is refused
-   *  outright while a submission is in review under REPO_POLICY. */
-  nextClassification?: {
-    type?: string;
-    content_kind?: string | null;
-    article_format?: string | null;
-  };
 }
 
 /**
  * May this actor move this post from where it is to where they want it?
  *
  * The order matters and mirrors the trigger's: the unconditional locks, then
- * self-publication, then the frozen-classification window, then the table.
- * Checking the table first would report "illegal transition" for a write that
- * is actually refused because the post was removed, which is a worse message
- * and a worse log line.
+ * the table. Checking the table first would report "illegal transition" for a
+ * write that is actually refused because the post was removed, which is a worse
+ * message and a worse log line.
  */
-export function checkTransition(
-  request: TransitionRequest,
-  options: PostPolicyOptions = LIVE_POLICY
-): PolicyDecision {
+export function checkTransition(request: TransitionRequest): PolicyDecision {
   const { actor, post, nextStatus } = request;
 
-  const writable = canWriteToPost(actor, post, options);
+  const writable = canWriteToPost(actor, post);
   if (!writable.allowed) return writable;
-
-  // The trigger's first check, and the one with the most product weight: an
-  // author may not produce a row claiming to be an accepted, formally
-  // reviewed publication.
-  if (
-    nextStatus === "published" &&
-    !isPrivileged(actor) &&
-    requiresEditorialPublication(
-      {
-        type: request.nextClassification?.type ?? post.type,
-        content_kind:
-          request.nextClassification?.content_kind !== undefined
-            ? request.nextClassification.content_kind
-            : post.content_kind,
-      },
-      options
-    )
-  ) {
-    return deny(
-      "self_publish_reviewed",
-      "Research and policy briefs can only be published by an editor accepting a submission."
-    );
-  }
-
-  // REPO_ONLY. Off by default; see PostPolicyOptions.
-  if (
-    options.freezeClassificationInReview &&
-    (post.status === "pending" || post.status === "pending_revision") &&
-    requiresEditorialPublication(post, options) &&
-    !isPrivileged(actor)
-  ) {
-    const next = request.nextClassification;
-    if (
-      next &&
-      ((next.type !== undefined && next.type !== post.type) ||
-        (next.content_kind !== undefined &&
-          (next.content_kind ?? null) !== post.content_kind) ||
-        (next.article_format !== undefined &&
-          (next.article_format ?? null) !== post.article_format))
-    ) {
-      return deny(
-        "classification_frozen",
-        "A submission awaiting review or in revision cannot change its classification."
-      );
-    }
-
-    if (post.status === "pending" && nextStatus !== "pending") {
-      return deny(
-        "illegal_transition",
-        "A submission awaiting review can only be changed by the editorial decision workflow."
-      );
-    }
-    if (
-      post.status === "pending_revision" &&
-      nextStatus !== "pending_revision" &&
-      nextStatus !== "pending"
-    ) {
-      return deny(
-        "illegal_transition",
-        "A submission in revision can only stay in revision or be resubmitted for review."
-      );
-    }
-  }
 
   const rule = findTransition(post.status, nextStatus);
   if (!rule) {
@@ -671,36 +442,18 @@ export function checkTransition(
     );
   }
 
-  const editorial = requiresEditorialPublication(post, options);
-
-  if (rule.forbiddenForEditorialTypes && editorial && !isPrivileged(actor)) {
-    return deny(
-      "self_publish_reviewed",
-      "Research and policy briefs can only be published by an editor accepting a submission."
-    );
-  }
-
-  if (rule.editorialTypesOnly && !editorial) {
-    return deny(
-      "withdraw_not_eligible",
-      "Only a research paper or policy brief submission can be withdrawn."
-    );
-  }
-
   return allow;
 }
 
 /**
  * May this actor hard-delete this post?
  *
- * Drafts only, for everyone below `system`. Everything else is withdrawn,
- * rejected or removed instead, so the editorial record survives the author
- * changing their mind.
+ * Drafts only, for everyone below `system`. A published piece has readers and
+ * inbound links; taking one down is moderation, not an author's delete.
  */
 export function checkDelete(
   actor: PostActor,
-  post: PostStateSnapshot,
-  options: PostPolicyOptions = LIVE_POLICY
+  post: PostStateSnapshot
 ): PolicyDecision {
   if (!isOwner(actor, post) && actor.kind !== "system" && actor.kind !== "admin") {
     return deny("not_owner", "The viewer does not own this post.");
@@ -709,27 +462,10 @@ export function checkDelete(
   if (actor.kind === "system") return allow;
 
   if (post.status !== "draft") {
-    return deny(
-      "delete_non_draft",
-      "Only drafts can be deleted directly. Withdraw a submission instead of deleting it."
-    );
+    return deny("delete_non_draft", "Only drafts can be deleted directly.");
   }
 
-  return canWriteToPost(actor, post, options);
-}
-
-/** Does this patch actually change how the post is classified, as opposed to
- *  writing the same values back? The composer derives classification from the
- *  stored row and rewrites it on every save, so "present in the patch" and
- *  "changed" are very different questions. */
-export function changesClassification(
-  post: PostStateSnapshot,
-  patch: Record<string, unknown>
-): boolean {
-  return CLASSIFICATION_COLUMNS.some(
-    (column) =>
-      column in patch && (patch[column] ?? null) !== (post[column] ?? null)
-  );
+  return canWriteToPost(actor, post);
 }
 
 /**
@@ -738,16 +474,14 @@ export function changesClassification(
  *
  * Separate from `checkContentEdit` because the two have different allowlists
  * and the difference is the whole point. An ordinary edit may not touch
- * classification; composing may. Collapsing them would mean either forbidding
- * the composer from doing its job or letting an edit reclassify a submission.
+ * classification; composing may, because a title is what classification is.
  */
 export function checkComposition(
   actor: PostActor,
   post: PostStateSnapshot,
-  patch: Record<string, unknown>,
-  options: PostPolicyOptions = LIVE_POLICY
+  patch: Record<string, unknown>
 ): PolicyDecision {
-  const writable = canWriteToPost(actor, post, options);
+  const writable = canWriteToPost(actor, post);
   if (!writable.allowed) return writable;
 
   const evidence = checkWorkflowEvidence(actor, post, patch);
@@ -761,31 +495,6 @@ export function checkComposition(
     return deny(
       "protected_field",
       `A composer write may not set: ${rejected.join(", ")}.`
-    );
-  }
-
-  const reclassifying = changesClassification(post, patch);
-
-  // A published post's classification is the published record. Changing it
-  // after the fact rewrites what readers and citations already refer to,
-  // whatever the type is.
-  if (reclassifying && post.status === "published") {
-    return deny(
-      "classification_frozen",
-      "A published post cannot be reclassified."
-    );
-  }
-
-  // REPO_ONLY. Production permits this today; see PostPolicyOptions.
-  if (
-    options.freezeClassificationInReview &&
-    reclassifying &&
-    (post.status === "pending" || post.status === "pending_revision") &&
-    requiresEditorialPublication(post, options)
-  ) {
-    return deny(
-      "classification_frozen",
-      "A submission awaiting review or in revision cannot change its classification."
     );
   }
 
@@ -806,10 +515,9 @@ export const MAX_SLUG_LENGTH = 200;
 export function checkSlugRename(
   actor: PostActor,
   post: PostStateSnapshot,
-  slug: string,
-  options: PostPolicyOptions = LIVE_POLICY
+  slug: string
 ): PolicyDecision {
-  const writable = canWriteToPost(actor, post, options);
+  const writable = canWriteToPost(actor, post);
   if (!writable.allowed) return writable;
 
   if (!slug || slug.length > MAX_SLUG_LENGTH || !SLUG_PATTERN.test(slug)) {
@@ -824,14 +532,12 @@ export function checkSlugRename(
  *
  * There is no stored row to authorize against, so this is the one check that
  * reads the caller's values rather than the database's. The trigger has an
- * INSERT branch for exactly the same reason, and it enforces the same three
- * things:
+ * INSERT branch for the same reason, and it enforces the same things:
  *
  *   - a new row may not already carry `citation_id` or
  *     `published_version_id`, because both are evidence a workflow completed
- *     and no workflow has run yet;
- *   - a new row may not be born published if publishing it would be an
- *     editorial act;
+ *     and no workflow has run;
+ *   - a new row may not be born into a status nothing creates;
  *   - and, which the trigger cannot check, the author is the viewer.
  *
  * Everything else about a new post is composition, so the allowlist is the
@@ -846,8 +552,7 @@ export const INSERTABLE_POST_COLUMNS = [
 
 export function checkInsert(
   actor: PostActor,
-  values: Record<string, unknown>,
-  options: PostPolicyOptions = LIVE_POLICY
+  values: Record<string, unknown>
 ): PolicyDecision {
   if (actor.kind === "system") return allow;
 
@@ -861,39 +566,22 @@ export function checkInsert(
   if (values.citation_id != null) {
     return deny(
       "citation_id_forbidden",
-      "citation_id can only be assigned by the editorial acceptance workflow."
+      "citation_id belongs to the retired editorial workflow and cannot be set."
     );
   }
   if (values.published_version_id != null) {
     return deny(
       "published_version_id_forbidden",
-      "published_version_id can only be assigned by the editorial acceptance workflow."
+      "published_version_id belongs to the retired editorial workflow and cannot be set."
     );
   }
 
   const status = (values.status as PostStatus | undefined) ?? "draft";
 
-  if (status === "removed" || status === "withdrawn" || status === "rejected") {
+  if (status !== "draft" && status !== "published") {
     return deny(
       "illegal_transition",
       `A post cannot be created as ${status}.`
-    );
-  }
-
-  if (
-    status === "published" &&
-    !isPrivileged(actor) &&
-    requiresEditorialPublication(
-      {
-        type: String(values.type ?? ""),
-        content_kind: (values.content_kind as string | null) ?? null,
-      },
-      options
-    )
-  ) {
-    return deny(
-      "self_publish_reviewed",
-      "Research and policy briefs can only be published by an editor accepting a submission."
     );
   }
 
@@ -918,10 +606,9 @@ export function checkInsert(
 export function checkContentEdit(
   actor: PostActor,
   post: PostStateSnapshot,
-  patch: Record<string, unknown>,
-  options: PostPolicyOptions = LIVE_POLICY
+  patch: Record<string, unknown>
 ): PolicyDecision {
-  const writable = canWriteToPost(actor, post, options);
+  const writable = canWriteToPost(actor, post);
   if (!writable.allowed) return writable;
 
   const evidence = checkWorkflowEvidence(actor, post, patch);

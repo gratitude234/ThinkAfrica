@@ -59,11 +59,10 @@ export interface NotificationRow {
   dismissed_at: string | null;
   actor: NotificationActor | NotificationActor[] | null;
   post:
-    | { title: string; slug: string; type: string; content_kind: string | null }
+    | { title: string; slug: string; content_kind: string | null }
     | Array<{
         title: string;
         slug: string;
-        type: string;
         content_kind: string | null;
       }>
     | null;
@@ -114,7 +113,6 @@ const LIST_SQL = `
     case when p.id is null then null else jsonb_build_object(
       'title', p.title,
       'slug', p.slug,
-      'type', p.type,
       'content_kind', p.content_kind
     ) end as post
   from public.notifications n
@@ -141,7 +139,7 @@ const UNREAD_COUNT_SQL = `
 const NOTIFICATIONS_SELECT = `
   id, type, read, created_at, actor_id, post_id, message, link, dismissed_at,
   actor:profiles!notifications_actor_id_fkey(full_name, username, avatar_url),
-  post:posts!notifications_post_id_fkey(title, slug, type, content_kind)
+  post:posts!notifications_post_id_fkey(title, slug, content_kind)
 `;
 
 /**

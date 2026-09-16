@@ -1,3 +1,23 @@
+> **SUPERSEDED in part by the publishing reset, Phase 2I (2026-09-16).**
+>
+> The three checks this document is named for -- the ones that existed in
+> `supabase/migrations/20260720000001` but not in the live database, carried in
+> code as `REPO_POLICY` against `LIVE_POLICY` -- were all about the editorial
+> review workflow: freezing a submission's classification while it sat in
+> review, and widening the editorial types to include `content_kind =
+> 'research'`. Phase 2I retired that workflow from the application and from the
+> trigger (`20260915000007`), so there is nothing left for the two policies to
+> disagree about and the options argument is gone from every function.
+>
+> Still true: the layering, the reason it exists (the trigger's bypass fails
+> OPEN off Supabase), the pipeline order, and the rules that survive -- drafts
+> only for a hard delete, immutable `citation_id` and `published_version_id`,
+> and the removed and withdrawn locks.
+>
+> No longer true: the self-publish refusal, the lock on an accepted
+> publication, withdrawal, the `editor` actor, and the REPO_ONLY section. See
+> `PUBLISHING_RESET_PHASE2I.md` and `lib/postPolicy.ts`.
+
 # Post write rules, and the three production does not have
 
 Where the rules `guard_locked_post_write()` enforces now live, and a decision

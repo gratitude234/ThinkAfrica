@@ -8,7 +8,14 @@ import {
   BRAND_PROMISE,
   BRAND_SEO_DESCRIPTION,
 } from "@/lib/brand";
+import { getEmailSender } from "@/lib/emailSenders";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
+
+/**
+ * The partner outreach page (`/partners`) redirects here. It was a contact
+ * form; what it offered a visitor is this one address.
+ */
+const PARTNERSHIP_ADDRESS = getEmailSender("partnership").address;
 
 export const metadata: Metadata = {
   title: { absolute: "About Indegenius | Build Your Intellectual Identity" },
@@ -33,7 +40,6 @@ export const metadata: Metadata = {
 const STATS = [
   { value: "Post", label: "Lightweight publishing" },
   { value: "Article", label: "Long-form publishing" },
-  { value: "Response", label: "Linked publication" },
 ];
 
 const BELIEFS = [
@@ -69,7 +75,7 @@ const GAPS = [
   {
     number: "02",
     title: "Contribution stays fragmented",
-    body: "Young people who engage seriously with ideas lack one place to publish, respond, collaborate, and build a durable record across communities.",
+    body: "Young people who engage seriously with ideas lack one place to publish, discuss, and build a durable record across communities.",
     tag: "Platform gap",
     accent: "bg-purple-accent",
     tagClass: "bg-purple-400/15 text-purple-200",
@@ -194,14 +200,14 @@ export default function AboutPage() {
           <div
             data-about-reveal="up"
             data-about-delay="3"
-            className="mx-auto mt-10 grid max-w-[640px] grid-cols-2 border-y border-[#e5e0d8] sm:grid-cols-4 sm:border-y-0"
+            className="mx-auto mt-10 grid max-w-[640px] grid-cols-2 border-y border-[#e5e0d8] sm:border-y-0"
           >
             {STATS.map((stat, index) => (
               <div
                 key={stat.label}
                 className={`px-3 py-5 text-center ${
                   index > 0 ? "sm:border-l sm:border-[#e5e0d8]" : ""
-                } ${index < 2 ? "border-b border-[#e5e0d8] sm:border-b-0" : ""}`}
+                }`}
               >
                 <span
                   className="block font-display text-3xl font-bold leading-none text-ink"
@@ -355,27 +361,20 @@ export default function AboutPage() {
         >
           <div>
             <h2 className="font-display text-2xl font-bold tracking-tight text-ink">
-              Become a campus ambassador
+              Partnerships
             </h2>
             <p className="mt-2 max-w-[520px] text-sm leading-[1.7] text-ink-muted">
-              Help Indegenius grow at your university. Represent your
-              institution&apos;s intellectual community, recruit contributors,
-              and bring your campus into the network.
+              Organizations that want to work with Indegenius can write to
+              the partnerships team.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link
-              href="/ambassadors/apply"
-              className="inline-flex rounded-lg border border-emerald-brand px-6 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
-            >
-              Apply Now
-            </Link>
-            <Link
-              href="/ambassadors"
+            <a
+              href={`mailto:${PARTNERSHIP_ADDRESS}`}
               className="inline-flex rounded-lg bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:opacity-85"
             >
-              Learn More
-            </Link>
+              {PARTNERSHIP_ADDRESS}
+            </a>
           </div>
         </div>
       </section>
@@ -395,8 +394,8 @@ export default function AboutPage() {
               Ready to build your intellectual identity?
             </h2>
             <p className="mx-auto mt-4 max-w-[460px] text-[15px] leading-[1.7] text-white/60">
-              Join people who take ideas seriously. Read, publish, respond,
-              respond, and build a record that grows with you. Free to join.
+              Join people who take ideas seriously. Read, publish, comment,
+              and build a record that grows with you. Free to join.
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3">
               <Link

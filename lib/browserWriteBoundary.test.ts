@@ -99,10 +99,8 @@ describe("browser database writes", () => {
     // The list is exhaustive on purpose. Adding an RPC to a client component
     // fails this test, which forces the question of whether it writes.
     const READ_ONLY_BROWSER_RPCS = new Set([
-      // The member's own onboarding and profile state, rendered during setup.
+      // The member's own private profile state.
       "get_my_profile_private",
-      "get_my_onboarding_state",
-      "get_public_profile_record_summary",
     ]);
 
     const unexpected: string[] = [];
@@ -127,10 +125,7 @@ describe("browser database writes", () => {
       "@/lib/supabase/admin",
       "@/lib/db",
       "@/lib/postDeletion",
-      "@/lib/profileMutations",
-      "@/lib/rateLimit",
-      "@/lib/contactRequests",
-      "@/lib/serverActions",
+      "@/lib/profileMutations",      "@/lib/serverActions",
     ];
 
     const offenders: string[] = [];

@@ -236,59 +236,6 @@ describe.skipIf(!enabled)("authenticated parity: policies vs repositories", () =
 
   // ── the four embedded projections ──────────────────────────────────
 
-  it("never surfaces an unpublished post through pending invites", async () => {
-    const viewer = await memberWith("post_authors");
-    if (!viewer) return;
-
-    const invites = await dashboard.pendingInvites(viewer, 20);
-
-    const underPolicy = await asMember(viewer, async (tx) => {
-      const rows = (await tx.unsafe(
-        `select p.id::text as id, p.status
-           from public.post_authors a
-           join public.posts p on p.id = a.post_id
-          where a.user_id = $1::uuid and a.accepted_at is null`,
-        [viewer]
-      )) as Array<{ id: string; status: string }>;
-      return rows;
-    });
-
-    // Every post the repository shows must be one the policies let this member
-    // see. The reverse is not required: the repository may legitimately
-    // restrict further.
-    const visible = new Set(underPolicy.map((row) => row.id));
-    const leaked = invites
-      .map((invite) => (invite as { post_id?: string }).post_id)
-      .filter((id): id is string => Boolean(id) && !visible.has(id));
-
-    expect(leaked, `invites referencing posts the policy hides: ${leaked.join(", ")}`).toEqual(
-      []
-    );
-  }, 120_000);
-
-  it("agrees on the unread notification list and its actor embed", async () => {
-    const viewer = await memberWith("notifications");
-    if (!viewer) return;
-
-    const underPolicy = await asMember(viewer, async (tx) => {
-      // Exactly the restriction NOTIFICATIONS_SQL applies: unread, this
-      // member, newest first. There is deliberately no dismissed_at clause,
-      // because that read does not have one either.
-      const rows = (await tx.unsafe(
-        `select id::text as id from public.notifications
-          where user_id = $1::uuid and read = false
-          order by created_at desc limit 20`,
-        [viewer]
-      )) as Array<{ id: string }>;
-      return rows.map((row) => row.id);
-    });
-
-    const viaRepository = await dashboard.unreadNotifications(viewer, 20);
-    const ids = viaRepository.map((row) => String((row as { id: unknown }).id));
-
-    expect(differences(underPolicy, ids, "unreadNotifications")).toEqual([]);
-  }, 120_000);
-
   it("agrees on the notification inbox, including ordering", async () => {
     const viewer = await memberWith("notifications");
     if (!viewer) return;
@@ -341,7 +288,6 @@ describe.skipIf(!enabled)("authenticated parity: policies vs repositories", () =
     const nobody = "00000000-0000-0000-0000-000000000000";
     expect(await bookmarks.list(nobody)).toEqual([]);
     expect(await notifications.list(nobody, 10, [])).toEqual([]);
-    expect(await dashboard.unreadNotifications(nobody, 10)).toEqual([]);
   }, 120_000);
 });
 

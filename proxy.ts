@@ -30,7 +30,6 @@ export async function proxy(request: NextRequest) {
     "/admin",
 
     "/onboarding",
-    "/stats",
     "/dashboard",
     "/settings",
     "/bookmarks",

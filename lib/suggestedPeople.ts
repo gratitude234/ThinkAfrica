@@ -1,26 +1,13 @@
-import {
-  getCategoryProfileTypes,
-  type OnboardingPath,
-  type WorkCategory,
-} from "@/lib/onboarding";
 
 export interface SuggestedPerson {
   id: string;
   username: string;
   full_name: string | null;
-  university: string | null;
   avatar_url: string | null;
-  /**
-   * Carried alongside the identity fields because every surface that renders a
-   * suggestion needs a reason to follow, and these two are the only ones the
-   * profile row can supply. They were previously dropped here and re-stubbed as
-   * `null` by callers, which meant a signed-in viewer saw *less* about a person
-   * than a signed-out one.
-   */
-  field_of_study: string | null;
-  points: number | null;
-  interests?: string[] | null;
-  profile_type?: string | null;
+  /** One of the viewer's chosen topics that this writer chose too. */
+  sharedTopic: string | null;
+  /** Their newest publication among the recent ones, when they have one. */
+  lastPublishedAt: string | null;
 }
 
 export interface SuggestedPeopleResult {
@@ -28,11 +15,22 @@ export interface SuggestedPeopleResult {
   reason: string;
 }
 
-const PROFILE_SELECT =
-  "id, username, full_name, university, field_of_study, avatar_url, points, interests, profile_type";
+const PROFILE_SELECT = "id, username, full_name, avatar_url, interests";
+
+/** How many of the newest publications count as recent activity. */
+const RECENT_PUBLICATION_WINDOW = 120;
+
+interface ProfileRow {
+  id: string;
+  username: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  interests: string[] | null;
+}
 
 interface QueryBuilder {
   eq: (column: string, value: string) => QueryBuilder;
+  neq: (column: string, value: string) => QueryBuilder;
   in: (column: string, values: string[]) => QueryBuilder;
   overlaps: (column: string, values: string[]) => QueryBuilder;
   order: (column: string, options: { ascending: boolean }) => QueryBuilder;
@@ -64,25 +62,104 @@ function applyExclusions(query: QueryBuilder, excludeIds: string[]) {
   return next;
 }
 
+function normalizeTopic(value: string) {
+  return value.trim().toLocaleLowerCase("en");
+}
+
+/**
+ * Who published among the newest publications, newest first, with the time
+ * of each writer's latest one. Ids in `excludeIds` are left out.
+ */
+async function recentPublishers(supabase: any, excludeIds: Set<string>) {
+  const { data } = await (supabase
+    .from("posts")
+    .select("author_id, published_at")
+    .eq("status", "published")
+    .order("published_at", { ascending: false }) as QueryBuilder).limit(
+    RECENT_PUBLICATION_WINDOW
+  );
+
+  const latest = new Map<string, string>();
+  for (const row of (data ?? []) as Array<{ author_id: string | null; published_at: string | null }>) {
+    if (!row.author_id || !row.published_at || excludeIds.has(row.author_id)) continue;
+    if (!latest.has(row.author_id)) latest.set(row.author_id, row.published_at);
+  }
+  return latest;
+}
+
+async function profilesById(supabase: any, ids: string[]) {
+  if (ids.length === 0) return [] as ProfileRow[];
+  const { data } = await (supabase
+    .from("profiles")
+    .select(PROFILE_SELECT)
+    .in("id", ids) as QueryBuilder).limit(ids.length);
+  return (data ?? []) as ProfileRow[];
+}
+
+function byRecentPublication(
+  latest: Map<string, string>,
+  left: SuggestedPerson,
+  right: SuggestedPerson
+) {
+  const leftAt = latest.get(left.id) ?? "";
+  const rightAt = latest.get(right.id) ?? "";
+  return rightAt.localeCompare(leftAt) || left.username.localeCompare(right.username);
+}
+
+/**
+ * Writers who published recently, newest first. What a signed-out reader is
+ * shown, since there is nothing of theirs to match against.
+ */
+export async function getRecentWriters(
+  supabase: any,
+  { limit = 8 }: { limit?: number } = {}
+): Promise<SuggestedPeopleResult> {
+  const latest = await recentPublishers(supabase, new Set());
+  const rows = await profilesById(supabase, [...latest.keys()].slice(0, Math.max(24, limit * 3)));
+  const suggestions = rows
+    .filter((row) => Boolean(row.username))
+    .map((row) => toSuggestion(row, null, latest))
+    .sort((left, right) => byRecentPublication(latest, left, right))
+    .slice(0, limit);
+  return { suggestions, reason: "Published recently" };
+}
+
+function toSuggestion(
+  row: ProfileRow,
+  sharedTopic: string | null,
+  latest: Map<string, string>
+): SuggestedPerson {
+  return {
+    id: row.id,
+    username: row.username ?? "",
+    full_name: row.full_name,
+    avatar_url: row.avatar_url,
+    sharedTopic,
+    lastPublishedAt: latest.get(row.id) ?? null,
+  };
+}
+
+/**
+ * Writers to suggest on Explore, for a signed-in reader.
+ *
+ * Three plain signals, in order, with no score behind them: how many of the
+ * reader's topics a writer shares, then how recently they published, then
+ * their username so the order is stable. The publishing reset removed what
+ * came before. Phase 2G took out the persona matching and Phase 2H took out
+ * points and the university and field matches: a suggestion is about what
+ * someone writes, not where they study or how many points they collected.
+ */
 export async function getSuggestedPeople(
   supabase: any,
   {
     currentUserId,
-    university,
-    fieldOfStudy,
     excludedUserIds,
     followedIds,
     interests = [],
-    currentPath = null,
-    workCategory = null,
     limit = 3,
   }: {
     currentUserId: string;
-    university: string | null;
-    fieldOfStudy: string | null;
     interests?: string[];
-    currentPath?: OnboardingPath | null;
-    workCategory?: WorkCategory | null;
     excludedUserIds?: string[];
     /**
      * Supplied by callers that already loaded the viewer's follow graph, so
@@ -122,109 +199,76 @@ export async function getSuggestedPeople(
       (row) => row.blocked_id
     ),
   ];
-
-  const categoryProfileTypes = getCategoryProfileTypes(workCategory);
+  const excluded = new Set(excludeIds);
   const candidateLimit = Math.max(24, limit * 6);
 
-  function createCandidateQuery() {
-    let query = supabase
-      .from("profiles")
-      .select(PROFILE_SELECT)
-      .order("points", { ascending: false });
-    return applyExclusions(query as unknown as QueryBuilder, excludeIds);
+  const [topicRows, latest] = await Promise.all([
+    interests.length > 0
+      ? (applyExclusions(
+          supabase
+            .from("profiles")
+            .select(PROFILE_SELECT)
+            .overlaps("interests", interests)
+            .order("username", { ascending: true }) as QueryBuilder,
+          excludeIds
+        ).limit(candidateLimit) as PromiseLike<{ data: unknown[] | null }>)
+      : Promise.resolve({ data: [] as unknown[] }),
+    recentPublishers(supabase, excluded),
+  ]);
+
+  const rowsById = new Map<string, ProfileRow>();
+  for (const row of (topicRows.data ?? []) as ProfileRow[]) {
+    if (!excluded.has(row.id)) rowsById.set(row.id, row);
+  }
+  const missingRecent = [...latest.keys()]
+    .filter((id) => !rowsById.has(id))
+    .slice(0, candidateLimit);
+  for (const row of await profilesById(supabase, missingRecent)) {
+    if (!excluded.has(row.id)) rowsById.set(row.id, row);
   }
 
-  const candidateQueries: Array<PromiseLike<{ data: unknown[] | null }>> = [];
-  if (currentPath === "student" && university) {
-    candidateQueries.push(
-      createCandidateQuery().eq("university", university).limit(candidateLimit)
-    );
-  }
-  if (interests.length > 0) {
-    candidateQueries.push(
-      createCandidateQuery().overlaps("interests", interests).limit(candidateLimit)
-    );
-  }
-  if (currentPath === "non_student" && categoryProfileTypes.length > 0) {
-    candidateQueries.push(
-      createCandidateQuery()
-        .in("profile_type", categoryProfileTypes)
-        .limit(candidateLimit)
-    );
-  }
-  candidateQueries.push(createCandidateQuery().limit(candidateLimit));
-
-  const candidateResults = await Promise.all(candidateQueries);
-  const candidatesById = new Map<string, SuggestedPerson>();
-  for (const result of candidateResults) {
-    for (const candidate of (result.data ?? []) as SuggestedPerson[]) {
-      if (candidate.username) candidatesById.set(candidate.id, candidate);
+  // The stable fallback, for a community too quiet to fill the list.
+  if (rowsById.size < limit) {
+    const { data } = await applyExclusions(
+      supabase
+        .from("profiles")
+        .select(PROFILE_SELECT)
+        .order("username", { ascending: true }) as QueryBuilder,
+      excludeIds
+    ).limit(candidateLimit);
+    for (const row of (data ?? []) as ProfileRow[]) {
+      if (!excluded.has(row.id) && !rowsById.has(row.id)) rowsById.set(row.id, row);
     }
   }
 
-  const normalizedInterests = new Set(
-    interests.map((interest) => interest.trim().toLocaleLowerCase("en"))
-  );
-  const normalizedUniversity = university?.trim().toLocaleLowerCase("en") ?? "";
-  const normalizedField = fieldOfStudy?.trim().toLocaleLowerCase("en") ?? "";
+  const viewerTopics = new Set(interests.map(normalizeTopic));
+  const sharedTopics = (row: ProfileRow) =>
+    (row.interests ?? []).filter((topic) => viewerTopics.has(normalizeTopic(topic)));
 
-  function topicMatches(candidate: SuggestedPerson) {
-    return (candidate.interests ?? []).filter((interest) =>
-      normalizedInterests.has(interest.trim().toLocaleLowerCase("en"))
-    ).length;
-  }
-
-  function sameUniversity(candidate: SuggestedPerson) {
-    return Boolean(
-      normalizedUniversity &&
-        candidate.university?.trim().toLocaleLowerCase("en") === normalizedUniversity
-    );
-  }
-
-  function sameField(candidate: SuggestedPerson) {
-    return Boolean(
-      normalizedField &&
-        candidate.field_of_study?.trim().toLocaleLowerCase("en") === normalizedField
-    );
-  }
-
-  function categoryMatches(candidate: SuggestedPerson) {
-    return Boolean(
-      candidate.profile_type &&
-        categoryProfileTypes.some((profileType) => profileType === candidate.profile_type)
-    );
-  }
-
-  function score(candidate: SuggestedPerson) {
-    let value = topicMatches(candidate) * 100;
-    if (currentPath === "student" && sameUniversity(candidate)) value += 80;
-    if (currentPath === "student" && sameField(candidate)) value += 20;
-    if (currentPath === "non_student" && categoryMatches(candidate)) value += 25;
-    return value;
-  }
-
-  const suggestions = Array.from(candidatesById.values())
+  const ranked = [...rowsById.values()]
+    .filter((row) => Boolean(row.username))
+    .map((row) => ({ row, shared: sharedTopics(row) }))
     .sort(
       (left, right) =>
-        score(right) - score(left) ||
-        (right.points ?? 0) - (left.points ?? 0) ||
-        left.username.localeCompare(right.username)
+        right.shared.length - left.shared.length ||
+        byRecentPublication(
+          latest,
+          toSuggestion(left.row, null, latest),
+          toSuggestion(right.row, null, latest)
+        )
     )
     .slice(0, limit);
 
+  const suggestions = ranked.map(({ row, shared }) =>
+    toSuggestion(row, shared[0] ?? null, latest)
+  );
+
   const first = suggestions[0];
-  let reason = "Top contributors";
-  if (first && topicMatches(first) > 0 && sameUniversity(first)) {
-    reason = "From your school and topics";
-  } else if (first && topicMatches(first) > 0) {
-    reason = "Writing about your topics";
-  } else if (first && currentPath === "non_student" && categoryMatches(first)) {
-    reason = "Connected to your work";
-  } else if (first && sameUniversity(first) && sameField(first)) {
-    reason = "From your university and field";
-  } else if (first && sameUniversity(first)) {
-    reason = "From your university";
-  }
+  const reason = first?.sharedTopic
+    ? "Writing about your topics"
+    : first?.lastPublishedAt
+      ? "Published recently"
+      : "Writers on Indegenius";
 
   return { suggestions, reason };
 }

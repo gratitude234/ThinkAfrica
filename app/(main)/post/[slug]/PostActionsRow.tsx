@@ -15,9 +15,8 @@ interface PostActionsRowProps {
   initialLiked: boolean;
   initialLikeCount: number;
   initialBookmarked: boolean;
-  /** Shown alongside the reply action: comments plus responses, matching the
-   *  discussion metric on feed cards. */
-  responseCount?: number;
+  /** Shown alongside the reply action, matching the comment count on feed
+   *  cards. */
   commentCount?: number;
   /** Rendered at the trailing edge of the bar — keeps secondary actions such as
    *  Report grouped with the row instead of orphaned on a line of their own. */
@@ -37,7 +36,6 @@ export default function PostActionsRow({
   initialLiked,
   initialLikeCount,
   initialBookmarked,
-  responseCount = 0,
   commentCount = 0,
   reportSlot = null,
 }: PostActionsRowProps) {
@@ -57,7 +55,6 @@ export default function PostActionsRow({
   } = usePostEngagement();
   const rowRef = useRef<HTMLDivElement | null>(null);
   const { requestAuth } = useGuestAuthGate();
-  const discussionCount = commentCount + responseCount;
 
   const goToComposer = () => {
     if (!userId) {
@@ -131,9 +128,8 @@ export default function PostActionsRow({
         </button>
 
         {/* The inline composer is a few hundred pixels below this row, so the
-            reply action takes the reader there rather than opening the chooser
-            and navigating away from the post they are replying to. Publishing a
-            full Response is still one click, from inside the composer. */}
+            reply action takes the reader there rather than navigating away
+            from the post they are replying to. */}
         <button type="button" onClick={goToComposer} className={ACTION_CLASS} aria-label="Reply to this post">
           <svg
             className="h-5 w-5"
@@ -150,8 +146,8 @@ export default function PostActionsRow({
             />
           </svg>
           Reply
-          {discussionCount > 0 ? (
-            <span className="text-ink-muted">{discussionCount}</span>
+          {commentCount > 0 ? (
+            <span className="text-ink-muted">{commentCount}</span>
           ) : null}
         </button>
 

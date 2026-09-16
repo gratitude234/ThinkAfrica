@@ -135,20 +135,6 @@ describe.skipIf(!enabled)("search: PostgREST vs PostgreSQL, same database", () =
     expect(mismatches).toEqual([]);
   });
 
-  it("agrees on the opportunity results, in order", async () => {
-    const mismatches: string[] = [];
-    for (const word of words) {
-      const [rest, direct] = await Promise.all([
-        viaRest.opportunities(word, { limit: 6 }),
-        viaSql.opportunities(word, { limit: 6 }),
-      ]);
-      mismatches.push(
-        ...differences(rest, direct).map((line) => `"${word}": ${line}`)
-      );
-    }
-    expect(mismatches).toEqual([]);
-  });
-
   it("agrees on the typeahead results, as a set", async () => {
     const mismatches: string[] = [];
     for (const word of words) {

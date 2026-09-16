@@ -2,39 +2,10 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import FeedSkeleton from "@/components/post/FeedSkeleton";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
-import PushPromptBanner from "@/components/push/PushPromptBanner";
-import BriefColumn from "@/components/ui/BriefColumn";
-import HomeSidebar from "@/components/ui/HomeSidebar";
-import WelcomeBanner from "@/components/ui/WelcomeBanner";
-import type { LegacyPushPromptSeed } from "@/lib/pushPromptPolicy";
-import { getActivationState, type ActivationState } from "@/lib/activation";
-import { getProfileTypeLabel, isProfileType } from "@/lib/profileTypes";
-import { getFeedSurfaceReason } from "@/lib/postQuality";
-import { scorePost, type RankingContext } from "@/lib/feedRanking";
-import {
-  getFeedExcludedUserIds,
-  getPostIdsWithExcludedAuthors,
-} from "@/lib/blocking";
-import { getSuggestedPeople, type SuggestedPeopleResult } from "@/lib/suggestedPeople";
-import {
-  getEngagementCounts,
-  getFeaturedPostCandidates,
-  uniqueFeaturedPosts,
-  type FeaturedPostRow as FeaturedPostRaw,
-} from "@/lib/dailyBrief";
 import PostsFeedSection from "./PostsFeedSection";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
-import {
-  isAuthorSubscriptionsUxV2Enabled,
-  isTopicSubscriptionsEnabled,
-  RESEARCH_TYPE_QUERY_EXCLUSION,
-} from "@/lib/featureFlags";
-import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
-import { normalizeMyPrivateProfile } from "@/lib/profilePrivate";
-import { normalizeOnboardingPreference } from "@/lib/onboarding";
 import { BRAND_PROMISE, BRAND_SEO_DESCRIPTION } from "@/lib/brand";
 
 export const revalidate = 60;
@@ -70,54 +41,16 @@ interface PageProps {
   }>;
 }
 
-const DEFAULT_SIDEBAR_TOPICS = [
-  "Climate Policy",
-  "Labour Law",
-  "Gender Studies",
-  "Public Health",
-  "Economic Development",
-  "Legal Theory",
-  "African Philosophy",
-  "Tech & Society",
-  "Education Reform",
-  "Urban Planning",
-];
-
-function logHomeQueryError(
-  label: string,
-  error?: { message?: string } | null
-) {
-  if (!error) return;
-  console.error(`[home] ${label} query failed`, error);
-}
-
-function deriveSidebarTopics({
-  userInterests,
-  featuredPosts,
-}: {
-  userInterests: string[];
-  featuredPosts: Array<{ tags: string[] | null }>;
-}) {
-  const scores = new Map<string, number>();
-
-  for (const tag of userInterests) {
-    scores.set(tag, (scores.get(tag) ?? 0) + 4);
-  }
-
-  for (const post of featuredPosts) {
-    for (const tag of post.tags ?? []) {
-      scores.set(tag, (scores.get(tag) ?? 0) + 2);
-    }
-  }
-
-  const ranked = Array.from(scores.entries())
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-    .map(([tag]) => tag)
-    .filter(Boolean);
-
-  return Array.from(new Set([...ranked, ...DEFAULT_SIDEBAR_TOPICS])).slice(0, 10);
-}
-
+/**
+ * Home: the publication feed, and nothing else.
+ *
+ * Two modes, For You and Following, and a list of Posts and Articles. The
+ * publishing reset (Phase 2F) removed the sidebar brief, the featured lead,
+ * the people and topic interludes, the welcome and push-permission banners,
+ * and the activation and retention cards, along with every query that fed
+ * them. This page reads only the session; the feed's own reads happen inside
+ * the Suspense boundary, in PostsFeedSection.
+ */
 export default async function HomePage({ searchParams }: PageProps) {
   const { guest, tab, type, timeframe, source, welcome } = await searchParams;
   const supabase = await createClient();
@@ -130,398 +63,44 @@ export default async function HomePage({ searchParams }: PageProps) {
     redirect("/landing");
   }
 
-  // Content-kind filtering moved off the home feed and onto Explore, which
-  // already had the same four filters plus a genre refinement underneath.
-  // Hand old `/?type=research` links over rather than dropping the filter
-  // silently: without the chips there is no longer any control on this page
-  // that could show such a filter is active or clear it, so honouring the
-  // param here would strand the reader in a narrowed feed with no way out.
+  // Content-kind filtering lives on Explore. Hand old `/?type=` links over
+  // rather than honouring an invisible filter Home has no control to clear.
   // The raw value is passed through untouched because Explore reads the same
-  // `?type=` names and additionally maps the pre-content-model ones
-  // (`blog`, `essay`, `policy_brief`) that may still be sitting in bookmarks.
+  // names and maps the pre-content-model ones that may sit in bookmarks.
   if (type && type !== "all") {
     redirect(`/explore?type=${encodeURIComponent(type)}`);
   }
 
-  // Home no longer exposes a timeframe control. Canonicalize old bookmarked
-  // URLs instead of silently narrowing the feed with an invisible filter.
-  if (timeframe && timeframe !== "all") {
-    const canonicalParams = new URLSearchParams();
-    if (guest === "1") canonicalParams.set("guest", "1");
-    if (tab) canonicalParams.set("tab", tab);
-    if (source) canonicalParams.set("source", source);
-    if (welcome === "1") canonicalParams.set("welcome", "1");
-    const query = canonicalParams.toString();
+  const activeTab = user && tab === "following" ? "following" : "home";
+
+  // Older addresses carry parameters Home no longer reads: a timeframe, a
+  // subscription source, the retired welcome flag, or a retired tab (Latest,
+  // Subscribed, Topics). Canonicalize them so the address describes the feed
+  // on screen, keeping only guest context and the Following tab.
+  const tabIsCanonical =
+    tab === undefined || tab === "home" || tab === activeTab;
+  if (
+    !tabIsCanonical ||
+    timeframe !== undefined ||
+    source !== undefined ||
+    welcome !== undefined
+  ) {
+    const canonical = new URLSearchParams();
+    if (guest === "1") canonical.set("guest", "1");
+    if (activeTab === "following") canonical.set("tab", "following");
+    const query = canonical.toString();
     redirect(query ? `/?${query}` : "/");
   }
 
-  const showWelcomeBanner = Boolean(user) && welcome === "1";
-
-  const draftCutoff = new Date(
-    Date.now() - 14 * 24 * 60 * 60 * 1000
-  ).toISOString();
-
-  // The viewer's profile is only read after this batch resolves (interests
-  // feed the featured-post ranking below), so it belongs in the batch rather
-  // than in front of it -- fetching it first made the home page wait on a
-  // round trip before it even started loading the feed.
-  const [
-    { data: profileData },
-    { data: followedUsers },
-    { data: recentDraft },
-    featuredCandidates,
-    { data: topicSubscriptions },
-    { data: authorSubscriptions },
-    { data: privateProfileRaw },
-    { data: onboardingPreferenceRaw },
-    excludedAuthorIds,
-  ] = await Promise.all([
-    user
-      ? supabase
-          .from("profiles")
-          .select(
-            "interests, university, field_of_study, full_name, profile_type"
-          )
-          .eq("id", user.id)
-          .single()
-      : Promise.resolve({ data: null }),
-
-    user
-      ? supabase
-          .from("follows")
-          .select("following_id")
-          .eq("follower_id", user.id)
-      : Promise.resolve({ data: [], error: null }),
-
-    user
-      ? supabase
-          .from("posts")
-          .select("id, title, updated_at, type, content_kind")
-          .eq("author_id", user.id)
-          .eq("status", "draft")
-          .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-          .gte("updated_at", draftCutoff)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-
-    getFeaturedPostCandidates(supabase),
-
-    user && isTopicSubscriptionsEnabled()
-      ? supabase
-          .from("topic_subscriptions")
-          .select("topic_key")
-          .eq("subscriber_id", user.id)
-          .limit(1000)
-      : Promise.resolve({ data: [] as Array<{ topic_key: string }> }),
-    user && isAuthorSubscriptionsUxV2Enabled()
-      ? supabase
-          .from("author_subscriptions")
-          .select("author_id")
-          .eq("subscriber_id", user.id)
-          .limit(1000)
-      : Promise.resolve({ data: [] as Array<{ author_id: string }> }),
-    user
-      ? supabase.rpc("get_my_profile_private")
-      : Promise.resolve({ data: null, error: null }),
-    user
-      ? supabase.rpc("get_my_onboarding_state")
-      : Promise.resolve({ data: null, error: null }),
-    getFeedExcludedUserIds(user?.id ?? null, { strict: true }),
-  ]);
-
-  const userInterests = (profileData?.interests as string[] | null) ?? [];
-  const userUniversity = profileData?.university ?? null;
-  const userFieldOfStudy = profileData?.field_of_study ?? null;
-  const welcomeFirstName =
-    profileData?.full_name?.trim().split(/\s+/)[0] ?? null;
-  const welcomePrimaryLabel = isProfileType(profileData?.profile_type)
-    ? getProfileTypeLabel(profileData.profile_type)
-    : null;
-  const privateProfile = normalizeMyPrivateProfile(privateProfileRaw);
-  const onboardingPreference = normalizeOnboardingPreference(onboardingPreferenceRaw);
-  const legacyPushSeed: LegacyPushPromptSeed = {
-    attemptCount: privateProfile?.push_prompt_attempt_count ?? 0,
-    lastShownAt: privateProfile?.push_prompt_last_shown_at ?? null,
-    shownAt: privateProfile?.push_prompt_shown_at ?? null,
-  };
-  const peopleAndActivationPromise: Promise<
-    [SuggestedPeopleResult, ActivationState | null]
-  > = user
-    ? Promise.all([
-        getSuggestedPeople(supabase, {
-          currentUserId: user.id,
-          university: userUniversity,
-          fieldOfStudy: userFieldOfStudy,
-          interests: userInterests,
-          currentPath: onboardingPreference.currentPath,
-          workCategory: onboardingPreference.workCategory,
-          excludedUserIds: excludedAuthorIds,
-          limit: 3,
-        }),
-        getActivationState(supabase, user.id),
-      ])
-    : Promise.resolve([{ suggestions: [], reason: "" }, null]);
-
-  const { manualFeaturedResult, recentFeaturedCandidatesResult, latestPublishedResult } =
-    featuredCandidates;
-
-  logHomeQueryError("manual featured post", manualFeaturedResult.error);
-  logHomeQueryError(
-    "recent featured candidates",
-    recentFeaturedCandidatesResult.error
-  );
-  logHomeQueryError("latest published fallback", latestPublishedResult.error);
-
-  const followedIds = (followedUsers ?? []).map(
-    (row: { following_id: string }) => row.following_id
-  );
-  const topicSubscriptionKeys = (topicSubscriptions ?? []).map(
-    (row: { topic_key: string }) => row.topic_key
-  );
-  const authorSubscriptionIds = (authorSubscriptions ?? []).map(
-    (row: { author_id: string }) => row.author_id
-  );
-  const followCount = followedIds.length;
-
-  const manualFeaturedRaw =
-    (manualFeaturedResult.data as FeaturedPostRaw | null) ?? null;
-  const latestPublishedRaw =
-    (latestPublishedResult.data as FeaturedPostRaw | null) ?? null;
-  const recentFeaturedCandidatesRaw =
-    (recentFeaturedCandidatesResult.data ?? []) as FeaturedPostRaw[];
-  const unfilteredFeaturedPosts = uniqueFeaturedPosts([
-    ...(manualFeaturedRaw ? [manualFeaturedRaw] : []),
-    ...recentFeaturedCandidatesRaw,
-    ...(latestPublishedRaw ? [latestPublishedRaw] : []),
-  ]);
-  const blockedAuthorSet = new Set(excludedAuthorIds);
-  const unfilteredFeaturedIds = unfilteredFeaturedPosts.map((post) => post.id);
-  const featuredMetricsReader = process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? createAdminClient()
-    : supabase;
-  const [blockedCoauthoredPostIdRows, engagementCounts] = await Promise.all([
-    getPostIdsWithExcludedAuthors(
-      unfilteredFeaturedIds,
-      excludedAuthorIds,
-      { strict: true }
-    ),
-    getEngagementCounts(featuredMetricsReader, unfilteredFeaturedIds),
-  ]);
-  const blockedCoauthoredPostIds = new Set(blockedCoauthoredPostIdRows);
-  const featuredPostsRaw = unfilteredFeaturedPosts.filter(
-    (post) =>
-      !blockedAuthorSet.has(post.author_id) &&
-      !blockedCoauthoredPostIds.has(post.id)
-  );
-  const featuredPostsNorm = featuredPostsRaw.map((post) => ({
-    ...post,
-    profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
-  }));
-
-  const { referenceCounts, bookmarkCounts, responseCounts } = engagementCounts;
-  const rankingContext: RankingContext = {
-    userId: user?.id ?? null,
-    followedIds: new Set(followedIds),
-    userInterests,
-    userUniversity,
-    userCountry: null,
-  };
-  const qualityRankedFeaturedPosts = featuredPostsNorm
-    .map((post) => {
-      const interestMatch = Boolean(
-        post.tags?.some((tag) =>
-          userInterests.some(
-            (interest) =>
-              interest.trim().toLocaleLowerCase("en") ===
-              tag.trim().toLocaleLowerCase("en")
-          )
-        )
-      );
-      const qualityInput = {
-        type: post.type,
-        citationId: post.citation_id,
-        publishedVersionId: post.published_version_id,
-        referenceCount: referenceCounts[post.id] ?? 0,
-        responseCount: responseCounts[post.id] ?? 0,
-        bookmarkCount: bookmarkCounts[post.id] ?? 0,
-        viewCount: post.view_count,
-        publishedAt: post.published_at,
-        tags: post.tags,
-        author: post.profiles,
-        followedAuthor: followedIds.includes(post.author_id),
-        interestMatch,
-      };
-
-      return {
-        ...post,
-        quality_reason: getFeedSurfaceReason(qualityInput),
-        quality_score: scorePost(
-          {
-            id: post.id,
-            title: post.title,
-            slug: post.slug,
-            excerpt: post.excerpt,
-            type: post.type,
-            content_kind: post.content_kind,
-            article_format: post.article_format,
-            tags: post.tags,
-            created_at: post.published_at ?? new Date(0).toISOString(),
-            published_at: post.published_at,
-            author_id: post.author_id,
-            view_count: post.view_count,
-            impression_count: post.impression_count,
-            read_count: post.read_count,
-            bookmark_count: bookmarkCounts[post.id] ?? 0,
-            reference_count: referenceCounts[post.id] ?? 0,
-            response_count: responseCounts[post.id] ?? 0,
-            citation_id: post.citation_id,
-            published_version_id: post.published_version_id,
-            profiles: post.profiles
-              ? {
-                  username: post.profiles.username ?? "",
-                  full_name: post.profiles.full_name,
-                  university: post.profiles.university,
-                  avatar_url: post.profiles.avatar_url,
-                  verified: post.profiles.verified,
-                }
-              : null,
-          },
-          rankingContext
-        ),
-      };
-    })
-    .sort((left, right) => right.quality_score - left.quality_score);
-
-  const manualFeaturedPost = qualityRankedFeaturedPosts.find(
-    (post) => post.id === manualFeaturedRaw?.id
-  );
-  const automaticFeaturedPost =
-    qualityRankedFeaturedPosts.find(
-      (post) => post.id !== manualFeaturedPost?.id
-    ) ?? null;
-  const featuredPost = manualFeaturedPost
-    ? { ...manualFeaturedPost, featured_provenance: "editorial" as const }
-    : automaticFeaturedPost
-      ? {
-          ...automaticFeaturedPost,
-          featured_provenance:
-            automaticFeaturedPost.id === latestPublishedRaw?.id
-              ? ("latest" as const)
-              : ("recommended" as const),
-        }
-      : null;
-
-  // A second, distinct candidate for the sidebar's "Featured today" card --
-  // never the same record as the main Editor's Pick lead. Reuses the
-  // already-fetched/ranked candidate pool (no extra query). If every
-  // candidate was already used as the lead, there's nothing distinct left
-  // to show, so the card is omitted rather than duplicating it.
-  const featuredTodayPost =
-    qualityRankedFeaturedPosts.find((post) => post.id !== featuredPost?.id) ?? null;
-
-  const sidebarTopics = deriveSidebarTopics({
-    userInterests,
-    featuredPosts: qualityRankedFeaturedPosts,
-  });
-
-  const [peopleResult, activationState] = await peopleAndActivationPromise;
-
-  const showFollowingEligible = !!user;
-  const showSubscriptionsEligible =
-    Boolean(user) && isAuthorSubscriptionsUxV2Enabled();
-  const showTopicsEligible =
-    Boolean(user) &&
-    isTopicSubscriptionsEnabled() &&
-    !showSubscriptionsEligible;
-  const subscriptionSource: SubscriptionFeedSource =
-    source === "authors" || source === "topics" ? source : "all";
-  const activeTab =
-    tab === "following" && showFollowingEligible
-      ? "following"
-      : (tab === "subscriptions" || tab === "topics") &&
-          showSubscriptionsEligible
-        ? "subscriptions"
-      : tab === "topics" && showTopicsEligible
-        ? "topics"
-      : tab === "latest"
-        ? "latest"
-        : "home";
-
   return (
-    <div>
-      {showWelcomeBanner ? (
-        <WelcomeBanner
-          firstName={welcomeFirstName ?? "there"}
-          primaryLabel={welcomePrimaryLabel}
-        />
-      ) : null}
-
-      {user ? <PushPromptBanner userId={user.id} legacySeed={legacyPushSeed} /> : null}
-
+    <div className="mx-auto w-full max-w-[720px]">
       {user ? (
-        <RetentionEventTracker
-          event="home_viewed"
-          metadata={{ tab: activeTab, activated: Boolean(activationState?.activated) }}
-        />
+        <RetentionEventTracker event="home_viewed" metadata={{ tab: activeTab }} />
       ) : null}
 
-      {/* Below xl there is no rail, so the feed keeps its capped, centered
-          layout. At xl the rail already consumes the left edge, so the feed
-          goes fluid and fills the column instead of centering inside it --
-          the old justify-center was throwing away ~130px on wide screens. */}
-      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(0,744px)_minmax(288px,304px)] lg:justify-center lg:gap-6 xl:grid-cols-[minmax(0,800px)_304px] xl:justify-center xl:gap-7">
-        <div className="min-w-0">
-          <Suspense fallback={<FeedSkeleton />}>
-            <PostsFeedSection
-              tab={activeTab}
-              type={type ?? null}
-              timeframe={timeframe ?? null}
-              userId={user?.id ?? null}
-              userInterests={userInterests}
-              userUniversity={userUniversity}
-              followedIds={followedIds}
-              authorSubscriptionIds={authorSubscriptionIds}
-              topicSubscriptionKeys={topicSubscriptionKeys}
-              excludedAuthorIds={excludedAuthorIds}
-              subscriptionSource={
-                tab === "topics" && showSubscriptionsEligible
-                  ? "topics"
-                  : subscriptionSource
-              }
-              showFollowingEligible={showFollowingEligible}
-              showTopicsEligible={showTopicsEligible}
-              showSubscriptionsEligible={showSubscriptionsEligible}
-              peopleSuggestions={peopleResult.suggestions}
-              peopleSuggestionReason={peopleResult.reason}
-              prioritizePeopleSuggestions={followCount < 3}
-              featuredPost={featuredPost}
-            />
-          </Suspense>
-        </div>
-
-        {/* This column can stack four cards (draft or activation, featured
-            today, people, topics), which runs past 800px -- taller
-            than the ~700px of usable height on a 1366x768 laptop. It used to
-            cap its height and scroll inside itself, which made the lower cards
-            reachable but not findable: a second gesture, on a region whose
-            scrollbar was hidden, that also stole the wheel from the feed for
-            the quarter of the screen it covers. BriefColumn drops the inner
-            scroller and lets the column travel with the document instead,
-            pinning its last card against the bottom of the viewport rather
-            than its first against the nav. See the comment there. */}
-        <BriefColumn>
-          <HomeSidebar
-            recentDraft={recentDraft ?? null}
-            activationState={activationState}
-            featuredToday={featuredTodayPost}
-            peopleSuggestions={peopleResult.suggestions}
-            currentUserId={user?.id ?? null}
-            topics={sidebarTopics}
-          />
-        </BriefColumn>
-      </div>
+      <Suspense fallback={<FeedSkeleton />}>
+        <PostsFeedSection tab={activeTab} userId={user?.id ?? null} />
+      </Suspense>
     </div>
   );
 }

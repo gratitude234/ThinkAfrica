@@ -44,9 +44,12 @@ describe("Phase 0 measurement foundation", () => {
     expect(migration).toContain("coalesce(cardinality(v_interests), 0) < 1");
     expect(migration).toContain("v_profile_type IN ('student', 'researcher', 'educator')");
     expect(migration).toContain("'complete_onboarding_rpc'");
-    // Called from app/(onboarding)/onboarding/actions.ts now, not from the
-    // client component. Still one RPC, still the only completion path.
-    expect(onboardingActions).toContain('supabase.rpc("complete_onboarding")');
+    // Phase 2G retired the four-step flow this function validates. Completion
+    // is now lib/onboardingCompletion.ts, reached only from the onboarding
+    // server action, and it still writes onboarding_completed_at, which is what
+    // the baseline counts. Still never from the browser.
+    expect(onboardingActions).toContain("completeOwnOnboarding(viewer.userId)");
+    expect(onboardingActions).not.toContain('rpc("complete_onboarding")');
     expect(onboardingPage).not.toContain(
       'trackActivationEvent({ event: "onboarding_completed" })'
     );
@@ -58,7 +61,10 @@ describe("Phase 0 measurement foundation", () => {
     expect(migration).toContain("CREATE OR REPLACE FUNCTION public.record_user_activity_day()");
     expect(migration).toContain("ON CONFLICT (user_id, activity_date) DO NOTHING");
     expect(migration).toContain("(v_seen_at AT TIME ZONE 'UTC')::date");
-    expect(mainLayout).toContain('supabase.rpc("record_user_activity_day")');
+    // Phase 2F removed the per-navigation call. The function and table stay
+    // until the database cleanup phase, and nothing in the application
+    // reaches them.
+    expect(mainLayout).not.toContain('rpc("record_user_activity_day")');
   });
 
   it("keeps the ordered baseline service-role-only and based on durable facts", () => {

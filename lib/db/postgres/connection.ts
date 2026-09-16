@@ -149,8 +149,7 @@ export function resolvePostgresExecutor(): SqlExecutor {
  * be the same transaction, or the row can move between them and the predicates
  * are the only thing left. They are a good last line and they are not a
  * substitute for atomicity when an operation is several dependent statements:
- * featuring a post clears every other featured row and then sets one, and a
- * failure between those two leaves the site with nothing featured.
+ * a failure between two of them would otherwise commit the first alone.
  *
  * postgres.js rolls back when the callback throws and commits when it returns,
  * so an affected-row check that throws inside here undoes everything before it.

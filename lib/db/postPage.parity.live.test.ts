@@ -59,7 +59,7 @@ describe.skipIf(!enabled)("post page: PostgREST vs PostgreSQL, same database", (
     viaSql = createPostgresPostPageRepository(adaptDriver(sql as never));
 
     // A spread of real posts: with references, with co-authors, with reviews,
-    // with responses, and a plain one. A parity run over five identical
+    // and a plain one. A parity run over five identical
     // published essays proves the easy half.
     const rows = await sql.unsafe(`
       (select id::text as id, to_jsonb(tags) as tags, published_at from public.posts
@@ -70,9 +70,6 @@ describe.skipIf(!enabled)("post page: PostgREST vs PostgreSQL, same database", (
       union all
       (select id::text, to_jsonb(tags), published_at from public.posts
          where status='published' and id in (select post_id from public.post_reviews) limit 2)
-      union all
-      (select id::text, to_jsonb(tags), published_at from public.posts
-         where status='published' and in_response_to is not null limit 2)
       union all
       (select id::text, to_jsonb(tags), published_at from public.posts
          where status='published' order by published_at desc limit 3)
@@ -185,34 +182,6 @@ describe.skipIf(!enabled)("post page: PostgREST vs PostgreSQL, same database", (
         ...differences(rest, direct, `${testCase.id}.neighbours`)
       );
     }
-    expect(mismatches, mismatches.join("\n")).toEqual([]);
-  }, 300_000);
-
-  it("returns identical parent posts, including the unpublished refusal", async () => {
-    const mismatches: string[] = [];
-    for (const testCase of cases.slice(0, 5)) {
-      const [rest, direct] = await Promise.all([
-        viaRest.parentPost(testCase.id, null),
-        viaSql.parentPost(testCase.id, null),
-      ]);
-      mismatches.push(...differences(rest, direct, `${testCase.id}.parent`));
-    }
-
-    // An unpublished post must be refused by both.
-    const rows = await sql.unsafe(
-      "select id::text as id from public.posts where status <> 'published' limit 1"
-    );
-    if (rows.length > 0) {
-      const id = String((rows[0] as Record<string, unknown>).id);
-      const [rest, direct] = await Promise.all([
-        viaRest.parentPost(id, null),
-        viaSql.parentPost(id, null),
-      ]);
-      if (rest !== null || direct !== null) {
-        mismatches.push(`unpublished parent leaked: ${canonical(rest)} vs ${canonical(direct)}`);
-      }
-    }
-
     expect(mismatches, mismatches.join("\n")).toEqual([]);
   }, 300_000);
 

@@ -1,131 +1,32 @@
-// Static controls for whether selected sections are surfaced. These are not
-// authorization checks or route guards: a route remains reachable unless it
-// explicitly reads its flag. Toggle only when the section has enough verified
-// volume and operational support to feel alive.
-export const FEATURE_FLAGS = {
-  // Temporary product kill switch. Keep every Research surface and mutation
-  // behind this value so the feature can be restored in one place.
-  research: false,
-  fellowshipsSection: false,
-  ambassadors: false,
-  talentMarketplace: false,
-} as const;
-
-export const RESEARCH_UNAVAILABLE_MESSAGE =
-  "Research is temporarily unavailable.";
-
-export function isResearchEnabled(): boolean {
-  return FEATURE_FLAGS.research;
-}
-
-// Post.type is constrained to known content types, so this sentinel matches
-// nothing when Research is enabled and lets shared query chains stay intact.
-export const RESEARCH_TYPE_QUERY_EXCLUSION = FEATURE_FLAGS.research
-  ? "__research_feature_enabled__"
-  : "research";
-
-export type FeatureFlag = keyof typeof FEATURE_FLAGS;
-
-export function isEnabled(flag: FeatureFlag): boolean {
-  return FEATURE_FLAGS[flag];
-}
+// The static section switches (fellowships, ambassadors, talent marketplace)
+// went with those products in the publishing reset, Phase 2D. The profile
+// positioning, featured-work-notes and AI topic suggestion gates went with
+// their features in Phase 2G, and the author subscription, subscription UX V2
+// and topic subscription gates in Phase 2H.
+//
+// RESEARCH_TYPE_QUERY_EXCLUSION went in Phase 2I. It was the filter every post
+// query carried to keep legacy `type = 'research'` rows out of feeds, search
+// and discovery. There are no such rows: 20260915000005 normalized all five of
+// them into Articles, and 20260915000006 made the value unwritable. A filter
+// against a value the database refuses to store is not a safety net, it is a
+// line of code that has to be explained to the next reader.
+//
+// What is left here is one release gate for database objects.
 
 /**
- * Author subscriptions depend on database objects that are deliberately
- * release-gated. Keep the runtime check separate from the static navigation
- * flags so code can be deployed before the migration without querying tables
- * that do not exist yet.
- */
-export function isAuthorSubscriptionsEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED === "1";
-}
-
-/**
- * UX V2 is independently reversible while retaining the live V1 relationship
- * and publication-delivery infrastructure.
- */
-export function isAuthorSubscriptionsUxV2Enabled(): boolean {
-  return (
-    isAuthorSubscriptionsEnabled() &&
-    process.env.NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED === "1" &&
-    process.env.NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED === "1"
-  );
-}
-
-/**
- * Topic subscriptions extend the durable author-publication delivery
- * infrastructure, so the topic flag can never enable them independently.
- */
-export function isTopicSubscriptionsEnabled(): boolean {
-  return (
-    isAuthorSubscriptionsEnabled() &&
-    process.env.NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED === "1"
-  );
-}
-
-/**
- * AI topic suggestions can ship before Topic Subscriptions. The flag also
- * gates reads/writes of the additive research_keywords column so application
- * code can be deployed before its pending migration is promoted.
- */
-export function isAiTopicSuggestionsEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_AI_TOPIC_SUGGESTIONS_ENABLED === "1";
-}
-
-/**
- * Gates reads and writes of the additive profiles.positioning_statement
- * column so this code can be deployed before its migration is applied.
- *
- * Without the gate the ordering is unforgiving: PostgREST rejects a select
- * naming a column that does not exist, and the profile page treats that
- * rejection as a missing profile, so deploying ahead of the migration would
- * turn every public profile into a 404. Set to 1 only after
- * 20260826000001_profile_positioning_statement.sql is applied and verified.
- *
- * Production was confirmed on 2026-09-06 to have profiles.positioning_statement.
- * The gate is kept anyway, because it does not protect production alone: a
- * preview branch or a developer's local database can still lag, and there is
- * no way from here to know that every environment has caught up. The
- * condition for deleting it is that claim being verifiable, not production
- * being ahead. Note that the failure it prevents is no longer a 404 either
- * way: the profile loader now separates a failed query from a missing row.
- */
-export function isProfilePositioningEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_PROFILE_POSITIONING_ENABLED === "1";
-}
-
-/**
- * Gates reads and writes of profile_featured_posts.feature_note and the v2
- * replacement RPC, for the same reason as the positioning gate above: a
- * select naming a column PostgREST does not know about fails outright, and
- * this one is on the public profile query. Set to 1 only after
- * 20260826000002_featured_work_notes.sql is applied and verified.
- *
- * Production was confirmed on 2026-09-06 to have
- * profile_featured_posts.feature_note. Kept for the same reason as the
- * positioning gate above: production being ahead is not the same as every
- * environment being ahead.
- */
-export function isFeaturedWorkNotesEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_FEATURED_WORK_NOTES_ENABLED === "1";
-}
-
-/**
- * Gates the credibility graph: citation edges, the public recognition and
- * demonstrated-expertise sections, and verified opportunity outcomes.
+ * Gates the credibility graph's citation edges. It also gated the public
+ * recognition and demonstrated-expertise sections and verified opportunity
+ * outcomes, all of which have since been removed.
  *
  * Production was confirmed on 2026-09-06 NOT to have this schema:
  * post_citation_edges, profile_recognitions and
  * opportunity_applications.outcome_verified_at are all absent. The gate must
- * stay off. The public profile no longer depends on it either way, because
- * the redesign does not surface Demonstrated Expertise or Recognition and so
- * stopped loading the graph rather than loading it to render nothing.
+ * stay off.
  *
- * Same reason as the gates above. The credibility migrations add a column to
- * post_references and two new tables; a select naming any of them before
- * 20260827000001 to 20260827000003 are applied fails outright, and one of
- * those selects sits on the public profile. Set to 1 only after all three are
- * applied and verified.
+ * The reason it exists is the release-gate one: the credibility migrations add
+ * a column to post_references and two new tables, and a select naming any of
+ * them before 20260827000001 to 20260827000003 are applied fails outright. Set
+ * to 1 only after all three are applied and verified.
  */
 export function isCredibilityGraphEnabled(): boolean {
   return process.env.NEXT_PUBLIC_CREDIBILITY_GRAPH_ENABLED === "1";

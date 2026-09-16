@@ -9,12 +9,7 @@ import {
   type LandingPostRaw,
 } from "./landingData";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import {
-  getArticleFormatLabel,
-  resolveArticleFormat,
-  resolveContentKind,
-} from "@/lib/contentModel";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { getContentKindLabel, resolveContentKind } from "@/lib/contentModel";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
@@ -78,13 +73,13 @@ const VALUE_PROPS = [
     num: "02",
     numStyle: "bg-amber-100 text-amber-700",
     title: "Build a body of work",
-    desc: "Bring publications, Responses, collaborations, and review signals together in one evidence-backed Intellectual Record.",
+    desc: "Bring your Posts and Articles together in one evidence-backed Intellectual Record.",
   },
   {
     num: "03",
     numStyle: "bg-purple-100 text-purple-700",
     title: "Test ideas in public",
-    desc: "Move from reading into questions, counterpoints, and Responses that make your reasoning part of your Intellectual Record.",
+    desc: "Move from reading into writing, and turn your questions and counterpoints into work on your Intellectual Record.",
   },
 ];
 
@@ -92,27 +87,13 @@ const VALUE_PROPS = [
 
 function typeBadge(post: LandingPost): { classes: string; label: string } {
   const kind = resolveContentKind(post);
-
-  if (kind === "article") {
-    const format = getArticleFormatLabel(resolveArticleFormat(post));
-    return {
-      classes: "bg-gold-tint text-gold-ink",
-      label: format ? `Article · ${format}` : "Article",
-    };
-  }
-
-  if (kind === "research") {
-    return {
-      classes: "bg-purple-tint text-purple-accent",
-      label: "Research",
-    };
-  }
-
-  if (kind === "post") {
-    return { classes: "bg-green-tint text-emerald-brand", label: "Post" };
-  }
-
-  return { classes: "bg-green-tint text-emerald-brand", label: "Content" };
+  return {
+    classes:
+      kind === "article"
+        ? "bg-gold-tint text-gold-ink"
+        : "bg-green-tint text-emerald-brand",
+    label: getContentKindLabel(kind),
+  };
 }
 
 /** Titleless lightweight Post: lead with the excerpt instead of a blank/fabricated headline. */
@@ -149,11 +130,6 @@ export default async function LandingPage() {
   const { postsRaw, postCount, userCount, topics } = await loadLandingData();
 
   const posts: LandingPost[] = postsRaw
-    .filter(
-      (post) =>
-        FEATURE_FLAGS.research ||
-        (post.type !== "research" && post.content_kind !== "research")
-    )
     .map((p) => ({
       ...p,
       profiles: Array.isArray(p.profiles) ? (p.profiles[0] ?? null) : p.profiles,
@@ -217,9 +193,7 @@ export default async function LandingPage() {
                   <PostCover
                     src={leadPost.cover_image_url}
                     alt={getPostDisplayTitle(leadPost)}
-                    type={leadPost.type}
                     content_kind={leadPost.content_kind}
-                    article_format={leadPost.article_format}
                     sizes="88px"
                     className="h-[92px] rounded-[10px]"
                     imageClassName="object-cover"
@@ -245,7 +219,7 @@ export default async function LandingPage() {
                 <LandingTrackedLink
                   href={primaryHref}
                   event="landing_read_clicked"
-                  metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, postType: leadPost?.type ?? null, position: "primary" }}
+                  metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, contentKind: leadPost?.content_kind ?? null, position: "primary" }}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-5 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[#0E4B37] sm:px-7 sm:text-base"
                 >
                   Explore ideas
@@ -319,9 +293,7 @@ export default async function LandingPage() {
                     <PostCover
                       src={leadPost.cover_image_url}
                       alt={getPostDisplayTitle(leadPost)}
-                      type={leadPost.type}
                       content_kind={leadPost.content_kind}
-                      article_format={leadPost.article_format}
                       sizes="440px"
                       className="h-[156px] border-b border-gray-100"
                       imageClassName="object-cover"
@@ -447,9 +419,7 @@ export default async function LandingPage() {
                       <PostCover
                         src={post.cover_image_url}
                         alt={displayTitle}
-                        type={post.type}
                         content_kind={post.content_kind}
-                        article_format={post.article_format}
                         sizes="(max-width: 768px) 100vw, 280px"
                         className="h-[188px] border-b border-gray-100 md:h-full md:min-h-[240px] md:border-b-0 md:border-r"
                         imageClassName="object-cover"
@@ -476,9 +446,7 @@ export default async function LandingPage() {
                       <PostCover
                         src={post.cover_image_url}
                         alt={displayTitle}
-                        type={post.type}
                         content_kind={post.content_kind}
-                        article_format={post.article_format}
                         sizes="(max-width: 768px) 100vw, 33vw"
                         className="h-[150px] border-b border-gray-100"
                         imageClassName="object-cover"

@@ -222,15 +222,16 @@ it("reports POST LIFECYCLE OUTSTANDING: 0", () => {
   });
 
   it("routes every lifecycle RPC through the domain's authorization", () => {
-    // withdraw_post_submission() keeps its statement in the database because
-    // it also retires the assigned reviewers in one transaction. The decision
+    // withdraw_post_submission() belonged to the editorial review workflow,
+    // which the publishing reset retired (Phase 2A), so nothing in the
+    // application calls it now. If something ever does again, the decision
     // still has to happen here first, or the only thing guarding it is that
     // function's own auth.uid() filter, which returns NULL off Supabase.
     const withdrawCallers = sourceFiles("app").filter((file) =>
       readFileSync(file, "utf8").includes('rpc("withdraw_post_submission"')
     );
 
-    expect(withdrawCallers.length).toBeGreaterThan(0);
+    expect(withdrawCallers).toEqual([]);
 
     for (const file of withdrawCallers) {
       const text = readFileSync(file, "utf8");
@@ -244,13 +245,13 @@ it("reports POST LIFECYCLE OUTSTANDING: 0", () => {
 
 describe("the domain is the only thing that decides", () => {
   it("keeps the rules in one module", () => {
-    // A second copy of "only drafts can be deleted" or "research cannot be
-    // self-published" is a second copy that can drift. The policy module is
-    // where those sentences live.
+    // A second copy of "only drafts can be deleted" is a second copy that can
+    // drift. The policy module is where those sentences live. The
+    // self-publication refusal is not among them any more: Phase 2I retired
+    // the rule in the application and in the trigger.
     const policyPhrases = [
-      "Research and policy briefs can only be published",
       "Only drafts can be deleted directly",
-      "citation_id can only be assigned",
+      "citation_id belongs to the retired editorial workflow",
     ];
 
     for (const phrase of policyPhrases) {
@@ -274,17 +275,29 @@ describe("the domain is the only thing that decides", () => {
       "updatePostContent",
       "updateDraftComposition",
       "publishOwnDraft",
-      "submitPostForReview",
-      "resubmitRevision",
-      "withdrawSubmission",
-      "editorialDecision",
       "removePost",
       "restorePost",
       "deleteDraftPost",
       "createPost",
+      "renamePostSlug",
     ]) {
       expect(domain, `${named} should exist`).toContain(
         `export async function ${named}(`
+      );
+    }
+
+    // The editorial operations went with the workflow. None had a caller
+    // outside its own tests, and 20260915000007 removed the database side.
+    for (const gone of [
+      "submitPostForReview",
+      "resubmitRevision",
+      "withdrawSubmission",
+      "editorialDecision",
+      "publishApprovedPost",
+      "authorizeTransition",
+    ]) {
+      expect(domain, `${gone} should be gone`).not.toContain(
+        `export async function ${gone}(`
       );
     }
   });

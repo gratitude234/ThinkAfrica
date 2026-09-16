@@ -17,8 +17,6 @@ const selectContract = readFileSync(
 const ownerReadCallsites = [
   "app/(main)/settings/page.tsx",
   "app/(main)/notifications/page.tsx",
-  "app/(main)/subscriptions/page.tsx",
-  "app/(main)/page.tsx",
   // The onboarding owner read moved into the client when the identity-first
   // flow landed. The route file is now a thin wrapper that reads nothing.
   // The onboarding owner read is now server-side; see lib/onboardingActions.ts.
@@ -99,6 +97,13 @@ describe("Phase 0 profile-security migration", () => {
     for (const source of ownerReadCallsites) {
       expect(source).toMatch(/rpc\(\s*"get_my_profile_private"\s*\)/);
     }
+  });
+
+  it("keeps Home off the private profile entirely", () => {
+    // Home read get_my_profile_private only to seed the push-permission
+    // banner, which Phase 2F removed. It now reads the session and nothing else.
+    const home = readFileSync(resolve(process.cwd(), "app/(main)/page.tsx"), "utf8");
+    expect(home).not.toMatch(/get_my_profile_private|push_prompt_/);
   });
 
   it("keeps the notification bell off the private profile entirely", () => {

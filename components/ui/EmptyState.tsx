@@ -31,10 +31,4 @@ export const EMPTY_STATES = {
     description: "Be the first to share your ideas with Africa.",
     cta: { label: "Write an article", href: "/write" },
   },
-
-  fellowships: {
-    title: "No open opportunities right now.",
-    description: "Check back soon for fellowships, internships, and research roles.",
-    cta: undefined,
-  },
 } as const;

@@ -3,16 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import CreateLauncher from "./CreateLauncher";
+import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 import { shouldShowMobilePrimaryNav } from "./navRoutes";
 import { useAppChrome } from "./AppChromeProvider";
 
 import {
   ExploreIcon,
   HomeIcon,
-  ResponsesIcon,
   NAV_MATCH_PREFIXES,
+  NotificationsIcon,
   ProfileIcon,
+  WriteIcon,
+  getProfileNavHref,
+  guestAwareHref,
   isAccountNavActive,
   isNavItemActive,
 } from "./navItems";
@@ -35,111 +38,136 @@ function navPillClass(isCurrent: boolean) {
   }`;
 }
 
+const WRITE_CLASS =
+  "flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-emerald-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold";
+
+function WriteMark() {
+  return (
+    <span className="flex flex-col items-center justify-center gap-0.5">
+      <span className="flex h-8 w-11 items-center justify-center rounded-full bg-emerald-brand text-white shadow-sm">
+        <WriteIcon className="h-[20px] w-[20px]" />
+      </span>
+      <span className="whitespace-nowrap text-[11px] font-semibold">Write</span>
+    </span>
+  );
+}
+
 export default function BottomNav({
   username,
   userId,
 }: BottomNavProps) {
   const pathname = usePathname();
   const { setInteractionLocked } = useAppChrome();
+  const { requestAuth } = useGuestAuthGate();
 
   useEffect(() => {
     return () => setInteractionLocked(false);
   }, [setInteractionLocked]);
 
   const showPrimaryNav = shouldShowMobilePrimaryNav(pathname);
-  // Post pages get no mobile chrome from here. They used to keep the compose
-  // FAB alone, which put a second floating writing control 40px from the
-  // ReadingBar's Respond -- and the FAB opens a blank /write canvas, so it led
-  // away from the piece being read rather than into a reply to it.
+  // Post pages and the writing surfaces get no mobile chrome from here: a
+  // reader finishing a piece, or a writer mid-draft, should have the whole
+  // screen.
   if (!showPrimaryNav) {
     return null;
   }
 
   const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
   const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
-  const isResponsesActive = isNavItemActive(
+  const isNotificationsActive = isNavItemActive(
     pathname,
-    NAV_MATCH_PREFIXES.responses
+    NAV_MATCH_PREFIXES.notifications
   );
-  const profileHref = userId ? "/me" : "/signup";
   const profileActive = isAccountNavActive(pathname, { userId, username });
 
   return (
-    <>
-      <CreateLauncher userId={userId} variant="mobileFab" />
-
-      {/* The bar drops away on a downward scroll and returns on an upward one,
-          in step with the top nav: reading a feed on a phone should get the
-          whole screen, and the destinations are one flick away rather than a
-          page scroll away. transform rather than bottom so the slide is
-          composited and the safe-area padding travels with the bar -- and the
-          bar holds no fixed descendants, so making it a containing block costs
-          nothing. translate-y-full clears that padding too, which a fixed pixel
-          offset would leave stranded on notched devices. */}
-      <nav
-          data-app-bottom-nav=""
-          data-app-chrome-motion=""
-          onFocus={() => setInteractionLocked(true)}
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              setInteractionLocked(false);
-            }
-          }}
-          className="fixed left-0 right-0 z-50 translate-y-0 border-t border-gray-100 bg-white shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden"
-          style={{
-            bottom: "var(--mobile-visual-viewport-bottom, 0px)",
-            paddingBottom: "env(safe-area-inset-bottom)",
-          }}
-          aria-label="Primary navigation"
+    // The bar drops away on a downward scroll and returns on an upward one, in
+    // step with the top nav: reading a feed on a phone should get the whole
+    // screen, and the destinations are one flick away rather than a page scroll
+    // away. transform rather than bottom so the slide is composited and the
+    // safe-area padding travels with the bar.
+    <nav
+      data-app-bottom-nav=""
+      data-app-chrome-motion=""
+      onFocus={() => setInteractionLocked(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setInteractionLocked(false);
+        }
+      }}
+      className="fixed left-0 right-0 z-50 translate-y-0 border-t border-gray-100 bg-white shadow-[0_-2px_12px_-2px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden"
+      style={{
+        bottom: "var(--mobile-visual-viewport-bottom, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+      aria-label="Primary navigation"
+    >
+      <div className="flex h-[60px] items-center justify-around px-2">
+        <Link
+          href="/"
+          className={navLinkClass(isHomeActive)}
+          aria-current={isHomeActive ? "page" : undefined}
         >
-        <div className="flex h-[60px] items-center justify-around px-2">
-          <Link
-            href="/"
-            className={navLinkClass(isHomeActive)}
-            aria-current={isHomeActive ? "page" : undefined}
-          >
-            <span className={navPillClass(isHomeActive)}>
-              <HomeIcon className="h-[22px] w-[22px]" filled={isHomeActive} />
-              <span className="whitespace-nowrap text-[11px] font-medium">For you</span>
-            </span>
-          </Link>
+          <span className={navPillClass(isHomeActive)}>
+            <HomeIcon className="h-[22px] w-[22px]" filled={isHomeActive} />
+            <span className="whitespace-nowrap text-[11px] font-medium">Home</span>
+          </span>
+        </Link>
 
-          <Link
-            href="/explore"
-            className={navLinkClass(isExploreActive)}
-            aria-current={isExploreActive ? "page" : undefined}
-          >
-            <span className={navPillClass(isExploreActive)}>
-              <ExploreIcon className="h-[22px] w-[22px]" />
-              <span className="whitespace-nowrap text-[11px] font-medium">Discover</span>
-            </span>
-          </Link>
+        <Link
+          href="/explore"
+          className={navLinkClass(isExploreActive)}
+          aria-current={isExploreActive ? "page" : undefined}
+        >
+          <span className={navPillClass(isExploreActive)}>
+            <ExploreIcon className="h-[22px] w-[22px]" />
+            <span className="whitespace-nowrap text-[11px] font-medium">Explore</span>
+          </span>
+        </Link>
 
-          <Link
-            href="/responses"
-            className={navLinkClass(isResponsesActive)}
-            aria-current={isResponsesActive ? "page" : undefined}
-          >
-            <span className={navPillClass(isResponsesActive)}>
-              <ResponsesIcon className="h-[22px] w-[22px]" />
-              <span className="whitespace-nowrap text-[11px] font-medium">Responses</span>
-            </span>
+        {userId ? (
+          <Link href="/write" className={WRITE_CLASS}>
+            <WriteMark />
           </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => requestAuth("create", { destination: "/write" })}
+            className={WRITE_CLASS}
+          >
+            <WriteMark />
+          </button>
+        )}
 
-          <Link
-            href={profileHref}
-            className={navLinkClass(profileActive)}
-            aria-current={profileActive ? "page" : undefined}
-          >
-            <span className={navPillClass(profileActive)}>
-              <ProfileIcon className="h-[22px] w-[22px]" filled={profileActive} />
-              <span className="whitespace-nowrap text-[11px] font-medium">
-                {userId ? "Record" : "Join"}
-              </span>
+        <Link
+          href={guestAwareHref(userId, "/notifications")}
+          className={navLinkClass(isNotificationsActive)}
+          aria-current={isNotificationsActive ? "page" : undefined}
+        >
+          <span className={navPillClass(isNotificationsActive)}>
+            <NotificationsIcon
+              className="h-[22px] w-[22px]"
+              filled={isNotificationsActive}
+            />
+            <span className="whitespace-nowrap text-[11px] font-medium">
+              Notifications
             </span>
-          </Link>
-        </div>
-      </nav>
-    </>
+          </span>
+        </Link>
+
+        <Link
+          href={getProfileNavHref({ userId, username })}
+          className={navLinkClass(profileActive)}
+          aria-current={profileActive ? "page" : undefined}
+        >
+          <span className={navPillClass(profileActive)}>
+            <ProfileIcon className="h-[22px] w-[22px]" filled={profileActive} />
+            <span className="whitespace-nowrap text-[11px] font-medium">
+              {userId ? "Profile" : "Join"}
+            </span>
+          </span>
+        </Link>
+      </div>
+    </nav>
   );
 }

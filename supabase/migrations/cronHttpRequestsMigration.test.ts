@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -20,7 +20,6 @@ function read(name: string) {
 
 const original = read("20260827110918_migrate_scheduler_to_supabase_cron.sql");
 const surrogateKey = read("20260904000001_cron_http_requests_surrogate_key.sql");
-const debateRemoval = read("20260906000003_remove_debate_cron_jobs.sql");
 
 describe("the cron http request log", () => {
   it("was originally keyed on the pg_net request id, which is the bug", () => {
@@ -106,15 +105,28 @@ describe("inspecting the jobs", () => {
     // redefinition that drops one silently stops reporting on it. Read from
     // the newest redefinition, not this file's own: the expected set is
     // whatever the last migration to touch the function says it is.
+    const newest = readdirSync(MIGRATIONS)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()
+      .map((name) => read(name))
+      .filter((sql) =>
+        sql.includes("create or replace function private.inspect_indegenius_cron_jobs()")
+      )
+      .at(-1);
+    expect(newest).toBeDefined();
+
     for (const job of [
-      "indegenius-daily-brief",
-      "indegenius-review-reminders",
-      "indegenius-publication-recovery",
       "indegenius-resend-segment-sync",
       "indegenius-cron-http-reconcile",
       "indegenius-cron-history-prune",
     ]) {
-      expect(debateRemoval).toContain(`('${job}'`);
+      expect(newest).toContain(`('${job}'`);
     }
+    // Retired with the editorial workflow; see
+    // 20260914000001_remove_review_reminders_cron_job.sql.
+    expect(newest).not.toContain("('indegenius-review-reminders'");
+    // Retired with publication delivery; see
+    // 20260915000003_remove_publication_recovery_cron_job.sql.
+    expect(newest).not.toContain("('indegenius-publication-recovery'");
   });
 });

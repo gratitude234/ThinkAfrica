@@ -15,7 +15,6 @@ import CoverImageUploader from "@/components/ui/CoverImageUploader";
 import ProfileGate from "@/components/ui/ProfileGate";
 import TagInput from "@/components/ui/TagInput";
 import ReferencesPanel from "@/components/post/ReferencesPanel";
-import CoAuthorPicker from "@/components/collaboration/CoAuthorPicker";
 import type { EditorHandle, SelectedImage } from "@/components/editor/Editor";
 import {
   contributionText,
@@ -34,8 +33,6 @@ import {
 import MyDrafts from "./MyDrafts";
 import ArticlePreview, { readingMinutes } from "./ArticlePreview";
 import RevisionHistory, { type RestoredRevision } from "./RevisionHistory";
-import DraftShareControl from "./DraftShareControl";
-import { getDraftShareLink } from "./shareActions";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
@@ -159,8 +156,6 @@ interface UniversalComposerProps {
   /** When the account copy was last written, so a stale device copy can be told apart from a newer one. */
   draftUpdatedAt?: string | null;
   returnTo: string;
-  parent?: { id: string; displayTitle: string; slug: string } | null;
-  prompt?: { id: string; title: string; promptText: string; responseQuestion: string | null } | null;
 }
 
 const LOCAL_PREFIX = "indegenius:contribution-draft:v1";
@@ -201,12 +196,6 @@ function safeSnapshot(value: unknown, fallback: ContributionSnapshot) {
     references: Array.isArray(data.references)
       ? (data.references as ContributionSnapshot["references"])
       : fallback.references,
-    collaborators: Array.isArray(data.collaborators)
-      ? (data.collaborators as ContributionSnapshot["collaborators"])
-      : fallback.collaborators,
-    inResponseToId:
-      typeof data.inResponseToId === "string" ? data.inResponseToId : fallback.inResponseToId,
-    promptId: typeof data.promptId === "string" ? data.promptId : fallback.promptId,
   };
   return hasMeaningfulContribution(snapshot) ? snapshot : null;
 }
@@ -278,8 +267,6 @@ export default function UniversalComposer({
   publishedSlug = null,
   draftUpdatedAt = null,
   returnTo,
-  parent = null,
-  prompt = null,
 }: UniversalComposerProps) {
   const router = useRouter();
   const editorRef = useRef<EditorHandle>(null);
@@ -308,7 +295,6 @@ export default function UniversalComposer({
   const [showPreview, setShowPreview] = useState(false);
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
-  const [shareToken, setShareToken] = useState<string | null>(null);
   const [history, setHistory] = useState({ canUndo: false, canRedo: false });
   const [linkUrl, setLinkUrl] = useState("");
   const [activeMarks, setActiveMarks] = useState<Record<string, boolean>>({});
@@ -326,7 +312,7 @@ export default function UniversalComposer({
   const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const mountedRef = useRef(true);
   const localKeyRef = useRef(
-    `${LOCAL_PREFIX}:${userId}:${mode}:${publishedPostId ?? initialDraftId ?? snapshot.inResponseToId ?? "new"}`
+    `${LOCAL_PREFIX}:${userId}:${mode}:${publishedPostId ?? initialDraftId ?? "new"}`
   );
   // The document this canvas is currently editing. It picks up an id when the
   // first autosave mints a draft, so a later arrival of that same id reads as
@@ -675,23 +661,6 @@ export default function UniversalComposer({
     field.style.height = `${field.scrollHeight}px`;
   }, [showSubtitle, snapshot.excerpt]);
 
-  // The composer, not the drawer, owns whether a share link is live. The
-  // indicator has to be visible without opening the drawer first, since the
-  // case worth catching is a writer who has forgotten the link exists.
-  useEffect(() => {
-    if (mode === "published-edit" || !draftId) {
-      setShareToken(null);
-      return;
-    }
-    let active = true;
-    void getDraftShareLink({ postId: draftId }).then((result) => {
-      if (active) setShareToken(result.token);
-    });
-    return () => {
-      active = false;
-    };
-  }, [draftId, mode]);
-
   // The caption panel renders below the toolbar, which on a long piece is well
   // past the image that opened it. Keyed on presence rather than contents, so
   // it fires when the panel appears and not on every keystroke inside it.
@@ -744,20 +713,6 @@ export default function UniversalComposer({
           <p aria-live="polite" className={`min-w-0 flex-1 truncate text-xs ${saveState === "error" ? "text-red-600" : "text-ink-muted"}`}>
             {saveLabel}
           </p>
-          {/* A live share link is easy to create and then forget, and the
-              consequence of forgetting is a draft anyone can read. It says so
-              where the writer already looks for save state. */}
-          {shareToken ? (
-            <button
-              type="button"
-              onClick={() => setPanel("more")}
-              aria-label="A share link for this draft is live. Open sharing options."
-              className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-gold-tint px-2.5 text-xs font-semibold text-gold-ink transition-opacity hover:opacity-80"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-gold-ink" aria-hidden="true" />
-              Link live
-            </button>
-          ) : null}
           <Button
             type="button"
             onClick={openPublishSheet}
@@ -780,19 +735,6 @@ export default function UniversalComposer({
               <button type="button" onClick={() => { localStorage.removeItem(recovery.key); setRecovery(null); }} className="min-h-11 rounded-lg px-3 font-semibold text-gold-ink">Discard</button>
             </div>
           </div>
-        ) : null}
-
-        {/* Responding to a post and answering a campus prompt are the same
-            idea: context for what this piece is written into. One treatment. */}
-        {parent || prompt ? (
-          <section className="mb-7 rounded-xl border-l-2 border-emerald-brand/25 bg-green-wash px-4 py-3">
-            <p className="text-kicker font-semibold uppercase text-emerald-ink">
-              {prompt ? prompt.title : "Responding to"}
-            </p>
-            <p className="mt-1 text-sm text-ink">
-              {prompt ? prompt.responseQuestion || prompt.promptText : parent?.displayTitle}
-            </p>
-          </section>
         ) : null}
 
         {showTitle ? (
@@ -1045,21 +987,9 @@ export default function UniversalComposer({
               <Icon path={PREVIEW_ICON} className="h-4 w-4" />
               Preview as a reader
             </button>
-            {mode !== "published-edit" ? (
-              <div>
-                <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Co-authors</h2>
-                <CoAuthorPicker userId={userId} value={snapshot.collaborators} onChange={(collaborators) => setSnapshot((current) => ({ ...current, collaborators }))} source="write" />
-              </div>
-            ) : null}
-            {/* Both of these describe a draft that exists on the account, so
-                neither is offered until the first autosave has minted one, and
-                neither applies to editing something already published. */}
-            {mode !== "published-edit" && draftId ? (
-              <div>
-                <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Share this draft</h2>
-                <DraftShareControl postId={draftId} token={shareToken} onTokenChange={setShareToken} />
-              </div>
-            ) : null}
+            {/* Version history describes a draft that exists on the account, so
+                it is not offered until the first autosave has minted one, and it
+                does not apply to editing something already published. */}
             {mode !== "published-edit" && draftId ? (
               <div>
                 <h2 className="mb-3 text-kicker font-semibold uppercase text-ink-muted">Version history</h2>

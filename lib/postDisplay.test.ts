@@ -78,22 +78,20 @@ describe("getPostReferenceQuoted (for 'liked \"{value}\"' sentences)", () => {
 describe("isLightweightPost", () => {
   it("is true for a new titleless post (content_kind resolves to post, no title)", () => {
     expect(isLightweightPost({ content_kind: "post", title: null })).toBe(true);
-    expect(isLightweightPost({ type: "blog", title: null })).toBe(true);
   });
 
-  it("is false for a legacy titled blog even though it resolves to post", () => {
-    expect(isLightweightPost({ type: "blog", title: "My old blog post" })).toBe(false);
+  it("is false for a titled Post, of which production has 40", () => {
     expect(isLightweightPost({ content_kind: "post", title: "My old blog post" })).toBe(false);
   });
 
-  it("is false for article/research kinds regardless of title", () => {
-    expect(isLightweightPost({ type: "essay", title: "An essay" })).toBe(false);
-    expect(isLightweightPost({ type: "research", title: "A paper" })).toBe(false);
+  it("is false for an Article regardless of title", () => {
+    expect(isLightweightPost({ content_kind: "article", title: "An essay" })).toBe(false);
     expect(isLightweightPost({ content_kind: "article", title: null })).toBe(false);
   });
 
-  it("is false when the content kind can't be resolved at all", () => {
-    expect(isLightweightPost({ type: null, title: null })).toBe(false);
-    expect(isLightweightPost({ type: "op_ed", title: null })).toBe(false);
+  it("is false when the content kind cannot be resolved at all", () => {
+    expect(isLightweightPost({ content_kind: null, title: null })).toBe(false);
+    expect(isLightweightPost({ content_kind: "research", title: null })).toBe(false);
+    expect(isLightweightPost({ title: null })).toBe(false);
   });
 });

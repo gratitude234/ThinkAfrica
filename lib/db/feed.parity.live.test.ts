@@ -45,24 +45,13 @@ import type { FeedRepository } from "@/lib/db/feed";
 
 vi.setConfig({ testTimeout: 180_000 });
 
-/** Matches nothing, which is what the sentinel does when research is on. */
-const NO_EXCLUSION = "__no_such_post_type__";
-
 const BASE: FeedListCriteria = {
-  researchTypeExclusion: NO_EXCLUSION,
   contentKind: null,
   cutoff: null,
   authorIds: null,
-  coauthorUserIds: null,
-  topicKeys: null,
-  requireCitation: false,
-  onlyResponses: false,
   excludedAuthorIds: [],
   excludedPostIds: [],
   cursor: null,
-  order: "recent",
-  includeTopicKeys: false,
-  projection: "card",
   offset: 0,
   limit: 12,
 };
@@ -172,13 +161,8 @@ describe.skipIf(!enabled)("feed: PostgREST vs PostgreSQL, same database", () => 
     ).toEqual([]);
   });
 
-  it("agrees on the well-read ordering and the citable arm", async () => {
-    const mismatches = [
-      ...(await compare("well_read", { order: "well_read", limit: 20 })),
-      ...(await compare("citable", { requireCitation: true, limit: 20 })),
-      ...(await compare("responses", { onlyResponses: true, limit: 20 })),
-    ];
-    expect(mismatches).toEqual([]);
+  it("agrees on the date-ordered tail's offset", async () => {
+    expect(await compare("offset", { offset: 12, limit: 13 })).toEqual([]);
   });
 
   it("agrees on the exclusions, including a post with no author", async () => {
@@ -197,90 +181,6 @@ describe.skipIf(!enabled)("feed: PostgREST vs PostgreSQL, same database", () => 
       ...(await compare("excludedPosts", { excludedPostIds: posts, limit: 30 })),
     ];
     expect(mismatches).toEqual([]);
-  });
-
-  it("agrees on the topic-subscription arm", async () => {
-    const executor = adaptDriver(sql as never);
-    const [row] = await executor.query<{ key: string }>(
-      `select k as key from public.posts p, unnest(p.topic_keys) as k
-       where p.status = 'published' limit 1`
-    );
-    if (!row) return;
-
-    expect(
-      await compare("topicKeys", {
-        topicKeys: [row.key],
-        includeTopicKeys: true,
-        limit: 30,
-      })
-    ).toEqual([]);
-  });
-
-  it("agrees on the co-author credit arm, credits included", async () => {
-    const executor = adaptDriver(sql as never);
-    const [credit] = await executor.query<{ user_id: string }>(
-      `select a.user_id::text as user_id
-       from public.post_authors a
-       join public.posts p on p.id = a.post_id
-       where a.accepted_at is not null and p.status = 'published'
-       group by a.user_id order by count(*) desc limit 1`
-    );
-    if (!credit) return;
-
-    const input = {
-      ...BASE,
-      coauthorUserIds: [credit.user_id],
-      limit: 20,
-    };
-    const [rest, direct] = await Promise.all([
-      listRest.listPostsWithCredits(input),
-      listSql.listPostsWithCredits(input),
-    ]);
-
-    // The credit list is a set on both sides; PostgREST's embed order is not
-    // defined and neither is jsonb_agg's without an ORDER BY.
-    const index = (rows: typeof rest) =>
-      Object.fromEntries(
-        rows.map((row) => {
-          const credits = Array.isArray(row.subscription_author_credits)
-            ? row.subscription_author_credits
-            : row.subscription_author_credits
-              ? [row.subscription_author_credits]
-              : [];
-          return [
-            row.id,
-            {
-              ...row,
-              subscription_author_credits: [...credits].sort((a, b) =>
-                String(a.user_id).localeCompare(String(b.user_id))
-              ),
-            },
-          ];
-        })
-      );
-
-    expect(rest.length).toBe(direct.length);
-    expect(differences(index(rest), index(direct))).toEqual([]);
-  });
-
-  it("agrees on the ranked probe's narrow projection", async () => {
-    const input = { ...BASE, projection: "identity" as const, limit: 20 };
-    const [rest, direct] = await Promise.all([
-      listRest.listPosts(input),
-      listSql.listPosts(input),
-    ]);
-
-    // The projection is part of the contract: reading whole cards here would
-    // be 160 rows of metadata fetched and dropped on every tail page.
-    expect(differences(rest, direct)).toEqual([]);
-    for (const row of direct) {
-      expect(Object.keys(row).sort()).toEqual([
-        "citation_id",
-        "id",
-        "published_at",
-        "read_count",
-      ]);
-    }
   });
 
   it("agrees on the excluded-credit lookup", async () => {

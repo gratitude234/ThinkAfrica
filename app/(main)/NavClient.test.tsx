@@ -25,57 +25,59 @@ vi.mock("./NavUserMenu", () => ({
 }));
 
 vi.mock("./CreateLauncher", () => ({
-  default: () => null,
+  default: ({ userId }: { userId: string | null }) => (
+    <button type="button" data-user-id={userId ?? ""}>
+      Write
+    </button>
+  ),
 }));
 
 vi.mock("@/components/ui/NotificationBell", () => ({
   default: () => <button type="button">Notifications</button>,
 }));
 
-vi.mock("@/components/ui/MessagesUnreadBadge", () => ({
-  default: () => null,
-}));
+function renderNav(user: { id: string } | null = null) {
+  return render(
+    <NavClient
+      user={user as Parameters<typeof NavClient>[0]["user"]}
+      profile={null}
+      isAdmin={false}
+      onOpenSearch={vi.fn()}
+    />
+  );
+}
 
-describe("NavClient mobile Messages visibility", () => {
+describe("NavClient destinations", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
   });
 
-  it("hides the shortcut on mobile when the bottom navigation is present", () => {
-    render(
-      <NavClient
-        user={null}
-        profile={null}
-        isAdmin={false}
-        canAccessReview={false}
-        onOpenSearch={vi.fn()}
-      />
-    );
+  it("links Home and Explore and nothing from the retired product", () => {
+    renderNav();
 
-    const messages = screen.getByRole("link", { name: "Open messages" });
-    expect(messages).toHaveClass("hidden");
-    expect(messages).toHaveClass("md:flex");
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Explore" })).toHaveAttribute(
+      "href",
+      "/explore"
+    );
+    for (const name of ["For you", "Discover", "Responses", "Campus", "Research"]) {
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+    }
     expect(
-      screen.queryByRole("button", { name: "Open more menu" })
+      screen.queryByRole("link", { name: "Open messages" })
     ).not.toBeInTheDocument();
   });
 
-  it("shows the shortcut on mobile when a post hides the bottom navigation", () => {
-    navigationState.pathname = "/post/a-published-piece";
+  it("offers Write, and Notifications to a signed-in viewer", () => {
+    renderNav({ id: "user-1" });
 
-    render(
-      <NavClient
-        user={null}
-        profile={null}
-        isAdmin={false}
-        canAccessReview={false}
-        onOpenSearch={vi.fn()}
-      />
+    // CreateLauncher owns the /write destination and the guest gate; its own
+    // test covers both. Here the top bar only has to hand it the viewer.
+    expect(screen.getByRole("button", { name: "Write" })).toHaveAttribute(
+      "data-user-id",
+      "user-1"
     );
-
-    const messages = screen.getByRole("link", { name: "Open messages" });
-    expect(messages).toHaveClass("flex");
-    expect(messages).not.toHaveClass("hidden");
+    expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument();
   });
 });
 
@@ -84,24 +86,12 @@ describe("NavClient desktop nav handoff", () => {
     navigationState.pathname = "/";
   });
 
-  function renderNav() {
-    return render(
-      <NavClient
-        user={null}
-        profile={null}
-        isAdmin={false}
-        canAccessReview={false}
-        onOpenSearch={vi.fn()}
-      />
-    );
-  }
-
   // jsdom has no layout engine, so the breakpoint handoff to SideRail is
   // asserted on the utility classes.
   it("hands the primary links to the side rail at xl", () => {
     renderNav();
 
-    const links = screen.getByRole("link", { name: "For you" }).parentElement;
+    const links = screen.getByRole("link", { name: "Home" }).parentElement;
     expect(links).toHaveClass("xl:hidden");
   });
 
@@ -146,18 +136,6 @@ describe("NavClient shared chrome contract", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
   });
-
-  function renderNav() {
-    return render(
-      <NavClient
-        user={null}
-        profile={null}
-        isAdmin={false}
-        canAccessReview={false}
-        onOpenSearch={vi.fn()}
-      />
-    );
-  }
 
   it("registers as the primary composited chrome surface", () => {
     const { container } = renderNav();

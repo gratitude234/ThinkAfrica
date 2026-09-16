@@ -1,7 +1,6 @@
 ﻿import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 import { BRAND_PROMISE, BRAND_TAGLINE } from "@/lib/brand";
-import { isResearchEnabled } from "@/lib/featureFlags";
 
 export const runtime = "edge";
 
@@ -12,18 +11,18 @@ export async function GET(request: NextRequest) {
   const university = searchParams.get("university") ?? "";
   const type = searchParams.get("type") ?? "brand";
 
-  if (type === "research" && !isResearchEnabled()) {
-    return new Response("Not found.", { status: 404 });
-  }
-
-  const typeLabel: Record<string, string> = {
+  // Keyed on the kind, with the legacy vocabulary kept as aliases so an OG
+  // image already cached against an old share link still resolves. An Essay, a
+  // Policy Brief and a Research paper are all Articles now, and the genre
+  // suffixes ("Article · Policy Brief") went with the genre.
+  const kindLabel: Record<string, string> = {
     brand: BRAND_TAGLINE,
-    research: "Research",
-    article: "Article",
-    essay: "Article · Essay",
-    policy_brief: "Article · Policy Brief",
     post: "Post",
     blog: "Post",
+    article: "Article",
+    essay: "Article",
+    policy_brief: "Article",
+    research: "Article",
   };
 
   return new ImageResponse(
@@ -54,7 +53,7 @@ export async function GET(request: NextRequest) {
               textTransform: "uppercase",
             }}
           >
-            {typeLabel[type] ?? "Publication"}
+            {kindLabel[type] ?? "Publication"}
           </div>
         </div>
 

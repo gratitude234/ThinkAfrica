@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { resolveContentKind } from "@/lib/contentModel";
 import { isAbandonedScrap } from "@/lib/contribution";
 import { deleteOwnDraftPosts } from "./deleteActions";
 import { loadMyDrafts } from "@/lib/composerActions";
@@ -13,9 +12,7 @@ interface Draft {
   title: string | null;
   excerpt?: string | null;
   word_count?: number | null;
-  type: string;
   content_kind?: string | null;
-  article_format?: string | null;
   updated_at: string;
 }
 
@@ -82,7 +79,7 @@ export default function MyDrafts({
   }, []);
 
   const filtered = useMemo(
-    () => drafts.filter((draft) => draft.id !== activeDraftId && resolveContentKind(draft) !== "research"),
+    () => drafts.filter((draft) => draft.id !== activeDraftId),
     [activeDraftId, drafts]
   );
   const scraps = useMemo(() => filtered.filter((draft) => isAbandonedScrap(draft)), [filtered]);

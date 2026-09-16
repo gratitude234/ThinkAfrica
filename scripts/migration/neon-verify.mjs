@@ -46,7 +46,6 @@ const SUITES = [
   "lib/db/feed.neon.test.ts",
   "lib/db/feedList.neon.test.ts",
   "lib/db/profilePage.neon.test.ts",
-  "lib/db/profileRecord.neon.test.ts",
   "lib/db/profileVisibility.neon.test.ts",
   "lib/db/comments.neon.test.ts",
   "lib/db/viewerState.neon.test.ts",

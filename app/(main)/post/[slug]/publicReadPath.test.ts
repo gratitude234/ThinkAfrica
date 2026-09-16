@@ -82,20 +82,6 @@ describe("the public published post page", () => {
     }
   });
 
-  it("loads responses without PostgREST", () => {
-    // fetchResponsePage -> fetchResponseCards -> repository. These two are the
-    // whole of the post page's dependency on the feed module.
-    for (const name of [
-      "export async function fetchResponsePage(",
-      "export async function fetchResponseCards(",
-    ]) {
-      const body = functionBody(feedSource, name);
-      expect(body, `${name} should issue no PostgREST call`).not.toMatch(
-        /\.from\("/
-      );
-    }
-  });
-
   it("hydrates cards without PostgREST", () => {
     // enrichPosts is the shared hydration every card list goes through, and it
     // was nine round trips plus three follow-ups.

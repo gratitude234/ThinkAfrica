@@ -345,30 +345,6 @@ describe.skipIf(!enabled)("search against PostgreSQL", () => {
     });
   });
 
-  // ── opportunities ──────────────────────────────────────────────────
-
-  it("returns only open fellowships, soonest deadline first, nulls last", async () => {
-    const [row] = await executor.query<{ word: string }>(
-      `select lower(split_part(btrim(f.title), ' ', 1)) as word
-       from public.fellowships f where f.status = 'open' and f.title is not null limit 1`
-    );
-    if (!row) return;
-
-    const results = await repository.opportunities(row.word, { limit: 20 });
-    const stamps = results.map((entry) =>
-      entry.deadline ? Date.parse(entry.deadline) : null
-    );
-
-    const firstNull = stamps.indexOf(null);
-    if (firstNull >= 0) {
-      expect(stamps.slice(firstNull).every((value) => value === null)).toBe(true);
-    }
-    const real = stamps.filter((value): value is number => value !== null);
-    for (let i = 1; i < real.length; i += 1) {
-      expect(real[i]).toBeGreaterThanOrEqual(real[i - 1]);
-    }
-  });
-
   // ── tag sample ─────────────────────────────────────────────────────
 
   it("returns tags as arrays, never as Postgres literals", async () => {

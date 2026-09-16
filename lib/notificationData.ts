@@ -1,5 +1,4 @@
 import { notificationsRepository } from "@/lib/db/readAdapter";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 export {
   groupByDate,
@@ -58,18 +57,11 @@ export async function fetchNotificationRows(
       | NotificationData["actor"][]
       | null;
     const rawPost = notification.post as
-      | { title: string; slug: string; type: string; content_kind: string | null }
-      | { title: string; slug: string; type: string; content_kind: string | null }[]
+      | { title: string; slug: string; content_kind: string | null }
+      | { title: string; slug: string; content_kind: string | null }[]
       | null;
     const actor = Array.isArray(rawActor) ? rawActor[0] ?? null : rawActor;
     const post = Array.isArray(rawPost) ? rawPost[0] ?? null : rawPost;
-
-    if (
-      !FEATURE_FLAGS.research &&
-      (post?.type === "research" || post?.content_kind === "research")
-    ) {
-      return [];
-    }
 
     return [{
       id: notification.id as string,

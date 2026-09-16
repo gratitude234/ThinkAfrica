@@ -1,5 +1,10 @@
 # The post page query path
 
+> **Changed since this was written.** Phase 2C of the publishing reset removed
+> the two response reads (the Responses page and its count) and the parent-post
+> lookup, and the comment count is the only discussion count left. The round
+> trips below that name responses no longer happen.
+
 An audit of what `GET /post/[slug]` actually asks the database for, why the same
 post was being looked up twice per request, and what the request costs now.
 

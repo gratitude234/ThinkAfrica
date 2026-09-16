@@ -43,11 +43,8 @@ export interface BookmarkedPostRow {
   author_id: string;
   title: string | null;
   slug: string;
-  in_response_to: string | null;
   excerpt: string | null;
-  type: string;
   content_kind: string | null;
-  article_format: string | null;
   tags: string[] | null;
   created_at: string;
   published_at: string | null;
@@ -56,8 +53,6 @@ export interface BookmarkedPostRow {
   read_count: number | null;
   word_count: number | null;
   cover_image_url: string | null;
-  citation_id: string | null;
-  published_version_id: string | null;
   profiles: {
     username: string | null;
     full_name: string | null;
@@ -83,11 +78,10 @@ export interface BookmarksRepository {
 
 const LIST_SQL = `
   select
-    p.id, p.author_id, p.title, p.slug, p.in_response_to, p.excerpt,
-    p.type, p.content_kind, p.article_format, to_jsonb(p.tags) as tags,
+    p.id, p.author_id, p.title, p.slug, p.excerpt,
+    p.content_kind, to_jsonb(p.tags) as tags,
     p.created_at, p.published_at, p.view_count, p.impression_count,
-    p.read_count, p.word_count, p.cover_image_url, p.citation_id,
-    p.published_version_id,
+    p.read_count, p.word_count, p.cover_image_url,
     case when author.id is null then null else jsonb_build_object(
       'username', author.username,
       'full_name', author.full_name,
@@ -121,7 +115,7 @@ const LIST_SQL = `
 // ── Shared ───────────────────────────────────────────────────────────
 
 const SELECT = `post_id, posts!bookmarks_post_id_fkey (
-            id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url, citation_id, published_version_id,
+            id, author_id, title, slug, excerpt, content_kind, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url,
             profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
             post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
           )`;

@@ -39,7 +39,7 @@ async function searchAndGetResult(result: Record<string, unknown>) {
   return screen.findByText(String(result.title));
 }
 
-describe("SearchOverlay Reviewed badge", () => {
+describe("SearchOverlay retired review and citation badges", () => {
   it("does not claim a pending policy brief is Reviewed based on type alone", async () => {
     await searchAndGetResult({
       id: "1",
@@ -54,18 +54,19 @@ describe("SearchOverlay Reviewed badge", () => {
     expect(screen.queryByText("Reviewed")).not.toBeInTheDocument();
   });
 
-  it("shows Reviewed once a policy brief has an accepted published version", async () => {
+  it("never shows Reviewed or Citable, even for a publication from the retired workflow", async () => {
     await searchAndGetResult({
       id: "2",
       title: "An accepted policy brief",
       slug: "p2",
       type: "policy_brief",
-      citation_id: null,
+      citation_id: "IND-2026-0001",
       published_version_id: "11111111-1111-1111-1111-111111111111",
       profiles: null,
     });
 
-    expect(await screen.findByText("Reviewed")).toBeInTheDocument();
+    expect(screen.queryByText("Reviewed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Citable")).not.toBeInTheDocument();
   });
 });
 

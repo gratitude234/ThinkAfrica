@@ -19,10 +19,6 @@ vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
 // these mocks let the test prove that never happens.
 vi.mock("@/app/(main)/post/[slug]/likeActions", () => ({ togglePostLike: mocks.like }));
 vi.mock("@/app/(main)/post/[slug]/bookmarkActions", () => ({ toggleBookmark: mocks.bookmark }));
-vi.mock("@/lib/featureFlags", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/featureFlags")>();
-  return { ...actual, FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, research: true } };
-});
 
 describe("FeedPreviewPage (dev-only visual fixture harness)", () => {
   afterEach(() => {
@@ -37,22 +33,37 @@ describe("FeedPreviewPage (dev-only visual fixture harness)", () => {
     expect(() => FeedPreviewPage()).toThrow();
   });
 
-  it("renders real fixture data for every section outside production", () => {
+  it("renders the cards and states Home actually has, outside production", () => {
     vi.stubEnv("NODE_ENV", "development");
     render(<FeedPreviewPage />);
 
     expect(screen.getByText("Home feed visual preview")).toBeInTheDocument();
-    // One representative fixture per content kind, rendered through the
-    // real HomeFeedCard/HomeFeaturedLead/HomeSidebar components.
     expect(screen.getByRole("heading", { name: "The Hidden Cost of Studying Abroad" })).toBeInTheDocument();
+    // Research is no longer a product, so the harness has no Research section.
     expect(
-      screen.getByRole("heading", { name: "Community Health Worker Retention After the 2023 Stipend Reform" })
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: "Community Health Worker Retention After the 2023 Stipend Reform" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "No publications to show yet." })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "What My First Year of Medical School Taught Me About Grief" })
+      screen.getByRole("heading", { name: "Follow writers to see their Posts and Articles here." })
     ).toBeInTheDocument();
-    expect(screen.getByText("Featured today")).toBeInTheDocument();
     expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
+  });
+
+  it("previews none of the modules Phase 2F removed from Home", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    render(<FeedPreviewPage />);
+
+    for (const retired of [
+      /Featured today/i,
+      /Editor.s pick/i,
+      /intellectual brief/i,
+      /Writers to follow/i,
+      /Discovery interludes/i,
+      /Matches your reading interests/i,
+    ]) {
+      expect(screen.queryByText(retired)).not.toBeInTheDocument();
+    }
   });
 
   it("never writes to Supabase, even when a pre-liked/saved fixture's engagement button is clicked", () => {

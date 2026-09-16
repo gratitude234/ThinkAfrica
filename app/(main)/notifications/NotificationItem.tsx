@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getActionInboxSummary, type ActionInboxItem } from "@/lib/actionInbox";
 import { notificationHref, notificationMessage } from "@/lib/notificationCatalog";
 import NotificationAvatar from "@/components/notifications/NotificationAvatar";
 import { formatRelativeTime } from "@/lib/utils";
-import { respondToCoAuthorInvite } from "./actions";
-import ResponseStartLink from "@/components/post/ResponseStartLink";
 import type { NotificationData } from "@/lib/notificationData";
 
 interface NotificationItemProps {
@@ -41,7 +38,6 @@ export default function NotificationItem({
   const inboxItem = getActionInboxSummary([notification]).items[0];
   const message = inboxItem?.description ?? buildNotificationMessage(notification);
   const link = notificationHref(notification);
-  const [inviteState, setInviteState] = useState<"idle" | "saving" | "accepted" | "declined">("idle");
   const isRead = notification.read;
 
   const trackNotificationAction = (source: string, item?: ActionInboxItem) => {
@@ -79,25 +75,6 @@ export default function NotificationItem({
     onOpen?.(notification.id);
   };
 
-  const handleInviteResponse = async (accept: boolean) => {
-    if (!notification.post_id || inviteState === "saving") return;
-
-    setInviteState("saving");
-    const result = await respondToCoAuthorInvite({
-      notificationId: notification.id,
-      postId: notification.post_id,
-      accept,
-    });
-
-    if (result.error) {
-      setInviteState("idle");
-      return;
-    }
-
-    setInviteState(accept ? "accepted" : "declined");
-    onOpen?.(notification.id);
-  };
-
   const avatar = (
     <NotificationAvatar
       type={notification.type}
@@ -111,11 +88,7 @@ export default function NotificationItem({
       <div className="min-w-0 flex-1">
         {inboxItem ? (
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            {(notification.type === "author_published" ||
-              notification.type === "topic_published") &&
-            notification.post_content_kind
-              ? `${notification.post_content_kind} · ${inboxItem.label}`
-              : inboxItem.label}
+            {inboxItem.label}
           </p>
         ) : null}
         <p className="mt-0.5 text-sm leading-snug text-gray-700">{message}</p>
@@ -131,40 +104,6 @@ export default function NotificationItem({
           <p className="mt-2 text-xs font-semibold text-emerald-700">
             {inboxItem.cta}
           </p>
-        ) : null}
-        {notification.type === "co_author_invite" && notification.post_id ? (
-          <div className="mt-3 flex gap-2">
-            {inviteState === "accepted" || inviteState === "declined" ? (
-              <span className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
-                {inviteState === "accepted" ? "Accepted" : "Declined"}
-              </span>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    void handleInviteResponse(true);
-                  }}
-                  disabled={inviteState === "saving"}
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                >
-                  {inviteState === "saving" ? "Saving..." : "Accept"}
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    void handleInviteResponse(false);
-                  }}
-                  disabled={inviteState === "saving"}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-50"
-                >
-                  Decline
-                </button>
-              </>
-            )}
-          </div>
         ) : null}
       </div>
     </>
@@ -204,6 +143,9 @@ export default function NotificationItem({
     </div>
   );
 
+  // LEGACY COMPATIBILITY — existing co-authored publications. Invitation rows already in an inbox
+  // still render with their own copy, but co-authoring is removed and they can
+  // no longer be answered, so they carry no call to action and open nothing.
   const isInvite = notification.type === "co_author_invite";
 
   const row = (
@@ -226,69 +168,6 @@ export default function NotificationItem({
       {rowControls}
     </div>
   );
-
-  if (notification.type === "response_post") {
-    return (
-      <div className="rounded-xl border border-emerald-100 bg-white shadow-sm">
-        {row}
-        <div className="flex flex-wrap gap-2 border-t border-emerald-50 px-4 py-3">
-          {link ? (
-            <Link
-              href={link}
-              onClick={() => {
-                trackActivationEvent({
-                  event: "next_action_clicked",
-                  metadata: {
-                    actionKey: "response_received",
-                    label: "Read response",
-                    source: "notifications_response",
-                    notificationId: notification.id,
-                    type: notification.type,
-                    postId: notification.post_id ?? null,
-                  },
-                });
-                trackActivationEvent({
-                  event: "notification_opened",
-                  metadata: {
-                    notificationId: notification.id,
-                    type: notification.type,
-                    source: "notifications_response",
-                    postId: notification.post_id ?? null,
-                  },
-                });
-                onOpen?.(notification.id);
-              }}
-              className="rounded-lg bg-emerald-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-            >
-              Read response
-            </Link>
-          ) : null}
-          {notification.post_id ? (
-            <ResponseStartLink
-              postId={notification.post_id}
-              source="notifications_response"
-              onTriggerClick={() => {
-                trackActivationEvent({
-                  event: "next_action_clicked",
-                  metadata: {
-                    actionKey: "write_back",
-                    label: "Write back",
-                    source: "notifications_response",
-                    notificationId: notification.id,
-                    type: notification.type,
-                    postId: notification.post_id ?? null,
-                  },
-                });
-              }}
-              className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-            >
-              Write back
-            </ResponseStartLink>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
 
   return row;
 }

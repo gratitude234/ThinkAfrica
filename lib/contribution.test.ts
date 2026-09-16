@@ -15,24 +15,20 @@ const empty: ContributionSnapshot = {
   tags: [],
   coverImageUrl: "",
   references: [],
-  collaborators: [],
-  inResponseToId: null,
-  promptId: null,
 };
 
 describe("universal contribution model", () => {
   it("derives presentation from title presence without a writer-selected mode", () => {
+    // content_kind alone. The legacy type and the genre it used to dual-write
+    // are derived and nulled by the database now (20260915000006), so writing
+    // them here would be a second place that could disagree.
     expect(derivePresentationClassification("   ")).toEqual({
       title: null,
-      type: "blog",
       content_kind: "post",
-      article_format: null,
     });
     expect(derivePresentationClassification(" A longer thought ")).toEqual({
       title: "A longer thought",
-      type: "essay",
       content_kind: "article",
-      article_format: null,
     });
   });
 

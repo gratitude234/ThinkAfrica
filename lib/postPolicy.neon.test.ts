@@ -174,9 +174,7 @@ describe.skipIf(!enabled)(
                 id: String(row.id),
                 author_id: String(row.author_id),
                 status: row.status,
-                type: row.type,
                 content_kind: row.content_kind ?? null,
-                article_format: row.article_format ?? null,
                 citation_id: row.citation_id ?? null,
                 published_version_id: row.published_version_id ?? null,
               };
@@ -275,9 +273,7 @@ describe.skipIf(!enabled)(
               id: String(row.id),
               author_id: String(row.author_id),
               status: row.status,
-              type: row.type,
               content_kind: row.content_kind ?? null,
-              article_format: row.article_format ?? null,
               citation_id: row.citation_id ?? null,
               published_version_id: row.published_version_id ?? null,
             };

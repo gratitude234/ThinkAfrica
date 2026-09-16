@@ -66,7 +66,7 @@ describe("the migration write freeze", () => {
       expect(shouldRefuseWrite("POST", "/write", true)).toBe(true);
       expect(shouldRefuseWrite("POST", "/post/some-slug", true)).toBe(true);
       expect(shouldRefuseWrite("POST", "/settings", true)).toBe(true);
-      expect(shouldRefuseWrite("POST", "/admin/review", true)).toBe(true);
+      expect(shouldRefuseWrite("POST", "/admin/moderation", true)).toBe(true);
     });
   });
 
@@ -98,15 +98,14 @@ describe("the migration write freeze", () => {
       const paths = [
         "/api/upload-image",
         "/api/activation",
-        "/api/research-document/upload",
+        "/api/bookmarks",
         "/settings/profile",
         "/dashboard",
         "/bookmarks",
         "/notifications",
         "/edit/a-slug",
-        "/messages/123",
         "/onboarding",
-        "/submit/research",
+        "/write",
       ];
       for (const path of paths) {
         expect(shouldRefuseWrite("POST", path, true), path).toBe(true);

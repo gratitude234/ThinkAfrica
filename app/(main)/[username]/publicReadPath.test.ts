@@ -15,8 +15,9 @@ import { describe, expect, it } from "vitest";
  * still reads the same production database; what has moved is the gateway in
  * front of it, and gateway failures are the ones that have been happening.
  *
- * The companion behavioural proofs are `lib/db/profilePage.neon.test.ts` and
- * `lib/db/profileRecord.neon.test.ts`.
+ * The companion behavioural proof is `lib/db/profilePage.neon.test.ts`. The
+ * Intellectual Record loader and its repository, which this used to cover as
+ * well, were removed in the publishing reset, Phase 2G.
  */
 
 function read(relative: string): string {
@@ -43,49 +44,37 @@ function rpcCalls(source: string): string[] {
 }
 
 const viewSource = withoutComments(read("lib/profileViewData.ts"));
-const recordSource = withoutComments(read("lib/profileRecordData.ts"));
+const pageSource = withoutComments(read("app/(main)/[username]/page.tsx"));
 
 describe("the public profile page", () => {
-  it("issues no PostgREST table call from lib/profileViewData.ts", () => {
+  it("issues no PostgREST table call from lib/profileViewData.ts or the route", () => {
     expect(tableCalls(viewSource)).toEqual([]);
+    expect(tableCalls(pageSource)).toEqual([]);
   });
 
-  it("issues no PostgREST table call from lib/profileRecordData.ts", () => {
-    expect(tableCalls(recordSource)).toEqual([]);
-  });
-
-  it("issues no PostgREST RPC from either loader", () => {
-    // The record summary's v2-then-v1 fallback moved into the repository,
-    // which reproduces it on both backends. A `.rpc(` reappearing here means
-    // it came back to the caller and stopped being portable.
+  it("issues no PostgREST RPC from the loader or the route", () => {
     expect(rpcCalls(viewSource)).toEqual([]);
-    expect(rpcCalls(recordSource)).toEqual([]);
+    expect(rpcCalls(pageSource)).toEqual([]);
   });
 
   it("routes every profile read through the adapter", () => {
-    for (const source of [viewSource, recordSource]) {
-      expect(source).toMatch(/from "@\/lib\/db/);
-    }
+    expect(viewSource).toMatch(/from "@\/lib\/db/);
   });
 
   it("keeps the identity lookup behind lib/db, not on the request client", () => {
-    // loadProfileIdentity moved first and is what 404s a nonexistent profile.
-    // If it regressed to a direct query the page would still work and the
-    // migration claim would be false.
+    // loadProfileIdentity is what 404s a nonexistent profile. If it regressed
+    // to a direct query the page would still work and the migration claim
+    // would be false.
     expect(viewSource).toMatch(/getDatabase\(\)\.profiles\.findIdentityByUsername/);
   });
 
-  it("shares one migration switch between the header and the record", () => {
+  it("has one migration switch for the profile page", () => {
     const adapter = withoutComments(read("lib/db/readAdapter.ts"));
-
-    // Both repositories answer to `profile-page`. Two switches would let one
-    // profile be served half from PostgREST and half from PostgreSQL, which
-    // is the state this migration is arranged to avoid.
     const gated = [
       ...adapter.matchAll(/isReadDomainMigrated\("([a-z-]+)"\)/g),
     ].map((match) => match[1]);
 
-    expect(gated.filter((domain) => domain === "profile-page")).toHaveLength(2);
+    expect(gated.filter((domain) => domain === "profile-page")).toHaveLength(1);
   });
 
   it("leaves the profile domain unmigrated by default", () => {
@@ -96,19 +85,8 @@ describe("the public profile page", () => {
 });
 
 describe("the reads that remain on the request client", () => {
-  it("are the authenticated ones, and are reached only by a signed-in stranger", () => {
-    // getMessageEligibility is the one PostgREST caller left in the profile
-    // path. It answers "can this viewer message this member", which a
-    // logged-out reader never asks, so it is not on the public path.
-    expect(viewSource).toMatch(/getMessageEligibility\(supabase/);
-
-    const guarded = viewSource.slice(
-      viewSource.indexOf("const [counts, relationship, messaging]")
-    );
-    const call = guarded.indexOf("getMessageEligibility(supabase");
-    const guard = guarded.lastIndexOf("isStranger", call);
-
-    expect(guard).toBeGreaterThan(-1);
-    expect(call - guard).toBeLessThan(120);
+  it("no longer include message eligibility, because messaging was removed", () => {
+    expect(viewSource).not.toMatch(/getMessageEligibility|messagingEligibility/);
+    expect(viewSource).not.toMatch(/\bmessaging\b/);
   });
 });

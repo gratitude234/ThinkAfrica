@@ -11,9 +11,6 @@ const privateRow = {
   suspended_reason: null,
   last_engagement_push_notified_at: null,
   last_comment_email_notified_at: null,
-  push_prompt_shown_at: "2026-01-01T00:00:00.000Z",
-  push_prompt_last_shown_at: "2026-01-02T00:00:00.000Z",
-  push_prompt_attempt_count: 2,
 };
 
 describe("normalizeMyPrivateProfile", () => {
@@ -28,8 +25,22 @@ describe("normalizeMyPrivateProfile", () => {
       profile_id: privateRow.profile_id,
       signup_email: null,
       onboarding_completed: false,
-      push_prompt_attempt_count: 0,
     });
+  });
+
+  it("drops the push-prompt columns the retired Home banner read", () => {
+    // The RPC still returns them until the database cleanup phase. Nothing in
+    // the application reads them, so they do not survive normalization.
+    expect(
+      normalizeMyPrivateProfile([
+        {
+          ...privateRow,
+          push_prompt_shown_at: "2026-01-01T00:00:00.000Z",
+          push_prompt_last_shown_at: "2026-01-02T00:00:00.000Z",
+          push_prompt_attempt_count: 2,
+        },
+      ])
+    ).toEqual(privateRow);
   });
 
   it("rejects missing, empty, and malformed payloads", () => {

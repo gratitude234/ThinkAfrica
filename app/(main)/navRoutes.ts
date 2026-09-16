@@ -2,7 +2,6 @@ const MOBILE_FOCUS_ROUTE_PREFIXES = [
   "/write",
   "/create",
   "/edit",
-  "/submit/research",
 ] as const;
 
 // Routes whose layout already owns the full content width -- they break out of
@@ -12,13 +11,11 @@ const MOBILE_FOCUS_ROUTE_PREFIXES = [
 // feed to a profile or to /settings doesn't make the rail flicker in and out.
 const RAIL_SUPPRESSED_PREFIXES = [
   "/post",
-  "/messages",
   "/admin",
   "/about",
   "/write",
   "/create",
   "/edit",
-  "/submit",
 ] as const;
 
 /**
@@ -32,7 +29,6 @@ export function matchesRoute(pathname: string, route: string) {
 
 export function shouldShowMobilePrimaryNav(pathname: string) {
   if (pathname.startsWith("/post/")) return false;
-  if (/^\/messages\/.+/.test(pathname)) return false;
 
   return !MOBILE_FOCUS_ROUTE_PREFIXES.some((prefix) =>
     matchesRoute(pathname, prefix)

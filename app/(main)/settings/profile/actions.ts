@@ -1,66 +1,40 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { profileUpdateMessage, updateOwnProfile } from "@/lib/profileMutations";
+import { normalizeMyPrivateProfile, retainedPrivacySettings } from "@/lib/profilePrivate";
 import {
-  FEATURE_FLAGS,
-  isFeaturedWorkNotesEnabled,
-  isProfilePositioningEnabled,
-} from "@/lib/featureFlags";
-import {
-  validateFeaturedWorkSelections,
-  type FeaturedWorkSelection,
-} from "@/lib/featuredWork";
-import { deriveLegacyOnboardingPreference } from "@/lib/onboarding";
-import {
-  getPositioningStatementError,
-  normalizePositioningStatement,
-} from "@/lib/profileIdentity";
-import type { ProfileSectionKey } from "@/lib/profileCommandCenter";
-import {
-  getProfileUsernameError,
-  normalizeProfileUsername,
-} from "@/lib/profileUsername";
-import { isProfileType, normalizeSecondaryProfileTypes } from "@/lib/profileTypes";
+  getProfileDetailsError,
+  type ProfileDetailsDraft,
+} from "@/lib/profileSettings";
+import { normalizeProfileUsername } from "@/lib/profileUsername";
+import { requireViewer } from "@/lib/serverActions";
 import { createClient } from "@/lib/supabase/server";
 
 export interface SectionSaveResult {
   ok: boolean;
   error?: string;
-  /** Set when the username changed, so the client can hard-navigate. */
+  /** Set when the Profile section saved, so the client can follow a new username. */
   username?: string;
 }
 
+type ServerClient = Awaited<ReturnType<typeof createClient>>;
+
 /**
- * One shape for every section save, so the client can render dirty, saving,
- * saved and failed identically wherever it is used. A failure never clears
- * the caller's draft: the action returns and the section keeps its state.
+ * One shape for every section save, so the client renders dirty, saving,
+ * saved and failed identically. The viewer comes from the session; no action
+ * takes a profile id. Every write goes through `updateOwnProfile`, which holds
+ * the self-editable column allowlist, and none of them writes a retired field.
  */
-async function withOwner<T>(
-  run: (
-    supabase: Awaited<ReturnType<typeof createClient>>,
-    userId: string
-  ) => Promise<T | SectionSaveResult>
-): Promise<T | SectionSaveResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "You must be signed in to edit your profile." };
-  return run(supabase, user.id);
+async function withViewer(
+  run: (supabase: ServerClient, userId: string) => Promise<SectionSaveResult>
+): Promise<SectionSaveResult> {
+  const viewer = await requireViewer();
+  if (!viewer) return { ok: false, error: "You must be signed in to edit your profile." };
+  return run(await createClient(), viewer.userId);
 }
 
-function revalidateProfile(username: string | null) {
-  revalidatePath("/settings/profile");
-  if (username) {
-    revalidatePath(`/${username}`);
-    revalidatePath(`/${username}/record`);
-  }
-}
-
-async function currentUsername(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string
-) {
+async function currentUsername(supabase: ServerClient, userId: string) {
   const { data } = await supabase
     .from("profiles")
     .select("username")
@@ -69,284 +43,116 @@ async function currentUsername(
   return (data?.username as string | undefined) ?? null;
 }
 
-export async function saveIdentitySection(input: {
-  fullName: string;
-  username: string;
-  profileType: string | null;
-  secondaryProfileTypes: string[];
-}): Promise<SectionSaveResult> {
-  return withOwner(async (supabase, userId) => {
-    const username = normalizeProfileUsername(input.username);
-    const usernameError = getProfileUsernameError(username);
-    if (usernameError) return { ok: false, error: usernameError };
+function revalidateProfile(username: string | null) {
+  revalidatePath("/settings/profile");
+  if (username) revalidatePath(`/${username}`);
+}
 
-    const profileType = isProfileType(input.profileType) ? input.profileType : null;
-    if (!profileType) return { ok: false, error: "Choose a profile type." };
+function optionalText(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
 
-    const { data: taken } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("username", username)
-      .neq("id", userId)
-      .maybeSingle();
-    if (taken) return { ok: false, error: "Username already taken." };
+export async function saveProfileSection(
+  input: ProfileDetailsDraft
+): Promise<SectionSaveResult> {
+  return withViewer(async (supabase, userId) => {
+    const draft: ProfileDetailsDraft = {
+      fullName: String(input.fullName ?? ""),
+      username: String(input.username ?? ""),
+      headline: String(input.headline ?? ""),
+      bio: String(input.bio ?? ""),
+      country: String(input.country ?? ""),
+      university: String(input.university ?? ""),
+      fieldOfStudy: String(input.fieldOfStudy ?? ""),
+      graduationYear: String(input.graduationYear ?? ""),
+    };
+    const problem = getProfileDetailsError(draft);
+    if (problem) return { ok: false, error: problem };
 
-    const secondary = normalizeSecondaryProfileTypes(
-      input.secondaryProfileTypes,
-      profileType
-    );
-
+    const username = normalizeProfileUsername(draft.username);
     const previousUsername = await currentUsername(supabase, userId);
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        full_name: input.fullName.trim(),
-        username,
-        profile_type: profileType,
-        secondary_profile_types: secondary,
-      })
-      .eq("id", userId);
-    if (error) return { ok: false, error: error.message };
+    const year = draft.graduationYear.trim();
 
-    // The private work category is re-derived only when the profile type
-    // actually changed, matching the settings form: several categories share
-    // one type, and deriving on every save would overwrite what onboarding set.
-    const preference = deriveLegacyOnboardingPreference(profileType);
-    if (preference.currentPath) {
-      await supabase.rpc("save_onboarding_preferences", {
-        p_current_path: preference.currentPath,
-        p_work_category: preference.workCategory,
-      });
-    }
+    const result = await updateOwnProfile(supabase, {
+      viewerId: userId,
+      patch: {
+        full_name: draft.fullName.trim(),
+        username,
+        professional_title: optionalText(draft.headline),
+        bio: draft.bio.trim(),
+        country: optionalText(draft.country),
+        university: optionalText(draft.university),
+        field_of_study: optionalText(draft.fieldOfStudy),
+        graduation_year: year ? Number(year) : null,
+      },
+    });
+    if (!result.ok) return { ok: false, error: profileUpdateMessage(result.failure) };
 
     revalidateProfile(previousUsername);
     if (username !== previousUsername) revalidateProfile(username);
     return { ok: true, username };
-  }) as Promise<SectionSaveResult>;
-}
-
-export async function saveFocusSection(input: {
-  positioningStatement: string;
-  bio: string;
-}): Promise<SectionSaveResult> {
-  return withOwner(async (supabase, userId) => {
-    const positioningError = getPositioningStatementError(input.positioningStatement);
-    if (positioningError) return { ok: false, error: positioningError };
-    if (input.bio.length > 300) {
-      return { ok: false, error: "Keep your biography to 300 characters or fewer." };
-    }
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        bio: input.bio,
-        // Omitted entirely until the column exists. See
-        // isProfilePositioningEnabled.
-        ...(isProfilePositioningEnabled()
-          ? {
-              positioning_statement: normalizePositioningStatement(
-                input.positioningStatement
-              ),
-            }
-          : {}),
-      })
-      .eq("id", userId);
-    if (error) return { ok: false, error: error.message };
-
-    revalidateProfile(await currentUsername(supabase, userId));
-    return { ok: true };
-  }) as Promise<SectionSaveResult>;
+  });
 }
 
 export async function saveTopicsSection(input: {
   interests: string[];
 }): Promise<SectionSaveResult> {
-  return withOwner(async (supabase, userId) => {
-    // Demonstrated topics are read from published work and are never written
-    // here. Only the declared list is editable.
+  return withViewer(async (supabase, userId) => {
+    // Deduplicated case-insensitively, keeping the first spelling. Interests an
+    // older signup typed stay selectable, so a save does not drop them.
     const interests = Array.from(
       new Map(
-        input.interests
+        (Array.isArray(input.interests) ? input.interests : [])
+          .filter((interest): interest is string => typeof interest === "string")
           .map((interest) => interest.trim())
           .filter(Boolean)
+          .slice(0, 60)
           .map((interest) => [interest.toLowerCase(), interest])
       ).values()
     );
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ interests })
-      .eq("id", userId);
-    if (error) return { ok: false, error: error.message };
+    const result = await updateOwnProfile(supabase, {
+      viewerId: userId,
+      patch: { interests },
+    });
+    if (!result.ok) return { ok: false, error: profileUpdateMessage(result.failure) };
 
     revalidateProfile(await currentUsername(supabase, userId));
     return { ok: true };
-  }) as Promise<SectionSaveResult>;
-}
-
-export async function saveBackgroundSection(input: {
-  country: string;
-  university: string;
-  fieldOfStudy: string;
-  graduationYear: string;
-  professionalTitle: string;
-  organizationName: string;
-  organizationWebsite: string;
-  openToMentoring: boolean;
-}): Promise<SectionSaveResult> {
-  return withOwner(async (supabase, userId) => {
-    const parsedYear = input.graduationYear ? parseInt(input.graduationYear, 10) : null;
-    if (parsedYear !== null && (Number.isNaN(parsedYear) || parsedYear < 2015 || parsedYear > 2040)) {
-      return { ok: false, error: "Enter a graduation year between 2015 and 2040." };
-    }
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        country: input.country,
-        university: input.university.trim(),
-        field_of_study: input.fieldOfStudy,
-        graduation_year: parsedYear,
-        professional_title: input.professionalTitle.trim() || null,
-        organization_name: input.organizationName.trim() || null,
-        organization_website: input.organizationWebsite.trim() || null,
-        open_to_mentoring: input.openToMentoring,
-      })
-      .eq("id", userId);
-    if (error) return { ok: false, error: error.message };
-
-    revalidateProfile(await currentUsername(supabase, userId));
-    return { ok: true };
-  }) as Promise<SectionSaveResult>;
+  });
 }
 
 export async function saveVisibilitySection(input: {
   profileVisibility: string;
-  allowMessages: string;
   showInDirectory: boolean;
 }): Promise<SectionSaveResult> {
-  return withOwner(async (supabase, userId) => {
+  return withViewer(async (supabase, userId) => {
     const profileVisibility =
       input.profileVisibility === "members_only" ? "members_only" : "public";
-    const allowMessages = ["everyone", "followers_only", "nobody"].includes(
-      input.allowMessages
-    )
-      ? input.allowMessages
-      : "everyone";
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        privacy_settings: {
-          profile_visibility: profileVisibility,
-          allow_messages: allowMessages,
-          show_in_directory: input.showInDirectory,
-        },
-      })
-      .eq("id", userId);
-    if (error) return { ok: false, error: error.message };
-
-    revalidateProfile(await currentUsername(supabase, userId));
-    return { ok: true };
-  }) as Promise<SectionSaveResult>;
-}
-
-export async function saveOpportunitiesSection(input: {
-  openToOpportunities: boolean;
-  opportunityTypes: string[];
-  skills: string[];
-  cvUrl: string;
-  linkedinUrl: string;
-  visibility: string;
-}): Promise<SectionSaveResult> {
-  return withOwner(async (supabase, userId) => {
-    // talent_profiles keeps its own table and its own RLS. The Command Center
-    // unifies the owner's experience of it, not its storage: private
-    // readiness detail never moves into public.profiles.
-    const { error } = await supabase.from("talent_profiles").upsert(
-      {
-        user_id: userId,
-        open_to_opportunities: input.openToOpportunities,
-        opportunity_types: input.opportunityTypes,
-        cv_url: input.cvUrl.trim() || null,
-        linkedin_url: input.linkedinUrl.trim() || null,
-        skills: input.skills,
-        visibility: input.visibility,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    );
-    if (error) return { ok: false, error: error.message };
-
-    revalidateProfile(await currentUsername(supabase, userId));
-    revalidatePath("/opportunities");
-    return { ok: true };
-  }) as Promise<SectionSaveResult>;
-}
-
-export async function saveFeaturedWorkSection(input: {
-  selections: FeaturedWorkSelection[];
-}): Promise<SectionSaveResult> {
-  return withOwner(async (supabase, userId) => {
-    const validation = validateFeaturedWorkSelections(input.selections);
-    if (validation.error) return { ok: false, error: validation.error };
-
-    const username = await currentUsername(supabase, userId);
-    if (!username) {
-      return { ok: false, error: "Complete your profile before featuring work." };
+    // The column is rebuilt from the validated values, except for a retired
+    // key already stored, which is carried forward: see retainedPrivacySettings.
+    const stored = await supabase.rpc("get_my_profile_private");
+    if (stored.error) {
+      return { ok: false, error: "Could not save visibility settings. Try again." };
     }
 
-    // Selection, order and notes replace atomically in one call. The v1 RPC
-    // stays in use until the notes migration is applied, so a deploy that
-    // lands first cannot start sending a column the database lacks.
-    const { error } = isFeaturedWorkNotesEnabled()
-      ? await supabase.rpc("replace_my_featured_posts_v2", {
-          p_post_ids: validation.postIds,
-          p_feature_notes: validation.notes,
-        })
-      : await supabase.rpc("replace_my_featured_posts", {
-          p_post_ids: validation.postIds,
-        });
+    const result = await updateOwnProfile(supabase, {
+      viewerId: userId,
+      patch: {
+        privacy_settings: {
+          ...retainedPrivacySettings(
+            normalizeMyPrivateProfile(stored.data)?.privacy_settings
+          ),
+          profile_visibility: profileVisibility,
+          show_in_directory: Boolean(input.showInDirectory),
+        },
+      },
+    });
+    if (!result.ok) return { ok: false, error: profileUpdateMessage(result.failure) };
 
-    if (error) return { ok: false, error: error.message };
-
-    revalidateProfile(username);
+    revalidateProfile(await currentUsername(supabase, userId));
     return { ok: true };
-  }) as Promise<SectionSaveResult>;
-}
-
-export async function saveResearchSection(input: {
-  headline: string;
-  overview: string;
-  researchInterests: string[];
-  methods: string[];
-  collaborationStatus: string;
-  preferredRoles: string[];
-  orcidUrl: string;
-  websiteUrl: string;
-}): Promise<SectionSaveResult> {
-  if (!FEATURE_FLAGS.research) {
-    return { ok: false, error: "Research is temporarily unavailable." };
-  }
-
-  // Delegates to the existing research action so validation lives in one
-  // place: ORCID format, URL safety and the headline/overview limits are the
-  // research domain's rules, not the Command Center's.
-  const { updateResearcherProfile } = await import("@/app/(main)/research/actions");
-  const result = await updateResearcherProfile({
-    headline: input.headline,
-    overview: input.overview,
-    researchInterests: input.researchInterests,
-    methods: input.methods,
-    collaborationStatus: input.collaborationStatus as never,
-    preferredRoles: input.preferredRoles,
-    orcidUrl: input.orcidUrl,
-    websiteUrl: input.websiteUrl,
   });
-
-  if (result.error) return { ok: false, error: result.error };
-  revalidatePath("/settings/profile");
-  return { ok: true };
 }
-
-export type { ProfileSectionKey };

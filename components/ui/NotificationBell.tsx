@@ -83,7 +83,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
   // publication at the Postgres level regardless of shouldUseRealtime()'s flag check
   // (see 20260521000001_disable_realtime_for_launch_stability.sql), so gating this on
   // that flag would silently stop delivery if Realtime is ever enabled for other
-  // tables (e.g. messages) without also being re-enabled for this one.
+  // tables without also being re-enabled for this one.
   //
   // It is gated on visibility, though: a backgrounded tab polled every 30s forever,
   // and on /notifications that ran alongside the page's own poller.
@@ -444,13 +444,6 @@ export default function NotificationBell({ userId }: { userId: string }) {
                           avatarUrl={notification.actor?.avatar_url}
                         />
                         <div className="min-w-0 flex-1">
-                          {(notification.type === "author_published" ||
-                            notification.type === "topic_published") &&
-                          notification.post_content_kind ? (
-                            <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-                              {notification.post_content_kind}
-                            </p>
-                          ) : null}
                           <p className="text-sm leading-snug text-gray-700">
                             {notificationMessage(notification)}
                           </p>

@@ -277,8 +277,8 @@ export async function sendWelcomeEmail(input: {
   const email = normalizeEmail(input.email);
   const name = input.fullName?.trim();
   const intro = name
-    ? `Welcome to Indegenius, ${name}. Complete your profile, then publish or respond to begin an evidence-backed record of what you think and contribute.`
-    : "Welcome to Indegenius. Complete your profile, then publish or respond to begin an evidence-backed record of what you think and contribute.";
+    ? `Welcome to Indegenius, ${name}. Complete your profile, then publish to begin an evidence-backed record of what you think and contribute.`
+    : "Welcome to Indegenius. Complete your profile, then publish to begin an evidence-backed record of what you think and contribute.";
 
   const result = await sendDirectEmail({
     to: email,

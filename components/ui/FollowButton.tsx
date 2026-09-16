@@ -1,110 +1,131 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { toggleFollow } from "@/components/ui/followActions";
-import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
-import { isAuthorSubscriptionsUxV2Enabled } from "@/lib/featureFlags";
-import type { AuthorRelationshipSurface } from "@/lib/publicationDelivery";
+
+export type FollowSurface = "profile" | "post_header" | "author_card" | "explore";
 
 interface Props {
-  followerId: string;
+  /** The member being followed. */
   followingId: string;
-  initialFollowing?: boolean;
-  initialSubscribed?: boolean;
+  /** Null for a signed-out reader, who is sent to sign in instead. */
+  currentUserId: string | null;
+  initialFollowing: boolean;
+  /** Names the member for assistive technology: "Follow Ada Obi". */
   authorName?: string;
-  source?: AuthorRelationshipSurface;
-  onChange?: (following: boolean) => void;
-  /** "chip" is the compact pill used in lists; "solid" is the prominent brand button used next to the author on the post page. */
-  variant?: "chip" | "solid";
+  source: FollowSurface;
+  postId?: string | null;
+  /** "default" sits in a header; "compact" is the pill used in cards and lists. */
+  size?: "default" | "compact";
+  className?: string;
+  /**
+   * Called once the server confirms a new follow, never on the click that
+   * requested it. A surface measuring conversion needs the completed state:
+   * a failed write, or an anonymous click that becomes a redirect to sign
+   * in, is not a follow.
+   */
+  onFollowCompleted?: () => void;
 }
 
+/**
+ * The one Follow control: "Follow" or "Following", backed by a row in
+ * `follows` and nothing else. There is no second relationship to offer, so
+ * there is no drawer, nudge or delivery setting beside it.
+ */
 export default function FollowButton({
-  followerId,
   followingId,
-  initialFollowing = false,
-  initialSubscribed = false,
-  authorName = "this author",
-  source = "explore",
-  onChange,
-  variant = "chip",
+  currentUserId,
+  initialFollowing,
+  authorName,
+  source,
+  postId = null,
+  size = "default",
+  className = "",
+  onFollowCompleted,
 }: Props) {
-  const [following, setFollowing] = useState(initialFollowing);
-  const [loading, setLoading] = useState(false);
+  const router = useRouter();
   const pathname = usePathname();
+  const [following, setFollowing] = useState(initialFollowing);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  if (isAuthorSubscriptionsUxV2Enabled()) {
-    return (
-      <AuthorRelationshipControls
-        authorId={followingId}
-        authorName={authorName}
-        currentUserId={followerId}
-        initialFollowing={initialFollowing}
-        initialSubscribed={initialSubscribed}
-        variant="follow_only"
-        source={source}
-      />
-    );
+  // A refresh after another Follow control on the same page changed the
+  // relationship hands this one a new initial state. Adopting it during
+  // render keeps the two in agreement without an effect.
+  const [adoptedInitial, setAdoptedInitial] = useState(initialFollowing);
+  if (adoptedInitial !== initialFollowing) {
+    setAdoptedInitial(initialFollowing);
+    setFollowing(initialFollowing);
   }
 
-  const handleToggle = async () => {
-    const optimisticNext = !following;
-    const previousFollowing = following;
+  if (currentUserId && currentUserId === followingId) return null;
 
-    // Flip the UI immediately rather than waiting on the round trip — the
-    // follow/unfollow itself is the only part of the server action that
-    // needs to gate this button, and it's rare enough to fail that
-    // optimistic-then-revert reads better than "..." on every click.
-    setFollowing(optimisticNext);
-    setLoading(true);
-
-    const result = await toggleFollow({
-      followingId,
-      follow: optimisticNext,
-      pathname,
-    });
-
-    if (result.error) {
-      console.error(result.error);
-      setFollowing(previousFollowing);
-      setLoading(false);
+  const handleClick = () => {
+    if (!currentUserId) {
+      const destination = `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?redirectTo=${encodeURIComponent(destination)}`);
       return;
     }
 
-    const nextFollowing = result.following;
-    if (nextFollowing) {
-      trackActivationEvent({
-        event: "writer_followed",
-        metadata: { followerId, followingId },
-      });
-    }
-
+    const nextFollowing = !following;
+    const previousFollowing = following;
+    // Optimistic: the write is rare enough to fail that flipping at once and
+    // reverting on refusal reads better than a spinner on every click.
     setFollowing(nextFollowing);
-    onChange?.(nextFollowing);
-    setLoading(false);
+    setError(null);
+
+    startTransition(async () => {
+      const result = await toggleFollow({
+        followingId,
+        follow: nextFollowing,
+        pathname,
+      });
+      if (result.error) {
+        setFollowing(previousFollowing);
+        setError(result.error);
+        return;
+      }
+      setFollowing(result.following);
+      if (nextFollowing && result.following) {
+        trackActivationEvent({
+          event: "writer_followed",
+          source,
+          metadata: { authorId: followingId, ...(postId ? { postId } : {}) },
+        });
+        onFollowCompleted?.();
+      }
+      router.refresh();
+    });
   };
 
+  const label = following ? "Following" : "Follow";
+  const sizeClass =
+    size === "compact"
+      ? "min-h-8 rounded-full px-3 py-1.5 text-xs"
+      : "min-h-11 rounded-lg px-4 py-2 text-sm";
+  const stateClass = following
+    ? "border-card-border bg-card text-ink-soft hover:border-card-border-hover hover:text-ink"
+    : "border-emerald-brand bg-emerald-brand text-white hover:bg-[#0E4B37]";
+
   return (
-    <button
-      onClick={handleToggle}
-      disabled={loading}
-      aria-label={following ? "Unfollow" : "Follow"}
-      className={
-        variant === "solid"
-          ? `flex-shrink-0 rounded-lg px-5 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${
-              following
-                ? "border border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                : "bg-emerald-brand text-white hover:bg-[#0E4B37]"
-            }`
-          : `flex-shrink-0 rounded-full border px-3.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-              following
-                ? "border-emerald-100 bg-emerald-50 text-emerald-brand"
-                : "border-gray-300 bg-white text-gray-700 hover:border-emerald-brand hover:text-emerald-brand"
-            }`
-      }
-    >
-      {following ? "Following" : "Follow"}
-    </button>
+    <div className={`flex-shrink-0 ${className}`}>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isPending}
+        aria-busy={isPending || undefined}
+        aria-label={authorName ? `${label} ${authorName}` : undefined}
+        className={`focus-ring ${sizeClass} border font-semibold transition-colors disabled:opacity-50 ${stateClass}`}
+      >
+        {label}
+      </button>
+      {error ? (
+        <p className="mt-1 text-xs text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
