@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +21,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -95,14 +96,37 @@ describe("SearchOverlay request handling", () => {
   });
 
   it("ignores a slow response that a later keystroke has superseded", async () => {
+    vi.useFakeTimers();
+
     // Debouncing orders the requests, not the responses. A slow "af" landing
     // after a fast "africa" used to replace the right results with stale ones.
     let resolveFirst: (value: unknown) => void = () => {};
+    let resolveSecond: (value: unknown) => void = () => {};
     fetchMock
       .mockImplementationOnce(
         () => new Promise((resolve) => (resolveFirst = resolve))
       )
-      .mockResolvedValue({
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveSecond = resolve))
+      );
+
+    render(<SearchOverlay isOpen onClose={vi.fn()} />);
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "a" } });
+    fireEvent.change(input, { target: { value: "af" } });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(300));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(input, { target: { value: "africa" } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    act(() => vi.advanceTimersByTime(300));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveSecond({
         ok: true,
         json: async () => ({
           posts: [
@@ -118,34 +142,29 @@ describe("SearchOverlay request handling", () => {
           ],
         }),
       });
+    });
+    expect(screen.getByText("The current answer")).toBeInTheDocument();
 
-    render(<SearchOverlay isOpen onClose={vi.fn()} />);
-    await userEvent.type(screen.getByRole("textbox"), "af");
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-
-    await userEvent.type(screen.getByRole("textbox"), "rica");
-    expect(await screen.findByText("The current answer")).toBeInTheDocument();
-
-    resolveFirst({
-      ok: true,
-      json: async () => ({
-        posts: [
-          {
-            id: "1",
-            title: "The stale answer",
-            slug: "stale",
-            type: "essay",
-            citation_id: null,
-            published_version_id: null,
-            profiles: null,
-          },
-        ],
-      }),
+    await act(async () => {
+      resolveFirst({
+        ok: true,
+        json: async () => ({
+          posts: [
+            {
+              id: "1",
+              title: "The stale answer",
+              slug: "stale",
+              type: "essay",
+              citation_id: null,
+              published_version_id: null,
+              profiles: null,
+            },
+          ],
+        }),
+      });
     });
 
-    await vi.waitFor(() =>
-      expect(screen.queryByText("The stale answer")).not.toBeInTheDocument()
-    );
+    expect(screen.queryByText("The stale answer")).not.toBeInTheDocument();
     expect(screen.getByText("The current answer")).toBeInTheDocument();
   });
 });
