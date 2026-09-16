@@ -1,85 +1,20 @@
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { notificationsRepository } from "@/lib/db/readAdapter";
 
-export interface NotificationData {
-  id: string;
-  type: string;
-  read: boolean;
-  created_at: string;
-  message?: string | null;
-  link?: string | null;
-  post_id?: string | null;
-  actor: {
-    full_name: string | null;
-    username: string;
-    avatar_url: string | null;
-  } | null;
-  actor_username: string | null;
-  post_title: string | null;
-  post_slug: string | null;
-  post_content_kind: string | null;
-}
+export {
+  groupByDate,
+  sectionsFromNotifications,
+} from "@/lib/notificationShape";
+export type {
+  NotificationData,
+  NotificationSection,
+} from "@/lib/notificationShape";
 
-export interface NotificationSection {
-  label: string;
-  items: NotificationData[];
-}
+import type { NotificationData } from "@/lib/notificationShape";
 
-export function groupByDate(notifications: NotificationData[]): {
-  today: NotificationData[];
-  thisWeek: NotificationData[];
-  earlier: NotificationData[];
-} {
-  const now = new Date();
-  const todayStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  ).getTime();
-  const weekAgoStart = todayStart - 6 * 24 * 60 * 60 * 1000;
-
-  const today: NotificationData[] = [];
-  const thisWeek: NotificationData[] = [];
-  const earlier: NotificationData[] = [];
-
-  for (const notification of notifications) {
-    const timestamp = new Date(notification.created_at).getTime();
-    if (timestamp >= todayStart) today.push(notification);
-    else if (timestamp >= weekAgoStart) thisWeek.push(notification);
-    else earlier.push(notification);
-  }
-
-  return { today, thisWeek, earlier };
-}
-
-export function sectionsFromNotifications(
-  notifications: NotificationData[]
-): NotificationSection[] {
-  const { today, thisWeek, earlier } = groupByDate(notifications);
-  return [
-    { label: "Today", items: today },
-    { label: "This week", items: thisWeek },
-    { label: "Earlier", items: earlier },
-  ].filter((section) => section.items.length > 0);
-}
-
-const NOTIFICATIONS_SELECT = `
-  id, type, read, created_at, actor_id, post_id, message, link, dismissed_at,
-  actor:profiles!notifications_actor_id_fkey(full_name, username, avatar_url),
-  post:posts!notifications_post_id_fkey(title, slug, type, content_kind)
-`;
-
+// The loader still takes a Supabase client on the un-migrated path.
 type NotificationsQueryClient = {
   from: (table: string) => any;
 };
-
-/**
- * PostgREST renders this as `type=not.in.(like,follow)`. Notification types are
- * `[a-z0-9_]+` throughout the catalog, so no value here needs quoting or escaping.
- */
-function applyMutedTypes(query: any, mutedTypes: string[]) {
-  if (mutedTypes.length === 0) return query;
-  return query.not("type", "in", `(${mutedTypes.join(",")})`);
-}
 
 export interface NotificationRowsResult {
   rows: NotificationData[];
@@ -97,40 +32,36 @@ export async function fetchNotificationRows(
   limit = 50,
   mutedTypes: string[] = []
 ): Promise<NotificationRowsResult> {
-  // Dismissed notifications are soft-deleted, not removed, so they have to be
-  // filtered out here rather than relying on the row being gone.
-  let query = supabase
-    .from("notifications")
-    .select(NOTIFICATIONS_SELECT)
-    .eq("user_id", userId)
-    .is("dismissed_at", null);
+  // Muting is applied in the query rather than at insert time, so one rule
+  // covers both surfaces and turning a group back on restores its history.
+  // Dismissal is a soft delete, so it is filtered rather than being gone.
+  let raw: Array<Record<string, unknown>> = [];
+  let error: { message: string } | null = null;
+  try {
+    raw = (await notificationsRepository(supabase as never).list(
+      userId,
+      limit,
+      mutedTypes
+    )) as unknown as Array<Record<string, unknown>>;
+  } catch (failure) {
+    // The caller distinguishes "no notifications" from "we could not ask", so
+    // a failure arrives as a message rather than as an empty list.
+    error = {
+      message: failure instanceof Error ? failure.message : String(failure),
+    };
+  }
 
-  // Muting filters here rather than at insert time so one rule covers both
-  // surfaces, and so turning a group back on restores its history.
-  query = applyMutedTypes(query, mutedTypes);
-
-  const { data: raw, error } = await query
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  const rows = ((raw ?? []) as Array<Record<string, unknown>>).flatMap((notification) => {
+  const rows = raw.flatMap((notification) => {
     const rawActor = notification.actor as
       | NotificationData["actor"]
       | NotificationData["actor"][]
       | null;
     const rawPost = notification.post as
-      | { title: string; slug: string; type: string; content_kind: string | null }
-      | { title: string; slug: string; type: string; content_kind: string | null }[]
+      | { title: string; slug: string; content_kind: string | null }
+      | { title: string; slug: string; content_kind: string | null }[]
       | null;
     const actor = Array.isArray(rawActor) ? rawActor[0] ?? null : rawActor;
     const post = Array.isArray(rawPost) ? rawPost[0] ?? null : rawPost;
-
-    if (
-      !FEATURE_FLAGS.research &&
-      (post?.type === "research" || post?.content_kind === "research")
-    ) {
-      return [];
-    }
 
     return [{
       id: notification.id as string,
@@ -172,21 +103,23 @@ export async function fetchUnreadCount(
   userId: string,
   mutedTypes: string[] = []
 ): Promise<UnreadCountResult> {
-  let query = supabase
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("read", false)
-    .is("dismissed_at", null);
-
-  // Must match fetchNotificationRows exactly, or the badge counts notifications
-  // the inbox will not show.
-  query = applyMutedTypes(query, mutedTypes);
-
-  const { count, error } = await query;
-
-  return {
-    count: typeof count === "number" ? count : null,
-    error: error?.message ?? null,
-  };
+  // Must match fetchNotificationRows exactly, or the badge counts
+  // notifications the inbox will not show. Both go through one repository, so
+  // the two filter sets cannot drift apart.
+  try {
+    return {
+      count: await notificationsRepository(supabase as never).unreadCount(
+        userId,
+        mutedTypes
+      ),
+      error: null,
+    };
+  } catch (failure) {
+    // null, not zero: the caller leaves the previous badge alone rather than
+    // clearing it, because "we do not know" is not "no unread".
+    return {
+      count: null,
+      error: failure instanceof Error ? failure.message : String(failure),
+    };
+  }
 }

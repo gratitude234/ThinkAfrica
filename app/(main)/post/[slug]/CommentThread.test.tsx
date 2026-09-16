@@ -9,7 +9,7 @@ const { mocks } = vi.hoisted(() => ({
     deleteComment: vi.fn(),
     loadMoreComments: vi.fn(),
     requestAuth: vi.fn(),
-    rpc: vi.fn(),
+    toggleCommentVote: vi.fn(),
   },
 }));
 
@@ -18,13 +18,14 @@ vi.mock("./commentActions", () => ({
   updateComment: mocks.updateComment,
   deleteComment: mocks.deleteComment,
   loadMoreComments: mocks.loadMoreComments,
+  // The vote is still one SECURITY DEFINER function, but the component no
+  // longer calls it: toggleCommentVote does, from the server.
+  toggleCommentVote: mocks.toggleCommentVote,
 }));
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
   useGuestAuthGate: () => ({ requestAuth: mocks.requestAuth }),
 }));
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({ rpc: mocks.rpc }),
-}));
+
 vi.mock("@/components/moderation/ReportButton", () => ({
   default: () => <button type="button">Report</button>,
 }));
@@ -81,7 +82,9 @@ beforeEach(() => {
   mocks.deleteComment.mockReset().mockResolvedValue({ error: null, tombstoned: false });
   mocks.loadMoreComments.mockReset();
   mocks.requestAuth.mockReset();
-  mocks.rpc.mockReset().mockResolvedValue({ data: { voted: true, upvotes: 3 }, error: null });
+  mocks.toggleCommentVote
+    .mockReset()
+    .mockResolvedValue({ ok: true, voted: true, upvotes: 3 });
 });
 
 describe("CommentThread", () => {
@@ -101,12 +104,17 @@ describe("CommentThread", () => {
     expect(screen.getByRole("button", { name: "Remove upvote" })).toHaveTextContent("3");
 
     await waitFor(() =>
-      expect(mocks.rpc).toHaveBeenCalledWith("toggle_comment_vote", { p_comment_id: "c1" })
+      // The comment id and nothing else. The voter is the session's, resolved
+      // on the server, and is not something this component can name.
+      expect(mocks.toggleCommentVote).toHaveBeenCalledWith({ commentId: "c1" })
     );
   });
 
-  it("rolls the vote back when the RPC fails", async () => {
-    mocks.rpc.mockResolvedValue({ data: null, error: { message: "Comment not found." } });
+  it("rolls the vote back when the server refuses it", async () => {
+    mocks.toggleCommentVote.mockResolvedValue({
+      ok: false,
+      error: "Could not record that vote. Try again.",
+    });
     renderThread();
 
     fireEvent.click(screen.getByRole("button", { name: "Upvote this comment" }));
@@ -122,7 +130,7 @@ describe("CommentThread", () => {
     fireEvent.click(screen.getByRole("button", { name: "Upvote this comment" }));
 
     expect(mocks.requestAuth).toHaveBeenCalledWith("like", { contentKind: "post" });
-    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.toggleCommentVote).not.toHaveBeenCalled();
   });
 
   it("posts a reply against the parent and shows it in the thread", async () => {

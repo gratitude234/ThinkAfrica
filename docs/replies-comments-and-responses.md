@@ -1,5 +1,12 @@
 # Replies: comments and Responses
 
+> **Historical.** Responses were retired by the publishing reset: creation in
+> Phase 2B, and every remaining signal (counts, lists, badges, ranking, points,
+> profile category) in Phase 2C. Comments and their replies are the only way
+> to reply. Posts published as Responses before then are ordinary Posts and
+> Articles. See `PUBLISHING_RESET_PHASE2B.md` and `PUBLISHING_RESET_PHASE2C.md`.
+> The rest of this document describes the product as it was.
+
 Indegenius has two ways to reply, and they are not redundant. Read this before
 removing either one.
 

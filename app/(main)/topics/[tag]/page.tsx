@@ -2,50 +2,27 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import Link from "next/link";
-import {
-  createAnonymousRankingContext,
-  scoreCandidate,
-} from "@/lib/feedRanking";
-import {
-  getBookmarkCountsByPostId,
-  getReferenceCountsByPostId,
-  getVisibleCommentCountsByPostId,
-} from "@/lib/postCounts";
-import {
-  getFeedSurfaceReason,
-  getPublicQualitySignals,
-} from "@/lib/postQuality";
-import { getPostMetadataTitle } from "@/lib/postDisplay";
-import TopicSubscribeButton from "@/components/topic/TopicSubscribeButton";
-import {
-  isTopicSubscriptionsEnabled,
-  RESEARCH_TYPE_QUERY_EXCLUSION,
-} from "@/lib/featureFlags";
-import { normalizeTagValue } from "@/lib/tags";
+import { getVisibleCommentCountsByPostId } from "@/lib/postCounts";
+import type { PostCardData } from "@/components/post/PostCard";
 
 interface PageProps {
   params: Promise<{ tag: string }>;
 }
 
+type TopicPostProfile = NonNullable<PostCardData["profiles"]>;
+
+/**
+ * Every publication under one topic.
+ *
+ * The cards used to carry quality badges, a "why surfaced" reason, a quality
+ * score, co-author credits and a source-backed count, all computed here with
+ * the feed's retired scorer. The publishing reset, Phase 2F, removed them with
+ * the systems they described, and the extra count queries that fed them.
+ */
 export default async function TopicPage({ params }: PageProps) {
   const { tag } = await params;
   const decodedTag = decodeURIComponent(tag);
-  const topicKey = normalizeTagValue(decodedTag);
   const supabase = await createClient();
-  const subscriptionsEnabled = isTopicSubscriptionsEnabled();
-
-  let postsQuery = supabase
-    .from("posts")
-    .select(`
-      id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url, citation_id, published_version_id,
-      profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
-      post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
-    `)
-    .eq("status", "published")
-    .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION);
-  postsQuery = subscriptionsEnabled
-    ? postsQuery.contains("topic_keys", [topicKey])
-    : postsQuery.contains("tags", [decodedTag]);
 
   const [
     { data: postsRaw },
@@ -53,117 +30,53 @@ export default async function TopicPage({ params }: PageProps) {
       data: { user },
     },
   ] = await Promise.all([
-    postsQuery.order("view_count", { ascending: false }),
+    supabase
+      .from("posts")
+      .select(`
+      id, author_id, title, slug, excerpt, content_kind, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url,
+      profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)
+    `)
+      .eq("status", "published")
+      .contains("tags", [decodedTag])
+      .order("view_count", { ascending: false }),
     supabase.auth.getUser(),
   ]);
-
-  let initialSubscribed = false;
-  if (subscriptionsEnabled && user) {
-    const { data: subscription } = await supabase
-      .from("topic_subscriptions")
-      .select("topic_key")
-      .eq("subscriber_id", user.id)
-      .eq("topic_key", topicKey)
-      .maybeSingle();
-    initialSubscribed = Boolean(subscription);
-  }
 
   if (!postsRaw) notFound();
 
   const postIds = postsRaw.map((post) => post.id);
-  const [bookmarkCounts, referenceCounts, commentCounts, responseRows] =
+  const commentCounts =
     postIds.length > 0
-      ? await Promise.all([
-          getBookmarkCountsByPostId(supabase, postIds),
-          getReferenceCountsByPostId(supabase, postIds),
-          getVisibleCommentCountsByPostId(supabase, postIds),
-          supabase.from("posts").select("in_response_to").in("in_response_to", postIds),
-        ])
-      : [
-          {} as Record<string, number>,
-          {} as Record<string, number>,
-          {} as Record<string, number>,
-          { data: [] as Array<{ in_response_to?: string | null }> },
-        ];
-  const responseCounts = ((responseRows.data ?? []) as Array<{
-    in_response_to?: string | null;
-  }>).reduce((acc: Record<string, number>, row) => {
-    if (row.in_response_to) acc[row.in_response_to] = (acc[row.in_response_to] ?? 0) + 1;
-    return acc;
-  }, {});
+      ? await getVisibleCommentCountsByPostId(supabase, postIds)
+      : ({} as Record<string, number>);
 
-  // Every card on this page is already on-topic by definition, so there is no
-  // per-reader relevance left to express here. The neutral context scores what
-  // is true of the work itself, using the same function the feed ranks by.
-  const topicScoringContext = createAnonymousRankingContext();
-
-  const posts = postsRaw.map((p) => {
-    const profile = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
-    const qualityInput = {
-      type: p.type,
-      citationId: (p as { citation_id?: string | null }).citation_id ?? null,
-      publishedVersionId:
-        (p as { published_version_id?: string | null }).published_version_id ?? null,
-      referenceCount: referenceCounts[p.id] ?? 0,
-      responseCount: responseCounts[p.id] ?? 0,
-      bookmarkCount: bookmarkCounts[p.id] ?? 0,
-      viewCount: p.view_count,
-      publishedAt: p.published_at,
-      createdAt: p.created_at,
-      tags: p.tags,
-      author: profile,
-      interestMatch: true,
-    };
-    const qualitySignals = getPublicQualitySignals(qualityInput);
-
+  const posts: PostCardData[] = postsRaw.map((row) => {
+    const profile = (Array.isArray(row.profiles) ? row.profiles[0] : row.profiles) as
+      | TopicPostProfile
+      | null
+      | undefined;
     return {
-    ...p,
-    profiles: profile,
-    bookmark_count: bookmarkCounts[p.id] ?? 0,
-    reference_count: referenceCounts[p.id] ?? 0,
-    response_count: responseCounts[p.id] ?? 0,
-    comment_count: commentCounts[p.id] ?? 0,
-    quality_badges: qualitySignals.badges,
-    quality_score: scoreCandidate(
-      {
-        id: p.id,
-        author_id: (p as { author_id?: string }).author_id,
-        type: p.type,
-        content_kind: (p as { content_kind?: string | null }).content_kind,
-        tags: p.tags,
-        published_at: p.published_at,
-        created_at: p.created_at,
-        citation_id: (p as { citation_id?: string | null }).citation_id ?? null,
-        published_version_id:
-          (p as { published_version_id?: string | null }).published_version_id ??
-          null,
-        view_count: p.view_count,
-        impression_count: (p as { impression_count?: number | null })
-          .impression_count,
-        read_count: (p as { read_count?: number | null }).read_count,
-        bookmark_count: bookmarkCounts[p.id] ?? 0,
-        reference_count: referenceCounts[p.id] ?? 0,
-        response_count: responseCounts[p.id] ?? 0,
-      },
-      topicScoringContext
-    ),
-    surface_reason: getFeedSurfaceReason(qualityInput),
-    co_authors: Array.isArray((p as { post_authors?: unknown[] }).post_authors)
-      ? ((p as { post_authors?: Array<Record<string, unknown>> }).post_authors ?? [])
-          .filter((row) => !!row.accepted_at)
-          .filter((row) => row.user_id !== (p as { author_id?: string }).author_id)
-          .map((row) => ({
-            user_id: row.user_id as string,
-            profile: Array.isArray(row.profile)
-              ? (row.profile[0] as { username: string; full_name: string | null })
-              : (row.profile as { username: string; full_name: string | null }),
-          }))
-      : [],
+      id: row.id,
+      title: row.title,
+      slug: row.slug,
+      excerpt: row.excerpt,
+      content_kind: row.content_kind ?? null,
+      tags: row.tags,
+      created_at: row.created_at,
+      published_at: row.published_at,
+      view_count: row.view_count,
+      impression_count: row.impression_count ?? null,
+      read_count: row.read_count ?? null,
+      word_count: row.word_count ?? null,
+      cover_image_url: row.cover_image_url ?? null,
+      comment_count: commentCounts[row.id] ?? 0,
+      profiles: profile ?? null,
     };
   });
 
-  // Top contributors for this tag
-  const contributorMap = new Map<string, { full_name: string; username: string; count: number }>();
+  // The writers with the most publications under this tag. A list, not a
+  // ranking: nothing here is numbered or scored.
+  const contributorMap = new Map<string, { full_name: string | null; username: string; count: number }>();
   for (const post of posts) {
     if (post.profiles) {
       const key = post.profiles.username;
@@ -182,18 +95,6 @@ export default async function TopicPage({ params }: PageProps) {
   const topContributors = Array.from(contributorMap.values())
     .sort((a, b) => b.count - a.count)
     .slice(0, 3);
-  const sourceBackedCount = posts.filter((post) => (post.reference_count ?? 0) > 0).length;
-  const citableCount = posts.filter(
-    (post) =>
-      Boolean((post as { citation_id?: string | null }).citation_id) ||
-      Boolean((post as { published_version_id?: string | null }).published_version_id)
-  ).length;
-  const activeConversationPosts = posts
-    .filter((post) => (post.response_count ?? 0) > 0)
-    .sort(
-      (left, right) => (right.response_count ?? 0) - (left.response_count ?? 0)
-    )
-    .slice(0, 3);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -204,17 +105,10 @@ export default async function TopicPage({ params }: PageProps) {
             <p className="text-sm text-gray-500 mb-1">Topic</p>
             <h1 className="text-3xl font-bold text-gray-900">#{decodedTag}</h1>
             <p className="text-gray-500 text-sm mt-1">
-              {posts.length} post{posts.length !== 1 ? "s" : ""} /{" "}
-              {sourceBackedCount} source-backed / {citableCount} citable
+              {posts.length} post{posts.length !== 1 ? "s" : ""}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <TopicSubscribeButton
-              topic={decodedTag}
-              initialSubscribed={initialSubscribed}
-              currentUserId={user?.id ?? null}
-              showConfirmation
-            />
             <Link
               href={`/write?starter=1&tag=${encodeURIComponent(decodedTag)}`}
               className="w-fit rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white hover:bg-[#0E4B37]"
@@ -241,71 +135,7 @@ export default async function TopicPage({ params }: PageProps) {
                 key={post.id}
                 currentUserId={user?.id ?? null}
                 surface="topic"
-                post={{
-                  id: post.id,
-                  title: post.title,
-                  slug: post.slug,
-                  in_response_to:
-                    (post as { in_response_to?: string | null }).in_response_to ?? null,
-                  excerpt: post.excerpt,
-                  type: post.type,
-                  content_kind:
-                    (post as { content_kind?: string | null }).content_kind ?? null,
-                  article_format:
-                    (post as { article_format?: string | null }).article_format ?? null,
-                  tags: post.tags,
-                  created_at: post.created_at,
-                  published_at: post.published_at,
-                  view_count: post.view_count,
-                  impression_count:
-                    (post as { impression_count?: number | null })
-                      .impression_count ?? null,
-                  read_count:
-                    (post as { read_count?: number | null }).read_count ?? null,
-                  citation_id:
-                    (post as { citation_id?: string | null }).citation_id ?? null,
-                  published_version_id:
-                    (post as { published_version_id?: string | null })
-                      .published_version_id ?? null,
-                  cover_image_url:
-                    (post as { cover_image_url?: string | null })
-                      .cover_image_url ?? null,
-                  bookmark_count:
-                    (post as { bookmark_count?: number }).bookmark_count ?? 0,
-                  reference_count:
-                    (post as { reference_count?: number }).reference_count ?? 0,
-                  response_count:
-                    (post as { response_count?: number }).response_count ?? 0,
-                  comment_count:
-                    (post as { comment_count?: number }).comment_count ?? 0,
-                  quality_score:
-                    (post as { quality_score?: number }).quality_score ?? 0,
-                  quality_badges:
-                    (post as {
-                      quality_badges?: Array<{
-                        key: string;
-                        label: string;
-                        tone: "emerald" | "sky" | "purple" | "amber" | "gray";
-                      }>;
-                    }).quality_badges ?? [],
-                  surface_reason:
-                    (post as { surface_reason?: string | null }).surface_reason ?? null,
-                  co_authors:
-                    (post as {
-                      co_authors?: Array<{
-                        user_id: string;
-                        profile: { username: string; full_name: string | null } | null;
-                      }>;
-                    }).co_authors ?? [],
-                  profiles: post.profiles as {
-                    username: string;
-                    full_name: string | null;
-                    university: string | null;
-                    avatar_url: string | null;
-                    verified?: boolean;
-                    verified_type?: string | null;
-                  } | null,
-                }}
+                post={post}
               />
             ))
           )}
@@ -313,44 +143,16 @@ export default async function TopicPage({ params }: PageProps) {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          {activeConversationPosts.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-900 mb-3 text-sm">
-                Active Conversations
-              </h3>
-              <div className="space-y-3">
-                {activeConversationPosts.map((post) => (
-                  <Link
-                    key={post.id}
-                    href={`/post/${post.slug}`}
-                    className="block rounded-lg bg-canvas p-3 hover:bg-[#F5F3EE]"
-                  >
-                    <p className="line-clamp-2 text-sm font-semibold text-gray-900">
-                      {getPostMetadataTitle(post, post.profiles)}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {post.response_count ?? 0}{" "}
-                      {(post.response_count ?? 0) === 1 ? "response" : "responses"}
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
           {topContributors.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-900 mb-3 text-sm">Top Contributors</h3>
+              <h3 className="font-semibold text-gray-900 mb-3 text-sm">Writers on this topic</h3>
               <div className="space-y-3">
-                {topContributors.map((c, i) => (
+                {topContributors.map((c) => (
                   <Link
                     key={c.username}
                     href={`/${c.username}`}
                     className="flex items-center gap-3 group"
                   >
-                    <span className="text-xs text-gray-500 font-medium w-4">
-                      {i + 1}
-                    </span>
                     <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0">
                       {c.full_name?.charAt(0)?.toUpperCase() ?? "?"}
                     </div>

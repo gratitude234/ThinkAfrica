@@ -10,21 +10,19 @@ import {
   type ActionInboxItem,
 } from "@/lib/actionInbox";
 import {
-  dismissNotification,
-  markAllNotificationsRead,
-  restoreUnread,
-  undismissNotification,
-} from "@/lib/notificationMutations";
+  dismissNotificationAction,
+  markAllNotificationsReadAction,
+  restoreUnreadAction,
+  undismissNotificationAction,
+} from "@/lib/notificationActions";
 import { markNotificationRead } from "@/lib/notificationRead";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { formatRelativeTime } from "@/lib/utils";
 import NotificationItem from "./NotificationItem";
 import {
-  fetchNotificationRows,
   sectionsFromNotifications,
   type NotificationData,
-} from "@/lib/notificationData";
-import { isAuthorSubscriptionsUxV2Enabled } from "@/lib/featureFlags";
+} from "@/lib/notificationShape";
 
 interface NotificationsPageClientProps {
   userId: string;
@@ -38,39 +36,14 @@ interface NotificationsPageClientProps {
  * of thing, which is why the old single "needs_attention" key -- a state pretending
  * to be a category -- had to be special-cased everywhere it was touched.
  */
-type FilterKey =
-  | "all"
-  | "unread"
-  | "needs_attention"
-  | ActionInboxCategory;
+type FilterKey = "all" | "unread" | ActionInboxCategory;
 
-const BASE_FILTERS: Array<{ key: FilterKey; label: string }> = [
+const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
-  { key: "responses", label: "Responses" },
   { key: "review", label: "Review" },
-  { key: "opportunities", label: "Opportunities" },
   { key: "activity", label: "Activity" },
 ];
-
-const V2_FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: "needs_attention", label: "Needs attention" },
-  { key: "subscriptions", label: "Subscriptions" },
-  ...BASE_FILTERS,
-];
-
-function initialFilter(
-  notifications: NotificationData[],
-  subscriptionUxEnabled: boolean
-): FilterKey {
-  if (!subscriptionUxEnabled) return "all";
-  const summary = getActionInboxSummary(notifications);
-  if (summary.unreadActionCount > 0) return "needs_attention";
-  if (summary.items.some((item) => item.category === "subscriptions")) {
-    return "subscriptions";
-  }
-  return "activity";
-}
 
 interface UndoState {
   message: string;
@@ -110,11 +83,7 @@ export default function NotificationsPageClient({
   // derived from it, so marking one row read cannot leave the header count, the
   // hero and the list disagreeing with each other.
   const [notifications, setNotifications] = useState(initialNotifications);
-  const subscriptionUxEnabled = isAuthorSubscriptionsUxV2Enabled();
-  const filters = subscriptionUxEnabled ? V2_FILTERS : BASE_FILTERS;
-  const [activeFilter, setActiveFilter] = useState<FilterKey>(() =>
-    initialFilter(initialNotifications, subscriptionUxEnabled)
-  );
+  const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [toast, setToast] = useState<
     { message: string; undo?: UndoState } | null
@@ -127,20 +96,29 @@ export default function NotificationsPageClient({
 
   const supabase = useMemo(() => createClient(), []);
 
+  // Read through the application rather than the database: a browser has no
+  // database credential once the database is Neon, and the reader's mute
+  // preference comes from a function that answers nothing over a direct
+  // connection. The route resolves the viewer from the session and applies the
+  // mute list, so neither is on this page's path any more.
   const refresh = useCallback(async () => {
     if (pendingWrites.current > 0) return;
-    const { rows, error } = await fetchNotificationRows(
-      supabase,
-      userId,
-      50,
-      mutedTypes
-    );
-    // Leave the currently-displayed notifications alone on a transient fetch
-    // failure rather than wiping them out with an empty result.
-    if (error) return;
-    if (pendingWrites.current > 0) return;
-    setNotifications(rows);
-  }, [supabase, userId, mutedTypes]);
+
+    try {
+      const response = await fetch("/api/notifications?limit=50");
+      if (!response.ok) return;
+      const body = (await response.json()) as {
+        notifications: NotificationData[] | null;
+      };
+      // Leave the currently-displayed notifications alone on a transient
+      // failure rather than wiping them out with an empty result.
+      if (!body.notifications) return;
+      if (pendingWrites.current > 0) return;
+      setNotifications(body.notifications);
+    } catch {
+      // Same: keep what is on screen.
+    }
+  }, []);
 
   // Polling — this page has no realtime subscription of its own, and `notifications`
   // stays out of the Realtime publication regardless of the shouldUseRealtime() flag
@@ -207,35 +185,25 @@ export default function NotificationsPageClient({
         listNotifications.filter((item) => {
           if (activeFilter === "all") return true;
           if (activeFilter === "unread") return !item.read;
-          if (activeFilter === "needs_attention") {
-            const inboxItem = summary.items.find(
-              (candidate) => candidate.notificationId === item.id
-            );
-            return !item.read && inboxItem?.requiresAction === true;
-          }
           return categoryByNotificationId.get(item.id) === activeFilter;
         })
       ),
-    [listNotifications, activeFilter, categoryByNotificationId, summary.items]
+    [listNotifications, activeFilter, categoryByNotificationId]
   );
 
   /**
    * Every count answers the same question: how many rows will I see if I tap this?
    *
-   * They previously did not. "Needs attention" counted unread only while the four
-   * category chips counted read and unread alike, so the same three notifications
-   * were advertised as "Needs attention (3)" and "Activity (3)" by two different
-   * rules. Counting over exactly the set the list renders makes them comparable.
+   * They previously did not: one chip counted unread only while the category
+   * chips counted read and unread alike, so the same three notifications were
+   * advertised twice by two different rules. Counting over exactly the set the
+   * list renders makes them comparable.
    */
   const filterCounts = useMemo(() => {
     const counts: Record<FilterKey, number> = {
       all: listNotifications.length,
       unread: 0,
-      needs_attention: summary.unreadActionCount,
-      responses: 0,
       review: 0,
-      opportunities: 0,
-      subscriptions: 0,
       activity: 0,
     };
     for (const item of listNotifications) {
@@ -244,7 +212,7 @@ export default function NotificationsPageClient({
       if (category) counts[category] += 1;
     }
     return counts;
-  }, [listNotifications, categoryByNotificationId, summary.unreadActionCount]);
+  }, [listNotifications, categoryByNotificationId]);
 
   const handleOpen = useCallback(
     (notificationId: string) => {
@@ -284,11 +252,7 @@ export default function NotificationsPageClient({
       );
 
       void runWrite(async () => {
-        const { error } = await dismissNotification(
-          supabase,
-          userId,
-          notificationId
-        );
+        const { error } = await dismissNotificationAction(notificationId);
 
         if (error) {
           setNotifications((current) =>
@@ -309,7 +273,7 @@ export default function NotificationsPageClient({
             actionLabel: "Undo",
             run: async () => {
               const result = await runWrite(() =>
-                undismissNotification(supabase, userId, notificationId)
+                undismissNotificationAction(notificationId)
               );
               if (result.error) {
                 setToast({ message: `Could not undo: ${result.error}` });
@@ -321,7 +285,7 @@ export default function NotificationsPageClient({
         });
       });
     },
-    [notifications, refresh, runWrite, supabase, userId]
+    [notifications, refresh, runWrite]
   );
 
   const handleMarkAllRead = useCallback(async () => {
@@ -334,7 +298,7 @@ export default function NotificationsPageClient({
 
     try {
       const { error, affectedIds } = await runWrite(() =>
-        markAllNotificationsRead(supabase, userId)
+        markAllNotificationsReadAction()
       );
 
       if (error) {
@@ -361,7 +325,7 @@ export default function NotificationsPageClient({
           actionLabel: "Undo",
           run: async () => {
             const result = await runWrite(() =>
-              restoreUnread(supabase, userId, undoableIds)
+              restoreUnreadAction(undoableIds)
             );
             if (result.error) {
               setToast({
@@ -386,7 +350,7 @@ export default function NotificationsPageClient({
     } finally {
       setMarkingAllRead(false);
     }
-  }, [notifications, refresh, runWrite, supabase, userId]);
+  }, [notifications, refresh, runWrite]);
 
   return (
     <>
@@ -502,7 +466,7 @@ export default function NotificationsPageClient({
       ) : (
         <>
           <div className="mb-3 flex flex-wrap gap-2">
-            {filters.map((filter) => {
+            {FILTERS.map((filter) => {
               const count = filterCounts[filter.key];
               const isActive = activeFilter === filter.key;
               return (

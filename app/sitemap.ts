@@ -3,7 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { absoluteUrl } from "@/lib/site";
 import { isLowQualityTitle } from "@/lib/postQuality";
 import { isLightweightPost } from "@/lib/postDisplay";
-import { FEATURE_FLAGS, RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 
 export const revalidate = 3600;
 
@@ -25,7 +24,6 @@ type QueryResponse<T> = { data: T[] | null; error: { message: string } | null };
 type PostRow = {
   slug: string | null;
   title: string | null;
-  type: string | null;
   content_kind: string | null;
   published_at: string | null;
   created_at: string | null;
@@ -40,21 +38,12 @@ type ProfileRow = {
   bio: string | null;
 };
 type AuthorRow = { author_id: string | null };
-type ResearchProjectRow = { slug: string | null; updated_at: string | null };
-type ResearcherProfileRow = { user_id: string | null };
 
 const staticRoutes: SitemapRow[] = [
   { url: absoluteUrl("/landing"), changeFrequency: "daily", priority: 1 },
   { url: absoluteUrl("/explore"), changeFrequency: "hourly", priority: 0.9 },
-
-  { url: absoluteUrl("/campus"), changeFrequency: "daily", priority: 0.75 },
-  ...(FEATURE_FLAGS.research
-    ? [{ url: absoluteUrl("/research"), changeFrequency: "daily" as const, priority: 0.8 }]
-    : []),
-  { url: absoluteUrl("/opportunities"), changeFrequency: "daily", priority: 0.8 },
   { url: absoluteUrl("/about"), changeFrequency: "monthly", priority: 0.6 },
   { url: absoluteUrl("/topics"), changeFrequency: "weekly", priority: 0.7 },
-  { url: absoluteUrl("/editorial-standards"), changeFrequency: "monthly", priority: 0.5 },
   { url: absoluteUrl("/privacy"), changeFrequency: "yearly", priority: 0.3 },
   { url: absoluteUrl("/terms"), changeFrequency: "yearly", priority: 0.3 },
 ];
@@ -114,16 +103,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       posts,
       profiles,
       publishedAuthors,
-      researchProjects,
-      researcherProfiles,
     ] = await Promise.all([
       collect<PostRow>(
         "posts",
         supabase
           .from("posts")
-          .select("slug, title, type, content_kind, published_at, created_at, updated_at")
+          .select("slug, title, content_kind, published_at, created_at, updated_at")
           .eq("status", "published")
-          .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
           .not("slug", "is", null)
           .order("published_at", { ascending: false, nullsFirst: false })
           .limit(1000)
@@ -151,32 +137,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           .from("posts")
           .select("author_id")
           .eq("status", "published")
-          .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
           .limit(5000)
           .abortSignal(signal),
         deadline
       ),
-      FEATURE_FLAGS.research ? collect<ResearchProjectRow>(
-        "research projects",
-        supabase
-          .from("research_projects")
-          .select("slug, updated_at")
-          .eq("visibility", "public")
-          .neq("status", "archived")
-          .order("updated_at", { ascending: false })
-          .limit(1000)
-          .abortSignal(signal),
-        deadline
-      ) : Promise.resolve([] as ResearchProjectRow[]),
-      FEATURE_FLAGS.research ? collect<ResearcherProfileRow>(
-        "researcher profiles",
-        supabase.from("researcher_profiles").select("user_id").limit(5000).abortSignal(signal),
-        deadline
-      ) : Promise.resolve([] as ResearcherProfileRow[]),
     ]);
 
     const authorsWithPublishedPosts = new Set(publishedAuthors.map((row) => row.author_id));
-    const profilesWithResearchPractice = new Set(researcherProfiles.map((row) => row.user_id));
 
     const postRoutes = posts
       .filter(
@@ -206,7 +173,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
         const hasBio = Boolean(profile.bio?.trim());
         const hasPublishedPost = authorsWithPublishedPosts.has(profile.id);
-        return hasBio || hasPublishedPost || profilesWithResearchPractice.has(profile.id);
+        return hasBio || hasPublishedPost;
       })
       .map((profile) => ({
         url: absoluteUrl(`/${profile.username}`),
@@ -215,17 +182,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.55,
       }));
 
-    const researchProjectRoutes = researchProjects.map((project) => ({
-      url: absoluteUrl(`/research/projects/${project.slug}`),
-      lastModified: project.updated_at ?? undefined,
-      changeFrequency: "weekly" as const,
-      priority: 0.7,
-    }));
-
     return [
       ...staticRoutes,
       ...postRoutes,
-      ...researchProjectRoutes,
       ...profileRoutes,
     ];
   } catch (error) {

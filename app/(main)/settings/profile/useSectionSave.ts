@@ -1,41 +1,52 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { trackActivationEvent } from "@/lib/activationEvents";
+import type { ProfileSettingsSection } from "@/lib/profileSettings";
 import type { SectionSaveResult } from "./actions";
-import type { ProfileSectionKey } from "@/lib/profileCommandCenter";
-import { trackSectionSaved } from "@/lib/profileOwnerAnalytics";
 
 export type SectionStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
 /**
- * The save lifecycle every Command Center section shares.
- *
- * One hook rather than per-section state so dirty, saving, saved and failed
- * mean the same thing everywhere, and so the analytics event fires from one
- * place: after persistence returns success, never on the click.
+ * `profile_section_saved`, the one analytics event Edit profile records. It
+ * fires after persistence answers, never on the click, and carries the section
+ * and the outcome: nothing a member typed.
+ */
+function trackSectionSaved(
+  section: ProfileSettingsSection,
+  profileId: string,
+  outcome: "success" | "failure"
+) {
+  trackActivationEvent({
+    event: "profile_section_saved",
+    metadata: { profileId, section, outcome },
+  });
+}
+
+/**
+ * The save lifecycle every Edit profile section shares, so dirty, saving,
+ * saved and failed mean the same thing everywhere.
  *
  * A failure keeps the draft. The section stays dirty and holds the values the
- * author typed, because losing an edit to a network blip is worse than any
+ * member typed, because losing an edit to a network blip is worse than any
  * error message.
  */
 export function useSectionSave({
   section,
   profileId,
   isDirty,
-  onSaved,
 }: {
-  section: ProfileSectionKey;
+  section: ProfileSettingsSection;
   profileId: string;
   isDirty: boolean;
-  onSaved?: (result: SectionSaveResult) => void;
 }) {
   const [status, setStatus] = useState<SectionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
 
   useEffect(() => {
-    // Never overwrite a terminal state mid-save: the author typing again
-    // while a request is out should not report the section as clean.
+    // Never overwrite a terminal state mid-save: typing again while a request
+    // is out should not report the section as clean.
     setStatus((current) => {
       if (current === "saving") return current;
       if (isDirty) return "dirty";
@@ -57,24 +68,23 @@ export function useSectionSave({
         if (!result.ok) {
           setError(result.error ?? "Could not save this section. Try again.");
           setStatus("error");
-          trackSectionSaved({ section, profileId, outcome: "failure" });
+          trackSectionSaved(section, profileId, "failure");
           return result;
         }
 
         setStatus("saved");
-        trackSectionSaved({ section, profileId, outcome: "success" });
-        onSaved?.(result);
+        trackSectionSaved(section, profileId, "success");
         return result;
       } catch {
         setError("Could not save this section. Try again.");
         setStatus("error");
-        trackSectionSaved({ section, profileId, outcome: "failure" });
+        trackSectionSaved(section, profileId, "failure");
         return { ok: false, error: "Could not save this section. Try again." };
       } finally {
         inFlight.current = false;
       }
     },
-    [onSaved, profileId, section]
+    [profileId, section]
   );
 
   return { status, error, save, saving: status === "saving" };
@@ -84,8 +94,8 @@ export function useSectionSave({
  * Warns before a reload or a tab close discards unsaved section edits.
  *
  * Only for the hard exits the browser owns. In-app navigation is left alone:
- * Next's App Router gives no reliable cancellable hook, and a blocker that
- * fires on some navigations and not others teaches an author to distrust it.
+ * the App Router gives no reliable cancellable hook, and a blocker that fires
+ * on some navigations and not others teaches a member to distrust it.
  */
 export function useUnsavedChangesWarning(hasUnsavedChanges: boolean) {
   useEffect(() => {

@@ -2,15 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PostCardData } from "@/components/post/PostCard";
 
 const fetchFeedPage = vi.fn();
-const fetchCitableFeed = vi.fn();
 
 vi.mock("@/lib/feedData", () => ({
   fetchFeedPage: (options: unknown) => fetchFeedPage(options),
-  fetchCitableFeed: (...args: unknown[]) => fetchCitableFeed(...args),
 }));
 
 vi.mock("@/lib/suggestedPeople", () => ({
-  getSuggestedPeople: vi.fn(async () => ({ suggestions: [], reason: "Top contributors" })),
+  getSuggestedPeople: vi.fn(async () => ({ suggestions: [], reason: "Writing about your topics" })),
+  getRecentWriters: vi.fn(async () => ({ suggestions: [], reason: "Published recently" })),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -18,8 +17,6 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 vi.mock("@/lib/featureFlags", () => ({
-  isAuthorSubscriptionsUxV2Enabled: () => false,
-  isTopicSubscriptionsEnabled: () => false,
   RESEARCH_TYPE_QUERY_EXCLUSION: "research",
 }));
 
@@ -65,9 +62,7 @@ function feedResult(posts: PostCardData[], hasMore = true, nextCursor = "cursor-
 
 beforeEach(() => {
   fetchFeedPage.mockReset();
-  fetchCitableFeed.mockReset();
   fetchFeedPage.mockResolvedValue(feedResult([post("a")]));
-  fetchCitableFeed.mockResolvedValue([]);
 });
 
 describe("Explore filters reach the query", () => {

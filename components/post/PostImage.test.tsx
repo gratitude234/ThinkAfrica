@@ -61,7 +61,7 @@ describe("PostImage", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses a compact crop for article and research thumbnails", () => {
+  it("uses a compact crop for article thumbnails", () => {
     render(<PostImage src={SRC} alt="An article cover" variant="feed-thumbnail" />);
 
     expect(screen.getByRole("img", { name: "An article cover" }).parentElement).toHaveClass(
@@ -70,11 +70,4 @@ describe("PostImage", () => {
     );
   });
 
-  it("uses a contained paper ratio for Research previews", () => {
-    render(<PostImage src={SRC} alt="A paper cover" variant="research-preview" />);
-
-    const image = screen.getByRole("img", { name: "A paper cover" });
-    expect(image.parentElement).toHaveClass("aspect-[3/4]");
-    expect(image).toHaveClass("object-contain");
-  });
 });

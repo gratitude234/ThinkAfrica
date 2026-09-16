@@ -1,158 +1,93 @@
-import type { ProfileType } from "@/lib/profileTypes";
+import {
+  PROFILE_BIO_MAX_LENGTH,
+  PROFILE_NAME_MAX_LENGTH,
+} from "@/lib/profileIdentity";
+import {
+  getProfileUsernameError,
+  normalizeProfileUsername,
+} from "@/lib/profileUsername";
 
-export const ONBOARDING_STEPS = ["path", "identity", "topics", "record"] as const;
+/**
+ * Onboarding is two steps: a profile, then topics.
+ *
+ * The profile step needs a display name and a username. A photo and a bio are
+ * optional. Topics are optional too, and "Skip for now" finishes without them.
+ *
+ * The publishing reset, Phase 2G, replaced the four-step identity
+ * questionnaire (student or not, school or work category, 3 to 5 required
+ * topics, an Intellectual Record preview). Nothing here asks what someone is.
+ */
+export const ONBOARDING_STEPS = ["profile", "topics"] as const;
+
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
-export const ONBOARDING_PATHS = ["student", "non_student"] as const;
-export type OnboardingPath = (typeof ONBOARDING_PATHS)[number];
+/**
+ * Every retired step name an old link, email or half-finished session can
+ * carry, and the step that now holds its purpose. A member who stopped on
+ * "path" or "identity" resumes on the profile step; one who stopped on topics
+ * or on the record preview resumes on topics, one tap from done.
+ */
+export const LEGACY_ONBOARDING_STEPS: Readonly<Record<string, OnboardingStep>> = {
+  path: "profile",
+  identity: "profile",
+  persona: "profile",
+  interests: "topics",
+  record: "topics",
+  follow: "topics",
+};
 
-export const WORK_CATEGORY_OPTIONS = [
-  {
-    value: "research_education",
-    label: "Research or education",
-    description: "Researching, teaching, learning, or building knowledge.",
-  },
-  {
-    value: "business_technology",
-    label: "Business or technology",
-    description: "Building products, companies, technology, or industry expertise.",
-  },
-  {
-    value: "policy_community",
-    label: "Policy or community work",
-    description: "Working in policy, government, advocacy, or community impact.",
-  },
-  {
-    value: "media_creative",
-    label: "Media or creative work",
-    description: "Reporting, creating, editing, or interpreting culture.",
-  },
-  {
-    value: "independent",
-    label: "Independent thinker",
-    description: "Developing ideas outside a formal role or organisation.",
-  },
-] as const;
-
-export type WorkCategory = (typeof WORK_CATEGORY_OPTIONS)[number]["value"];
-
-export interface OnboardingPreference {
-  currentPath: OnboardingPath | null;
-  workCategory: WorkCategory | null;
-}
-
-export const ONBOARDING_MIN_TOPICS = 3;
-export const ONBOARDING_MAX_TOPICS = 5;
-
-export function isOnboardingPath(value: unknown): value is OnboardingPath {
-  return (
-    typeof value === "string" &&
-    (ONBOARDING_PATHS as readonly string[]).includes(value)
-  );
-}
-
-export function isWorkCategory(value: unknown): value is WorkCategory {
-  return (
-    typeof value === "string" &&
-    WORK_CATEGORY_OPTIONS.some((option) => option.value === value)
-  );
-}
-
-export function parseOnboardingStep(value: string | null): OnboardingStep | null {
+export function parseOnboardingStep(
+  value: string | null | undefined
+): OnboardingStep | null {
   if (!value) return null;
   if ((ONBOARDING_STEPS as readonly string[]).includes(value)) {
     return value as OnboardingStep;
   }
-
-  const legacySteps: Record<string, OnboardingStep> = {
-    persona: "path",
-    interests: "topics",
-    follow: "record",
-  };
-  return legacySteps[value] ?? null;
+  return LEGACY_ONBOARDING_STEPS[value] ?? null;
 }
 
-export function normalizeOnboardingPreference(
-  value: unknown
-): OnboardingPreference {
-  const row = Array.isArray(value) ? value[0] : value;
-  if (!row || typeof row !== "object") {
-    return { currentPath: null, workCategory: null };
+export interface OnboardingProfileDraft {
+  fullName: string;
+  username: string;
+  bio: string;
+}
+
+/**
+ * The one rule the profile step enforces, shared by the client for immediate
+ * feedback, by the server action that saves it, and by the completion that
+ * refuses to mark a member done without it.
+ */
+export function getOnboardingProfileError(
+  draft: OnboardingProfileDraft
+): string | null {
+  const name = draft.fullName.trim();
+  if (!name) return "Add your name.";
+  if (name.length > PROFILE_NAME_MAX_LENGTH) return "That name is too long.";
+
+  const usernameError = getProfileUsernameError(
+    normalizeProfileUsername(draft.username)
+  );
+  if (usernameError) return usernameError;
+
+  if (draft.bio.length > PROFILE_BIO_MAX_LENGTH) {
+    return `Keep your bio to ${PROFILE_BIO_MAX_LENGTH} characters or fewer.`;
   }
-
-  const currentPath = isOnboardingPath(
-    (row as { current_path?: unknown }).current_path
-  )
-    ? (row as { current_path: OnboardingPath }).current_path
-    : null;
-  const workCategory = isWorkCategory(
-    (row as { work_category?: unknown }).work_category
-  )
-    ? (row as { work_category: WorkCategory }).work_category
-    : null;
-
-  return { currentPath, workCategory };
+  return null;
 }
 
-export function deriveLegacyOnboardingPreference(
-  profileType: ProfileType | null
-): OnboardingPreference {
-  if (!profileType) return { currentPath: null, workCategory: null };
-  if (profileType === "student") {
-    return { currentPath: "student", workCategory: null };
-  }
-
-  const categoryByProfileType: Record<Exclude<ProfileType, "student">, WorkCategory> = {
-    researcher: "research_education",
-    educator: "research_education",
-    ngo_nonprofit: "policy_community",
-    founder: "business_technology",
-    policy_government: "policy_community",
-    journalist_media: "media_creative",
-    professional: "business_technology",
-    other: "independent",
-  };
-
-  return {
-    currentPath: "non_student",
-    workCategory: categoryByProfileType[profileType],
-  };
-}
-
-// The public profile type a work category writes. Every category maps to a
-// distinct type, and each of those types derives back to the same category
-// through deriveLegacyOnboardingPreference, so a later settings save cannot
-// flatten a stored category. Each value also appears in that category's match
-// list below, which is what makes the suggestion signal reachable.
-export const CATEGORY_PRIMARY_PROFILE_TYPE: Record<WorkCategory, ProfileType> = {
-  research_education: "researcher",
-  business_technology: "professional",
-  policy_community: "policy_government",
-  media_creative: "journalist_media",
-  independent: "other",
-};
-
-export function getCategoryPrimaryProfileType(
-  category: WorkCategory | null | undefined
-): ProfileType | null {
-  return category ? CATEGORY_PRIMARY_PROFILE_TYPE[category] : null;
-}
-
-export function getCategoryProfileTypes(
-  category: WorkCategory | null | undefined
-): ProfileType[] {
-  switch (category) {
-    case "research_education":
-      return ["researcher", "educator"];
-    case "business_technology":
-      return ["founder", "professional"];
-    case "policy_community":
-      return ["policy_government", "ngo_nonprofit"];
-    case "media_creative":
-      return ["journalist_media"];
-    case "independent":
-      return ["other"];
-    default:
-      return [];
-  }
+/**
+ * Where a member lands. Topics only when they asked for it (or for a retired
+ * step that maps to it) and their name and username already stand. Anything
+ * else opens the profile step, prefilled with what they have, which is also
+ * where a first visit with no step starts.
+ */
+export function resolveOnboardingStep(
+  requested: string | null | undefined,
+  profile: { fullName: string; username: string }
+): OnboardingStep {
+  const profileReady =
+    getOnboardingProfileError({ ...profile, bio: "" }) === null;
+  return parseOnboardingStep(requested) === "topics" && profileReady
+    ? "topics"
+    : "profile";
 }

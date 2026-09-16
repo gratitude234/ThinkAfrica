@@ -1,5 +1,7 @@
 # Feed ranking v2.1 — what changed and how to release it
 
+> **Superseded (publishing reset, Phase 2F).** For You no longer uses this model. It now ranks the newest 120 publications on relevance (followed writers and chosen topics), engagement (reads, likes and saves per impression) and freshness, under `feed-v3.0.0`, with no evergreen arms, reader affinity, fatigue, evidence or university signal. See `lib/feedRanking.ts` and `PUBLISHING_RESET_PHASE2F.md`. What follows is kept as the record of v2.1.
+
 Last updated: 2026-08-21.
 
 Five changes to the For You feed, listed here in the order they should be

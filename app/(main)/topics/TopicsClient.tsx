@@ -2,11 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { setProfileInterests } from "@/app/(main)/settings/profileActions";
 import Toast from "@/components/ui/Toast";
-import TopicSubscribeButton from "@/components/topic/TopicSubscribeButton";
-import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
-import { normalizeTagValue } from "@/lib/tags";
 
 interface TopicEntry {
   tag: string;
@@ -21,21 +18,17 @@ interface TopicSection {
 interface TopicsClientProps {
   sections: TopicSection[];
   initialInterests: string[];
-  initialSubscribedTopicKeys: string[];
   userId: string | null;
 }
 
 export default function TopicsClient({
   sections,
   initialInterests,
-  initialSubscribedTopicKeys,
   userId,
 }: TopicsClientProps) {
   const [interests, setInterests] = useState<string[]>(initialInterests);
   const [savingTag, setSavingTag] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const subscriptionsEnabled = isTopicSubscriptionsEnabled();
-  const subscribedKeys = new Set(initialSubscribedTopicKeys);
 
   const toggleTopic = async (tag: string) => {
     if (!userId || savingTag) return;
@@ -49,15 +42,13 @@ export default function TopicsClient({
     setInterests(nextInterests);
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ interests: nextInterests })
-        .eq("id", userId);
+      const result = await setProfileInterests({ interests: nextInterests });
 
-      if (error) {
+      if (!result.ok) {
         setInterests(interests);
-        setToastMessage(`Failed to update topics: ${error.message}`);
+        setToastMessage(result.error);
+      } else {
+        setInterests(result.data.interests);
       }
     } catch {
       setInterests(interests);
@@ -77,7 +68,6 @@ export default function TopicsClient({
           <div className="flex flex-wrap gap-2">
             {section.entries.map((entry) => {
               const isFollowing = interests.includes(entry.tag);
-              const topicKey = normalizeTagValue(entry.tag);
 
               return (
                 <div
@@ -92,14 +82,7 @@ export default function TopicsClient({
                     <span className="text-xs text-gray-400">{entry.count}</span>
                   </Link>
 
-                  {subscriptionsEnabled ? (
-                    <TopicSubscribeButton
-                      topic={entry.tag}
-                      initialSubscribed={subscribedKeys.has(topicKey)}
-                      currentUserId={userId}
-                      compact
-                    />
-                  ) : userId ? (
+                  {userId ? (
                     <button
                       type="button"
                       onClick={() => toggleTopic(entry.tag)}

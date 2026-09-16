@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import UserAvatar from "@/components/ui/UserAvatar";
-import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
+import FollowButton from "@/components/ui/FollowButton";
 
 interface Author {
   id: string;
@@ -19,7 +19,6 @@ interface Props {
   postId?: string;
   userId: string | null;
   initialFollowing: boolean;
-  initialSubscribed?: boolean;
   isCorrespondingAuthor?: boolean;
   coAuthors?: Array<{
     user_id: string;
@@ -36,7 +35,6 @@ export default function AuthorBioCard({
   postId,
   userId,
   initialFollowing,
-  initialSubscribed = false,
   isCorrespondingAuthor = false,
   coAuthors = [],
 }: Props) {
@@ -72,16 +70,14 @@ export default function AuthorBioCard({
             </p>
           </div>
           {!isOwnProfile ? (
-            <AuthorRelationshipControls
-              authorId={author.id}
+            <FollowButton
+              followingId={author.id}
               authorName={authorName}
               currentUserId={userId}
               initialFollowing={initialFollowing}
-              initialSubscribed={initialSubscribed}
               source="author_card"
               postId={postId}
-              compact
-              className="flex-shrink-0"
+              size="compact"
             />
           ) : null}
         </div>

@@ -9,10 +9,8 @@ const migration = readFileSync(
   ),
   "utf8"
 );
-const onboarding = readFileSync(
-  resolve(process.cwd(), "app/(onboarding)/onboarding/OnboardingClient.tsx"),
-  "utf8"
-);
+// The Intellectual Record and Featured Work left the application in Phase 2G.
+// The view and the function stay in the database until the cleanup phase.
 
 describe("Intellectual Profile V2 migration", () => {
   it("exposes only a neutral RLS-aware record index", () => {
@@ -38,7 +36,6 @@ describe("Intellectual Profile V2 migration", () => {
     expect(migration).toMatch(
       /entry_kind IN \('publication', 'research'\) AND citable/
     );
-    expect(onboarding).toContain('rpc("get_public_profile_record_summary"');
   });
 
   it("replaces Featured atomically with strict ownership and limits", () => {

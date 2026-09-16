@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import type { PostCardData } from "@/components/post/PostCard";
 import PostCardImpression from "@/components/post/PostCardImpression";
 import { createClient } from "@/lib/supabase/client";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
-const POST_TYPE_FILTERS = [
+// Two kinds and All. These used to be Blog, Essay and Policy, which named
+// the legacy type rather than anything the product has.
+const KIND_FILTERS = [
   { label: "All", value: "all" },
-  { label: "Blog", value: "blog" },
-  { label: "Essay", value: "essay" },
-  { label: "Policy", value: "policy_brief" },
+  { label: "Posts", value: "post" },
+  { label: "Articles", value: "article" },
 ];
 
 function BookmarkSkeletons() {
@@ -38,8 +38,8 @@ function BookmarkSkeletons() {
   );
 }
 
-function typeLabel(filter: string) {
-  const match = POST_TYPE_FILTERS.find((item) => item.value === filter);
+function kindLabel(filter: string) {
+  const match = KIND_FILTERS.find((item) => item.value === filter);
   return match?.label.toLowerCase() ?? "filtered";
 }
 
@@ -52,58 +52,38 @@ export default function BookmarksPage() {
   useEffect(() => {
     const supabase = createClient();
 
+    // The list is fetched from the application, not from the database. The
+    // browser has no database credential after the migration, and a reading
+    // list is private, so the ownership check lives on the server where the
+    // session is. Auth is still read here only to redirect and to label the
+    // cards with the current viewer.
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) setCurrentUserId(user.id);
       if (!user) {
         window.location.href = "/login?redirectTo=/bookmarks";
         return;
       }
+      setCurrentUserId(user.id);
 
-      const { data } = await supabase
-        .from("bookmarks")
-        .select(
-          `post_id, posts!bookmarks_post_id_fkey (
-            id, author_id, title, slug, in_response_to, excerpt, type, content_kind, article_format, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url, citation_id, published_version_id,
-            profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
-            post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
-          )`
-        )
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      const mapped = (data ?? [])
-        .map((bookmark) => {
-          const post = Array.isArray(bookmark.posts)
-            ? bookmark.posts[0]
-            : bookmark.posts;
-          if (!post || (!FEATURE_FLAGS.research && post.type === "research")) return null;
-          return {
-            ...post,
-            profiles: Array.isArray(post.profiles) ? post.profiles[0] : post.profiles,
-            co_authors: Array.isArray((post as { post_authors?: unknown[] }).post_authors)
-              ? ((post as { post_authors?: Array<Record<string, unknown>> }).post_authors ?? [])
-                  .filter((row) => !!row.accepted_at)
-                  .filter((row) => row.user_id !== (post as { author_id?: string }).author_id)
-                  .map((row) => ({
-                    user_id: row.user_id as string,
-                    profile: Array.isArray(row.profile)
-                      ? (row.profile[0] as { username: string; full_name: string | null })
-                      : (row.profile as { username: string; full_name: string | null }),
-                  }))
-              : [],
-          } as PostCardData;
-        })
-        .filter(Boolean) as PostCardData[];
-
-      setAllPosts(mapped);
-      setLoading(false);
+      try {
+        const response = await fetch("/api/bookmarks");
+        if (!response.ok) throw new Error(String(response.status));
+        const body = (await response.json()) as { posts: PostCardData[] };
+        setAllPosts(body.posts ?? []);
+      } catch {
+        // An empty list and a failed load look the same to this page, which
+        // is the pre-existing behaviour: it rendered nothing when the query
+        // failed too. The route logs the reason.
+        setAllPosts([]);
+      } finally {
+        setLoading(false);
+      }
     });
   }, []);
 
   const filtered =
     filter === "all"
       ? allPosts
-      : allPosts.filter((post) => post.type === filter);
+      : allPosts.filter((post) => post.content_kind === filter);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -139,11 +119,11 @@ export default function BookmarksPage() {
       ) : (
         <>
           <div className="mb-6 flex flex-wrap gap-2">
-            {POST_TYPE_FILTERS.map((item) => {
+            {KIND_FILTERS.map((item) => {
               const count =
                 item.value === "all"
                   ? allPosts.length
-                  : allPosts.filter((post) => post.type === item.value).length;
+                  : allPosts.filter((post) => post.content_kind === item.value).length;
 
               if (item.value !== "all" && count === 0) return null;
 
@@ -167,10 +147,10 @@ export default function BookmarksPage() {
           {filtered.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-gray-500">
               <p className="text-lg font-medium">
-                No {typeLabel(filter)} bookmarks
+                No {kindLabel(filter)} bookmarks
               </p>
               <p className="mt-1 text-sm">
-                Save a {typeLabel(filter)} to find it here later.
+                Save a {kindLabel(filter)} to find it here later.
               </p>
             </div>
           ) : (

@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const upsert = vi.fn();
-const deleteEq = vi.fn();
-const deleteQuery = { eq: deleteEq };
-const from = vi.fn(() => ({
-  upsert,
-  delete: () => deleteQuery,
-}));
+/**
+ * The row is written on the server now, so the stubs are the two actions
+ * rather than a Supabase query builder.
+ *
+ * What the assertions check has changed with it, and deliberately: the old
+ * ones asserted that a `user_id` the caller supplied reached the upsert. That
+ * argument no longer exists. The viewer comes from the session, which is the
+ * whole point of the move, so what is asserted now is that the browser sends
+ * the subscription's own fields and nothing about who owns it.
+ */
+const persist = vi.fn();
+const forget = vi.fn();
 
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({ from }),
+vi.mock("@/lib/pushSubscriptionActions", () => ({
+  persistPushSubscription: (keys: unknown) => persist(keys),
+  forgetPushSubscription: (endpoint: string) => forget(endpoint),
 }));
 
 import { subscribeCurrentDevice, unsubscribeCurrentDevice } from "@/lib/pushClient";
@@ -48,8 +54,8 @@ describe("current-device push client", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = "dGVzdA";
-    deleteEq.mockReturnValue(deleteQuery);
-    upsert.mockResolvedValue({ error: null });
+    persist.mockResolvedValue({ ok: true });
+    forget.mockResolvedValue({ ok: true });
   });
 
   it("reuses and repairs an existing browser subscription", async () => {
@@ -58,16 +64,18 @@ describe("current-device push client", () => {
     const result = await subscribeCurrentDevice("user-a");
     expect(result).toMatchObject({ ok: true, created: false, endpoint: subscription.endpoint });
     expect(environment.subscribe).not.toHaveBeenCalled();
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ user_id: "user-a", endpoint: subscription.endpoint }),
-      { onConflict: "endpoint" }
+    // The endpoint and keys travel; the owner does not. An id in this payload
+    // would be an identity the browser chose.
+    expect(persist).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: subscription.endpoint })
     );
+    expect(persist.mock.calls[0][0]).not.toHaveProperty("user_id");
   });
 
   it("reports persistence failure without creating another subscription", async () => {
     const subscription = fakeSubscription();
     const environment = installPushEnvironment(subscription);
-    upsert.mockResolvedValue({ error: { message: "db unavailable" } });
+    persist.mockResolvedValue({ ok: false, reason: "persistence_failed" });
     await expect(subscribeCurrentDevice("user-a")).resolves.toEqual({ ok: false, code: "persistence_failed" });
     expect(environment.subscribe).not.toHaveBeenCalled();
   });
@@ -78,14 +86,15 @@ describe("current-device push client", () => {
     const result = await unsubscribeCurrentDevice("user-a");
     expect(result).toEqual({ ok: true, endpoint: subscription.endpoint });
     expect(subscription.unsubscribe).toHaveBeenCalled();
-    expect(deleteEq).toHaveBeenNthCalledWith(1, "user_id", "user-a");
-    expect(deleteEq).toHaveBeenNthCalledWith(2, "endpoint", subscription.endpoint);
+    // Scoped to the viewer as well as the endpoint, on the server. An
+    // endpoint identifies a device, never a person.
+    expect(forget).toHaveBeenCalledWith(subscription.endpoint);
   });
 
   it("reports local success when database cleanup fails", async () => {
     const subscription = fakeSubscription();
     installPushEnvironment(subscription);
-    deleteEq.mockReturnValueOnce(deleteQuery).mockResolvedValueOnce({ error: { message: "db unavailable" } });
+    forget.mockResolvedValue({ ok: false, reason: "database_cleanup_failed" });
     await expect(unsubscribeCurrentDevice("user-a")).resolves.toEqual({
       ok: false,
       code: "database_cleanup_failed",

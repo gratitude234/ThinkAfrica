@@ -13,6 +13,8 @@ vi.mock("@/lib/useSignOut", () => ({
   useSignOut: () => signOutState,
 }));
 
+const writer = { id: "user-1", email: "writer@example.com" } as User;
+
 describe("NavUserMenu profile destination", () => {
   beforeEach(() => {
     signOutState.signOut.mockReset();
@@ -24,7 +26,7 @@ describe("NavUserMenu profile destination", () => {
   it("links directly to the public profile when a usable username exists", () => {
     render(
       <NavUserMenu
-        user={{ id: "user-1", email: "writer@example.com" } as User}
+        user={writer}
         profile={{
           username: "writer",
           full_name: "A Writer",
@@ -35,16 +37,17 @@ describe("NavUserMenu profile destination", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
 
-    expect(screen.getByRole("link", { name: "Intellectual Record" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
       "href",
       "/writer"
     );
+    expect(screen.queryByText("Intellectual Record")).not.toBeInTheDocument();
   });
 
   it("falls back to Settings when the username cannot be used as a profile route", () => {
     render(
       <NavUserMenu
-        user={{ id: "user-1", email: "writer@example.com" } as User}
+        user={writer}
         profile={{
           username: "bad username",
           full_name: "A Writer",
@@ -55,15 +58,42 @@ describe("NavUserMenu profile destination", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
 
-    expect(screen.getByRole("link", { name: "Intellectual Record" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
       "href",
       "/settings"
     );
   });
 
+  it("keeps the account actions and drops the editorial review queue", () => {
+    render(
+      <NavUserMenu
+        user={writer}
+        profile={{ username: "writer", full_name: "A Writer", avatar_url: null }}
+        isAdmin
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
+
+    expect(screen.getByRole("link", { name: "Bookmarks" })).toHaveAttribute(
+      "href",
+      "/bookmarks"
+    );
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/settings"
+    );
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute(
+      "href",
+      "/admin"
+    );
+    expect(screen.queryByRole("link", { name: "Review" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+  });
+
   it("shows pending and failed sign-out states inside the menu", () => {
     const props = {
-      user: { id: "user-1", email: "writer@example.com" } as User,
+      user: writer,
       profile: {
         username: "writer",
         full_name: "A Writer",

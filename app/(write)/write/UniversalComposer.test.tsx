@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
   updateSelectedImage: vi.fn(),
   historyState: { canUndo: false, canRedo: false },
   selectedImage: null as { src: string; alt: string; caption: string } | null,
-  shareToken: null as string | null,
   uploadingHandler: null as ((uploading: boolean) => void) | null,
   editorMounts: { count: 0 },
 }));
@@ -68,21 +67,13 @@ vi.mock("./editActions", () => ({
 vi.mock("@/components/ui/CoverImageUploader", () => ({ default: () => <button type="button">Add cover</button> }));
 vi.mock("@/components/ui/TagInput", () => ({ default: () => <input aria-label="Topics" /> }));
 vi.mock("@/components/post/ReferencesPanel", () => ({ default: () => <div>Sources panel</div> }));
-vi.mock("@/components/collaboration/CoAuthorPicker", () => ({ default: () => <div>Collaborators panel</div> }));
 vi.mock("./MyDrafts", () => ({ default: () => <div>Drafts panel</div> }));
-vi.mock("./DraftShareControl", () => ({ default: () => <div>Share control</div> }));
-vi.mock("./shareActions", () => ({
-  getDraftShareLink: async () => ({ token: mocks.shareToken }),
-  createDraftShareLink: vi.fn(),
-  revokeDraftShareLink: vi.fn(),
-}));
 vi.mock("./RevisionHistory", () => ({ default: () => <div>History panel</div> }));
 vi.mock("@/components/ui/ProfileGate", () => ({ default: () => null }));
 vi.mock("next/image", () => ({ default: (props: { alt: string }) => <div role="img" aria-label={props.alt} /> }));
 
 const empty: ContributionSnapshot = {
   title: "", content: "", excerpt: "", tags: [], coverImageUrl: "", references: [],
-  collaborators: [], inResponseToId: null, promptId: null,
 };
 
 describe("UniversalComposer", () => {
@@ -299,7 +290,6 @@ describe("UniversalComposer canvas polish", () => {
     mocks.updateSelectedImage.mockReset();
     mocks.historyState = { canUndo: false, canRedo: false };
     mocks.selectedImage = null;
-    mocks.shareToken = null;
     localStorage.clear();
     window.history.replaceState(null, "", "/write");
   });
@@ -330,7 +320,10 @@ describe("UniversalComposer canvas polish", () => {
     expect(screen.getByRole("heading", { name: "Sources" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "More writing options" }));
-    expect(screen.getByRole("heading", { name: "Co-authors" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview as a reader" })).toBeInTheDocument();
+    // Co-authoring and draft share links were removed by the publishing reset.
+    expect(screen.queryByRole("heading", { name: "Co-authors" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Share this draft" })).not.toBeInTheDocument();
   });
 
   it("offers undo in the toolbar, which is the only place a phone can reach it", () => {
@@ -400,14 +393,6 @@ describe("UniversalComposer canvas polish", () => {
     expect(screen.queryByText(/In the feed: The angle/)).not.toBeInTheDocument();
   });
 
-  it("says so in the header while a share link is live", async () => {
-    mocks.shareToken = "live-token";
-    open({ ...empty, content: "<p>Body.</p>" }, { draftId: "draft-1" });
-
-    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
-    expect(screen.getByRole("button", { name: /share link for this draft is live/i })).toBeInTheDocument();
-  });
-
   it("reports an image upload where the writer already looks for save state", async () => {
     open();
     const editor = screen.getByLabelText("Publication body");
@@ -435,21 +420,6 @@ describe("UniversalComposer canvas polish", () => {
 
     await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
     expect(screen.getByText("Saved")).toBeInTheDocument();
-  });
-
-  it("gives one context treatment to a response and a campus prompt", () => {
-    const { unmount } = open(empty, {
-      parent: { id: "p1", displayTitle: "The original piece", slug: "original" },
-    });
-    expect(screen.getByText("Responding to")).toBeInTheDocument();
-    expect(screen.getByText("The original piece")).toBeInTheDocument();
-    unmount();
-
-    open(empty, {
-      prompt: { id: "q1", title: "Campus prompt", promptText: "Write about water.", responseQuestion: null },
-    });
-    expect(screen.getByText("Campus prompt")).toBeInTheDocument();
-    expect(screen.getByText("Write about water.")).toBeInTheDocument();
   });
 
   it("counts words in the publish sheet, never on the canvas", () => {

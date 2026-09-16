@@ -148,13 +148,14 @@ describe("what the public profile path no longer costs", () => {
     expect(profilePage).not.toContain("RESEARCH_TYPE_QUERY_EXCLUSION");
   });
 
-  it("keeps the shared research exclusion for the routes that still use it", async () => {
-    // Removing the constant outright would have taken the feed, search,
-    // topics, the dashboard and the sitemap with it. This is a profile-path
-    // cleanup, not a global deletion.
+  it("no longer needs the shared research exclusion anywhere", async () => {
+    // At the time of the profile split this constant was still load-bearing
+    // for the feed, search, topics, the dashboard and the sitemap. Phase 2I
+    // normalized the rows it filtered and made the value unwritable, so every
+    // one of those queries dropped it and the constant went with them.
     const flags = await vi.importActual<typeof import("./featureFlags")>(
       "./featureFlags"
     );
-    expect(flags.RESEARCH_TYPE_QUERY_EXCLUSION).toBeDefined();
+    expect("RESEARCH_TYPE_QUERY_EXCLUSION" in flags).toBe(false);
   });
 });

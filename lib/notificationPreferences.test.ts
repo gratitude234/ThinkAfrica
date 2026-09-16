@@ -26,7 +26,6 @@ describe("what may be muted", () => {
       "review_assigned",
       "co_author_invite",
       "response_post",
-      "opportunity_inquiry",
     ]) {
       expect(mutable, type).not.toContain(type);
     }
@@ -90,7 +89,7 @@ describe("mutedNotificationTypes", () => {
     ]);
   });
 
-  it("never mutes publication subscription alerts", () => {
+  it("ignores a publications key no setting offers", () => {
     expect(
       mutedNotificationTypes({ inapp_publications: false })
     ).toEqual([]);

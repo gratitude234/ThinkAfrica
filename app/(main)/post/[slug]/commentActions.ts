@@ -341,3 +341,44 @@ export async function deleteComment(input: {
 
   return { error: null, tombstoned: false };
 }
+
+/**
+ * A comment upvote.
+ *
+ * `toggle_comment_vote` is SECURITY DEFINER and is the only thing that keeps
+ * `comments.upvotes` in step with `comment_votes`, so the write stays in the
+ * database. What moved is who calls it: the browser held a Supabase client to
+ * do this, and now it does not.
+ *
+ * The function derives the voter from `auth.uid()`, which this action does not
+ * override, so the viewer's own client is used rather than the service role.
+ * That also keeps RLS underneath. See
+ * supabase/migrations/20260909000001_parameterize_identity_rpcs.sql for the
+ * parameterised signature this will pass `p_user_id` to once it is applied.
+ */
+export async function toggleCommentVote(input: {
+  commentId: string;
+}): Promise<
+  | { ok: true; voted: boolean; upvotes: number }
+  | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You must be signed in to vote." };
+
+  const { data, error } = await supabase.rpc("toggle_comment_vote", {
+    p_comment_id: input.commentId,
+  });
+
+  if (error) {
+    console.error("[comments] vote failed", error);
+    return { ok: false, error: "Could not record that vote. Try again." };
+  }
+
+  const result = data as { voted: boolean; upvotes: number } | null;
+  if (!result) return { ok: false, error: "Could not record that vote. Try again." };
+
+  return { ok: true, voted: result.voted, upvotes: result.upvotes };
+}

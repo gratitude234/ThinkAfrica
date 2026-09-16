@@ -1,195 +1,40 @@
-import Link from "next/link";
-import { PostCardData } from "./PostCard";
+import type { PostCardData } from "./PostCard";
 import HomeFeedCardImpression from "./HomeFeedCardImpression";
-import PeopleInterlude from "./PeopleInterlude";
-import TopicInterlude from "./TopicInterlude";
-
-type FeedTabKey =
-  | "home"
-  | "following"
-  | "subscriptions"
-  | "topics"
-  | "latest";
-export type DiscoveryModule = "people" | "topic";
-
-export function getDiscoveryModuleOrder({
-  prioritizePeople,
-  hasPeople,
-  hasTopic,
-}: {
-  prioritizePeople: boolean;
-  hasPeople: boolean;
-  hasTopic: boolean;
-}): DiscoveryModule[] {
-  const order: DiscoveryModule[] = prioritizePeople
-    ? ["people", "topic"]
-    : ["topic", "people"];
-
-  return order.filter((module) => {
-    if (module === "people") return hasPeople;
-    return hasTopic;
-  });
-}
-
-export function getDiscoveryModuleAt({
-  activeTab,
-  completedCount,
-  modules,
-}: {
-  activeTab: FeedTabKey;
-  completedCount: number;
-  modules: DiscoveryModule[];
-}) {
-  if (activeTab !== "home") return null;
-
-  // Mobile has no right rail, so discovery belongs inside the early reading
-  // journey. The first module arrives after three publications, followed by
-  // calm four-card reading runs before the next two modules.
-  const discoveryBreakpoints = [3, 7, 11];
-  const moduleIndex = discoveryBreakpoints.indexOf(completedCount);
-  return moduleIndex >= 0 ? modules[moduleIndex] ?? null : null;
-}
+import type { HomeFeedTab } from "@/lib/homeFeedTabs";
 
 interface PostFeedProps {
   posts: PostCardData[];
-  activeTab: FeedTabKey;
-  peopleSuggestions?: {
-    id: string;
-    username: string;
-    full_name: string | null;
-    university: string | null;
-    avatar_url: string | null;
-  }[];
-  peopleSuggestionReason?: string;
-  prioritizePeopleSuggestions?: boolean;
+  surface: HomeFeedTab;
   currentUserId?: string | null;
   prioritizeFirstPost?: boolean;
 }
 
+/**
+ * Home's list of publications. Every item is a Post or an Article card: no
+ * people, topic or other modules are inserted between them (publishing reset,
+ * Phase 2F). Writer and topic discovery live on Explore.
+ */
 export default function PostFeed({
   posts,
-  activeTab,
-  peopleSuggestions = [],
-  peopleSuggestionReason = "Suggested for you",
-  prioritizePeopleSuggestions = false,
+  surface,
   currentUserId = null,
   prioritizeFirstPost = true,
 }: PostFeedProps) {
-  const topicPosts = posts.filter((post) => (post.tags ?? []).length > 0);
-  const discoveryModules = getDiscoveryModuleOrder({
-    prioritizePeople: prioritizePeopleSuggestions,
-    hasPeople: peopleSuggestions.length > 0,
-    hasTopic: topicPosts.length > 1,
-  });
-
-  const renderDiscoveryModule = (module: DiscoveryModule) => {
-    if (module === "people") {
-      return (
-        <PeopleInterlude
-          people={peopleSuggestions}
-          reason={peopleSuggestionReason}
-          currentUserId={currentUserId}
-        />
-      );
-    }
-    if (module === "topic") return <TopicInterlude posts={topicPosts} />;
-    return null;
-  };
-
   return (
     <div>
-      {posts.length === 0 ? (
-        activeTab === "following" ? (
-          <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
-            <p className="text-sm text-ink-muted">
-              You&apos;re not following anyone yet.
-            </p>
-            <Link
-              href="/explore?tab=people"
-              className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
-            >
-              Find writers to follow
-            </Link>
-          </div>
-        ) : activeTab === "topics" ? (
-          <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
-            <p className="text-sm text-ink-muted">
-              You have no matching topic publications yet.
-            </p>
-            <Link
-              href="/topics"
-              className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
-            >
-              Explore topics
-            </Link>
-          </div>
-        ) : activeTab === "subscriptions" ? (
-          <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
-            <p className="text-sm text-ink-muted">
-              You have no matching subscription publications yet.
-            </p>
-            <Link
-              href="/subscriptions"
-              className="mt-3 inline-flex items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
-            >
-              Manage subscriptions
-            </Link>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-12 text-center">
-            <p className="mb-1 text-lg font-medium text-ink">
-              No posts match this view yet.
-            </p>
-            <p className="text-sm text-ink-muted">
-              Try the latest feed or share the first post in this space.
-            </p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Link
-                href="/?tab=latest"
-                className="rounded-lg border border-divider px-4 py-2 text-sm font-medium text-ink-soft hover:border-card-border-hover hover:bg-canvas"
-              >
-                View latest
-              </Link>
-              <Link
-                href="/write"
-                className="rounded-lg bg-emerald-brand px-4 py-2 text-sm font-medium text-white hover:bg-[#0E4B37]"
-              >
-                Share a post
-              </Link>
-            </div>
-          </div>
-        )
-      ) : (
-        <div>
-          {posts.map((post, index) => {
-            const completedCount = index + 1;
-            const discoveryModule = getDiscoveryModuleAt({
-              activeTab,
-              completedCount,
-              modules: discoveryModules,
-            });
-
-            return (
-              <div
-                key={post.id}
-                className="[contain-intrinsic-size:auto_520px] [content-visibility:auto]"
-              >
-                <HomeFeedCardImpression
-                  post={post}
-                  currentUserId={currentUserId}
-                  surface={activeTab}
-                  priority={prioritizeFirstPost && index === 0}
-                />
-                {discoveryModule ? (
-                  <div className="lg:hidden">
-                    {renderDiscoveryModule(discoveryModule)}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+      {posts.map((post, index) => (
+        <div
+          key={post.id}
+          className="[contain-intrinsic-size:auto_520px] [content-visibility:auto]"
+        >
+          <HomeFeedCardImpression
+            post={post}
+            currentUserId={currentUserId}
+            surface={surface}
+            priority={prioritizeFirstPost && index === 0}
+          />
         </div>
-      )}
+      ))}
     </div>
   );
 }

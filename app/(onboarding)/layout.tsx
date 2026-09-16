@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import { BRAND_PROMISE, BRAND_SEO_DESCRIPTION } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: { absolute: `Start Your Intellectual Record | Indegenius` },
-  description: `${BRAND_PROMISE} ${BRAND_SEO_DESCRIPTION}`,
+  title: { absolute: "Set up your profile | Indegenius" },
+  description: "Set up your Indegenius profile: a name, a username and the topics you want to read.",
   robots: { index: false, follow: false },
 };
 

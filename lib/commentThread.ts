@@ -4,12 +4,19 @@
  * ordering, block-filtering and vote hydration can't drift apart.
  *
  * Always call this with the *viewer's* Supabase client, never the admin one:
- * moderated comments are excluded by the RLS SELECT policy
- * (`hidden_at is null or auth.uid() = author_id or public.is_admin()`), so a
- * service-role read would leak hidden content.
+ * on the PostgREST path, moderated comments are excluded by the RLS SELECT
+ * policy (`hidden_at is null or auth.uid() = author_id or public.is_admin()`),
+ * so a service-role read would leak hidden content.
+ *
+ * The queries themselves live in `lib/db/comments.ts`, in both transports. On
+ * the PostgreSQL path there is no policy to lean on, so the same rule is
+ * written into the SQL and the viewer arrives as a parameter. That is why
+ * `viewerId` is now load-bearing rather than only being used for votes: it
+ * decides which comments exist.
  */
 
 import { getBlockedUserIds } from "@/lib/blocking";
+import { commentsRepository } from "@/lib/db/readAdapter";
 import { DEFAULT_COMMENT_SORT, type CommentSort } from "@/lib/commentSort";
 
 export { DEFAULT_COMMENT_SORT, isCommentSort, type CommentSort } from "@/lib/commentSort";
@@ -109,39 +116,27 @@ export async function fetchCommentPage(
     pageSize?: number;
   }
 ): Promise<CommentPage> {
+  const repository = commentsRepository(supabase as never);
+  const cursor = before
+    ? decodeCursor(sort, before)
+    : { createdAt: null as string | null, upvotes: null as number | null };
+
   // Ask for one more top-level comment than needed, so `hasMore` is a fact
   // rather than a guess -- same trick fetchFeedPage uses.
-  let topLevelQuery = supabase
-    .from("comments")
-    .select(COMMENT_SELECT)
-    .eq("post_id", postId)
-    .is("parent_id", null)
-    .limit(pageSize + 1);
-
-  topLevelQuery =
-    sort === "top"
-      ? topLevelQuery
-          .order("upvotes", { ascending: false })
-          .order("created_at", { ascending: false })
-      : topLevelQuery.order("created_at", { ascending: false });
-
-  if (before) {
-    const { createdAt, upvotes } = decodeCursor(sort, before);
-    topLevelQuery =
-      sort === "top" && upvotes !== null
-        ? topLevelQuery.or(
-            `upvotes.lt.${upvotes},and(upvotes.eq.${upvotes},created_at.lt.${createdAt})`
-          )
-        : topLevelQuery.lt("created_at", createdAt);
-  }
-
-  const [{ data: topLevelRaw }, blockedIds] = await Promise.all([
-    topLevelQuery,
+  const [topLevelRaw, blockedIds] = await Promise.all([
+    repository.topLevel({
+      postId,
+      viewerId,
+      sort,
+      cursorCreatedAt: cursor.createdAt,
+      cursorUpvotes: cursor.upvotes,
+      limit: pageSize + 1,
+    }),
     getBlockedUserIds(viewerId),
   ]);
 
   const blockedSet = new Set(blockedIds);
-  const topLevelRows = ((topLevelRaw ?? []) as any[])
+  const topLevelRows = (topLevelRaw as any[])
     .map(normalizeRow)
     .filter((row) => !blockedSet.has(row.author_id));
 
@@ -153,14 +148,10 @@ export async function fetchCommentPage(
   }
 
   const parentIds = pageRows.map((row) => row.id);
-  const { data: repliesRaw } = await supabase
-    .from("comments")
-    .select(COMMENT_SELECT)
-    .in("parent_id", parentIds)
-    // Oldest-first within a thread so an exchange reads downwards.
-    .order("created_at", { ascending: true });
+  // Oldest-first within a thread so an exchange reads downwards.
+  const repliesRaw = await repository.replies(parentIds, viewerId);
 
-  const repliesByParent = ((repliesRaw ?? []) as any[])
+  const repliesByParent = (repliesRaw as any[])
     .map(normalizeRow)
     .filter((row) => !blockedSet.has(row.author_id))
     .reduce<Record<string, ThreadReply[]>>((acc, reply) => {
@@ -181,13 +172,9 @@ export async function fetchCommentPage(
       ...comment.replies.map((reply) => reply.id),
     ]);
     if (ids.length > 0) {
-      const { data: votes } = await supabase
-        .from("comment_votes")
-        .select("comment_id")
-        .eq("user_id", viewerProfileId ?? viewerId)
-        .in("comment_id", ids);
-      userVotedCommentIds = ((votes ?? []) as Array<{ comment_id: string }>).map(
-        (vote) => vote.comment_id
+      userVotedCommentIds = await repository.votedCommentIds(
+        ids,
+        viewerProfileId ?? viewerId
       );
     }
   }
@@ -209,11 +196,8 @@ export async function fetchCommentPage(
  */
 export async function countComments(
   supabase: SupabaseLike,
-  postId: string
+  postId: string,
+  viewerId: string | null
 ): Promise<number> {
-  const { count } = await supabase
-    .from("comments")
-    .select("id", { count: "exact", head: true })
-    .eq("post_id", postId);
-  return count ?? 0;
+  return commentsRepository(supabase as never).count(postId, viewerId);
 }

@@ -4,52 +4,17 @@ import PostCover from "./PostCover";
 import PostImage from "./PostImage";
 import type { PostCardData } from "./PostCard";
 import { CARD_SHELL, FOCUS_RING } from "./cardShell";
-import {
-  getArticleFormatLabel,
-  isFormallyReviewed,
-  resolveArticleFormat,
-  resolveContentKind,
-} from "@/lib/contentModel";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
-import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
+import { resolveContentKind } from "@/lib/contentModel";
+import { getPostDisplayTitle } from "@/lib/postDisplay";
 import { formatTagLabel } from "@/lib/tags";
 import { formatRelativeTime, sanitizePostExcerpt } from "@/lib/utils";
-
-interface RespondingToInfo {
-  title: string;
-  author: string;
-  slug?: string | null;
-  authorUsername?: string | null;
-  /** Whether `title` is the parent's own title rather than a derived label. */
-  hasOwnTitle?: boolean;
-}
 
 interface Props {
   post: PostCardData;
   currentUserId: string | null;
-  surface: "home" | "following" | "subscriptions" | "topics" | "latest";
   priority?: boolean;
-  respondingTo?: RespondingToInfo | null;
-  /** Hide response context where the parent post is already the page context. */
-  hideRespondingTo?: boolean;
   /** Feed cards show recency by default; callers can suppress it explicitly. */
   showTimestamp?: boolean;
-}
-
-function deriveRespondingTo(
-  responseTo: PostCardData["response_to"]
-): RespondingToInfo | null {
-  if (!responseTo) return null;
-  return {
-    title: getPostMetadataTitle(responseTo, responseTo.profiles),
-    hasOwnTitle: getPostDisplayTitle(responseTo) !== null,
-    author:
-      responseTo.profiles?.full_name ??
-      responseTo.profiles?.username ??
-      "another author",
-    slug: responseTo.slug,
-    authorUsername: responseTo.profiles?.username ?? null,
-  };
 }
 
 function initials(name: string) {
@@ -70,7 +35,7 @@ function initials(name: string) {
  * reported "1 min" no matter how long the article was.
  *
  * Returns null rather than a floor of 1 when the count is missing: a post can
- * legitimately have no body (a research entry that is only a PDF), and the
+ * legitimately have no stored body count, and the
  * column is only populated once the 20260818 migration runs. Omitting the
  * segment is honest; printing "1 min" is the bug again in a smaller font.
  */
@@ -79,36 +44,30 @@ function readTime(wordCount: number | null | undefined) {
   return Math.max(1, Math.ceil(wordCount / 200));
 }
 
-function documentSize(bytes: number | null | undefined) {
-  if (!bytes) return null;
-  if (bytes < 1024 * 1024) {
-    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
+/**
+ * Who wrote it and when, on one line.
+ *
+ * The university used to sit on this line too, and a co-author count after
+ * the name. The publishing reset (Phase 2F) removed both from feed cards: the
+ * card identifies the writer, and the rest of who they are is on their profile
+ * a tap away. The timestamp never truncates -- "22h" is three characters and
+ * is the one piece a reader scans for -- so the name is the item that gives
+ * way when the line runs out of room.
+ */
 function AuthorLine({
   post,
   avatarSize = 36,
   showTimestamp = true,
-  showCoauthorCount = true,
 }: {
   post: PostCardData;
   avatarSize?: number;
   showTimestamp?: boolean;
-  showCoauthorCount?: boolean;
 }) {
   const publishedAt = post.published_at ?? post.created_at;
   const profile = post.profiles;
   const name = profile?.full_name ?? profile?.username ?? "Indegenius member";
-  const coauthorCount = post.co_authors?.length ?? 0;
-  const byline =
-    showCoauthorCount && coauthorCount > 0 ? `${name} + ${coauthorCount}` : name;
   const avatarDimensions = { width: avatarSize, height: avatarSize };
-  const verificationClass =
-    resolveContentKind(post) === "research"
-      ? "bg-purple-accent"
-      : "bg-emerald-brand";
+  const verificationClass = "bg-emerald-brand";
   const avatar = profile?.avatar_url ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -139,28 +98,16 @@ function AuthorLine({
       ) : (
         <span className="shrink-0">{avatar}</span>
       )}
-      {/* One line, not two. The university and timestamp used to sit on their
-          own line under the name, which cost a line of height on every post in
-          the feed -- four posts on screen meant four lines spent on metadata.
-          X, Medium and Substack all run name, source and time together on a
-          single line, and none of them lose anything by it.
-
-          Shrink order matters when the line runs out of room, and it is the
-          reverse of source order: the university truncates first (it is the
-          least load-bearing), the name truncates second, and the timestamp
-          never truncates -- "22h" is three characters and is the one piece a
-          reader scans for. Hence `shrink-0` on the time and its separator, and
-          `min-w-0` on the university so it is the flex item that gives way. */}
       <div className="flex min-w-0 flex-1 items-center gap-1.5 text-byline">
         {profile?.username ? (
           <Link
             href={`/${profile.username}`}
             className={`truncate font-semibold text-ink hover:text-emerald-ink ${FOCUS_RING}`}
           >
-            {byline}
+            {name}
           </Link>
         ) : (
-          <span className="truncate font-semibold text-ink">{byline}</span>
+          <span className="truncate font-semibold text-ink">{name}</span>
         )}
         {profile?.verified ? (
           // The glyph takes the card's own ground colour rather than a fixed
@@ -173,23 +120,6 @@ function AuthorLine({
             ✓
           </span>
         ) : null}
-        {/* Dropped outright below 480px rather than left to truncate.
-            The shrink order above is right in principle, but on a phone there
-            was not enough room for it to work: name and university both hit
-            their minimum and both truncated, so the line read "Mayowa
-            Akinto... · Adeleke Univ..." and identified nobody. One whole line
-            of every card, spent on two halves of two words.
-
-            The name is the part a reader recognises and the part that makes
-            the byline a byline, so on the narrowest screens it takes the
-            space and the university waits on the profile a tap away. From
-            480px up there is room for both and the shrink order applies. */}
-        {profile?.university ? (
-          <span className="min-w-0 truncate text-meta text-ink-muted max-[479px]:hidden">
-            <span aria-hidden="true">· </span>
-            {profile.university}
-          </span>
-        ) : null}
         {showTimestamp && publishedAt ? (
           <span className="shrink-0 whitespace-nowrap text-meta text-ink-muted">
             <span aria-hidden="true">· </span>
@@ -199,85 +129,6 @@ function AuthorLine({
       </div>
     </div>
   );
-}
-
-function ContextLine({
-  post,
-  surface,
-  respondingTo,
-  hideRespondingTo,
-}: Pick<
-  Props,
-  "post" | "surface" | "respondingTo" | "hideRespondingTo"
->) {
-  if (post.in_response_to && !hideRespondingTo) {
-    const parent = respondingTo ?? deriveRespondingTo(post.response_to);
-    return (
-      <p className="mb-2.5 flex items-start gap-1.5 text-meta text-ink-muted">
-        <span aria-hidden="true" className="mt-px">
-          ↩
-        </span>
-        <span className="min-w-0">
-          Responding to{" "}
-          {parent ? (
-            <>
-              {parent.slug ? (
-                <Link
-                  href={`/post/${parent.slug}`}
-                  className={`font-semibold text-ink-soft hover:text-emerald-ink hover:underline ${FOCUS_RING}`}
-                >
-                  {parent.title}
-                </Link>
-              ) : (
-                <span className="font-semibold text-ink-soft">{parent.title}</span>
-              )}
-              {parent.author && parent.hasOwnTitle !== false ? (
-                <>
-                  {" by "}
-                  {parent.authorUsername ? (
-                    <Link
-                      href={`/${parent.authorUsername}`}
-                      className={`hover:text-emerald-ink hover:underline ${FOCUS_RING}`}
-                    >
-                      {parent.author}
-                    </Link>
-                  ) : (
-                    parent.author
-                  )}
-                </>
-              ) : null}
-            </>
-          ) : (
-            "another publication"
-          )}
-        </span>
-      </p>
-    );
-  }
-
-  if (surface === "home" && post.surface_reason) {
-    return (
-      <p className="mb-2.5 flex items-center gap-2 text-meta font-semibold text-gold-ink">
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden="true" />
-        {post.surface_reason}
-      </p>
-    );
-  }
-
-  if (surface === "subscriptions") {
-    const reason = post.subscription_match?.reasons[0];
-    if (reason) {
-      return (
-        <p className="mb-2.5 text-meta font-medium text-emerald-ink">
-          {reason.kind === "author"
-            ? `Because you subscribe to ${reason.label}`
-            : `From #${reason.label}`}
-        </p>
-      );
-    }
-  }
-
-  return null;
 }
 
 function Actions({
@@ -293,7 +144,6 @@ function Actions({
       initialLiked={post.viewer_liked ?? false}
       initialLikeCount={post.like_count ?? 0}
       initialBookmarked={post.viewer_bookmarked ?? false}
-      responseCount={post.response_count ?? 0}
       commentCount={post.comment_count ?? 0}
       showDiscussion={showDiscussion}
       contentKind={resolveContentKind(post)}
@@ -356,12 +206,10 @@ function FullWidthCover({
     <PostImage
       src={post.cover_image_url}
       alt={title}
-      type={post.type}
       content_kind={post.content_kind}
-      article_format={post.article_format}
       // 100vw less the row's own px-4 (32); the shell's px-4 is cancelled by
       // the row's -mx-4 on phones, so it no longer enters the arithmetic.
-      sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) 720px, 780px"
+      sizes="(max-width: 640px) calc(100vw - 32px), 720px"
       priority={priority}
       variant="feed"
       wrapperClassName="mt-3 overflow-hidden rounded-[14px]"
@@ -373,10 +221,7 @@ function FullWidthCover({
 function PostFeedCard({
   post,
   currentUserId,
-  surface,
   priority,
-  respondingTo,
-  hideRespondingTo,
   showTimestamp,
 }: Props) {
   const title = getPostDisplayTitle(post);
@@ -384,12 +229,6 @@ function PostFeedCard({
 
   return (
     <article className={CARD_SHELL} data-content-kind="post">
-      <ContextLine
-        post={post}
-        surface={surface}
-        respondingTo={respondingTo}
-        hideRespondingTo={hideRespondingTo}
-      />
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
       <div className="mt-3">
         {title ? (
@@ -421,29 +260,20 @@ function PostFeedCard({
   );
 }
 
-// The `onCover` variant (a lighter gold, for the kicker sitting on a darkened
-// photograph) went with the overlay layout and is gone with it.
-function ArticleMeta({
-  format,
-  readingTime,
-}: {
-  format: string | null;
-  readingTime: number | null;
-}) {
+/**
+ * The Article kicker.
+ *
+ * It used to carry a genre between the kind and the reading time ("Article ·
+ * Policy Brief · 9 min"). Genre is not part of the product, so the line is the
+ * kind and how long the piece takes to read.
+ */
+function ArticleMeta({ readingTime }: { readingTime: number | null }) {
   return (
     <p
       className="font-sans text-kicker font-bold uppercase text-gold-ink"
-      aria-label={`Article${format ? `, ${format}` : ""}${
-        readingTime ? `, ${readingTime} minute read` : ""
-      }`}
+      aria-label={`Article${readingTime ? `, ${readingTime} minute read` : ""}`}
     >
       <span>Article</span>
-      {format ? (
-        <>
-          <span aria-hidden="true"> · </span>
-          <span>{format}</span>
-        </>
-      ) : null}
       {readingTime ? (
         <>
           <span aria-hidden="true"> · </span>
@@ -457,15 +287,11 @@ function ArticleMeta({
 function ArticleFeedCard({
   post,
   currentUserId,
-  surface,
   priority,
-  respondingTo,
-  hideRespondingTo,
   showTimestamp,
 }: Props) {
   const title = getPostDisplayTitle(post) ?? "Untitled article";
   const excerpt = sanitizePostExcerpt(post.excerpt);
-  const format = getArticleFormatLabel(resolveArticleFormat(post));
   const hasCover = Boolean(post.cover_image_url?.trim());
   const readingTime = readTime(post.word_count);
 
@@ -484,21 +310,13 @@ function ArticleFeedCard({
   // fixed-height crop truncated real headlines mid-phrase.
   //
   // So: text below for every article, and the cover becomes what it always
-  // was, an illustration. The Editor's pick lead keeps its own treatment --
-  // one deliberately dramatic card at the top of the page, on an image the
-  // editors chose, is worth the exception the feed rows are not.
+  // was, an illustration.
   return (
     <article className={CARD_SHELL} data-content-kind="article">
-      <ContextLine
-        post={post}
-        surface={surface}
-        respondingTo={respondingTo}
-        hideRespondingTo={hideRespondingTo}
-      />
       <AuthorLine post={post} avatarSize={34} showTimestamp={showTimestamp ?? true} />
 
       <div className="mt-3">
-        <ArticleMeta format={format} readingTime={readingTime} />
+        <ArticleMeta readingTime={readingTime} />
         <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
           <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
             {title}
@@ -531,10 +349,8 @@ function ArticleFeedCard({
           <PostCover
             src={post.cover_image_url}
             alt={title}
-            type={post.type}
             content_kind={post.content_kind}
-            article_format={post.article_format}
-            sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) 720px, 780px"
+            sizes="(max-width: 640px) calc(100vw - 32px), 720px"
             priority={priority}
             fit="cover"
             className="aspect-[16/9] w-full"
@@ -548,199 +364,10 @@ function ArticleFeedCard({
   );
 }
 
-function ResearchDocumentPreview({
-  post,
-  title,
-  priority,
-}: {
-  post: PostCardData;
-  title: string;
-  priority?: boolean;
-}) {
-  const hasCover = Boolean(post.cover_image_url?.trim());
-  const hasDocument = Boolean(
-    post.document_original_name || post.document_mime_type
-  );
-
-  if (hasCover) {
-    return (
-      <PostImage
-        src={post.cover_image_url as string}
-        alt={title}
-        type={post.type}
-        content_kind={post.content_kind}
-        article_format={post.article_format}
-        sizes="170px"
-        priority={priority}
-        variant="research-preview"
-        wrapperClassName="overflow-hidden rounded-[10px] border border-card-border bg-card shadow-sm"
-        className="w-full bg-card"
-      />
-    );
-  }
-
-  if (!hasDocument) return null;
-
-  return (
-    <Link
-      href={`/post/${post.slug}`}
-      aria-label={`View ${title} manuscript`}
-      className={`relative block aspect-[3/4] overflow-hidden rounded-[10px] border border-card-border bg-card p-3 shadow-sm transition-colors hover:border-purple-accent ${FOCUS_RING}`}
-    >
-      <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-purple-accent">
-        PDF manuscript
-      </span>
-      <span className="mt-2 block font-display line-clamp-4 text-[13px] font-semibold leading-[1.18] text-ink">
-        {title}
-      </span>
-      <span className="absolute inset-x-3 bottom-3 space-y-1.5" aria-hidden="true">
-        <span className="block h-1 rounded-full bg-divider" />
-        <span className="block h-1 w-5/6 rounded-full bg-divider" />
-        <span className="block h-1 w-3/5 rounded-full bg-divider" />
-      </span>
-    </Link>
-  );
-}
-
-function ResearchManuscriptRow({ post }: { post: PostCardData }) {
-  const size = documentSize(post.document_size_bytes);
-  const hasDocument = Boolean(
-    post.document_original_name || post.document_mime_type
-  );
-  if (!hasDocument) return null;
-
-  // Spacing alone, no rule and no panel. The `border-t` this used to draw sat
-  // a few pixels above the row's own bottom hairline, so a research row ended
-  // in two parallel lines -- the boxed-in look the flat feed exists to remove.
-  // Boxing it instead was the other obvious fix and is the wrong one: the
-  // research layout is deliberately metadata-first with no PDF sub-card (see
-  // the note on the research section of /dev-preview/feed), and a bordered
-  // panel here would rebuild exactly the sub-card that decision removed.
-  return (
-    <div className="mt-3 flex min-w-0 items-center gap-2">
-      <span
-        aria-hidden="true"
-        className="flex h-[25px] w-[22px] shrink-0 items-center justify-center rounded-[3px] bg-purple-accent text-[7px] font-bold tracking-wide text-card"
-      >
-        PDF
-      </span>
-      <span className="min-w-0 truncate text-meta text-ink-muted">
-        PDF manuscript{size ? ` · ${size}` : ""}
-      </span>
-      <span className="flex-1" />
-      <Link
-        href={`/post/${post.slug}`}
-        aria-label="View paper"
-        className={`inline-flex min-h-10 shrink-0 items-center rounded-md px-1.5 text-meta font-bold text-purple-accent hover:underline ${FOCUS_RING}`}
-      >
-        View paper →
-      </Link>
-    </div>
-  );
-}
-
-function ResearchFeedCard({
-  post,
-  currentUserId,
-  surface,
-  priority,
-  respondingTo,
-  hideRespondingTo,
-  showTimestamp,
-}: Props) {
-  const title = getPostDisplayTitle(post) ?? "Untitled research paper";
-  const abstract = sanitizePostExcerpt(post.excerpt);
-  const evidence = post.citation_id
-    ? "Citable"
-    : isFormallyReviewed(post)
-      ? "Reviewed"
-      : null;
-  const coauthors = (post.co_authors ?? [])
-    .map((author) => author.profile?.full_name ?? author.profile?.username)
-    .filter(Boolean) as string[];
-  const hasPreview = Boolean(
-    post.cover_image_url?.trim() ||
-      post.document_original_name ||
-      post.document_mime_type
-  );
-
-  return (
-    <article className={CARD_SHELL} data-content-kind="research">
-      <ContextLine
-        post={post}
-        surface={surface}
-        respondingTo={respondingTo}
-        hideRespondingTo={hideRespondingTo}
-      />
-      <AuthorLine
-        post={post}
-        avatarSize={34}
-        showTimestamp={showTimestamp ?? true}
-        showCoauthorCount={false}
-      />
-
-      {/* Side-by-side only from `sm` up. On a 375px phone the old two-column
-          grid left the title roughly 199px -- about 16 characters a line of
-          21px Bodoni, clamped to four lines -- so the single densest piece of
-          text in the feed got its narrowest column. Below `sm` the text block
-          now spans the full card and the preview is dropped; the manuscript
-          row underneath still states that a PDF exists and links to it. */}
-      <div
-        className={`mt-3 min-w-0 ${
-          hasPreview
-            ? "sm:grid sm:grid-cols-[minmax(0,1fr)_170px] sm:items-start sm:gap-5"
-            : ""
-        }`}
-      >
-        <div className="min-w-0">
-          <p className="text-kicker font-bold uppercase text-purple-accent">
-            <span>Research</span>
-            {evidence ? (
-              <>
-                <span aria-hidden="true"> · </span>
-                <span>{evidence}</span>
-              </>
-            ) : null}
-          </p>
-          <Link href={`/post/${post.slug}`} className={`group block ${FOCUS_RING}`}>
-            <h2 className="mt-2 font-display line-clamp-4 text-headline font-semibold text-ink transition-colors group-hover:text-emerald-ink motion-reduce:transition-none">
-              {title}
-            </h2>
-          </Link>
-          {abstract ? (
-            <p
-              className={`${
-                hasPreview ? "sm:line-clamp-3" : ""
-              } mt-2.5 line-clamp-4 max-w-measure text-excerpt text-ink-soft`}
-            >
-              {abstract}
-            </p>
-          ) : null}
-          {coauthors.length > 0 ? (
-            <p className="mt-2 line-clamp-2 text-meta text-ink-muted">
-              with {coauthors.join(", ")}
-            </p>
-          ) : null}
-          <TopicLinks tags={post.tags} />
-        </div>
-
-        {hasPreview ? (
-          <div className="hidden sm:block">
-            <ResearchDocumentPreview post={post} title={title} priority={priority} />
-          </div>
-        ) : null}
-      </div>
-
-      <ResearchManuscriptRow post={post} />
-      <Actions post={post} currentUserId={currentUserId} />
-    </article>
-  );
-}
-
 export default function HomeFeedCard(props: Props) {
-  const kind = resolveContentKind(props.post);
-  if (!FEATURE_FLAGS.research && kind === "research") return null;
-  if (kind === "research") return <ResearchFeedCard {...props} />;
-  if (kind === "article") return <ArticleFeedCard {...props} />;
-  return <PostFeedCard {...props} />;
+  return resolveContentKind(props.post) === "article" ? (
+    <ArticleFeedCard {...props} />
+  ) : (
+    <PostFeedCard {...props} />
+  );
 }

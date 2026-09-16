@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { withSupabaseTimeout } from "@/lib/supabase/fetchTimeout";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -8,6 +9,11 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // A database that has stopped answering must not be able to hold a
+      // Vercel function open until the 300-second ceiling. See
+      // lib/supabase/fetchTimeout.ts: PostgREST and Auth get a deadline,
+      // storage transfers do not, and nothing is retried.
+      global: { fetch: withSupabaseTimeout() },
       cookies: {
         getAll() {
           return cookieStore.getAll();

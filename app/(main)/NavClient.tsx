@@ -8,12 +8,9 @@ import BrandWordmark from "@/components/ui/BrandWordmark";
 import NavUserMenu from "./NavUserMenu";
 import CreateLauncher from "./CreateLauncher";
 import NotificationBell from "@/components/ui/NotificationBell";
-import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
-import { shouldShowMobilePrimaryNav } from "./navRoutes";
 import { NAV_MATCH_PREFIXES, isNavItemActive } from "./navItems";
 import { useHasScrolled } from "@/lib/useHasScrolled";
 import { useAppChrome } from "./AppChromeProvider";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import { BRAND_TAGLINE } from "@/lib/brand";
 
 interface NavClientProps {
@@ -25,7 +22,6 @@ interface NavClientProps {
     role?: "student" | "reviewer" | "editor" | "admin";
   } | null;
   isAdmin: boolean;
-  canAccessReview: boolean;
   onOpenSearch: () => void;
 }
 
@@ -37,30 +33,16 @@ function navItemClass(isActive: boolean) {
   }`;
 }
 
-function MessageIcon({ className = "h-5 w-5" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M7 8.5h10M7 12.25h6.5M5.75 19 9 15.75h8.25A2.75 2.75 0 0020 13V7.75A2.75 2.75 0 0017.25 5H6.75A2.75 2.75 0 004 7.75V13a2.75 2.75 0 002.75 2.75H7V19z"
-      />
-    </svg>
-  );
-}
-
+/**
+ * The top bar carries the same five destinations as the rail and the bottom
+ * bar: Home and Explore as links, Write as the primary button, Notifications
+ * as the bell (which links through to /notifications), and Profile behind the
+ * account menu.
+ */
 export default function NavClient({
   user,
   profile,
   isAdmin,
-  canAccessReview,
   onOpenSearch,
 }: NavClientProps) {
   const pathname = usePathname();
@@ -79,21 +61,7 @@ export default function NavClient({
 
   const isHomeActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.home);
   const isExploreActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore);
-  const isCampusActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.campus);
-  const isResearchActive = isNavItemActive(
-    pathname,
-    NAV_MATCH_PREFIXES.research
-  );
-
-  const isResponsesActive = isNavItemActive(
-    pathname,
-    NAV_MATCH_PREFIXES.responses
-  );
-  const isWriteActive = pathname.startsWith("/write");
-  const showMobilePrimaryNav = shouldShowMobilePrimaryNav(pathname);
-  const messagesHref = user
-    ? "/messages"
-    : `/login?redirectTo=${encodeURIComponent("/messages")}`;
+  const isWriteActive = isNavItemActive(pathname, NAV_MATCH_PREFIXES.write);
 
   return (
     <>
@@ -148,38 +116,15 @@ export default function NavClient({
                 className={navItemClass(isHomeActive)}
                 aria-current={isHomeActive ? "page" : undefined}
               >
-                For you
+                Home
               </Link>
               <Link
                 href="/explore"
                 className={navItemClass(isExploreActive)}
                 aria-current={isExploreActive ? "page" : undefined}
               >
-                Discover
+                Explore
               </Link>
-              <Link
-                href="/responses"
-                className={navItemClass(isResponsesActive)}
-                aria-current={isResponsesActive ? "page" : undefined}
-              >
-                Responses
-              </Link>
-              <Link
-                href="/campus"
-                className={navItemClass(isCampusActive)}
-                aria-current={isCampusActive ? "page" : undefined}
-              >
-                Campus
-              </Link>
-              {FEATURE_FLAGS.research ? (
-                <Link
-                  href="/research"
-                  className={navItemClass(isResearchActive)}
-                  aria-current={isResearchActive ? "page" : undefined}
-                >
-                  Research
-                </Link>
-              ) : null}
             </div>
 
             <button
@@ -209,22 +154,9 @@ export default function NavClient({
           </div>
 
           <div className="ml-auto flex items-center gap-2.5">
-            <Link
-              href={messagesHref}
-              className={`relative h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
-                showMobilePrimaryNav ? "hidden md:flex" : "flex"
-              }`}
-              aria-label="Open messages"
-            >
-              <MessageIcon />
-              {user ? (
-                <MessagesUnreadBadge userId={user.id} className="-right-0.5 -top-0.5" />
-              ) : null}
-            </Link>
             {user ? <NotificationBell userId={user.id} /> : null}
             <CreateLauncher
               userId={user?.id ?? null}
-              variant="desktop"
               isActive={isWriteActive}
             />
             <div className="hidden md:block">
@@ -232,7 +164,6 @@ export default function NavClient({
                 user={user}
                 profile={profile}
                 isAdmin={isAdmin}
-                canAccessReview={canAccessReview}
               />
             </div>
           </div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Toast from "@/components/ui/Toast";
-import ResponseStartLink from "@/components/post/ResponseStartLink";
 import { usePostEngagement } from "./PostEngagementContext";
 
 interface Props {
@@ -183,28 +182,6 @@ export default function ReadingBar({
               <span className={label}>Share</span>
             </button>
 
-            <ResponseStartLink
-              postId={postId}
-              source="reading_bar"
-              userId={userId}
-              className={`${cell} text-emerald-ink`}
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 10h10a8 8 0 010 16H9M3 10l4-4M3 10l4 4"
-                />
-              </svg>
-              <span className={label}>Respond</span>
-            </ResponseStartLink>
           </div>
         </div>
       )}

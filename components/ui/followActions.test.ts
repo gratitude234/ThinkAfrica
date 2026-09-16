@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { setAuthorSubscription, toggleFollow } from "./followActions";
+import { isBlockedPair } from "@/lib/blocking";
+import { toggleFollow } from "./followActions";
 
 // Captured rather than executed inline so each test controls when the
 // after-response notification work runs, and can assert it never ran.
@@ -17,6 +18,7 @@ vi.mock("next/server", () => ({
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
+vi.mock("@/lib/blocking", () => ({ isBlockedPair: vi.fn() }));
 vi.mock("@/lib/push", () => ({
   ENGAGEMENT_PUSH_COOLDOWN_MS: 1,
   logPushResult: vi.fn(),
@@ -25,26 +27,42 @@ vi.mock("@/lib/push", () => ({
 
 const mockedCreateClient = vi.mocked(createClient);
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
+const mockedIsBlockedPair = vi.mocked(isBlockedPair);
 
-type RelationshipRow = {
-  following: boolean;
-  subscribed: boolean;
-  follow_created: boolean;
-  subscription_created: boolean;
-};
+/** A request client whose `follows` table is the only thing it knows. */
+function followsClient({
+  user = { id: "reader-id" } as { id: string } | null,
+  existing = null as unknown,
+  insertError = null as { code?: string; message: string } | null,
+} = {}) {
+  const tables: string[] = [];
+  const rpc = vi.fn();
+  const insert = vi.fn().mockResolvedValue({ error: insertError });
+  const deleteFilters: Array<[string, unknown]> = [];
+  const deleteBuilder = {
+    eq: vi.fn((column: string, value: unknown) => {
+      deleteFilters.push([column, value]);
+      return deleteFilters.length === 2 ? Promise.resolve({ error: null }) : deleteBuilder;
+    }),
+  };
+  const selectBuilder: Record<string, unknown> = {};
+  selectBuilder.eq = vi.fn(() => selectBuilder);
+  selectBuilder.maybeSingle = vi.fn().mockResolvedValue({ data: existing, error: null });
 
-function relationshipClient(row: RelationshipRow) {
-  const single = vi.fn().mockResolvedValue({ data: row, error: null });
-  const rpc = vi.fn(() => ({ single }));
   mockedCreateClient.mockResolvedValue({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: { id: "reader-id" } },
-      }),
-    },
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
     rpc,
+    from: vi.fn((table: string) => {
+      tables.push(table);
+      return {
+        select: vi.fn(() => selectBuilder),
+        insert,
+        delete: vi.fn(() => deleteBuilder),
+      };
+    }),
   } as never);
-  return { rpc, single };
+
+  return { tables, rpc, insert, deleteFilters };
 }
 
 function adminClient() {
@@ -68,170 +86,136 @@ async function runAfterCallbacks() {
   await Promise.all(pending.map((callback) => callback()));
 }
 
-describe("author relationship actions", () => {
+describe("toggleFollow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     afterCallbacks.length = 0;
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED", "1");
+    mockedIsBlockedPair.mockResolvedValue(false);
   });
 
-  it("Subscribe requests Follow and Subscribe in one transaction", async () => {
-    const { rpc } = relationshipClient({
-      following: true,
-      subscribed: true,
-      follow_created: true,
-      subscription_created: true,
-    });
+  it("writes one follows row and nothing else", async () => {
+    const { tables, rpc, insert } = followsClient();
+    adminClient();
 
-    const result = await setAuthorSubscription({
-      authorId: "author-id",
-      subscribed: true,
-      pathname: "/author",
-    });
+    const result = await toggleFollow({ followingId: "author-id", follow: true });
 
-    expect(rpc).toHaveBeenCalledWith("set_author_relationship", {
-      p_author_id: "author-id",
-      p_following: true,
-      p_subscribed: true,
+    expect(result).toEqual({ error: null, following: true });
+    expect(insert).toHaveBeenCalledWith({
+      follower_id: "reader-id",
+      following_id: "author-id",
     });
-    expect(result).toEqual({
-      error: null,
-      following: true,
-      subscribed: true,
-      followCreated: true,
-      subscriptionCreated: true,
-    });
+    expect(new Set(tables)).toEqual(new Set(["follows"]));
+    expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("Unsubscribe leaves the Follow state returned by the RPC intact", async () => {
-    const { rpc } = relationshipClient({
-      following: true,
-      subscribed: false,
-      follow_created: false,
-      subscription_created: false,
-    });
+  it("unfollows by deleting the viewer's own row", async () => {
+    const { deleteFilters, insert } = followsClient();
 
-    const result = await setAuthorSubscription({
-      authorId: "author-id",
-      subscribed: false,
-    });
+    const result = await toggleFollow({ followingId: "author-id", follow: false });
 
-    expect(rpc).toHaveBeenCalledWith("set_author_relationship", {
-      p_author_id: "author-id",
-      p_following: null,
-      p_subscribed: false,
-    });
-    expect(result.following).toBe(true);
-    expect(result.subscribed).toBe(false);
-  });
-
-  it("Unfollow returns both states cleared", async () => {
-    const { rpc } = relationshipClient({
-      following: false,
-      subscribed: false,
-      follow_created: false,
-      subscription_created: false,
-    });
-
-    const result = await toggleFollow({
-      followingId: "author-id",
-      follow: false,
-    });
-
-    expect(rpc).toHaveBeenCalledWith("set_author_relationship", {
-      p_author_id: "author-id",
-      p_following: false,
-      p_subscribed: null,
-    });
-    expect(result).toEqual({
-      error: null,
-      following: false,
-      subscribed: false,
-    });
-  });
-});
-
-describe("author subscriber notifications", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    afterCallbacks.length = 0;
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED", "1");
-  });
-
-  it("tells the author they were subscribed to, not followed", async () => {
-    // Subscribing creates the underlying Follow too, so both flags are true for
-    // this single click. Only the stronger notification may be sent.
-    relationshipClient({
-      following: true,
-      subscribed: true,
-      follow_created: true,
-      subscription_created: true,
-    });
-    const { insert } = adminClient();
-
-    await setAuthorSubscription({ authorId: "author-id", subscribed: true });
-    await runAfterCallbacks();
-
-    expect(insert).toHaveBeenCalledTimes(1);
-    expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: "author-id",
-        type: "author_subscribed",
-        actor_id: "reader-id",
-        message: "Tunde Bello subscribed to your work on Indegenius.",
-        link: "/tunde",
-      })
-    );
-  });
-
-  it("notifies when an existing follower subscribes", async () => {
-    relationshipClient({
-      following: true,
-      subscribed: true,
-      follow_created: false,
-      subscription_created: true,
-    });
-    const { insert } = adminClient();
-
-    await setAuthorSubscription({ authorId: "author-id", subscribed: true });
-    await runAfterCallbacks();
-
-    expect(insert).toHaveBeenCalledTimes(1);
-    expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "author_subscribed" })
-    );
-  });
-
-  it("stays silent when the subscription already existed", async () => {
-    relationshipClient({
-      following: true,
-      subscribed: true,
-      follow_created: false,
-      subscription_created: false,
-    });
-    const { insert } = adminClient();
-
-    await setAuthorSubscription({ authorId: "author-id", subscribed: true });
-    await runAfterCallbacks();
-
+    expect(result).toEqual({ error: null, following: false });
+    expect(deleteFilters).toEqual([
+      ["follower_id", "reader-id"],
+      ["following_id", "author-id"],
+    ]);
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("still sends a plain follow notification from toggleFollow", async () => {
-    relationshipClient({
-      following: true,
-      subscribed: false,
-      follow_created: true,
-      subscription_created: false,
-    });
+  it("refuses a signed-out reader before touching the table", async () => {
+    const { tables } = followsClient({ user: null });
+
+    const result = await toggleFollow({ followingId: "author-id", follow: true });
+
+    expect(result.error).toMatch(/signed in/);
+    expect(tables).toEqual([]);
+  });
+
+  it("refuses to follow yourself", async () => {
+    const { tables } = followsClient({ user: { id: "author-id" } });
+
+    const result = await toggleFollow({ followingId: "author-id", follow: true });
+
+    expect(result).toEqual({ error: "You cannot follow yourself.", following: false });
+    expect(tables).toEqual([]);
+  });
+
+  it("refuses a follow across a block, in either direction", async () => {
+    const { insert } = followsClient();
+    mockedIsBlockedPair.mockResolvedValue(true);
+
+    const result = await toggleFollow({ followingId: "author-id", follow: true });
+
+    expect(mockedIsBlockedPair).toHaveBeenCalledWith("reader-id", "author-id");
+    expect(result.following).toBe(false);
+    expect(result.error).toBeTruthy();
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("treats an existing follow as success and does not notify twice", async () => {
+    const { insert } = followsClient({ existing: { follower_id: "reader-id" } });
+    const admin = adminClient();
+
+    const result = await toggleFollow({ followingId: "author-id", follow: true });
+    await runAfterCallbacks();
+
+    expect(result).toEqual({ error: null, following: true });
+    expect(insert).not.toHaveBeenCalled();
+    expect(admin.insert).not.toHaveBeenCalled();
+  });
+
+  it("treats a concurrent duplicate insert as the follow it asked for", async () => {
+    followsClient({ insertError: { code: "23505", message: "duplicate key" } });
+    const admin = adminClient();
+
+    const result = await toggleFollow({ followingId: "author-id", follow: true });
+    await runAfterCallbacks();
+
+    expect(result).toEqual({ error: null, following: true });
+    expect(admin.insert).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed insert as not following", async () => {
+    followsClient({ insertError: { message: "permission denied" } });
+
+    const result = await toggleFollow({ followingId: "author-id", follow: true });
+
+    expect(result).toEqual({ error: "permission denied", following: false });
+  });
+});
+
+describe("follow notification", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    afterCallbacks.length = 0;
+    mockedIsBlockedPair.mockResolvedValue(false);
+  });
+
+  it("tells the member they were followed, after the response", async () => {
+    followsClient();
     const { insert } = adminClient();
 
     await toggleFollow({ followingId: "author-id", follow: true });
+    expect(insert).not.toHaveBeenCalled();
     await runAfterCallbacks();
 
     expect(insert).toHaveBeenCalledTimes(1);
-    expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "follow" })
-    );
+    expect(insert).toHaveBeenCalledWith({
+      user_id: "author-id",
+      type: "follow",
+      message: "Tunde Bello started following you on Indegenius.",
+      link: "/tunde",
+      actor_id: "reader-id",
+      read: false,
+    });
+  });
+
+  it("sends nothing when a follow is removed", async () => {
+    followsClient();
+    const { insert } = adminClient();
+
+    await toggleFollow({ followingId: "author-id", follow: false });
+    await runAfterCallbacks();
+
+    expect(insert).not.toHaveBeenCalled();
   });
 });

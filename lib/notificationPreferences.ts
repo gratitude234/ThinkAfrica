@@ -11,9 +11,8 @@ import { describeNotificationType } from "./notificationCatalog";
  *
  * 1. Only *non-actionable* types can be muted. You can turn down likes, follows,
  *    and collaboration replies, but never something that asks you
- *    to act and never a moderation or account notice. Publication subscription
- *    alerts are intentionally absent because explicit subscriptions are always on
- *    in-app. `assertMutableTypes()` holds the line in the test suite.
+ *    to act and never a moderation or account notice. `assertMutableTypes()`
+ *    holds the line in the test suite.
  *
  * 2. Groups, not one switch per type. There are 34 notification types; a settings
  *    page with 34 toggles is not a preference, it is a chore.
@@ -27,6 +26,8 @@ export interface InAppNotificationPrefs {
   inapp_likes: boolean;
   inapp_comments: boolean;
   inapp_follows: boolean;
+  /** LEGACY COMPATIBILITY — existing co-authored publications. Still stored in
+   *  notification_prefs, but no setting offers it: nothing it muted is sent. */
   inapp_collaboration: boolean;
 }
 
@@ -52,17 +53,10 @@ export const IN_APP_PREF_GROUPS: InAppPrefGroup[] = [
   },
   {
     key: "inapp_follows",
-    label: "Followers and subscribers",
-    description: "When someone follows you or subscribes to your work",
+    label: "Followers",
+    description: "When someone follows you",
+    // author_subscribed is retired; its existing rows read as follows.
     types: ["follow", "author_subscribed"],
-  },
-
-  {
-    key: "inapp_collaboration",
-    label: "Co-author replies",
-    description:
-      "When someone accepts or declines your co-author invitation. Invitations to you always come through.",
-    types: ["co_author_accepted", "co_author_declined"],
   },
 ];
 

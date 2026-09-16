@@ -26,9 +26,6 @@ function snapshot(overrides: Partial<ContributionSnapshot> = {}): ContributionSn
     tags: [],
     coverImageUrl: "",
     references: [],
-    collaborators: [],
-    inResponseToId: null,
-    promptId: null,
     ...overrides,
   };
 }

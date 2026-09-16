@@ -19,7 +19,7 @@ import { resendSignupConfirmationEmail } from "../accountEmailActions";
 
 const PROOF_ITEMS = [
   "Return to drafts and saved reading",
-  "Keep responses and replies in context",
+  "Keep comments and replies in context",
   "Keep building your Intellectual Record",
 ];
 
@@ -49,7 +49,7 @@ function LoginForm() {
   const isWritingRedirect = redirectTo.startsWith("/write");
   const introCopy = isWritingRedirect
     ? "Sign in to start your draft and keep autosave tied to your profile."
-    : "Sign in to keep reading, responding, and building your Intellectual Record.";
+    : "Sign in to keep reading, writing, and building your Intellectual Record.";
   const signupHref =
     redirectTo === "/" ? "/signup" : `/signup?redirectTo=${encodeURIComponent(redirectTo)}`;
 

@@ -14,15 +14,7 @@ vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
   useGuestAuthGate: () => ({ requestAuth: mocks.requestAuth }),
 }));
 
-// Real MessagesUnreadBadge instantiates a Supabase browser client, which
-// needs live project env vars this test environment doesn't have -- it's
-// unrelated to what these tests assert on (labels, hrefs, safe-area/touch
-// target classes), so it's stubbed out like any other unrelated dependency.
-vi.mock("@/components/ui/MessagesUnreadBadge", () => ({
-  default: () => null,
-}));
-
-describe("BottomNav compose access", () => {
+describe("BottomNav destinations", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
     mocks.requestAuth.mockReset();
@@ -30,49 +22,64 @@ describe("BottomNav compose access", () => {
 
   afterEach(() => cleanup());
 
-  it("shows the compose FAB to guests and gates the universal composer", () => {
-    render(
-      <BottomNav username={null} userId={null} />
+  it("offers Home, Explore, Write, Notifications and Profile, in that order", () => {
+    render(<BottomNav username="writer" userId="user-1" />);
+
+    const nav = screen.getByRole("navigation", { name: "Primary navigation" });
+    const labels = Array.from(nav.querySelectorAll("a, button")).map(
+      (item) => item.textContent
     );
+    expect(labels).toEqual(["Home", "Explore", "Write", "Notifications", "Profile"]);
 
-    const trigger = screen.getByRole("button", { name: "Publish" });
-    expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
+    expect(screen.getByText("Home").closest("a")).toHaveAttribute("href", "/");
+    expect(screen.getByText("Explore").closest("a")).toHaveAttribute("href", "/explore");
+    expect(screen.getByText("Write").closest("a")).toHaveAttribute("href", "/write");
+    expect(screen.getByText("Notifications").closest("a")).toHaveAttribute(
+      "href",
+      "/notifications"
+    );
+    expect(screen.getByText("Profile").closest("a")).toHaveAttribute("href", "/writer");
+  });
 
-    fireEvent.click(trigger);
+  it("no longer offers the retired destinations", () => {
+    render(<BottomNav username="writer" userId="user-1" />);
+    for (const label of ["For you", "Discover", "Responses", "Record", "Messages"]) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
+  });
 
+  it("gates Write for guests and sends Notifications through sign-in", () => {
+    render(<BottomNav username={null} userId={null} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
     expect(mocks.requestAuth).toHaveBeenCalledWith("create", {
       destination: "/write",
     });
+    expect(screen.getByText("Notifications").closest("a")).toHaveAttribute(
+      "href",
+      "/login?redirectTo=%2Fnotifications"
+    );
   });
 
-  it("renders no mobile chrome on post pages, FAB included", () => {
+  it("renders no mobile chrome on post pages", () => {
     navigationState.pathname = "/post/a-test-post";
 
-    render(
-      <BottomNav username="writer" userId="user-1" />
-    );
+    render(<BottomNav username="writer" userId="user-1" />);
 
-    // The post page floats its own ReadingBar, whose Respond writes a reply to
-    // the piece being read. The compose FAB opened a blank /create/post from
-    // 40px away, so the corner offered two writing controls and the more
-    // prominent one led away from the article.
-    expect(
-      screen.queryByRole("button", { name: "Publish" })
-    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("navigation", { name: "Primary navigation" })
     ).not.toBeInTheDocument();
   });
 
   it("hides mobile navigation inside dedicated creation flows", () => {
-    navigationState.pathname = "/create/post";
-
-    render(
-      <BottomNav username="writer" userId="user-1" />
-    );
-
-    expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("navigation", { name: "Primary navigation" })).not.toBeInTheDocument();
+    for (const pathname of ["/create/post", "/write"]) {
+      navigationState.pathname = pathname;
+      const { unmount } = render(<BottomNav username="writer" userId="user-1" />);
+      expect(
+        screen.queryByRole("navigation", { name: "Primary navigation" })
+      ).not.toBeInTheDocument();
+      unmount();
+    }
   });
 });
 
@@ -84,38 +91,36 @@ describe("BottomNav account label and safe areas", () => {
 
   afterEach(() => cleanup());
 
-  it("labels the account destination Join for a guest and Record for a signed-in user", () => {
-    const { rerender } = render(
-      <BottomNav username={null} userId={null} />
-    );
+  it("labels the account destination Join for a guest and Profile for a signed-in user", () => {
+    const { rerender } = render(<BottomNav username={null} userId={null} />);
     expect(screen.getByText("Join")).toBeInTheDocument();
-    expect(screen.queryByText("Record")).not.toBeInTheDocument();
+    expect(screen.queryByText("Profile")).not.toBeInTheDocument();
 
     rerender(<BottomNav username="writer" userId="user-1" />);
-    expect(screen.getByText("Record")).toBeInTheDocument();
+    expect(screen.getByText("Profile")).toBeInTheDocument();
     expect(screen.queryByText("Join")).not.toBeInTheDocument();
   });
 
-  it("still routes the guest account destination to Join, not the authenticated profile route", () => {
+  it("still routes the guest account destination to Join, not an authenticated route", () => {
     render(<BottomNav username={null} userId={null} />);
 
     expect(screen.getByText("Join").closest("a")).toHaveAttribute("href", "/signup");
   });
 
-  it("pads the bar for the safe area and keeps every nav destination at least 44px tall", () => {
+  it("pads the bar for the safe area and keeps every destination full height", () => {
     render(<BottomNav username="writer" userId="user-1" />);
 
     const nav = screen.getByRole("navigation", { name: "Primary navigation" });
     expect(nav.className).toMatch(/\bfixed\b/);
     expect(nav).toHaveStyle({ paddingBottom: "env(safe-area-inset-bottom)" });
 
-    for (const label of ["For you", "Discover", "Responses", "Record"]) {
-      const link = screen.getByText(label).closest("a");
-      expect(link?.className).toMatch(/h-full/);
+    for (const label of ["Home", "Explore", "Write", "Notifications", "Profile"]) {
+      const target = screen.getByText(label).closest("a, button");
+      expect(target?.className).toMatch(/h-full/);
     }
   });
 
-  it("keeps Record selected throughout the signed-in account area", () => {
+  it("keeps Profile selected throughout the signed-in account area", () => {
     for (const pathname of [
       "/me",
       "/writer",
@@ -127,7 +132,7 @@ describe("BottomNav account label and safe areas", () => {
       const { unmount } = render(
         <BottomNav username="writer" userId="user-1" />
       );
-      expect(screen.getByText("Record").closest("a")).toHaveAttribute(
+      expect(screen.getByText("Profile").closest("a")).toHaveAttribute(
         "aria-current",
         "page"
       );

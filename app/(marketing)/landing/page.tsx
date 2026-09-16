@@ -1,21 +1,15 @@
-import { unstable_cache } from "next/cache";
 import type { Metadata } from "next";
 import Footer from "@/components/ui/Footer";
 import PostCover from "@/components/post/PostCover";
 import RetentionEventTracker from "@/components/retention/RetentionEventTracker";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { getPublicTopicCounts, type TopicCount } from "@/lib/discoverData";
+import {
+  loadLandingData,
+  TOPICS_DISPLAY_LIMIT,
+  type LandingPost,
+  type LandingPostRaw,
+} from "./landingData";
 import { getPostDisplayTitle, getPostMetadataTitle } from "@/lib/postDisplay";
-import {
-  getArticleFormatLabel,
-  resolveArticleFormat,
-  resolveContentKind,
-} from "@/lib/contentModel";
-import {
-  FEATURE_FLAGS,
-  RESEARCH_TYPE_QUERY_EXCLUSION,
-} from "@/lib/featureFlags";
+import { getContentKindLabel, resolveContentKind } from "@/lib/contentModel";
 import LandingTrackedLink from "./LandingTrackedLink";
 import LandingAnimations from "./LandingAnimations";
 import LandingNav from "./LandingNav";
@@ -29,37 +23,22 @@ import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/s
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type LandingPost = {
-  id: string;
-  title: string | null;
-  slug: string;
-  type: string;
-  content_kind?: string | null;
-  article_format?: string | null;
-  excerpt: string | null;
-  cover_image_url: string | null;
-  view_count: number | null;
-  published_at: string | null;
-  featured?: boolean | null;
-  profiles: {
-    username: string | null;
-    full_name: string | null;
-    university: string | null;
-  } | null;
-};
 
-type LandingPostRaw = Omit<LandingPost, "profiles"> & {
-  profiles: LandingPost["profiles"] | LandingPost["profiles"][];
-};
-
-type LandingData = {
-  postsRaw: LandingPostRaw[];
-  postCount: number;
-  userCount: number;
-  topics: TopicCount[];
-};
-
-export const revalidate = 300;
+/**
+ * Rendered per request, not at build time.
+ *
+ * This page is the front door and it reads four things out of Supabase. As a
+ * statically generated page that read ran during `next build`, which meant a
+ * deployment could only succeed while the database was responsive. On
+ * 2026-09-07 it was not: Next killed the page build at 60 seconds, retried
+ * three times, and failed the deployment. An identical redeploy two minutes
+ * later succeeded.
+ *
+ * A build must not depend on a third party being fast. The data is still
+ * cached for five minutes, in the Data Cache rather than the Route Cache, so
+ * a visitor still does not pay for four round trips. See ./landingData.ts.
+ */
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Build Your Intellectual Identity",
@@ -83,8 +62,6 @@ export const metadata: Metadata = {
 
 // ── Static data ──────────────────────────────────────────────────────
 
-const TOPICS_DISPLAY_LIMIT = 12;
-
 const VALUE_PROPS = [
   {
     num: "01",
@@ -96,13 +73,13 @@ const VALUE_PROPS = [
     num: "02",
     numStyle: "bg-amber-100 text-amber-700",
     title: "Build a body of work",
-    desc: "Bring publications, Responses, collaborations, and review signals together in one evidence-backed Intellectual Record.",
+    desc: "Bring your Posts and Articles together in one evidence-backed Intellectual Record.",
   },
   {
     num: "03",
     numStyle: "bg-purple-100 text-purple-700",
     title: "Test ideas in public",
-    desc: "Move from reading into questions, counterpoints, and Responses that make your reasoning part of your Intellectual Record.",
+    desc: "Move from reading into writing, and turn your questions and counterpoints into work on your Intellectual Record.",
   },
 ];
 
@@ -110,27 +87,13 @@ const VALUE_PROPS = [
 
 function typeBadge(post: LandingPost): { classes: string; label: string } {
   const kind = resolveContentKind(post);
-
-  if (kind === "article") {
-    const format = getArticleFormatLabel(resolveArticleFormat(post));
-    return {
-      classes: "bg-gold-tint text-gold-ink",
-      label: format ? `Article · ${format}` : "Article",
-    };
-  }
-
-  if (kind === "research") {
-    return {
-      classes: "bg-purple-tint text-purple-accent",
-      label: "Research",
-    };
-  }
-
-  if (kind === "post") {
-    return { classes: "bg-green-tint text-emerald-brand", label: "Post" };
-  }
-
-  return { classes: "bg-green-tint text-emerald-brand", label: "Content" };
+  return {
+    classes:
+      kind === "article"
+        ? "bg-gold-tint text-gold-ink"
+        : "bg-green-tint text-emerald-brand",
+    label: getContentKindLabel(kind),
+  };
 }
 
 /** Titleless lightweight Post: lead with the excerpt instead of a blank/fabricated headline. */
@@ -158,62 +121,15 @@ function authorLine(post: LandingPost) {
   };
 }
 
-async function fetchLandingData(
-  supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>
-): Promise<LandingData> {
-  const [{ data: postsRaw }, { count: postCount }, { count: userCount }, topicCounts] =
-    await Promise.all([
-      supabase
-        .from("posts")
-        .select(
-          `id, title, slug, type, content_kind, article_format, excerpt, cover_image_url, view_count, published_at, featured,
-           profiles!posts_author_id_fkey (username, full_name, university)`
-        )
-        .eq("status", "published")
-        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-        .order("featured", { ascending: false })
-        .order("view_count", { ascending: false })
-        .order("published_at", { ascending: false })
-        .limit(7),
-      supabase
-        .from("posts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "published")
-        .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION),
-      supabase.from("profiles").select("id", { count: "exact", head: true }),
-      getPublicTopicCounts(supabase),
-    ]);
-
-  return {
-    postsRaw: (postsRaw ?? []) as LandingPostRaw[],
-    postCount: postCount ?? 0,
-    userCount: userCount ?? 0,
-    topics: topicCounts
-      .sort((a, b) => b.count - a.count)
-      .slice(0, TOPICS_DISPLAY_LIMIT),
-  };
-}
-
-const getCachedLandingData = unstable_cache(
-  async () => fetchLandingData(createAdminClient()),
-  ["marketing-landing-data"],
-  { revalidate: 300, tags: ["landing", "public"] }
-);
 
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default async function LandingPage() {
-  const { postsRaw, postCount, userCount, topics } =
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? await getCachedLandingData()
-      : await fetchLandingData(await createClient());
+  // Never rejects. An unreachable database renders the page with empty
+  // strips rather than an error, and says so in the server log.
+  const { postsRaw, postCount, userCount, topics } = await loadLandingData();
 
   const posts: LandingPost[] = postsRaw
-    .filter(
-      (post) =>
-        FEATURE_FLAGS.research ||
-        (post.type !== "research" && post.content_kind !== "research")
-    )
     .map((p) => ({
       ...p,
       profiles: Array.isArray(p.profiles) ? (p.profiles[0] ?? null) : p.profiles,
@@ -277,9 +193,7 @@ export default async function LandingPage() {
                   <PostCover
                     src={leadPost.cover_image_url}
                     alt={getPostDisplayTitle(leadPost)}
-                    type={leadPost.type}
                     content_kind={leadPost.content_kind}
-                    article_format={leadPost.article_format}
                     sizes="88px"
                     className="h-[92px] rounded-[10px]"
                     imageClassName="object-cover"
@@ -305,7 +219,7 @@ export default async function LandingPage() {
                 <LandingTrackedLink
                   href={primaryHref}
                   event="landing_read_clicked"
-                  metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, postType: leadPost?.type ?? null, position: "primary" }}
+                  metadata={{ source: "hero_primary", postId: leadPost?.id ?? null, contentKind: leadPost?.content_kind ?? null, position: "primary" }}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-5 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-[#0E4B37] sm:px-7 sm:text-base"
                 >
                   Explore ideas
@@ -379,9 +293,7 @@ export default async function LandingPage() {
                     <PostCover
                       src={leadPost.cover_image_url}
                       alt={getPostDisplayTitle(leadPost)}
-                      type={leadPost.type}
                       content_kind={leadPost.content_kind}
-                      article_format={leadPost.article_format}
                       sizes="440px"
                       className="h-[156px] border-b border-gray-100"
                       imageClassName="object-cover"
@@ -507,9 +419,7 @@ export default async function LandingPage() {
                       <PostCover
                         src={post.cover_image_url}
                         alt={displayTitle}
-                        type={post.type}
                         content_kind={post.content_kind}
-                        article_format={post.article_format}
                         sizes="(max-width: 768px) 100vw, 280px"
                         className="h-[188px] border-b border-gray-100 md:h-full md:min-h-[240px] md:border-b-0 md:border-r"
                         imageClassName="object-cover"
@@ -536,9 +446,7 @@ export default async function LandingPage() {
                       <PostCover
                         src={post.cover_image_url}
                         alt={displayTitle}
-                        type={post.type}
                         content_kind={post.content_kind}
-                        article_format={post.article_format}
                         sizes="(max-width: 768px) 100vw, 33vw"
                         className="h-[150px] border-b border-gray-100"
                         imageClassName="object-cover"

@@ -3,11 +3,10 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
 import {
   isQualifiedPublicationRead,
   qualifiedReadThresholds,
-} from "@/lib/publicationDelivery";
+} from "@/lib/postReadQualification";
 import {
   verifyFeedExposureMetadata,
   type FeedExposure,
@@ -26,28 +25,23 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/g;
 
 // Every current surface emitted by HomeFeedCardImpression and
 // PostCardImpression. Keeping this finite prevents callers from manufacturing
-// arbitrary per-surface impression uniqueness keys.
+// arbitrary per-surface impression uniqueness keys. Home's retired surfaces
+// (the featured lead, Latest, Subscribed, Topics) now record as "unknown".
 const ENGAGEMENT_SURFACES = new Set([
   "unknown",
   "home",
-  "home_featured",
   "following",
-  "subscriptions",
-  "topics",
-  "latest",
   "feed",
   "bookmarks",
   "explore-for-you",
   "explore-trending",
   "explore-citable",
-  "responses",
   "topic",
 ]);
 
 // Generic client metadata is diagnostic context, never an authority boundary.
 // Feed-placement fields from this list are accepted only after HMAC
-// verification; nested objects such as server-owned distribution attribution
-// are always excluded.
+// verification; nested objects are always excluded.
 const CLIENT_METADATA_KEYS = [
   "exposureId",
   "postId",
@@ -150,17 +144,6 @@ function sanitizeClientMetadata(
   return sanitized;
 }
 
-const DELIVERY_TOKEN_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-type AttributedDelivery = {
-  id: string;
-  channel: "in_app" | "email" | "push";
-  source: "author_subscription" | "topic_subscription";
-  postId: string;
-  wordCount: number;
-};
-
 type PublishedPost = {
   id: string;
   wordCount: number;
@@ -176,20 +159,14 @@ function countPublicationWords(content: string | null) {
 
 async function loadPublishedPost(
   admin: ReturnType<typeof createAdminClient>,
-  slug: string,
-  expectedPostId?: string
+  slug: string
 ): Promise<PublishedPost | null> {
-  let query = admin
+  const { data: post, error } = await admin
     .from("posts")
     .select("id, slug, status, content")
     .eq("slug", slug)
-    .eq("status", "published");
-
-  if (expectedPostId) {
-    query = query.eq("id", expectedPostId);
-  }
-
-  const { data: post, error } = await query.maybeSingle<{
+    .eq("status", "published")
+    .maybeSingle<{
     id: string;
     slug: string;
     status: string;
@@ -202,73 +179,6 @@ async function loadPublishedPost(
     id: post.id,
     wordCount: countPublicationWords(post.content),
   };
-}
-
-async function validateAttributedDelivery(
-  admin: ReturnType<typeof createAdminClient>,
-  token: unknown,
-  slug: string,
-  knownPost: PublishedPost | null = null
-): Promise<AttributedDelivery | null> {
-  if (
-    !isAuthorSubscriptionsEnabled() ||
-    typeof token !== "string" ||
-    !DELIVERY_TOKEN_PATTERN.test(token)
-  ) {
-    return null;
-  }
-
-  const { data: delivery } = await admin
-    .from("publication_deliveries")
-    .select("id, event_id, channel, status, matched_author_ids")
-    .eq("tracking_token", token)
-    .eq("status", "sent")
-    .maybeSingle<{
-      id: string;
-      event_id: string;
-      channel: "in_app" | "email" | "push";
-      status: string;
-      matched_author_ids: string[];
-    }>();
-  if (!delivery) return null;
-
-  const { data: event } = await admin
-    .from("publication_events")
-    .select("post_id")
-    .eq("id", delivery.event_id)
-    .maybeSingle<{ post_id: string }>();
-  if (!event) return null;
-
-  const post =
-    knownPost?.id === event.post_id
-      ? knownPost
-      : knownPost
-        ? null
-        : await loadPublishedPost(admin, slug, event.post_id);
-  if (!post) return null;
-
-  return {
-    id: delivery.id,
-    channel: delivery.channel,
-    source:
-      delivery.matched_author_ids.length > 0
-        ? "author_subscription"
-        : "topic_subscription",
-    postId: post.id,
-    wordCount: post.wordCount,
-  };
-}
-
-function qualifiesAttributedRead(
-  delivery: AttributedDelivery,
-  readSeconds: number | null,
-  scrollDepth: number | null
-) {
-  return isQualifiedPublicationRead({
-    wordCount: delivery.wordCount,
-    activeSeconds: readSeconds,
-    scrollDepth,
-  });
 }
 
 function invalidReadResponse() {
@@ -364,12 +274,6 @@ export async function handlePostEngagement(
       }
     }
 
-    const attributedDelivery = await validateAttributedDelivery(
-      admin,
-      body.deliveryToken,
-      slug,
-      readPost
-    );
     const clientMetadata = sanitizeClientMetadata(
       body.metadata,
       verifiedExposure
@@ -390,54 +294,12 @@ export async function handlePostEngagement(
       engagement_route: cleanBoundedString(body.route, MAX_ROUTE_LENGTH),
       engagement_read_seconds: readSeconds,
       engagement_scroll_depth: scrollDepth,
-      engagement_metadata: attributedDelivery
-        ? {
-            ...verifiedMetadata,
-            distribution: {
-              source: attributedDelivery.source,
-              deliveryId: attributedDelivery.id,
-              channel: attributedDelivery.channel,
-            },
-          }
-        : verifiedMetadata,
+      engagement_metadata: verifiedMetadata,
     });
 
     if (error) {
       console.error(`[post-engagement] ${eventType} failed`, error);
       return NextResponse.json({ error: "Unable to record engagement." }, { status: 500 });
-    }
-
-    if (attributedDelivery && (eventType === "view" || eventType === "read")) {
-      const now = new Date().toISOString();
-      const update: { viewed_at: string; qualified_read_at?: string } = {
-        viewed_at: now,
-      };
-      if (
-        eventType === "read" &&
-        qualifiesAttributedRead(attributedDelivery, readSeconds, scrollDepth)
-      ) {
-        update.qualified_read_at = now;
-      }
-
-      let deliveryUpdate = admin
-        .from("publication_deliveries")
-        .update(update)
-        .eq("id", attributedDelivery.id)
-        .is("viewed_at", null);
-
-      if (update.qualified_read_at) {
-        // A reader may have produced a prior attributed view. Qualified-read
-        // attribution is independently first-write-wins.
-        deliveryUpdate = admin
-          .from("publication_deliveries")
-          .update(update)
-          .eq("id", attributedDelivery.id)
-          .is("qualified_read_at", null);
-      }
-      const { error: attributionError } = await deliveryUpdate;
-      if (attributionError) {
-        console.error("[post-engagement] delivery attribution failed", attributionError);
-      }
     }
 
     const response = NextResponse.json({ counted: Boolean(data) });

@@ -13,7 +13,7 @@ describe("HomeGuestNotice", () => {
     const { container } = render(<HomeGuestNotice />);
 
     expect(
-      screen.getByText("Browsing as a guest. Sign in to like, save, respond, and publish.")
+      screen.getByText("Browsing as a guest. Sign in to like, comment, save and publish.")
     ).toBeInTheDocument();
     const signIn = screen.getByRole("button", { name: "Sign in" });
     expect(signIn).toBeInTheDocument();

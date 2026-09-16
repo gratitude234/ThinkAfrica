@@ -2,31 +2,37 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+/** Ids handed to the server action, in call order. The panel no longer issues
+ *  a delete of its own: ownership and status are decided in
+ *  app/(write)/write/deleteActions.ts, so what is asserted here is what this
+ *  component asks for and what it does with the answer. */
 const deleted: { ids: string[][] } = { ids: [] };
 
-function mockSupabaseWithDrafts(drafts: Array<Record<string, unknown>>, deleteError: unknown = null) {
+/**
+ * The panel reads through a server action now, so the stub is the action.
+ * `loadFailed` is a state the component has to render differently from an
+ * empty list: a failed load that showed nothing would tell a writer their
+ * drafts were gone.
+ */
+function mockDraftsAction(
+  drafts: Array<Record<string, unknown>>,
+  deleteError: string | null = null,
+  loadFailed = false
+) {
   deleted.ids = [];
-  vi.doMock("@/lib/supabase/client", () => ({
-    createClient: () => ({
-      auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              order: () => ({
-                limit: () => Promise.resolve({ data: drafts }),
-              }),
-            }),
-          }),
-        }),
-        delete: () => ({
-          in: (_column: string, ids: string[]) => {
-            deleted.ids.push(ids);
-            return Promise.resolve({ error: deleteError });
-          },
-        }),
-      }),
-    }),
+  vi.doMock("@/lib/composerActions", () => ({
+    loadMyDrafts: async () =>
+      loadFailed
+        ? { ok: false, reason: "unavailable" }
+        : { ok: true, data: drafts },
+  }));
+  vi.doMock("./deleteActions", () => ({
+    deleteOwnDraftPosts: async ({ postIds }: { postIds: string[] }) => {
+      deleted.ids.push(postIds);
+      return deleteError
+        ? { ok: false, error: deleteError }
+        : { ok: true, data: { deleted: postIds, refusedCount: 0 } };
+    },
   }));
 }
 
@@ -48,9 +54,12 @@ function draft(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function openPanel(drafts: Array<Record<string, unknown>>, deleteError: unknown = null) {
+async function openPanel(
+  drafts: Array<Record<string, unknown>>,
+  deleteError: string | null = null
+) {
   vi.resetModules();
-  mockSupabaseWithDrafts(drafts, deleteError);
+  mockDraftsAction(drafts, deleteError);
   const { default: MyDraftsFresh } = await import("./MyDrafts");
   render(<MyDraftsFresh activeDraftId={null} />);
   await userEvent.click(await screen.findByText("My Drafts"));
@@ -155,16 +164,20 @@ describe("MyDrafts", () => {
     expect(screen.getByText("Draft number 8")).toBeInTheDocument();
   });
 
-  it("keeps the row when the database refuses the delete", async () => {
-    await openPanel([draft({ id: "locked", title: "Submitted elsewhere" })], {
-      message: "This post is no longer an editable draft.",
-    });
+  it("keeps the row when the server refuses the delete", async () => {
+    // The refusal now arrives as a sentence from the action rather than as a
+    // PostgREST error object, because a trigger's message is not something a
+    // UI should be able to display.
+    await openPanel(
+      [draft({ id: "locked", title: "Submitted elsewhere" })],
+      "Only drafts can be deleted. Withdraw a submission instead of deleting it."
+    );
     await waitFor(() => expect(screen.getByText("Submitted elsewhere")).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Delete draft: Submitted elsewhere" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent("no longer an editable draft");
+      expect(screen.getByRole("alert")).toHaveTextContent("Only drafts can be deleted");
     });
     expect(screen.getByText("Submitted elsewhere")).toBeInTheDocument();
   });

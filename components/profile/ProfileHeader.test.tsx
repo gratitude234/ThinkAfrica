@@ -1,7 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getProfileIdentityLines } from "@/lib/profileIdentity";
 import ProfileHeader from "./ProfileHeader";
 
 vi.mock("next/navigation", () => ({
@@ -16,324 +14,102 @@ vi.mock("@/lib/activationEvents", async (importOriginal) => ({
   trackActivationEvent,
 }));
 
+type HeaderProps = Parameters<typeof ProfileHeader>[0];
+
 function baseProfile(
-  overrides: Partial<Parameters<typeof ProfileHeader>[0]["profile"]> = {}
-) {
+  overrides: Partial<HeaderProps["profile"]> = {}
+): HeaderProps["profile"] {
   return {
     id: "user-1",
     username: "student1",
     full_name: "A Student",
-    country: "Nigeria",
-    university: "University of Lagos",
-    field_of_study: "Political Science",
-    graduation_year: 2028,
-    is_alumni: false,
     bio: "Writes about governance and institutions.",
     avatar_url: null,
-    cover_image_url: null,
+    professional_title: null,
     verified: false,
     verified_type: null,
-    profile_type: "student",
-    professional_title: null,
-    organization_name: null,
-    organization_website: null,
-    positioning_statement: null,
     ...overrides,
   };
 }
-
-const POPULATED_RECORD = {
-  publicationCount: 5,
-  sourceBackedCount: 3,
-  citableCount: 1,
-  responseCount: 4,
-
-  researchCount: 0,
-};
-
-const EMPTY_RECORD = {
-  publicationCount: 0,
-  sourceBackedCount: 0,
-  citableCount: 0,
-  responseCount: 0,
-
-  researchCount: 0,
-};
-
-const TOPICS = [
-  { key: "governance", label: "Governance", count: 4 },
-  { key: "history", label: "History", count: 2 },
-  { key: "policy", label: "Policy", count: 1 },
-  { key: "economics", label: "Economics", count: 1 },
-];
 
 function renderHeader({
   profileOverrides = {},
   props = {},
 }: {
-  profileOverrides?: Partial<Parameters<typeof ProfileHeader>[0]["profile"]>;
-  props?: Partial<Parameters<typeof ProfileHeader>[0]>;
+  profileOverrides?: Partial<HeaderProps["profile"]>;
+  props?: Partial<HeaderProps>;
 } = {}) {
   return render(
     <ProfileHeader
       profile={baseProfile(profileOverrides)}
-      demonstratedTopics={TOPICS}
-      recordSummary={POPULATED_RECORD}
       followerCount={12}
+      followingCount={34}
       isOwnProfile
       currentUserId="user-1"
       initialFollowing={false}
-      isOpenToOpportunities={false}
-      canContact={false}
-      talentProfileId={null}
       {...props}
     />
   );
 }
 
 describe("ProfileHeader identity", () => {
-  it("derives a student identity without showing a persona label", () => {
-    renderHeader();
+  it("shows the name, the handle and the writer's own headline", () => {
+    renderHeader({ profileOverrides: { professional_title: "Policy researcher" } });
 
-    expect(screen.getByText("Political Science student")).toBeInTheDocument();
-    expect(screen.getByText("University of Lagos · Nigeria")).toBeInTheDocument();
-    expect(screen.queryByText("Student", { exact: true })).not.toBeInTheDocument();
-  });
-
-  it("uses professional identity fields for non-students", () => {
+    expect(screen.getByRole("heading", { level: 1, name: "A Student" })).toBeInTheDocument();
+    expect(screen.getByText("@student1")).toBeInTheDocument();
+    expect(screen.getByText("Policy researcher")).toBeInTheDocument();
+    // One line under the name. The bio is on About.
     expect(
-      getProfileIdentityLines(
-        baseProfile({
-          profile_type: "professional",
-          university: null,
-          field_of_study: null,
-          professional_title: "Climate policy researcher",
-          organization_name: "Civic Lab",
-        })
-      )
-    ).toEqual({
-      headline: "Climate policy researcher",
-      affiliation: "Civic Lab · Nigeria",
-      positioning: null,
-    });
-  });
-
-  it("falls back to affiliation and Writer on Indegenius for incomplete legacy profiles", () => {
-    expect(
-      getProfileIdentityLines(
-        baseProfile({
-          profile_type: null,
-          professional_title: null,
-          field_of_study: "Economics",
-        })
-      )
-    ).toEqual({
-      headline: "Writer on Indegenius",
-      affiliation: "University of Lagos · Nigeria",
-      positioning: null,
-    });
-  });
-});
-
-describe("ProfileHeader intellectual focus", () => {
-  const focus =
-    "Why Nigerian state budgets rarely survive contact with local government.";
-
-  it("renders the positioning statement as prose, not as a badge", () => {
-    renderHeader({ profileOverrides: { positioning_statement: focus } });
-
-    const statement = screen.getByText(focus);
-    expect(statement).toBeInTheDocument();
-    // It reads as the author's own sentence: no chip, no role, nothing that
-    // would present it as a title the platform conferred.
-    expect(statement.tagName).toBe("P");
-    expect(statement).not.toHaveAttribute("role");
-  });
-
-  it("shows a visitor nothing when the author has not written one", () => {
-    renderHeader({
-      props: { isOwnProfile: false, currentUserId: "someone-else" },
-    });
-
-    expect(
-      screen.queryByRole("link", { name: /intellectual focus/i })
+      screen.queryByText("Writes about governance and institutions.")
     ).not.toBeInTheDocument();
   });
 
-  it("offers the owner a way to add one", () => {
+  it("shows the bio when the writer has no headline", () => {
     renderHeader();
-
     expect(
-      screen.getByRole("link", { name: /Add your intellectual focus/i })
-    // Phase 2 moved profile editing to its own canonical route.
-    ).toHaveAttribute("href", "/settings/profile#focus");
+      screen.getByText("Writes about governance and institutions.")
+    ).toBeInTheDocument();
   });
 
-  it("collapses pasted line breaks into one line", () => {
-    renderHeader({
-      profileOverrides: { positioning_statement: "First line.\n\n  Second line." },
-    });
-
-    expect(screen.getByText("First line. Second line.")).toBeInTheDocument();
+  it("shows nothing under the name when there is neither", () => {
+    const { container } = renderHeader({ profileOverrides: { bio: null } });
+    // No derived persona line and no platform filler in its place.
+    expect(container.textContent).not.toMatch(/Writer on Indegenius|student\b/);
   });
-});
 
-describe("ProfileHeader record metrics", () => {
-  it("links every metric that has a value", () => {
+  it("falls back to the username when there is no name", () => {
+    renderHeader({ profileOverrides: { full_name: null } });
+    expect(screen.getByRole("heading", { level: 1, name: "student1" })).toBeInTheDocument();
+  });
+
+  it("names a verified account on the mark itself", () => {
     renderHeader({ profileOverrides: { verified: true, verified_type: "student" } });
-
-    expect(screen.getByLabelText("Verified student")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", {
-        name: /5 Publications\. Original published work/i,
-      })
-    ).toHaveAttribute("href", "/student1/record?type=publications");
-    expect(screen.getByText("Source-backed")).toBeInTheDocument();
-    expect(screen.getByText("Citable")).toBeInTheDocument();
-    expect(screen.queryByText(/point/i)).not.toBeInTheDocument();
-  });
-
-  it("hides a metric that is zero and keeps the ones that are not", () => {
-    renderHeader({
-      props: {
-        recordSummary: { ...POPULATED_RECORD, sourceBackedCount: 0, citableCount: 0 },
-      },
-    });
-
-    expect(screen.getByText("Publications")).toBeInTheDocument();
-    expect(screen.queryByText("Source-backed")).not.toBeInTheDocument();
-    expect(screen.queryByText("Citable")).not.toBeInTheDocument();
-  });
-
-  it("renders one tile per visible metric", () => {
-    const tileCount = (summary: typeof POPULATED_RECORD) => {
-      const { container, unmount } = render(
-        <ProfileHeader
-          profile={baseProfile()}
-          demonstratedTopics={TOPICS}
-          recordSummary={summary}
-          followerCount={0}
-          isOwnProfile={false}
-          currentUserId={null}
-          initialFollowing={false}
-          isOpenToOpportunities={false}
-          canContact={false}
-          talentProfileId={null}
-        />
-      );
-      // One tile per visible metric, which is the behaviour. The row used to
-      // be an N-column grid and this asserted the Tailwind class name.
-      const row = container.querySelector("[class*='divide-x']");
-      const count = row?.childElementCount ?? 0;
-      unmount();
-      return count;
-    };
-
-    expect(tileCount({ ...POPULATED_RECORD, sourceBackedCount: 0, citableCount: 0 })).toBe(1);
-    expect(tileCount({ ...POPULATED_RECORD, citableCount: 0 })).toBe(2);
-    expect(tileCount(POPULATED_RECORD)).toBe(3);
-  });
-
-  it("shows a visitor no metrics at all when the record is empty", () => {
-    renderHeader({
-      props: {
-        recordSummary: EMPTY_RECORD,
-        isOwnProfile: false,
-        currentUserId: "someone-else",
-      },
-    });
-
-    expect(screen.queryByText("Publications")).not.toBeInTheDocument();
-    expect(screen.queryByText("Source-backed")).not.toBeInTheDocument();
-    expect(screen.queryByText("Citable")).not.toBeInTheDocument();
-    expect(screen.queryByText("0")).not.toBeInTheDocument();
-    expect(screen.queryByText("Intellectual Record")).not.toBeInTheDocument();
-  });
-
-  it("gives the owner a next action instead of zeroes, and no completion score", () => {
-    renderHeader({ props: { recordSummary: EMPTY_RECORD } });
-
-    expect(
-      screen.getByRole("link", { name: /Publish your first contribution/i })
-    ).toHaveAttribute("href", "/write");
-    expect(screen.queryByText("0")).not.toBeInTheDocument();
-    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/complete/i)).not.toBeInTheDocument();
-  });
-
-  it("explains each metric without hover, on an accessible disclosure", async () => {
-    const user = userEvent.setup();
-    renderHeader();
-
-    const trigger = screen.getByRole("button", { name: "What these mean" });
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-
-    await user.click(trigger);
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(
-      screen.getByRole("group", {
-        name: "What the Intellectual Record metrics mean",
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Publications carrying at least one structured source/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/not popularity counts or an overall quality score/i)
-    ).toBeInTheDocument();
-
-    await user.keyboard("{Escape}");
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(trigger).toHaveFocus();
+    expect(screen.getByRole("img", { name: "Verified student" })).toBeInTheDocument();
   });
 });
 
-describe("ProfileHeader topics", () => {
-  it("limits the visible topics to three and labels the group", () => {
-    renderHeader();
-
-    expect(
-      screen.getByRole("list", { name: "Writes about" })
-    ).toBeInTheDocument();
-    expect(screen.getByText("Governance")).toBeInTheDocument();
-    expect(screen.getByText("History")).toBeInTheDocument();
-    expect(screen.getByText("Policy")).toBeInTheDocument();
-    expect(screen.queryByText("Economics")).not.toBeInTheDocument();
-  });
-
-  it("links each topic to the record filter that holds its work", () => {
-    renderHeader();
-
-    expect(screen.getByRole("link", { name: /^Governance/ })).toHaveAttribute(
-      "href",
-      "/student1/record?topic=governance"
-    );
-    // The count comes from the same pass that ranked the topic, so a chip can
-    // say how much work is behind it without a query per topic.
-    expect(screen.getByText("4")).toBeInTheDocument();
-  });
-
-  it("shows a visitor nothing when the author has demonstrated no topics", () => {
-    renderHeader({
-      props: {
-        demonstratedTopics: [],
-        isOwnProfile: false,
-        currentUserId: "someone-else",
-      },
+describe("ProfileHeader carries no record and no credibility", () => {
+  it("renders no Intellectual Record, metrics, topics, focus statement or cover", () => {
+    const { container } = renderHeader({
+      profileOverrides: { professional_title: "Policy researcher" },
     });
+    const text = container.textContent ?? "";
 
-    expect(
-      screen.queryByRole("list", { name: "Writes about" })
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/Topics appear here/i)).not.toBeInTheDocument();
-  });
-
-  it("guides the owner when they have demonstrated no topics", () => {
-    renderHeader({ props: { demonstratedTopics: [] } });
-
-    expect(
-      screen.getByText(/Topics appear here once you publish work tagged with them/i)
-    ).toBeInTheDocument();
+    for (const retired of [
+      /Intellectual Record/i,
+      /Writes about/i,
+      /citable/i,
+      /source-backed/i,
+      /intellectual focus/i,
+      /recognition/i,
+      /expertise/i,
+      /publications?\b/i,
+    ]) {
+      expect(text).not.toMatch(retired);
+    }
+    expect(screen.queryByRole("button", { name: /cover image/i })).toBeNull();
+    expect(container.querySelector('a[href*="/record"]')).toBeNull();
   });
 });
 
@@ -353,116 +129,66 @@ describe("ProfileHeader relationship counts", () => {
 
   it("says one follower rather than 1 followers", () => {
     renderHeader({ props: { followerCount: 1, followingCount: 0 } });
-
     expect(screen.getByRole("link", { name: "1 follower" })).toBeInTheDocument();
   });
 
   /**
-   * A zero here is a real answer to "how many people follow this person", not
-   * an empty metric. The record strip suppresses its zeros because an
-   * unpublished author has nothing to report yet; a follower count of zero is
-   * something to report.
+   * A zero here is a real answer to "how many people follow this person". It
+   * reads as words, never as a bare "0" an eye takes for a metric.
    */
-  it("prints a zero count as words, never as a bare metric", () => {
-    renderHeader({
-      props: { followerCount: 0, followingCount: 0, recordSummary: EMPTY_RECORD },
-    });
+  it("prints a zero count as words, never as a bare number", () => {
+    renderHeader({ props: { followerCount: 0, followingCount: 0 } });
 
     expect(screen.getByRole("link", { name: "0 followers" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "0 following" })).toBeInTheDocument();
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
-
-  /**
-   * The Command Center preview renders the same panel without a following
-   * count, because that model never loads one. The row has to read as one
-   * number rather than as a number and a gap.
-   */
-  it("omits the following count entirely when none was supplied", () => {
-    renderHeader({ props: { followerCount: 12 } });
-
-    expect(screen.getByRole("link", { name: "12 followers" })).toBeInTheDocument();
-    expect(screen.queryByText(/following/)).not.toBeInTheDocument();
-  });
-
-  /**
-   * Separators trail the item they follow rather than leading the next one.
-   * The two are indistinguishable while the line fits on one row and behave
-   * completely differently when it wraps: a leading dot opens the new line
-   * looking like a bullet, which is what a 320px phone showed for
-   * "· 64 following". Asserted at both ends, since a trailing dot on the last
-   * item would be the same defect in reverse.
-   */
-  it("never opens or closes the meta line with a separator", () => {
-    renderHeader({
-      profileOverrides: {
-        university: null,
-        country: null,
-        organization_name: null,
-      },
-      props: { followerCount: 3, followingCount: 4 },
-    });
-
-    const metaLine = screen
-      .getByRole("link", { name: "3 followers" })
-      .closest("p");
-    const text = metaLine?.textContent?.trim() ?? "";
-
-    expect(text.startsWith("·")).toBe(false);
-    expect(text.endsWith("·")).toBe(false);
-    expect(text).toContain("3 followers");
-    expect(text).toContain("4 following");
-  });
 });
 
 describe("ProfileHeader actions", () => {
-  it("offers the owner editing and nothing to do to themselves", () => {
+  it("offers the owner Edit profile and Share, and nothing to do to themselves", () => {
     renderHeader();
 
     expect(screen.getByRole("link", { name: "Edit profile" })).toHaveAttribute(
       "href",
       "/settings/profile"
     );
-    expect(screen.queryByRole("button", { name: /Follow author/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Message" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Follow/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /message/i })).not.toBeInTheDocument();
   });
 
-  it("offers a visitor the relationship controls", () => {
-    renderHeader({
-      props: {
-        isOwnProfile: false,
-        currentUserId: "viewer-9",
-        messagingEligibility: { eligible: true, reason: null },
-      },
-    });
+  it("offers a visitor Follow and the menu that holds Share, Report and Block", () => {
+    renderHeader({ props: { isOwnProfile: false, currentUserId: "viewer-9" } });
 
-    expect(screen.getByRole("button", { name: "Follow author" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Message" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Follow A Student" })).toHaveTextContent("Follow");
+    expect(screen.getByRole("button", { name: "More profile actions" })).toBeInTheDocument();
+    // Follow is the only relationship: no subscribe bell beside it.
+    expect(screen.queryByRole("button", { name: /subscri/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /message/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit profile" })).not.toBeInTheDocument();
+  });
+
+  it("offers a signed-out reader no Message control either", () => {
+    renderHeader({ props: { isOwnProfile: false, currentUserId: null } });
+
+    expect(screen.queryByRole("button", { name: /message/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /message/i })).not.toBeInTheDocument();
   });
 
   /**
    * A blocked visitor is shown a profile with no relationship controls and no
-   * explanation. Saying "you have blocked this person" here would be a
-   * disclosure in the other direction too, since the same header renders for
-   * both sides of the block.
+   * explanation. The same header renders for both sides of a block, so saying
+   * so would be a disclosure in the other direction.
    */
   it("tells a blocked visitor nothing about the block", () => {
     renderHeader({
-      props: {
-        isOwnProfile: false,
-        currentUserId: "viewer-9",
-        initialBlocked: true,
-        messagingEligibility: { eligible: true, reason: null },
-      },
+      props: { isOwnProfile: false, currentUserId: "viewer-9", initialBlocked: true },
     });
 
-    expect(screen.queryByRole("button", { name: "Follow author" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Message" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Follow/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/block/i)).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "More profile actions" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More profile actions" })).toBeInTheDocument();
   });
 });
 
@@ -472,9 +198,7 @@ describe("ProfileHeader funnel instrumentation", () => {
   });
 
   it("records one profile view after render, with no personal data", () => {
-    renderHeader({
-      props: { isOwnProfile: false, currentUserId: "viewer-9" },
-    });
+    renderHeader({ props: { isOwnProfile: false, currentUserId: "viewer-9" } });
 
     const views = trackActivationEvent.mock.calls.filter(
       ([payload]) => payload.event === "profile_viewed"
@@ -492,34 +216,15 @@ describe("ProfileHeader funnel instrumentation", () => {
   });
 
   it("does not send a second view when the header rerenders", () => {
-    const { rerender } = render(
-      <ProfileHeader
-        profile={baseProfile()}
-        demonstratedTopics={TOPICS}
-        recordSummary={POPULATED_RECORD}
-        followerCount={1}
-        isOwnProfile={false}
-        currentUserId={null}
-        initialFollowing={false}
-        isOpenToOpportunities={false}
-        canContact={false}
-        talentProfileId={null}
-      />
-    );
-    rerender(
-      <ProfileHeader
-        profile={baseProfile()}
-        demonstratedTopics={TOPICS}
-        recordSummary={POPULATED_RECORD}
-        followerCount={2}
-        isOwnProfile={false}
-        currentUserId={null}
-        initialFollowing={false}
-        isOpenToOpportunities={false}
-        canContact={false}
-        talentProfileId={null}
-      />
-    );
+    const props = {
+      profile: baseProfile(),
+      followingCount: 0,
+      isOwnProfile: false,
+      currentUserId: null,
+      initialFollowing: false,
+    };
+    const { rerender } = render(<ProfileHeader {...props} followerCount={1} />);
+    rerender(<ProfileHeader {...props} followerCount={2} />);
 
     expect(
       trackActivationEvent.mock.calls.filter(
@@ -530,40 +235,10 @@ describe("ProfileHeader funnel instrumentation", () => {
 
   it("distinguishes an anonymous visitor from the owner", () => {
     renderHeader({ props: { isOwnProfile: false, currentUserId: null } });
-    expect(trackActivationEvent.mock.calls[0][0].metadata.viewerState).toBe(
-      "anonymous"
-    );
+    expect(trackActivationEvent.mock.calls[0][0].metadata.viewerState).toBe("anonymous");
 
     trackActivationEvent.mockClear();
     renderHeader();
     expect(trackActivationEvent.mock.calls[0][0].metadata.viewerState).toBe("owner");
-  });
-});
-
-describe("ProfileHeader cover image", () => {
-  const COVER = "https://example.test/cover.jpg";
-
-  it("opens the full-screen viewer, because the band shows a crop", async () => {
-    const user = userEvent.setup();
-    renderHeader({ profileOverrides: { cover_image_url: COVER } });
-
-    expect(screen.queryByRole("dialog")).toBeNull();
-    await user.click(
-      screen.getByRole("button", { name: "View cover image full screen" })
-    );
-
-    const dialog = screen.getByRole("dialog");
-    expect(dialog).toBeInTheDocument();
-    expect(
-      screen.getByRole("img", { name: "A Student cover image" }).getAttribute("src")
-    ).toBe(COVER);
-  });
-
-  it("offers nothing to click when there is no cover", () => {
-    renderHeader();
-
-    expect(
-      screen.queryByRole("button", { name: "View cover image full screen" })
-    ).toBeNull();
   });
 });

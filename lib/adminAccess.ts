@@ -3,20 +3,13 @@ import "server-only";
 import { createAdminClient, AdminAccessError } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/lib/types";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 
 export type AdminCapability =
   | "admin.full"
-  | "editorial.manage"
   | "review.assigned"
   | "users.verify"
   | "moderation.manage"
-  | "opportunities.manage"
-  | "partners.manage"
-  | "sponsors.manage"
-  | "ambassadors.manage"
   | "analytics.view"
-  | "digest.manage"
   | "communications.manage"
   | "communications.send_as_executive";
 
@@ -39,12 +32,6 @@ export type AdminNavItem = {
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
-    href: "/admin/review",
-    title: "Editorial Queue",
-    description: "Assign reviewers and make final editorial decisions.",
-    capability: "editorial.manage",
-  },
-  {
     href: "/admin/verification",
     title: "Contributor Verification",
     description: "Verify contributors and manage reviewer/editor roles.",
@@ -57,73 +44,25 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     capability: "moderation.manage",
   },
   {
-    href: "/admin/fellowships",
-    title: "Opportunities",
-    description: "Manage curated opportunities and applications.",
-    capability: "opportunities.manage",
-  },
-  {
-    href: "/admin/campuses",
-    title: "Campus Programs",
-    description: "Operate selected cohorts, editorial prompts, and recurring campus programs.",
-    capability: "ambassadors.manage",
-  },
-  {
-    href: "/admin/ambassadors",
-    title: "Ambassadors",
-    description: "Review applications and activate Ambassadors at selected campuses.",
-    capability: "ambassadors.manage",
-  },
-  {
-    href: "/admin/partners",
-    title: "Partners",
-    description: "Manage institutional partner visibility.",
-    capability: "partners.manage",
-  },
-  {
-    href: "/admin/sponsors",
-    title: "Sponsors",
-    description: "Manage sponsor placements.",
-    capability: "sponsors.manage",
-  },
-  {
     href: "/admin/analytics",
     title: "Analytics",
     description: "Review platform activity and growth signals.",
     capability: "analytics.view",
   },
-  ...(FEATURE_FLAGS.research ? [{
-    href: "/admin/research",
-    title: "Research Expansion",
-    description: "Measure structured inquiry, collaboration, outputs, and the Phase 4 exit gate.",
-    capability: "analytics.view" as const,
-  }] : []),
   {
     href: "/admin/communications",
     title: "Communications",
     description: "Compose and broadcast email to the Indegenius community.",
     capability: "communications.manage",
   },
-  {
-    href: "/admin/digest",
-    title: "Digest",
-    description: "Preview the weekly editorial digest.",
-    capability: "digest.manage",
-  },
 ];
 
 const FULL_ADMIN_CAPABILITIES: AdminCapability[] = [
   "admin.full",
-  "editorial.manage",
   "review.assigned",
   "users.verify",
   "moderation.manage",
-  "opportunities.manage",
-  "partners.manage",
-  "sponsors.manage",
-  "ambassadors.manage",
   "analytics.view",
-  "digest.manage",
   "communications.manage",
   // Sending as a named executive is deliberately its own capability: a
   // moderator who can run the platform's own announcements still should not be
@@ -140,7 +79,7 @@ export function getAdminCapabilitiesForRole(
   }
 
   if (role === "editor") {
-    return ["editorial.manage", "review.assigned"];
+    return ["review.assigned"];
   }
 
   if (role === "reviewer") {

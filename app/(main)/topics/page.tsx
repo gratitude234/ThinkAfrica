@@ -1,6 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { isFormallyReviewed } from "@/lib/contentModel";
-import { isTopicSubscriptionsEnabled } from "@/lib/featureFlags";
 import { normalizeTagValue } from "@/lib/tags";
 import TopicsClient from "./TopicsClient";
 
@@ -64,9 +62,6 @@ const TOPIC_CATEGORIES: Record<string, string[]> = {
 
 type TagRow = {
   tags: string[] | null;
-  type?: string | null;
-  citation_id?: string | null;
-  published_version_id?: string | null;
 };
 
 export default async function TopicsPage() {
@@ -79,44 +74,25 @@ export default async function TopicsPage() {
   ] = await Promise.all([
     supabase
       .from("posts")
-      .select("tags, type, citation_id, published_version_id")
+      .select("tags")
       .eq("status", "published")
       .limit(500),
     supabase.auth.getUser(),
   ]);
 
   let initialInterests: string[] = [];
-  let initialSubscribedTopicKeys: string[] = [];
-  const subscriptionsEnabled = isTopicSubscriptionsEnabled();
   if (user) {
-    if (subscriptionsEnabled) {
-      const { data: subscriptions } = await supabase
-        .from("topic_subscriptions")
-        .select("topic_key")
-        .eq("subscriber_id", user.id);
-      initialSubscribedTopicKeys = (subscriptions ?? []).map(
-        (row) => row.topic_key as string
-      );
-    } else {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("interests")
-        .eq("id", user.id)
-        .single();
-      initialInterests = (profile?.interests as string[] | null) ?? [];
-    }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("interests")
+      .eq("id", user.id)
+      .single();
+    initialInterests = (profile?.interests as string[] | null) ?? [];
   }
 
   const counts = new Map<string, { tag: string; count: number }>();
-  // Evidence-based, not name-based: a type merely qualifying for the
-  // editorial workflow (e.g. a still-pending policy brief) does not count
-  // as "reviewed" until a record actually completes it (see
-  // lib/contentModel.ts). A single counter avoids double-counting a post
-  // that is both citable and formally reviewed.
-  let citableOrReviewedCount = 0;
   ((postsRaw ?? []) as TagRow[]).forEach((post) =>
     {
-      if (isFormallyReviewed(post)) citableOrReviewedCount++;
       const postTopics = new Map<string, string>();
       (post.tags ?? []).forEach((tag) => {
         const topicKey = normalizeTagValue(tag);
@@ -175,10 +151,8 @@ export default async function TopicsPage() {
         </p>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">Explore Topics</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
-          Browse {allTags.length} topics from the community and{" "}
-          {subscriptionsEnabled
-            ? "subscribe for a dedicated feed and in-app publication alerts."
-            : "follow the ones that should shape your feed."}
+          Browse {allTags.length} topics from the community and follow the ones
+          that should shape your feed.
         </p>
       </div>
 
@@ -188,19 +162,9 @@ export default async function TopicsPage() {
           <p className="mt-1 text-2xl font-bold text-gray-900">{allTags.length}</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500">
-            {subscriptionsEnabled ? "Your subscriptions" : "Your interests"}
-          </p>
+          <p className="text-xs font-medium text-gray-500">Your interests</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">
-            {subscriptionsEnabled
-              ? initialSubscribedTopicKeys.length
-              : initialInterests.length}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500">Citable or reviewed</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
-            {citableOrReviewedCount.toLocaleString()}
+            {initialInterests.length}
           </p>
         </div>
       </div>
@@ -213,7 +177,6 @@ export default async function TopicsPage() {
         <TopicsClient
           sections={sections}
           initialInterests={initialInterests}
-          initialSubscribedTopicKeys={initialSubscribedTopicKeys}
           userId={user?.id ?? null}
         />
       )}

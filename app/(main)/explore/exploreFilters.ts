@@ -1,12 +1,16 @@
 import type { PostCardData } from "@/components/post/PostCard";
-import { resolveArticleFormat, resolveContentKind } from "@/lib/contentModel";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
+import { resolveContentKind } from "@/lib/contentModel";
 
-// Primary Explore filters are the three top-level content kinds (plus
-// "All"). Essay and Policy Brief are refinements of Articles, not
-// top-level content types; see docs/content-model.md.
-export type ExplorePrimaryFilter = "all" | "post" | "article" | "research";
-export type ExploreGenreFilter = "all" | "general" | "essay" | "policy_brief";
+/**
+ * Explore filters on the two things the product publishes, and nothing else.
+ *
+ * There used to be a second axis under Articles: a genre refinement of Essay,
+ * Policy Brief and General, filtered in memory because `article_format` was
+ * descriptive metadata rather than a feed axis. Genre is not part of the
+ * product and `posts.article_format` is always null now, so the axis and the
+ * in-memory refinement it needed are gone with it.
+ */
+export type ExplorePrimaryFilter = "all" | "post" | "article";
 
 export const PRIMARY_FILTERS: Array<{
   value: ExplorePrimaryFilter;
@@ -15,91 +19,49 @@ export const PRIMARY_FILTERS: Array<{
   { value: "all", label: "All" },
   { value: "post", label: "Posts" },
   { value: "article", label: "Articles" },
-  ...(FEATURE_FLAGS.research
-    ? [{ value: "research" as const, label: "Research" }]
-    : []),
 ];
 
-export const GENRE_FILTERS: Array<{
-  value: ExploreGenreFilter;
-  label: string;
-}> = [
-  { value: "all", label: "All genres" },
-  { value: "general", label: "General" },
-  { value: "essay", label: "Essay" },
-  { value: "policy_brief", label: "Policy Brief" },
-];
+/**
+ * Old Explore links still land somewhere sensible.
+ *
+ * `type=essay` and `type=policy_brief` open Articles, which is what those
+ * pieces are now; the product offers neither as a filter. `type=research` is
+ * deliberately absent and falls through to "All", like any unknown value.
+ */
+// A Map, not an object literal. A plain record is reachable through its
+// prototype, so `?type=toString` would look up Object.prototype.toString, find
+// something truthy, and return a function where a filter was expected.
+const LEGACY_TYPE_PARAM = new Map<string, ExplorePrimaryFilter>([
+  ["blog", "post"],
+  ["post", "post"],
+  ["article", "article"],
+  ["essay", "article"],
+  ["policy_brief", "article"],
+]);
 
-function isExploreGenreFilter(value: string): value is ExploreGenreFilter {
-  return (
-    value === "all" || value === "general" || value === "essay" || value === "policy_brief"
-  );
-}
-
-// Preserve old Explore links while mapping them to the current taxonomy.
-const LEGACY_TYPE_PARAM: Record<string, { primary: ExplorePrimaryFilter; genre: ExploreGenreFilter }> = {
-  blog: { primary: "post", genre: "all" },
-  post: { primary: "post", genre: "all" },
-  article: { primary: "article", genre: "all" },
-  essay: { primary: "article", genre: "essay" },
-  policy_brief: { primary: "article", genre: "policy_brief" },
-  research: { primary: "research", genre: "all" },
-};
-
-export function getExploreFilters(
-  typeParam: string | null | undefined,
-  genreParam: string | null | undefined
-): { primary: ExplorePrimaryFilter; genre: ExploreGenreFilter } {
-  if (!typeParam || !(typeParam in LEGACY_TYPE_PARAM)) {
-    return { primary: "all", genre: "all" };
-  }
-
-  const mapped = LEGACY_TYPE_PARAM[typeParam];
-  if (mapped.primary === "research" && !FEATURE_FLAGS.research) {
-    return { primary: "all", genre: "all" };
-  }
-  if (mapped.primary === "article" && genreParam && isExploreGenreFilter(genreParam)) {
-    return { primary: "article", genre: genreParam };
-  }
-  return mapped;
+export function getExploreFilter(
+  typeParam: string | null | undefined
+): ExplorePrimaryFilter {
+  if (!typeParam) return "all";
+  return LEGACY_TYPE_PARAM.get(typeParam) ?? "all";
 }
 
 export function filterPostsByExplore(
   posts: PostCardData[],
-  primary: ExplorePrimaryFilter,
-  genre: ExploreGenreFilter = "all"
+  primary: ExplorePrimaryFilter
 ) {
-  // Resolve against the current content-model columns instead of the
-  // legacy `type` column so new records are classified correctly.
-  if (primary === "post") {
-    return posts.filter((post) => resolveContentKind(post) === "post");
-  }
-  if (primary === "research") {
-    return posts.filter((post) => resolveContentKind(post) === "research");
-  }
-  if (primary === "article") {
-    const articles = posts.filter((post) => resolveContentKind(post) === "article");
-    if (genre === "general") {
-      return articles.filter((post) => resolveArticleFormat(post) === null);
-    }
-    if (genre === "essay" || genre === "policy_brief") {
-      return articles.filter((post) => resolveArticleFormat(post) === genre);
-    }
-    return articles;
-  }
-  return FEATURE_FLAGS.research
-    ? posts
-    : posts.filter((post) => resolveContentKind(post) !== "research");
+  if (primary === "all") return posts;
+  return posts.filter((post) => resolveContentKind(post) === primary);
 }
 
 /**
- * The Explore primary filter and the feed's content filter are the same three
- * kinds under different names. Keeping the mapping explicit means a future
- * divergence is a compile error here rather than a silently unfiltered query.
+ * The Explore primary filter and the feed's content filter name the same
+ * kinds. Keeping the mapping explicit means a future divergence is a compile
+ * error here rather than a silently unfiltered query.
  */
 export function toFeedContentFilter(
   primary: ExplorePrimaryFilter
-): "all" | "post" | "article" | "research" {
+): "all" | "post" | "article" {
   return primary;
 }
 
@@ -107,23 +69,4 @@ export function getPrimaryFilterLabel(primary: ExplorePrimaryFilter): string {
   return (
     PRIMARY_FILTERS.find((filter) => filter.value === primary)?.label ?? "All"
   );
-}
-
-export function getGenreFilterLabel(genre: ExploreGenreFilter): string {
-  return (
-    GENRE_FILTERS.find((filter) => filter.value === genre)?.label ?? "All genres"
-  );
-}
-
-/**
- * Whether the genre chips are narrowing an already-loaded set of Articles
- * rather than the query itself. `article_format` is descriptive metadata, not
- * a feed axis, so Essay/Policy Brief/General refine in memory. The UI says so
- * when a refinement empties the page instead of claiming nothing exists.
- */
-export function isGenreRefinementActive(
-  primary: ExplorePrimaryFilter,
-  genre: ExploreGenreFilter
-) {
-  return primary === "article" && genre !== "all";
 }

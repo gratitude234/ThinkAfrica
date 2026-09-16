@@ -14,12 +14,7 @@
  * Everything a surface needs to render a notification is now described once, here.
  */
 
-export type NotificationCategory =
-  | "responses"
-  | "review"
-  | "opportunities"
-  | "subscriptions"
-  | "activity";
+export type NotificationCategory = "review" | "activity";
 
 /**
  * Semantic icon names. These replaced ASCII placeholder glyphs ("<3", "NEW", "+",
@@ -111,7 +106,7 @@ const toPost = (context: NotificationContext) =>
   context.postSlug ? `/post/${context.postSlug}` : null;
 const toProfile = (context: NotificationContext) =>
   context.actorUsername ? `/${context.actorUsername}` : null;
-const toGuidelines = () => "/editorial-standards";
+const toGuidelines = () => "/terms";
 
 export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = {
   // --- Trust and safety -----------------------------------------------------
@@ -127,7 +122,7 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     icon: "ban",
     tone: "critical",
     describe: () =>
-      "Your account has been suspended. Open the editorial standards for details.",
+      "Your account has been suspended. Open the terms of use for details.",
     hrefFor: toGuidelines,
   },
   moderation_post_removed: {
@@ -246,26 +241,18 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
       `${context.postTitle} was not accepted for publication.`,
     hrefFor: () => "/dashboard",
   },
-  fellowship: {
-    label: "Fellowship update",
-    category: "review",
-    priority: 50,
-    cta: "Open update",
-    actionKey: "status_update",
-    actionable: true,
-    icon: "briefcase",
-    tone: "neutral",
-    describe: () => "You have a fellowship update.",
-  },
 
   // --- Conversation ---------------------------------------------------------
+  // LEGACY COMPATIBILITY — historic response_post notification. Responses are
+  // retired and none is written any more. Old rows still render and open the
+  // piece they announced, filed under activity and asking nothing of the reader.
   response_post: {
     label: "Response to your work",
-    category: "responses",
-    priority: 20,
+    category: "activity",
+    priority: 70,
     cta: "Read response",
     actionKey: "response_received",
-    actionable: true,
+    actionable: false,
     icon: "reply",
     tone: "neutral",
     describe: (context) =>
@@ -284,21 +271,6 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     describe: (context) =>
       `${context.actorName} commented on ${context.postTitle}.`,
     hrefFor: toPost,
-  },
-
-  // --- Opportunities --------------------------------------------------------
-  opportunity_inquiry: {
-    label: "Opportunity inquiry",
-    category: "opportunities",
-    priority: 30,
-    cta: "Review inquiry",
-    actionKey: "opportunity_inquiry",
-    actionable: true,
-    icon: "briefcase",
-    tone: "neutral",
-    describe: () =>
-      "A partner sent structured opportunity interest for your profile.",
-    hrefFor: () => "/dashboard#opportunity-interest",
   },
 
   // --- Collaboration --------------------------------------------------------
@@ -352,7 +324,6 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     tone: "neutral",
     describe: (context) =>
       `${context.actorName} sent you a research collaboration request.`,
-    hrefFor: () => "/research",
   },
   research_collaboration_accepted: {
     label: "Research request accepted",
@@ -365,7 +336,6 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     tone: "positive",
     describe: (context) =>
       `${context.actorName} accepted your research collaboration request.`,
-    hrefFor: () => "/research",
   },
   research_collaboration_declined: {
     label: "Research request declined",
@@ -378,13 +348,15 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     tone: "neutral",
     describe: (context) =>
       `${context.actorName} declined your research collaboration request.`,
-    hrefFor: () => "/research",
   },
 
-  // --- Publication delivery -------------------------------------------------
+  // --- Retired publication delivery ----------------------------------------
+  // Author subscriptions and their delivery were removed in the publishing
+  // reset, Phase 2H, and nothing sends these any more. Existing rows still
+  // render, as ordinary activity.
   author_published: {
     label: "New from an author you follow",
-    category: "subscriptions",
+    category: "activity",
     priority: 78,
     cta: "Read now",
     actionKey: "author_published",
@@ -397,7 +369,7 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
   },
   topic_published: {
     label: "New in a topic you follow",
-    category: "subscriptions",
+    category: "activity",
     priority: 79,
     cta: "Read now",
     actionKey: "topic_published",
@@ -405,23 +377,23 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     icon: "hashtag",
     tone: "neutral",
     describe: (context) =>
-      `New work was published in a topic you subscribe to: ${context.postTitle}.`,
+      `New work was published in a topic you follow: ${context.postTitle}.`,
     hrefFor: toPost,
   },
 
   // --- Audience -------------------------------------------------------------
-  // Subscribing outranks a follow: it is the strongest signal a reader can give,
-  // and it opts them into every future publication.
+  // Retired with author subscriptions in Phase 2H. A subscriber always
+  // followed too, so an existing row reads as the follow it also was.
   author_subscribed: {
-    label: "New subscriber",
+    label: "New follower",
     category: "activity",
-    priority: 75,
+    priority: 80,
     cta: "View profile",
     actionKey: "author_subscribed",
     actionable: false,
-    icon: "star",
-    tone: "positive",
-    describe: (context) => `${context.actorName} subscribed to your work.`,
+    icon: "user-plus",
+    tone: "neutral",
+    describe: (context) => `${context.actorName} started following your work.`,
     hrefFor: toProfile,
   },
   follow: {
@@ -434,18 +406,6 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     icon: "user-plus",
     tone: "neutral",
     describe: (context) => `${context.actorName} started following your work.`,
-    hrefFor: toProfile,
-  },
-  badge: {
-    label: "New badge",
-    category: "activity",
-    priority: 85,
-    cta: "View profile",
-    actionKey: "badge",
-    actionable: false,
-    icon: "trophy",
-    tone: "positive",
-    describe: () => "You earned a new badge.",
     hrefFor: toProfile,
   },
   like: {
@@ -505,8 +465,15 @@ export function notificationMessage(subject: NotificationSubject): string {
  * Resolves where a notification points. Returns null when nothing sensible can be
  * built, so a surface can render the row as plain text rather than a dead link.
  */
+/**
+ * The tracked-delivery links publication alerts used to carry. The route that
+ * resolved them was removed with publication delivery in Phase 2H, so a
+ * stored one is ignored and the notification links to its post instead.
+ */
+const RETIRED_DELIVERY_LINK = /^\/r\/p\//;
+
 export function notificationHref(subject: NotificationSubject): string | null {
-  if (subject.link) return subject.link;
+  if (subject.link && !RETIRED_DELIVERY_LINK.test(subject.link)) return subject.link;
   const descriptor = describeNotificationType(subject.type);
   return descriptor.hrefFor?.(notificationContext(subject)) ?? null;
 }

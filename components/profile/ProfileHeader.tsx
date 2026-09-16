@@ -1,76 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import AuthorRelationshipControls from "@/components/profile/AuthorRelationshipControls";
+import { useEffect, useRef, useState } from "react";
 import BlockUserButton from "@/components/moderation/BlockUserButton";
 import ReportButton from "@/components/moderation/ReportButton";
-import ContactInquiryModal from "@/components/profile/ContactInquiryModal";
-import ProfileIdentityPanel from "@/components/profile/ProfileIdentityPanel";
 import ProfileViewTracker from "@/components/profile/ProfileViewTracker";
 import ShareButton from "@/components/profile/ShareButton";
-import { findOrCreateConversation } from "@/lib/messaging";
-import type { PublicProfileIdentity } from "@/lib/profileIdentity";
+import FollowButton from "@/components/ui/FollowButton";
+import UserAvatar from "@/components/ui/UserAvatar";
 import {
   getProfileViewerState,
   trackProfileFunnelEvent,
 } from "@/lib/profileFunnel";
-import type { ProfileRecordSummary } from "@/lib/profileRecord";
-import type { DemonstratedTopic } from "@/lib/profileTopics";
-import { createClient } from "@/lib/supabase/client";
+import {
+  getProfileDisplayName,
+  getProfileHeadline,
+  type PublicProfileIdentity,
+} from "@/lib/profileIdentity";
 
 export type { PublicProfileIdentity } from "@/lib/profileIdentity";
 
-/**
- * The header's own action buttons, in one place so Message, Edit profile and
- * the overflow trigger cannot drift apart.
- *
- * The radius is deliberately `rounded-lg` rather than the mockup's pill. The
- * Follow control sitting beside these is `AuthorRelationshipControls`, which
- * is shared with the mobile sticky bar, the feed interludes and the V2
- * variant, and it sets its own radius internally. Rounding only the buttons
- * this file owns would put a pill next to a rectangle; rounding the shared
- * control instead would restyle four other surfaces to settle a corner on
- * this one. The mockup's restraint is carried here by weight and colour
- * instead: one filled primary, one outlined secondary, everything else quiet.
- */
 const ACTION_BASE =
   "focus-ring inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors";
 
 /** The single filled action. Only ever one of these is on screen at a time. */
 const ACTION_PRIMARY = `${ACTION_BASE} bg-emerald-brand text-white hover:bg-[#0E4B37]`;
 
-/** Outlined in the brand, the way the mockup sets Message beside Follow. */
-const ACTION_SECONDARY = `${ACTION_BASE} border border-emerald-brand/40 bg-card text-emerald-ink hover:border-emerald-brand hover:bg-green-tint`;
-
 interface ProfileHeaderProps {
   profile: PublicProfileIdentity;
-  /**
-   * Topics this author has published on. Declared interests are deliberately
-   * not accepted here: the header is the most-read claim on the page, and a
-   * ticked checkbox rendered beside published work reads as published work.
-   */
-  demonstratedTopics: DemonstratedTopic[];
-  recordSummary: ProfileRecordSummary;
   followerCount: number;
-  /**
-   * Counted from `follows` on every request, like the follower count beside
-   * it. Neither is stored: both are a single indexed head query, and a
-   * denormalised counter would need triggers and a reconciliation job to earn
-   * its keep.
-   */
-  followingCount?: number | null;
+  followingCount: number;
   isOwnProfile: boolean;
   currentUserId: string | null;
   initialFollowing: boolean;
-  initialSubscribed?: boolean;
   initialBlocked?: boolean;
-  isOpenToOpportunities: boolean;
-  canContact: boolean;
-  talentProfileId: string | null;
-  messagingEligibility?: { eligible: boolean; reason: string | null } | null;
 }
 
 function MoreMenu({
@@ -85,7 +48,7 @@ function MoreMenu({
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const displayName = profile.full_name ?? profile.username;
+  const displayName = getProfileDisplayName(profile);
 
   useEffect(() => {
     if (!open) return;
@@ -154,33 +117,50 @@ function MoreMenu({
 }
 
 /**
- * The public profile's header: relationship behaviour wrapped around the
- * shared identity presentation.
+ * The platform's own confirmation that an account belongs to who it says, set
+ * by an admin. The name of the state is the accessible name, on the element
+ * itself, so touch and keyboard users get it too.
+ */
+function VerifiedMark({ profile }: { profile: PublicProfileIdentity }) {
+  if (!profile.verified) return null;
+  const label = profile.verified_type
+    ? `Verified ${profile.verified_type}`
+    : "Verified profile";
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-brand text-[11px] font-bold leading-none text-white"
+    >
+      ✓
+    </span>
+  );
+}
+
+/**
+ * A writer's profile header: photo, name, username, an optional headline or
+ * bio, the two relationship counts, and what the reader can do.
  *
- * The card itself lives in ProfileIdentityPanel, which the Command Center's
- * preview renders with no actions. Keeping one implementation is what stops
- * the preview from quietly becoming a different page than the one it claims
- * to show.
+ * The publishing reset, Phase 2G, reduced it to that. The cover band, record
+ * metrics, "Writes about" topics, the intellectual focus line and the sticky
+ * follow bar are gone, and nothing on it measures or ranks the writer.
+ *
+ * The counts are single text nodes rather than an emphasised number beside a
+ * label: an element whose whole text is "0" reads as a metric of zero.
  */
 export default function ProfileHeader({
   profile,
-  demonstratedTopics,
-  recordSummary,
   followerCount,
-  followingCount = null,
+  followingCount,
   isOwnProfile,
   currentUserId,
   initialFollowing,
-  initialSubscribed = false,
   initialBlocked = false,
-  isOpenToOpportunities,
-  canContact,
-  talentProfileId,
-  messagingEligibility,
 }: ProfileHeaderProps) {
-  const router = useRouter();
-  const [showInquiry, setShowInquiry] = useState(false);
-  const displayName = profile.full_name ?? profile.username;
+  const displayName = getProfileDisplayName(profile);
+  const headline = getProfileHeadline(profile);
+  const bio = profile.bio?.trim() || null;
   const viewerState = getProfileViewerState({
     viewerId: currentUserId,
     profileId: profile.id,
@@ -201,18 +181,14 @@ export default function ProfileHeader({
     />
   ) : (
     <>
-      <AuthorRelationshipControls
-        authorId={profile.id}
+      <FollowButton
+        followingId={profile.id}
         authorName={displayName}
         currentUserId={currentUserId}
         initialFollowing={initialFollowing}
-        initialSubscribed={initialSubscribed}
         source="profile"
-        variant="icon"
         /* Fires only once the server has confirmed the follow, so the funnel
-           counts relationships rather than clicks: a click that fails, or
-           that redirects an anonymous reader to sign in, is not a
-           conversion. */
+           counts relationships rather than clicks. */
         onFollowCompleted={() =>
           trackProfileFunnelEvent({
             event: "profile_follow_completed",
@@ -222,23 +198,6 @@ export default function ProfileHeader({
           })
         }
       />
-      {!currentUserId ? (
-        <button
-          type="button"
-          onClick={() =>
-            router.push(`/login?redirectTo=${encodeURIComponent(`/${profile.username}`)}`)
-          }
-          className={ACTION_SECONDARY}
-        >
-          Message
-        </button>
-      ) : messagingEligibility?.eligible ? (
-        <MessageButton
-          currentUserId={currentUserId}
-          targetUserId={profile.id}
-          reason={messagingEligibility.reason}
-        />
-      ) : null}
       <MoreMenu
         profile={profile}
         currentUserId={currentUserId}
@@ -247,124 +206,57 @@ export default function ProfileHeader({
     </>
   );
 
-  const availability = isOpenToOpportunities ? (
-    isOwnProfile ? (
-      <Link
-        href="/settings/profile#opportunities"
-        className="tap-target focus-ring inline-flex items-center rounded-full border border-green-wash-border bg-green-tint px-3 py-1 text-xs font-semibold text-emerald-ink"
-      >
-        Open to opportunities
-      </Link>
-    ) : canContact ? (
-      <button
-        type="button"
-        onClick={() => {
-          if (!currentUserId) {
-            router.push(`/login?redirectTo=/${profile.username}`);
-            return;
-          }
-          setShowInquiry(true);
-        }}
-        className="tap-target focus-ring inline-flex items-center rounded-full border border-green-wash-border bg-green-tint px-3 py-1 text-xs font-semibold text-emerald-ink hover:bg-green-wash"
-      >
-        Open to opportunities
-      </button>
-    ) : (
-      <span className="inline-flex items-center rounded-full border border-green-wash-border bg-green-tint px-3 py-1 text-xs font-semibold text-emerald-ink">
-        Open to opportunities
-      </span>
-    )
-  ) : null;
+  const countLinkClass = "tap-target focus-ring font-medium text-ink-soft hover:text-ink";
 
   return (
     <>
       <ProfileViewTracker profileId={profile.id} viewerState={viewerState} />
-      <ProfileIdentityPanel
-        profile={profile}
-        demonstratedTopics={demonstratedTopics}
-        recordSummary={recordSummary}
-        followerCount={followerCount}
-        followingCount={followingCount}
-        isOwnProfile={isOwnProfile}
-        actions={actions}
-        availability={availability}
-      />
+      <section aria-labelledby="profile-name" className="pb-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <UserAvatar
+              name={displayName}
+              src={profile.avatar_url}
+              size={80}
+              className="shrink-0 overflow-hidden rounded-full"
+            />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h1
+                  id="profile-name"
+                  className="font-display text-[26px] font-semibold leading-tight text-ink [overflow-wrap:anywhere] sm:text-[30px]"
+                >
+                  {displayName}
+                </h1>
+                <VerifiedMark profile={profile} />
+              </div>
+              <p className="mt-1 text-sm text-ink-muted [overflow-wrap:anywhere]">
+                @{profile.username}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+        </div>
 
-      {talentProfileId ? (
-        <ContactInquiryModal
-          talentProfileId={talentProfileId}
-          open={showInquiry}
-          onClose={() => setShowInquiry(false)}
-          source="profile_header"
-          funnel={{
-            profileId: profile.id,
-            viewerState,
-            surface: "profile_header",
-          }}
-        />
-      ) : null}
-    </>
-  );
-}
+        {headline ? (
+          <p className="mt-4 max-w-measure text-[15px] font-medium leading-6 text-ink-soft">
+            {headline}
+          </p>
+        ) : bio ? (
+          <p className="mt-4 line-clamp-3 max-w-measure whitespace-pre-line text-[15px] leading-6 text-ink-soft">
+            {bio}
+          </p>
+        ) : null}
 
-function MessageButton({
-  currentUserId,
-  targetUserId,
-  reason,
-}: {
-  currentUserId: string;
-  targetUserId: string;
-  reason: string | null;
-}) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isOpeningThread, startOpeningThread] = useTransition();
-  const isBusy = loading || isOpeningThread;
-
-  const handleMessage = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const supabase = createClient();
-      const conversationId = await findOrCreateConversation(
-        supabase,
-        currentUserId,
-        targetUserId
-      );
-      if (!conversationId) {
-        setError("Unable to start conversation.");
-        return;
-      }
-      startOpeningThread(() => router.push(`/messages/${conversationId}`));
-    } catch (messageError) {
-      setError(
-        messageError instanceof Error
-          ? messageError.message
-          : "Unable to start conversation."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={handleMessage}
-        disabled={isBusy}
-        aria-busy={isBusy || undefined}
-        title={reason ?? undefined}
-        className={`${ACTION_SECONDARY} disabled:opacity-50`}
-      >
-        {isBusy ? "Opening…" : "Message"}
-      </button>
-      {error ? (
-        <p className="mt-1 text-xs text-red-600" role="alert">
-          {error}
+        <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
+          <Link href={`/${profile.username}/followers`} className={countLinkClass}>
+            {`${followerCount.toLocaleString()} follower${followerCount === 1 ? "" : "s"}`}
+          </Link>
+          <Link href={`/${profile.username}/following`} className={countLinkClass}>
+            {`${followingCount.toLocaleString()} following`}
+          </Link>
         </p>
-      ) : null}
-    </div>
+      </section>
+    </>
   );
 }

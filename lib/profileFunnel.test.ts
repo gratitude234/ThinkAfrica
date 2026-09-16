@@ -18,31 +18,25 @@ const activationEvents = readFileSync(
 );
 
 describe("profile funnel event contract", () => {
-  it("keeps the five conversion steps, in order, at the head of the list", () => {
-    // Phase 3 added recognition and brief events to the same funnel. The
-    // original five stay first and unchanged, because the conversion rates in
-    // docs/profile-conversion-funnel.md are computed from them.
-    expect([...PROFILE_FUNNEL_EVENTS].slice(0, 5)).toEqual([
+  it("keeps the three conversion steps, in order, at the head of the list", () => {
+    // The conversion rates in docs/profile-conversion-funnel.md are computed
+    // from these three. Phase 2D removed the opportunity inquiry steps and
+    // Phase 2G the recognition, expertise and brief events.
+    expect([...PROFILE_FUNNEL_EVENTS]).toEqual([
       "profile_viewed",
       "profile_work_opened",
       "profile_follow_completed",
-      "profile_inquiry_opened",
-      "profile_inquiry_submitted",
     ]);
+    expect(PROFILE_FUNNEL_EVENTS as readonly string[]).not.toContain("profile_inquiry_opened");
+    expect(PROFILE_FUNNEL_EVENTS as readonly string[]).not.toContain("profile_inquiry_submitted");
   });
 
   it("names the surfaces a funnel step can start from", () => {
-    expect([...PROFILE_FUNNEL_SURFACES].slice(0, 5)).toEqual([
+    expect([...PROFILE_FUNNEL_SURFACES]).toEqual([
       "profile_header",
-      "featured_work",
-      "latest_record",
-      "full_record",
-      "sticky_bar",
+      "profile_posts",
+      "profile_articles",
     ]);
-    // Phase 3 surfaces are additive.
-    expect([...PROFILE_FUNNEL_SURFACES]).toContain("recognition");
-    expect([...PROFILE_FUNNEL_SURFACES]).toContain("demonstrated_expertise");
-    expect([...PROFILE_FUNNEL_SURFACES]).toContain("profile_brief");
   });
 
   it("registers every event with the server, or the row is never written", () => {
@@ -53,15 +47,14 @@ describe("profile funnel event contract", () => {
   });
 
   it("dedupes the view event rather than the actions", () => {
-    // Views repeat on every remount of the same page; a follow or an inquiry
-    // is a discrete act and must never be swallowed by a dedupe window.
+    // Views repeat on every remount of the same page; a follow is a discrete
+    // act and must never be swallowed by a dedupe window.
     const viewEvents = activationEvents.slice(
       activationEvents.indexOf("const VIEW_EVENTS")
     );
     const viewSet = viewEvents.slice(0, viewEvents.indexOf("]);"));
     expect(viewSet).toContain('"profile_viewed"');
     expect(viewSet).not.toContain('"profile_follow_completed"');
-    expect(viewSet).not.toContain('"profile_inquiry_submitted"');
   });
 });
 
@@ -102,16 +95,16 @@ describe("profile funnel metadata", () => {
         event: "profile_work_opened",
         profileId: "author-1",
         viewerState: "authenticated",
-        surface: "latest_record",
+        surface: "profile_posts",
         workId: "post-9",
-        workKind: "publication",
+        workKind: "post",
       })
     ).toEqual({
       profileId: "author-1",
       viewerState: "authenticated",
-      surface: "latest_record",
+      surface: "profile_posts",
       workId: "post-9",
-      workKind: "publication",
+      workKind: "post",
     });
   });
 
@@ -120,7 +113,7 @@ describe("profile funnel metadata", () => {
       event: "profile_follow_completed",
       profileId: "author-1",
       viewerState: "authenticated",
-      surface: "sticky_bar",
+      surface: "profile_header",
       workId: null,
       workKind: null,
     });
@@ -131,12 +124,12 @@ describe("profile funnel metadata", () => {
 
   it("never carries a name, an email, a bio, or anything an author wrote", () => {
     const metadata = buildProfileFunnelMetadata({
-      event: "profile_inquiry_submitted",
+      event: "profile_work_opened",
       profileId: "author-1",
       viewerState: "authenticated",
       surface: "profile_header",
       workId: "post-9",
-      workKind: "research",
+      workKind: "article",
     });
 
     expect(Object.keys(metadata).sort()).toEqual([

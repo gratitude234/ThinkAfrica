@@ -1,30 +1,19 @@
 ﻿import Link from "next/link";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import CreateTrigger from "@/app/(main)/CreateTrigger";
 import { BRAND_ORIGIN_STATEMENT, BRAND_PROMISE } from "@/lib/brand";
 
-// "Write" is ambiguous (Post/Article/Research Paper), so it renders the
-// shared Create chooser (CreateTrigger) instead of linking straight to
-// /write -- the landing page (Footer's only caller) is guest-only, so
-// userId is always null here; the chooser routes each choice through
-// login with the right destination preserved.
+// Write goes through CreateTrigger rather than a plain link: the landing page
+// (Footer's only caller) is guest-only, so userId is always null here, and the
+// trigger routes the guest through sign-in with /write preserved.
 const platformLinks = [
   { label: "Home", href: "/" },
   { label: "Explore", href: "/explore" },
-  { label: "Opportunities", href: "/opportunities" },
-  { label: "Policy Hub", href: "/policy" },
 ];
 
 const FOOTER_LINK_CLASS =
   "text-sm text-gray-400 hover:text-emerald-400 transition-colors";
 
-const communityLinks = [
-  ...(FEATURE_FLAGS.ambassadors
-    ? [{ label: "Become an Ambassador", href: "/ambassadors" }]
-    : []),
-  { label: "Editorial Standards", href: "/editorial-standards" },
-  { label: "About Us", href: "/about" },
-];
+const communityLinks = [{ label: "About Us", href: "/about" }];
 
 const legalLinks = [
   { label: "Privacy Policy", href: "/privacy" },

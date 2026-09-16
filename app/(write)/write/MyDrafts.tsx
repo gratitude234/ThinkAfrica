@@ -3,17 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { resolveContentKind } from "@/lib/contentModel";
 import { isAbandonedScrap } from "@/lib/contribution";
+import { deleteOwnDraftPosts } from "./deleteActions";
+import { loadMyDrafts } from "@/lib/composerActions";
 
 interface Draft {
   id: string;
   title: string | null;
   excerpt?: string | null;
   word_count?: number | null;
-  type: string;
   content_kind?: string | null;
-  article_format?: string | null;
   updated_at: string;
 }
 
@@ -54,6 +53,9 @@ export default function MyDrafts({
   variant?: "default" | "panel";
 }) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  // A failed load is not an empty list. Rendering nothing in both cases is
+  // what would tell a writer their drafts are gone.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [open, setOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [confirmingSweep, setConfirmingSweep] = useState(false);
@@ -61,46 +63,57 @@ export default function MyDrafts({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      supabase
-        .from("posts")
-        .select("id, title, excerpt, word_count, type, content_kind, article_format, updated_at")
-        .eq("author_id", user.id)
-        .eq("status", "draft")
-        .order("updated_at", { ascending: false })
-        .limit(30)
-        .then(({ data }) => setDrafts((data ?? []) as Draft[]));
+    // The list comes from the application, not the database. The viewer is
+    // resolved server-side, so the drafts returned are this member's by
+    // construction rather than because RLS refused a wrong id.
+    void loadMyDrafts().then((result) => {
+      if (result.ok) {
+        setDrafts(result.data as Draft[]);
+        setLoadFailed(false);
+        return;
+      }
+      // A failed load must not render as "no drafts". Somebody would conclude
+      // their work was gone.
+      setLoadFailed(result.reason === "unavailable");
     });
   }, []);
 
   const filtered = useMemo(
-    () => drafts.filter((draft) => draft.id !== activeDraftId && resolveContentKind(draft) !== "research"),
+    () => drafts.filter((draft) => draft.id !== activeDraftId),
     [activeDraftId, drafts]
   );
   const scraps = useMemo(() => filtered.filter((draft) => isAbandonedScrap(draft)), [filtered]);
 
   /**
-   * Deleting a draft is a plain row delete: guard_locked_post_write in the
-   * database is what actually permits it, and only ever for an author's own
-   * draft. A row that changed status in another tab is rejected there.
+   * Deleting a draft goes through a server action that checks ownership and
+   * status before the statement runs. guard_locked_post_write is still
+   * underneath and still only permits an author's own draft, but it is now the
+   * backstop rather than the decision. See lib/postDeletion.ts.
    */
   const remove = useCallback(async (ids: string[]) => {
     if (!ids.length) return;
     setBusy(true);
     setError(null);
-    const supabase = createClient();
-    const { error: deleteError } = await supabase.from("posts").delete().in("id", ids);
+    const result = await deleteOwnDraftPosts({ postIds: ids });
     setBusy(false);
-    if (deleteError) {
-      setError(deleteError.message || "Couldn't delete that. Try again.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    const removed = new Set(ids);
+    // Driven by what the server actually deleted, not by what was asked for,
+    // so a row that stopped being a draft in another tab stays on screen.
+    const removed = new Set(result.data.deleted);
     setDrafts((current) => current.filter((draft) => !removed.has(draft.id)));
     setConfirmingSweep(false);
   }, []);
+
+  if (loadFailed) {
+    return (
+      <p className="text-sm text-ink-muted">
+        Your drafts could not be loaded. Refresh to try again.
+      </p>
+    );
+  }
 
   if (filtered.length === 0) return null;
   const compact = variant === "panel";

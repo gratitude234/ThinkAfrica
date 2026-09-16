@@ -1,28 +1,19 @@
 ﻿"use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { RESEARCH_TYPE_QUERY_EXCLUSION } from "@/lib/featureFlags";
 import Badge from "@/components/ui/Badge";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { getPostMetadataTitle } from "@/lib/postDisplay";
-import { isFormallyReviewed } from "@/lib/contentModel";
-import { formatTagLabel } from "@/lib/tags";
 
 interface PostResult {
   id: string;
   title: string | null;
   slug: string;
   excerpt: string | null;
-  type: string;
   content_kind?: string | null;
-  article_format?: string | null;
-  citation_id?: string | null;
-  published_version_id?: string | null;
   published_at: string | null;
   profiles: {
     username: string;
@@ -44,7 +35,6 @@ interface PersonResult {
   username: string;
   full_name: string | null;
   university: string | null;
-  points: number;
   avatar_url: string | null;
 }
 
@@ -54,59 +44,14 @@ interface TopicResult {
 }
 
 
-interface OpportunityResult {
-  id: string;
-  title: string;
-  sponsor_name: string | null;
-  deadline: string | null;
-}
-
 interface DiscoverSearchGroup {
-  key: "people" | "posts" | "topics" | "opportunities";
+  key: "people" | "posts" | "topics";
   label: string;
   count: number;
 }
 
-type RawPostResult = Omit<PostResult, "profiles"> & {
-  profiles: PostResult["profiles"] | PostResult["profiles"][];
-};
-
-type TrendingRow = {
-  tags: string[] | null;
-};
-
-// Evidence-based, not name-based: a type says a workflow *requires* review,
-// but only citation_id/published_version_id prove a specific record
-// actually completed it (see lib/contentModel.ts).
-function isReviewedWork(post: { citation_id?: string | null; published_version_id?: string | null }) {
-  return isFormallyReviewed(post);
-}
-
 function getPersonSignal(person: PersonResult) {
-  if (person.university) return person.university;
-  if (person.points > 0) return `${person.points.toLocaleString()} points`;
-  return "Indegenius writer";
-}
-
-function SearchSignalBadge({
-  children,
-  variant = "emerald",
-}: {
-  children: ReactNode;
-  variant?: "emerald" | "sky";
-}) {
-  const styles = {
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    sky: "border-sky-200 bg-sky-50 text-sky-700",
-  };
-
-  return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${styles[variant]}`}
-    >
-      {children}
-    </span>
-  );
+  return person.university || "Indegenius writer";
 }
 
 function ResultSkeleton() {
@@ -156,8 +101,6 @@ function SearchPageContent() {
   const [posts, setPosts] = useState<PostResult[]>([]);
   const [people, setPeople] = useState<PersonResult[]>([]);
   const [topics, setTopics] = useState<TopicResult[]>([]);
-
-  const [opportunities, setOpportunities] = useState<OpportunityResult[]>([]);
   const [allTopics, setAllTopics] = useState<TopicResult[]>([]);
   const [trending, setTrending] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -173,62 +116,49 @@ function SearchPageContent() {
         setPosts([]);
         setPeople([]);
         setTopics([]);
-        setOpportunities([]);
         setLoading(false);
         return;
       }
 
       const requestId = ++requestIdRef.current;
       setLoading(true);
-      const supabase = createClient();
 
-      const [
-        { data: postResults },
-        { data: peopleResults },
-        { data: opportunityResults },
-      ] = await Promise.all([
-        supabase
-          .from("posts")
-          .select(
-            "id, title, slug, excerpt, type, content_kind, article_format, citation_id, published_version_id, published_at, profiles!posts_author_id_fkey(username, full_name, university)"
-          )
-          .eq("status", "published")
-          .neq("type", RESEARCH_TYPE_QUERY_EXCLUSION)
-          .or(`title.ilike.%${trimmed}%,excerpt.ilike.%${trimmed}%`)
-          .order("published_at", { ascending: false })
-          .limit(15),
-        supabase
-          .from("profiles")
-          .select("id, username, full_name, university, points, avatar_url")
-          .or(
-            `username.ilike.%${trimmed}%,full_name.ilike.%${trimmed}%,university.ilike.%${trimmed}%`
-          )
-          .limit(8),
-        supabase
-          .from("fellowships")
-          .select("id, title, sponsor_name, deadline")
-          .eq("status", "open")
-          .or(`title.ilike.%${trimmed}%,sponsor_name.ilike.%${trimmed}%`)
-          .order("deadline", { ascending: true, nullsFirst: false })
-          .limit(6),
-      ]);
+      /**
+       * One request to the application, which runs the queries. They used
+       * to run from here against the anon key, and the user's text was
+       * interpolated straight into a PostgREST `or=` filter: a search
+       * containing a comma or a bracket sent a malformed filter and returned
+       * nothing at all, which looks exactly like a search that found nothing.
+       * See lib/searchData.ts.
+       */
+      let postResults: PostResult[] = [];
+      let peopleResults: PersonResult[] = [];
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
+        if (response.ok) {
+          const payload = (await response.json()) as {
+            posts?: PostResult[];
+            people?: PersonResult[];
+          };
+          postResults = payload.posts ?? [];
+          peopleResults = payload.people ?? [];
+        }
+      } catch {
+        // Nothing found, and the next keystroke tries again.
+      }
 
       if (requestId !== requestIdRef.current) {
         return;
       }
 
-      const normalizedPosts = ((postResults ?? []) as RawPostResult[]).map((post) => ({
-        ...post,
-        profiles: Array.isArray(post.profiles) ? post.profiles[0] ?? null : post.profiles,
-      }));
+      const normalizedPosts = postResults;
       const normalizedTopics = allTopics
         .filter((topic) => topic.tag.toLowerCase().includes(trimmed.toLowerCase()))
         .slice(0, 12);
 
       setPosts(normalizedPosts);
-      setPeople((peopleResults ?? []) as PersonResult[]);
+      setPeople(peopleResults);
       setTopics(normalizedTopics);
-      setOpportunities((opportunityResults ?? []) as OpportunityResult[]);
       setLoading(false);
       trackActivationEvent({
         event: "search_performed",
@@ -236,14 +166,10 @@ function SearchPageContent() {
           surface: "search",
           queryLength: trimmed.length,
           postResults: normalizedPosts.length,
-          peopleResults: peopleResults?.length ?? 0,
+          peopleResults: peopleResults.length,
           topicResults: normalizedTopics.length,
-          opportunityResults: opportunityResults?.length ?? 0,
           resultCount:
-            normalizedPosts.length +
-            (peopleResults?.length ?? 0) +
-            normalizedTopics.length +
-            (opportunityResults?.length ?? 0),
+            normalizedPosts.length + peopleResults.length + normalizedTopics.length,
         },
       });
     },
@@ -271,46 +197,30 @@ function SearchPageContent() {
   }, [query, runSearch]);
 
   useEffect(() => {
-    const supabase = createClient();
-
-    supabase
-      .from("posts")
-      .select("tags")
-      .eq("status", "published")
-      .limit(500)
-      .then(({ data }) => {
-        const counts: Record<string, number> = {};
-
-        ((data ?? []) as TrendingRow[]).forEach((post) => {
-          (post.tags ?? []).forEach((tag) => {
-            // Tally on the hash-stripped label, not the raw tag. Keying on the
-            // raw value counted "#africa" and "africa" as two separate topics,
-            // so a topic split across both spellings ranked as two half-sized
-            // entries and could miss the trending list entirely.
-            const label = formatTagLabel(tag);
-            if (!label) return;
-            counts[label] = (counts[label] ?? 0) + 1;
-          });
-        });
-
-        const sortedTopics = Object.entries(counts)
-          .sort((a, b) => b[1] - a[1])
-          .map(([tag, count]) => ({ tag, count }));
-
-        setAllTopics(sortedTopics);
-        setTrending(sortedTopics.slice(0, 10).map((topic) => topic.tag));
+    // The same list the tag field's suggestions come from, counted once on the
+    // server. Two copies of this aggregation keyed on different things, which
+    // is how "#africa" and "africa" became two topics. See /api/topics.
+    fetch("/api/topics")
+      .then((response) => (response.ok ? response.json() : { topics: [] }))
+      .then((payload: { topics?: TopicResult[] }) => {
+        const topics = payload.topics ?? [];
+        setAllTopics(topics);
+        // Already ordered most-used-first by the route.
+        setTrending(topics.slice(0, 10).map((topic) => topic.tag));
+      })
+      .catch(() => {
+        // No trending row and no suggestions is a usable search page.
+        setAllTopics([]);
+        setTrending([]);
       });
   }, []);
 
   const showResults = query.trim().length >= 2 && !loading;
-  const totalResults =
-    people.length + posts.length + topics.length + opportunities.length;
+  const totalResults = people.length + posts.length + topics.length;
   const groups: DiscoverSearchGroup[] = [
     { key: "posts", label: "Posts", count: posts.length },
     { key: "people", label: "Writers", count: people.length },
     { key: "topics", label: "Topics", count: topics.length },
-
-    { key: "opportunities", label: "Opportunities", count: opportunities.length },
   ].filter((group) => group.count > 0) as DiscoverSearchGroup[];
 
   return (
@@ -323,7 +233,7 @@ function SearchPageContent() {
           Search across Indegenius
         </h1>
         <p className="mt-2 text-sm leading-6 text-gray-500">
-          Find posts, writers, topics, and opportunities from one place.
+          Find posts, writers, and topics from one place.
         </p>
       </div>
 
@@ -459,9 +369,6 @@ function SearchPageContent() {
                         {getPersonSignal(person)}
                       </p>
                     </div>
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        {person.points} pts
-                      </span>
                     </Link>
                   );
                 })}
@@ -484,17 +391,7 @@ function SearchPageContent() {
                     className="rounded-xl border border-gray-200/70 bg-white p-5 transition-shadow hover:shadow-md"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge type={post.type} content_kind={post.content_kind} article_format={post.article_format} />
-                      {isReviewedWork(post) ? (
-                        <SearchSignalBadge>Reviewed</SearchSignalBadge>
-                      ) : null}
-                      {post.citation_id ? (
-                        <Link href={`/publication/${post.citation_id}`}>
-                          <SearchSignalBadge variant="sky">
-                            Citable
-                          </SearchSignalBadge>
-                        </Link>
-                      ) : null}
+                      <Badge content_kind={post.content_kind} />
                     </div>
                     <div className="min-w-0">
                       <Link
@@ -505,7 +402,7 @@ function SearchPageContent() {
                             metadata: {
                               item: "search_post",
                               postId: post.id,
-                              postType: post.type,
+                              contentKind: post.content_kind ?? null,
                               surface: "search",
                             },
                           });
@@ -563,54 +460,6 @@ function SearchPageContent() {
                   >
                     <span>#{topic.tag}</span>
                     <span className="text-xs text-gray-500">{topic.count}</span>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-
-          {opportunities.length > 0 ? (
-            <section>
-              <h2
-                id="opportunities"
-                className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500"
-              >
-                Opportunities
-              </h2>
-              <div className="space-y-3">
-                {opportunities.map((opportunity) => (
-                  <Link
-                    key={opportunity.id}
-                    href={`/fellowships/${opportunity.id}`}
-                    onClick={() => {
-                      trackActivationEvent({
-                        event: "discover_item_clicked",
-                        metadata: {
-                          item: "search_opportunity",
-                          fellowshipId: opportunity.id,
-                          surface: "search",
-                        },
-                      });
-                    }}
-                    className="block rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
-                  >
-                    <div className="mb-2 flex items-center gap-2">
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                        Open
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {opportunity.sponsor_name ?? "Indegenius"}
-                      </span>
-                    </div>
-                    <p className="line-clamp-2 text-sm font-semibold text-gray-900">
-                      {opportunity.title}
-                    </p>
-                    {opportunity.deadline ? (
-                      <p className="mt-2 text-xs text-gray-500">
-                        Deadline {new Date(opportunity.deadline).toLocaleDateString()}
-                      </p>
-                    ) : null}
                   </Link>
                 ))}
               </div>

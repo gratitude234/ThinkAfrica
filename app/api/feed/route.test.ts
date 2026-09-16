@@ -7,6 +7,7 @@ import { FEED_ALGORITHM_VERSION } from "@/lib/feedExposure";
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   fetchFeedPage: vi.fn(),
+  loadFeedViewer: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -22,23 +23,33 @@ vi.mock("@/lib/feedData", () => ({
   normalizeFeedContentFilter: (value: string | null) => value ?? "all",
 }));
 
-vi.mock("@/lib/featureFlags", () => ({
-  isAuthorSubscriptionsUxV2Enabled: () => false,
-  isTopicSubscriptionsEnabled: () => false,
+vi.mock("@/lib/feedViewer", () => ({
+  loadFeedViewer: mocks.loadFeedViewer,
 }));
 
-vi.mock("@/lib/blocking", () => ({
-  getFeedExcludedUserIds: vi.fn().mockResolvedValue([]),
-}));
+const ANONYMOUS = {
+  userId: null,
+  userInterests: [],
+  followedIds: [],
+  excludedAuthorIds: [],
+};
+
+function signedInAs(userId: string | null) {
+  mocks.createClient.mockResolvedValue({
+    auth: {
+      getUser: vi
+        .fn()
+        .mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
+    },
+  });
+}
 
 describe("GET /api/feed", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    });
+    signedInAs(null);
+    mocks.loadFeedViewer.mockResolvedValue(ANONYMOUS);
+    mocks.fetchFeedPage.mockResolvedValue({ posts: [], hasMore: false });
   });
 
   it("rejects out-of-bounds pagination before opening a database client", async () => {
@@ -74,7 +85,7 @@ describe("GET /api/feed", () => {
     mocks.fetchFeedPage.mockRejectedValueOnce(new FeedCursorError());
 
     const response = await GET(
-      new NextRequest("http://localhost/api/feed?tab=latest&cursor=bad")
+      new NextRequest("http://localhost/api/feed?tab=following&cursor=bad")
     );
 
     expect(response.status).toBe(400);
@@ -116,5 +127,50 @@ describe("GET /api/feed", () => {
       candidateSource: "for_you_ranked",
       position: 1,
     });
+  });
+
+  it.each(["latest", "subscriptions", "topics", "featured"])(
+    "serves For You for the retired %s mode rather than failing",
+    async (tab) => {
+      await GET(new NextRequest(`http://localhost/api/feed?tab=${tab}`));
+      expect(mocks.fetchFeedPage).toHaveBeenCalledWith(
+        expect.objectContaining({ tab: "home" })
+      );
+    }
+  );
+
+  it("loads the reader through the shared three-read context", async () => {
+    signedInAs("user-1");
+    const viewer = {
+      userId: "user-1",
+      userInterests: ["climate"],
+      followedIds: ["writer-1"],
+      excludedAuthorIds: ["blocked-1"],
+    };
+    mocks.loadFeedViewer.mockResolvedValueOnce(viewer);
+
+    await GET(new NextRequest("http://localhost/api/feed?tab=following"));
+
+    expect(mocks.loadFeedViewer).toHaveBeenCalledWith(expect.anything(), "user-1", {
+      personalized: true,
+    });
+    expect(mocks.fetchFeedPage).toHaveBeenCalledWith(
+      expect.objectContaining({ tab: "following", ...viewer })
+    );
+  });
+
+  it("asks for a depersonalized reader on Explore's Trending shelf", async () => {
+    signedInAs("user-1");
+
+    await GET(
+      new NextRequest("http://localhost/api/feed?tab=home&timeframe=week&personalized=0")
+    );
+
+    expect(mocks.loadFeedViewer).toHaveBeenCalledWith(expect.anything(), "user-1", {
+      personalized: false,
+    });
+    expect(mocks.fetchFeedPage).toHaveBeenCalledWith(
+      expect.objectContaining({ timeframe: "week" })
+    );
   });
 });

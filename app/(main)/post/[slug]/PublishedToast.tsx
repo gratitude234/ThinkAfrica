@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trackActivationEvent } from "@/lib/activationEvents";
 import { APP_DOMAIN } from "@/lib/site";
-import ResponseStartLink from "@/components/post/ResponseStartLink";
 
 interface RelatedTarget {
   id: string;
@@ -15,7 +14,7 @@ interface RelatedTarget {
 
 interface Props {
   postId: string;
-  postType: string;
+  contentKind: string | null;
   title: string;
   slug: string;
   username: string;
@@ -25,13 +24,12 @@ interface Props {
 type NextAction =
   | "read_related"
   | "read_latest"
-  | "write_response"
   | "view_record"
   | "track_review";
 
 export default function PublishedToast({
   postId,
-  postType,
+  contentKind,
   title,
   slug,
   username,
@@ -68,7 +66,7 @@ export default function PublishedToast({
     : {
         href: "/?tab=latest",
         label: "Read latest posts",
-        description: "Find another piece to read or respond to.",
+        description: "Find another piece to read.",
         action: "read_latest" as const,
       };
 
@@ -79,7 +77,7 @@ export default function PublishedToast({
         source: "post_publish_success",
         action,
         postId,
-        postType,
+        contentKind,
         live: isLive,
       },
     });
@@ -143,7 +141,7 @@ export default function PublishedToast({
 
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
             {isLive
-              ? "It now appears as a dated, public contribution on your profile. Keep the loop going by reading a related idea and adding a response when you have a useful angle."
+              ? "It now appears as a dated, public contribution on your profile. Keep the loop going by reading a related idea."
               : "Your submission is in editorial review. If accepted, its reviewed and citable evidence will appear with it in your Intellectual Record."}
           </p>
 
@@ -161,16 +159,7 @@ export default function PublishedToast({
               </span>
             </Link>
 
-            {relatedTarget ? (
-              <ResponseStartLink
-                postId={relatedTarget.id}
-                source="post_publish_success"
-                onTriggerClick={() => trackNextAction("write_response")}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37]"
-              >
-                Write a response
-              </ResponseStartLink>
-            ) : isLive ? (
+            {isLive ? (
               <Link
                 href={username ? `/${username}#intellectual-record` : "/dashboard"}
                 onClick={() => trackNextAction("view_record")}

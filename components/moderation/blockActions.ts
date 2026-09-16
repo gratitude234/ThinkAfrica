@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { isAuthorSubscriptionsEnabled } from "@/lib/featureFlags";
 
 type ToggleBlockInput = {
   blockedId: string;
@@ -55,7 +54,7 @@ export async function toggleBlock(input: ToggleBlockInput): Promise<{
   // to the blocked user, so it needs the service-role client.
   try {
     const admin = createAdminClient();
-    const relationshipDeletes = [
+    await Promise.all([
       admin
         .from("follows")
         .delete()
@@ -66,22 +65,7 @@ export async function toggleBlock(input: ToggleBlockInput): Promise<{
         .delete()
         .eq("follower_id", input.blockedId)
         .eq("following_id", user.id),
-    ];
-    if (isAuthorSubscriptionsEnabled()) {
-      relationshipDeletes.push(
-        admin
-          .from("author_subscriptions")
-          .delete()
-          .eq("subscriber_id", user.id)
-          .eq("author_id", input.blockedId),
-        admin
-          .from("author_subscriptions")
-          .delete()
-          .eq("subscriber_id", input.blockedId)
-          .eq("author_id", user.id)
-      );
-    }
-    await Promise.all(relationshipDeletes);
+    ]);
   } catch (error) {
     console.error(
       `[blocking] failed to remove follows after block: ${

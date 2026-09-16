@@ -102,9 +102,12 @@ describe("fetchUnreadCount", () => {
     // Null means "unknown" so the caller can leave the previous badge alone.
     const { client } = createClient({ error: { message: "offline" } });
 
-    await expect(fetchUnreadCount(client, "u1")).resolves.toEqual({
-      count: null,
-      error: "offline",
-    });
+    // The count must be null, not zero, which is what the caller reads to
+    // decide whether to leave the previous badge alone. The message is still
+    // the database's, now carrying the label the repository adds so a log
+    // line says which query failed.
+    const result = await fetchUnreadCount(client, "u1");
+    expect(result.count).toBeNull();
+    expect(result.error).toContain("offline");
   });
 });

@@ -15,17 +15,18 @@ import {
 
 interface Props {
   signupsByDay: { date: string; count: number }[];
-  postsByType: { type: string; count: number }[];
+  postsByKind: { kind: string; count: number }[];
   topUniversities: { university: string; count: number }[];
   activationFunnel: { stage: string; count: number }[];
   retentionByDay: { date: string; activeUsers: number }[];
 }
 
-const TYPE_COLORS: Record<string, string> = {
-  blog: "#073929",
-  essay: "#CE932B",
-  research: "#391A60",
-  policy_brief: "#391A60",
+// Two kinds, two colours. The four-valued map this replaces was keyed on the
+// legacy `posts.type`, which is why the chart had a Policy slice and a
+// Research slice for a product that has neither.
+const KIND_COLORS: Record<string, string> = {
+  post: "#073929",
+  article: "#CE932B",
 };
 
 function EmptyChart({ label }: { label: string }) {
@@ -38,7 +39,7 @@ function EmptyChart({ label }: { label: string }) {
 
 export default function AnalyticsCharts({
   signupsByDay,
-  postsByType,
+  postsByKind,
   topUniversities,
   activationFunnel,
   retentionByDay,
@@ -140,25 +141,21 @@ export default function AnalyticsCharts({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Posts by Content Type</h3>
-          {postsByType.length > 0 ? (
+          <h3 className="font-semibold text-gray-900 mb-4">Posts and Articles</h3>
+          {postsByKind.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={postsByType} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <BarChart data={postsByKind} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis
-                  dataKey="type"
+                  dataKey="kind"
                   tick={{ fontSize: 11, fill: "#9CA3AF" }}
-                  tickFormatter={(v) =>
-                    v === "policy_brief"
-                      ? "Policy"
-                      : v.charAt(0).toUpperCase() + v.slice(1)
-                  }
+                  tickFormatter={(v) => (v === "article" ? "Articles" : "Posts")}
                 />
                 <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} allowDecimals={false} />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Bar dataKey="count" name="Posts" radius={[4, 4, 0, 0]}>
-                  {postsByType.map((entry) => (
-                    <Cell key={entry.type} fill={TYPE_COLORS[entry.type] ?? "#9CA3AF"} />
+                <Bar dataKey="count" name="Published" radius={[4, 4, 0, 0]}>
+                  {postsByKind.map((entry) => (
+                    <Cell key={entry.kind} fill={KIND_COLORS[entry.kind] ?? "#9CA3AF"} />
                   ))}
                 </Bar>
               </BarChart>

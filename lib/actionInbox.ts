@@ -5,7 +5,6 @@ import {
   notificationMessage,
   type NotificationCategory,
 } from "./notificationCatalog";
-import { isAuthorSubscriptionsUxV2Enabled } from "./featureFlags";
 
 /**
  * Categories are exactly the descriptor categories -- nothing more.
@@ -49,11 +48,11 @@ export interface ActionInboxItem {
   cta: string;
   actionKey: string;
   postId: string | null;
-  /** Public contract used by inbox counts and subscription-alert safeguards. */
+  /** Public contract used by inbox counts. */
   requiresAction: boolean;
   /**
    * Whether this notification asks the reader to *do* something (revise a draft,
-   * answer an invitation, respond to an inquiry) as opposed to merely telling them
+   * answer an invitation) as opposed to merely telling them
    * something happened (a like, a follow, a new publication).
    *
    * Only actionable items are eligible to be promoted into a "Needs attention"
@@ -104,11 +103,7 @@ function notificationToAction(
     read: notification.read,
     createdAt: notification.created_at,
     postId: notification.post_id ?? null,
-    category:
-      descriptor.category === "subscriptions" &&
-      !isAuthorSubscriptionsUxV2Enabled()
-        ? "activity"
-        : descriptor.category,
+    category: descriptor.category,
     priority: descriptor.priority,
     label: descriptor.label,
     cta: descriptor.cta,
@@ -136,10 +131,7 @@ export function getActionInboxSummary(
   const unreadItems = items.filter((item) => !item.read);
   const unreadActions = unreadItems.filter((item) => item.requiresAction);
   const groupOrder: Array<{ key: ActionInboxCategory; label: string }> = [
-    { key: "responses", label: "Responses" },
     { key: "review", label: "Review and status" },
-    { key: "opportunities", label: "Opportunities" },
-    { key: "subscriptions", label: "Subscriptions" },
     { key: "activity", label: "Activity" },
   ];
 

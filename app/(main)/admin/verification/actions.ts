@@ -96,7 +96,7 @@ export async function updateVerificationStatus(input: {
 
     if (previousProfile && previousProfile.role !== nextRole) {
       const roleCtaPath =
-        nextRole === "admin" ? "/admin" : nextRole === "editor" || nextRole === "reviewer" ? "/review" : "/settings/profile";
+        nextRole === "admin" ? "/admin" : "/settings/profile";
       const result = await sendUserEmail({
         recipientId: input.userId,
         subject: "Your Indegenius account role changed",
@@ -106,11 +106,7 @@ export async function updateVerificationStatus(input: {
           previousProfile?.role ?? "student"
         } to ${nextRole}.`,
         ctaLabel:
-          nextRole === "admin"
-            ? "Open admin"
-            : nextRole === "editor" || nextRole === "reviewer"
-              ? "Open reviews"
-              : "Open profile settings",
+          nextRole === "admin" ? "Open admin" : "Open profile settings",
         ctaPath: roleCtaPath,
         preferenceKey: "email_account_security",
         idempotencyKey: `role-change:${input.userId}:${previousProfile?.role ?? "none"}:${nextRole}`,

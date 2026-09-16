@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getDiscoverData,
   getDiscoverTab,
-  type DiscoverConversation,
   type DiscoverData,
   type DiscoverPerson,
   type DiscoverTab,
@@ -17,18 +16,14 @@ import RetentionEventTracker from "@/components/retention/RetentionEventTracker"
 import ExploreTrackedLink from "./ExploreTrackedLink";
 import ExploreTopicsGrid from "./ExploreTopicsGrid";
 import ExploreFeed from "./ExploreFeed";
-import MobileOpportunitiesBanner from "./MobileOpportunitiesBanner";
-import IntellectualRecordWelcome from "@/components/ui/IntellectualRecordWelcome";
 import {
-  getExploreFilters,
+  getExploreFilter,
   toFeedContentFilter,
-  GENRE_FILTERS,
   PRIMARY_FILTERS,
-  type ExploreGenreFilter,
   type ExplorePrimaryFilter,
 } from "./exploreFilters";
-import { formatDate } from "@/lib/utils";
 import { DEFAULT_OG_IMAGE, SITE_NAME, absoluteUrl, canonicalPath } from "@/lib/site";
+import { formatRelativeTime } from "@/lib/utils";
 
 const EXPLORE_DESCRIPTION =
   "Discover posts, articles, topics, and people building evidence-backed Intellectual Records on Indegenius.";
@@ -37,9 +32,9 @@ const EXPLORE_DESCRIPTION =
  * No `revalidate` here. This route reads the session through
  * `supabase.auth.getUser()`, which opts it into dynamic rendering, so a
  * route-level revalidate window is silently inert. The expensive shared
- * queries (topic counts, top people, fellowships, opportunity
- * counts) carry their own `unstable_cache` windows in lib/discoverData.ts,
- * which is where the caching actually takes effect.
+ * queries (topic counts, recent writers) carry their own `unstable_cache`
+ * windows in lib/discoverData.ts, which is where the caching actually takes
+ * effect.
  */
 export const metadata: Metadata = {
   title: "Explore Ideas and Intellectual Work",
@@ -65,20 +60,17 @@ interface PageProps {
   searchParams: Promise<{
     tab?: string;
     type?: string;
-    genre?: string;
-    welcome?: string;
   }>;
 }
 
 /**
- * Five tabs, all of which swap the content below them. Campus and Research
+ * Four tabs, all of which swap the content below them. Campus and Research
  * projects used to sit in this row wearing identical styling while navigating
- * away to unrelated pages; they are destinations, so they live in the rail now.
+ * away to unrelated pages. Both products have since been removed.
  */
 const TABS: Array<{ value: DiscoverTab; label: string }> = [
   { value: "for-you", label: "For you" },
   { value: "trending", label: "Trending" },
-  { value: "citable", label: "Citable" },
   { value: "topics", label: "Topics" },
   { value: "people", label: "People" },
 ];
@@ -87,8 +79,7 @@ const FILTERABLE_TABS: DiscoverTab[] = ["for-you", "trending"];
 
 function getExploreHref(
   tab: DiscoverTab,
-  primary: ExplorePrimaryFilter = "all",
-  genre: ExploreGenreFilter = "all"
+  primary: ExplorePrimaryFilter = "all"
 ) {
   const params = new URLSearchParams();
 
@@ -98,9 +89,6 @@ function getExploreHref(
 
   if (primary !== "all" && FILTERABLE_TABS.includes(tab)) {
     params.set("type", primary);
-    if (primary === "article" && genre !== "all") {
-      params.set("genre", genre);
-    }
   }
 
   const query = params.toString();
@@ -157,11 +145,9 @@ function SearchEntry() {
 function ExploreTabs({
   activeTab,
   activePrimary,
-  activeGenre,
 }: {
   activeTab: DiscoverTab;
   activePrimary: ExplorePrimaryFilter;
-  activeGenre: ExploreGenreFilter;
 }) {
   return (
     <StickySubnav className="z-30 -mx-4 mb-4 max-w-[calc(100%+2rem)] overflow-x-auto border-b border-card-border bg-canvas/95 px-4 pt-1 backdrop-blur [scrollbar-width:none] sm:-mx-6 sm:max-w-[calc(100%+3rem)] sm:px-6 lg:mx-0 lg:max-w-full lg:px-0 [&::-webkit-scrollbar]:hidden">
@@ -174,8 +160,7 @@ function ExploreTabs({
               key={tab.value}
               href={getExploreHref(
                 tab.value,
-                preserveFilters ? activePrimary : "all",
-                preserveFilters ? activeGenre : "all"
+                preserveFilters ? activePrimary : "all"
               )}
               event="discover_tab_changed"
               metadata={{ tab: tab.value, surface: "explore" }}
@@ -233,17 +218,21 @@ function FilterChip({
   );
 }
 
+/**
+ * One row of chips: All, Posts, Articles.
+ *
+ * A second row used to appear under Articles offering Essay, Policy Brief and
+ * General, with a line explaining that genre "does not change review status or
+ * credibility" -- a sentence that only needed writing because the filter
+ * implied otherwise. Genre is not part of the product.
+ */
 function FilterBar({
   activeTab,
   activePrimary,
-  activeGenre,
 }: {
   activeTab: DiscoverTab;
   activePrimary: ExplorePrimaryFilter;
-  activeGenre: ExploreGenreFilter;
 }) {
-  const showGenres = activePrimary === "article";
-
   return (
     <div className="mb-4">
       <div
@@ -254,11 +243,7 @@ function FilterBar({
         {PRIMARY_FILTERS.map((filter) => (
           <FilterChip
             key={filter.value}
-            href={getExploreHref(
-              activeTab,
-              filter.value,
-              filter.value === "article" ? activeGenre : "all"
-            )}
+            href={getExploreHref(activeTab, filter.value)}
             active={activePrimary === filter.value}
             label={filter.label}
             metadata={{
@@ -270,34 +255,6 @@ function FilterBar({
           />
         ))}
       </div>
-
-      {showGenres ? (
-        <div className="mt-2">
-          <div
-            role="group"
-            aria-label="Refine Articles by genre. Genre is descriptive only: it does not affect review status or credibility."
-            className="flex max-w-full gap-2 overflow-x-auto pb-1 pr-8 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pr-0 [&::-webkit-scrollbar]:hidden"
-          >
-            {GENRE_FILTERS.map((filter) => (
-              <FilterChip
-                key={filter.value}
-                href={getExploreHref(activeTab, "article", filter.value)}
-                active={activeGenre === filter.value}
-                label={filter.label}
-                metadata={{
-                  item: "genre_filter",
-                  genre: filter.value,
-                  tab: activeTab,
-                  surface: "explore",
-                }}
-              />
-            ))}
-          </div>
-          <p className="mt-1.5 text-meta text-ink-muted">
-            Genre is descriptive only: it does not change review status or credibility.
-          </p>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -348,6 +305,17 @@ function TopicInterlude({ topics }: { topics: DiscoverData["topics"] }) {
   );
 }
 
+/**
+ * Why this writer is on the list, in the reader's terms: a topic they share,
+ * or that they published recently. Nothing about where they study, and no
+ * score.
+ */
+function personSignal(person: DiscoverPerson) {
+  if (person.sharedTopic) return `Writes about ${person.sharedTopic}`;
+  if (person.lastPublishedAt) return `Published ${formatRelativeTime(person.lastPublishedAt)}`;
+  return null;
+}
+
 function PersonCard({
   person,
   currentUserId,
@@ -355,13 +323,7 @@ function PersonCard({
   person: DiscoverPerson;
   currentUserId: string | null;
 }) {
-  // One signal, strongest first. The card used to print field_of_study or
-  // university on its own line and then repeat whichever it found in a badge
-  // underneath, so every card said the same thing twice.
-  const signal =
-    person.field_of_study ??
-    person.university ??
-    (person.points !== null ? `${person.points.toLocaleString()} points` : null);
+  const signal = personSignal(person);
 
   return (
     <div className="flex min-h-[92px] items-center gap-3 rounded-xl border border-card-border bg-card p-4">
@@ -389,12 +351,12 @@ function PersonCard({
       </div>
       {currentUserId ? (
         <FollowButton
-          followerId={currentUserId}
           followingId={person.id}
+          currentUserId={currentUserId}
           initialFollowing={person.followed}
-          initialSubscribed={person.subscribed}
           authorName={person.full_name ?? person.username}
           source="explore"
+          size="compact"
         />
       ) : (
         <ExploreTrackedLink
@@ -423,13 +385,13 @@ function PeopleGrid({
           No writer suggestions yet.
         </p>
         <p className="mt-1 text-meta text-ink-muted">
-          Suggestions improve once more people publish from your university or field.
+          Suggestions appear as more people publish on the topics you follow.
         </p>
         <Link
-          href="/leaderboard"
+          href="/topics"
           className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-card-border bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:bg-canvas"
         >
-          See top contributors
+          Browse topics
         </Link>
       </div>
     );
@@ -445,95 +407,6 @@ function PeopleGrid({
         />
       ))}
     </div>
-  );
-}
-
-function getConversationSignal(conversation: DiscoverConversation) {
-  const reason = conversation.reason.toLowerCase();
-
-  if (reason.includes("response") || reason.includes("discuss")) {
-    return { dot: "bg-purple-accent", text: "text-purple-accent" };
-  }
-
-  if (conversation.referenceCount > 0 || reason.includes("source")) {
-    return { dot: "bg-gold", text: "text-gold-ink" };
-  }
-
-  return { dot: "bg-emerald-brand", text: "text-emerald-ink" };
-}
-
-function getConversationStats(conversation: DiscoverConversation) {
-  if (conversation.responseCount > 0) {
-    return `${conversation.responseCount.toLocaleString()} ${
-      conversation.responseCount === 1 ? "response" : "responses"
-    }`;
-  }
-
-  if (conversation.referenceCount > 0) {
-    return `${conversation.referenceCount.toLocaleString()} ${
-      conversation.referenceCount === 1 ? "reference" : "references"
-    } cited`;
-  }
-
-  return "Join the conversation";
-}
-
-function ConversationsRailCard({ data }: { data: DiscoverData }) {
-  if (data.activeConversations.length === 0) return null;
-
-  return (
-    <section className="rounded-xl border border-card-border bg-card p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-kicker font-semibold uppercase text-ink-muted">
-          Active conversations
-        </p>
-        <ExploreTrackedLink
-          href="/responses"
-          metadata={{ item: "all_responses", surface: "explore" }}
-          className="shrink-0 text-meta font-semibold text-emerald-ink hover:underline"
-        >
-          See all
-        </ExploreTrackedLink>
-      </div>
-      <div className="space-y-3">
-        {data.activeConversations.map((conversation, index) => {
-          const signal = getConversationSignal(conversation);
-          return (
-            <div key={conversation.postId}>
-              {index > 0 ? <div className="mb-3 h-px bg-divider" /> : null}
-              <ExploreTrackedLink
-                href={`/post/${conversation.slug}`}
-                metadata={{
-                  item: "active_conversation",
-                  postId: conversation.postId,
-                  rank: index + 1,
-                  surface: "explore",
-                }}
-                className="group block"
-              >
-                <span className="mb-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${signal.dot}`} />
-                  <span className={`text-meta font-semibold ${signal.text}`}>
-                    {conversation.reason}
-                  </span>
-                  {conversation.tag ? (
-                    <span className="min-w-0 truncate text-meta text-ink-muted">
-                      · #{conversation.tag}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="font-display line-clamp-2 block text-byline font-semibold leading-snug text-ink transition-colors group-hover:text-emerald-ink">
-                  {conversation.title}
-                </span>
-                <span className="mt-1.5 block text-meta text-ink-muted">
-                  {getConversationStats(conversation)}
-                </span>
-              </ExploreTrackedLink>
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -580,17 +453,17 @@ function WritersRailCard({
                   </p>
                 </Link>
                 <p className="truncate text-meta text-ink-muted">
-                  {person.field_of_study ?? person.university ?? `@${person.username}`}
+                  {personSignal(person) ?? `@${person.username}`}
                 </p>
               </div>
               {currentUserId ? (
                 <FollowButton
-                  followerId={currentUserId}
                   followingId={person.id}
+                  currentUserId={currentUserId}
                   initialFollowing={person.followed}
-                  initialSubscribed={person.subscribed}
                   authorName={person.full_name ?? person.username}
                   source="explore"
+                  size="compact"
                 />
               ) : (
                 <ExploreTrackedLink
@@ -609,110 +482,6 @@ function WritersRailCard({
   );
 }
 
-function OpportunitiesRailCard({ data }: { data: DiscoverData }) {
-  const { openProfileCount, openFellowshipCount } = data.opportunitySummary;
-  const hasOpportunitySignal = openProfileCount > 0 || openFellowshipCount > 0;
-
-  return (
-    <section className="rounded-xl border border-card-border bg-card p-4">
-      <p className="text-kicker font-semibold uppercase text-ink-muted">
-        Opportunities
-      </p>
-      <h3 className="mt-2 font-display text-byline font-semibold leading-snug text-ink">
-        {hasOpportunitySignal
-          ? "Find people and openings connected to serious work"
-          : "Make your Intellectual Record discoverable"}
-      </h3>
-      <p className="mt-1.5 text-meta leading-5 text-ink-muted">
-        {hasOpportunitySignal
-          ? `${openProfileCount.toLocaleString()} open profiles${
-              openFellowshipCount > 0
-                ? ` and ${openFellowshipCount.toLocaleString()} curated opportunities`
-                : ""
-            }`
-          : "Signal your skills, interests, and availability for collaboration."}
-      </p>
-
-      {data.fellowships.length > 0 ? (
-        <div className="mt-3 space-y-2 border-t border-divider pt-3">
-          {data.fellowships.slice(0, 2).map((fellowship) => (
-            <ExploreTrackedLink
-              key={fellowship.id}
-              href={`/fellowships/${fellowship.id}`}
-              metadata={{ item: "fellowship", fellowshipId: fellowship.id, surface: "explore" }}
-              className="block rounded-lg bg-canvas p-3 transition-colors hover:bg-green-wash"
-            >
-              <span className="line-clamp-2 text-meta font-semibold leading-snug text-ink">
-                {fellowship.title}
-              </span>
-              <span className="mt-1 block text-meta text-ink-muted">
-                {fellowship.sponsor_name ?? "Indegenius"}
-                {fellowship.deadline ? ` · Due ${formatDate(fellowship.deadline)}` : ""}
-              </span>
-            </ExploreTrackedLink>
-          ))}
-        </div>
-      ) : null}
-
-      <ExploreTrackedLink
-        href="/opportunities"
-        metadata={{ item: "opportunities", surface: "explore" }}
-        className="mt-3 inline-flex items-center gap-1 text-meta font-semibold text-emerald-ink hover:underline"
-      >
-        Explore opportunities
-        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2.5}
-            d="M5 12h14M12 5l7 7-7 7"
-          />
-        </svg>
-      </ExploreTrackedLink>
-    </section>
-  );
-}
-
-/**
- * The two destinations that used to masquerade as tabs. They are still one
- * click away, but they no longer promise to swap the content below them.
- */
-function MoreDestinationsCard() {
-  const destinations = [
-    {
-      href: "/campus",
-      label: "Campus",
-      body: "Work grouped by university.",
-      item: "campus",
-    },
-  ];
-
-  return (
-    <section className="rounded-xl border border-card-border bg-card p-4">
-      <p className="mb-3 text-kicker font-semibold uppercase text-ink-muted">
-        More on Indegenius
-      </p>
-      <div className="space-y-2">
-        {destinations.map((destination) => (
-          <ExploreTrackedLink
-            key={destination.href}
-            href={destination.href}
-            metadata={{ itemType: destination.item, surface: "explore_rail" }}
-            className="block rounded-lg bg-canvas p-3 transition-colors hover:bg-green-wash"
-          >
-            <span className="block text-byline font-semibold text-ink">
-              {destination.label}
-            </span>
-            <span className="mt-0.5 block text-meta text-ink-muted">
-              {destination.body}
-            </span>
-          </ExploreTrackedLink>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function ExploreAside({
   data,
   currentUserId,
@@ -722,10 +491,7 @@ function ExploreAside({
 }) {
   return (
     <aside className="hidden space-y-4 lg:sticky lg:top-[var(--app-sticky-offset)] lg:block">
-      <ConversationsRailCard data={data} />
       <WritersRailCard people={data.people} currentUserId={currentUserId} />
-      <OpportunitiesRailCard data={data} />
-      <MoreDestinationsCard />
     </aside>
   );
 }
@@ -734,16 +500,14 @@ function ForYouSection({
   data,
   signedIn,
   activePrimary,
-  activeGenre,
 }: {
   data: DiscoverData;
   signedIn: boolean;
   activePrimary: ExplorePrimaryFilter;
-  activeGenre: ExploreGenreFilter;
 }) {
   return (
     <>
-      <FilterBar activeTab="for-you" activePrimary={activePrimary} activeGenre={activeGenre} />
+      <FilterBar activeTab="for-you" activePrimary={activePrimary} />
       <SectionHeading
         title={signedIn ? "Recommended reads" : "Active on Indegenius now"}
         subtitle={
@@ -758,7 +522,6 @@ function ForYouSection({
         initialHasMore={data.forYou.hasMore}
         initialNextCursor={data.forYou.nextCursor}
         primary={activePrimary}
-        genre={activeGenre}
         signedIn={signedIn}
         surface="explore-for-you"
         interlude={<TopicInterlude topics={data.topics} />}
@@ -771,16 +534,14 @@ function TrendingSection({
   data,
   signedIn,
   activePrimary,
-  activeGenre,
 }: {
   data: DiscoverData;
   signedIn: boolean;
   activePrimary: ExplorePrimaryFilter;
-  activeGenre: ExploreGenreFilter;
 }) {
   return (
     <>
-      <FilterBar activeTab="trending" activePrimary={activePrimary} activeGenre={activeGenre} />
+      <FilterBar activeTab="trending" activePrimary={activePrimary} />
       <SectionHeading
         title="Trending this week"
         subtitle="Recent posts with the strongest engagement and freshness signals, the same for everyone."
@@ -791,54 +552,10 @@ function TrendingSection({
         initialHasMore={data.trending.hasMore}
         initialNextCursor={data.trending.nextCursor}
         primary={activePrimary}
-        genre={activeGenre}
         signedIn={signedIn}
         surface="explore-trending"
         interlude={<TopicInterlude topics={data.topics} />}
       />
-    </>
-  );
-}
-
-function CitableSection({ data }: { data: DiscoverData }) {
-  return (
-    <>
-      <SectionHeading
-        title="Citable works"
-        subtitle="Archived articles carrying a citation record."
-      />
-      {data.citablePosts.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-10 text-center">
-          <p className="text-byline font-medium text-ink">
-            Nothing has been archived yet.
-          </p>
-          <p className="mt-1 text-meta text-ink-muted">
-            Works appear here once they complete review and receive a citation ID.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div>
-            {data.citablePosts.map((post) => (
-              <PostCardImpression
-                key={post.id}
-                post={post}
-                surface="explore-citable"
-                variant="explore"
-              />
-            ))}
-          </div>
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <span aria-hidden="true" className="mb-1 h-px w-8 bg-divider" />
-            <p className="text-byline font-medium text-ink-muted">
-              That is the full citable archive.
-            </p>
-            <p className="text-meta text-ink-muted">
-              Every work here has completed review.
-            </p>
-          </div>
-        </>
-      )}
     </>
   );
 }
@@ -857,7 +574,7 @@ function TopicsSection({
           title="Explore topics"
           subtitle={
             userId
-              ? "Subscribe to topics for a dedicated feed and in-app publication alerts."
+              ? "Follow topics to shape your For you feed."
               : "Browse what the community is writing about."
           }
         />
@@ -872,7 +589,6 @@ function TopicsSection({
       <ExploreTopicsGrid
         topics={data.topics}
         initialInterests={data.userInterests}
-        initialSubscribedTopicKeys={data.topicSubscriptionKeys}
         userId={userId}
       />
     </>
@@ -890,7 +606,7 @@ function PeopleSection({
     <>
       <SectionHeading
         title="Writers to follow"
-        subtitle={userId ? data.peopleReason : "Top contributors from the community."}
+        subtitle={data.peopleReason}
       />
       <PeopleGrid people={data.people} currentUserId={userId} />
     </>
@@ -900,13 +616,11 @@ function PeopleSection({
 function ActiveSection({
   activeTab,
   activePrimary,
-  activeGenre,
   data,
   userId,
 }: {
   activeTab: DiscoverTab;
   activePrimary: ExplorePrimaryFilter;
-  activeGenre: ExploreGenreFilter;
   data: DiscoverData;
   userId: string | null;
 }) {
@@ -916,12 +630,10 @@ function ActiveSection({
         data={data}
         signedIn={Boolean(userId)}
         activePrimary={activePrimary}
-        activeGenre={activeGenre}
       />
     );
   }
 
-  if (activeTab === "citable") return <CitableSection data={data} />;
   if (activeTab === "topics") return <TopicsSection data={data} userId={userId} />;
   if (activeTab === "people") return <PeopleSection data={data} userId={userId} />;
 
@@ -930,15 +642,14 @@ function ActiveSection({
       data={data}
       signedIn={Boolean(userId)}
       activePrimary={activePrimary}
-      activeGenre={activeGenre}
     />
   );
 }
 
 export default async function ExplorePage({ searchParams }: PageProps) {
-  const { tab, type, genre, welcome } = await searchParams;
+  const { tab, type } = await searchParams;
   const activeTab = getDiscoverTab(tab);
-  const { primary: activePrimary, genre: activeGenre } = getExploreFilters(type, genre);
+  const activePrimary = getExploreFilter(type);
   const supabase = await createClient();
   const {
     data: { user },
@@ -951,7 +662,6 @@ export default async function ExplorePage({ searchParams }: PageProps) {
     primary: FILTERABLE_TABS.includes(activeTab)
       ? toFeedContentFilter(activePrimary)
       : "all",
-    genre: activeGenre,
   });
 
   return (
@@ -963,13 +673,10 @@ export default async function ExplorePage({ searchParams }: PageProps) {
           surface: "explore",
           signedIn: Boolean(user),
           type: activePrimary,
-          genre: activeGenre,
           interests: data.userInterests.length,
           following: data.followedIds.length,
         }}
       />
-
-      {user && welcome === "1" ? <IntellectualRecordWelcome /> : null}
 
       <div className="mb-4 min-w-0 max-w-full sm:mb-5">
         <h1 className="text-headline font-semibold tracking-normal text-ink">
@@ -981,29 +688,16 @@ export default async function ExplorePage({ searchParams }: PageProps) {
         <SearchEntry />
       </div>
 
-      <ExploreTabs
-        activeTab={activeTab}
-        activePrimary={activePrimary}
-        activeGenre={activeGenre}
-      />
+      <ExploreTabs activeTab={activeTab} activePrimary={activePrimary} />
 
       <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_312px] lg:gap-8">
         <main className="min-w-0">
           <ActiveSection
             activeTab={activeTab}
             activePrimary={activePrimary}
-            activeGenre={activeGenre}
             data={data}
             userId={user?.id ?? null}
           />
-          {/* Below the reading run on mobile: an aside on desktop, and never
-              the thing standing between a reader and the first post. */}
-          <div className="mt-6 lg:hidden">
-            <MobileOpportunitiesBanner
-              openProfileCount={data.opportunitySummary.openProfileCount}
-              openFellowshipCount={data.opportunitySummary.openFellowshipCount}
-            />
-          </div>
         </main>
         <ExploreAside data={data} currentUserId={user?.id ?? null} />
       </div>

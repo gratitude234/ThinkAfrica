@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { ensureContributionDraft } from "@/app/(write)/write/actions";
 import { useGuestAuthGate } from "@/components/ui/GuestAuthGateProvider";
 import {
   COMMENT_MAX_CHARACTERS,
@@ -21,19 +20,13 @@ interface InlineResponseComposerProps {
   label?: string;
 }
 
-const EDITOR_HREF = (postId: string) =>
-  `/write?${new URLSearchParams({ inResponseTo: postId }).toString()}`;
-
-function bodyToHtml(value: string) {
-  return value
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${paragraph.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}</p>`)
-    .join("");
-}
-
 /**
- * Comments stay inline. A public response opens the same universal publishing
- * canvas used everywhere else, carrying any text already written with it.
+ * The comment box under a post. Comments stay inline, on this page.
+ *
+ * It used to offer "Open editor", which carried the comment into the full
+ * composer as a draft Response. The publishing reset removed Responses, so a
+ * comment is the only thing written here. The name is kept so the scroll
+ * target in PostActionsRow and the thread's two mount points did not move.
  */
 export default function InlineResponseComposer({
   parentPostId,
@@ -46,13 +39,12 @@ export default function InlineResponseComposer({
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [promoting, setPromoting] = useState(false);
   const [refreshing, startRefresh] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const characters = countCommentCharacters(body);
   const overLimit = characters > COMMENT_MAX_CHARACTERS;
-  const busy = submitting || promoting || refreshing;
+  const busy = submitting || refreshing;
   const canSubmit = characters > 0 && !overLimit && !busy;
 
   if (!userId) {
@@ -61,11 +53,7 @@ export default function InlineResponseComposer({
         <p className="text-excerpt text-ink-soft">Join the conversation.</p>
         <button
           type="button"
-          onClick={() =>
-            requestAuth("respond", {
-              destination: EDITOR_HREF(parentPostId),
-            })
-          }
+          onClick={() => requestAuth("respond", { contentKind: "post" })}
           className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
         >
           Sign in to reply
@@ -98,49 +86,6 @@ export default function InlineResponseComposer({
     } catch {
       setSubmitting(false);
       setError("Could not post this comment. Check your connection and try again.");
-    }
-  };
-
-  const openFullEditor = async () => {
-    if (busy) return;
-
-    // An empty box can open the contextual editor directly. Once someone has
-    // written anything, create the contribution draft first so navigation
-    // carries both their words and the response relationship across.
-    if (characters === 0) {
-      router.push(EDITOR_HREF(parentPostId));
-      return;
-    }
-
-    setPromoting(true);
-    setError(null);
-    try {
-      const result = await ensureContributionDraft({
-        draftId: null,
-        snapshot: {
-          title: "",
-          content: bodyToHtml(body),
-          excerpt: "",
-          tags: [],
-          coverImageUrl: "",
-          references: [],
-          collaborators: [],
-          inResponseToId: parentPostId,
-          promptId: null,
-        },
-      });
-
-      if (result.error || !result.draftId) {
-        setPromoting(false);
-        setError(result.error ?? "Could not open the editor. Try again.");
-        return;
-      }
-
-      reset();
-      router.push(`/write?draft=${result.draftId}`);
-    } catch {
-      setPromoting(false);
-      setError("Could not open the editor. Check your connection and try again.");
     }
   };
 
@@ -178,31 +123,20 @@ export default function InlineResponseComposer({
         </p>
       ) : null}
 
-      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-divider pt-2">
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-2 border-t border-divider pt-2">
+        {characters >= COMMENT_MAX_CHARACTERS - 200 ? (
+          <span className={`text-meta ${overLimit ? "font-semibold text-red-600" : "text-ink-muted"}`}>
+            {COMMENT_MAX_CHARACTERS - characters}
+          </span>
+        ) : null}
         <button
           type="button"
-          onClick={() => void openFullEditor()}
-          disabled={busy}
-          aria-busy={promoting || undefined}
-          className="inline-flex min-h-11 items-center rounded-lg px-2 text-meta font-semibold text-ink-muted underline-offset-2 hover:bg-canvas hover:text-emerald-brand hover:underline disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
+          onClick={() => void postComment()}
+          disabled={!canSubmit}
+          className="inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
         >
-          {promoting ? "Opening editor…" : "Open editor"}
+          {submitting ? "Posting…" : refreshing ? "Posted" : "Comment"}
         </button>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {characters >= COMMENT_MAX_CHARACTERS - 200 ? (
-            <span className={`text-meta ${overLimit ? "font-semibold text-red-600" : "text-ink-muted"}`}>
-              {COMMENT_MAX_CHARACTERS - characters}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => void postComment()}
-            disabled={!canSubmit}
-            className="inline-flex min-h-11 items-center rounded-lg bg-emerald-brand px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0E4B37] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2"
-          >
-            {submitting ? "Posting…" : refreshing ? "Posted" : "Comment"}
-          </button>
-        </div>
       </div>
     </div>
   );

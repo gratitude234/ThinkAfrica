@@ -3,9 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import NotificationsForm, { type NotificationPrefs } from "./NotificationsForm";
 
-const rpc = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({ rpc }),
+/** The form saves every preference at once through saveNotificationPrefs, which
+ *  resolves the acting member from the session. */
+const savePrefs = vi.hoisted(() => vi.fn());
+vi.mock("./profileActions", () => ({
+  saveNotificationPrefs: savePrefs,
 }));
 vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
 vi.mock("@/lib/pushClient", () => ({
@@ -20,27 +22,20 @@ vi.mock("@/lib/pushClient", () => ({
   subscribeCurrentDevice: vi.fn(),
   unsubscribeCurrentDevice: vi.fn(),
 }));
-vi.mock("@/lib/pushNudgeStorage", () => ({
-  loadPushNudgeState: vi.fn(),
-  savePushNudgeState: vi.fn(),
-  setPushNudgeDisabled: vi.fn(),
-}));
 vi.mock("./pushActions", () => ({ sendCurrentDeviceTestPush: vi.fn() }));
 
 const prefs: NotificationPrefs = {
   inapp_likes: true,
+  inapp_comments: true,
   inapp_follows: true,
-
   inapp_collaboration: true,
+
   email_comments: true,
   email_follows: true,
   email_likes: true,
   email_responses: true,
-  email_messages: true,
   email_published: true,
-  email_digest: true,
   email_account_security: true,
-  email_profile_reminders: true,
   email_announcements: true,
   email_review_assigned: true,
   email_review_started: true,
@@ -48,24 +43,17 @@ const prefs: NotificationPrefs = {
   email_co_author_invite: true,
   email_co_author_accepted: true,
   email_co_author_declined: true,
-  email_opportunity_inquiry: true,
-  email_author_publications: true,
 
   push_published: true,
-  push_messages: true,
   push_comments: true,
   push_likes: true,
   push_follows: true,
-  push_daily_brief: true,
-  push_author_publications: true,
-
 };
 
 describe("NotificationsForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.unstubAllEnvs();
-    rpc.mockResolvedValue({ error: null });
+    savePrefs.mockResolvedValue({ ok: true, data: null });
   });
 
   it("keeps account-wide push preferences editable on an unsupported device", async () => {
@@ -73,74 +61,66 @@ describe("NotificationsForm", () => {
     await waitFor(() => {
       expect(screen.getByText("This browser does not support push notifications.")).toBeInTheDocument();
     });
-    for (const label of ["Submission decisions", "Direct messages", "Comments", "Likes", "New followers", "Daily brief", "Subscribed author publications"]) {
+    for (const label of ["Submission decisions", "Comments", "Likes", "New followers"]) {
       expect(screen.getByRole("switch", { name: `Push: ${label}` })).toBeEnabled();
     }
   });
 
-  it("keeps subscription delivery always on in-app and auto-saves other V2 switches", async () => {
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED", "1");
-    vi.stubEnv("NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED", "1");
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED", "1");
-
+  it("offers no publication subscription delivery on any channel", () => {
     render(<NotificationsForm profileId="user-a" notificationPrefs={prefs} />);
 
-    expect(
-      screen.getByText(/Always on for Posts and Articles/)
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("switch", { name: "In-app: New publications" })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Save preferences" })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Publication subscriptions/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Subscribed author publications/i)).not.toBeInTheDocument();
+    for (const name of ["Email: Email", "Push: Push"]) {
+      expect(screen.queryByRole("switch", { name })).not.toBeInTheDocument();
+    }
+  });
 
-    await userEvent.click(
-      screen.getByRole("switch", { name: "In-app: Likes" })
-    );
-    await waitFor(() => {
-      expect(rpc).toHaveBeenCalledWith("set_notification_preference", {
-        p_key: "inapp_likes",
-        p_enabled: false,
-      });
-    });
+  it("saves every switch at once, and sends no member id", async () => {
+    render(<NotificationsForm profileId="user-a" notificationPrefs={prefs} />);
+
+    await userEvent.click(screen.getByRole("switch", { name: "In-app: Likes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
+
+    await waitFor(() => expect(savePrefs).toHaveBeenCalledTimes(1));
+    // profileId is still a prop, for the device push subscription. It is
+    // deliberately not part of what the save sends.
+    expect(Object.keys(savePrefs.mock.calls[0][0])).toEqual(["prefs"]);
+    expect(savePrefs.mock.calls[0][0].prefs).toMatchObject({ inapp_likes: false });
   });
 });
 
 describe("the announcements preference", () => {
   beforeEach(() => {
-    rpc.mockReset();
-    rpc.mockResolvedValue({ data: {}, error: null });
+    savePrefs.mockReset();
+    savePrefs.mockResolvedValue({ ok: true, data: null });
   });
 
-  it("is offered as its own switch, separate from the weekly digest", async () => {
-    // Broadcasts are their own opt-out category. Muting the digest must not
-    // silently mute founder correspondence, so the reader needs both switches.
+  it("is offered as its own switch, and the retired digest and reminder switches are not", async () => {
+    // Broadcasts are their own opt-out category. The weekly digest, profile
+    // reminders and the daily brief were retired in Phase 2F, so none is
+    // offered; a stored value for any of them is carried by the save, not shown.
     render(<NotificationsForm profileId="user-a" notificationPrefs={prefs} />);
 
     expect(
       screen.getByRole("switch", { name: "Email: Indegenius announcements" })
     ).toBeChecked();
-    expect(
-      screen.getByRole("switch", { name: "Email: Weekly digest" })
-    ).toBeInTheDocument();
+    for (const retired of ["Email: Weekly digest", "Email: Profile reminders", "Push: Daily brief"]) {
+      expect(screen.queryByRole("switch", { name: retired })).not.toBeInTheDocument();
+    }
   });
 
   it("saves under the key the broadcast eligibility rule reads", async () => {
-    // set_notification_preference validates against a hardcoded allowlist, so
-    // a key the function does not know about throws rather than saving.
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED", "1");
-
     render(<NotificationsForm profileId="user-a" notificationPrefs={prefs} />);
 
     await userEvent.click(
       screen.getByRole("switch", { name: "Email: Indegenius announcements" })
     );
+    await userEvent.click(screen.getByRole("button", { name: "Save preferences" }));
 
     await waitFor(() => {
-      expect(rpc).toHaveBeenCalledWith("set_notification_preference", {
-        p_key: "email_announcements",
-        p_enabled: false,
+      expect(savePrefs).toHaveBeenCalledWith({
+        prefs: expect.objectContaining({ email_announcements: false }),
       });
     });
   });

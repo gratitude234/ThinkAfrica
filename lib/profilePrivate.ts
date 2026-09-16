@@ -2,6 +2,10 @@
  * Owner-only fields returned by public.get_my_profile_private(). Public profile
  * queries must not select these columns once the pending SELECT contract is
  * promoted.
+ *
+ * The RPC also still returns push_prompt_shown_at, push_prompt_last_shown_at
+ * and push_prompt_attempt_count, which only the retired Home permission banner
+ * read. They are not normalized here (DATABASE DEFERRED, Phase 2F).
  */
 export interface MyPrivateProfile {
   profile_id: string;
@@ -13,9 +17,6 @@ export interface MyPrivateProfile {
   suspended_reason: string | null;
   last_engagement_push_notified_at: string | null;
   last_comment_email_notified_at: string | null;
-  push_prompt_shown_at: string | null;
-  push_prompt_last_shown_at: string | null;
-  push_prompt_attempt_count: number;
 }
 
 /**
@@ -49,15 +50,28 @@ export function normalizeMyPrivateProfile(value: unknown): MyPrivateProfile | nu
       typeof row.last_comment_email_notified_at === "string"
         ? row.last_comment_email_notified_at
         : null,
-    push_prompt_shown_at:
-      typeof row.push_prompt_shown_at === "string" ? row.push_prompt_shown_at : null,
-    push_prompt_last_shown_at:
-      typeof row.push_prompt_last_shown_at === "string"
-        ? row.push_prompt_last_shown_at
-        : null,
-    push_prompt_attempt_count:
-      typeof row.push_prompt_attempt_count === "number"
-        ? row.push_prompt_attempt_count
-        : 0,
   };
+}
+
+/**
+ * LEGACY COMPATIBILITY — retired `privacy_settings` keys, carried forward on save.
+ *
+ * Both privacy saves rebuild the jsonb column from the values they validate,
+ * so a key the form no longer offers would be erased the next time a member
+ * saved. `allow_messages` controlled who could start a conversation, and
+ * messaging was removed in the publishing reset, Phase 2E. The stored value is
+ * for the database cleanup phase to decide on, not for a settings save to
+ * delete. Only a string value is carried, so nothing new can ride along.
+ */
+export const RETIRED_PRIVACY_SETTING_KEYS = ["allow_messages"] as const;
+
+export function retainedPrivacySettings(stored: unknown): Record<string, string> {
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+
+  const retained: Record<string, string> = {};
+  for (const key of RETIRED_PRIVACY_SETTING_KEYS) {
+    const value = (stored as Record<string, unknown>)[key];
+    if (typeof value === "string") retained[key] = value;
+  }
+  return retained;
 }

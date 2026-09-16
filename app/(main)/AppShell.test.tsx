@@ -11,7 +11,6 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/ui/GuestAuthGateProvider", () => ({
   useGuestAuthGate: () => ({ requestAuth: vi.fn() }),
 }));
-vi.mock("@/components/ui/MessagesUnreadBadge", () => ({ default: () => null }));
 
 function renderShell(pathname: string, showGuestBanner = false) {
   navigationState.pathname = pathname;
@@ -27,13 +26,10 @@ function renderShell(pathname: string, showGuestBanner = false) {
   return { ...result, main: result.container.querySelector("main") };
 }
 
-const railRoutes = ["/", "/explore", "/opportunities", "/settings"];
+const railRoutes = ["/", "/explore", "/notifications", "/settings"];
 const suppressedRoutes = [
   "/post/a-published-piece",
-  "/messages",
-  "/messages/conversation-1",
-  "/admin/review",
-
+  "/admin/moderation",
   "/about",
 ];
 
@@ -59,14 +55,14 @@ describe("AppShell", () => {
   });
 
   it("leaves suppressed routes at the original container width", () => {
-    const { main } = renderShell("/messages");
+    const { main } = renderShell("/admin/moderation");
     expect(main?.className).not.toMatch(/\bxl:grid\b/);
     expect(main?.className).not.toMatch(/xl:max-w-/);
     expect(main?.className).toMatch(/max-w-\[1240px\]/);
   });
 
   it("always wraps content in a min-w-0 column so wide children cannot blow out the track", () => {
-    for (const pathname of ["/", "/messages"]) {
+    for (const pathname of ["/", "/admin/moderation"]) {
       const { unmount } = renderShell(pathname);
       expect(screen.getByText("page content").closest(".min-w-0")).not.toBeNull();
       unmount();

@@ -1,168 +1,66 @@
 import PostsFeedTabs from "./PostsFeedTabs";
 import {
   fetchFeedPage,
-  normalizeFeedContentFilter,
   RANKED_FEED_WINDOW,
-  type FeedContentFilter,
   type FeedPageResult,
-  type FeedTimeframe,
   type FeedTabKey,
 } from "@/lib/feedData";
-import {
-  createFeaturedExposure,
-  prepareFeedPageForClient,
-} from "@/lib/feedExposure";
+import { prepareFeedPageForClient } from "@/lib/feedExposure";
+import { loadFeedViewer } from "@/lib/feedViewer";
 import { createClient } from "@/lib/supabase/server";
 
-import type { HomeFeaturedPost } from "@/components/post/HomeFeaturedLead";
-import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
+const HOME_PAGE_SIZE = 12;
 
-interface Props {
-  tab: string;
-  type: string | null;
-  timeframe: string | null;
-  userId: string | null;
-  userInterests: string[];
-  userUniversity: string | null;
-  followedIds: string[];
-  authorSubscriptionIds: string[];
-  topicSubscriptionKeys: string[];
-  excludedAuthorIds: string[];
-  subscriptionSource: SubscriptionFeedSource;
-  showFollowingEligible: boolean;
-  showTopicsEligible: boolean;
-  showSubscriptionsEligible: boolean;
-
-  peopleSuggestions: {
-    id: string;
-    username: string;
-    full_name: string | null;
-    university: string | null;
-    avatar_url: string | null;
-  }[];
-  peopleSuggestionReason?: string;
-  prioritizePeopleSuggestions?: boolean;
-  featuredPost?: HomeFeaturedPost | null;
-}
-
-function getInitialTab(
-  tab: string,
-  showFollowingEligible: boolean,
-  showTopicsEligible: boolean,
-  showSubscriptionsEligible: boolean
-): FeedTabKey {
-  if (tab === "following" && showFollowingEligible) return "following";
-  if (tab === "subscriptions" && showSubscriptionsEligible) {
-    return "subscriptions";
-  }
-  if (tab === "topics" && showTopicsEligible) return "topics";
-  if (tab === "latest") return "latest";
-  return "home";
-}
-
-function getInitialType(type: string | null): FeedContentFilter {
-  return normalizeFeedContentFilter(type);
-}
-
-function getInitialTimeframe(timeframe: string | null): FeedTimeframe {
-  if (timeframe === "week" || timeframe === "month") return timeframe;
-  return "all";
-}
-
+/**
+ * The first page of Home's feed, rendered on the server.
+ *
+ * Everything Home reads happens here, inside the page's Suspense boundary: the
+ * three viewer reads in lib/feedViewer.ts, then one page of the feed. A failure
+ * in either becomes the feed's retryable error state rather than a broken page.
+ */
 export default async function PostsFeedSection({
   tab,
-  type,
-  timeframe,
   userId,
-  userInterests,
-  userUniversity,
-  followedIds,
-  authorSubscriptionIds,
-  topicSubscriptionKeys,
-  excludedAuthorIds,
-  subscriptionSource,
-  showFollowingEligible,
-  showTopicsEligible,
-  showSubscriptionsEligible,
-
-  peopleSuggestions,
-  peopleSuggestionReason,
-  prioritizePeopleSuggestions = false,
-  featuredPost = null,
-}: Props) {
+}: {
+  tab: FeedTabKey;
+  userId: string | null;
+}) {
   const supabase = await createClient();
-  const initialTab = getInitialTab(
-    tab,
-    showFollowingEligible,
-    showTopicsEligible,
-    showSubscriptionsEligible
-  );
-  const initialType = getInitialType(type);
-  const initialTimeframe = getInitialTimeframe(timeframe);
   let initialFeed: FeedPageResult = { posts: [], hasMore: false };
   let initialLoadFailed = false;
 
   try {
+    const viewer = await loadFeedViewer(supabase, userId);
     initialFeed = await fetchFeedPage({
       supabase,
-      tab: initialTab,
+      tab,
       page: 1,
-      pageSize: 12,
-      type: initialType === "all" ? null : initialType,
-      timeframe: initialTimeframe,
-      userId,
-      userInterests,
-      userUniversity,
-      followedIds,
-      authorSubscriptionIds,
-      topicSubscriptionKeys,
-      subscriptionSource,
-      excludedAuthorIds,
+      pageSize: HOME_PAGE_SIZE,
+      type: null,
+      timeframe: "all",
+      ...viewer,
     });
   } catch (error) {
     initialLoadFailed = true;
     console.error("[home-feed] initial feed query failed", error);
   }
 
-  const requestId = crypto.randomUUID();
   const clientFeed = prepareFeedPageForClient(initialFeed, {
-    tab: initialTab,
+    tab,
     page: 1,
-    pageSize: 12,
+    pageSize: HOME_PAGE_SIZE,
     rankedWindow: RANKED_FEED_WINDOW,
-    requestId,
+    requestId: crypto.randomUUID(),
   });
-  const clientFeaturedPost = featuredPost
-    ? {
-        ...featuredPost,
-        feed_exposure: createFeaturedExposure(
-          featuredPost.id,
-          featuredPost.slug,
-          featuredPost.featured_provenance ?? "recommended",
-          requestId
-        ),
-      }
-    : null;
 
   return (
     <PostsFeedTabs
-      initialTab={initialTab}
-      initialType={initialType}
-      initialTimeframe={initialTimeframe}
+      initialTab={tab}
       initialPosts={clientFeed.posts}
       initialHasMore={clientFeed.hasMore}
       initialNextCursor={clientFeed.nextCursor ?? null}
       initialLoadFailed={initialLoadFailed}
-      showFollowingTab={showFollowingEligible}
-      showTopicsTab={showTopicsEligible}
-      showSubscriptionsTab={showSubscriptionsEligible}
-      initialSubscriptionSource={subscriptionSource}
-
-      peopleSuggestions={peopleSuggestions}
-      peopleSuggestionReason={peopleSuggestionReason}
-      prioritizePeopleSuggestions={prioritizePeopleSuggestions}
       currentUserId={userId}
-      featuredPost={clientFeaturedPost}
     />
   );
 }

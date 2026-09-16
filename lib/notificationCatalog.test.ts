@@ -20,9 +20,12 @@ const ICON_NAMES: NotificationIconName[] = [
  * Every notification type this codebase actually writes, traced from the
  * `.from("notifications").insert` call sites and the SQL that inserts directly:
  *
- *   likeActions, followActions, responsePost, write/actions, notifications/actions,
- *   admin/review/actions, admin/moderation/actions, cron/review-reminders,
- *   publicationDistribution, and opportunityInquiryActions.
+ *   likeActions, followActions and admin/moderation/actions.
+ *
+ * Some types below are no longer written. Response, co-author, editorial
+ * review, publication delivery and author subscription notifications stopped
+ * with the publishing reset, but their rows are still in inboxes and must keep
+ * rendering with copy of their own, so they stay covered here.
  *
  * Anything emitted but missing from the catalog renders as "New notification"
  * with an "Open" CTA at the lowest priority, which is what this guards against.
@@ -47,9 +50,7 @@ const EMITTED_TYPES = [
   "revision_requested",
   "post_published",
   "post_rejected",
-  // opportunities
-  "opportunity_inquiry",
-  // publication delivery
+  // retired publication delivery
   "author_published",
   "topic_published",
   // trust and safety
@@ -106,21 +107,31 @@ describe("priority ordering", () => {
     expect(priorityOf("revision_requested")).toBeLessThan(priorityOf("comment"));
     expect(priorityOf("review_reminder")).toBeLessThan(priorityOf("review_assigned"));
     expect(priorityOf("co_author_invite")).toBeLessThan(priorityOf("co_author_accepted"));
-    expect(priorityOf("author_subscribed")).toBeLessThan(priorityOf("follow"));
     expect(priorityOf("follow")).toBeLessThan(priorityOf("like"));
   });
 });
 
-describe("subscription delivery", () => {
-  it.each(["author_published", "topic_published"])(
-    "files %s under subscriptions without making it actionable",
+describe("retired subscription notifications", () => {
+  it.each(["author_published", "topic_published", "author_subscribed"])(
+    "files a historic %s row as ordinary activity",
     (type) => {
       expect(describeNotificationType(type)).toMatchObject({
-        category: "subscriptions",
+        category: "activity",
         actionable: false,
       });
     }
   );
+
+  it("renders a historic subscriber as the follow it also was", () => {
+    expect(describeNotificationType("author_subscribed")).toMatchObject({
+      label: describeNotificationType("follow").label,
+      priority: describeNotificationType("follow").priority,
+    });
+  });
+
+  it("describes no badge notification", () => {
+    expect(NOTIFICATION_DESCRIPTORS.badge).toBeUndefined();
+  });
 });
 
 describe("notificationMessage", () => {
@@ -146,8 +157,8 @@ describe("notificationMessage", () => {
   });
 
   it("names the actor rather than saying 'Someone'", () => {
-    // The bell dropdown used to render this as "An author you subscribe to
-    // published new work" because its query never joined profiles.
+    // The bell dropdown used to render the actor generically because its query
+    // never joined profiles.
     expect(notificationMessage({ ...subject, type: "follow" })).toBe(
       "Ama Mensah started following your work."
     );
@@ -169,8 +180,18 @@ describe("notificationMessage", () => {
 describe("notificationHref", () => {
   it("prefers the stored link", () => {
     expect(
-      notificationHref({ type: "follow", link: "/r/p/token", actor_username: "ama" })
-    ).toBe("/r/p/token");
+      notificationHref({ type: "follow", link: "/ama?from=follow", actor_username: "ama" })
+    ).toBe("/ama?from=follow");
+  });
+
+  it("ignores a retired tracked-delivery link and opens the post", () => {
+    expect(
+      notificationHref({
+        type: "author_published",
+        link: "/r/p/123e4567-e89b-42d3-a456-426614174000",
+        post_slug: "designing-lagos",
+      })
+    ).toBe("/post/designing-lagos");
   });
 
   it("falls back to the actor profile for audience notifications", () => {
@@ -186,13 +207,13 @@ describe("notificationHref", () => {
     );
   });
 
-  it("sends moderation notices to the editorial standards", () => {
+  it("sends moderation notices to the terms of use", () => {
     for (const type of [
       "account_suspended",
       "moderation_post_removed",
       "moderation_comment_hidden",
     ]) {
-      expect(notificationHref({ type })).toBe("/editorial-standards");
+      expect(notificationHref({ type })).toBe("/terms");
     }
   });
 

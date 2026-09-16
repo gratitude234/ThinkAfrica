@@ -113,15 +113,35 @@ jobs:
 
       # apply-schema reads out/schema.neon.sql and verify-schema reads
       # out/manifest.json. out/ is gitignored, so a fresh runner has neither,
-      # and without the first two lines this step wiped Neon and then failed
-      # on a missing file. They run BEFORE the reset deliberately: the default
-      # shell stops at the first failing command, so a schema dump that fails
-      # leaves Neon exactly as it was.
-      - name: Reset Neon and apply the schema
+      # and without generating them first this step wiped Neon and then failed
+      # on a missing file.
+      - name: Generate the schema artifacts
         if: inputs.mode == 'prepare'
         run: |
           node scripts/migration/dump-schema.mjs
           node scripts/migration/transform-schema.mjs
+
+      # This is the only place in CI where out/schema.raw.sql and
+      # out/schema.neon.sql exist, so it is the only place these guards can
+      # run. They are skipped on a clean checkout (out/ is gitignored), so
+      # REQUIRE_MIGRATION_ARTIFACTS turns that skip back into a failure here:
+      # a guard that can only ever skip in CI is not a guard.
+      #
+      # Before the reset, for the reason the dump is: the default shell stops
+      # at the first failing command, so a dump that does not satisfy the
+      # transformation contract leaves Neon exactly as it was.
+      - name: Schema pipeline guards, against the dump just generated
+        if: inputs.mode == 'prepare'
+        env:
+          REQUIRE_MIGRATION_ARTIFACTS: "1"
+        run: |
+          npx vitest run \
+            lib/db/columnContract.test.ts \
+            scripts/migration/sqlStatements.test.ts
+
+      - name: Reset Neon and apply the schema
+        if: inputs.mode == 'prepare'
+        run: |
           node scripts/migration/reset-neon.mjs --yes
           node scripts/migration/apply-schema.mjs
           node scripts/migration/verify-schema.mjs

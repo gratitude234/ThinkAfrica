@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useOptionalAuthorRelationship } from "@/components/profile/AuthorRelationshipProvider";
 import { trackActivationEvent } from "@/lib/activationEvents";
-import { qualifiedReadThresholds } from "@/lib/publicationDelivery";
+import { qualifiedReadThresholds } from "@/lib/postReadQualification";
 import {
   consumeStoredFeedExposure,
   type StoredFeedExposure,
@@ -11,16 +10,6 @@ import {
 
 const VIEW_SESSION_KEY = (slug: string) => `ta_post_view_${slug}`;
 const READ_SESSION_KEY = (slug: string) => `ta_post_read_${slug}`;
-
-function getDeliveryToken() {
-  const token = new URLSearchParams(window.location.search).get("delivery");
-  return token && /^[0-9a-f-]{36}$/i.test(token) ? token : null;
-}
-
-function sessionKey(base: (slug: string) => string, slug: string) {
-  const token = getDeliveryToken();
-  return token ? `${base(slug)}_${token}` : base(slug);
-}
 
 function getScrollDepth() {
   const documentElement = document.documentElement;
@@ -45,7 +34,6 @@ function postEngagement(
     body: JSON.stringify({
       route: `${window.location.pathname}${window.location.search}`,
       engagementToken,
-      deliveryToken: getDeliveryToken(),
       metadata,
       ...payload,
     }),
@@ -62,7 +50,6 @@ export default function ViewTracker({
   wordCount: number;
   engagementToken: string | null;
 }) {
-  const relationship = useOptionalAuthorRelationship();
   const activeSecondsRef = useRef(0);
   const maxScrollDepthRef = useRef(0);
   const readFiredRef = useRef(false);
@@ -71,7 +58,7 @@ export default function ViewTracker({
   useEffect(() => {
     const exposure = consumeStoredFeedExposure(slug);
     exposureRef.current = exposure;
-    const viewSessionKey = sessionKey(VIEW_SESSION_KEY, slug);
+    const viewSessionKey = VIEW_SESSION_KEY(slug);
     if (!sessionStorage.getItem(viewSessionKey)) {
       sessionStorage.setItem(viewSessionKey, "1");
       void postEngagement(slug, "view", engagementToken, {}, exposure);
@@ -95,7 +82,7 @@ export default function ViewTracker({
   }, [engagementToken, slug]);
 
   useEffect(() => {
-    const readSessionKey = sessionKey(READ_SESSION_KEY, slug);
+    const readSessionKey = READ_SESSION_KEY(slug);
     if (sessionStorage.getItem(readSessionKey)) return;
 
     const { activeSeconds: requiredSeconds, scrollDepth: requiredDepth } =
@@ -123,7 +110,6 @@ export default function ViewTracker({
         },
         exposureRef.current
       );
-      relationship?.offerQualifiedReadNudge();
     };
 
     const onScroll = () => {
@@ -148,7 +134,7 @@ export default function ViewTracker({
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [engagementToken, relationship, slug, wordCount]);
+  }, [engagementToken, slug, wordCount]);
 
   return null;
 }

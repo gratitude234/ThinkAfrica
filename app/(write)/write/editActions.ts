@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sanitizePostHtml } from "@/lib/sanitizePostHtml";
 import { getTopicValuesValidationError, MAX_LONG_FORM_TOPICS, normalizeAndDedupeTopicValues } from "@/lib/tags";
-import { resolveContentKind } from "@/lib/contentModel";
 import type { ContributionSnapshot } from "@/lib/contribution";
 import {
   getPersistedReferenceId,
@@ -39,18 +38,22 @@ async function editablePublishedPost(postId: string, userId: string) {
   const supabase = await createClient();
   const { data: post } = await supabase
     .from("posts")
-    .select("id, slug, author_id, status, type, content_kind, citation_id, published_version_id")
+    .select("id, slug, author_id, status")
     .eq("id", postId)
     .maybeSingle();
-  const locked =
-    !post ||
-    post.author_id !== userId ||
-    post.status !== "published" ||
-    post.type === "policy_brief" ||
-    resolveContentKind(post) === "research" ||
-    Boolean(post.citation_id) ||
-    Boolean(post.published_version_id);
-  return { supabase, post: locked ? null : post };
+  // An author's own published work is editable, full stop. The four review-era
+  // locks this used to apply -- a `policy_brief` type, a research kind, a
+  // citation_id, a published_version_id -- belonged to a workflow the product
+  // no longer has, and went with it in
+  // 20260915000007_retire_review_publication_locks.sql. The two publications
+  // that still carry a citation_id are editable like any other: editing a body
+  // does not move the citation, and the database still refuses to let the id
+  // itself change.
+  const editable =
+    post !== null &&
+    post.author_id === userId &&
+    post.status === "published";
+  return { supabase, post: editable ? post : null };
 }
 
 export async function savePublishedEditDraft(input: {

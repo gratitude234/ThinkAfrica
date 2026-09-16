@@ -37,8 +37,8 @@ describe("GuestAuthGateProvider -- contextual copy", () => {
   it.each([
     ["like", "post", "Sign in to like this Post"],
     ["like", "article", "Sign in to like this Article"],
-    ["save", "research", "Sign in to save this Research"],
-    ["respond", undefined, "Sign in to respond"],
+    ["save", "article", "Sign in to save this Article"],
+    ["respond", undefined, "Sign in to comment"],
     ["create", undefined, "Sign in to publish"],
   ] as const)("shows the correct title for %s / %s", (intent, contentKind, expectedTitle) => {
     renderWithGate(<Trigger intent={intent} contentKind={contentKind ?? null} />);

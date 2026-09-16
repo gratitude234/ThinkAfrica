@@ -1,10 +1,8 @@
 interface StatsBarProps {
-  totalImpressions: number;
-  totalViews: number;
-  totalReads: number;
   publishedCount: number;
-  reviewedCount: number;
-  sourceBackedCount: number;
+  draftCount: number;
+  totalViews: number;
+  totalLikes: number;
 }
 
 function StatCard({
@@ -26,22 +24,22 @@ function StatCard({
   );
 }
 
+/**
+ * Four plain numbers about the writer's own work. Views and likes count
+ * published work only; a draft has neither.
+ */
 export default function StatsBar({
-  totalImpressions,
-  totalViews,
-  totalReads,
   publishedCount,
-  reviewedCount,
-  sourceBackedCount,
+  draftCount,
+  totalViews,
+  totalLikes,
 }: StatsBarProps) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <StatCard label="Published" value={publishedCount} color="text-emerald-brand" />
-      <StatCard label="Reviewed / Citable" value={reviewedCount} color="text-blue-600" />
-      <StatCard label="Source-backed" value={sourceBackedCount} color="text-amber-600" />
-      <StatCard label="Impressions" value={totalImpressions} />
+      <StatCard label="Drafts" value={draftCount} />
       <StatCard label="Views" value={totalViews} />
-      <StatCard label="Reads" value={totalReads} />
+      <StatCard label="Likes" value={totalLikes} />
     </div>
   );
 }

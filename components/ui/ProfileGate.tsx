@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import UniversitySelect from "@/components/ui/UniversitySelect";
 import Button from "@/components/ui/Button";
-import { isUsernameConflict, USERNAME_TAKEN_MESSAGE } from "@/lib/supabaseErrors";
+import { completeProfileGate } from "@/app/(main)/settings/profileActions";
+import { checkUsernameAvailable } from "@/lib/composerActions";
 
 interface ProfileGateProfile {
   full_name: string | null;
@@ -36,11 +36,9 @@ export default function ProfileGate({
 }: ProfileGateProps) {
   const hasFullName = Boolean(initialProfile?.full_name?.trim());
   const hasUsername = Boolean(initialProfile?.username?.trim());
-  const hasUniversity = Boolean(initialProfile?.university?.trim());
 
   const [fullName, setFullName] = useState(initialProfile?.full_name ?? "");
   const [username, setUsername] = useState(initialProfile?.username ?? "");
-  const [university, setUniversity] = useState(initialProfile?.university ?? "");
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -49,7 +47,6 @@ export default function ProfileGate({
     if (!open) return;
     setFullName(initialProfile?.full_name ?? "");
     setUsername(initialProfile?.username ?? "");
-    setUniversity(initialProfile?.university ?? "");
     setUsernameError(null);
   }, [initialProfile, open]);
 
@@ -65,15 +62,19 @@ export default function ProfileGate({
 
     setCheckingUsername(true);
     const timeoutId = window.setTimeout(async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("username", normalizedUsername)
-        .neq("id", userId)
-        .maybeSingle();
+      const result = await checkUsernameAvailable(normalizedUsername);
 
-      setUsernameError(data ? "Username already taken." : null);
+      // Three outcomes, not two. A check that could not run must not read as
+      // "available": the member would be sent into a submit that rejects them.
+      if (!result.ok) {
+        setUsernameError(
+          result.reason === "unauthorized"
+            ? "Sign in again to continue."
+            : "Couldn't check that username. Try again."
+        );
+      } else {
+        setUsernameError(result.data.taken ? "Username already taken." : null);
+      }
       setCheckingUsername(false);
     }, 300);
 
@@ -100,25 +101,26 @@ export default function ProfileGate({
       username: hasUsername
         ? (initialProfile?.username ?? "")
         : username.trim().toLowerCase().replace(/\s+/g, ""),
-      university: hasUniversity
-        ? (initialProfile?.university ?? null)
-        : university.trim() || null,
+      // Carried through untouched for the composer's own state. The gate asks
+      // for a name and a username only.
+      university: initialProfile?.university ?? null,
     };
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update(payload)
-      .eq("id", userId);
+    // The server resolves the viewer from the session, so this gate can no
+    // longer be pointed at another member's row by changing a prop.
+    const result = await completeProfileGate({
+      fullName: payload.full_name,
+      username: payload.username,
+    });
 
     setSaving(false);
 
-    if (error) {
-      setUsernameError(isUsernameConflict(error) ? USERNAME_TAKEN_MESSAGE : error.message);
+    if (!result.ok) {
+      setUsernameError(result.error);
       return;
     }
 
-    onComplete(payload);
+    onComplete({ ...payload, username: result.data.username });
   };
 
   return (
@@ -182,15 +184,6 @@ export default function ProfileGate({
               {usernameError ? (
                 <p className="mt-1 text-xs text-red-500">{usernameError}</p>
               ) : null}
-            </div>
-          ) : null}
-
-          {!hasUniversity ? (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                University
-              </label>
-              <UniversitySelect value={university} onChange={setUniversity} />
             </div>
           ) : null}
 

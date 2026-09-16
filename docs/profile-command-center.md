@@ -1,3 +1,8 @@
+> **Retired.** The publishing reset, Phase 2G, replaced the profile Command
+> Center with Edit profile (`/settings/profile`: Profile, Topics and Visibility).
+> See `PUBLISHING_RESET_PHASE2G.md`. What follows is kept as the record of what
+> the Command Center did.
+
 # Profile Command Center
 
 Last updated: 2026-08-26
@@ -105,11 +110,14 @@ preview are never side by side on a phone.
 `View public profile` is separate, and is the way to check the saved
 production state.
 
-## Contextual next actions
+## Contextual next actions (removed)
 
-`lib/profileNextAction.ts`. Deterministic: the same state always produces the
-same ordered list. One primary action and at most two secondary suggestions,
-so the page never becomes a task list.
+Removed in the publishing reset, Phase 2F, with `lib/profileNextAction.ts`. The
+Command Center no longer recommends a next step: editing a profile is the
+owner's to start. What follows is kept as the record of what the engine did.
+
+It was deterministic: the same state always produced the same ordered list, with
+one primary action and at most two secondary suggestions.
 
 Priority, most blocking first:
 

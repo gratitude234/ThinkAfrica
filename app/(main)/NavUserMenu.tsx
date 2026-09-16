@@ -16,14 +16,12 @@ interface NavUserMenuProps {
     role?: "student" | "reviewer" | "editor" | "admin";
   } | null;
   isAdmin?: boolean;
-  canAccessReview?: boolean;
 }
 
 export default function NavUserMenu({
   user,
   profile,
   isAdmin,
-  canAccessReview,
 }: NavUserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -95,9 +93,11 @@ export default function NavUserMenu({
             <p className="text-sm font-semibold text-gray-900 truncate">
               {displayName}
             </p>
-            <span className="text-xs font-medium text-emerald-700">
-              Intellectual Record
-            </span>
+            {profileUsername ? (
+              <span className="block truncate text-xs text-gray-500">
+                @{profileUsername}
+              </span>
+            ) : null}
           </div>
           {profile && (
             <Link
@@ -118,7 +118,7 @@ export default function NavUserMenu({
                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                 />
               </svg>
-              Intellectual Record
+              Profile
             </Link>
           )}
           <Link
@@ -141,28 +141,6 @@ export default function NavUserMenu({
             </svg>
             Writing dashboard
           </Link>
-          {canAccessReview ? (
-            <Link
-              href="/review"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
-            >
-              <svg
-                className="w-4 h-4 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m5-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              Review
-            </Link>
-          ) : null}
           <Link
             href="/bookmarks"
             onClick={() => setOpen(false)}
@@ -211,7 +189,7 @@ export default function NavUserMenu({
           </Link>
           {isAdmin && (
             <Link
-              href="/admin/review"
+              href="/admin"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-canvas transition-colors"
             >

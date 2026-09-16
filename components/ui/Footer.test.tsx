@@ -58,3 +58,16 @@ describe("Footer 'Write' link (generic creation CTA)", () => {
     expect(screen.queryByRole("link", { name: "Write" })).not.toBeInTheDocument();
   });
 });
+
+describe("Footer links", () => {
+  it("links to no retired product", () => {
+    const { container } = render(<Footer landing />);
+    const hrefs = Array.from(container.querySelectorAll("a")).map((link) =>
+      link.getAttribute("href")
+    );
+
+    for (const retired of ["/opportunities", "/policy", "/ambassadors", "/partners", "/campus"]) {
+      expect(hrefs).not.toContain(retired);
+    }
+  });
+});

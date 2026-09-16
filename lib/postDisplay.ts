@@ -11,7 +11,6 @@ import { resolveContentKind } from "@/lib/contentModel";
 interface TitledRecord {
   title?: string | null;
   content_kind?: string | null;
-  type?: string | null;
 }
 
 interface AuthorNameSource {
@@ -68,11 +67,10 @@ export function getPostReferenceQuoted(record: TitledRecord): string {
 }
 
 /**
- * A newly created lightweight Post is distinguished from a legacy titled
- * Blog by BOTH signals together: the resolved content kind is "post" AND
- * the title is null. A legacy Blog that resolves to "post" but still has
- * its historical title keeps rendering through the existing Blog path --
- * only genuinely titleless records get the new lightweight treatment.
+ * A lightweight Post is both signals together: the kind is "post" AND there
+ * is no title. A Post that still carries a historical title (40 of the 101 in
+ * production do) keeps rendering with its heading -- only a genuinely
+ * titleless record gets the lightweight treatment.
  */
 export function isLightweightPost(record: TitledRecord): boolean {
   return resolveContentKind(record) === "post" && getPostDisplayTitle(record) === null;

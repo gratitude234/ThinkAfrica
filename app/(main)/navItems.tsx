@@ -1,23 +1,24 @@
+import { getUsableProfileUsername } from "@/lib/profileUsername";
 import { matchesRoute } from "./navRoutes";
 
 /**
  * Single source of truth for primary-navigation destinations and their
  * active-state rules.
  *
- * Three shells render this nav -- the mobile bottom bar, the top bar, and the
- * desktop side rail -- and each has legitimately different markup. What they
- * must not have is three different opinions about which destination is
- * currently active, which is what happened before this module existed.
- * The shells own their own layout and classes; they share the data and the
- * predicates below.
+ * The product has exactly five destinations: Home, Explore, Write,
+ * Notifications and Profile. Three shells render them -- the mobile bottom bar,
+ * the top bar, and the desktop side rail -- and each has legitimately different
+ * markup. What they must not have is different opinions about which
+ * destinations exist or which one is currently active. The shells own their own
+ * layout and classes; they share the data and the predicates below.
  */
 
 export interface NavIconProps {
   className?: string;
   /**
    * Solid-fill the glyph when the destination is active. Only the closed
-   * shapes (home, message bubble, person) read well filled -- the magnifier
-   * and the balance scale are open paths and stay stroked either way.
+   * shapes (home, bell, person) read well filled -- the magnifier and the pen
+   * are open paths and stay stroked either way.
    */
   filled?: boolean;
 }
@@ -30,6 +31,7 @@ export function HomeIcon({ className, filled }: NavIconProps) {
       stroke="currentColor"
       strokeWidth={2}
       viewBox="0 0 24 24"
+      aria-hidden="true"
     >
       <path
         strokeLinecap="round"
@@ -48,6 +50,7 @@ export function ExploreIcon({ className }: NavIconProps) {
       stroke="currentColor"
       strokeWidth={2}
       viewBox="0 0 24 24"
+      aria-hidden="true"
     >
       <path
         strokeLinecap="round"
@@ -58,8 +61,31 @@ export function ExploreIcon({ className }: NavIconProps) {
   );
 }
 
+export function WriteIcon({ className }: NavIconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13.5 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6.5"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m11.75 14.25.45-2.35 5.55-5.55a1.6 1.6 0 0 1 2.25 0l.15.15a1.6 1.6 0 0 1 0 2.25l-5.55 5.55-2.35.45.5-2.35"
+      />
+    </svg>
+  );
+}
 
-export function MessagesIcon({ className, filled }: NavIconProps) {
+export function NotificationsIcon({ className, filled }: NavIconProps) {
   return (
     <svg
       className={className}
@@ -67,69 +93,12 @@ export function MessagesIcon({ className, filled }: NavIconProps) {
       stroke="currentColor"
       strokeWidth={2}
       viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z"
-      />
-    </svg>
-  );
-}
-
-export function ResponsesIcon({ className }: NavIconProps) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
       aria-hidden="true"
     >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M7 7h10a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-4l-4 3v-3H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3Z"
-      />
-      <path strokeLinecap="round" d="M8 11h8" />
-    </svg>
-  );
-}
-
-export function CampusIcon({ className }: NavIconProps) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="m3 9 9-5 9 5-9 5-9-5Zm3 2.5V17c2.8 2.1 9.2 2.1 12 0v-5.5M21 9v7"
-      />
-    </svg>
-  );
-}
-
-export function ResearchIcon({ className }: NavIconProps) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M9 3h6m-5 0v5l-5.5 9.25A2.5 2.5 0 0 0 6.65 21h10.7a2.5 2.5 0 0 0 2.15-3.75L14 8V3M7.5 15h9"
+        d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
       />
     </svg>
   );
@@ -143,6 +112,7 @@ export function ProfileIcon({ className, filled }: NavIconProps) {
       stroke="currentColor"
       strokeWidth={2}
       viewBox="0 0 24 24"
+      aria-hidden="true"
     >
       <path
         strokeLinecap="round"
@@ -153,55 +123,15 @@ export function ProfileIcon({ className, filled }: NavIconProps) {
   );
 }
 
-export function OpportunitiesIcon({ className }: NavIconProps) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M4 8.5h16v10a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 014 18.5v-10zm5-.5V6a2 2 0 012-2h2a2 2 0 012 2v2M4 12.5h16"
-      />
-    </svg>
-  );
-}
-
-export function BookmarksIcon({ className, filled }: NavIconProps) {
-  return (
-    <svg
-      className={className}
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M6 4.75A1.75 1.75 0 017.75 3h8.5A1.75 1.75 0 0118 4.75V21l-6-4.25L6 21V4.75z"
-      />
-    </svg>
-  );
-}
-
 /**
- * Pathname prefixes that mark each destination active. `/discover` is folded
- * into Explore because it is the same surface under an older URL.
+ * Pathname prefixes that mark each destination active. Search and topic pages
+ * are discovery surfaces, so they light Explore; `/discover` is the same
+ * surface under an older URL.
  */
 export const NAV_MATCH_PREFIXES = {
   home: ["/"],
-  explore: ["/explore", "/discover"],
-  opportunities: ["/opportunities"],
-  messages: ["/messages"],
-  responses: ["/responses"],
-  campus: ["/campus"],
-  research: ["/research"],
-  bookmarks: ["/bookmarks"],
+  explore: ["/explore", "/discover", "/search", "/topics"],
+  write: ["/write"],
   notifications: ["/notifications"],
 } as const;
 
@@ -215,8 +145,30 @@ export function isNavItemActive(
   );
 }
 
+/** Guests are sent through sign-in and land where they were heading. */
+export function guestAwareHref(userId: string | null, target: string) {
+  return userId ? target : `/login?redirectTo=${encodeURIComponent(target)}`;
+}
+
 /**
- * The account destination stands for a cluster of personal surfaces, so it
+ * The Profile destination is the signed-in writer's public profile. A username
+ * that cannot be used as a route falls back to profile settings, where it can
+ * be fixed; a guest is offered sign-up instead.
+ */
+export function getProfileNavHref({
+  userId,
+  username,
+}: {
+  userId: string | null;
+  username: string | null;
+}) {
+  if (!userId) return "/signup";
+  const usable = getUsableProfileUsername(username);
+  return usable ? `/${usable}` : "/settings/profile";
+}
+
+/**
+ * The Profile destination stands for a cluster of personal surfaces, so it
  * stays lit across all of them rather than only on the profile itself.
  */
 export function isAccountNavActive(

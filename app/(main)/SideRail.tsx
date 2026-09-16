@@ -3,20 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import MessagesUnreadBadge from "@/components/ui/MessagesUnreadBadge";
 import CreateTrigger from "./CreateTrigger";
-import { FEATURE_FLAGS } from "@/lib/featureFlags";
 import {
-  BookmarksIcon,
-  CampusIcon,
   ExploreIcon,
   HomeIcon,
-  MessagesIcon,
   NAV_MATCH_PREFIXES,
-  OpportunitiesIcon,
+  NotificationsIcon,
   ProfileIcon,
-  ResearchIcon,
-  ResponsesIcon,
+  WriteIcon,
+  getProfileNavHref,
+  guestAwareHref,
   isAccountNavActive,
   isNavItemActive,
   type NavIconProps,
@@ -46,16 +42,12 @@ function RailLink({
   icon: Icon,
   isCurrent,
   fillWhenActive = false,
-  badge,
-  children,
 }: {
   href: string;
   label: string;
   icon: ComponentType<NavIconProps>;
   isCurrent: boolean;
   fillWhenActive?: boolean;
-  badge?: React.ReactNode;
-  children?: React.ReactNode;
 }) {
   return (
     <Link
@@ -63,12 +55,8 @@ function RailLink({
       className={railLinkClass(isCurrent)}
       aria-current={isCurrent ? "page" : undefined}
     >
-      <span className="relative flex shrink-0 items-center">
-        <Icon className={ICON_CLASS} filled={fillWhenActive && isCurrent} />
-        {badge}
-      </span>
+      <Icon className={ICON_CLASS} filled={fillWhenActive && isCurrent} />
       <span className="truncate">{label}</span>
-      {children}
     </Link>
   );
 }
@@ -79,117 +67,60 @@ export default function SideRail({
 }: SideRailProps) {
   const pathname = usePathname();
 
-  const guestHref = (target: string) =>
-    userId ? target : `/login?redirectTo=${encodeURIComponent(target)}`;
-
-  const accountActive = isAccountNavActive(pathname, { userId, username });
-
   return (
     <aside
       // Sticky under the top nav and independently scrollable, so a short
-      // viewport can still reach the Create button. The +1rem offset is shared
+      // viewport can still reach every destination. The +1rem offset is shared
       // with every other sticky aside in the app (home sidebar, explore, admin)
-      // so columns in the same viewport pin in line -- and
-      // it tracks --app-nav-offset rather than the measured height so the rail
-      // rises with the nav when it retreats, instead of the feed's tab strip
-      // sliding up while this column stays behind. max-h stays on the measured
-      // height: it is a ceiling, not a size, and animating it would resize a
-      // scrolling column mid-scroll for no visible gain.
+      // so columns in the same viewport pin in line -- and it tracks
+      // --app-nav-offset rather than the measured height so the rail rises with
+      // the nav when it retreats. max-h stays on the measured height: it is a
+      // ceiling, not a size.
       //
-      // Deliberately not overscroll-contain. Containment is for a surface you
-      // would lose your place behind (a thread, a dropdown); a nav rail beside
-      // a feed is not one. It also made the behaviour depend on window height:
-      // on a tall window the rail fits, is not really a scroller, and the wheel
-      // passes through to the page, while on a short one the page stopped dead
-      // under the pointer. Chaining keeps one gesture meaning one thing
-      // wherever it lands.
+      // Deliberately not overscroll-contain. A nav rail beside a feed is not a
+      // surface you would lose your place behind, and containment made the page
+      // stop dead under the pointer on short windows. Chaining keeps one gesture
+      // meaning one thing wherever it lands.
       className="hidden xl:sticky xl:top-[var(--app-sticky-offset)] xl:block xl:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] xl:self-start xl:overflow-y-auto"
     >
       <nav aria-label="Sections" className="flex flex-col gap-0.5">
         <RailLink
           href="/"
-          label="For you"
+          label="Home"
           icon={HomeIcon}
           fillWhenActive
           isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.home)}
         />
         <RailLink
           href="/explore"
-          label="Discover"
+          label="Explore"
           icon={ExploreIcon}
           isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.explore)}
         />
+        {/* Write sits in its place in the order but carries the primary
+            treatment: it is the one action, not another place to browse. */}
+        <CreateTrigger
+          userId={userId}
+          className="my-1 flex min-h-11 w-full items-center gap-3 rounded-xl bg-emerald-brand px-3 py-2.5 text-[14.5px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+        >
+          <WriteIcon className={ICON_CLASS} />
+          <span className="truncate">Write</span>
+        </CreateTrigger>
         <RailLink
-          href="/responses"
-          label="Responses"
-          icon={ResponsesIcon}
-          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.responses)}
+          href={guestAwareHref(userId, "/notifications")}
+          label="Notifications"
+          icon={NotificationsIcon}
+          fillWhenActive
+          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.notifications)}
         />
         <RailLink
-          href="/campus"
-          label="Campus"
-          icon={CampusIcon}
-          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.campus)}
-        />
-        {FEATURE_FLAGS.research ? (
-          <RailLink
-            href="/research"
-            label="Research"
-            icon={ResearchIcon}
-            isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.research)}
-          />
-        ) : null}
-        <RailLink
-          href={userId ? "/me" : "/signup"}
-          label={userId ? "My record" : "Join"}
+          href={getProfileNavHref({ userId, username })}
+          label={userId ? "Profile" : "Join"}
           icon={ProfileIcon}
           fillWhenActive
-          isCurrent={accountActive}
-        />
-        <div className="my-2 border-t border-gray-200" aria-hidden="true" />
-        <RailLink
-          href="/opportunities"
-          label="Opportunities"
-          icon={OpportunitiesIcon}
-          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.opportunities)}
-        />
-        <RailLink
-          href={guestHref("/bookmarks")}
-          label="Bookmarks"
-          icon={BookmarksIcon}
-          fillWhenActive
-          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.bookmarks)}
-        />
-        <RailLink
-          href={guestHref("/messages")}
-          label="Messages"
-          icon={MessagesIcon}
-          fillWhenActive
-          isCurrent={isNavItemActive(pathname, NAV_MATCH_PREFIXES.messages)}
-          badge={
-            userId ? (
-              <MessagesUnreadBadge userId={userId} className="-right-1.5 -top-1.5" />
-            ) : undefined
-          }
+          isCurrent={isAccountNavActive(pathname, { userId, username })}
         />
       </nav>
-
-      <CreateTrigger
-        userId={userId}
-        className="mt-4 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-brand px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
-      >
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.25}
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-        </svg>
-        Publish
-      </CreateTrigger>
     </aside>
   );
 }

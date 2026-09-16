@@ -5,9 +5,8 @@
  * rules the client showed the writer.
  *
  * A comment is plain text end to end: stored raw in `comments.content` and
- * rendered as a React text node, never as HTML. That is the `messages`
- * precedent rather than the buildShortPostHtml() one -- there is no markup to
- * sanitise, so there is no injection surface to get wrong.
+ * rendered as a React text node, never as HTML, unlike buildShortPostHtml():
+ * there is no markup to sanitise, so there is no injection surface to get wrong.
  */
 
 /** Long enough for a real paragraph of argument; short enough that anything

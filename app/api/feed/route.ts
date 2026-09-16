@@ -11,28 +11,18 @@ import {
   type FeedTimeframe,
 } from "@/lib/feedData";
 import { prepareFeedPageForClient } from "@/lib/feedExposure";
-import { getFeedExcludedUserIds } from "@/lib/blocking";
-import {
-  isAuthorSubscriptionsUxV2Enabled,
-  isTopicSubscriptionsEnabled,
-} from "@/lib/featureFlags";
-import type { SubscriptionFeedSource } from "@/lib/publicationDelivery";
+import { loadFeedViewer } from "@/lib/feedViewer";
 
 const FEED_SESSION_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/**
+ * For You or Following. A retired mode (`latest`, `subscriptions`, `topics`)
+ * from a page loaded before Phase 2F falls back to For You rather than
+ * failing, and its cursor is refused, which the client already recovers from.
+ */
 function getTab(param: string | null): FeedTabKey {
-  if (param === "topics" && isTopicSubscriptionsEnabled()) return "topics";
-  if (param === "subscriptions" && isAuthorSubscriptionsUxV2Enabled()) {
-    return "subscriptions";
-  }
-  if (param === "following" || param === "latest") return param;
-  return "home";
-}
-
-function getSource(param: string | null): SubscriptionFeedSource {
-  if (param === "authors" || param === "topics") return param;
-  return "all";
+  return param === "following" ? "following" : "home";
 }
 
 function getTimeframe(param: string | null): FeedTimeframe {
@@ -89,11 +79,6 @@ export async function GET(request: NextRequest) {
     }
     const supabase = await createClient();
     const tab = getTab(params.get("tab"));
-    const timeframe = getTimeframe(params.get("timeframe"));
-    const type = getType(params.get("type"));
-    const personalized = isPersonalized(params.get("personalized"));
-    const subscriptionSource = getSource(params.get("source"));
-    const cursor = params.get("cursor");
     const requestedFeedSessionId = params.get("session");
     const feedSessionId =
       requestedFeedSessionId && FEED_SESSION_PATTERN.test(requestedFeedSessionId)
@@ -104,96 +89,19 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    let userInterests: string[] = [];
-    let userUniversity: string | null = null;
-    let followedIds: string[] = [];
-    let authorSubscriptionIds: string[] = [];
-    let topicSubscriptionKeys: string[] = [];
-    let excludedAuthorIds: string[] = [];
-
-    if (user) {
-      const topicSubscriptionsPromise = isTopicSubscriptionsEnabled()
-        ? supabase
-            .from("topic_subscriptions")
-            .select("topic_key")
-            .eq("subscriber_id", user.id)
-        : Promise.resolve({
-            data: [] as Array<{ topic_key: string }>,
-            error: null,
-          });
-      const authorSubscriptionsPromise = isAuthorSubscriptionsUxV2Enabled()
-        ? supabase
-            .from("author_subscriptions")
-            .select("author_id")
-            .eq("subscriber_id", user.id)
-        : Promise.resolve({
-            data: [] as Array<{ author_id: string }>,
-            error: null,
-          });
-      const [
-        { data: profile, error: profileError },
-        { data: followedUsers, error: followsError },
-        blockedIds,
-        { data: topicSubscriptions, error: topicSubscriptionsError },
-        { data: authorSubscriptions, error: authorSubscriptionsError },
-      ] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("interests, university")
-          .eq("id", user.id)
-          .single(),
-        supabase
-          .from("follows")
-          .select("following_id")
-          .eq("follower_id", user.id),
-        getFeedExcludedUserIds(user.id, { strict: true }),
-        topicSubscriptionsPromise,
-        authorSubscriptionsPromise,
-      ]);
-
-      const contextError =
-        profileError ??
-        followsError ??
-        topicSubscriptionsError ??
-        authorSubscriptionsError;
-      if (contextError) {
-        throw new Error("Unable to load feed personalization context.");
-      }
-
-      // A depersonalized request keeps the viewer's block list and drops every
-      // ranking signal, so the shelf matches the anonymous first page exactly.
-      if (personalized) {
-        userInterests = (profile?.interests as string[] | null) ?? [];
-        userUniversity = profile?.university ?? null;
-        followedIds = (followedUsers ?? []).map(
-          (row: { following_id: string }) => row.following_id
-        );
-        topicSubscriptionKeys = (topicSubscriptions ?? []).map(
-          (row: { topic_key: string }) => row.topic_key
-        );
-        authorSubscriptionIds = (authorSubscriptions ?? []).map(
-          (row: { author_id: string }) => row.author_id
-        );
-      }
-      excludedAuthorIds = blockedIds;
-    }
+    const viewer = await loadFeedViewer(supabase, user?.id ?? null, {
+      personalized: isPersonalized(params.get("personalized")),
+    });
 
     const result = await fetchFeedPage({
       supabase,
       tab,
       page,
       pageSize,
-      type,
-      timeframe,
-      userId: personalized ? user?.id ?? null : null,
-      userInterests,
-      userUniversity,
-      followedIds,
-      authorSubscriptionIds,
-      topicSubscriptionKeys,
-      subscriptionSource,
-      excludedAuthorIds,
-      cursor,
+      type: getType(params.get("type")),
+      timeframe: getTimeframe(params.get("timeframe")),
+      ...viewer,
+      cursor: params.get("cursor"),
     });
 
     return NextResponse.json(

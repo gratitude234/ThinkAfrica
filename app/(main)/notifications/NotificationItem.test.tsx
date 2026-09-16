@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import NotificationItem, { buildNotificationMessage } from "./NotificationItem";
 
 vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
-vi.mock("./actions", () => ({ respondToCoAuthorInvite: vi.fn() }));
 
 const publicationNotification = {
   id: "delivery-id",
@@ -26,7 +25,11 @@ const publicationNotification = {
 
 // Fallback copy is now standardised as full sentences by lib/notificationCatalog.ts,
 // which is why these expectations gained terminal punctuation.
-describe("author publication notifications", () => {
+//
+// Publication delivery and author subscriptions were removed in Phase 2H. These
+// rows are history: they still render, and their retired tracked-delivery
+// links are not followed.
+describe("historic publication notifications", () => {
   it("uses author-specific fallback copy", () => {
     expect(
       buildNotificationMessage({
@@ -43,25 +46,20 @@ describe("author publication notifications", () => {
         type: "topic_published",
         message: null,
       })
-    ).toBe(
-      "New work was published in a topic you subscribe to: Designing Lagos."
-    );
+    ).toBe("New work was published in a topic you follow: Designing Lagos.");
   });
 
-  it("renders the durable tracked delivery link", () => {
+  it("opens the publication itself rather than the retired tracked link", () => {
     render(<NotificationItem notification={publicationNotification} />);
     expect(
       screen.getByRole("link", {
         name: /Ama published a new Article: Designing Lagos/i,
       })
-    ).toHaveAttribute(
-      "href",
-      "/r/p/123e4567-e89b-42d3-a456-426614174000"
-    );
+    ).toHaveAttribute("href", "/post/designing-lagos");
   });
 });
 
-describe("author subscriber notifications", () => {
+describe("historic subscriber notifications", () => {
   const subscriberNotification = {
     ...publicationNotification,
     id: "subscription-id",
@@ -73,16 +71,16 @@ describe("author subscriber notifications", () => {
     post_slug: null,
   };
 
-  it("says subscribed rather than followed", () => {
+  it("reads as the follow it also was", () => {
     expect(buildNotificationMessage(subscriberNotification)).toBe(
-      "Ama Mensah subscribed to your work."
+      "Ama Mensah started following your work."
     );
   });
 
-  it("links to the subscriber's profile", () => {
+  it("links to the follower's profile", () => {
     render(<NotificationItem notification={subscriberNotification} />);
     expect(
-      screen.getByRole("link", { name: /subscribed to your work/i })
+      screen.getByRole("link", { name: /started following your work/i })
     ).toHaveAttribute("href", "/ama");
   });
 });

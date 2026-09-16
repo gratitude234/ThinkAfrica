@@ -1,3 +1,20 @@
+> **SUPERSEDED by the publishing reset, Phase 2I (2026-09-16).**
+>
+> This document describes the three-kind model this migration was heading for:
+> Post, Article and Research, with Essay and Policy Brief as genres of Article
+> in an `article_format` column. None of that is the product any more, and as
+> of `20260915000005` to `20260915000007` none of it is the database either.
+>
+> What is true now: a piece is a **Post** or an **Article**, and its title
+> decides which. `posts.content_kind` is NOT NULL and constrained to those two
+> values, `posts.article_format` is always null, and `posts.type` is derived
+> from `content_kind` by a trigger until the column is dropped. See
+> `PUBLISHING_RESET_PHASE2I.md` and `lib/contentModel.ts`, which is now the
+> whole model in about eighty lines.
+>
+> Kept because it is the record of how the columns came to exist and what each
+> phase of that migration did. Do not follow its rollout plan.
+
 # Content model migration (Post / Article / Research)
 
 ## Target model

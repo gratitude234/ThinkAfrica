@@ -14,10 +14,9 @@ interface Props {
   initialLiked: boolean;
   initialLikeCount: number;
   initialBookmarked: boolean;
-  responseCount: number;
   commentCount?: number;
-  /** The discussion metric: comments plus responses. Off only where there is
-   *  deliberately no discussion affordance. */
+  /** The comment count and its link. Off only where there is deliberately no
+   *  discussion affordance. */
   showDiscussion?: boolean;
   contentKind?: ContentKind | null;
   shareTitle?: string;
@@ -50,7 +49,6 @@ export default function FeedEngagementActions({
   initialLiked,
   initialLikeCount,
   initialBookmarked,
-  responseCount,
   commentCount = 0,
   showDiscussion = true,
   contentKind = null,
@@ -180,7 +178,6 @@ export default function FeedEngagementActions({
    */
   const labelClass = "hidden min-[400px]:inline";
 
-  const discussionCount = commentCount + responseCount;
   const shareLabel =
     shareStatus === "sharing"
       ? "Sharing…"
@@ -227,19 +224,17 @@ export default function FeedEngagementActions({
         </button>
 
         {showDiscussion ? (
-          // The total includes both lightweight comments and published
-          // Responses, so link to the shared discussion overview rather than
-          // implying the combined number is a comment count.
+          // The comment count, linking to the comments under the post.
           <Link
             href={`/post/${slug}#discussion`}
-            aria-label={`${discussionCount} in this discussion`}
+            aria-label={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
             className={`${actionClass} ${actionHoverBg} hover:text-emerald-ink`}
           >
             <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
             <span className={labelClass}>Discuss</span>
-            {discussionCount > 0 ? <span>{discussionCount}</span> : null}
+            {commentCount > 0 ? <span>{commentCount}</span> : null}
           </Link>
         ) : null}
 

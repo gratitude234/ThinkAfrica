@@ -19,8 +19,6 @@ describe("actionability", () => {
   it.each([
     "revision_requested",
     "review_assigned",
-    "response_post",
-    "opportunity_inquiry",
     "co_author_invite",
     "research_collaboration_request",
   ])("treats %s as something the reader must act on", (type) => {
@@ -31,6 +29,9 @@ describe("actionability", () => {
   });
 
   it.each([
+    // A historic Response notification. Responses are retired, so it no
+    // longer asks anything of the reader.
+    "response_post",
     "follow",
     "like",
     "comment",
@@ -102,21 +103,17 @@ describe("type coverage regressions", () => {
     });
   });
 
-  it("keeps publication alerts out of Needs attention", () => {
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_ENABLED", "1");
-    vi.stubEnv("NEXT_PUBLIC_TOPIC_SUBSCRIPTIONS_ENABLED", "1");
-    vi.stubEnv("NEXT_PUBLIC_AUTHOR_SUBSCRIPTIONS_UX_V2_ENABLED", "1");
+  it("files historic publication alerts as activity, never as something to act on", () => {
     const summary = getActionInboxSummary([
       notification("author_published"),
       notification("topic_published"),
+      notification("author_subscribed"),
     ]);
 
-    expect(summary.items.every((item) => item.category === "subscriptions")).toBe(
-      true
-    );
+    expect(summary.items.every((item) => item.category === "activity")).toBe(true);
+    expect(summary.groups.map((group) => group.key)).toEqual(["activity"]);
     expect(summary.unreadActionCount).toBe(0);
     expect(summary.primaryActionable).toBeNull();
-    vi.unstubAllEnvs();
   });
 
   it("promotes a suspension over every other unread item", () => {

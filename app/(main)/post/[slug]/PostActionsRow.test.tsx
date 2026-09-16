@@ -43,7 +43,6 @@ function renderRow(overrides: Partial<Parameters<typeof PostActionsRow>[0]> = {}
       initialLiked={false}
       initialLikeCount={0}
       initialBookmarked={false}
-      responseCount={2}
       commentCount={3}
       {...overrides}
     />
@@ -56,9 +55,9 @@ beforeEach(() => {
 });
 
 describe("PostActionsRow reply action", () => {
-  it("counts comments and responses together", () => {
+  it("shows the comment count, and nothing else", () => {
     renderRow();
-    expect(screen.getByRole("button", { name: "Reply to this post" })).toHaveTextContent("5");
+    expect(screen.getByRole("button", { name: "Reply to this post" })).toHaveTextContent("3");
   });
 
   it("takes the reader to the composer instead of navigating away", () => {
@@ -97,7 +96,7 @@ describe("PostActionsRow reply action", () => {
   });
 
   it("hides the count when there is nothing to count", () => {
-    renderRow({ responseCount: 0, commentCount: 0 });
+    renderRow({ commentCount: 0 });
     expect(screen.getByRole("button", { name: "Reply to this post" })).toHaveTextContent("Reply");
     expect(screen.getByRole("button", { name: "Reply to this post" })).not.toHaveTextContent("0");
   });

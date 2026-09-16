@@ -15,7 +15,7 @@ import { sendPasswordChangedEmail } from "../accountEmailActions";
 
 const PROOF_ITEMS = [
   "Choose a fresh password",
-  "Protect drafts and messages",
+  "Protect your drafts and published work",
   "Return to the same profile",
 ];
 
