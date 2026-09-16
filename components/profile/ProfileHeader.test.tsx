@@ -26,8 +26,6 @@ function baseProfile(
     bio: "Writes about governance and institutions.",
     avatar_url: null,
     professional_title: null,
-    verified: false,
-    verified_type: null,
     ...overrides,
   };
 }
@@ -83,9 +81,23 @@ describe("ProfileHeader identity", () => {
     expect(screen.getByRole("heading", { level: 1, name: "student1" })).toBeInTheDocument();
   });
 
-  it("names a verified account on the mark itself", () => {
-    renderHeader({ profileOverrides: { verified: true, verified_type: "student" } });
-    expect(screen.getByRole("img", { name: "Verified student" })).toBeInTheDocument();
+  it("shows no verified prestige mark, even for an account the database marks verified", () => {
+    // Verified prestige was retired in the final UI simplification. A stored
+    // row can still carry the columns, so they are passed through here the way
+    // an untyped caller could, and must not render.
+    renderHeader({
+      profileOverrides: { verified: true, verified_type: "student" } as Partial<HeaderProps["profile"]>,
+    });
+    expect(screen.queryByRole("img", { name: /verified/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/verified/i)).not.toBeInTheDocument();
+  });
+
+  it("offers the More actions control with a readable glyph", () => {
+    // The glyph was once saved double-encoded and rendered as mojibake.
+    renderHeader({ props: { isOwnProfile: false, currentUserId: "reader-1" } });
+    expect(screen.getByRole("button", { name: "More profile actions" })).toHaveTextContent(
+      "•••"
+    );
   });
 });
 

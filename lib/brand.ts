@@ -1,15 +1,15 @@
 export const BRAND_NAME = "Indegenius";
 
-export const BRAND_PROMISE = "Build your intellectual identity.";
+export const BRAND_PROMISE = "Read. Write. Follow. Discover.";
 
-export const BRAND_TAGLINE = "Africa's First Intellectual Social Network";
+export const BRAND_TAGLINE = "A place to read and publish ideas.";
 
-export const BRAND_AUDIENCE = "young people who actively engage with ideas";
+export const BRAND_AUDIENCE = "readers and writers";
 
 export const BRAND_DESCRIPTION =
-  "Publish ideas, test them through thoughtful discourse, and build a lasting record of what you write, argue, research, and contribute.";
+  "Read Posts and Articles, publish your own work, and follow writers and topics you care about.";
 
 export const BRAND_SEO_DESCRIPTION =
-  "Indegenius helps young people who engage with ideas publish, respond, research, and build an evidence-backed intellectual identity.";
+  "Indegenius is a focused publishing platform for reading Posts and Articles, following writers, and sharing ideas.";
 
 export const BRAND_ORIGIN_STATEMENT = "Imagined in Africa. Ideas have no borders.";

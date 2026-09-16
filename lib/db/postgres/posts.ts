@@ -81,7 +81,6 @@ export const POST_BY_SLUG_SQL = `
     p.impression_count,
     p.read_count,
     p.cover_image_url,
-    p.audio_summary_url,
     case
       when author.id is null then null
       else jsonb_build_object(
@@ -127,7 +126,6 @@ export function toPostRecord(row: Record<string, unknown>): PostRecord {
     impression_count: toNumber(row.impression_count),
     read_count: toNumber(row.read_count),
     cover_image_url: (row.cover_image_url as string | null) ?? null,
-    audio_summary_url: (row.audio_summary_url as string | null) ?? null,
     profiles: toAuthor(row.profiles),
   };
 }

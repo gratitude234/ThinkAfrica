@@ -29,11 +29,6 @@ import {
   type BookmarksRepository,
 } from "@/lib/db/bookmarks";
 import {
-  createPostgresDashboardRepository,
-  createSupabaseDashboardRepository,
-  type DashboardRepository,
-} from "@/lib/db/dashboard";
-import {
   createPostgresViewerStateRepository,
   createSupabaseViewerStateRepository,
   type ViewerStateRepository,
@@ -95,7 +90,6 @@ export const MIGRATABLE_READ_DOMAINS = [
   "search",
   "comments",
   "viewer-state",
-  "dashboard",
   "bookmarks",
   "notifications",
   "composer",
@@ -107,7 +101,7 @@ export const MIGRATABLE_READ_DOMAINS = [
  * rather than refused: refusing would take every read down on deploy for a
  * domain that no longer has a read to move.
  */
-export const RETIRED_READ_DOMAINS = ["messaging"] as const;
+export const RETIRED_READ_DOMAINS = ["messaging", "dashboard"] as const;
 
 export type ReadDomain = (typeof MIGRATABLE_READ_DOMAINS)[number];
 
@@ -243,21 +237,6 @@ export function viewerStateRepository(
   return isReadDomainMigrated("viewer-state")
     ? createPostgresViewerStateRepository(resolvePostgresExecutor())
     : createSupabaseViewerStateRepository(supabase);
-}
-
-/**
- * The member dashboard.
- *
- * It used to take the research exclusion sentinel as an argument, so the two
- * backends could not be built from different values. There is no exclusion to
- * pass: Phase 2I normalized the rows it filtered and made the value unwritable.
- */
-export function dashboardRepository(
-  supabase: SupabaseClient
-): DashboardRepository {
-  return isReadDomainMigrated("dashboard")
-    ? createPostgresDashboardRepository(resolvePostgresExecutor())
-    : createSupabaseDashboardRepository(supabase);
 }
 
 /** The member's saved posts. See lib/db/bookmarks.ts for why this moved to

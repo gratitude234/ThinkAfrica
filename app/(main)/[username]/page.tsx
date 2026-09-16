@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProfileAbout from "@/components/profile/ProfileAbout";
+import ProfileDraftList from "@/components/profile/ProfileDraftList";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfilePublicationList from "@/components/profile/ProfilePublicationList";
 import ProfileTabs from "@/components/profile/ProfileTabs";
@@ -44,7 +45,10 @@ export async function generateMetadata({
     title,
     description,
     alternates: {
-      canonical: profileTabHref(profile.username, resolveProfileTab(query)),
+      canonical: profileTabHref(
+        profile.username,
+        resolveProfileTab(query) === "drafts" ? "posts" : resolveProfileTab(query)
+      ),
     },
     openGraph: {
       type: "profile",
@@ -56,20 +60,21 @@ export async function generateMetadata({
   };
 }
 
-/**
- * A writer's public profile: a header, then Posts, Articles or About.
- *
- * The publishing reset, Phase 2G, replaced the Intellectual Record overview
- * (Featured Work, the record preview, evidence legends and the Background rail)
- * with this. `/username/record` redirects here permanently.
- */
+/** A writer profile: one header and one tab navigation. */
 export default async function UserProfilePage({ params, searchParams }: PageProps) {
   const [{ username }, query] = await Promise.all([params, searchParams]);
-  const tab = resolveProfileTab(query);
-  const page = tab === "about" ? 1 : resolveProfilePage(query.page);
+  const requestedTab = resolveProfileTab(query);
+  const page = requestedTab === "about" || requestedTab === "drafts"
+    ? 1
+    : resolveProfilePage(query.page);
   const supabase = await createClient();
 
-  const data = await loadProfileView({ supabase, username, tab, page });
+  const data = await loadProfileView({
+    supabase,
+    username,
+    tab: requestedTab,
+    page,
+  });
 
   /**
    * Null means the database answered and had nothing to show: no such
@@ -80,7 +85,7 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
    */
   if (!data) notFound();
 
-  const { profile, viewer, publications } = data;
+  const { profile, viewer, tab, publications, drafts } = data;
   const viewerState = getProfileViewerState({
     viewerId: viewer.viewerId,
     profileId: profile.id,
@@ -96,8 +101,6 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
           bio: profile.bio,
           avatar_url: profile.avatar_url,
           professional_title: profile.professional_title,
-          verified: profile.verified,
-          verified_type: profile.verified_type,
         }}
         followerCount={viewer.followerCount}
         followingCount={viewer.followingCount}
@@ -107,10 +110,16 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
         initialBlocked={viewer.isBlocked}
       />
 
-      <ProfileTabs username={profile.username} active={tab} />
+      <ProfileTabs
+        username={profile.username}
+        active={tab}
+        isOwnProfile={viewer.isOwnProfile}
+      />
 
       <div className="mt-6">
-        {publications && tab !== "about" ? (
+        {tab === "drafts" && drafts ? (
+          <ProfileDraftList initialDrafts={drafts} />
+        ) : publications && tab !== "about" && tab !== "drafts" ? (
           <ProfilePublicationList
             username={profile.username}
             profileId={profile.id}

@@ -5,14 +5,15 @@ import "server-only";
  *
  * The identity row lives in `lib/db/supabase/profiles.ts` and its PostgreSQL
  * twin. This is everything else the page loads: the relationship counts, the
- * viewer's relationship to the profile, and the Posts and Articles lists.
+ * viewer's relationship to the profile, the Posts and Articles lists, and the
+ * owner's Drafts.
  *
  * Same production database, not Neon. What changes on the direct path is that
  * these stop travelling through the gateway.
  *
  * ## Where faithful is not the same as tidy
  *
- * **The publication pagination is quirky and is reproduced quirk and all.**
+ * **Publications are the writer's own published Posts and Articles.**
  * The owned branch is offset-paginated; the co-authored branch takes
  * `start + pageSize + 1` rows from the top and is then merged and re-sorted in
  * TypeScript. That means page two is an approximation rather than a clean
@@ -23,7 +24,7 @@ import "server-only";
  *
  * The publishing reset, Phase 2G, removed featured work and the evidence
  * columns (citation ids and reference counts) from these reads, along with the
- * Intellectual Record repository that sat beside this one. Phase 2I removed the
+ * retired profile-record repository that sat beside this one. Phase 2I removed the
  * legacy `type` half of the kind predicate: every row carries a canonical
  * `content_kind`, so a tab selects on it alone.
  */
@@ -63,6 +64,14 @@ export interface ProfilePublicationBranches {
   coauthored: ProfilePublicationRow[];
 }
 
+/** The projection the owner's Drafts tab reads. */
+export interface ProfileDraftRow {
+  id: string;
+  title: string | null;
+  content_kind: string | null;
+  updated_at: string;
+}
+
 export interface ProfilePageRepository {
   /** Public: the header states both as facts. */
   relationshipCounts(profileId: string): Promise<ProfileRelationshipCounts>;
@@ -79,7 +88,18 @@ export interface ProfilePageRepository {
     start: number;
     limit: number;
   }): Promise<ProfilePublicationBranches>;
+  /**
+   * The owner's own drafts, newest edit first. Owner-only, and authorized
+   * here rather than left to RLS: a direct connection has no policy to refuse
+   * a stranger's drafts, so a profile that is not the viewer's answers empty
+   * without asking the database.
+   */
+  ownerDrafts(input: { profileId: string; viewerId: string }): Promise<ProfileDraftRow[]>;
   readonly backend: "supabase" | "postgres";
+}
+
+function isOwner({ profileId, viewerId }: { profileId: string; viewerId: string }) {
+  return Boolean(viewerId) && profileId === viewerId;
 }
 
 // ── PostgreSQL ───────────────────────────────────────────────────────
@@ -111,54 +131,30 @@ const VIEWER_RELATIONSHIP_SQL = `
  *  $3  offset
  */
 const PUBLICATION_BRANCHES_SQL = `
-  with kinds as (
-    select value as k from jsonb_array_elements_text($2::text::jsonb) as value
-  ),
-  owned as (
-    select
-      p.*,
-      'owned' as branch,
-      row_number() over (
-        order by p.published_at desc nulls last, p.created_at desc
-      ) as ord
-    from public.posts as p
-    where p.author_id = $1::uuid
-      and p.status = 'published'
-      and p.content_kind in (select k from kinds)
-    order by p.published_at desc nulls last, p.created_at desc
-    offset $3::int
-    limit $4::int
-  ),
-  coauthored as (
-    select
-      p.*,
-      'coauthored' as branch,
-      row_number() over (order by a.accepted_at desc) as ord
-    from public.post_authors as a
-    join public.posts as p on p.id = a.post_id
-    where a.user_id = $1::uuid
-      and a.accepted_at is not null
-    order by a.accepted_at desc
-    limit $5::int
-  ),
-  merged as (
-    select * from owned
-    union all
-    select * from coauthored
-  )
   select
-    m.branch, m.id, m.author_id, m.title, m.slug, m.excerpt,
-    m.content_kind,
-    m.created_at, m.published_at, m.cover_image_url,
-    -- The owned branch's PostgREST projection does not carry status: only
-    -- the co-authored branch needs it, because only that one is filtered on
-    -- it in TypeScript.
-    case when m.branch = 'owned' then null else m.status end as status
-  from merged as m
-  -- A CTE's own ORDER BY selects the right slice but does not survive into
-  -- the outer query. The ord column ranks rows within each branch, computed
-  -- where that branch's ordering is in scope.
-  order by (case when m.branch = 'owned' then 0 else 1 end), m.ord
+    'owned' as branch, p.id, p.author_id, p.title, p.slug, p.excerpt,
+    p.content_kind, p.created_at, p.published_at, p.cover_image_url
+  from public.posts as p
+  where p.author_id = $1::uuid
+    and p.status = 'published'
+    and p.content_kind in (
+      select value from jsonb_array_elements_text($2::text::jsonb)
+    )
+  order by p.published_at desc nulls last, p.created_at desc
+  offset $3::int
+  limit $4::int
+`;
+
+/**
+ * The owner's drafts. `author_id = $1` is the whole authorization on a direct
+ * connection, which is why the repository only runs it for the owner.
+ */
+const OWNER_DRAFTS_SQL = `
+  select p.id, p.title, p.content_kind, p.updated_at
+  from public.posts as p
+  where p.author_id = $1::uuid
+    and p.status = 'draft'
+  order by p.updated_at desc, p.id desc
 `;
 
 function toNumber(value: unknown): number {
@@ -225,21 +221,25 @@ export function createPostgresProfilePageRepository(
     async publicationBranches({ profileId, contentKinds, start, limit }) {
       const rows = await executor.query<Record<string, unknown>>(
         PUBLICATION_BRANCHES_SQL,
-        [
-          profileId,
-          JSON.stringify([...contentKinds]),
-          start,
-          limit,
-          start + limit,
-        ]
+        [profileId, JSON.stringify([...contentKinds]), start, limit]
       );
 
-      const owned: ProfilePublicationRow[] = [];
-      const coauthored: ProfilePublicationRow[] = [];
-      for (const row of rows) {
-        (row.branch === "owned" ? owned : coauthored).push(toPublicationRow(row));
-      }
-      return { owned, coauthored };
+      const owned = rows.map(toPublicationRow);
+      return { owned, coauthored: [] };
+    },
+
+    async ownerDrafts(input) {
+      if (!isOwner(input)) return [];
+      const rows = await executor.query<Record<string, unknown>>(
+        OWNER_DRAFTS_SQL,
+        [input.viewerId]
+      );
+      return rows.map((row) => ({
+        id: String(row.id),
+        title: (row.title as string | null) ?? null,
+        content_kind: (row.content_kind as string | null) ?? null,
+        updated_at: toIso(row.updated_at) ?? "",
+      }));
     },
   };
 }
@@ -248,6 +248,7 @@ export function createPostgresProfilePageRepository(
 
 const PUBLICATION_SELECT =
   "id, author_id, title, slug, excerpt, content_kind, created_at, published_at, cover_image_url";
+const DRAFT_SELECT = "id, title, content_kind, updated_at";
 
 /** A database error is an error, not an empty list. */
 function rows<T>(result: { data?: unknown; error?: unknown }, label: string): T[] {
@@ -320,40 +321,30 @@ export function createSupabaseProfilePageRepository(
     },
 
     async publicationBranches({ profileId, contentKinds, start, limit }) {
-      const [ownedResult, coauthoredResult] = await Promise.all([
-        supabase
-          .from("posts")
-          .select(PUBLICATION_SELECT)
-          .eq("author_id", profileId)
-          .eq("status", "published")
-          .in("content_kind", [...contentKinds])
-          .order("published_at", { ascending: false, nullsFirst: false })
-          .order("created_at", { ascending: false })
-          .range(start, start + limit - 1),
-        supabase
-          .from("post_authors")
-          .select(`posts!post_authors_post_id_fkey(${PUBLICATION_SELECT}, status)`)
-          .eq("user_id", profileId)
-          .not("accepted_at", "is", null)
-          .order("accepted_at", { ascending: false })
-          .limit(start + limit),
-      ]);
+      const ownedResult = await supabase
+        .from("posts")
+        .select(PUBLICATION_SELECT)
+        .eq("author_id", profileId)
+        .eq("status", "published")
+        .in("content_kind", [...contentKinds])
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .range(start, start + limit - 1);
 
       const owned = rows<ProfilePublicationRow>(ownedResult, "publications failed");
-      const wrappers = rows<{ posts: unknown }>(
-        coauthoredResult,
-        "co-authored publications failed"
-      );
+      return { owned, coauthored: [] };
+    },
 
-      const coauthored = wrappers
-        .map((wrapper) =>
-          Array.isArray(wrapper.posts)
-            ? ((wrapper.posts[0] as ProfilePublicationRow | undefined) ?? null)
-            : ((wrapper.posts as ProfilePublicationRow | null) ?? null)
-        )
-        .filter((row): row is ProfilePublicationRow => row !== null);
-
-      return { owned, coauthored };
+    async ownerDrafts(input) {
+      if (!isOwner(input)) return [];
+      const result = await supabase
+        .from("posts")
+        .select(DRAFT_SELECT)
+        .eq("author_id", input.viewerId)
+        .eq("status", "draft")
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: false });
+      return rows<ProfileDraftRow>(result, "drafts failed");
     },
   };
 }

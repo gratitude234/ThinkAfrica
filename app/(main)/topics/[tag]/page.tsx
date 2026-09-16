@@ -33,8 +33,8 @@ export default async function TopicPage({ params }: PageProps) {
     supabase
       .from("posts")
       .select(`
-      id, author_id, title, slug, excerpt, content_kind, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url,
-      profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type)
+      id, author_id, title, slug, excerpt, content_kind, tags, created_at, published_at, word_count, cover_image_url,
+      profiles!posts_author_id_fkey (username, full_name, avatar_url)
     `)
       .eq("status", "published")
       .contains("tags", [decodedTag])
@@ -71,9 +71,6 @@ export default async function TopicPage({ params }: PageProps) {
       tags: row.tags,
       created_at: row.created_at,
       published_at: row.published_at,
-      view_count: row.view_count,
-      impression_count: row.impression_count ?? null,
-      read_count: row.read_count ?? null,
       word_count: row.word_count ?? null,
       cover_image_url: row.cover_image_url ?? null,
       comment_count: commentCounts[row.id] ?? 0,

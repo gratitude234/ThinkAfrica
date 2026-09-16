@@ -23,13 +23,15 @@ import { describe, expect, it } from "vitest";
  *      `where user_id = auth.uid()` does once auth.uid() is NULL.
  */
 
+// Line endings normalised: the file is LF in git, but a Windows checkout with
+// core.autocrlf writes CRLF, and the slices below anchor on "\n".
 const migration = readFileSync(
   resolve(
     process.cwd(),
     "supabase/migrations/20260909000001_parameterize_identity_rpcs.sql"
   ),
   "utf8"
-);
+).replace(/\r\n/g, "\n");
 
 /** Executable SQL only. Prose describing a pattern must not satisfy a check
  *  for that pattern, and this file's header discusses the design it replaced. */

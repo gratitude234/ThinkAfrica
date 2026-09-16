@@ -61,34 +61,6 @@ export interface PostReferenceRow {
   ref_type: string | null;
 }
 
-export interface CoAuthorRow {
-  user_id: string;
-  display_order: number | null;
-  corresponding_author: boolean | null;
-  accepted_at: string | null;
-  profile: { username: string; full_name: string | null } | null;
-}
-
-export interface ReviewRow {
-  assigned_at: string | null;
-  submitted_at: string | null;
-  recommendation: string | null;
-  round: number | null;
-}
-
-export interface EditorDecisionRow {
-  decision: string | null;
-  created_at: string | null;
-  round: number | null;
-}
-
-export interface VersionRow {
-  id: string;
-  version_kind: string | null;
-  round: number | null;
-  created_at: string | null;
-}
-
 export interface NeighbourPost {
   id: string;
   title: string | null;
@@ -108,10 +80,6 @@ export interface RelatedPost {
 
 export interface PostPageCollections {
   references: PostReferenceRow[];
-  coAuthors: CoAuthorRow[];
-  reviews: ReviewRow[];
-  decisions: EditorDecisionRow[];
-  versions: VersionRow[];
 }
 
 export interface PostPageViewerState {
@@ -122,11 +90,9 @@ export interface PostPageViewerState {
 
 export interface PostPageRepository {
   counts(postId: string): Promise<PostPageCounts>;
-  /** Takes the viewer because the co-author projection is governed by the
-   *  profiles policy PostgREST applied from the session. Null is logged out. */
   collections(
     postId: string,
-    viewerId: string | null
+    _viewerId?: string | null
   ): Promise<PostPageCollections>;
   related(
     postId: string,
@@ -217,51 +183,14 @@ export function createSupabasePostPageRepository(
       // The viewer is unused on this side: the request client carries the
       // session, so the profiles policy is applied by the database.
     async collections(postId, _viewerId) {
-      const [references, coAuthors, reviews, decisions, versions] = await Promise.all([
-        supabase
-          .from("post_references")
-          .select("*")
-          .eq("post_id", postId)
-          .order("display_order", { ascending: true }),
-        supabase
-          .from("post_authors")
-          .select(
-            "user_id, display_order, corresponding_author, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name)"
-          )
-          .eq("post_id", postId)
-          .not("accepted_at", "is", null)
-          .order("display_order", { ascending: true }),
-        supabase
-          .from("post_reviews")
-          .select("assigned_at, submitted_at, recommendation, round")
-          .eq("post_id", postId)
-          .is("removed_at", null),
-        supabase
-          .from("post_editor_decisions")
-          .select("decision, created_at, round")
-          .eq("post_id", postId)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("post_versions")
-          .select("id, version_kind, round, created_at")
-          .eq("post_id", postId)
-          .order("created_at", { ascending: true }),
-      ]);
-
-      const firstProfile = (value: unknown) =>
-        Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+      const references = await supabase
+        .from("post_references")
+        .select("*")
+        .eq("post_id", postId)
+        .order("display_order", { ascending: true });
 
       return {
         references: rows<PostReferenceRow>(references, "post references"),
-        coAuthors: rows<Record<string, unknown>>(coAuthors, "co-authors").map(
-          (row) => ({
-            ...(row as unknown as CoAuthorRow),
-            profile: firstProfile(row.profile) as CoAuthorRow["profile"],
-          })
-        ),
-        reviews: rows<ReviewRow>(reviews, "post reviews"),
-        decisions: rows<EditorDecisionRow>(decisions, "editor decisions"),
-        versions: rows<VersionRow>(versions, "post versions"),
       };
     },
 
@@ -365,7 +294,6 @@ export function createSupabasePostPageRepository(
  * Each is a JOIN condition rather than a WHERE clause, which is the difference
  * between hiding a name and deleting a published post from the page.
  */
-const COAUTHOR_VIEWER = "$2";
 const RELATED_VIEWER = "$4";
 
 /**
@@ -382,7 +310,7 @@ const COUNTS_SQL = `
 `;
 
 /**
- * The five child collections, as one row of jsonb aggregates.
+ * The publication references, as one jsonb aggregate.
  *
  * `jsonb_agg` rather than a join: five collections in one result set would be
  * a cross product, and the page wants five lists, not one denormalised table.
@@ -391,62 +319,11 @@ const COUNTS_SQL = `
  * and every caller here expects an array it can map.
  */
 const COLLECTIONS_SQL = `
-  select
-    coalesce((
-      select jsonb_agg(to_jsonb(r) order by r.display_order asc nulls last)
-      from public.post_references as r
-      where r.post_id = $1::uuid
-    ), '[]'::jsonb) as references,
-
-    coalesce((
-      select jsonb_agg(
-        jsonb_build_object(
-          'user_id', a.user_id,
-          'display_order', a.display_order,
-          'corresponding_author', a.corresponding_author,
-          'accepted_at', a.accepted_at,
-          'profile', case when p.id is null then null else jsonb_build_object(
-            'username', p.username,
-            'full_name', p.full_name
-          ) end
-        ) order by a.display_order asc nulls last
-      )
-      from public.post_authors as a
-      ${visibleProfileJoin("p", "a.user_id", COAUTHOR_VIEWER)}
-      where a.post_id = $1::uuid and a.accepted_at is not null
-    ), '[]'::jsonb) as co_authors,
-
-    coalesce((
-      select jsonb_agg(jsonb_build_object(
-        'assigned_at', v.assigned_at,
-        'submitted_at', v.submitted_at,
-        'recommendation', v.recommendation,
-        'round', v.round
-      ))
-      from public.post_reviews as v
-      where v.post_id = $1::uuid and v.removed_at is null
-    ), '[]'::jsonb) as reviews,
-
-    coalesce((
-      select jsonb_agg(jsonb_build_object(
-        'decision', d.decision,
-        'created_at', d.created_at,
-        'round', d.round
-      ) order by d.created_at desc)
-      from public.post_editor_decisions as d
-      where d.post_id = $1::uuid
-    ), '[]'::jsonb) as decisions,
-
-    coalesce((
-      select jsonb_agg(jsonb_build_object(
-        'id', s.id,
-        'version_kind', s.version_kind,
-        'round', s.round,
-        'created_at', s.created_at
-      ) order by s.created_at asc)
-      from public.post_versions as s
-      where s.post_id = $1::uuid
-    ), '[]'::jsonb) as versions
+  select coalesce((
+    select jsonb_agg(to_jsonb(r) order by r.display_order asc nulls last)
+    from public.post_references as r
+    where r.post_id = $1::uuid
+  ), '[]'::jsonb) as references
 `;
 
 /**
@@ -559,18 +436,9 @@ export function createPostgresPostPageRepository(
       };
     },
 
-    async collections(postId, viewerId) {
-      const [row] = await executor.query<Record<string, unknown>>(COLLECTIONS_SQL, [
-        postId,
-        viewerId,
-      ]);
-      return {
-        references: toArray<PostReferenceRow>(row?.references),
-        coAuthors: toArray<CoAuthorRow>(row?.co_authors),
-        reviews: toArray<ReviewRow>(row?.reviews),
-        decisions: toArray<EditorDecisionRow>(row?.decisions),
-        versions: toArray<VersionRow>(row?.versions),
-      };
+    async collections(postId, _viewerId) {
+      const [row] = await executor.query<Record<string, unknown>>(COLLECTIONS_SQL, [postId]);
+      return { references: toArray<PostReferenceRow>(row?.references) };
     },
 
     async related(postId, tags, limit, viewerId) {

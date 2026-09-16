@@ -56,16 +56,8 @@ export interface BookmarkedPostRow {
   profiles: {
     username: string | null;
     full_name: string | null;
-    university: string | null;
     avatar_url: string | null;
-    verified: boolean | null;
-    verified_type: string | null;
   } | null;
-  post_authors: Array<{
-    user_id: string;
-    accepted_at: string | null;
-    profile: { username: string; full_name: string | null } | null;
-  }>;
 }
 
 export interface BookmarksRepository {
@@ -85,24 +77,8 @@ const LIST_SQL = `
     case when author.id is null then null else jsonb_build_object(
       'username', author.username,
       'full_name', author.full_name,
-      'university', author.university,
-      'avatar_url', author.avatar_url,
-      'verified', author.verified,
-      'verified_type', author.verified_type
-    ) end as profiles,
-    coalesce((
-      select jsonb_agg(jsonb_build_object(
-        'user_id', a.user_id,
-        'accepted_at', a.accepted_at,
-        'profile', case when co.id is null then null else jsonb_build_object(
-          'username', co.username,
-          'full_name', co.full_name
-        ) end
-      ))
-      from public.post_authors a
-      ${visibleProfileJoin("co", "a.user_id", "$1")}
-      where a.post_id = p.id
-    ), '[]'::jsonb) as post_authors
+      'avatar_url', author.avatar_url
+    ) end as profiles
   from public.bookmarks b
   join public.posts p
     on p.id = b.post_id
@@ -116,8 +92,7 @@ const LIST_SQL = `
 
 const SELECT = `post_id, posts!bookmarks_post_id_fkey (
             id, author_id, title, slug, excerpt, content_kind, tags, created_at, published_at, view_count, impression_count, read_count, word_count, cover_image_url,
-            profiles!posts_author_id_fkey (username, full_name, university, avatar_url, verified, verified_type),
-            post_authors(user_id, accepted_at, profile:profiles!post_authors_user_id_fkey(username, full_name))
+            profiles!posts_author_id_fkey (username, full_name, avatar_url)
           )`;
 
 export function createSupabaseBookmarksRepository(

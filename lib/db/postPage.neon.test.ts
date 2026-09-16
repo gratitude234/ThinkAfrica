@@ -94,12 +94,12 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
   }, 60_000);
 
   it("returns every collection as an array, even when empty", async () => {
-    // A post with no references, co-authors, reviews, decisions or versions.
-    // jsonb_agg over no rows is NULL, and the page maps all five.
+    // A post with no references. jsonb_agg over no rows is NULL, and the page
+    // maps it. The final UI simplification removed the co-author, review,
+    // decision and version collections, so references is the only one left.
     const rows = await executor.query<{ id: string }>(
       `select p.id::text as id from public.posts as p
        where not exists (select 1 from public.post_references r where r.post_id = p.id)
-         and not exists (select 1 from public.post_reviews v where v.post_id = p.id)
        limit 1`
     );
     if (rows.length === 0) return;
@@ -108,8 +108,8 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     for (const [name, value] of Object.entries(collections)) {
       expect(Array.isArray(value), `${name} should be an array`).toBe(true);
     }
+    expect(Object.keys(collections)).toEqual(["references"]);
     expect(collections.references).toEqual([]);
-    expect(collections.reviews).toEqual([]);
   }, 60_000);
 
   it("orders references by display_order and carries every column", async () => {
@@ -132,51 +132,19 @@ describe.skipIf(!enabled)("the post page repository against PostgreSQL", () => {
     }
   }, 60_000);
 
-  it("embeds the co-author profile as an object, not an array", async () => {
+  it("loads no retired co-author, review, decision or version collection", async () => {
+    // A post that has all of them in the database still answers with
+    // references alone: the rows are kept, and the page no longer reads them.
     const rows = await executor.query<{ id: string }>(
-      `select post_id::text as id from public.post_authors
-       where accepted_at is not null limit 1`
+      `select a.post_id::text as id from public.post_authors a
+       where a.accepted_at is not null
+         and exists (select 1 from public.post_reviews v where v.post_id = a.post_id)
+       limit 1`
     );
     if (rows.length === 0) return;
 
-    const { coAuthors } = await repository.collections(rows[0].id, null);
-    expect(coAuthors.length).toBeGreaterThan(0);
-
-    // PostgREST returns a one-to-one embed as an object or a one-element
-    // array depending on how it resolved the relationship, and the page
-    // normalises. This side must produce the object directly.
-    const profile = coAuthors[0].profile;
-    expect(Array.isArray(profile)).toBe(false);
-    if (profile) expect(typeof profile.username).toBe("string");
-  }, 60_000);
-
-  it("excludes co-authors who have not accepted", async () => {
-    const rows = await executor.query<{ id: string }>(
-      `select post_id::text as id from public.post_authors
-       where accepted_at is null limit 1`
-    );
-    if (rows.length === 0) return;
-
-    const { coAuthors } = await repository.collections(rows[0].id, null);
-    for (const entry of coAuthors) {
-      expect(entry.accepted_at).not.toBeNull();
-    }
-  }, 60_000);
-
-  it("excludes removed reviews", async () => {
-    const rows = await executor.query<{ id: string }>(
-      `select post_id::text as id from public.post_reviews
-       where removed_at is not null limit 1`
-    );
-    if (rows.length === 0) return;
-
-    const { reviews } = await repository.collections(rows[0].id, null);
-    const [expected] = await executor.query<{ count: string }>(
-      `select count(*)::int as count from public.post_reviews
-       where post_id = $1::uuid and removed_at is null`,
-      [rows[0].id]
-    );
-    expect(reviews.length).toBe(Number(expected.count));
+    const collections = await repository.collections(rows[0].id, null);
+    expect(Object.keys(collections)).toEqual(["references"]);
   }, 60_000);
 
   it("finds related posts by tag overlap and never the post itself", async () => {

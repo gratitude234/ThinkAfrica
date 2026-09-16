@@ -9,7 +9,7 @@ import {
  *
  * This is the first version deliberately. There is no automation, no drip
  * sequence and no segmentation language here. A broadcast is one message, from
- * one approved identity, to one named audience.
+ * one configured sender, to one named audience.
  */
 
 /**
@@ -105,12 +105,6 @@ export const BROADCAST_AUDIENCES: BroadcastAudience[] = [
     isStanding: true,
   },
   {
-    key: "verified",
-    label: "Verified users",
-    description: "Contributors carrying a verified credential on their profile.",
-    isStanding: true,
-  },
-  {
     key: "new",
     label: "New users",
     description: "Joined Indegenius in the last 30 days.",
@@ -124,13 +118,43 @@ export const BROADCAST_AUDIENCES: BroadcastAudience[] = [
   },
 ];
 
+/**
+ * Audiences that can no longer be chosen or sent to, kept so a broadcast that
+ * already names one still renders in the admin list and detail pages.
+ *
+ * Verified users went with verified prestige in the final UI simplification.
+ * Its `broadcast_segments` row and Resend segment still exist, but the nightly
+ * sync no longer maintains them, so it is not a standing audience and a draft
+ * addressed to it is refused at send time.
+ */
+export const RETIRED_BROADCAST_AUDIENCES: BroadcastAudience[] = [
+  {
+    key: "verified",
+    label: "Verified users",
+    description: "Retired audience. Choose another audience to send this broadcast.",
+    isStanding: false,
+  },
+];
+
 /** The audiences the nightly sync provisions a Resend segment for. */
 export const STANDING_AUDIENCE_KEYS = BROADCAST_AUDIENCES.filter(
   (audience) => audience.isStanding
 ).map((audience) => audience.key);
 
+/** True for an audience a broadcast may be saved with and sent to. */
+export function isCurrentBroadcastAudience(key: string): key is BroadcastAudienceKey {
+  return BROADCAST_AUDIENCES.some((audience) => audience.key === key);
+}
+
+export function isRetiredBroadcastAudience(key: string): boolean {
+  return RETIRED_BROADCAST_AUDIENCES.some((audience) => audience.key === key);
+}
+
+/** Resolves current and retired audiences alike, for display. */
 export function getBroadcastAudience(key: BroadcastAudienceKey): BroadcastAudience {
-  const audience = BROADCAST_AUDIENCES.find((item) => item.key === key);
+  const audience =
+    BROADCAST_AUDIENCES.find((item) => item.key === key) ??
+    RETIRED_BROADCAST_AUDIENCES.find((item) => item.key === key);
   if (!audience) {
     throw new Error(`Unknown broadcast audience: ${key}`);
   }

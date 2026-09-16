@@ -104,8 +104,8 @@ export async function planPostDeletion(
     }
 
     // "Not yours" and "does not exist" stay indistinguishable to the caller;
-    // "yours, but not a draft" is the one refusal the author is supposed to
-    // understand, because it tells them to withdraw instead.
+    // "yours, but not deletable" is the one refusal the author is told about,
+    // so their own piece is never reported as missing.
     if (decision.refusal === "not_owner") plan.missing.push(id);
     else plan.refused.push(id);
   }

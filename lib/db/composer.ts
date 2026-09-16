@@ -33,15 +33,6 @@ import type { SqlExecutor } from "@/lib/db/postgres/executor";
 
 // ── Shapes ───────────────────────────────────────────────────────────
 
-export interface DraftRow {
-  id: string;
-  title: string | null;
-  excerpt: string | null;
-  word_count: number | null;
-  content_kind: string | null;
-  updated_at: string;
-}
-
 /** The narrower projection the "continue where you left off" row reads. */
 export interface ResumableDraftRow {
   id: string;
@@ -60,8 +51,6 @@ export interface RevisionRow {
 }
 
 export interface ComposerRepository {
-  /** Every draft this member owns, newest edit first. */
-  myDrafts(viewerId: string, limit: number): Promise<DraftRow[]>;
   /** The few most recent drafts, for the resume prompt. */
   resumableDrafts(viewerId: string, limit: number): Promise<ResumableDraftRow[]>;
   /**
@@ -81,17 +70,6 @@ export interface ComposerRepository {
 }
 
 // ── SQL ──────────────────────────────────────────────────────────────
-
-const MY_DRAFTS_SQL = `
-  select
-    p.id, p.title, p.excerpt, p.word_count,
-    p.content_kind, p.updated_at
-  from public.posts p
-  where p.author_id = $1::uuid
-    and p.status = 'draft'
-  order by p.updated_at desc
-  limit $2::int
-`;
 
 const RESUMABLE_SQL = `
   select p.id, p.title, p.content_kind, p.updated_at
@@ -153,8 +131,6 @@ function rows<T>(result: { data?: unknown; error?: unknown }, label: string): T[
   return (result.data ?? []) as T[];
 }
 
-const DRAFT_SELECT =
-  "id, title, excerpt, word_count, content_kind, updated_at";
 const RESUMABLE_SELECT = "id, title, content_kind, updated_at";
 const REVISION_SELECT = "id, title, excerpt, content, word_count, created_at";
 
@@ -165,17 +141,6 @@ export function createSupabaseComposerRepository(
 ): ComposerRepository {
   return {
     backend: "supabase",
-
-    async myDrafts(viewerId, limit) {
-      const result = await supabase
-        .from("posts")
-        .select(DRAFT_SELECT)
-        .eq("author_id", viewerId)
-        .eq("status", "draft")
-        .order("updated_at", { ascending: false })
-        .limit(limit);
-      return rows<DraftRow>(result, "drafts");
-    },
 
     async resumableDrafts(viewerId, limit) {
       const result = await supabase
@@ -236,10 +201,6 @@ export function createPostgresComposerRepository(
 ): ComposerRepository {
   return {
     backend: "postgres",
-
-    async myDrafts(viewerId, limit) {
-      return executor.query<DraftRow>(MY_DRAFTS_SQL, [viewerId, limit]);
-    },
 
     async resumableDrafts(viewerId, limit) {
       return executor.query<ResumableDraftRow>(RESUMABLE_SQL, [viewerId, limit]);

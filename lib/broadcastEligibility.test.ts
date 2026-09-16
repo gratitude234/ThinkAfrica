@@ -295,10 +295,13 @@ describe("audience membership", () => {
     );
   });
 
-  it("counts a verified profile", () => {
-    expect(audienceMembership(candidate({ isVerified: true }), NOW)).toContain(
-      "verified"
-    );
+  it("files a verified profile in no retired verified audience", () => {
+    // Verified users is no longer an audience, so the sync must not put anyone
+    // in its segment. A verified member is still in every audience they
+    // qualify for on other grounds.
+    const memberships = audienceMembership(candidate({ isVerified: true }), NOW);
+    expect(memberships).not.toContain("verified");
+    expect(memberships).toContain("all");
   });
 
   it("counts a recently joined member as new", () => {

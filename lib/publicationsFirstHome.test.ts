@@ -160,7 +160,10 @@ describe("publications-first Home: the retired systems stay retired", () => {
         /\.(?:eq|order)\(\s*["']featured["']|\bfeatured_provenance\b|\b(?:featurePostExclusively|setPostFeatured|clearFeatured|createFeaturedExposure|getFeaturedPostCandidates|uniqueFeaturedPosts)\b/
       )
     ).toEqual([]);
-    expect(codeOf("app/(marketing)/landing/landingData.ts")).not.toMatch(/\bfeatured\b/);
+    // The landing page's data module went in the final UI simplification; the
+    // page that remains must not have picked the featured read back up.
+    expect(existsSync(join(process.cwd(), "app/(marketing)/landing/landingData.ts"))).toBe(false);
+    expect(codeOf("app/(marketing)/landing/page.tsx")).not.toMatch(/\bfeatured\b/);
   });
 
   it("asks for push permission nowhere but Settings", () => {
@@ -273,20 +276,23 @@ describe("publications-first Home: what Home reads", () => {
 });
 
 describe("publications-first Home: the writer's dashboard", () => {
-  it("shows drafts, published work and plain numbers, and nothing that coaches", () => {
+  it("is retired, and sends the writer to their profile, where Drafts live", () => {
+    // The final UI simplification replaced the dashboard with the owner's
+    // Drafts tab. The address stays, as a redirect, so old links still land.
     const dashboard = codeOf("app/(main)/dashboard/page.tsx");
     expect(importsOf(dashboard)).toEqual(
-      [
-        "next/navigation",
-        "@/lib/supabase/server",
-        "@/lib/db/readAdapter",
-        "./StatsBar",
-        "./PostsTable",
-        "./PostsTable",
-        "@/app/(main)/CreateTrigger",
-        "@/components/retention/RetentionEventTracker",
-      ].sort()
+      ["next/navigation", "@/lib/profileUsername", "@/lib/supabase/server"].sort()
     );
-    expect(dashboard).not.toMatch(/myProfile|featuredWorkCount|unreadNotifications|engagementHistory/);
+    // A temporary (307) redirect: the destination is per account, and a
+    // permanent one could be cached by the browser across sign-ins.
+    expect(dashboard).toMatch(/\bredirect\(username \? `\/\$\{username\}` : "\/settings\/profile"\)/);
+    expect(dashboard).not.toMatch(/permanentRedirect/);
+    const me = codeOf("app/(main)/me/page.tsx");
+    expect(me).toMatch(/\bredirect\(username \? `\/\$\{username\}` : "\/settings\/profile"\)/);
+    expect(me).not.toMatch(/permanentRedirect/);
+    expect(dashboard).not.toMatch(/myProfile|featuredWorkCount|unreadNotifications|engagementHistory|StatsBar|PostsTable/);
+    for (const retired of ["StatsBar.tsx", "PostsTable.tsx", "loading.tsx"]) {
+      expect(existsSync(join(process.cwd(), "app/(main)/dashboard", retired)), retired).toBe(false);
+    }
   });
 });

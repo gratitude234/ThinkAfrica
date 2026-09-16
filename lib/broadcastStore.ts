@@ -349,7 +349,7 @@ export async function listSelectableRecipients(
   const { data, error } = await admin
     .from("broadcast_contacts")
     .select(
-      "profile_id, published_count, is_verified, profiles!broadcast_contacts_profile_id_fkey(full_name, username)"
+      "profile_id, published_count, profiles!broadcast_contacts_profile_id_fkey(full_name, username)"
     )
     .eq("is_eligible", true)
     .is("suppressed_at", null)
@@ -370,7 +370,7 @@ export async function listSelectableRecipients(
       id: row.profile_id as string,
       name: profile?.full_name?.trim() || username || "Indegenius member",
       handle: username,
-      detail: `${row.is_verified ? "Verified" : "Member"} · ${publications}`,
+      detail: publications,
     };
   });
 }
@@ -417,8 +417,14 @@ export function standingSegmentsStale(
   segments: readonly SegmentStateRow[],
   now: Date
 ) {
-  if (segments.length < STANDING_AUDIENCE_KEYS.length) return true;
-  return segments.some(
+  // Only current standing audiences count. A retired audience keeps its row,
+  // which the sync no longer refreshes, and would otherwise report every
+  // audience stale for good once it aged out.
+  const standing = segments.filter((segment) =>
+    (STANDING_AUDIENCE_KEYS as readonly string[]).includes(segment.audience_key)
+  );
+  if (standing.length < STANDING_AUDIENCE_KEYS.length) return true;
+  return standing.some(
     (segment) =>
       !segment.resend_segment_id || isSegmentStale(segment.last_synced_at, now)
   );

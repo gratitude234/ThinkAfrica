@@ -219,6 +219,46 @@ describe.skipIf(!enabled)("the feed's selection against PostgreSQL", () => {
 
   // ── the keyset cursor ──────────────────────────────────────────────
 
+  it("finds posts credited to an excluded co-author, accepted only", async () => {
+    // The feed's block exclusion. Filtering on author_id alone would let a
+    // blocked person back in through a historic co-authored publication.
+    const [row] = await executor.query<{ post_id: string; user_id: string }>(
+      `select a.post_id::text as post_id, a.user_id::text as user_id
+       from public.post_authors a
+       where a.accepted_at is not null limit 1`
+    );
+    if (!row) return;
+
+    expect(await repository.postIdsCreditedTo([row.user_id])).toContain(row.post_id);
+
+    const [pending] = await executor.query<{ post_id: string; user_id: string }>(
+      `select a.post_id::text as post_id, a.user_id::text as user_id
+       from public.post_authors a
+       where a.accepted_at is null
+         and not exists (
+           select 1 from public.post_authors b
+           where b.post_id = a.post_id and b.user_id = a.user_id and b.accepted_at is not null
+         )
+       limit 1`
+    );
+    if (pending) {
+      // An unaccepted invitation is not a credit, so it must not exclude the
+      // post. Dropping the accepted_at filter would hide work nobody wrote.
+      expect(await repository.postIdsCreditedTo([pending.user_id])).not.toContain(
+        pending.post_id
+      );
+    }
+  });
+
+  it("finds no credited posts for nobody, without going to the database", async () => {
+    const guarded = createPostgresFeedListRepository({
+      query: async () => {
+        throw new Error("should not have been called");
+      },
+    });
+    expect(await guarded.postIdsCreditedTo([])).toEqual([]);
+  });
+
   it("pages without repeating or skipping a post", async () => {
     const first = await repository.listPosts({ ...BASE, limit: 5 });
     if (first.length < 5) return;

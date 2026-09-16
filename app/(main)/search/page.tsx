@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -18,7 +18,6 @@ interface PostResult {
   profiles: {
     username: string;
     full_name: string | null;
-    university: string | null;
   } | null;
 }
 
@@ -34,7 +33,6 @@ interface PersonResult {
   id: string;
   username: string;
   full_name: string | null;
-  university: string | null;
   avatar_url: string | null;
 }
 
@@ -48,10 +46,6 @@ interface DiscoverSearchGroup {
   key: "people" | "posts" | "topics";
   label: string;
   count: number;
-}
-
-function getPersonSignal(person: PersonResult) {
-  return person.university || "Indegenius writer";
 }
 
 function ResultSkeleton() {
@@ -363,10 +357,6 @@ function SearchPageContent() {
                         </p>
                       <p className="truncate text-xs text-gray-500">
                         @{person.username}
-                        {person.university ? ` - ${person.university}` : ""}
-                      </p>
-                      <p className="mt-1 inline-flex rounded-full bg-canvas px-2 py-0.5 text-[11px] font-medium text-gray-500">
-                        {getPersonSignal(person)}
                       </p>
                     </div>
                     </Link>
@@ -414,11 +404,7 @@ function SearchPageContent() {
                       </Link>
                       <p className="mt-3 text-xs text-gray-500">
                         {post.profiles
-                          ? `${post.profiles.full_name ?? post.profiles.username}${
-                              post.profiles.university
-                                ? ` / ${post.profiles.university}`
-                                : ""
-                            }`
+                          ? `${post.profiles.full_name ?? post.profiles.username}`
                           : "Indegenius"}
                       </p>
                       {post.excerpt ? (

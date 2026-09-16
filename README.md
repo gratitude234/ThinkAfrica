@@ -1,29 +1,22 @@
 # Indegenius
 
-Indegenius is where young people who actively engage with ideas build their intellectual identity. They publish ideas, test them through thoughtful discourse, and create an evidence-backed Intellectual Record of what they write, argue, research, and contribute. Imagined in Africa, Indegenius is Africa's First Intellectual Social Network—and ideas have no borders.
+Indegenius is a focused publishing product for reading Posts and Articles, publishing your own work, following writers, and discovering topics.
 
 ## Tech stack
 
 - **Frontend:** Next.js 16, React 19, TypeScript, and Tailwind CSS
-- **Backend:** Supabase (PostgreSQL, Auth, Storage, RLS, RPCs, and optional Realtime)
+- **Backend:** Supabase (PostgreSQL, Auth, Storage, RLS, and RPCs)
 - **Editor:** Tiptap rich-text editor
 - **Testing:** Vitest, jsdom, and Testing Library
 
 ## Setup
 
-### 1. Clone and install
+1. Install dependencies with `npm install`.
+2. Copy `.env.example` to `.env.local` and configure the required services.
+3. Apply the ordered migrations in `supabase/migrations/` through the team-approved workflow.
+4. Start the application with `npm run dev`.
 
-```bash
-git clone <repo-url>
-cd indegenius
-npm install
-```
-
-### 2. Configure environment variables
-
-Copy `.env.example` to `.env.local`, then provide the credentials required for the features you intend to use. Product flags use an exact string convention: `1` enables a flag; `0` or an unset value disables it.
-
-At minimum, the core application expects:
+The core application requires:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -31,59 +24,36 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-### 3. Prepare the database safely
+Do not use historical schema snapshots as setup instructions and do not apply files from `supabase/pending/` without release verification.
 
-The database is maintained through the ordered files in `supabase/migrations/`. The `supabase/schema*.sql` files are historical snapshots and are **not** sufficient setup instructions for the current application. Files in `supabase/pending/` are release candidates and are deliberately excluded from the executable migration ledger.
+## Product model
 
-Before applying anything to staging or production:
+- **Post:** short-form writing with an optional title.
+- **Article:** titled long-form writing with optional sources and references.
 
-1. Read [`docs/phase-0-product-truth.md`](docs/phase-0-product-truth.md).
-2. Record the target database's migration ledger and relevant catalog objects.
-3. Reconcile those results with `supabase/migrations/`.
-4. Follow the repository's feature-specific release documents.
-
-Do not paste `supabase/schema.sql` into a current project and do not run a blind database push. This repository audit did not verify either staging or production.
-
-For a new isolated development database, use the team's approved Supabase migration workflow to apply the executable migrations in timestamp order. Do not promote or apply files from `supabase/pending/` as part of local setup.
-
-### 4. Run the development server
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-## Canonical content model
-
-| Kind | Authoring contract | Publication and trust |
-|------|--------------------|-----------------------|
-| **Post** | Lightweight body, optional title, up to 2,000 characters | Publishes directly; not formally reviewed or citable |
-| **Article** | Title and long-form rich text; Essay and Policy Brief are optional genres | Publishes directly; genre is not evidence of review or credibility |
-| **Research** | PDF, title, abstract, keywords, authors, and references | Enters formal editorial review; becomes reviewed and citable only after acceptance |
-
-The database temporarily retains the legacy `posts.type` values `blog`, `essay`, `policy_brief`, and `research`. Application code must resolve content through `content_kind` and `article_format`, with the centralized compatibility helpers in `lib/contentModel.ts`. See [`docs/content-model.md`](docs/content-model.md) for the migration contract.
+Both publish directly. Drafts are private to their owner and are managed from the owner profile.
 
 ## Main routes
 
 | Feature | Route |
-|---------|-------|
-| Home feed | `/` |
+|---|---|
+| Home | `/` |
 | Explore | `/explore` |
-| Sign up | `/signup` |
-| Log in | `/login` |
-| Create a Post | `/create/post` |
-| Write an Article | `/write?kind=article` |
-| Submit Research | `/submit/research` |
-| View a publication | `/post/[slug]` |
-| User profile | `/[username]` |
-| Opportunities | `/opportunities` |
-| Editorial review queue | `/admin/review` |
+| Search | search overlay and `/search` |
+| Write | `/write` |
+| Notifications | `/notifications` |
+| Profile | `/[username]` |
+| Bookmarks | `/bookmarks` |
+| Settings | `/settings` |
+| Publication | `/post/[slug]` |
+| Admin | `/admin` (admins only) |
 
-## Editorial and admin access
+`/dashboard` and `/me` permanently redirect a signed-in writer to their profile.
 
-Application roles are `student`, `reviewer`, `editor`, and `admin`. Reviewers can access assigned reviews; editors can manage the editorial workflow; admins have the full administrative capability set. `ADMIN_EMAIL` is a bootstrap-admin mechanism, not the only source of editorial authorization.
+## Admin and safety
 
-## Brand tokens
+Admins can access users, moderation, reports, communications, basic platform counts, and security audit history. Block, report, suspension, and account-security infrastructure remain part of the product.
 
-The maintained visual tokens live in `tailwind.config.ts` and `app/globals.css`. Current core values include deep emerald `#073929`, gold `#CE932B`, purple `#391A60`, warm canvas `#FAF8F5`, and ink `#1A1A1A`.
+## Database cleanup boundary
+
+Legacy tables, columns, notification rows, and analytics data remain in place until Phase 2J dependency verification. This UI pass does not drop or rewrite database structures.

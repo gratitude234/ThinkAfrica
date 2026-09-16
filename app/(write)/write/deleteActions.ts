@@ -16,12 +16,13 @@ import {
 } from "@/lib/serverActions";
 
 /**
- * Draft deletion, for the dashboard table and the composer's draft list.
+ * Draft deletion, for the owner's Drafts tab on their profile.
  *
- * Both used to issue `supabase.from("posts").delete().eq("id", id)` from the
- * browser. One server boundary replaces both, because they are the same
- * operation asked twice: the dashboard deletes one draft, the composer sweeps
- * several, and neither needs its own authorization story.
+ * The dashboard table and the composer's draft list both used to issue
+ * `supabase.from("posts").delete().eq("id", id)` from the browser. This server
+ * boundary replaced them, and outlived both: the final UI simplification moved
+ * draft management to the profile. It still accepts several ids, so a sweep
+ * needs no authorization story of its own.
  *
  * The viewer comes from the session. The caller sends ids and nothing else;
  * there is deliberately no author id in the input, because an input is
@@ -73,9 +74,14 @@ export async function deleteOwnDraftPosts(input: {
   const { deletable, refused, missing } = planned.plan;
 
   if (deletable.length === 0) {
+    // Refused means the writer's own piece, but not one the policy lets them
+    // delete: it is past draft, or a moderator removed it. The plan does not
+    // say which, so the message claims neither.
     if (refused.length > 0) {
       return fail(
-        "Only drafts can be deleted. Withdraw a submission instead of deleting it."
+        refused.length === 1
+          ? "This draft can’t be deleted right now."
+          : "These drafts can’t be deleted right now."
       );
     }
     return fail(NOT_FOUND_OR_FORBIDDEN);
@@ -99,7 +105,7 @@ export async function deleteOwnDraftPosts(input: {
     );
   }
 
-  revalidatePath("/dashboard");
+  revalidatePath("/[username]", "page");
   revalidatePath("/write");
 
   return ok({

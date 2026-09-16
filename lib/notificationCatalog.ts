@@ -154,58 +154,56 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
 
   // --- Editorial workflow ---------------------------------------------------
   revision_requested: {
-    label: "Revision requested",
-    category: "review",
-    priority: 10,
-    cta: "Revise submission",
-    actionKey: "revision_requested",
-    actionable: true,
-    icon: "pencil",
-    tone: "attention",
-    describe: (context) => `Reviewer feedback is ready for ${context.postTitle}.`,
+    label: "Activity",
+    category: "activity",
+    priority: 70,
+    cta: "Open publication",
+    actionKey: "status_update",
+    actionable: false,
+    icon: "document",
+    tone: "neutral",
+    describe: (context) => `There is an update related to ${context.postTitle}.`,
     hrefFor: toPost,
   },
   review_reminder: {
-    label: "Review overdue",
-    category: "review",
-    priority: 15,
-    cta: "Finish review",
-    actionKey: "review_reminder",
-    actionable: true,
-    icon: "clock",
-    tone: "attention",
-    describe: (context) =>
-      `Your review of ${context.postTitle} is still outstanding.`,
+    label: "Activity",
+    category: "activity",
+    priority: 70,
+    cta: "Open publication",
+    actionKey: "status_update",
+    actionable: false,
+    icon: "document",
+    tone: "neutral",
+    describe: (context) => `There is an update related to ${context.postTitle}.`,
     hrefFor: toPost,
   },
   review_assigned: {
-    label: "Review assigned",
-    category: "review",
-    priority: 40,
-    cta: "Open review",
-    actionKey: "review_assigned",
-    actionable: true,
-    icon: "clipboard",
+    label: "Activity",
+    category: "activity",
+    priority: 70,
+    cta: "Open publication",
+    actionKey: "status_update",
+    actionable: false,
+    icon: "document",
     tone: "neutral",
-    describe: (context) =>
-      `You have been assigned to review ${context.postTitle}.`,
+    describe: (context) => `There is an update related to ${context.postTitle}.`,
     hrefFor: toPost,
   },
   review_started: {
-    label: "Submission under review",
-    category: "review",
-    priority: 52,
-    cta: "Open submission",
-    actionKey: "review_started",
+    label: "Activity",
+    category: "activity",
+    priority: 70,
+    cta: "Open publication",
+    actionKey: "status_update",
     actionable: false,
-    icon: "clipboard",
+    icon: "document",
     tone: "neutral",
-    describe: (context) => `${context.postTitle} is now under review.`,
+    describe: (context) => `There is an update related to ${context.postTitle}.`,
     hrefFor: toPost,
   },
   post_published: {
     label: "Published",
-    category: "review",
+    category: "activity",
     priority: 50,
     cta: "View publication",
     // Kept from the previous shared branch so existing analytics keep resolving.
@@ -217,29 +215,28 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
     hrefFor: toPost,
   },
   post_approved: {
-    label: "Approved",
-    category: "review",
+    label: "Published",
+    category: "activity",
     priority: 50,
-    cta: "Open post",
+    cta: "View publication",
     actionKey: "status_update",
-    actionable: true,
+    actionable: false,
     icon: "badge-check",
     tone: "positive",
-    describe: (context) => `${context.postTitle} was approved.`,
+    describe: (context) => `${context.postTitle} has been published.`,
     hrefFor: toPost,
   },
   post_rejected: {
-    label: "Not accepted",
-    category: "review",
-    priority: 50,
-    cta: "Open dashboard",
+    label: "Activity",
+    category: "activity",
+    priority: 70,
+    cta: "Open notifications",
     actionKey: "status_update",
-    actionable: true,
-    icon: "x-circle",
-    tone: "critical",
-    describe: (context) =>
-      `${context.postTitle} was not accepted for publication.`,
-    hrefFor: () => "/dashboard",
+    actionable: false,
+    icon: "document",
+    tone: "neutral",
+    describe: (context) => `There is an update related to ${context.postTitle}.`,
+    hrefFor: () => "/notifications",
   },
 
   // --- Conversation ---------------------------------------------------------
@@ -247,16 +244,15 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
   // retired and none is written any more. Old rows still render and open the
   // piece they announced, filed under activity and asking nothing of the reader.
   response_post: {
-    label: "Response to your work",
+    label: "Activity",
     category: "activity",
     priority: 70,
-    cta: "Read response",
-    actionKey: "response_received",
+    cta: "Open publication",
+    actionKey: "activity",
     actionable: false,
-    icon: "reply",
+    icon: "document",
     tone: "neutral",
-    describe: (context) =>
-      `${context.actorName} wrote a response to ${context.postTitle}.`,
+    describe: (context) => `There is an older activity update related to ${context.postTitle}.`,
     hrefFor: toPost,
   },
   comment: {
@@ -275,79 +271,76 @@ export const NOTIFICATION_DESCRIPTORS: Record<string, NotificationDescriptor> = 
 
   // --- Collaboration --------------------------------------------------------
   co_author_invite: {
-    label: "Co-author invite",
+    label: "Activity",
     category: "activity",
-    priority: 35,
-    cta: "Review invite",
-    actionKey: "co_author_invite",
-    actionable: true,
-    icon: "users",
+    priority: 70,
+    cta: "Open publication",
+    actionKey: "activity",
+    actionable: false,
+    icon: "document",
     tone: "neutral",
-    describe: (context) =>
-      `${context.actorName} invited you to co-author ${context.postTitle}.`,
+    describe: (context) => `There is an update related to ${context.postTitle}.`,
     hrefFor: toPost,
   },
   co_author_accepted: {
-    label: "Co-author invite accepted",
+    label: "Activity",
     category: "activity",
-    priority: 60,
-    cta: "Open post",
-    actionKey: "co_author_accepted",
+    priority: 70,
+    cta: "Open publication",
+    actionKey: "activity",
     actionable: false,
-    icon: "users",
-    tone: "positive",
-    describe: (context) =>
-      `${context.actorName} accepted your co-author invitation on ${context.postTitle}.`,
+    icon: "document",
+    tone: "neutral",
+    describe: (context) => `There is an update related to ${context.postTitle}.`,
     hrefFor: toPost,
   },
   co_author_declined: {
-    label: "Co-author invite declined",
+    label: "Activity",
     category: "activity",
-    priority: 60,
-    cta: "Open post",
-    actionKey: "co_author_declined",
+    priority: 70,
+    cta: "Open publication",
+    actionKey: "activity",
     actionable: false,
-    icon: "users",
-    tone: "critical",
-    describe: (context) =>
-      `${context.actorName} declined your co-author invitation on ${context.postTitle}.`,
+    icon: "document",
+    tone: "neutral",
+    describe: (context) => `There is an update related to ${context.postTitle}.`,
     hrefFor: toPost,
   },
   research_collaboration_request: {
-    label: "Research collaboration request",
+    label: "Activity",
     category: "activity",
-    priority: 32,
-    cta: "Review request",
-    actionKey: "research_collaboration_request",
-    actionable: true,
-    icon: "users",
+    priority: 70,
+    cta: "Open notifications",
+    actionKey: "activity",
+    actionable: false,
+    icon: "document",
     tone: "neutral",
-    describe: (context) =>
-      `${context.actorName} sent you a research collaboration request.`,
+    describe: () => "There is an older account activity update.",
+    hrefFor: () => "/notifications",
   },
   research_collaboration_accepted: {
-    label: "Research request accepted",
+    label: "Activity",
     category: "activity",
-    priority: 61,
-    cta: "Open project",
-    actionKey: "research_collaboration_accepted",
+    priority: 70,
+    cta: "Open notifications",
+    actionKey: "activity",
     actionable: false,
-    icon: "users",
-    tone: "positive",
-    describe: (context) =>
-      `${context.actorName} accepted your research collaboration request.`,
+    icon: "document",
+    tone: "neutral",
+    describe: () => "There is an older account activity update.",
+    hrefFor: () => "/notifications",
   },
   research_collaboration_declined: {
-    label: "Research request declined",
+    label: "Activity",
     category: "activity",
-    priority: 62,
-    cta: "Open research",
-    actionKey: "research_collaboration_declined",
+    priority: 70,
+    cta: "Open notifications",
+    actionKey: "activity",
     actionable: false,
-    icon: "users",
+    icon: "document",
     tone: "neutral",
-    describe: (context) =>
-      `${context.actorName} declined your research collaboration request.`,
+    describe: () => "There is an older account activity update.",
+    hrefFor: () => "/notifications",
   },
 
   // --- Retired publication delivery ----------------------------------------
@@ -438,6 +431,23 @@ export function describeNotificationType(type: string): NotificationDescriptor {
   return NOTIFICATION_DESCRIPTORS[type] ?? FALLBACK_DESCRIPTOR;
 }
 
+
+const RETIRED_PRODUCT_NOTIFICATION_TYPES = new Set([
+  "revision_requested",
+  "review_reminder",
+  "review_assigned",
+  "review_started",
+  "post_approved",
+  "post_rejected",
+  "co_author_invite",
+  "co_author_accepted",
+  "co_author_declined",
+  "research_collaboration_request",
+  "research_collaboration_accepted",
+  "research_collaboration_declined",
+  "response_post",
+]);
+
 export function notificationContext(
   subject: NotificationSubject
 ): NotificationContext {
@@ -452,10 +462,14 @@ export function notificationContext(
   };
 }
 
-/** The stored message always wins; descriptors only supply the fallback. */
+/** Current-product stored copy wins. Retired product rows deliberately render
+ * through the neutral compatibility descriptor so old review/collaboration
+ * wording cannot leak back into the simplified UI. */
 export function notificationMessage(subject: NotificationSubject): string {
-  const stored = subject.message?.trim();
-  if (stored) return stored;
+  if (!RETIRED_PRODUCT_NOTIFICATION_TYPES.has(subject.type)) {
+    const stored = subject.message?.trim();
+    if (stored) return stored;
+  }
   return describeNotificationType(subject.type).describe(
     notificationContext(subject)
   );
@@ -473,7 +487,13 @@ export function notificationMessage(subject: NotificationSubject): string {
 const RETIRED_DELIVERY_LINK = /^\/r\/p\//;
 
 export function notificationHref(subject: NotificationSubject): string | null {
-  if (subject.link && !RETIRED_DELIVERY_LINK.test(subject.link)) return subject.link;
+  if (
+    !RETIRED_PRODUCT_NOTIFICATION_TYPES.has(subject.type) &&
+    subject.link &&
+    !RETIRED_DELIVERY_LINK.test(subject.link)
+  ) {
+    return subject.link;
+  }
   const descriptor = describeNotificationType(subject.type);
   return descriptor.hrefFor?.(notificationContext(subject)) ?? null;
 }

@@ -88,12 +88,10 @@ describe("the post route's own authorization", () => {
     expect(component).toMatch(
       /post\.status === "draft" && user\?\.id !== post\.author_id\s*\)?\s*notFound\(\)/
     );
-    // Reviewers and invited co-authors are the only other readers of an
-    // in-review post, and the route earns that by querying for the assignment
-    // before it renders.
-    expect(component).toContain("!reviewAssignment && !coAuthorInvite) notFound()");
-    expect(component).toMatch(/\.from\("post_reviews"\)/);
-    expect(component).toMatch(/\.from\("post_authors"\)/);
+    // Editorial review and co-authoring are retired. Unpublished work is now
+    // author-only, so the route carries no reviewer/co-author exception.
+    expect(component).not.toMatch(/\.from\("post_reviews"\)/);
+    expect(component).not.toMatch(/\.from\("post_authors"\)/);
   });
 
   it("keeps an unpublished title out of the page metadata", () => {

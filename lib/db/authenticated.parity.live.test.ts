@@ -46,7 +46,6 @@ vi.mock("server-only", () => ({}));
 const directUrl = process.env.SUPABASE_DIRECT_URL;
 const enabled = Boolean(directUrl);
 
-const { createPostgresDashboardRepository } = await import("@/lib/db/dashboard");
 const { createPostgresNotificationsRepository } = await import(
   "@/lib/db/notifications"
 );
@@ -57,7 +56,6 @@ import { differences } from "@/lib/db/parityDiff";
 
 describe.skipIf(!enabled)("authenticated parity: policies vs repositories", () => {
   let sql: Awaited<ReturnType<typeof open>>;
-  let dashboard: ReturnType<typeof createPostgresDashboardRepository>;
   let notifications: ReturnType<typeof createPostgresNotificationsRepository>;
   let bookmarks: ReturnType<typeof createPostgresBookmarksRepository>;
 
@@ -104,7 +102,6 @@ describe.skipIf(!enabled)("authenticated parity: policies vs repositories", () =
   beforeAll(async () => {
     sql = await open();
     const executor = adaptDriver(sql as never);
-    dashboard = createPostgresDashboardRepository(executor);
     notifications = createPostgresNotificationsRepository(executor);
     bookmarks = createPostgresBookmarksRepository(executor);
   }, 180_000);
@@ -121,118 +118,6 @@ describe.skipIf(!enabled)("authenticated parity: policies vs repositories", () =
     )) as unknown as Array<{ id: string }>;
     return rows[0]?.id ?? null;
   }
-
-  // ── the RLS reference is real ──────────────────────────────────────
-
-  it("proves the impersonation actually applies policies", async () => {
-    const viewer = await memberWith("bookmarks");
-    expect(viewer, "no bookmarks in production to compare").toBeTruthy();
-
-    const [service] = (await sql.unsafe(
-      "select count(*)::int as n from public.bookmarks"
-    )) as unknown as Array<{ n: number }>;
-
-    const { seen, uid } = await asMember(viewer!, async (tx) => {
-      const [row] = (await tx.unsafe(
-        "select count(*)::int as n from public.bookmarks"
-      )) as Array<{ n: number }>;
-      const [who] = (await tx.unsafe("select auth.uid()::text as u")) as Array<{
-        u: string | null;
-      }>;
-      return { seen: row.n, uid: who.u };
-    });
-
-    // If these were equal the impersonation would not be doing anything, and
-    // every comparison below would be a service-role read wearing a costume.
-    expect(uid).toBe(viewer);
-    expect(seen).toBeLessThan(service.n);
-  }, 120_000);
-
-  // ── bookmarks ──────────────────────────────────────────────────────
-
-  it("agrees on which bookmarks a member has, against the policy", async () => {
-    const viewer = await memberWith("bookmarks");
-    if (!viewer) return;
-
-    const underPolicy = await asMember(viewer, async (tx) => {
-      const rows = (await tx.unsafe(
-        "select post_id::text as id from public.bookmarks"
-      )) as Array<{ id: string }>;
-      return new Set(rows.map((row) => row.id));
-    });
-
-    const viaRepository = (await bookmarks.list(viewer)).map((row) => row.id);
-
-    // Subset, not equality. The repository additionally restricts to posts the
-    // reader may see, so a bookmark pointing at an unpublished or removed post
-    // is legitimately absent from its result and present in the raw table. The
-    // direction that would be a security finding is the other one.
-    const beyondPolicy = viaRepository.filter((id) => !underPolicy.has(id));
-    expect(
-      beyondPolicy,
-      `bookmarks the policy would not have shown: ${beyondPolicy.join(", ")}`
-    ).toEqual([]);
-    expect(underPolicy.size).toBeGreaterThan(0);
-  }, 120_000);
-
-  // ── dashboard.postStats, the two blocked branches ──────────────────
-
-  it("agrees on the reference and bookmark stat branches", async () => {
-    const rows = (await sql.unsafe(
-      `select author_id::text as id from public.posts
-        where author_id is not null and status = 'published'
-        group by 1 order by count(*) desc limit 1`
-    )) as unknown as Array<{ id: string }>;
-    const viewer = rows[0]?.id;
-    if (!viewer) return;
-
-    const owned = (await sql.unsafe(
-      `select id::text as id from public.posts where author_id = $1::uuid`,
-      [viewer]
-    )) as unknown as Array<{ id: string }>;
-    const postIds = owned.map((row) => row.id);
-    if (postIds.length === 0) return;
-
-    // The ids travel as JSON text, not as an array. postgres.js runs with
-    // fetch_types: false here exactly as the repositories do, so it has no
-    // type OIDs and cannot serialise a JS array into uuid[]; the double cast
-    // is the shape that survives. Passing the array directly produced
-    // "malformed array literal" against production.
-    const asJson = JSON.stringify(postIds);
-    const idList = `(select (jsonb_array_elements_text($1::text::jsonb))::uuid)`;
-
-    const underPolicy = await asMember(viewer, async (tx) => {
-      const [refs] = (await tx.unsafe(
-        `select count(*)::int as n from public.post_references
-          where post_id in ${idList}`,
-        [asJson]
-      )) as Array<{ n: number }>;
-      const [marks] = (await tx.unsafe(
-        `select count(*)::int as n from public.bookmarks
-          where post_id in ${idList}`,
-        [asJson]
-      )) as Array<{ n: number }>;
-      return { references: refs.n, bookmarks: marks.n };
-    });
-
-    const stats = await dashboard.postStats(postIds, viewer);
-
-    // The bookmark stat counts the viewer's OWN bookmarks by existing policy,
-    // not bookmarks received by their work. That semantics is deliberately
-    // preserved for cutover and is recorded as a product follow-up, so the
-    // reference branch is what this compares.
-    const referenceTotal = Object.values(stats.referenceCounts).reduce(
-      (sum, n) => sum + n,
-      0
-    );
-    expect(
-      differences(
-        { references: underPolicy.references },
-        { references: referenceTotal },
-        "postStats"
-      )
-    ).toEqual([]);
-  }, 120_000);
 
   // ── the four embedded projections ──────────────────────────────────
 

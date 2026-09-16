@@ -621,12 +621,36 @@ describe("standing segment freshness", () => {
     };
   }
 
-  const allFive = ["all", "active", "authors", "verified", "new"].map((key) =>
+  const allFive = ["all", "active", "authors", "new"].map((key) =>
     segment({ audience_key: key, resend_segment_id: `seg-${key}` })
   );
 
   it("accepts a full set of freshly synced segments", () => {
     expect(store.standingSegmentsStale(allFive, now)).toBe(false);
+  });
+
+  it("ignores a retired audience's segment, which nothing refreshes any more", () => {
+    // 20260902000001 seeded a verified row. The sync stopped maintaining it,
+    // so once it ages out it must not make every current audience look stale.
+    const withRetired = [
+      ...allFive,
+      segment({
+        audience_key: "verified",
+        resend_segment_id: "seg-verified",
+        last_synced_at: "2026-08-01T00:00:00Z",
+      }),
+    ];
+
+    expect(store.standingSegmentsStale(withRetired, now)).toBe(false);
+  });
+
+  it("does not let a retired segment stand in for a missing current one", () => {
+    const retiredInsteadOfNew = [
+      ...allFive.filter((s) => s.audience_key !== "new"),
+      segment({ audience_key: "verified", resend_segment_id: "seg-verified" }),
+    ];
+
+    expect(store.standingSegmentsStale(retiredInsteadOfNew, now)).toBe(true);
   });
 
   it("is stale when one segment has never synced", () => {

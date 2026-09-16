@@ -51,7 +51,7 @@ export function PostEngagementProvider({
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
 
   // Defaults to false so posts that never render an inline actions row (drafts,
-  // posts under review) keep the floating bar behaving exactly as before.
+  // legacy unpublished posts) keep the floating bar behaving exactly as before.
   const [inlineActionsVisible, setInlineActionsVisible] = useState(false);
 
   // Multiple Suspense-streamed leaves report the same server-fetched viewer

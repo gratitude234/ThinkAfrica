@@ -54,29 +54,6 @@ export async function getFeedExcludedUserIds(
   }
 }
 
-/**
- * Post IDs that credit any excluded user as an accepted author. This closes
- * the gap where filtering only posts.author_id could re-surface a blocked
- * person through a co-authored publication.
- */
-export async function getPostIdsWithExcludedAuthors(
-  postIds: string[],
-  excludedAuthorIds: string[],
-  options: { strict?: boolean } = {}
-): Promise<string[]> {
-  if (postIds.length === 0 || excludedAuthorIds.length === 0) return [];
-
-  try {
-    return await repository().postIdsWithAuthors(postIds, excludedAuthorIds);
-  } catch (error) {
-    console.error("[blocking] failed to load excluded co-authored posts", error);
-    if (options.strict) {
-      throw new Error("Unable to apply co-author exclusions.");
-    }
-    return [];
-  }
-}
-
 /** True when either user has blocked the other. */
 export async function isBlockedPair(userA: string, userB: string): Promise<boolean> {
   if (!userA || !userB) return false;

@@ -28,10 +28,7 @@ type FixtureProfile = NonNullable<PostCardData["profiles"]>;
 
 function profile(overrides: Partial<FixtureProfile> & { username: string; full_name: string }): FixtureProfile {
   return {
-    university: null,
     avatar_url: null,
-    verified: false,
-    verified_type: null,
     ...overrides,
   };
 }

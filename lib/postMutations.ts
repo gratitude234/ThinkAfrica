@@ -55,7 +55,7 @@ import {
  * ## What Phase 2I removed
  *
  * The editorial operations: `submitPostForReview`, `resubmitRevision`,
- * `withdrawSubmission`, `editorialDecision`, `publishApprovedPost` and
+ * the retired editorial mutation actions and
  * `authorizeTransition`. None had a caller outside its own tests, because the
  * publishing reset removed the submission and review surfaces in Phase 2A, and
  * 20260915000007 has now removed the database side. What is left is what a

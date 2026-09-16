@@ -53,8 +53,6 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const directUrl = process.env.SUPABASE_DIRECT_URL;
 const enabled = Boolean(supabaseUrl && serviceKey && directUrl);
 
-const { createSupabaseDashboardRepository, createPostgresDashboardRepository } =
-  await import("@/lib/db/dashboard");
 const { createSupabaseBookmarksRepository, createPostgresBookmarksRepository } =
   await import("@/lib/db/bookmarks");
 const {
@@ -66,7 +64,6 @@ const { adaptDriver } = await import("@/lib/db/postgres/executor");
 import { canonical, differences } from "@/lib/db/parityDiff";
 
 import type { SqlExecutor } from "@/lib/db/postgres/executor";
-import type { DashboardRepository } from "@/lib/db/dashboard";
 import type { BookmarksRepository } from "@/lib/db/bookmarks";
 import type { NotificationsRepository } from "@/lib/db/notifications";
 
@@ -75,8 +72,6 @@ vi.setConfig({ testTimeout: 180_000 });
 describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
   let sql: Awaited<ReturnType<typeof open>>;
   let executor: SqlExecutor;
-  let dashRest: DashboardRepository;
-  let dashSql: DashboardRepository;
   let markRest: BookmarksRepository;
   let markSql: BookmarksRepository;
   let noteRest: NotificationsRepository;
@@ -99,100 +94,17 @@ describe.skipIf(!enabled)("viewer-scoped domains, same database", () => {
       auth: { persistSession: false, autoRefreshToken: false },
     }) as never;
 
-    dashRest = createSupabaseDashboardRepository(client);
     markRest = createSupabaseBookmarksRepository(client);
     noteRest = createSupabaseNotificationsRepository(client);
 
     sql = await open();
     executor = adaptDriver(sql as never);
-    dashSql = createPostgresDashboardRepository(executor);
     markSql = createPostgresBookmarksRepository(executor);
     noteSql = createPostgresNotificationsRepository(executor);
   }, 180_000);
 
   afterAll(async () => {
     await sql?.end({ timeout: 5 });
-  });
-
-  // ── the census ─────────────────────────────────────────────────────
-
-  it("reports how far the two sides could diverge, as a number", async () => {
-    const [row] = await executor.query<{
-      invisible_profiles: string;
-      hidden_comments: string;
-      total_profiles: string;
-    }>(
-      `select
-         (select count(*) from public.profiles
-           where suspended_at is not null
-              or coalesce(privacy_settings ->> 'profile_visibility', 'public')
-                 <> 'public') as invisible_profiles,
-         (select count(*) from public.comments where hidden_at is not null)
-           as hidden_comments,
-         (select count(*) from public.profiles) as total_profiles`
-    );
-
-    // Not an assertion about correctness: a measurement, so the BLOCKED
-    // verdicts below carry a magnitude instead of a shrug. A run where these
-    // are zero means the session-bound comparisons would agree today and
-    // proves nothing about whether the rules are reproduced.
-    console.log(
-      `[parity census] profiles hidden by policy: ${row.invisible_profiles} of ${row.total_profiles}; ` +
-        `moderated comments: ${row.hidden_comments}`
-    );
-    expect(Number(row.total_profiles)).toBeGreaterThan(0);
-  });
-
-  // ── dashboard: comparable reads ────────────────────────────────────
-
-  describe("dashboard, the reads whose own filter expresses the policy", () => {
-    async function someAuthors(limit = 3) {
-      return executor.query<{ id: string }>(
-        `select author_id::text as id from public.posts
-         where author_id is not null
-         group by author_id order by count(*) desc limit ${limit}`
-      );
-    }
-
-    it("agrees on a member's own posts, drafts included", async () => {
-      const authors = await someAuthors();
-      const mismatches: string[] = [];
-
-      for (const author of authors) {
-        const [rest, direct] = await Promise.all([
-          dashRest.myPosts(author.id),
-          dashSql.myPosts(author.id),
-        ]);
-
-        // The posts policy admits a row when auth.uid() = author_id, which is
-        // exactly this query's filter. A service-role read returns the same
-        // set, so this comparison is real.
-        mismatches.push(
-          ...differences(rest, direct).map((line) => `${author.id}: ${line}`)
-        );
-      }
-      expect(mismatches).toEqual([]);
-    });
-
-    it("agrees on the like stat branch", async () => {
-      const authors = await someAuthors(1);
-      if (authors.length === 0) return;
-      const author = authors[0];
-
-      const posts = await dashSql.myPosts(author.id);
-      const ids = posts.map((post) => post.id).slice(0, 20);
-      if (ids.length === 0) return;
-
-      const [rest, direct] = await Promise.all([
-        dashRest.postStats(ids, author.id),
-        dashSql.postStats(ids, author.id),
-      ]);
-
-      // Only this branch. `post_like_counts` is USING (true), so it gains
-      // nothing from a session. The other two are asserted as BLOCKED below.
-      expect(differences(rest.likeCounts, direct.likeCounts)).toEqual([]);
-    });
-
   });
 
   // ── dashboard: session-bound reads ─────────────────────────────────

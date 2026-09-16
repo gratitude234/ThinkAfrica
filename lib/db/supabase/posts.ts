@@ -30,7 +30,6 @@ import {
 export const POST_CORE_SELECT = `
       id, title, slug, content, excerpt, content_kind, tags, status, author_id,
       created_at, published_at, view_count, impression_count, read_count, cover_image_url,
-      audio_summary_url,
       profiles!posts_author_id_fkey (id, username, full_name, university, field_of_study, bio, avatar_url, verified, verified_type)
     `;
 

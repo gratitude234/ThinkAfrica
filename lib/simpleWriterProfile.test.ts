@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import nextConfig from "../next.config.mjs";
 import { ONBOARDING_STEPS } from "@/lib/onboarding";
 import { PROFILE_SETTINGS_SECTIONS } from "@/lib/profileSettings";
-import { PROFILE_TABS } from "@/lib/profileTabs";
+import { OWNER_PROFILE_TABS, PROFILE_TABS, PUBLIC_PROFILE_TABS } from "@/lib/profileTabs";
 
 /**
  * A public writer profile, not an Intellectual Record product. Minimal
@@ -140,6 +140,21 @@ describe("simple writer profile: the profile", () => {
     expect([...PROFILE_TABS]).toEqual(["posts", "articles", "about"]);
   });
 
+  it("adds Drafts for the owner only", () => {
+    expect([...PUBLIC_PROFILE_TABS]).toEqual(["posts", "articles", "about"]);
+    expect([...OWNER_PROFILE_TABS]).toEqual(["posts", "articles", "drafts", "about"]);
+
+    const tabs = codeOf("components/profile/ProfileTabs.tsx");
+    expect(tabs).toMatch(/isOwnProfile \? OWNER_PROFILE_TABS : PUBLIC_PROFILE_TABS/);
+
+    const page = codeOf("app/(main)/[username]/page.tsx");
+    expect(page).toMatch(/isOwnProfile=\{viewer\.isOwnProfile\}/);
+    // The drafts list, with its Edit and Delete controls, renders only from
+    // the drafts the loader returns, and the loader returns them only to the
+    // owner. See lib/profileViewData.test.ts.
+    expect(page).toMatch(/tab === "drafts" && drafts \? \(\s*<ProfileDraftList/);
+  });
+
   it("builds the page from the header, the tabs, the list and About, and nothing else", () => {
     const page = codeOf("app/(main)/[username]/page.tsx");
     expect(page).not.toMatch(/\.from\(|\.rpc\(/);
@@ -150,6 +165,7 @@ describe("simple writer profile: the profile", () => {
         "next",
         "next/navigation",
         "@/components/profile/ProfileAbout",
+        "@/components/profile/ProfileDraftList",
         "@/components/profile/ProfileHeader",
         "@/components/profile/ProfilePublicationList",
         "@/components/profile/ProfileTabs",
@@ -288,7 +304,7 @@ describe("simple writer profile: measurement", () => {
     expect(route).not.toMatch(retired);
   });
 
-  it("keeps a 26-name vocabulary, all of which a browser may send", () => {
+  it("keeps a 24-name vocabulary, all of which a browser may send", () => {
     const union = vocabulary.slice(
       vocabulary.indexOf("export type ActivationEventName"),
       vocabulary.indexOf("interface ActivationEventPayload")
@@ -299,7 +315,11 @@ describe("simple writer profile: measurement", () => {
       ...allowlist.slice(0, allowlist.indexOf("]);")).matchAll(/"([a-z_]+)",/g),
     ].map((match) => match[1]);
 
-    expect(names).toHaveLength(26);
+    // 26 after Phase 2H. The final UI simplification retired the dashboard
+    // view and next-action click events with the dashboard itself.
+    expect(names).toHaveLength(24);
+    expect(names).not.toContain("dashboard_viewed");
+    expect(names).not.toContain("next_action_clicked");
     expect([...allowed].sort()).toEqual([...names].sort());
   });
 
@@ -309,9 +329,15 @@ describe("simple writer profile: measurement", () => {
     ).toEqual([]);
   });
 
-  it("reports no Profile Credibility in admin analytics", () => {
-    expect(codeOf("app/(main)/admin/analytics/page.tsx")).not.toMatch(
-      /Profile Credibility|Complete Profiles|Partial Academic Profiles|Featured Work Profiles|Citable Author Profiles|Reviewed Author Profiles|isFormallyReviewed/
-    );
+  it("reports no Profile Credibility anywhere in admin", () => {
+    // The admin analytics page that once carried it was removed in the final
+    // UI simplification, so the check covers every admin surface instead.
+    expect(existsSync(join(process.cwd(), "app/(main)/admin/analytics"))).toBe(false);
+    expect(
+      filesMatching(
+        /Profile Credibility|Complete Profiles|Partial Academic Profiles|Featured Work Profiles|Citable Author Profiles|Reviewed Author Profiles|isFormallyReviewed/,
+        { within: (file) => file.startsWith("app/(main)/admin/") }
+      )
+    ).toEqual([]);
   });
 });

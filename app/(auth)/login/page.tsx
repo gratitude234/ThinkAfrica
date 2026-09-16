@@ -20,7 +20,7 @@ import { resendSignupConfirmationEmail } from "../accountEmailActions";
 const PROOF_ITEMS = [
   "Return to drafts and saved reading",
   "Keep comments and replies in context",
-  "Keep building your Intellectual Record",
+  "Return to writers and publications you follow",
 ];
 
 type VerificationType = "signup" | "magiclink";
@@ -49,7 +49,7 @@ function LoginForm() {
   const isWritingRedirect = redirectTo.startsWith("/write");
   const introCopy = isWritingRedirect
     ? "Sign in to start your draft and keep autosave tied to your profile."
-    : "Sign in to keep reading, writing, and building your Intellectual Record.";
+    : "Sign in to keep reading, writing, following, and discovering.";
   const signupHref =
     redirectTo === "/" ? "/signup" : `/signup?redirectTo=${encodeURIComponent(redirectTo)}`;
 
@@ -143,11 +143,11 @@ function LoginForm() {
   return (
     <AuthShell
       eyebrow="Welcome back"
-      title="Continue building your Intellectual Record."
+      title="Welcome back to Indegenius."
       subtitle={introCopy}
       proofItems={PROOF_ITEMS}
-      quote="Serious ideas deserve a place where readers can find, test, and build on them."
-      quoteSource="Indegenius editorial principle"
+      quote="Read ideas, publish your own, and follow writers you value."
+      quoteSource="Indegenius"
       footer={
         <>
           Don&apos;t have an account?{" "}

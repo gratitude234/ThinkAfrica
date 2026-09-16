@@ -30,15 +30,7 @@ export async function GET() {
   try {
     const posts = await bookmarksRepository(supabase).list(user.id);
 
-    return NextResponse.json({
-      posts: posts.map((post) => ({
-        ...post,
-        co_authors: (post.post_authors ?? [])
-          .filter((row) => !!row.accepted_at)
-          .filter((row) => row.user_id !== post.author_id)
-          .map((row) => ({ user_id: row.user_id, profile: row.profile })),
-      })),
-    });
+    return NextResponse.json({ posts });
   } catch (error) {
     // The message names the failing query and is for the server log. A reader
     // sees that bookmarks could not be loaded, which is not the same as being

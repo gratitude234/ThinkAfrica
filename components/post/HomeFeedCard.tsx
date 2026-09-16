@@ -67,7 +67,6 @@ function AuthorLine({
   const profile = post.profiles;
   const name = profile?.full_name ?? profile?.username ?? "Indegenius member";
   const avatarDimensions = { width: avatarSize, height: avatarSize };
-  const verificationClass = "bg-emerald-brand";
   const avatar = profile?.avatar_url ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -109,17 +108,6 @@ function AuthorLine({
         ) : (
           <span className="truncate font-semibold text-ink">{name}</span>
         )}
-        {profile?.verified ? (
-          // The glyph takes the card's own ground colour rather than a fixed
-          // white, so it stays legible when the badge fill lightens in dark
-          // mode instead of turning into white-on-pale-lilac.
-          <span
-            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-card ${verificationClass}`}
-            title="Verified"
-          >
-            ✓
-          </span>
-        ) : null}
         {showTimestamp && publishedAt ? (
           <span className="shrink-0 whitespace-nowrap text-meta text-ink-muted">
             <span aria-hidden="true">· </span>

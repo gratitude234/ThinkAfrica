@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -106,21 +106,26 @@ describe("Phase 0 profile-security migration", () => {
     expect(home).not.toMatch(/get_my_profile_private|push_prompt_/);
   });
 
-  it("keeps the notification bell off the private profile entirely", () => {
-    // The bell is a client component. It used to read notification_prefs from
-    // the browser through the RPC, which was safe under RLS and has no
-    // successor: after the migration there is no key a browser could hold.
-    // The read is now the server's, so the bell must not have come back to it.
-    const bell = readFileSync(
-      resolve(process.cwd(), "components/ui/NotificationBell.tsx"),
-      "utf8"
-    )
-      // Prose describing the move would otherwise read as the move being
-      // undone.
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  it("keeps the navigation that replaced the notification bell off the private profile entirely", () => {
+    // The bell was a client component that used to read notification_prefs
+    // from the browser through the RPC, which was safe under RLS and has no
+    // successor: after the migration there is no key a browser could hold. The
+    // final UI simplification removed the bell; Notifications is now a plain
+    // destination in the side rail and the bottom bar, and neither may pick
+    // that read back up.
+    expect(
+      existsSync(resolve(process.cwd(), "components/ui/NotificationBell.tsx"))
+    ).toBe(false);
 
-    expect(bell).not.toMatch(/get_my_profile_private/);
-    expect(bell).not.toMatch(/\.from\("/);
+    for (const file of ["app/(main)/SideRail.tsx", "app/(main)/BottomNav.tsx"]) {
+      const source = readFileSync(resolve(process.cwd(), file), "utf8")
+        // Prose describing the move would otherwise read as the move being
+        // undone.
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+
+      expect(source, file).not.toMatch(/get_my_profile_private/);
+      expect(source, file).not.toMatch(/\.from\("/);
+    }
   });
 });

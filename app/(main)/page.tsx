@@ -11,7 +11,7 @@ import { BRAND_PROMISE, BRAND_SEO_DESCRIPTION } from "@/lib/brand";
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Build Your Intellectual Identity",
+  title: "Home",
   description: BRAND_SEO_DESCRIPTION,
   alternates: { canonical: canonicalPath("/landing") },
   openGraph: {

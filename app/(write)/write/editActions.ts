@@ -129,7 +129,7 @@ export async function applyPublishedEditDraft(input: { editDraftId: string }) {
 
   const slug = typeof data === "string" ? data : null;
   revalidatePath("/");
-  revalidatePath("/dashboard");
+  revalidatePath("/[username]", "page");
   if (slug) revalidatePath(`/post/${slug}`);
   return { error: null, slug };
 }

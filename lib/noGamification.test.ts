@@ -128,14 +128,19 @@ describe("no gamification: what replaced it", () => {
     for (const file of [
       "app/(write)/write/actions.ts",
       "components/ui/followActions.ts",
-      "app/(main)/dashboard/PostsTable.tsx",
+      // The owner's Drafts tab, which replaced the dashboard's posts table.
+      "components/profile/ProfileDraftList.tsx",
     ]) {
       expect(codeOf(file), file).not.toMatch(/\bpoints?\b|\bbadges?\b/i);
     }
   });
 
-  it("keeps the verified mark, which is identity rather than a reward", () => {
-    expect(codeOf("components/profile/ProfileHeader.tsx")).toMatch(/function VerifiedMark/);
+  it("shows no verified prestige mark on a profile", () => {
+    // Phase 2H kept the mark as identity. The final UI simplification retired
+    // verified prestige from the product; account verification stays an
+    // internal admin state and is not rendered to readers.
+    const header = codeOf("components/profile/ProfileHeader.tsx");
+    expect(header).not.toMatch(/function VerifiedMark|verified_type|Verified profile/);
   });
 
   it("sends the retired pages somewhere useful, and keeps their names reserved", () => {

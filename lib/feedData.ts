@@ -289,7 +289,9 @@ function getTimeframeCutoff(timeframe: FeedTimeframe): string | null {
 /**
  * Posts crediting a blocked person as an accepted author. Filtering on
  * `posts.author_id` alone would let them back into the feed through an older
- * co-authored publication, so these ids are excluded too.
+ * co-authored publication, so these ids are excluded too. Co-authoring is
+ * retired as a product, but its credits are still data and blocking is not
+ * presentation.
  */
 async function getExcludedCreditedPostIds(
   reader: FeedSupabaseClient,

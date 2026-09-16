@@ -34,11 +34,16 @@ describe("shouldShowDesktopRail", () => {
     ["/writer", true],
     ["/me", true],
     ["/submitted", true],
+    // The top bar carries no primary destinations, so a post page or an admin
+    // page without the rail would leave only the logo as a way back.
+    ["/post/a-published-piece", true],
+    ["/admin", true],
+    ["/admin/moderation", true],
+    // Segment boundaries: neither is a suppressed prefix's child.
+    ["/aboutness", true],
+    ["/writer", true],
 
-    // Layouts that already own the full content width.
-    ["/post/a-published-piece", false],
-    ["/admin", false],
-    ["/admin/moderation", false],
+    // A layout that already owns the full viewport width.
     ["/about", false],
     // Deliberate focus modes.
     ["/write", false],

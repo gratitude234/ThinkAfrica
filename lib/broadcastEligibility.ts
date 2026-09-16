@@ -178,9 +178,6 @@ export function audienceMembership(
   if (candidate.publishedCount > 0) {
     memberships.push("authors");
   }
-  if (candidate.isVerified) {
-    memberships.push("verified");
-  }
   if (isWithinDays(candidate.profileCreatedAt, NEW_USER_WINDOW_DAYS, now)) {
     memberships.push("new");
   }

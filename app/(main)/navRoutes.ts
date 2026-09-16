@@ -4,14 +4,16 @@ const MOBILE_FOCUS_ROUTE_PREFIXES = [
   "/edit",
 ] as const;
 
-// Routes whose layout already owns the full content width -- they break out of
-// the shell container with negative margins, paint viewport-wide bands, or
-// render their own left column -- plus the deliberate focus modes. Everything
-// else in (main) is a browse surface and keeps the rail, so moving from the
-// feed to a profile or to /settings doesn't make the rail flicker in and out.
+// Routes whose layout already owns the full viewport width -- /about paints
+// viewport-wide bands -- plus the deliberate focus modes. Everything else in
+// (main) keeps the rail, so moving from the feed to a profile or to /settings
+// doesn't make the rail flicker in and out.
+//
+// Post pages and admin keep it too. The top bar is utilities only, so hiding
+// the rail there left a signed-in reader or an admin on desktop with nothing
+// but the logo as a way back into the app. Both centre their own column or
+// grid inside the content track, so they fit beside it.
 const RAIL_SUPPRESSED_PREFIXES = [
-  "/post",
-  "/admin",
   "/about",
   "/write",
   "/create",

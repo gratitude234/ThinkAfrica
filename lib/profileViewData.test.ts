@@ -24,6 +24,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import {
+  loadProfileDrafts,
   loadProfileIdentity,
   loadProfilePublications,
   loadProfileView,
@@ -47,8 +48,13 @@ type Routes = Record<string, StubResult>;
 function makeClient({ routes = {} }: { routes?: Routes } = {}) {
   const tables: string[] = [];
   const rpcNames: string[] = [];
+  /** Every table call with its equality filters, so a test can tell a drafts
+   *  query from a publications query on the same table. */
+  const queries: Array<{ table: string; eq: Array<[string, unknown]> }> = [];
 
   const chainFor = (table: string) => {
+    const query = { table, eq: [] as Array<[string, unknown]> };
+    queries.push(query);
     const resolve = () => {
       const route = routes[table] ?? { data: null, error: null };
       return Promise.resolve({ data: null, error: null, count: 0, ...route });
@@ -59,15 +65,20 @@ function makeClient({ routes = {} }: { routes?: Routes } = {}) {
       then: (onOk: unknown, onErr: unknown) =>
         resolve().then(onOk as never, onErr as never),
     };
-    for (const method of ["select", "eq", "neq", "in", "or", "not", "order", "limit", "range"]) {
+    for (const method of ["select", "neq", "in", "or", "not", "order", "limit", "range"]) {
       chain[method] = () => chain;
     }
+    chain.eq = (column: string, value: unknown) => {
+      query.eq.push([column, value]);
+      return chain;
+    };
     return chain;
   };
 
   return {
     tables,
     rpcNames,
+    queries,
     client: {
       from(table: string) {
         tables.push(table);
@@ -213,17 +224,16 @@ describe("loadProfileViewerContext", () => {
 });
 
 describe("Posts and Articles", () => {
-  it("files legacy Essays, Policy Briefs and Research as Articles, and a legacy blog as a Post", async () => {
+  it("files legacy Essays, Policy Briefs and Research as Articles, like any other Article", async () => {
     const { client } = makeClient({
       routes: {
-        posts: { data: [row({ id: "own-article", content_kind: "article" })], error: null },
-        post_authors: {
+        posts: {
+          // What a legacy Policy Brief and a legacy Research paper carry
+          // after 20260915000005: content_kind "article", like any other.
           data: [
-            // What a legacy Policy Brief and a legacy Research paper carry
-            // after 20260915000005: content_kind "article", like any other.
-            { posts: row({ id: "legacy-brief", author_id: "someone-else", content_kind: "article", status: "published" }) },
-            { posts: row({ id: "legacy-research", author_id: "someone-else", content_kind: "article", status: "published" }) },
-            { posts: row({ id: "legacy-blog", author_id: "someone-else", content_kind: "post", status: "published" }) },
+            row({ id: "own-article", content_kind: "article" }),
+            row({ id: "legacy-brief", content_kind: "article", published_at: "2025-12-01T00:00:00Z" }),
+            row({ id: "legacy-research", content_kind: "article", published_at: "2025-11-01T00:00:00Z" }),
           ],
           error: null,
         },
@@ -236,22 +246,43 @@ describe("Posts and Articles", () => {
       kind: "article",
     });
 
-    const ids = page.items.map((item) => item.id);
-    expect(ids).toEqual(expect.arrayContaining(["own-article", "legacy-brief", "legacy-research"]));
-    expect(ids).not.toContain("legacy-blog");
+    expect(page.items.map((item) => item.id)).toEqual([
+      "own-article",
+      "legacy-brief",
+      "legacy-research",
+    ]);
     expect(page.items.every((item) => item.kind === "article")).toBe(true);
-    expect(page.items.find((item) => item.id === "legacy-brief")?.isCoAuthor).toBe(true);
   });
 
-  it("gives a Response the tab its own content kind names", async () => {
+  it("lists only work the writer primarily authored, and reads no co-author credits", async () => {
+    const { client, tables } = makeClient({
+      routes: {
+        posts: { data: [row({ id: "own-post" })], error: null },
+        // A credit on somebody else's publication. Co-authoring is retired,
+        // so nothing on the profile asks for these any more.
+        post_authors: {
+          data: [{ posts: row({ id: "credited-post", author_id: "someone-else", status: "published" }) }],
+          error: null,
+        },
+      },
+    });
+
+    const page = await loadProfilePublications({
+      supabase: client,
+      profileId: "author-1",
+      kind: "post",
+    });
+
+    expect(page.items.map((item) => item.id)).toEqual(["own-post"]);
+    expect(page.items.every((item) => item.isCoAuthor === false)).toBe(true);
+    expect(tables).not.toContain("post_authors");
+  });
+
+  it("lists a legacy Response as an ordinary publication of its own content kind", async () => {
     const { client } = makeClient({
       routes: {
-        posts: { data: [], error: null },
-        post_authors: {
-          data: [
-            { posts: row({ id: "response-post", author_id: "someone-else", type: "blog", content_kind: "post", status: "published" }) },
-            { posts: row({ id: "response-article", author_id: "someone-else", type: "essay", content_kind: "article", status: "published" }) },
-          ],
+        posts: {
+          data: [row({ id: "response-post", content_kind: "post", in_response_to: "original" })],
           error: null,
         },
       },
@@ -259,6 +290,7 @@ describe("Posts and Articles", () => {
 
     const posts = await loadProfilePublications({ supabase: client, profileId: "author-1", kind: "post" });
     expect(posts.items.map((item) => item.id)).toEqual(["response-post"]);
+    expect(posts.items[0]?.kind).toBe("post");
   });
 
   it("reports a further page without counting the whole table", async () => {
@@ -307,22 +339,21 @@ describe("what a profile view reads", () => {
       routes: {
         follows: { count: 1, data: null, error: null },
         posts: { data: [], error: null },
-        post_authors: { data: [], error: null },
       },
     });
   }
 
-  it("is four table reads and no RPC for a signed-out reader on Posts", async () => {
+  it("is three table reads and no RPC for a signed-out reader on Posts", async () => {
     const { client, tables, rpcNames } = viewWith(null);
     await loadProfileView({ supabase: client, username: "student1" });
-    expect([...tables].sort()).toEqual(["follows", "follows", "post_authors", "posts"]);
+    expect([...tables].sort()).toEqual(["follows", "follows", "posts"]);
     expect(rpcNames).toEqual([]);
   });
 
-  it("is the same four for the owner", async () => {
+  it("is the same three for the owner", async () => {
     const { client, tables } = viewWith({ id: "author-1" });
     await loadProfileView({ supabase: client, username: "student1", tab: "articles" });
-    expect([...tables].sort()).toEqual(["follows", "follows", "post_authors", "posts"]);
+    expect([...tables].sort()).toEqual(["follows", "follows", "posts"]);
   });
 
   it("adds the viewer's follow and block state for a signed-in visitor", async () => {
@@ -332,7 +363,6 @@ describe("what a profile view reads", () => {
       "follows",
       "follows",
       "follows",
-      "post_authors",
       "posts",
       "user_blocks",
     ]);
@@ -344,6 +374,14 @@ describe("what a profile view reads", () => {
     expect(data?.publications).toBeNull();
     expect([...tables].sort()).toEqual(["follows", "follows"]);
     expect(rpcNames).toEqual([]);
+  });
+
+  it("reads no co-author credits for any tab", async () => {
+    for (const tab of ["posts", "articles", "about"] as const) {
+      const { client, tables } = viewWith({ id: "reader-1" });
+      await loadProfileView({ supabase: client, username: "student1", tab });
+      expect(tables).not.toContain("post_authors");
+    }
   });
 
   it("loads no record, featured work, citation edge or researcher profile", async () => {
@@ -359,5 +397,96 @@ describe("what a profile view reads", () => {
     ]) {
       expect(tables).not.toContain(retired);
     }
+  });
+});
+
+describe("the owner's Drafts tab", () => {
+  const DRAFT_ROWS = [
+    // Shaped like any posts row, because a visitor forcing Drafts gets the
+    // Posts tab from the same stubbed table.
+    row({ id: "draft-2", title: "Second thoughts", content_kind: "article", updated_at: "2026-02-02T00:00:00Z" }),
+    row({ id: "draft-1", title: null, content_kind: "post", updated_at: "2026-02-01T00:00:00Z" }),
+  ];
+
+  function viewWith(viewer: { id: string } | null) {
+    currentUser.value = viewer;
+    findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
+    return makeClient({
+      routes: {
+        follows: { count: 1, data: null, error: null },
+        posts: { data: DRAFT_ROWS, error: null },
+      },
+    });
+  }
+
+  function draftQueries(queries: Array<{ table: string; eq: Array<[string, unknown]> }>) {
+    return queries.filter(
+      (query) =>
+        query.table === "posts" &&
+        query.eq.some(([column, value]) => column === "status" && value === "draft")
+    );
+  }
+
+  it("shows the owner their drafts, scoped to their own id, and pages no publications", async () => {
+    const { client, tables, queries } = viewWith({ id: "author-1" });
+    const data = await loadProfileView({ supabase: client, username: "student1", tab: "drafts" });
+
+    expect(data?.tab).toBe("drafts");
+    expect(data?.publications).toBeNull();
+    expect(data?.drafts).toEqual([
+      { id: "draft-2", title: "Second thoughts", kind: "article", updatedAt: "2026-02-02T00:00:00Z" },
+      { id: "draft-1", title: null, kind: "post", updatedAt: "2026-02-01T00:00:00Z" },
+    ]);
+    expect([...tables].sort()).toEqual(["follows", "follows", "posts"]);
+
+    const drafts = draftQueries(queries);
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]?.eq).toContainEqual(["author_id", "author-1"]);
+  });
+
+  it("gives a signed-in visitor forcing Drafts the Posts tab, and never asks for drafts", async () => {
+    const { client, queries } = viewWith({ id: "reader-1" });
+    const data = await loadProfileView({ supabase: client, username: "student1", tab: "drafts" });
+
+    expect(data?.tab).toBe("posts");
+    expect(data?.drafts).toBeNull();
+    expect(data?.publications?.kind).toBe("post");
+    expect(draftQueries(queries)).toEqual([]);
+  });
+
+  it("gives a signed-out reader forcing Drafts the Posts tab, and never asks for drafts", async () => {
+    const { client, queries } = viewWith(null);
+    const data = await loadProfileView({ supabase: client, username: "student1", tab: "drafts" });
+
+    expect(data?.tab).toBe("posts");
+    expect(data?.drafts).toBeNull();
+    expect(draftQueries(queries)).toEqual([]);
+  });
+
+  it("does not load drafts on any other tab, even for the owner", async () => {
+    for (const tab of ["posts", "articles", "about"] as const) {
+      const { client, queries } = viewWith({ id: "author-1" });
+      const data = await loadProfileView({ supabase: client, username: "student1", tab });
+      expect(data?.drafts).toBeNull();
+      expect(draftQueries(queries)).toEqual([]);
+    }
+  });
+
+  it("answers empty without a query when the viewer is not the profile", async () => {
+    const { client, tables } = viewWith(null);
+    await expect(
+      loadProfileDrafts({ supabase: client, profileId: "author-1", viewerId: "reader-1" })
+    ).resolves.toEqual([]);
+    expect(tables).toEqual([]);
+  });
+
+  it("throws rather than showing an empty Drafts tab when the query fails", async () => {
+    const { client } = makeClient({
+      routes: { posts: { data: null, error: { message: "timeout" } } },
+    });
+
+    await expect(
+      loadProfileDrafts({ supabase: client, profileId: "author-1", viewerId: "author-1" })
+    ).rejects.toThrow(/drafts failed/);
   });
 });

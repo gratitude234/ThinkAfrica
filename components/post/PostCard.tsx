@@ -59,10 +59,7 @@ export interface PostCardData {
   profiles: {
     username: string;
     full_name: string | null;
-    university: string | null;
     avatar_url: string | null;
-    verified?: boolean;
-    verified_type?: string | null;
   } | null;
 }
 
@@ -70,13 +67,6 @@ interface PostCardProps {
   post: PostCardData;
   variant?: "standard" | "explore";
 }
-
-const VERIFIED_COLORS: Record<string, string> = {
-  student: "bg-emerald-brand",
-  researcher: "bg-purple-accent",
-  faculty: "bg-amber-500",
-  institution: "bg-blue-600",
-};
 
 // Keyed on the kind rather than the legacy type, which is what made these
 // four-valued: a Blog, an Essay, a Policy Brief and a Quick Take each had
@@ -174,14 +164,6 @@ function CommentIcon() {
   );
 }
 
-function EyeIcon() {
-  return (
-    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
 
 export default function PostCard({ post, variant = "standard" }: PostCardProps) {
   const author = post.profiles;
@@ -196,12 +178,9 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
   const readingLabel = readTime ? `${readTime} min read` : null;
   const authorName = author?.full_name ?? author?.username ?? "Unknown";
   const authorHref = author?.username ? `/${author.username}` : null;
-  const verifiedBg =
-    VERIFIED_COLORS[author?.verified_type ?? "student"] ?? "bg-emerald-brand";
   const badgeClass = KIND_BADGES[kind];
   const likeCount = typeof post.like_count === "number" ? post.like_count : null;
   const commentCount = typeof post.comment_count === "number" ? post.comment_count : null;
-  const readCount = typeof post.read_count === "number" ? post.read_count : null;
   const hasCoverImage = Boolean(post.cover_image_url?.trim());
   const isExplore = variant === "explore";
   const thumbnailClass = isExplore
@@ -303,14 +282,6 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
                     className="inline-flex max-w-full items-center gap-1 align-bottom font-semibold text-gray-700 transition-colors hover:text-emerald-700"
                   >
                     <span className="truncate">{authorName}</span>
-                    {author?.verified ? (
-                      <span
-                        title={author.verified_type ? `Verified ${author.verified_type}` : "Verified"}
-                        className={`inline-flex h-3 w-3 shrink-0 items-center justify-center rounded-full ${verifiedBg} text-[6px] font-bold text-white`}
-                      >
-                        {"✓"}
-                      </span>
-                    ) : null}
                   </Link>
                 ) : (
                   <span className="font-semibold text-gray-700">{authorName}</span>
@@ -320,7 +291,6 @@ export default function PostCard({ post, variant = "standard" }: PostCardProps) 
               <div className="ml-auto flex shrink-0 items-center gap-2.5 text-gray-500 sm:gap-3">
                 <EngagementMetric icon={<HeartIcon />} value={likeCount} label="likes" />
                 <EngagementMetric icon={<CommentIcon />} value={commentCount} label="comments" />
-                <EngagementMetric icon={<EyeIcon />} value={readCount} label="reads" />
               </div>
             </div>
           </div>

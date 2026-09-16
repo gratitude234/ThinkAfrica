@@ -44,10 +44,10 @@ export default function WriteError({
           Reload the editor
         </button>
         <Link
-          href="/dashboard"
+          href="/me"
           className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-canvas"
         >
-          Go to your drafts
+          Go to your profile
         </Link>
       </div>
 

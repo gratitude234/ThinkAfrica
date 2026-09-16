@@ -127,7 +127,6 @@ const SCALAR_FIELDS = [
   "status",
   "author_id",
   "cover_image_url",
-  "audio_summary_url",
 ] as const satisfies readonly (keyof PostRecord)[];
 
 function sameArray(a: unknown, b: unknown): boolean {

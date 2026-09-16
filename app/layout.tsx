@@ -8,7 +8,6 @@ import GuestAuthGateProvider from "@/components/ui/GuestAuthGateProvider";
 import {
   BRAND_PROMISE,
   BRAND_SEO_DESCRIPTION,
-  BRAND_TAGLINE,
 } from "@/lib/brand";
 
 const bodoniModa = Bodoni_Moda({
@@ -34,10 +33,10 @@ export const metadata: Metadata = {
   },
   description: BRAND_SEO_DESCRIPTION,
   keywords: [
-    "intellectual identity",
     "ideas",
     "publishing",
-    "African intellectual network",
+    "African writers",
+    "articles",
   ],
   manifest: "/manifest.webmanifest",
   openGraph: {
@@ -51,7 +50,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: `Indegenius - ${BRAND_PROMISE}`,
-    description: `${BRAND_SEO_DESCRIPTION} ${BRAND_TAGLINE}.`,
+    description: BRAND_SEO_DESCRIPTION,
     images: [absoluteUrl(DEFAULT_OG_IMAGE)],
   },
   icons: {

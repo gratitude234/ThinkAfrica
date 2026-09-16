@@ -56,6 +56,9 @@ const nextConfig = {
         destination: "/admin",
         permanent: true,
       })),
+      // Admin Analytics went in the final UI simplification. The admin index
+      // keeps the platform counts that are still worth a glance.
+      { source: "/admin/analytics", destination: "/admin", permanent: true },
       // Direct messaging was removed in Phase 2E. An old message link lands on
       // Notifications, the nearest thing to where that activity lived.
       { source: "/messages", destination: "/notifications", permanent: true },

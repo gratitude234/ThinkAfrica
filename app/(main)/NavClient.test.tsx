@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import NavClient from "./NavClient";
 
@@ -24,89 +24,72 @@ vi.mock("./NavUserMenu", () => ({
   default: () => <span>Account menu</span>,
 }));
 
-vi.mock("./CreateLauncher", () => ({
-  default: ({ userId }: { userId: string | null }) => (
-    <button type="button" data-user-id={userId ?? ""}>
-      Write
-    </button>
-  ),
-}));
-
-vi.mock("@/components/ui/NotificationBell", () => ({
-  default: () => <button type="button">Notifications</button>,
-}));
-
-function renderNav(user: { id: string } | null = null) {
+function renderNav(user: { id: string } | null = null, onOpenSearch = vi.fn()) {
   return render(
     <NavClient
       user={user as Parameters<typeof NavClient>[0]["user"]}
       profile={null}
       isAdmin={false}
-      onOpenSearch={vi.fn()}
+      onOpenSearch={onOpenSearch}
     />
   );
 }
 
-describe("NavClient destinations", () => {
+/**
+ * The top bar is global utilities only: the wordmark home, search and the
+ * account menu. Home, Explore, Write, Notifications and Profile live in the
+ * side rail and the bottom bar, and are not repeated here.
+ */
+describe("NavClient utilities", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
   });
 
-  it("links Home and Explore and nothing from the retired product", () => {
+  it("links the wordmark home", () => {
     renderNav();
 
-    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Explore" })).toHaveAttribute(
-      "href",
-      "/explore"
-    );
-    for (const name of ["For you", "Discover", "Responses", "Campus", "Research"]) {
-      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
-    }
-    expect(
-      screen.queryByRole("link", { name: "Open messages" })
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Indegenius home" })).toHaveAttribute("href", "/");
   });
 
-  it("offers Write, and Notifications to a signed-in viewer", () => {
+  it("repeats none of the primary destinations, and nothing from the retired product", () => {
     renderNav({ id: "user-1" });
 
-    // CreateLauncher owns the /write destination and the guest gate; its own
-    // test covers both. Here the top bar only has to hand it the viewer.
-    expect(screen.getByRole("button", { name: "Write" })).toHaveAttribute(
-      "data-user-id",
-      "user-1"
-    );
-    expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument();
-  });
-});
-
-describe("NavClient desktop nav handoff", () => {
-  beforeEach(() => {
-    navigationState.pathname = "/";
+    for (const name of ["Home", "Explore", "Write", "Notifications", "Profile"]) {
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    for (const name of ["For you", "Discover", "Responses", "Campus", "Research", "Open messages"]) {
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+    }
   });
 
-  // jsdom has no layout engine, so the breakpoint handoff to SideRail is
-  // asserted on the utility classes.
-  it("hands the primary links to the side rail at xl", () => {
-    renderNav();
-
-    const links = screen.getByRole("link", { name: "Home" }).parentElement;
-    expect(links).toHaveClass("xl:hidden");
-  });
-
-  it("widens the search field once the links are gone", () => {
-    renderNav();
+  it("opens search from a field that shows from md", () => {
+    const onOpenSearch = vi.fn();
+    renderNav(null, onOpenSearch);
 
     const search = screen.getByRole("button", { name: "Open search" });
-    expect(search).toHaveClass("xl:max-w-[520px]");
-    // Cancels ml-auto, which would otherwise strand search on the right.
-    expect(search).toHaveClass("xl:ml-0");
+    // jsdom has no layout engine, so the breakpoint is a class contract.
+    expect(search).toHaveClass("md:flex", "max-w-[520px]");
+
+    fireEvent.click(search);
+    expect(onOpenSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("carries the account menu", () => {
+    renderNav({ id: "user-1" });
+
+    expect(screen.getByText("Account menu")).toBeInTheDocument();
+  });
+
+  it("carries no announcement strip", () => {
+    renderNav();
+
+    expect(screen.queryByText(/Intellectual Social Network/)).not.toBeInTheDocument();
   });
 
   it("gains a shadow once the page is scrolled, and loses it at the top", () => {
     renderNav();
-    const nav = screen.getByRole("navigation", { name: "Primary navigation" });
+    const nav = screen.getByRole("navigation", { name: "Application header" });
 
     expect(nav.className).not.toMatch(/shadow-/);
 
@@ -121,14 +104,6 @@ describe("NavClient desktop nav handoff", () => {
       window.dispatchEvent(new Event("scroll"));
     });
     expect(nav.className).not.toMatch(/shadow-/);
-  });
-
-  it("leaves the announcement strip outside the sticky wrapper", () => {
-    const { container } = renderNav();
-
-    const strip = screen.getByText("Africa's First Intellectual Social Network");
-    expect(strip.closest(".sticky")).toBeNull();
-    expect(container.querySelector(".sticky")).not.toBeNull();
   });
 });
 

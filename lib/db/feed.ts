@@ -75,10 +75,7 @@ export interface FeedAuthorProfile {
   id: string;
   username: string;
   full_name: string | null;
-  university: string | null;
   avatar_url: string | null;
-  verified: boolean;
-  verified_type: string | null;
 }
 
 export interface FeedHydration {
@@ -164,10 +161,7 @@ const HYDRATE_SQL = `
         'id', p.id,
         'username', p.username,
         'full_name', p.full_name,
-        'university', p.university,
-        'avatar_url', p.avatar_url,
-        'verified', p.verified,
-        'verified_type', p.verified_type
+        'avatar_url', p.avatar_url
       ))
       from public.profiles as p
       where p.id in (select id from author_ids)
@@ -295,7 +289,7 @@ export function createSupabaseFeedRepository(
               (await supabase
                 .from("profiles")
                 .select(
-                  "id, username, full_name, university, avatar_url, verified, verified_type"
+                  "id, username, full_name, avatar_url"
                 )
                 .in("id", authors)) as { data?: unknown; error?: unknown }
             )

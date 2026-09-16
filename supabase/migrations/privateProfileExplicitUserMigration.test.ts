@@ -192,8 +192,10 @@ describe("the application", () => {
   it("does not call the implementation through PostgREST", () => {
     // There is no request that could: `private` is not an exposed schema. This
     // asserts the intent as well, so a future caller cannot quietly try.
+    // The notification bell was a caller until the final UI simplification
+    // removed it.
     const callers = [
-      "components/ui/NotificationBell.tsx",
+      "app/(main)/notifications/page.tsx",
       "app/(main)/settings/page.tsx",
       "app/api/notifications/route.ts",
     ];

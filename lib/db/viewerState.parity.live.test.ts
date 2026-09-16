@@ -116,28 +116,6 @@ describe.skipIf(!enabled)(
       expect(mismatches).toEqual([]);
     });
 
-    it("agrees on which posts credit an excluded co-author", async () => {
-      const posts = await executor.query<{ id: string }>(
-        `select post_id::text as id from public.post_authors
-         where accepted_at is not null limit 40`
-      );
-      const authors = await executor.query<{ id: string }>(
-        `select user_id::text as id from public.post_authors
-         where accepted_at is not null group by user_id limit 10`
-      );
-      if (posts.length === 0 || authors.length === 0) return;
-
-      const postIds = posts.map((row) => row.id);
-      const authorIds = authors.map((row) => row.id);
-
-      const [rest, direct] = await Promise.all([
-        viaRest.postIdsWithAuthors(postIds, authorIds),
-        viaSql.postIdsWithAuthors(postIds, authorIds),
-      ]);
-
-      expect(canonical([...rest].sort())).toBe(canonical([...direct].sort()));
-    });
-
     it("agrees on a blocked pair, in both directions", async () => {
       const edges = await executor.query<{ a: string; b: string }>(
         `select blocker_id::text as a, blocked_id::text as b

@@ -22,6 +22,11 @@ import "server-only";
  * The publishing reset, Phase 2F, removed the criteria only retired feed modes
  * used: co-author credit matching, topic-subscription overlap, the
  * citation-only arm, the read-count ordering and the identity-only projection.
+ *
+ * The final UI simplification stopped showing co-author credits anywhere, but
+ * `postIdsCreditedTo` stays: it is trust and safety, not presentation. A
+ * blocked person credited on a historic co-authored publication must not come
+ * back into the blocker's feed through it.
  * Phase 2I removed the research exclusion every feed query used to carry, and
  * the columns a card no longer reads: the legacy `type`, the `article_format`
  * genre, the response parent, and the research document fields.

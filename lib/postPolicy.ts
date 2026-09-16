@@ -147,7 +147,6 @@ export const AUTHOR_EDITABLE_POST_COLUMNS = [
   "excerpt",
   "cover_image_url",
   "tags",
-  "audio_summary_url",
 ] as const;
 
 export type AuthorEditablePostColumn =

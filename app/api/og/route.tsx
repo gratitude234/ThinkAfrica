@@ -1,4 +1,4 @@
-﻿import { ImageResponse } from "next/og";
+import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 import { BRAND_PROMISE, BRAND_TAGLINE } from "@/lib/brand";
 
@@ -8,7 +8,6 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const title = searchParams.get("title") ?? BRAND_PROMISE;
   const author = searchParams.get("author") ?? "";
-  const university = searchParams.get("university") ?? "";
   const type = searchParams.get("type") ?? "brand";
 
   // Keyed on the kind, with the legacy vocabulary kept as aliases so an OG
@@ -87,17 +86,6 @@ export async function GET(request: NextRequest) {
                 }}
               >
                 {author}
-              </div>
-            ) : null}
-            {university ? (
-              <div
-                style={{
-                  color: "rgba(255,255,255,0.65)",
-                  fontSize: "16px",
-                  fontFamily: "system-ui",
-                }}
-              >
-                {university}
               </div>
             ) : null}
           </div>

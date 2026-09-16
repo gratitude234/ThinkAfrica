@@ -21,10 +21,6 @@ const mainLayout = readFileSync(
   resolve(process.cwd(), "app/(main)/layout.tsx"),
   "utf8"
 );
-const analyticsPage = readFileSync(
-  resolve(process.cwd(), "app/(main)/admin/analytics/page.tsx"),
-  "utf8"
-);
 const activationRoute = readFileSync(
   resolve(process.cwd(), "app/api/activation/route.ts"),
   "utf8"
@@ -84,7 +80,6 @@ describe("Phase 0 measurement foundation", () => {
     );
     expect(baselineSql).toContain("FROM anon, authenticated");
     expect(baselineSql).toContain("TO service_role");
-    expect(analyticsPage).toContain('supabase.rpc("get_phase0_measurement_baseline", {');
   });
 
   it("removes anonymous activation-event insertion", () => {

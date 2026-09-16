@@ -29,7 +29,6 @@ import BodyContents from "./BodyContents";
 import BackLink from "@/components/ui/BackLink";
 import HighlightShare from "./HighlightShare";
 import PublishedToast from "./PublishedToast";
-import AudioSummaryPlayer from "@/components/post/AudioSummaryPlayer";
 import PostCover from "@/components/post/PostCover";
 import { formatTagLabel } from "@/lib/tags";
 import ReportButton from "@/components/moderation/ReportButton";
@@ -55,16 +54,7 @@ interface ReferenceRecord {
   url: string | null;
 }
 
-interface CoAuthorRecord {
-  user_id: string;
-  display_order: number;
-  corresponding_author: boolean;
-  accepted_at: string | null;
-  profile: {
-    username: string;
-    full_name: string | null;
-  } | null;
-}
+
 
 interface RelatedPost {
   id: string;
@@ -85,16 +75,7 @@ interface PostNavigationItem {
 
 interface SecondaryData {
   references: ReferenceRecord[];
-  coAuthors: CoAuthorRecord[];
   commentCount: number;
-  reviews: Array<{
-    assigned_at: string | null;
-    submitted_at: string | null;
-    recommendation: string | null;
-    round: number | null;
-  }>;
-  decisions: Array<{ decision: string | null; created_at: string | null; round: number | null }>;
-  versions: Array<{ id: string; version_kind: string | null; round: number | null; created_at: string | null }>;
   likeCount: number;
   bookmarkCount: number;
   relatedPosts: RelatedPost[];
@@ -208,67 +189,20 @@ async function getSecondaryData(
   viewerId: string | null
 ): Promise<SecondaryData> {
   const supabase = await createClient();
+  const repository = postPageRepository(supabase);
 
-  const [
-    { count: likeCount },
-    { data: referencesRaw },
-    { data: coAuthorsRaw },
-    { data: reviewsRaw },
-    { data: decisionsRaw },
-    { data: versionsRaw },
-    commentCount,
-    { count: bookmarkCount },
-    relatedResult,
-    previousPostResult,
-    nextPostResult,
-  ] = await (async () => {
-    // Fifteen PostgREST round trips became four statements against the same
-    // database. The repository decides which backend answers; see
-    // lib/db/readAdapter.ts.
-    const repository = postPageRepository(supabase);
+  const [counts, collections, related, neighbours] = await Promise.all([
+    repository.counts(postId),
+    repository.collections(postId, viewerId),
+    isPublished && tags.length > 0
+      ? repository.related(postId, tags, 3, viewerId)
+      : Promise.resolve([]),
+    isPublished && publishedAt
+      ? repository.neighbours(postId, publishedAt)
+      : Promise.resolve({ previous: null, next: null }),
+  ]);
 
-    const [counts, collections, related, neighbours] =
-      await Promise.all([
-        repository.counts(postId),
-        repository.collections(postId, viewerId),
-        isPublished && tags.length > 0
-          ? repository.related(postId, tags, 3, viewerId)
-          : Promise.resolve([]),
-        isPublished && publishedAt
-          ? repository.neighbours(postId, publishedAt)
-          : Promise.resolve({ previous: null, next: null }),
-      ]);
-
-    // Shaped to what the page below already destructures, so the rendering
-    // code is untouched by the move.
-    return [
-      { count: counts.likeCount },
-      { data: collections.references },
-      { data: collections.coAuthors },
-      { data: collections.reviews },
-      { data: collections.decisions },
-      { data: collections.versions },
-      counts.commentCount,
-      { count: counts.bookmarkCount },
-      { data: related },
-      { data: neighbours.previous },
-      { data: neighbours.next },
-    ] as const;
-  })();
-
-  const coAuthors = ((coAuthorsRaw ?? []) as Array<
-    Omit<CoAuthorRecord, "profile"> & {
-      profile:
-        | { username: string; full_name: string | null }
-        | Array<{ username: string; full_name: string | null }>
-        | null;
-    }
-  >).map((item) => ({
-    ...item,
-    profile: Array.isArray(item.profile) ? item.profile[0] ?? null : item.profile,
-  }));
-
-  const relatedPosts = ((relatedResult.data ?? []) as Array<
+  const relatedPosts = (related as Array<
     Omit<RelatedPost, "profiles"> & {
       profiles:
         | { full_name: string | null; username: string }
@@ -281,31 +215,13 @@ async function getSecondaryData(
   }));
 
   return {
-    references: (referencesRaw ?? []) as ReferenceRecord[],
-    coAuthors,
-    commentCount,
-    reviews: (reviewsRaw ?? []) as Array<{
-      assigned_at: string | null;
-      submitted_at: string | null;
-      recommendation: string | null;
-      round: number | null;
-    }>,
-    decisions: (decisionsRaw ?? []) as Array<{
-      decision: string | null;
-      created_at: string | null;
-      round: number | null;
-    }>,
-    versions: (versionsRaw ?? []) as Array<{
-      id: string;
-      version_kind: string | null;
-      round: number | null;
-      created_at: string | null;
-    }>,
-    likeCount: likeCount ?? 0,
-    bookmarkCount: bookmarkCount ?? 0,
+    references: collections.references as ReferenceRecord[],
+    commentCount: counts.commentCount,
+    likeCount: counts.likeCount,
+    bookmarkCount: counts.bookmarkCount,
     relatedPosts,
-    previousPost: (previousPostResult.data as PostNavigationItem | null) ?? null,
-    nextPost: (nextPostResult.data as PostNavigationItem | null) ?? null,
+    previousPost: neighbours.previous as PostNavigationItem | null,
+    nextPost: neighbours.next as PostNavigationItem | null,
   };
 }
 
@@ -384,39 +300,6 @@ function SectionSkeleton({ rows = 3 }: { rows?: number }) {
   );
 }
 
-async function HeaderCoAuthors({
-  authorId,
-  secondaryDataPromise,
-  mode = "magazine",
-}: {
-  authorId: string | null;
-  secondaryDataPromise: Promise<SecondaryData>;
-  mode?: "editorial" | "magazine";
-}) {
-  const { coAuthors } = await secondaryDataPromise;
-  const displayAuthors = coAuthors.filter((record) => record.user_id !== authorId);
-
-  if (displayAuthors.length === 0) return null;
-
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
-      {displayAuthors.map((coAuthor) => (
-        <Link
-          key={coAuthor.user_id}
-          href={`/${coAuthor.profile?.username}`}
-          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-            mode === "editorial"
-              ? "border-card-border bg-canvas text-ink-soft hover:border-card-border-hover hover:text-ink"
-              : "border-white/20 bg-surface/10 text-white/75 hover:border-white/30 hover:text-white"
-          }`}
-        >
-          {coAuthor.corresponding_author ? "Corresponding / " : ""}
-          {coAuthor.profile?.full_name ?? coAuthor.profile?.username}
-        </Link>
-      ))}
-    </div>
-  );
-}
 
 async function DetailAuthorRow({
   post,
@@ -454,9 +337,6 @@ async function DetailAuthorRow({
             >
               {authorName}
             </Link>
-            {author.university ? (
-              <span className="text-ink-muted"> · {author.university}</span>
-            ) : null}
           </p>
           <p className="mt-0.5 text-meta leading-5 text-ink-muted">
             {formatRelativeTime(post.published_at ?? post.created_at)}
@@ -630,24 +510,15 @@ async function AuthorSection({
   post,
   author,
   userId,
-  secondaryDataPromise,
   viewerDataPromise,
 }: {
   post: PostRecord;
   author: AuthorProfile | null;
   userId: string | null;
-  secondaryDataPromise: Promise<SecondaryData>;
   viewerDataPromise: Promise<ViewerData>;
 }) {
   if (!author) return null;
-  const [secondary, viewer] = await Promise.all([
-    secondaryDataPromise,
-    viewerDataPromise,
-  ]);
-  // LEGACY COMPATIBILITY — existing co-authored publications.
-  const primaryAuthorRecord =
-    secondary.coAuthors.find((record) => record.user_id === author.id) ?? null;
-  const coAuthors = secondary.coAuthors.filter((record) => record.user_id !== author.id);
+  const viewer = await viewerDataPromise;
 
   return (
     <AuthorBioCard
@@ -655,17 +526,6 @@ async function AuthorSection({
       postId={post.id}
       userId={userId}
       initialFollowing={viewer.userFollowsAuthor}
-      isCorrespondingAuthor={primaryAuthorRecord?.corresponding_author ?? false}
-      coAuthors={coAuthors
-        .filter((coAuthor) => coAuthor.profile?.username)
-        .map((coAuthor) => ({
-          user_id: coAuthor.user_id,
-          corresponding_author: coAuthor.corresponding_author,
-          profile: {
-            username: coAuthor.profile?.username ?? "",
-            full_name: coAuthor.profile?.full_name ?? null,
-          },
-        }))}
     />
   );
 }
@@ -842,7 +702,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const ogImageUrl = `${appUrl}/api/og?${new URLSearchParams({
     title: metadataTitle,
     author: author?.full_name ?? "",
-    university: author?.university ?? "",
     // The parameter keeps its name so an image cached against an existing
     // share URL still resolves; /api/og maps both vocabularies.
     type: resolveContentKind(post) ?? "post",
@@ -889,38 +748,7 @@ export default async function PostPage({ params }: PageProps) {
     (post.status === "pending" || post.status === "pending_revision") &&
     user?.id !== post.author_id
   ) {
-    const [
-      { data: reviewAssignment, error: reviewAssignmentError },
-      { data: coAuthorInvite, error: coAuthorInviteError },
-    ] = await Promise.all([
-      user
-        ? supabase
-            .from("post_reviews")
-            .select("id")
-            .eq("post_id", post.id)
-            .eq("reviewer_id", user.id)
-            .is("removed_at", null)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      user
-        ? supabase
-            .from("post_authors")
-            .select("user_id")
-            .eq("post_id", post.id)
-            .eq("user_id", user.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-    ]);
-
-    if (reviewAssignmentError || coAuthorInviteError) {
-      console.error(`[post/${slug}] visibility query failed`, {
-        reviewAssignmentError,
-        coAuthorInviteError,
-      });
-      throw new Error(`Failed to verify access for post "${slug}".`);
-    }
-
-    if (!reviewAssignment && !coAuthorInvite) notFound();
+    notFound();
   }
 
   const isPublished = post.status === "published";
@@ -1056,13 +884,6 @@ export default async function PostPage({ params }: PageProps) {
           />
         </Suspense>
 
-        <Suspense fallback={null}>
-          <HeaderCoAuthors
-            authorId={author?.id ?? null}
-            secondaryDataPromise={secondaryDataPromise}
-            mode="editorial"
-          />
-        </Suspense>
       </div>
     </header>
 
@@ -1097,10 +918,6 @@ export default async function PostPage({ params }: PageProps) {
               Edit &amp; publish
             </Link>
           </div>
-        ) : null}
-
-        {post.audio_summary_url ? (
-          <AudioSummaryPlayer audioUrl={post.audio_summary_url} />
         ) : null}
 
         <BodyContents headings={bodyHeadings} />
@@ -1151,7 +968,6 @@ export default async function PostPage({ params }: PageProps) {
               post={post}
               author={author}
               userId={userId}
-              secondaryDataPromise={secondaryDataPromise}
               viewerDataPromise={viewerDataPromise}
             />
           </Suspense>
