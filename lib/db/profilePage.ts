@@ -57,6 +57,7 @@ export interface ProfilePublicationRow {
   published_at: string | null;
   cover_image_url: string | null;
   status?: string;
+  word_count?: number | null;
 }
 
 export interface ProfilePublicationBranches {
@@ -70,6 +71,7 @@ export interface ProfileDraftRow {
   title: string | null;
   content_kind: string | null;
   updated_at: string;
+  excerpt?: string | null;
 }
 
 export interface ProfilePageRepository {
@@ -133,7 +135,7 @@ const VIEWER_RELATIONSHIP_SQL = `
 const PUBLICATION_BRANCHES_SQL = `
   select
     'owned' as branch, p.id, p.author_id, p.title, p.slug, p.excerpt,
-    p.content_kind, p.created_at, p.published_at, p.cover_image_url
+    p.content_kind, p.created_at, p.published_at, p.cover_image_url, p.word_count
   from public.posts as p
   where p.author_id = $1::uuid
     and p.status = 'published'
@@ -150,7 +152,7 @@ const PUBLICATION_BRANCHES_SQL = `
  * connection, which is why the repository only runs it for the owner.
  */
 const OWNER_DRAFTS_SQL = `
-  select p.id, p.title, p.content_kind, p.updated_at
+  select p.id, p.title, p.content_kind, p.updated_at, p.excerpt
   from public.posts as p
   where p.author_id = $1::uuid
     and p.status = 'draft'
@@ -173,6 +175,7 @@ function toPublicationRow(row: Record<string, unknown>): ProfilePublicationRow {
     author_id: String(row.author_id),
     title: (row.title as string | null) ?? null,
     slug: String(row.slug),
+    word_count: row.word_count == null ? null : toNumber(row.word_count),
     excerpt: (row.excerpt as string | null) ?? null,
     content_kind: (row.content_kind as string | null) ?? null,
     created_at: toIso(row.created_at) ?? "",
@@ -239,6 +242,7 @@ export function createPostgresProfilePageRepository(
         title: (row.title as string | null) ?? null,
         content_kind: (row.content_kind as string | null) ?? null,
         updated_at: toIso(row.updated_at) ?? "",
+        excerpt: (row.excerpt as string | null) ?? null,
       }));
     },
   };
@@ -247,8 +251,8 @@ export function createPostgresProfilePageRepository(
 // ── Supabase ─────────────────────────────────────────────────────────
 
 const PUBLICATION_SELECT =
-  "id, author_id, title, slug, excerpt, content_kind, created_at, published_at, cover_image_url";
-const DRAFT_SELECT = "id, title, content_kind, updated_at";
+  "id, author_id, title, slug, excerpt, content_kind, created_at, published_at, cover_image_url, word_count";
+const DRAFT_SELECT = "id, title, content_kind, updated_at, excerpt";
 
 /** A database error is an error, not an empty list. */
 function rows<T>(result: { data?: unknown; error?: unknown }, label: string): T[] {

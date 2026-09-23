@@ -662,3 +662,26 @@ font-family: var(--font-inter), system-ui, sans-serif;
 .broadcast-composer-body p.is-editor-empty:first-child::before {
   color: #9aa0a6;
 }
+
+/* Shared shell sizes: one rail and header for every normal application route. */
+:root { --app-rail-width: 0px; }
+.app-shell-with-rail { padding: 28px 20px 128px; }
+.app-side-rail { display: none; }
+.app-rail-write-label { display: none; }
+[data-app-primary-nav], [data-app-bottom-nav], .app-side-rail { font-family: var(--font-public-sans), system-ui, sans-serif; }
+@media (min-width: 768px) {
+  :root { --app-rail-width: 56px; }
+  .app-shell-with-rail { margin-left: var(--app-rail-width); padding: 28px 20px 64px; }
+  .app-side-rail { display: block; position: fixed; left: 0; top: var(--app-nav-offset); bottom: 0; width: var(--app-rail-width); padding: 24px 8px; overflow-y: auto; border-right: 1px solid #E4DFD4; background: #FAF8F5; z-index: 30; }
+  .app-side-rail a, .app-side-rail button { position: relative; min-height: 44px; justify-content: center; padding-left: 8px; padding-right: 8px; }
+  .app-rail-label { display: none; }
+  .app-rail-write-label { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .rail-link-current::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 16px; width: 3px; border-radius: 2px; background: #073929; }
+}
+@media (min-width: 1025px) {
+  :root { --app-rail-width: 176px; }
+  .app-side-rail { padding: 24px 12px; }
+  .app-side-rail a, .app-side-rail button { justify-content: flex-start; }
+  .app-rail-label { display: inline; }
+  .app-rail-write-label { display: none; }
+}

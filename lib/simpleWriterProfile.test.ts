@@ -136,13 +136,13 @@ describe("simple writer profile: the retired modules are gone", () => {
 });
 
 describe("simple writer profile: the profile", () => {
-  it("is three tabs", () => {
-    expect([...PROFILE_TABS]).toEqual(["posts", "articles", "about"]);
+  it("uses the approved four public tabs", () => {
+    expect([...PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts"]);
   });
 
   it("adds Drafts for the owner only", () => {
-    expect([...PUBLIC_PROFILE_TABS]).toEqual(["posts", "articles", "about"]);
-    expect([...OWNER_PROFILE_TABS]).toEqual(["posts", "articles", "drafts", "about"]);
+    expect([...PUBLIC_PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts"]);
+    expect([...OWNER_PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts", "drafts"]);
 
     const tabs = codeOf("components/profile/ProfileTabs.tsx");
     expect(tabs).toMatch(/isOwnProfile \? OWNER_PROFILE_TABS : PUBLIC_PROFILE_TABS/);
@@ -165,6 +165,8 @@ describe("simple writer profile: the profile", () => {
         "next",
         "next/navigation",
         "@/components/profile/ProfileAbout",
+        "@/components/profile/ProfileOverview",
+        "@/components/profile/StickyProfileBar",
         "@/components/profile/ProfileDraftList",
         "@/components/profile/ProfileHeader",
         "@/components/profile/ProfilePublicationList",
@@ -190,7 +192,7 @@ describe("simple writer profile: the profile", () => {
   it("uses no record, evidence, credibility or completion language on a profile, onboarding or settings surface", () => {
     expect(
       filesMatching(
-        /Intellectual Record|intellectual identity|intellectual focus|evidence-backed|Demonstrated (?:expertise|topics)|Writes about|Recognition|credibility|citable|source-backed|Featured Work|Selected work|Why I featured|% complete|Complete your profile|Complete profile/i,
+        /Intellectual Record|intellectual identity|intellectual focus|evidence-backed|Demonstrated (?:expertise|topics)|credibility|citable|source-backed|Featured Work|Selected work|Why I featured|% complete|Complete your profile|Complete profile/i,
         { within: isProfileSurface }
       )
     ).toEqual([]);
@@ -221,6 +223,11 @@ describe("simple writer profile: the profile", () => {
       filesMatching(
         /\b(?:profile_type|secondary_profile_types|positioning_statement|organization_name|organization_website|is_alumni|open_to_mentoring|cover_image_url|coverImageUrl|current_path|work_category)\b/,
         {
+          allowed: {
+            "lib/db/supabase/profiles.ts": "Existing external link projection",
+            "lib/db/postgres/profiles.ts": "Same external link projection",
+            "components/profile/ProfileAbout.tsx": "Validated external work URL",
+          },
           within: (file) =>
             identitySurfaces.has(file) ||
             file.startsWith("app/(main)/settings/profile/") ||

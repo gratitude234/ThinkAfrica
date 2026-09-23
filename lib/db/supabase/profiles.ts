@@ -20,7 +20,7 @@ import type {
  * from it, and added `created_at` for the joined date on About.
  */
 export const PROFILE_IDENTITY_SELECT =
-  "id, username, full_name, bio, avatar_url, professional_title, country, university, field_of_study, graduation_year, interests, verified, verified_type, created_at";
+  "id, username, full_name, bio, avatar_url, professional_title, country, university, field_of_study, graduation_year, interests, organization_website, verified, verified_type, created_at";
 
 export const supabaseProfilesRepository: ProfilesRepository = {
   // Unused, for the same reason as posts.findBySlug: RLS is applied by the

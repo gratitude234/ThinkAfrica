@@ -1,5 +1,8 @@
+import "@/components/profile/profile.css";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import ProfileOverview from "@/components/profile/ProfileOverview";
+import StickyProfileBar from "@/components/profile/StickyProfileBar";
 import ProfileAbout from "@/components/profile/ProfileAbout";
 import ProfileDraftList from "@/components/profile/ProfileDraftList";
 import ProfileHeader from "@/components/profile/ProfileHeader";
@@ -101,6 +104,7 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
           bio: profile.bio,
           avatar_url: profile.avatar_url,
           professional_title: profile.professional_title,
+          verified: profile.verified,
         }}
         followerCount={viewer.followerCount}
         followingCount={viewer.followingCount}
@@ -110,16 +114,22 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
         initialBlocked={viewer.isBlocked}
       />
 
+      <StickyProfileBar username={profile.username} name={getProfileDisplayName(profile)}
+        profileId={profile.id} currentUserId={viewer.viewerId} initialFollowing={viewer.isFollowing}
+        isBlocked={viewer.isBlocked} active={tab} />
+
       <ProfileTabs
         username={profile.username}
         active={tab}
         isOwnProfile={viewer.isOwnProfile}
       />
 
-      <div className="mt-6">
+      <div id="profile-panel" role="tabpanel" aria-labelledby={`main-tab-${tab}`} tabIndex={0} className="profile-panel focus-ring">
         {tab === "drafts" && drafts ? (
           <ProfileDraftList initialDrafts={drafts} />
-        ) : publications && tab !== "about" && tab !== "drafts" ? (
+        ) : tab === "overview" ? (
+          <ProfileOverview data={data} />
+        ) : publications && (tab === "articles" || tab === "posts") ? (
           <ProfilePublicationList
             username={profile.username}
             profileId={profile.id}

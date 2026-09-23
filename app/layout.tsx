@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Bodoni_Moda } from "next/font/google";
+import { Inter, Bodoni_Moda, Newsreader, Public_Sans } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
@@ -17,6 +17,9 @@ const bodoniModa = Bodoni_Moda({
   variable: "--font-bodoni",
   display: "swap",
 });
+
+const newsreader = Newsreader({ subsets: ["latin"], variable: "--font-newsreader", display: "swap" });
+const publicSans = Public_Sans({ subsets: ["latin"], variable: "--font-public-sans", display: "swap" });
 
 const inter = Inter({
   subsets: ["latin"],
@@ -88,7 +91,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${bodoniModa.variable} ${inter.variable}`}>
+    <html lang="en" className={`${bodoniModa.variable} ${inter.variable} ${newsreader.variable} ${publicSans.variable}`}>
       <body className="font-sans">
         <GuestAuthGateProvider>
           {children}

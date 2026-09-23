@@ -71,6 +71,7 @@ describe("ownerDrafts, PostgreSQL", () => {
       {
         id: "draft-1",
         title: null,
+        excerpt: null,
         content_kind: "article",
         updated_at: new Date("2026-02-01T00:00:00Z"),
       },
@@ -86,6 +87,7 @@ describe("ownerDrafts, PostgreSQL", () => {
       {
         id: "draft-1",
         title: null,
+        excerpt: null,
         content_kind: "article",
         updated_at: "2026-02-01T00:00:00.000Z",
       },

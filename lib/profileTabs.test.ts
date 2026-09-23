@@ -10,9 +10,9 @@ import {
 } from "./profileTabs";
 
 describe("the profile tabs", () => {
-  it("are Posts, Articles and About, opening on Posts", () => {
-    expect([...PROFILE_TABS]).toEqual(["posts", "articles", "about"]);
-    expect(DEFAULT_PROFILE_TAB).toBe("posts");
+  it("are Overview, About, Articles and Posts, opening on Overview", () => {
+    expect([...PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts"]);
+    expect(DEFAULT_PROFILE_TAB).toBe("overview");
   });
 
   it("open the tab a query names", () => {
@@ -22,26 +22,26 @@ describe("the profile tabs", () => {
   });
 
   it("open the default tab for every retired view", () => {
-    for (const view of ["overview", "research", "responses", "record", "featured", "brief"]) {
-      expect(resolveProfileTab({ view })).toBe("posts");
+    for (const view of ["research", "responses", "record", "featured", "brief"]) {
+      expect(resolveProfileTab({ view })).toBe("overview");
     }
-    expect(resolveProfileTab({})).toBe("posts");
+    expect(resolveProfileTab({})).toBe("overview");
   });
 
   it("honour an old record link's type after its redirect", () => {
     expect(resolveProfileTab({ type: "posts" })).toBe("posts");
     expect(resolveProfileTab({ type: "articles" })).toBe("articles");
-    expect(resolveProfileTab({ type: "publications" })).toBe("posts");
-    expect(resolveProfileTab({ type: "research" })).toBe("posts");
+    expect(resolveProfileTab({ type: "publications" })).toBe("overview");
+    expect(resolveProfileTab({ type: "research" })).toBe("overview");
     // A real view wins over a legacy type.
     expect(resolveProfileTab({ view: "about", type: "articles" })).toBe("about");
   });
 
   it("build plain addresses, with no query on the default tab", () => {
-    expect(profileTabHref("ada", "posts")).toBe("/ada");
+    expect(profileTabHref("ada", "overview")).toBe("/ada");
     expect(profileTabHref("ada", "articles")).toBe("/ada?view=articles");
     expect(profileTabHref("ada", "about")).toBe("/ada?view=about");
-    expect(profileTabHref("ada", "posts", 2)).toBe("/ada?page=2");
+    expect(profileTabHref("ada", "posts", 2)).toBe("/ada?view=posts&page=2");
     expect(profileTabHref("ada", "articles", 3)).toBe("/ada?view=articles&page=3");
   });
 

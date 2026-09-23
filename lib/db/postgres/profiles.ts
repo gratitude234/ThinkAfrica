@@ -51,6 +51,7 @@ export const PROFILE_BY_USERNAME_SQL = `
     p.field_of_study,
     p.graduation_year,
     to_jsonb(p.interests) as interests,
+    p.organization_website,
     p.verified,
     p.verified_type,
     to_jsonb(p.created_at) #>> '{}' as created_at
@@ -65,6 +66,7 @@ export function toProfileIdentityRecord(
 ): ProfileIdentityRecord {
   return {
     id: String(row.id),
+    organization_website: (row.organization_website as string | null) ?? null,
     username: String(row.username),
     full_name: (row.full_name as string | null) ?? null,
     bio: (row.bio as string | null) ?? null,
