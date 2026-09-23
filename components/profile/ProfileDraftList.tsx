@@ -11,24 +11,29 @@ export default function ProfileDraftList({ initialDrafts }: { initialDrafts: Pro
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  function draftLabel(draft: ProfileDraft) {
+    return draft.kind === "article" ? draft.title?.trim() || "Untitled Article" : draft.excerpt || "Post draft";
+  }
+
   async function removeDraft(draft: ProfileDraft) {
-    if (!window.confirm(`Delete "${draft.title || "Untitled post"}"? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete "${draftLabel(draft)}"? This cannot be undone.`)) return;
 
     setDeletingId(draft.id);
     setError(null);
-    const result = await deleteOwnDraftPosts({ postIds: [draft.id] });
-    setDeletingId(null);
-
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await deleteOwnDraftPosts({ postIds: [draft.id] });
+      if (!result.ok) { setError(result.error); return; }
+      setDrafts(current => current.filter(item => !result.data.deleted.includes(item.id)));
+    } catch {
+      setError("Could not delete the draft. Please try again.");
+    } finally {
+      setDeletingId(null);
     }
-    setDrafts((current) => current.filter((item) => !result.data.deleted.includes(item.id)));
   }
 
   if (drafts.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-10 text-center">
+      <div className="profile-empty">
         <p className="text-sm text-ink-muted">No drafts yet.</p>
         <Link href="/write" className="focus-ring mt-3 inline-block text-sm font-semibold text-emerald-ink">Start writing</Link>
       </div>
@@ -38,11 +43,11 @@ export default function ProfileDraftList({ initialDrafts }: { initialDrafts: Pro
   return (
     <section aria-label="Drafts">
       {error ? <p role="alert" className="mb-3 text-sm text-red-600">{error}</p> : null}
-      <ul className="divide-y divide-card-border rounded-xl border border-card-border bg-card">
+      <ul className="divide-y divide-card-border">
         {drafts.map((draft) => (
-          <li key={draft.id} className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap">
+          <li key={draft.id} className="flex flex-wrap items-center gap-3 py-4 sm:flex-nowrap">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-ink">{draft.title || "Untitled post"}</p>
+              <p className="truncate text-sm font-semibold text-ink">{draftLabel(draft)}</p>
               <p className="mt-1 text-xs text-ink-muted">
                 {draft.kind === "article" ? "Article" : "Post"} · Updated {formatDate(draft.updatedAt)}
               </p>
@@ -52,7 +57,7 @@ export default function ProfileDraftList({ initialDrafts }: { initialDrafts: Pro
               <button
                 type="button"
                 onClick={() => void removeDraft(draft)}
-                disabled={deletingId === draft.id}
+                disabled={deletingId !== null}
                 className="focus-ring inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
               >
                 {deletingId === draft.id ? "Deleting…" : "Delete"}

@@ -51,7 +51,7 @@ export default function NavClient({
       className="sticky top-0 z-50 transition-transform duration-200 ease-out motion-reduce:transition-none"
     >
       <nav
-        className={`h-[60px] border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
+        className={`h-[52px] md:h-16 border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
           hasScrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
         }`}
         aria-label="Application header"

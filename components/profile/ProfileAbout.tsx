@@ -1,132 +1,54 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { getProfileHeadline } from "@/lib/profileIdentity";
-import { formatInterestLabel } from "@/lib/profileTopics";
 import type { ProfileIdentityRecord } from "@/lib/profileViewData";
-import { getExactCanonicalTag, normalizeTagValue } from "@/lib/tags";
+import { getProfileHeadline } from "@/lib/profileIdentity";
+import AboutSectionIndex from "./AboutSectionIndex";
+import { joinedLabel, WriterTopics } from "./ProfileFacts";
 
-function text(value: string | null | undefined) {
-  return value?.trim() || null;
+/** Accept only explicit public web URLs; no credentials or executable schemes. */
+export function safeExternalProfileUrl(value: string | null | undefined) {
+  if (!value?.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
 }
 
-/**
- * An interest links out only when it names a real platform topic. Interests
- * include free text from older signups, and a topic page for a word nobody has
- * tagged would be empty.
- */
-function interestTopicHref(interest: string) {
-  const canonical = getExactCanonicalTag(interest);
-  if (!canonical) return null;
-  return `/topics/${encodeURIComponent(normalizeTagValue(canonical))}`;
-}
-
-function joinedLabel(createdAt: string) {
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat("en", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="grid gap-1 py-4 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-6">
-      <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">
-        {label}
-      </dt>
-      <dd className="min-w-0 text-[15px] leading-relaxed text-ink-soft">{children}</dd>
-    </div>
-  );
-}
-
-/**
- * What a writer says about themselves: bio, headline, location, education,
- * interests, and when they joined. Nothing else, and nothing here is scored,
- * counted or presented as a credential. Education is an ordinary fact a
- * member may add, shown only when they did.
- */
-export default function ProfileAbout({
-  profile,
-  isOwnProfile,
-}: {
-  profile: ProfileIdentityRecord;
-  isOwnProfile: boolean;
-}) {
-  const bio = text(profile.bio);
+export default function ProfileAbout({ profile, isOwnProfile }: { profile: ProfileIdentityRecord; isOwnProfile: boolean }) {
+  const bio = profile.bio?.trim();
   const headline = getProfileHeadline(profile);
-  const location = text(profile.country);
-  const field = text(profile.field_of_study);
-  const university = text(profile.university);
-  const graduationYear = profile.graduation_year;
-  const hasEducation = Boolean(field || university || graduationYear);
-  const interests = [
-    ...new Map(
-      (profile.interests ?? [])
-        .map((interest) => interest.trim())
-        .filter(Boolean)
-        .map((interest) => [interest.toLowerCase(), interest])
-    ).values(),
-  ];
+  const education = Boolean(profile.field_of_study?.trim() || profile.university?.trim() || profile.graduation_year);
+  const external = safeExternalProfileUrl(profile.organization_website);
   const joined = joinedLabel(profile.created_at);
-
-  return (
-    <section aria-labelledby="profile-about-title">
-      <div className="flex items-center justify-between gap-4">
-        <h2 id="profile-about-title" className="sr-only">
-          About
-        </h2>
-        {isOwnProfile ? (
-          <Link
-            href="/settings/profile"
-            className="tap-target focus-ring ml-auto text-sm font-semibold text-emerald-ink"
-          >
-            Edit profile
-          </Link>
-        ) : null}
-      </div>
-
-      <dl className="divide-y divide-card-border">
-        {bio ? (
-          <Row label="Bio">
-            <p className="whitespace-pre-line">{bio}</p>
-          </Row>
-        ) : null}
-        {headline ? <Row label="Headline">{headline}</Row> : null}
-        {location ? <Row label="Location">{location}</Row> : null}
-        {hasEducation ? (
-          <Row label="Education">
-            {field ? <p className="text-ink">{field}</p> : null}
-            {university ? <p>{university}</p> : null}
-            {graduationYear ? <p className="text-sm text-ink-muted">{graduationYear}</p> : null}
-          </Row>
-        ) : null}
-        {interests.length > 0 ? (
-          <Row label="Interests">
-            <ul className="flex flex-wrap gap-2">
-              {interests.map((interest) => {
-                const href = interestTopicHref(interest);
-                const label = formatInterestLabel(interest);
-                const chip =
-                  "inline-flex items-center rounded-full border border-card-border bg-canvas px-3 py-1.5 text-xs font-medium text-ink-soft";
-                return (
-                  <li key={interest}>
-                    {href ? (
-                      <Link href={href} className={`tap-target focus-ring hover:text-ink ${chip}`}>
-                        {label}
-                      </Link>
-                    ) : (
-                      <span className={chip}>{label}</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </Row>
-        ) : null}
-        {joined ? <Row label="Joined">{joined}</Row> : null}
-      </dl>
-    </section>
-  );
+  const interests = profile.interests?.some(value => value.trim());
+  const sections = [
+    ...(bio || headline ? [{ id: "about-profile", label: "Profile" }] : []),
+    ...(education ? [{ id: "about-education", label: "Education" }] : []),
+    ...(external ? [{ id: "about-links", label: "Links & external work" }] : []),
+  ];
+  return <section aria-label="About" className="profile-about">
+    <AboutSectionIndex sections={sections} />
+    <div className="profile-about-content">
+      {bio || headline ? <section id="about-profile" tabIndex={-1} className="profile-about-section">
+        <h2 className="profile-section-title">Profile</h2>
+        {bio ? <p className="whitespace-pre-line">{bio}</p> : <p>{headline}</p>}
+      </section> : null}
+      {education ? <section id="about-education" tabIndex={-1} className="profile-about-section">
+        <h2 className="profile-section-title">Education</h2>
+        {profile.field_of_study?.trim() ? <h3>{profile.field_of_study}</h3> : null}
+        {profile.university?.trim() ? <p>{profile.university}</p> : null}
+        {profile.graduation_year ? <p className="profile-about-date">{profile.graduation_year}</p> : null}
+      </section> : null}
+      {external ? <section id="about-links" tabIndex={-1} className="profile-about-section">
+        <h2 className="profile-section-title">Links & external work</h2>
+        <a href={external} target="_blank" rel="noopener noreferrer" className="focus-ring profile-external-link">
+          <span>{new URL(external).hostname}</span><span className="profile-external-label">EXTERNAL</span>
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      </section> : null}
+      {interests ? <section className="profile-about-section"><h2 className="profile-section-title">Interests</h2><WriterTopics interests={profile.interests} /></section> : null}
+      {joined ? <section className="profile-about-section"><h2 className="profile-section-title">Joined</h2><p>{joined}</p></section> : null}
+      {!sections.length && !interests && !joined ? <p className="profile-empty">No profile details yet.</p> : null}
+      {isOwnProfile ? <Link href="/settings/profile" className="focus-ring profile-about-edit">Edit profile</Link> : null}
+    </div>
+  </section>;
 }

@@ -50,10 +50,10 @@ function makeClient({ routes = {} }: { routes?: Routes } = {}) {
   const rpcNames: string[] = [];
   /** Every table call with its equality filters, so a test can tell a drafts
    *  query from a publications query on the same table. */
-  const queries: Array<{ table: string; eq: Array<[string, unknown]> }> = [];
+  const queries: Array<{ table: string; eq: Array<[string, unknown]>; ranges: number[][]; kinds: string[][] }> = [];
 
   const chainFor = (table: string) => {
-    const query = { table, eq: [] as Array<[string, unknown]> };
+    const query = { table, eq: [] as Array<[string, unknown]>, ranges: [] as number[][], kinds: [] as string[][] };
     queries.push(query);
     const resolve = () => {
       const route = routes[table] ?? { data: null, error: null };
@@ -68,6 +68,8 @@ function makeClient({ routes = {} }: { routes?: Routes } = {}) {
     for (const method of ["select", "neq", "in", "or", "not", "order", "limit", "range"]) {
       chain[method] = () => chain;
     }
+    chain.range = (start: number, end: number) => { query.ranges.push([start, end]); return chain; };
+    chain.in = (_column: string, values: string[]) => { query.kinds.push(values); return chain; };
     chain.eq = (column: string, value: unknown) => {
       query.eq.push([column, value]);
       return chain;
@@ -345,7 +347,7 @@ describe("what a profile view reads", () => {
 
   it("is three table reads and no RPC for a signed-out reader on Posts", async () => {
     const { client, tables, rpcNames } = viewWith(null);
-    await loadProfileView({ supabase: client, username: "student1" });
+    await loadProfileView({ supabase: client, username: "student1", tab: "posts" });
     expect([...tables].sort()).toEqual(["follows", "follows", "posts"]);
     expect(rpcNames).toEqual([]);
   });
@@ -358,7 +360,7 @@ describe("what a profile view reads", () => {
 
   it("adds the viewer's follow and block state for a signed-in visitor", async () => {
     const { client, tables } = viewWith({ id: "reader-1" });
-    await loadProfileView({ supabase: client, username: "student1" });
+    await loadProfileView({ supabase: client, username: "student1", tab: "posts" });
     expect([...tables].sort()).toEqual([
       "follows",
       "follows",
@@ -377,7 +379,7 @@ describe("what a profile view reads", () => {
   });
 
   it("reads no co-author credits for any tab", async () => {
-    for (const tab of ["posts", "articles", "about"] as const) {
+    for (const tab of ["overview", "posts", "articles", "about"] as const) {
       const { client, tables } = viewWith({ id: "reader-1" });
       await loadProfileView({ supabase: client, username: "student1", tab });
       expect(tables).not.toContain("post_authors");
@@ -434,8 +436,8 @@ describe("the owner's Drafts tab", () => {
     expect(data?.tab).toBe("drafts");
     expect(data?.publications).toBeNull();
     expect(data?.drafts).toEqual([
-      { id: "draft-2", title: "Second thoughts", kind: "article", updatedAt: "2026-02-02T00:00:00Z" },
-      { id: "draft-1", title: null, kind: "post", updatedAt: "2026-02-01T00:00:00Z" },
+      { id: "draft-2", title: "Second thoughts", kind: "article", updatedAt: "2026-02-02T00:00:00Z", excerpt: null },
+      { id: "draft-1", title: null, kind: "post", updatedAt: "2026-02-01T00:00:00Z", excerpt: null },
     ]);
     expect([...tables].sort()).toEqual(["follows", "follows", "posts"]);
 
@@ -444,27 +446,27 @@ describe("the owner's Drafts tab", () => {
     expect(drafts[0]?.eq).toContainEqual(["author_id", "author-1"]);
   });
 
-  it("gives a signed-in visitor forcing Drafts the Posts tab, and never asks for drafts", async () => {
+  it("gives a signed-in visitor forcing Drafts the Overview tab, and never asks for drafts", async () => {
     const { client, queries } = viewWith({ id: "reader-1" });
     const data = await loadProfileView({ supabase: client, username: "student1", tab: "drafts" });
 
-    expect(data?.tab).toBe("posts");
+    expect(data?.tab).toBe("overview");
     expect(data?.drafts).toBeNull();
-    expect(data?.publications?.kind).toBe("post");
+    expect(data?.overview?.posts.kind).toBe("post");
     expect(draftQueries(queries)).toEqual([]);
   });
 
-  it("gives a signed-out reader forcing Drafts the Posts tab, and never asks for drafts", async () => {
+  it("gives a signed-out reader forcing Drafts the Overview tab, and never asks for drafts", async () => {
     const { client, queries } = viewWith(null);
     const data = await loadProfileView({ supabase: client, username: "student1", tab: "drafts" });
 
-    expect(data?.tab).toBe("posts");
+    expect(data?.tab).toBe("overview");
     expect(data?.drafts).toBeNull();
     expect(draftQueries(queries)).toEqual([]);
   });
 
   it("does not load drafts on any other tab, even for the owner", async () => {
-    for (const tab of ["posts", "articles", "about"] as const) {
+    for (const tab of ["overview", "posts", "articles", "about"] as const) {
       const { client, queries } = viewWith({ id: "author-1" });
       const data = await loadProfileView({ supabase: client, username: "student1", tab });
       expect(data?.drafts).toBeNull();
@@ -488,5 +490,30 @@ describe("the owner's Drafts tab", () => {
     await expect(
       loadProfileDrafts({ supabase: client, profileId: "author-1", viewerId: "author-1" })
     ).rejects.toThrow(/drafts failed/);
+  });
+});
+
+
+describe("Overview bounded public reads", () => {
+  it("loads two items of each canonical kind, with one lookahead and no draft query", async () => {
+    findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
+    const { client, queries } = makeClient({ routes: {
+      follows: { count: 2, data: null },
+      posts: { data: [row({ id: "one" }), row({ id: "two" }), row({ id: "three" })] },
+    } });
+    const data = await loadProfileView({ supabase: client, username: "student1" });
+    expect(data?.tab).toBe("overview");
+    expect(data?.drafts).toBeNull();
+    expect(data?.publications).toBeNull();
+    expect(data?.overview?.articles.items).toHaveLength(2);
+    expect(data?.overview?.posts.items).toHaveLength(2);
+    const reads = queries.filter(query => query.table === "posts");
+    expect(reads).toHaveLength(2);
+    expect(reads.map(query => query.kinds)).toEqual([[["article"]], [["post"]]]);
+    for (const read of reads) {
+      expect(read.eq).toContainEqual(["status", "published"]);
+      expect(read.eq).toContainEqual(["author_id", "author-1"]);
+      expect(read.ranges).toEqual([[0, 2]]);
+    }
   });
 });

@@ -1,0 +1,2229 @@
+diff --git a/app/(main)/AppShell.test.tsx b/app/(main)/AppShell.test.tsx
+index afef082..61f2270 100644
+--- a/app/(main)/AppShell.test.tsx
++++ b/app/(main)/AppShell.test.tsx
+@@ -58,7 +58,7 @@ describe("AppShell", () => {
+         "Notifications",
+         "Profile",
+       ]);
+-      expect(main?.className).toMatch(/\bmd:grid\b/);
++      expect(main).toHaveClass("app-shell-with-rail");
+     }
+   );
+ 
+@@ -72,12 +72,10 @@ describe("AppShell", () => {
+   // jsdom has no layout engine, so the responsive geometry is a class contract.
+   // The rail is the desktop primary navigation from md, where the bottom bar
+   // hands off, and it widens to its full column at xl.
+-  it("widens the container and becomes a grid only on rail routes", () => {
++  it("uses the shared fixed-rail shell on rail routes", () => {
+     const { main } = renderShell("/");
+-    expect(main?.className).toMatch(/\bmd:grid\b/);
+-    expect(main?.className).toMatch(/md:max-w-\[1480px\]/);
+-    expect(main?.className).toMatch(/md:grid-cols-\[160px_minmax\(0,1fr\)\]/);
+-    expect(main?.className).toMatch(/xl:grid-cols-\[184px_minmax\(0,1fr\)\]/);
++    expect(main).toHaveClass("app-shell-with-rail");
++
+   });
+ 
+   it("leaves suppressed routes at the original container width", () => {
+diff --git a/app/(main)/AppShell.tsx b/app/(main)/AppShell.tsx
+index 7684074..f1cc102 100644
+--- a/app/(main)/AppShell.tsx
++++ b/app/(main)/AppShell.tsx
+@@ -16,10 +16,8 @@ interface AppShellProps {
+ const MAIN_BASE =
+   "mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-6 md:pb-16 lg:px-8";
+ 
+-// The container only widens on rail routes. A suppressed route -- /about and
+-// the writing focus modes -- stays at 1240px and is pixel-identical to before
+-// the rail existed, which is what keeps its full-bleed layout intact.
+-const MAIN_WITH_RAIL = `${MAIN_BASE} md:grid md:max-w-[1480px] md:grid-cols-[160px_minmax(0,1fr)] md:items-start md:gap-5 xl:grid-cols-[184px_minmax(0,1fr)] xl:gap-7`;
++// Normal routes share a fixed responsive rail; focus routes keep their layout.
++const MAIN_WITH_RAIL = "app-shell-with-rail";
+ 
+ /**
+  * Client shell around the (main) content column.
+diff --git a/app/(main)/NavClient.tsx b/app/(main)/NavClient.tsx
+index 71abe35..7077dcc 100644
+--- a/app/(main)/NavClient.tsx
++++ b/app/(main)/NavClient.tsx
+@@ -51,7 +51,7 @@ export default function NavClient({
+       className="sticky top-0 z-50 transition-transform duration-200 ease-out motion-reduce:transition-none"
+     >
+       <nav
+-        className={`h-[60px] border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
++        className={`h-[52px] md:h-16 border-b border-gray-200 bg-white transition-shadow duration-300 motion-reduce:transition-none ${
+           hasScrolled ? "shadow-[0_1px_12px_rgb(0,0,0,0.08)]" : ""
+         }`}
+         aria-label="Application header"
+diff --git a/app/(main)/SideRail.test.tsx b/app/(main)/SideRail.test.tsx
+index 447e852..d6f4dc2 100644
+--- a/app/(main)/SideRail.test.tsx
++++ b/app/(main)/SideRail.test.tsx
+@@ -127,7 +127,7 @@ describe("SideRail", () => {
+     // utility classes, as elsewhere in this suite.
+     const { container } = renderRail();
+     const rail = container.querySelector("aside");
+-    expect(rail).toHaveClass("hidden", "md:block");
++    expect(rail).toHaveClass("app-side-rail");
+   });
+ 
+   // Every sticky aside in the app pins at the nav's live offset + 1rem, so
+@@ -135,7 +135,7 @@ describe("SideRail", () => {
+   it("pins at the shared sticky offset", () => {
+     const { container } = renderRail();
+     const rail = container.querySelector("aside");
+-    expect(rail).toHaveClass("md:top-[var(--app-sticky-offset)]");
++    expect(rail).toHaveClass("app-side-rail");
+     expect(rail?.className).not.toMatch(/transition-\[top\]/);
+   });
+ 
+@@ -144,7 +144,7 @@ describe("SideRail", () => {
+   it("lets a wheel gesture chain from the rail into the page", () => {
+     const { container } = renderRail();
+     const rail = container.querySelector("aside");
+-    expect(rail).toHaveClass("md:overflow-y-auto");
++    expect(rail).toHaveClass("app-side-rail");
+     expect(rail?.className).not.toMatch(/overscroll/);
+   });
+ });
+diff --git a/app/(main)/SideRail.tsx b/app/(main)/SideRail.tsx
+index ca8e331..048b248 100644
+--- a/app/(main)/SideRail.tsx
++++ b/app/(main)/SideRail.tsx
+@@ -29,7 +29,7 @@ interface SideRailProps {
+ function railLinkClass(isCurrent: boolean) {
+   return `group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-[14.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 ${
+     isCurrent
+-      ? "border-emerald-100 bg-emerald-50 font-semibold text-emerald-950"
++      ? "border-transparent font-semibold text-emerald-brand rail-link-current"
+       : "border-transparent font-medium text-ink-muted hover:border-gray-200 hover:bg-white hover:text-ink"
+   }`;
+ }
+@@ -53,10 +53,12 @@ function RailLink({
+     <Link
+       href={href}
+       className={railLinkClass(isCurrent)}
++      aria-label={label}
++      title={label}
+       aria-current={isCurrent ? "page" : undefined}
+     >
+       <Icon className={ICON_CLASS} filled={fillWhenActive && isCurrent} />
+-      <span className="truncate">{label}</span>
++      <span className="app-rail-label truncate">{label}</span>
+     </Link>
+   );
+ }
+@@ -69,19 +71,8 @@ export default function SideRail({
+ 
+   return (
+     <aside
+-      // Sticky under the top nav and independently scrollable, so a short
+-      // viewport can still reach every destination. The +1rem offset is shared
+-      // with every other sticky aside in the app (home sidebar, explore, admin)
+-      // so columns in the same viewport pin in line -- and it tracks
+-      // --app-nav-offset rather than the measured height so the rail rises with
+-      // the nav when it retreats. max-h stays on the measured height: it is a
+-      // ceiling, not a size.
+-      //
+-      // Deliberately not overscroll-contain. A nav rail beside a feed is not a
+-      // surface you would lose your place behind, and containment made the page
+-      // stop dead under the pointer on short windows. Chaining keeps one gesture
+-      // meaning one thing wherever it lands.
+-      className="hidden md:sticky md:top-[var(--app-sticky-offset)] md:block md:max-h-[calc(100dvh-var(--app-nav-height)-2rem)] md:self-start md:overflow-y-auto"
++      // Shared fixed rail: 56px icons on tablet, 176px labelled on desktop.
++      className="app-side-rail"
+     >
+       <nav aria-label="Sections" className="flex flex-col gap-0.5">
+         <RailLink
+@@ -100,11 +91,13 @@ export default function SideRail({
+         {/* Write sits in its place in the order but carries the primary
+             treatment: it is the one action, not another place to browse. */}
+         <CreateTrigger
++          aria-label="Write"
++          title="Write"
+           userId={userId}
+           className="my-1 flex min-h-11 w-full items-center gap-3 rounded-xl bg-emerald-brand px-3 py-2.5 text-[14.5px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0E4B37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+         >
+           <WriteIcon className={ICON_CLASS} />
+-          <span className="truncate">Write</span>
++          <span className="app-rail-label truncate">Write</span>
+         </CreateTrigger>
+         <RailLink
+           href={guestAwareHref(userId, "/notifications")}
+diff --git a/app/(main)/[username]/loading.tsx b/app/(main)/[username]/loading.tsx
+index dcd3f2e..7277ff5 100644
+--- a/app/(main)/[username]/loading.tsx
++++ b/app/(main)/[username]/loading.tsx
+@@ -1,3 +1,4 @@
++import "@/components/profile/profile.css";
+ import { PROFILE_SHELL } from "@/lib/profileLayout";
+ 
+ /**
+@@ -15,33 +16,33 @@ export default function Loading() {
+       <div className="pb-5">
+         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+           <div className="flex items-center gap-4">
+-            <div className="h-20 w-20 shrink-0 rounded-full bg-gray-200" />
++            <div className="h-[76px] w-[76px] shrink-0 rounded-full bg-[#E4DFD4]" />
+             <div className="space-y-2">
+-              <div className="h-8 w-52 max-w-full rounded bg-gray-200" />
+-              <div className="h-4 w-28 rounded bg-gray-100" />
++              <div className="h-8 w-52 max-w-full rounded bg-[#E4DFD4]" />
++              <div className="h-4 w-28 rounded bg-[#EDE8DD]" />
+             </div>
+           </div>
+           <div className="flex gap-2">
+-            <div className="h-11 w-28 rounded-lg bg-gray-200" />
+-            <div className="h-11 w-11 rounded-lg bg-gray-100" />
++            <div className="h-11 w-28 rounded-lg bg-[#E4DFD4]" />
++            <div className="h-11 w-11 rounded-lg bg-[#EDE8DD]" />
+           </div>
+         </div>
+-        <div className="mt-4 h-4 w-3/4 rounded bg-gray-100" />
+-        <div className="mt-3 h-4 w-40 rounded bg-gray-100" />
++        <div className="mt-4 h-4 w-3/4 rounded bg-[#EDE8DD]" />
++        <div className="mt-3 h-4 w-40 rounded bg-[#EDE8DD]" />
+       </div>
+ 
+-      <div className="flex gap-6 border-b border-card-border pb-3">
+-        {[0, 1, 2].map((tab) => (
+-          <div key={tab} className="h-5 w-16 rounded bg-gray-100" />
++      <div className="flex gap-6 overflow-hidden border-b border-card-border pb-3">
++        {[0, 1, 2, 3].map((tab) => (
++          <div key={tab} className="h-5 w-16 rounded bg-[#EDE8DD]" />
+         ))}
+       </div>
+ 
+       <div className="mt-6 divide-y divide-card-border">
+         {[0, 1, 2].map((row) => (
+           <div key={row} className="space-y-2 py-5">
+-            <div className="h-6 w-3/4 rounded bg-gray-200" />
+-            <div className="h-4 w-full rounded bg-gray-100" />
+-            <div className="h-3 w-24 rounded bg-gray-100" />
++            <div className="h-6 w-3/4 rounded bg-[#E4DFD4]" />
++            <div className="h-4 w-full rounded bg-[#EDE8DD]" />
++            <div className="h-3 w-24 rounded bg-[#EDE8DD]" />
+           </div>
+         ))}
+       </div>
+diff --git a/app/(main)/[username]/page.tsx b/app/(main)/[username]/page.tsx
+index da8e09e..e19a1b0 100644
+--- a/app/(main)/[username]/page.tsx
++++ b/app/(main)/[username]/page.tsx
+@@ -1,5 +1,8 @@
++import "@/components/profile/profile.css";
+ import type { Metadata } from "next";
+ import { notFound } from "next/navigation";
++import ProfileOverview from "@/components/profile/ProfileOverview";
++import StickyProfileBar from "@/components/profile/StickyProfileBar";
+ import ProfileAbout from "@/components/profile/ProfileAbout";
+ import ProfileDraftList from "@/components/profile/ProfileDraftList";
+ import ProfileHeader from "@/components/profile/ProfileHeader";
+@@ -101,6 +104,7 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
+           bio: profile.bio,
+           avatar_url: profile.avatar_url,
+           professional_title: profile.professional_title,
++          verified: profile.verified,
+         }}
+         followerCount={viewer.followerCount}
+         followingCount={viewer.followingCount}
+@@ -110,16 +114,22 @@ export default async function UserProfilePage({ params, searchParams }: PageProp
+         initialBlocked={viewer.isBlocked}
+       />
+ 
++      <StickyProfileBar username={profile.username} name={getProfileDisplayName(profile)}
++        profileId={profile.id} currentUserId={viewer.viewerId} initialFollowing={viewer.isFollowing}
++        isBlocked={viewer.isBlocked} active={tab} />
++
+       <ProfileTabs
+         username={profile.username}
+         active={tab}
+         isOwnProfile={viewer.isOwnProfile}
+       />
+ 
+-      <div className="mt-6">
++      <div id="profile-panel" role="tabpanel" aria-labelledby={`main-tab-${tab}`} tabIndex={0} className="profile-panel focus-ring">
+         {tab === "drafts" && drafts ? (
+           <ProfileDraftList initialDrafts={drafts} />
+-        ) : publications && tab !== "about" && tab !== "drafts" ? (
++        ) : tab === "overview" ? (
++          <ProfileOverview data={data} />
++        ) : publications && (tab === "articles" || tab === "posts") ? (
+           <ProfilePublicationList
+             username={profile.username}
+             profileId={profile.id}
+diff --git a/app/dev-preview/profile/PreviewFrame.tsx b/app/dev-preview/profile/PreviewFrame.tsx
+new file mode 100644
+index 0000000..8a9506e
+--- /dev/null
++++ b/app/dev-preview/profile/PreviewFrame.tsx
+@@ -0,0 +1,18 @@
++"use client";
++import { useRouter } from "next/navigation";
++import type { ReactNode } from "react";
++
++/** Routes only fixture tab links locally; never supplies credentials to mutations. */
++export default function PreviewFrame({ children }: { children: ReactNode }) {
++  const router = useRouter();
++  return <div onClickCapture={event => {
++    const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>("a");
++    if (!anchor) return;
++    const url = new URL(anchor.href);
++    if (url.pathname !== "/amara" && !url.pathname.startsWith("/averylong")) return;
++    event.preventDefault(); event.stopPropagation();
++    const current = new URL(window.location.href);
++    current.searchParams.set("view", url.searchParams.get("view") || "overview");
++    router.push(current.pathname + current.search, { scroll: false });
++  }}>{children}</div>;
++}
+diff --git a/app/dev-preview/profile/page.tsx b/app/dev-preview/profile/page.tsx
+new file mode 100644
+index 0000000..f625f62
+--- /dev/null
++++ b/app/dev-preview/profile/page.tsx
+@@ -0,0 +1,55 @@
++import { notFound } from "next/navigation";
++import { AppChromeProvider } from "@/app/(main)/AppChromeProvider";
++import NavigationShell from "@/app/(main)/NavigationShell";
++import AppShell from "@/app/(main)/AppShell";
++import ProfileHeader from "@/components/profile/ProfileHeader";
++import ProfileTabs from "@/components/profile/ProfileTabs";
++import StickyProfileBar from "@/components/profile/StickyProfileBar";
++import ProfileOverview from "@/components/profile/ProfileOverview";
++import ProfileAbout from "@/components/profile/ProfileAbout";
++import ProfilePublicationList from "@/components/profile/ProfilePublicationList";
++import ProfileDraftList from "@/components/profile/ProfileDraftList";
++import { PROFILE_FIXTURE, PROFILE_DRAFT_FIXTURES, profileFixturePage } from "@/lib/devFixtures/profileFixtures";
++import { resolveProfileTab } from "@/lib/profileTabs";
++import type { ProfileViewData } from "@/lib/profileViewData";
++import { PROFILE_SHELL } from "@/lib/profileLayout";
++import PreviewFrame from "./PreviewFrame";
++import "@/components/profile/profile.css";
++
++export const metadata = { title: "Writer profile preview (development only)", robots: { index: false, follow: false } };
++
++export default async function WriterProfilePreviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
++  if (process.env.NODE_ENV !== "development") notFound();
++  const query = await searchParams;
++  const own = query.owner === "1";
++  const empty = query.empty === "1";
++  const sparse = query.sparse === "1";
++  const profile = { ...PROFILE_FIXTURE,
++    ...(sparse ? { bio: "Writing about everyday life.", professional_title: null, university: null, field_of_study: null, graduation_year: null, country: null, interests: [], organization_website: null, verified: false } : {}),
++    ...(query.long === "1" ? { full_name: "Amara Chiamaka Okafor-Adetunji", username: "averylongwriterusernametocheckoverflow" } : {}),
++  };
++  const requested = resolveProfileTab(query);
++  const tab = requested === "drafts" && !own ? "overview" : requested;
++  const articles = profileFixturePage("article", empty);
++  const posts = profileFixturePage("post", empty);
++  const viewer = { viewerId: own ? profile.id : null, isOwnProfile: own, isFollowing: query.following === "1", isBlocked: false, followerCount: 128, followingCount: 42 };
++  const data: ProfileViewData = { profile, viewer, tab, overview: { articles, posts }, publications: null, drafts: own ? (empty ? [] : PROFILE_DRAFT_FIXTURES) : null };
++  return <AppChromeProvider>
++    <NavigationShell user={null} profile={null} isAdmin={false} />
++    <AppShell showGuestBanner={false} userId={null} username={null}>
++      <PreviewFrame><div className={PROFILE_SHELL}>
++        <ProfileHeader profile={profile} followerCount={128} followingCount={42} isOwnProfile={own}
++          currentUserId={viewer.viewerId} initialFollowing={viewer.isFollowing} />
++        <StickyProfileBar username={profile.username} name={profile.full_name || profile.username} profileId={profile.id}
++          currentUserId={viewer.viewerId} initialFollowing={viewer.isFollowing} isBlocked={false} active={tab} />
++        <ProfileTabs username={profile.username} active={tab} isOwnProfile={own} />
++        <div id="profile-panel" role="tabpanel" aria-labelledby={`main-tab-${tab}`} tabIndex={0} className="profile-panel">
++          {tab === "overview" ? <ProfileOverview data={data} /> : tab === "about" ? <ProfileAbout profile={profile} isOwnProfile={own} />
++            : tab === "drafts" && data.drafts ? <ProfileDraftList initialDrafts={data.drafts} />
++            : tab === "articles" || tab === "posts" ? <ProfilePublicationList username={profile.username} profileId={profile.id}
++              tab={tab} publications={tab === "articles" ? articles : posts} isOwnProfile={own} viewerState={own ? "owner" : "anonymous"} /> : null}
++        </div>
++      </div></PreviewFrame>
++    </AppShell>
++  </AppChromeProvider>;
++}
+diff --git a/app/globals.css b/app/globals.css
+index 87a095d..b0066e9 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -662,3 +662,26 @@ font-family: var(--font-inter), system-ui, sans-serif;
+ .broadcast-composer-body p.is-editor-empty:first-child::before {
+   color: #9aa0a6;
+ }
++
++/* Shared shell sizes: one rail and header for every normal application route. */
++:root { --app-rail-width: 0px; }
++.app-shell-with-rail { padding: 28px 20px 128px; }
++.app-side-rail { display: none; }
++.app-rail-write-label { display: none; }
++[data-app-primary-nav], [data-app-bottom-nav], .app-side-rail { font-family: var(--font-public-sans), system-ui, sans-serif; }
++@media (min-width: 768px) {
++  :root { --app-rail-width: 56px; }
++  .app-shell-with-rail { margin-left: var(--app-rail-width); padding: 28px 20px 64px; }
++  .app-side-rail { display: block; position: fixed; left: 0; top: var(--app-nav-offset); bottom: 0; width: var(--app-rail-width); padding: 24px 8px; overflow-y: auto; border-right: 1px solid #E4DFD4; background: #FAF8F5; z-index: 30; }
++  .app-side-rail a, .app-side-rail button { position: relative; min-height: 44px; justify-content: center; padding-left: 8px; padding-right: 8px; }
++  .app-rail-label { display: none; }
++  .app-rail-write-label { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
++  .rail-link-current::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 16px; width: 3px; border-radius: 2px; background: #073929; }
++}
++@media (min-width: 1025px) {
++  :root { --app-rail-width: 176px; }
++  .app-side-rail { padding: 24px 12px; }
++  .app-side-rail a, .app-side-rail button { justify-content: flex-start; }
++  .app-rail-label { display: inline; }
++  .app-rail-write-label { display: none; }
++}
+diff --git a/app/layout.tsx b/app/layout.tsx
+index e3a2f41..8f2cd45 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -1,5 +1,5 @@
+ import type { Metadata, Viewport } from "next";
+-import { Inter, Bodoni_Moda } from "next/font/google";
++import { Inter, Bodoni_Moda, Newsreader, Public_Sans } from "next/font/google";
+ import { GoogleAnalytics } from "@next/third-parties/google";
+ import "./globals.css";
+ import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
+@@ -18,6 +18,9 @@ const bodoniModa = Bodoni_Moda({
+   display: "swap",
+ });
+ 
++const newsreader = Newsreader({ subsets: ["latin"], variable: "--font-newsreader", display: "swap" });
++const publicSans = Public_Sans({ subsets: ["latin"], variable: "--font-public-sans", display: "swap" });
++
+ const inter = Inter({
+   subsets: ["latin"],
+   variable: "--font-inter",
+@@ -88,7 +91,7 @@ export default function RootLayout({
+   children: React.ReactNode;
+ }) {
+   return (
+-    <html lang="en" className={`${bodoniModa.variable} ${inter.variable}`}>
++    <html lang="en" className={`${bodoniModa.variable} ${inter.variable} ${newsreader.variable} ${publicSans.variable}`}>
+       <body className="font-sans">
+         <GuestAuthGateProvider>
+           {children}
+diff --git a/components/profile/AboutSectionIndex.tsx b/components/profile/AboutSectionIndex.tsx
+new file mode 100644
+index 0000000..08e0c81
+--- /dev/null
++++ b/components/profile/AboutSectionIndex.tsx
+@@ -0,0 +1,36 @@
++"use client";
++
++import { useEffect, useState } from "react";
++
++export default function AboutSectionIndex({ sections }: { sections: { id: string; label: string }[] }) {
++  const [active, setActive] = useState(sections[0]?.id);
++  useEffect(() => {
++    if (typeof IntersectionObserver === "undefined") return;
++    const visible = new Set<string>();
++    const observer = new IntersectionObserver(entries => {
++      for (const entry of entries) {
++        if (entry.isIntersecting) visible.add(entry.target.id);
++        else visible.delete(entry.target.id);
++      }
++      const first = sections.find(section => visible.has(section.id));
++      if (first) setActive(first.id);
++    }, { rootMargin: "-170px 0px -35% 0px", threshold: 0 });
++    for (const section of sections) {
++      const node = document.getElementById(section.id);
++      if (node) observer.observe(node);
++    }
++    return () => observer.disconnect();
++  }, [sections]);
++  if (!sections.length) return null;
++  return <nav className="profile-about-index" aria-label="About sections">{sections.map(section =>
++    <a key={section.id} href={`#${section.id}`} aria-current={active === section.id ? "location" : undefined}
++      className="focus-ring" onClick={event => {
++        const node = document.getElementById(section.id);
++        if (!node) return;
++        event.preventDefault();
++        node.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
++        node.focus({ preventScroll: true });
++        setActive(section.id);
++      }}>{section.label}</a>
++  )}</nav>;
++}
+diff --git a/components/profile/IdentityVerification.tsx b/components/profile/IdentityVerification.tsx
+new file mode 100644
+index 0000000..f672a3e
+--- /dev/null
++++ b/components/profile/IdentityVerification.tsx
+@@ -0,0 +1,9 @@
++export default function IdentityVerification({ verified }: { verified?: boolean }) {
++  if (!verified) return null;
++  return <span role="img" aria-label="Identity verified by Indegenuis"
++    title="Identity verified by Indegenuis" className="profile-verification">
++    <svg aria-hidden="true" viewBox="0 0 16 16" width="12" height="12" fill="none">
++      <path d="m4 8 2.5 2.5L12 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
++    </svg>
++  </span>;
++}
+diff --git a/components/profile/ProfileAbout.tsx b/components/profile/ProfileAbout.tsx
+index 81e232e..c95b203 100644
+--- a/components/profile/ProfileAbout.tsx
++++ b/components/profile/ProfileAbout.tsx
+@@ -1,132 +1,54 @@
+ import Link from "next/link";
+-import type { ReactNode } from "react";
+-import { getProfileHeadline } from "@/lib/profileIdentity";
+-import { formatInterestLabel } from "@/lib/profileTopics";
+ import type { ProfileIdentityRecord } from "@/lib/profileViewData";
+-import { getExactCanonicalTag, normalizeTagValue } from "@/lib/tags";
+-
+-function text(value: string | null | undefined) {
+-  return value?.trim() || null;
+-}
+-
+-/**
+- * An interest links out only when it names a real platform topic. Interests
+- * include free text from older signups, and a topic page for a word nobody has
+- * tagged would be empty.
+- */
+-function interestTopicHref(interest: string) {
+-  const canonical = getExactCanonicalTag(interest);
+-  if (!canonical) return null;
+-  return `/topics/${encodeURIComponent(normalizeTagValue(canonical))}`;
+-}
+-
+-function joinedLabel(createdAt: string) {
+-  const date = new Date(createdAt);
+-  if (Number.isNaN(date.getTime())) return null;
+-  return new Intl.DateTimeFormat("en", {
+-    month: "long",
+-    year: "numeric",
+-    timeZone: "UTC",
+-  }).format(date);
+-}
++import { getProfileHeadline } from "@/lib/profileIdentity";
++import AboutSectionIndex from "./AboutSectionIndex";
++import { joinedLabel, WriterTopics } from "./ProfileFacts";
+ 
+-function Row({ label, children }: { label: string; children: ReactNode }) {
+-  return (
+-    <div className="grid gap-1 py-4 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-6">
+-      <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">
+-        {label}
+-      </dt>
+-      <dd className="min-w-0 text-[15px] leading-relaxed text-ink-soft">{children}</dd>
+-    </div>
+-  );
++/** Accept only explicit public web URLs; no credentials or executable schemes. */
++export function safeExternalProfileUrl(value: string | null | undefined) {
++  if (!value?.trim()) return null;
++  try {
++    const url = new URL(value.trim());
++    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : null;
++  } catch { return null; }
+ }
+ 
+-/**
+- * What a writer says about themselves: bio, headline, location, education,
+- * interests, and when they joined. Nothing else, and nothing here is scored,
+- * counted or presented as a credential. Education is an ordinary fact a
+- * member may add, shown only when they did.
+- */
+-export default function ProfileAbout({
+-  profile,
+-  isOwnProfile,
+-}: {
+-  profile: ProfileIdentityRecord;
+-  isOwnProfile: boolean;
+-}) {
+-  const bio = text(profile.bio);
++export default function ProfileAbout({ profile, isOwnProfile }: { profile: ProfileIdentityRecord; isOwnProfile: boolean }) {
++  const bio = profile.bio?.trim();
+   const headline = getProfileHeadline(profile);
+-  const location = text(profile.country);
+-  const field = text(profile.field_of_study);
+-  const university = text(profile.university);
+-  const graduationYear = profile.graduation_year;
+-  const hasEducation = Boolean(field || university || graduationYear);
+-  const interests = [
+-    ...new Map(
+-      (profile.interests ?? [])
+-        .map((interest) => interest.trim())
+-        .filter(Boolean)
+-        .map((interest) => [interest.toLowerCase(), interest])
+-    ).values(),
+-  ];
++  const education = Boolean(profile.field_of_study?.trim() || profile.university?.trim() || profile.graduation_year);
++  const external = safeExternalProfileUrl(profile.organization_website);
+   const joined = joinedLabel(profile.created_at);
+-
+-  return (
+-    <section aria-labelledby="profile-about-title">
+-      <div className="flex items-center justify-between gap-4">
+-        <h2 id="profile-about-title" className="sr-only">
+-          About
+-        </h2>
+-        {isOwnProfile ? (
+-          <Link
+-            href="/settings/profile"
+-            className="tap-target focus-ring ml-auto text-sm font-semibold text-emerald-ink"
+-          >
+-            Edit profile
+-          </Link>
+-        ) : null}
+-      </div>
+-
+-      <dl className="divide-y divide-card-border">
+-        {bio ? (
+-          <Row label="Bio">
+-            <p className="whitespace-pre-line">{bio}</p>
+-          </Row>
+-        ) : null}
+-        {headline ? <Row label="Headline">{headline}</Row> : null}
+-        {location ? <Row label="Location">{location}</Row> : null}
+-        {hasEducation ? (
+-          <Row label="Education">
+-            {field ? <p className="text-ink">{field}</p> : null}
+-            {university ? <p>{university}</p> : null}
+-            {graduationYear ? <p className="text-sm text-ink-muted">{graduationYear}</p> : null}
+-          </Row>
+-        ) : null}
+-        {interests.length > 0 ? (
+-          <Row label="Interests">
+-            <ul className="flex flex-wrap gap-2">
+-              {interests.map((interest) => {
+-                const href = interestTopicHref(interest);
+-                const label = formatInterestLabel(interest);
+-                const chip =
+-                  "inline-flex items-center rounded-full border border-card-border bg-canvas px-3 py-1.5 text-xs font-medium text-ink-soft";
+-                return (
+-                  <li key={interest}>
+-                    {href ? (
+-                      <Link href={href} className={`tap-target focus-ring hover:text-ink ${chip}`}>
+-                        {label}
+-                      </Link>
+-                    ) : (
+-                      <span className={chip}>{label}</span>
+-                    )}
+-                  </li>
+-                );
+-              })}
+-            </ul>
+-          </Row>
+-        ) : null}
+-        {joined ? <Row label="Joined">{joined}</Row> : null}
+-      </dl>
+-    </section>
+-  );
++  const interests = profile.interests?.some(value => value.trim());
++  const sections = [
++    ...(bio || headline ? [{ id: "about-profile", label: "Profile" }] : []),
++    ...(education ? [{ id: "about-education", label: "Education" }] : []),
++    ...(external ? [{ id: "about-links", label: "Links & external work" }] : []),
++  ];
++  return <section aria-label="About" className="profile-about">
++    <AboutSectionIndex sections={sections} />
++    <div className="profile-about-content">
++      {bio || headline ? <section id="about-profile" tabIndex={-1} className="profile-about-section">
++        <h2 className="profile-section-title">Profile</h2>
++        {bio ? <p className="whitespace-pre-line">{bio}</p> : <p>{headline}</p>}
++      </section> : null}
++      {education ? <section id="about-education" tabIndex={-1} className="profile-about-section">
++        <h2 className="profile-section-title">Education</h2>
++        {profile.field_of_study?.trim() ? <h3>{profile.field_of_study}</h3> : null}
++        {profile.university?.trim() ? <p>{profile.university}</p> : null}
++        {profile.graduation_year ? <p className="profile-about-date">{profile.graduation_year}</p> : null}
++      </section> : null}
++      {external ? <section id="about-links" tabIndex={-1} className="profile-about-section">
++        <h2 className="profile-section-title">Links & external work</h2>
++        <a href={external} target="_blank" rel="noopener noreferrer" className="focus-ring profile-external-link">
++          <span>{new URL(external).hostname}</span><span className="profile-external-label">EXTERNAL</span>
++          <span className="sr-only"> (opens in a new tab)</span>
++        </a>
++      </section> : null}
++      {interests ? <section className="profile-about-section"><h2 className="profile-section-title">Interests</h2><WriterTopics interests={profile.interests} /></section> : null}
++      {joined ? <section className="profile-about-section"><h2 className="profile-section-title">Joined</h2><p>{joined}</p></section> : null}
++      {!sections.length && !interests && !joined ? <p className="profile-empty">No profile details yet.</p> : null}
++      {isOwnProfile ? <Link href="/settings/profile" className="focus-ring profile-about-edit">Edit profile</Link> : null}
++    </div>
++  </section>;
+ }
+diff --git a/components/profile/ProfileBio.tsx b/components/profile/ProfileBio.tsx
+new file mode 100644
+index 0000000..7c2ce14
+--- /dev/null
++++ b/components/profile/ProfileBio.tsx
+@@ -0,0 +1,29 @@
++"use client";
++
++import { useEffect, useId, useRef, useState } from "react";
++
++export default function ProfileBio({ bio }: { bio: string }) {
++  const id = useId();
++  const ref = useRef<HTMLParagraphElement>(null);
++  const [expanded, setExpanded] = useState(false);
++  const [overflows, setOverflows] = useState(false);
++  useEffect(() => {
++    const node = ref.current;
++    if (!node) return;
++    const measure = () => {
++      const lineHeight = Number.parseFloat(getComputedStyle(node).lineHeight);
++      setOverflows(node.scrollHeight > lineHeight * 3 + 2);
++    };
++    measure();
++    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
++    observer?.observe(node);
++    return () => observer?.disconnect();
++  }, [bio]);
++  return (
++    <div className="profile-bio">
++      <p ref={ref} id={id} className={expanded ? "" : "line-clamp-3"}>{bio}</p>
++      {overflows ? <button type="button" className="focus-ring bio-toggle" aria-expanded={expanded}
++        aria-controls={id} onClick={() => setExpanded(value => !value)}>{expanded ? "Less" : "More"}</button> : null}
++    </div>
++  );
++}
+diff --git a/components/profile/ProfileDraftList.tsx b/components/profile/ProfileDraftList.tsx
+index 87b58a1..f4795d4 100644
+--- a/components/profile/ProfileDraftList.tsx
++++ b/components/profile/ProfileDraftList.tsx
+@@ -11,24 +11,29 @@ export default function ProfileDraftList({ initialDrafts }: { initialDrafts: Pro
+   const [deletingId, setDeletingId] = useState<string | null>(null);
+   const [error, setError] = useState<string | null>(null);
+ 
++  function draftLabel(draft: ProfileDraft) {
++    return draft.kind === "article" ? draft.title?.trim() || "Untitled Article" : draft.excerpt || "Post draft";
++  }
++
+   async function removeDraft(draft: ProfileDraft) {
+-    if (!window.confirm(`Delete "${draft.title || "Untitled post"}"? This cannot be undone.`)) return;
++    if (!window.confirm(`Delete "${draftLabel(draft)}"? This cannot be undone.`)) return;
+ 
+     setDeletingId(draft.id);
+     setError(null);
+-    const result = await deleteOwnDraftPosts({ postIds: [draft.id] });
+-    setDeletingId(null);
+-
+-    if (!result.ok) {
+-      setError(result.error);
+-      return;
++    try {
++      const result = await deleteOwnDraftPosts({ postIds: [draft.id] });
++      if (!result.ok) { setError(result.error); return; }
++      setDrafts(current => current.filter(item => !result.data.deleted.includes(item.id)));
++    } catch {
++      setError("Could not delete the draft. Please try again.");
++    } finally {
++      setDeletingId(null);
+     }
+-    setDrafts((current) => current.filter((item) => !result.data.deleted.includes(item.id)));
+   }
+ 
+   if (drafts.length === 0) {
+     return (
+-      <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-10 text-center">
++      <div className="profile-empty">
+         <p className="text-sm text-ink-muted">No drafts yet.</p>
+         <Link href="/write" className="focus-ring mt-3 inline-block text-sm font-semibold text-emerald-ink">Start writing</Link>
+       </div>
+@@ -38,11 +43,11 @@ export default function ProfileDraftList({ initialDrafts }: { initialDrafts: Pro
+   return (
+     <section aria-label="Drafts">
+       {error ? <p role="alert" className="mb-3 text-sm text-red-600">{error}</p> : null}
+-      <ul className="divide-y divide-card-border rounded-xl border border-card-border bg-card">
++      <ul className="divide-y divide-card-border">
+         {drafts.map((draft) => (
+-          <li key={draft.id} className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap">
++          <li key={draft.id} className="flex flex-wrap items-center gap-3 py-4 sm:flex-nowrap">
+             <div className="min-w-0 flex-1">
+-              <p className="truncate text-sm font-semibold text-ink">{draft.title || "Untitled post"}</p>
++              <p className="truncate text-sm font-semibold text-ink">{draftLabel(draft)}</p>
+               <p className="mt-1 text-xs text-ink-muted">
+                 {draft.kind === "article" ? "Article" : "Post"} · Updated {formatDate(draft.updatedAt)}
+               </p>
+@@ -52,7 +57,7 @@ export default function ProfileDraftList({ initialDrafts }: { initialDrafts: Pro
+               <button
+                 type="button"
+                 onClick={() => void removeDraft(draft)}
+-                disabled={deletingId === draft.id}
++                disabled={deletingId !== null}
+                 className="focus-ring inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+               >
+                 {deletingId === draft.id ? "Deleting…" : "Delete"}
+diff --git a/components/profile/ProfileExperience.test.tsx b/components/profile/ProfileExperience.test.tsx
+new file mode 100644
+index 0000000..7c6bba7
+--- /dev/null
++++ b/components/profile/ProfileExperience.test.tsx
+@@ -0,0 +1,112 @@
++import { fireEvent, render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import ProfileAbout, { safeExternalProfileUrl } from "./ProfileAbout";
++import ProfileDraftList from "./ProfileDraftList";
++import ProfilePublicationList from "./ProfilePublicationList";
++import ProfileOverview from "./ProfileOverview";
++import ProfileTabs from "./ProfileTabs";
++import ShareButton from "./ShareButton";
++import { PROFILE_FIXTURE, PROFILE_DRAFT_FIXTURES, profileFixturePage } from "@/lib/devFixtures/profileFixtures";
++
++const deletion = vi.hoisted(() => vi.fn());
++vi.mock("@/app/(write)/write/deleteActions", () => ({ deleteOwnDraftPosts: deletion }));
++vi.mock("@/lib/activationEvents", () => ({ trackActivationEvent: vi.fn() }));
++beforeEach(() => { deletion.mockReset(); });
++
++describe("approved writer profile", () => {
++  it("keeps the four Overview sections in order", () => {
++    render(<ProfileOverview data={{ profile: PROFILE_FIXTURE,
++      viewer: { viewerId: null, isOwnProfile: false, isFollowing: false, isBlocked: false, followerCount: 1, followingCount: 2 },
++      tab: "overview", overview: { articles: profileFixturePage("article"), posts: profileFixturePage("post") }, publications: null, drafts: null }} />);
++    expect(screen.getAllByRole("heading", { level: 2 }).map(node => node.textContent)).toEqual(["Recent articles", "Recent posts", "Writes about", "At a glance"]);
++    expect(screen.queryByText("Current role")).not.toBeInTheDocument();
++  });
++  it("never renders a Post title, even when a legacy row has one", () => {
++    const page = profileFixturePage("post"); page.items[0].title = "Legacy title must stay hidden";
++    render(<ProfilePublicationList username="amara" profileId="fixture" tab="posts" publications={page} isOwnProfile={false} viewerState="anonymous" />);
++    expect(screen.queryByText("Legacy title must stay hidden")).not.toBeInTheDocument();
++    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
++    expect(screen.getByText(page.items[0].excerpt!)).toBeInTheDocument();
++  });
++  it("derives Article reading time from the stored word count", () => {
++    render(<ProfilePublicationList username="amara" profileId="fixture" tab="articles" publications={profileFixturePage("article")} isOwnProfile={false} viewerState="anonymous" />);
++    expect(screen.getAllByText(/5 min read/)).toHaveLength(2);
++  });
++  it("renders available About facts and a secured external link", () => {
++    render(<ProfileAbout profile={PROFILE_FIXTURE} isOwnProfile={false} />);
++    expect(screen.getByRole("heading", { name: "Education" })).toBeInTheDocument();
++    expect(screen.getByRole("link", { name: /example.org/ })).toHaveAttribute("rel", "noopener noreferrer");
++    expect(screen.getByText("EXTERNAL")).toBeInTheDocument();
++    expect(screen.queryByRole("heading", { name: "Experience" })).not.toBeInTheDocument();
++  });
++  it("omits missing sections and unsafe links", () => {
++    render(<ProfileAbout profile={{ ...PROFILE_FIXTURE, bio: null, professional_title: null, university: null,
++      field_of_study: null, graduation_year: null, interests: [], organization_website: "javascript:alert(1)", created_at: "" }} isOwnProfile={false} />);
++    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
++    expect(screen.queryByRole("link")).not.toBeInTheDocument();
++  });
++  it.each(["javascript:alert(1)", "data:text/html,hi", "//example.org", "https://user:pass@example.org", "garbage"])("rejects unsafe external URL %s", value => {
++    expect(safeExternalProfileUrl(value)).toBeNull();
++  });
++  it("supports arrow, Home and End keys without selecting on focus", () => {
++    render(<ProfileTabs username="amara" active="overview" isOwnProfile />);
++    const overview = screen.getByRole("tab", { name: "Overview" }); overview.focus();
++    fireEvent.keyDown(overview, { key: "ArrowRight" });
++    expect(screen.getByRole("tab", { name: "About" })).toHaveFocus();
++    expect(overview).toHaveAttribute("aria-selected", "true");
++    fireEvent.keyDown(document.activeElement!, { key: "End" });
++    expect(screen.getByRole("tab", { name: "Drafts" })).toHaveFocus();
++    fireEvent.keyDown(document.activeElement!, { key: "Home" });
++    expect(overview).toHaveFocus();
++  });
++});
++
++describe("draft actions", () => {
++  it("names titled, untitled Article and titleless Post drafts correctly", () => {
++    render(<ProfileDraftList initialDrafts={PROFILE_DRAFT_FIXTURES} />);
++    expect(screen.getByText("Untitled Article")).toBeInTheDocument();
++    expect(screen.getByText("Making room for public life")).toBeInTheDocument();
++    expect(screen.getByText("A note about the spaces between buildings.")).toBeInTheDocument();
++    expect(screen.getAllByRole("link", { name: "Edit" })[0]).toHaveAttribute("href", "/write?draft=fixture-draft-1");
++  });
++  it("requires confirmation before deletion", async () => {
++    vi.spyOn(window, "confirm").mockReturnValue(false);
++    render(<ProfileDraftList initialDrafts={PROFILE_DRAFT_FIXTURES} />);
++    await userEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
++    expect(deletion).not.toHaveBeenCalled();
++  });
++  it("retains the draft and reports a failed deletion", async () => {
++    vi.spyOn(window, "confirm").mockReturnValue(true);
++    deletion.mockRejectedValue(new Error("offline"));
++    render(<ProfileDraftList initialDrafts={PROFILE_DRAFT_FIXTURES} />);
++    await userEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
++    expect(await screen.findByRole("alert")).toHaveTextContent("Could not delete");
++    expect(screen.getByText("Making room for public life")).toBeInTheDocument();
++  });
++  it("removes only server-confirmed deletions", async () => {
++    vi.spyOn(window, "confirm").mockReturnValue(true);
++    deletion.mockResolvedValue({ ok: true, data: { deleted: ["fixture-draft-1"] } });
++    render(<ProfileDraftList initialDrafts={PROFILE_DRAFT_FIXTURES} />);
++    await userEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
++    expect(screen.queryByText("Making room for public life")).not.toBeInTheDocument();
++    expect(screen.getByText("Untitled Article")).toBeInTheDocument();
++  });
++  it("offers Start writing for an empty draft list", () => {
++    render(<ProfileDraftList initialDrafts={[]} />);
++    expect(screen.getByText("No drafts yet.")).toBeInTheDocument();
++    expect(screen.getByRole("link", { name: "Start writing" })).toHaveAttribute("href", "/write");
++  });
++});
++
++describe("sharing", () => {
++  it("copies the canonical profile URL without private tab state", async () => {
++    const writeText = vi.fn().mockResolvedValue(undefined);
++    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
++    window.history.replaceState({}, "", "/amara?view=drafts");
++    render(<ShareButton label="Copy profile link" copyOnly />);
++    fireEvent.click(screen.getByRole("button", { name: "Copy profile link" }));
++    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/amara`);
++    expect(await screen.findByText("Profile URL copied")).toBeInTheDocument();
++  });
++});
+diff --git a/components/profile/ProfileFacts.tsx b/components/profile/ProfileFacts.tsx
+new file mode 100644
+index 0000000..9defb6a
+--- /dev/null
++++ b/components/profile/ProfileFacts.tsx
+@@ -0,0 +1,33 @@
++import Link from "next/link";
++import { formatInterestLabel } from "@/lib/profileTopics";
++import { getExactCanonicalTag, normalizeTagValue } from "@/lib/tags";
++import type { ProfileIdentityRecord } from "@/lib/profileViewData";
++
++export function joinedLabel(createdAt: string) {
++  const date = new Date(createdAt);
++  return Number.isNaN(date.getTime()) ? null : new Intl.DateTimeFormat("en", {
++    month: "long", year: "numeric", timeZone: "UTC",
++  }).format(date);
++}
++
++export function WriterTopics({ interests }: { interests: string[] | null }) {
++  const topics = [...new Map((interests ?? []).map(value => value.trim()).filter(Boolean)
++    .map(value => [value.toLowerCase(), value])).values()];
++  if (!topics.length) return null;
++  return <ul className="profile-topics">{topics.map(topic => {
++    const canonical = getExactCanonicalTag(topic);
++    const label = formatInterestLabel(topic);
++    return <li key={topic}>{canonical ? <Link className="focus-ring" href={`/topics/${encodeURIComponent(normalizeTagValue(canonical))}`}>{label}</Link> : <span>{label}</span>}</li>;
++  })}</ul>;
++}
++
++export function AtAGlance({ profile }: { profile: ProfileIdentityRecord }) {
++  const education = [profile.field_of_study?.trim(), profile.university?.trim(), profile.graduation_year].filter(Boolean).join(" · ");
++  const facts = [["Education", education], ["Location", profile.country?.trim()], ["Joined", joinedLabel(profile.created_at)]]
++    .filter(([, value]) => Boolean(value));
++  if (!facts.length) return null;
++  return <section className="profile-section" aria-labelledby="at-a-glance">
++    <h2 id="at-a-glance" className="profile-section-title">At a glance</h2>
++    <dl className="profile-facts">{facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
++  </section>;
++}
+diff --git a/components/profile/ProfileHeader.test.tsx b/components/profile/ProfileHeader.test.tsx
+index a82e8d3..c2f8030 100644
+--- a/components/profile/ProfileHeader.test.tsx
++++ b/components/profile/ProfileHeader.test.tsx
+@@ -57,10 +57,10 @@ describe("ProfileHeader identity", () => {
+     expect(screen.getByRole("heading", { level: 1, name: "A Student" })).toBeInTheDocument();
+     expect(screen.getByText("@student1")).toBeInTheDocument();
+     expect(screen.getByText("Policy researcher")).toBeInTheDocument();
+-    // One line under the name. The bio is on About.
++    // Headline and bio have separate positions in the approved hierarchy.
+     expect(
+       screen.queryByText("Writes about governance and institutions.")
+-    ).not.toBeInTheDocument();
++    ).toBeInTheDocument();
+   });
+ 
+   it("shows the bio when the writer has no headline", () => {
+@@ -81,15 +81,14 @@ describe("ProfileHeader identity", () => {
+     expect(screen.getByRole("heading", { level: 1, name: "student1" })).toBeInTheDocument();
+   });
+ 
+-  it("shows no verified prestige mark, even for an account the database marks verified", () => {
+-    // Verified prestige was retired in the final UI simplification. A stored
+-    // row can still carry the columns, so they are passed through here the way
+-    // an untyped caller could, and must not render.
+-    renderHeader({
+-      profileOverrides: { verified: true, verified_type: "student" } as Partial<HeaderProps["profile"]>,
+-    });
++  it("shows only the identity verification label for a verified account", () => {
++    renderHeader({ profileOverrides: { verified: true } });
++    expect(screen.getByRole("img", { name: "Identity verified by Indegenuis" })).toHaveAttribute("title", "Identity verified by Indegenuis");
++  });
++
++  it("does not show verification for an unverified account", () => {
++    renderHeader({ profileOverrides: { verified: false } });
+     expect(screen.queryByRole("img", { name: /verified/i })).not.toBeInTheDocument();
+-    expect(screen.queryByText(/verified/i)).not.toBeInTheDocument();
+   });
+ 
+   it("offers the More actions control with a readable glyph", () => {
+@@ -110,7 +109,6 @@ describe("ProfileHeader carries no record and no credibility", () => {
+ 
+     for (const retired of [
+       /Intellectual Record/i,
+-      /Writes about/i,
+       /citable/i,
+       /source-backed/i,
+       /intellectual focus/i,
+diff --git a/components/profile/ProfileHeader.tsx b/components/profile/ProfileHeader.tsx
+index 2b9e729..977ce5a 100644
+--- a/components/profile/ProfileHeader.tsx
++++ b/components/profile/ProfileHeader.tsx
+@@ -1,6 +1,8 @@
+ "use client";
+ 
+ import Link from "next/link";
++import ProfileBio from "./ProfileBio";
++import IdentityVerification from "./IdentityVerification";
+ import { useEffect, useRef, useState } from "react";
+ import BlockUserButton from "@/components/moderation/BlockUserButton";
+ import ReportButton from "@/components/moderation/ReportButton";
+@@ -75,7 +77,7 @@ function MoreMenu({
+         type="button"
+         onClick={() => setOpen((current) => !current)}
+         aria-expanded={open}
+-        aria-haspopup="true"
++        aria-haspopup="dialog"
+         aria-label="More profile actions"
+         className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-lg border border-card-border bg-card text-xl text-ink-soft hover:border-card-border-hover hover:text-ink"
+       >
+@@ -83,7 +85,7 @@ function MoreMenu({
+       </button>
+       {open ? (
+         <div
+-          role="group"
++          role="dialog"
+           aria-label="More profile actions"
+           className="absolute right-0 z-30 mt-2 w-52 rounded-xl border border-card-border bg-card p-2 shadow-xl"
+         >
+@@ -91,6 +93,7 @@ function MoreMenu({
+             label="Share profile"
+             className="min-h-11 w-full justify-start border-0 px-3 shadow-none"
+           />
++          <ShareButton label="Copy profile link" copyOnly className="min-h-11 w-full justify-start border-0 px-3 shadow-none" />
+           {currentUserId ? (
+             <>
+               <ReportButton
+@@ -116,17 +119,7 @@ function MoreMenu({
+   );
+ }
+ 
+-/**
+- * A writer's profile header: photo, name, username, an optional headline or
+- * bio, the two relationship counts, and what the reader can do.
+- *
+- * The publishing reset, Phase 2G, reduced it to that. The cover band, record
+- * metrics, "Writes about" topics, the intellectual focus line and the sticky
+- * follow bar are gone, and nothing on it measures or ranks the writer.
+- *
+- * The counts are single text nodes rather than an emphasised number beside a
+- * label: an element whose whole text is "0" reads as a metric of zero.
+- */
++/** Writer identity and existing account actions. Ownership is resolved by the server loader. */
+ export default function ProfileHeader({
+   profile,
+   followerCount,
+@@ -189,41 +182,35 @@ export default function ProfileHeader({
+   return (
+     <>
+       <ProfileViewTracker profileId={profile.id} viewerState={viewerState} />
+-      <section aria-labelledby="profile-name" className="pb-5">
+-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
++      <section id="profile-identity" aria-labelledby="profile-name" className="profile-identity">
++        <div className="profile-identity-top">
+           <div className="flex min-w-0 items-center gap-4">
+             <UserAvatar
+               name={displayName}
+               src={profile.avatar_url}
+-              size={80}
++              size={76}
+               className="shrink-0 overflow-hidden rounded-full"
+             />
+             <div className="min-w-0">
+               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                 <h1
+                   id="profile-name"
+-                  className="font-display text-[26px] font-semibold leading-tight text-ink [overflow-wrap:anywhere] sm:text-[30px]"
++                  className="profile-name"
+                 >
+                   {displayName}
+                 </h1>
++                <IdentityVerification verified={profile.verified} />
+               </div>
+               <p className="mt-1 text-sm text-ink-muted [overflow-wrap:anywhere]">
+                 @{profile.username}
+               </p>
++              {headline ? <p className="profile-headline">{headline}</p> : null}
+             </div>
+           </div>
+           <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+         </div>
+ 
+-        {headline ? (
+-          <p className="mt-4 max-w-measure text-[15px] font-medium leading-6 text-ink-soft">
+-            {headline}
+-          </p>
+-        ) : bio ? (
+-          <p className="mt-4 line-clamp-3 max-w-measure whitespace-pre-line text-[15px] leading-6 text-ink-soft">
+-            {bio}
+-          </p>
+-        ) : null}
++        {bio ? <ProfileBio bio={bio} /> : null}
+ 
+         <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
+           <Link href={`/${profile.username}/followers`} className={countLinkClass}>
+diff --git a/components/profile/ProfileOverview.tsx b/components/profile/ProfileOverview.tsx
+new file mode 100644
+index 0000000..0f8ddd0
+--- /dev/null
++++ b/components/profile/ProfileOverview.tsx
+@@ -0,0 +1,27 @@
++import Link from "next/link";
++import type { ProfileViewData } from "@/lib/profileViewData";
++import { getProfileViewerState } from "@/lib/profileFunnel";
++import { profileTabHref } from "@/lib/profileTabs";
++import ProfilePublicationList from "./ProfilePublicationList";
++import { AtAGlance, WriterTopics } from "./ProfileFacts";
++
++export default function ProfileOverview({ data }: { data: ProfileViewData }) {
++  const { profile, viewer, overview } = data;
++  if (!overview) return null;
++  const viewerState = getProfileViewerState({ viewerId: viewer.viewerId, profileId: profile.id });
++  return <>
++    {(["articles", "posts"] as const).map(tab => <section key={tab} className="profile-section" aria-labelledby={`recent-${tab}`}>
++      <div className="profile-section-heading">
++        <h2 id={`recent-${tab}`} className="profile-section-title">Recent {tab}</h2>
++        <Link className="focus-ring profile-view-all" href={profileTabHref(profile.username, tab)} scroll={false}>View all<span className="sr-only"> {tab}</span></Link>
++      </div>
++      <ProfilePublicationList username={profile.username} profileId={profile.id} tab={tab}
++        publications={overview[tab]} isOwnProfile={viewer.isOwnProfile} viewerState={viewerState} preview />
++    </section>)}
++    {profile.interests?.some(interest => interest.trim()) ? <section className="profile-section" aria-labelledby="writes-about">
++      <h2 id="writes-about" className="profile-section-title">Writes about</h2>
++      <WriterTopics interests={profile.interests} />
++    </section> : null}
++    <AtAGlance profile={profile} />
++  </>;
++}
+diff --git a/components/profile/ProfilePublicationList.tsx b/components/profile/ProfilePublicationList.tsx
+index 4ad0104..93cb452 100644
+--- a/components/profile/ProfilePublicationList.tsx
++++ b/components/profile/ProfilePublicationList.tsx
+@@ -2,144 +2,48 @@ import Link from "next/link";
+ import PostCover from "@/components/post/PostCover";
+ import ProfileWorkLink from "@/components/profile/ProfileWorkLink";
+ import type { ProfileViewerState } from "@/lib/profileFunnel";
+-import { profileTabHref, type ProfileTab } from "@/lib/profileTabs";
++import { profileTabHref } from "@/lib/profileTabs";
+ import type { ProfilePublicationPage } from "@/lib/profileViewData";
+ import { formatDate } from "@/lib/utils";
+ 
+-const EMPTY_COPY = {
+-  post: "No posts yet.",
+-  article: "No articles yet.",
+-} as const;
+-
+-const PAGE_LINK =
+-  "focus-ring inline-flex min-h-11 items-center rounded-lg border border-card-border bg-card px-4 text-sm font-semibold text-ink-soft hover:text-ink";
+-
+-/**
+- * One page of a writer's Posts or Articles, newest first.
+- *
+- * A row is a title, a line of the piece, and a date, with the cover as a
+- * thumbnail when there is one. Nothing on it grades the work: no evidence
+- * chips, no citation or source counts, no quality labels.
+- */
+-export default function ProfilePublicationList({
+-  username,
+-  profileId,
+-  tab,
+-  publications,
+-  isOwnProfile,
+-  viewerState,
+-}: {
+-  username: string;
+-  profileId: string;
+-  tab: Exclude<ProfileTab, "about">;
+-  publications: ProfilePublicationPage;
+-  isOwnProfile: boolean;
+-  viewerState: ProfileViewerState;
++export default function ProfilePublicationList({ username, profileId, tab, publications, isOwnProfile, viewerState, preview = false }: {
++  username: string; profileId: string; tab: "posts" | "articles";
++  publications: ProfilePublicationPage; isOwnProfile: boolean;
++  viewerState: ProfileViewerState; preview?: boolean;
+ }) {
+   const { kind, items, page, hasNextPage, hasPreviousPage } = publications;
+-
+-  if (items.length === 0) {
+-    return (
+-      <div className="rounded-xl border border-dashed border-card-border bg-card px-6 py-10 text-center">
+-        <p className="text-sm text-ink-muted">
+-          {page > 1 ? "Nothing more to show." : EMPTY_COPY[kind]}
+-        </p>
+-        {page > 1 ? (
+-          <Link
+-            href={profileTabHref(username, tab)}
+-            className="tap-target focus-ring mt-3 inline-block text-sm font-semibold text-emerald-ink"
+-          >
+-            Back to the newest
+-          </Link>
+-        ) : isOwnProfile ? (
+-          <Link
+-            href="/write"
+-            className="tap-target focus-ring mt-3 inline-block text-sm font-semibold text-emerald-ink"
+-          >
+-            Write your first Post or Article.
+-          </Link>
+-        ) : null}
+-      </div>
+-    );
+-  }
+-
+-  const tracking = {
+-    profileId,
+-    viewerState,
+-    surface: kind === "post" ? ("profile_posts" as const) : ("profile_articles" as const),
+-  };
+-
+-  return (
+-    <section aria-label={kind === "post" ? "Posts" : "Articles"}>
+-      <ul className="-mx-3 divide-y divide-card-border">
+-        {items.map((item) => {
+-          const title = item.title?.trim() || null;
+-          // An untitled Post leads with its own text, so repeating the excerpt
+-          // below the heading would print it twice.
+-          const headline = title ?? item.excerpt ?? "View post";
+-          const date = item.publishedAt ?? item.createdAt;
+-          return (
+-            <li key={item.id}>
+-              <article className="group relative flex items-start gap-4 px-3 py-5 transition-colors duration-150 ease-out hover:bg-card motion-reduce:transition-none sm:gap-5">
+-                <div className="min-w-0 flex-1">
+-                  <h2
+-                    className={
+-                      title
+-                        ? "font-display line-clamp-2 text-[18px] font-semibold leading-snug text-ink sm:text-[19px]"
+-                        : "line-clamp-3 text-[15px] font-medium leading-6 text-ink"
+-                    }
+-                  >
+-                    <ProfileWorkLink
+-                      href={`/post/${item.slug}`}
+-                      workId={item.id}
+-                      workKind={kind}
+-                      tracking={tracking}
+-                      className="stretch-target focus-ring after:z-10 group-hover:text-emerald-brand"
+-                    >
+-                      {headline}
+-                    </ProfileWorkLink>
+-                  </h2>
+-                  {title && item.excerpt ? (
+-                    <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-ink-soft">
+-                      {item.excerpt}
+-                    </p>
+-                  ) : null}
+-                  <p className="mt-2 text-xs text-ink-muted">
+-                    <time dateTime={date}>{formatDate(date)}</time>
+-                  </p>
+-                </div>
+-                {item.coverImageUrl ? (
+-                  <PostCover
+-                    src={item.coverImageUrl}
+-                    alt={title ?? "Cover image"}
+-                    content_kind={kind}
+-                    sizes="(max-width: 640px) 84px, 112px"
+-                    className="aspect-[4/3] w-[84px] shrink-0 overflow-hidden rounded-lg border border-card-border bg-canvas sm:w-[112px]"
+-                    imageClassName="object-cover"
+-                  />
+-                ) : null}
+-              </article>
+-            </li>
+-          );
+-        })}
+-      </ul>
+-
+-      {hasPreviousPage || hasNextPage ? (
+-        <nav aria-label="Pages" className="mt-6 flex items-center justify-between gap-3">
+-          {hasPreviousPage ? (
+-            <Link href={profileTabHref(username, tab, page - 1)} className={PAGE_LINK}>
+-              Newer
+-            </Link>
+-          ) : (
+-            <span />
+-          )}
+-          {hasNextPage ? (
+-            <Link href={profileTabHref(username, tab, page + 1)} className={PAGE_LINK}>
+-              Older
+-            </Link>
+-          ) : null}
+-        </nav>
+-      ) : null}
+-    </section>
+-  );
++  if (!items.length) return <div className="profile-empty">
++    <p>{page > 1 ? "Nothing more to show." : kind === "post" ? "No posts yet." : "No articles yet."}</p>
++    {page > 1 ? <Link className="focus-ring" href={profileTabHref(username, tab)}>Back to the newest</Link>
++      : isOwnProfile ? <Link className="focus-ring" href="/write">Write your first Post or Article</Link> : null}
++  </div>;
++  const tracking = { profileId, viewerState, surface: kind === "post" ? "profile_posts" as const : "profile_articles" as const };
++  const Heading = preview ? "h3" : "h2";
++  return <section aria-label={kind === "post" ? "Posts" : "Articles"}>
++    <ul className={`profile-publications ${preview ? "profile-publications-preview" : ""}`}>
++      {items.map(item => {
++        const date = item.publishedAt ?? item.createdAt;
++        const article = kind === "article";
++        const content = article ? item.title?.trim() || "Untitled Article" : item.excerpt || "View post";
++        const work = <ProfileWorkLink href={`/post/${item.slug}`} workId={item.id} workKind={kind} tracking={tracking}
++          className="stretch-target focus-ring after:z-10">{content}</ProfileWorkLink>;
++        return <li key={item.id}><article className={`profile-publication ${article ? "is-article" : "is-post"}`}>
++          <div className="min-w-0 flex-1">
++            {article ? <Heading className="profile-article-title">{work}</Heading> : <p className="profile-post-text">{work}</p>}
++            {article && item.excerpt ? <p className="profile-standfirst">{item.excerpt}</p> : null}
++            <p className="profile-publication-meta"><time dateTime={date}>{formatDate(date)}</time>
++              {article && item.wordCount && item.wordCount > 0 ? ` · ${Math.max(1, Math.ceil(item.wordCount / 200))} min read` : null}
++            </p>
++          </div>
++          {item.coverImageUrl ? <PostCover src={item.coverImageUrl} alt="" content_kind={kind}
++            sizes={article ? (preview ? "88px" : "112px") : (preview ? "56px" : "64px")}
++            className="profile-publication-cover" imageClassName="object-cover" /> : null}
++        </article></li>;
++      })}
++    </ul>
++    {!preview && (hasPreviousPage || hasNextPage) ? <nav aria-label="Pages" className="profile-pagination">
++      {hasPreviousPage ? <Link href={profileTabHref(username, tab, page - 1)} className="focus-ring">Newer</Link> : <span />}
++      {hasNextPage ? <Link href={profileTabHref(username, tab, page + 1)} className="focus-ring">Older</Link> : null}
++    </nav> : null}
++  </section>;
+ }
+diff --git a/components/profile/ProfileTabs.test.tsx b/components/profile/ProfileTabs.test.tsx
+index 0070d98..c93af02 100644
+--- a/components/profile/ProfileTabs.test.tsx
++++ b/components/profile/ProfileTabs.test.tsx
+@@ -7,24 +7,26 @@ describe("ProfileTabs", () => {
+   it("offers a visitor Posts, Articles and About, and no Drafts", () => {
+     render(<ProfileTabs username="amara" active="posts" isOwnProfile={false} />);
+ 
+-    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+-      "Posts",
+-      "Articles",
++    expect(screen.getAllByRole("tab").map((link) => link.textContent)).toEqual([
++      "Overview",
+       "About",
++      "Articles",
++      "Posts",
+     ]);
+-    expect(screen.queryByRole("link", { name: "Drafts" })).not.toBeInTheDocument();
++    expect(screen.queryByRole("tab", { name: "Drafts" })).not.toBeInTheDocument();
+   });
+ 
+   it("offers the owner Drafts, at its own address", () => {
+     render(<ProfileTabs username="amara" active="drafts" isOwnProfile />);
+ 
+-    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+-      "Posts",
++    expect(screen.getAllByRole("tab").map((link) => link.textContent)).toEqual([
++      "Overview",
++      "About",
+       "Articles",
++      "Posts",
+       "Drafts",
+-      "About",
+     ]);
+-    expect(screen.getByRole("link", { name: "Drafts" })).toHaveAttribute(
++    expect(screen.getByRole("tab", { name: "Drafts" })).toHaveAttribute(
+       "href",
+       "/amara?view=drafts"
+     );
+diff --git a/components/profile/ProfileTabs.tsx b/components/profile/ProfileTabs.tsx
+index c38b6d1..04b0088 100644
+--- a/components/profile/ProfileTabs.tsx
++++ b/components/profile/ProfileTabs.tsx
+@@ -1,46 +1,52 @@
++"use client";
++
+ import Link from "next/link";
++import { useEffect, useRef, type KeyboardEvent } from "react";
+ import {
+-  OWNER_PROFILE_TABS,
+-  PROFILE_TAB_LABELS,
+-  PUBLIC_PROFILE_TABS,
+-  profileTabHref,
+-  type ProfileTab,
++  OWNER_PROFILE_TABS, PROFILE_TAB_LABELS, PUBLIC_PROFILE_TABS,
++  profileTabHref, type ProfileTab,
+ } from "@/lib/profileTabs";
+ 
+-export default function ProfileTabs({
+-  username,
+-  active,
+-  isOwnProfile,
+-}: {
+-  username: string;
+-  active: ProfileTab;
+-  isOwnProfile: boolean;
++export default function ProfileTabs({ username, active, isOwnProfile, compact = false }: {
++  username: string; active: ProfileTab; isOwnProfile: boolean; compact?: boolean;
+ }) {
+   const tabs = isOwnProfile ? OWNER_PROFILE_TABS : PUBLIC_PROFILE_TABS;
+-
++  const list = useRef<HTMLDivElement>(null);
++  useEffect(() => {
++    const selected = list.current?.querySelector<HTMLElement>('[aria-selected="true"]');
++    if (!selected || !list.current) return;
++    // Scroll only the tab strip, never the document on initial load.
++    const left = selected.offsetLeft - list.current.offsetLeft;
++    if (left < list.current.scrollLeft) list.current.scrollLeft = left;
++    else if (left + selected.offsetWidth > list.current.scrollLeft + list.current.clientWidth) {
++      list.current.scrollLeft = left + selected.offsetWidth - list.current.clientWidth;
++    }
++  }, [active]);
++  function handleKeys(event: KeyboardEvent<HTMLDivElement>) {
++    const links = Array.from(event.currentTarget.querySelectorAll<HTMLAnchorElement>('[role="tab"]'));
++    const current = links.indexOf(document.activeElement as HTMLAnchorElement);
++    let next = current;
++    if (event.key === "ArrowRight") next = (current + 1) % links.length;
++    else if (event.key === "ArrowLeft") next = (current - 1 + links.length) % links.length;
++    else if (event.key === "Home") next = 0;
++    else if (event.key === "End") next = links.length - 1;
++    else if (event.key === " ") { event.preventDefault(); links[current]?.click(); return; }
++    else return;
++    event.preventDefault();
++    links[next]?.focus();
++  }
+   return (
+-    <nav aria-label="Profile" className="overflow-x-auto border-b border-card-border">
+-      <ul className="-mb-px flex min-w-max gap-6">
+-        {tabs.map((tab) => {
+-          const current = tab === active;
+-          return (
+-            <li key={tab}>
+-              <Link
+-                href={profileTabHref(username, tab)}
+-                scroll={false}
+-                aria-current={current ? "page" : undefined}
+-                className={`focus-ring inline-flex min-h-11 items-center border-b-2 text-sm font-semibold transition-colors ${
+-                  current
+-                    ? "border-emerald-brand text-ink"
+-                    : "border-transparent text-ink-muted hover:text-ink"
+-                }`}
+-              >
+-                {PROFILE_TAB_LABELS[tab]}
+-              </Link>
+-            </li>
+-          );
+-        })}
+-      </ul>
+-    </nav>
++    <div ref={list} role="tablist" aria-label="Profile sections" onKeyDown={handleKeys}
++      className={`profile-tabs ${compact ? "profile-tabs-compact" : ""}`}>
++      {tabs.map(tab => (
++        <Link key={tab} href={profileTabHref(username, tab)} scroll={false}
++          role="tab" id={`${compact ? "compact" : "main"}-tab-${tab}`}
++          aria-controls="profile-panel" aria-selected={tab === active}
++          tabIndex={tab === active ? 0 : -1}
++          className="focus-ring profile-tab">
++          {PROFILE_TAB_LABELS[tab]}
++        </Link>
++      ))}
++    </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/components/profile/ProfileWorkLink.test.tsx b/components/profile/ProfileWorkLink.test.tsx
+index be50a45..a0ff622 100644
+--- a/components/profile/ProfileWorkLink.test.tsx
++++ b/components/profile/ProfileWorkLink.test.tsx
+@@ -168,7 +168,7 @@ describe("ProfilePublicationList", () => {
+     );
+     expect(screen.getByText("No articles yet.")).toBeInTheDocument();
+     expect(
+-      screen.getByRole("link", { name: "Write your first Post or Article." })
++      screen.getByRole("link", { name: "Write your first Post or Article" })
+     ).toHaveAttribute("href", "/write");
+     expect(screen.getAllByRole("link")).toHaveLength(1);
+   });
+diff --git a/components/profile/ShareButton.tsx b/components/profile/ShareButton.tsx
+index 8d208e2..ee37ee9 100644
+--- a/components/profile/ShareButton.tsx
++++ b/components/profile/ShareButton.tsx
+@@ -6,25 +6,28 @@ import Toast from "@/components/ui/Toast";
+ interface ShareButtonProps {
+   label?: string;
+   className?: string;
++  copyOnly?: boolean;
+ }
+ 
+ export default function ShareButton({
+   label = "Share",
+   className = "",
++  copyOnly = false,
+ }: ShareButtonProps) {
+   const [toastMessage, setToastMessage] = useState<string | null>(null);
+ 
+   const handleShare = async () => {
+     if (typeof window === "undefined") return;
+ 
+-    const shareUrl = window.location.href;
++    const shareUrl = `${window.location.origin}${window.location.pathname}`;
+ 
+-    if (navigator.share) {
++    if (!copyOnly && navigator.share) {
+       try {
+         await navigator.share({ url: shareUrl });
+         return;
+-      } catch {
+-        // Fall back to clipboard when native sharing is dismissed or unavailable.
++      } catch (error) {
++        if (error instanceof Error && error.name === "AbortError") return;
++        // Fall back to clipboard when native sharing is unavailable.
+       }
+     }
+ 
+@@ -41,7 +44,7 @@ export default function ShareButton({
+       <button
+         type="button"
+         onClick={handleShare}
+-        className={`inline-flex items-center justify-center gap-2 rounded-lg border border-card-border bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink ${className}`}
++        className={`focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-card-border bg-card px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-card-border-hover hover:text-ink ${className}`}
+       >
+         <svg
+           className="h-4 w-4"
+diff --git a/components/profile/StickyProfileBar.tsx b/components/profile/StickyProfileBar.tsx
+new file mode 100644
+index 0000000..2868297
+--- /dev/null
++++ b/components/profile/StickyProfileBar.tsx
+@@ -0,0 +1,41 @@
++"use client";
++
++import Link from "next/link";
++import { useEffect, useRef, useState } from "react";
++import { useAppChrome } from "@/app/(main)/AppChromeProvider";
++import FollowButton from "@/components/ui/FollowButton";
++import type { ProfileTab } from "@/lib/profileTabs";
++import ProfileTabs from "./ProfileTabs";
++
++export default function StickyProfileBar({ username, name, profileId, currentUserId, initialFollowing, isBlocked, active }: {
++  username: string; name: string; profileId: string; currentUserId: string | null;
++  initialFollowing: boolean; isBlocked: boolean; active: ProfileTab;
++}) {
++  const own = currentUserId === profileId;
++  const [visible, setVisible] = useState(false);
++  const anchor = useRef<HTMLDivElement>(null);
++  const { navHeight } = useAppChrome();
++  useEffect(() => {
++    const node = anchor.current;
++    if (!node || typeof IntersectionObserver === "undefined") return;
++    const observer = new IntersectionObserver(([entry]) => {
++      setVisible(!entry.isIntersecting && entry.boundingClientRect.top < navHeight);
++    }, { rootMargin: `-${navHeight}px 0px 0px 0px` });
++    observer.observe(node);
++    return () => observer.disconnect();
++  }, [navHeight]);
++  return <>
++    <div ref={anchor} className="profile-sticky-anchor" aria-hidden="true" />
++    {visible ? <div className="profile-compact" aria-label="Compact writer profile">
++      <div className="profile-compact-inner">
++        <p className="profile-compact-name" title={name}>{name}</p>
++        <div className="profile-compact-tabs"><ProfileTabs username={username} active={active} isOwnProfile={own} compact /></div>
++        <div className="profile-compact-action">
++          {own ? <Link href="/settings/profile" className="focus-ring profile-edit-compact">Edit profile</Link>
++            : !isBlocked ? <FollowButton followingId={profileId} currentUserId={currentUserId}
++              initialFollowing={initialFollowing} authorName={name} source="profile" size="compact" /> : null}
++        </div>
++      </div>
++    </div> : null}
++  </>;
++}
+diff --git a/components/profile/profile.css b/components/profile/profile.css
+new file mode 100644
+index 0000000..a538ab7
+--- /dev/null
++++ b/components/profile/profile.css
+@@ -0,0 +1,73 @@
++/* Profile geometry follows the approved Writer Profile reference. */
++.writer-profile { width: 100%; max-width: 740px; margin-inline: auto; font-family: var(--font-public-sans), system-ui, sans-serif; color: #1B2420; }
++.writer-profile .font-display { font-family: var(--font-newsreader), Georgia, serif; }
++.profile-identity { padding-bottom: 18px; }
++.profile-identity-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
++.profile-identity-top > :first-child { flex: 1 1 320px; }
++.profile-name { font-family: var(--font-newsreader), Georgia, serif; font-size: 31px; line-height: 1.15; font-weight: 600; overflow-wrap: anywhere; }
++.profile-headline { margin-top: 6px; font-size: 14px; line-height: 1.5; font-weight: 500; color: #3F4A44; overflow-wrap: anywhere; }
++.profile-verification { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #0B4A36; color: #FAF8F5; flex-shrink: 0; }
++.profile-bio { margin-top: 14px; max-width: 600px; font-size: 16px; line-height: 1.6; color: #3F4A44; overflow-wrap: anywhere; }
++.profile-bio p { white-space: pre-line; }
++.bio-toggle { min-height: 36px; font-size: 13px; font-weight: 600; color: #0B4A36; }
++.profile-tabs { position: relative; display: flex; gap: 24px; overflow-x: auto; border-bottom: 1px solid #E4DFD4; scrollbar-width: thin; }
++.profile-tab { display: inline-flex; align-items: center; flex-shrink: 0; min-height: 44px; border-bottom: 2px solid transparent; color: #6B6B6B; font-size: 14px; font-weight: 600; white-space: nowrap; }
++.profile-tab[aria-selected="true"] { color: #0B4A36; border-bottom-color: #0B4A36; }
++.profile-panel { padding-top: 28px; }
++.profile-section + .profile-section { margin-top: 28px; }
++.profile-section-title { margin: 0 0 12px; font-family: var(--font-newsreader), Georgia, serif; font-size: 19px; font-weight: 600; line-height: 1.3; }
++.profile-section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
++.profile-view-all { font-size: 13px; font-weight: 600; color: #0B4A36; padding-block: 8px; }
++.profile-publication { position: relative; display: flex; align-items: flex-start; gap: 16px; padding: 20px 0; border-bottom: 1px solid #EDE8DD; }
++.profile-publications-preview .profile-publication { padding: 14px 0; }
++.profile-article-title { font-family: var(--font-newsreader), Georgia, serif; font-size: 21px; line-height: 1.3; font-weight: 600; overflow-wrap: anywhere; }
++.profile-publications-preview .profile-article-title { font-size: 20px; }
++.profile-standfirst { margin-top: 4px; font-size: 15px; line-height: 1.5; color: #3F4A44; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
++.profile-post-text { font-size: 16px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
++.profile-publication-meta { margin-top: 6px; font-size: 12px; color: #6B6B6B; }
++.profile-publication:hover a { color: #0B4A36; }
++.profile-publication-cover { width: 112px; height: 84px; border-radius: 6px; flex-shrink: 0; overflow: hidden; }
++.profile-publications-preview .profile-publication-cover { width: 88px; height: 66px; }
++.is-post .profile-publication-cover { width: 64px; height: 64px; }
++.profile-publications-preview .is-post .profile-publication-cover { width: 56px; height: 56px; }
++.profile-topics { display: flex; flex-wrap: wrap; gap: 8px; }
++.profile-topics li > * { display: inline-flex; align-items: center; min-height: 30px; border: 1px solid #D8D2C4; border-radius: 16px; padding: 4px 13px; font-size: 12.5px; font-weight: 500; color: #3F4A44; overflow-wrap: anywhere; }
++.profile-topics a:hover { color: #0B4A36; border-color: #0B4A36; }
++.profile-facts { border-top: 1px solid #EDE8DD; }
++.profile-facts > div { display: grid; grid-template-columns: 110px minmax(0,1fr); gap: 10px; padding: 12px 0; border-bottom: 1px solid #EDE8DD; }
++.profile-facts dt { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #6B6B6B; }
++.profile-facts dd { font-size: 14px; overflow-wrap: anywhere; }
++.profile-empty { padding: 24px 0; font-size: 14px; line-height: 1.6; color: #6B6B6B; }
++.profile-empty a { display: inline-flex; align-items: center; min-height: 44px; color: #0B4A36; font-weight: 600; }
++.profile-pagination { display: flex; justify-content: space-between; gap: 16px; margin-top: 24px; }
++.profile-pagination a { padding: 12px 16px; border: 1px solid #D8D2C4; border-radius: 8px; font-size: 14px; }
++.profile-sticky-anchor { height: 1px; margin-bottom: -1px; }
++.profile-compact { position: fixed; top: var(--app-nav-offset, 64px); left: var(--app-rail-width, 0px); right: 0; z-index: 40; border-bottom: 1px solid #E4DFD4; background: #FAF8F5; font-family: var(--font-public-sans), system-ui, sans-serif; }
++.profile-compact-inner { max-width: 780px; margin: 0 auto; display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 18px; padding: 0 20px; min-height: 56px; }
++.profile-compact-name { font-family: var(--font-newsreader), Georgia, serif; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
++.profile-tabs-compact { border: 0; gap: 16px; }
++.profile-tabs-compact .profile-tab { font-size: 13px; }
++.profile-edit-compact { display: inline-flex; align-items: center; min-height: 36px; padding: 6px 14px; border-radius: 8px; background: #0B4A36; color: #FAF8F5; font-size: 12px; font-weight: 600; white-space: nowrap; }
++.profile-about { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 48px; }
++.profile-about-index { position: sticky; top: calc(var(--app-nav-offset, 64px) + 80px); align-self: start; display: flex; flex-direction: column; gap: 4px; }
++.profile-about-index a { padding: 9px 0; font-size: 13px; color: #6B7570; }
++.profile-about-index [aria-current] { color: #0B4A36; font-weight: 600; text-decoration: underline; text-underline-offset: 5px; }
++.profile-about-content { min-width: 0; font-size: 15px; line-height: 1.7; color: #3F4A44; }
++.profile-about-section { padding-bottom: 26px; margin-bottom: 26px; border-bottom: 1px solid #E9E5DE; scroll-margin-top: 176px; overflow-wrap: anywhere; }
++.profile-about-section h3 { font-size: 15px; font-weight: 600; color: #1B2420; }
++.profile-about-date { margin-top: 4px; font-size: 13px; color: #6B7570; }
++.profile-external-link { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 44px; color: #0B4A36; }
++.profile-external-label { font-size: 10px; letter-spacing: .06em; color: #6B7570; }
++.profile-about-edit { display: inline-flex; min-height: 44px; align-items: center; font-size: 13px; font-weight: 600; color: #0B4A36; }
++@media (max-width: 767px) {
++  .profile-identity-top > :first-child { flex-basis: 100%; }
++  .profile-compact-inner { grid-template-columns: minmax(0,1fr) auto; gap: 0 12px; padding-top: 8px; }
++  .profile-compact-name { grid-row: 1; }
++  .profile-compact-action { grid-column: 2; grid-row: 1; }
++  .profile-compact-tabs { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
++  .profile-tabs-compact { gap: 24px; }
++  .profile-compact-action button { min-height: 36px; }
++  .profile-about { display: block; }
++  .profile-about-index { display: none; }
++  .profile-topics a { min-height: 36px; }
++}
+diff --git a/components/ui/FollowButton.tsx b/components/ui/FollowButton.tsx
+index bc537b3..3f05b45 100644
+--- a/components/ui/FollowButton.tsx
++++ b/components/ui/FollowButton.tsx
+@@ -116,6 +116,7 @@ export default function FollowButton({
+         onClick={handleClick}
+         disabled={isPending}
+         aria-busy={isPending || undefined}
++        aria-pressed={following}
+         aria-label={authorName ? `${label} ${authorName}` : undefined}
+         className={`focus-ring ${sizeClass} border font-semibold transition-colors disabled:opacity-50 ${stateClass}`}
+       >
+diff --git a/lib/db/postgres/profiles.test.ts b/lib/db/postgres/profiles.test.ts
+index 887b544..356237f 100644
+--- a/lib/db/postgres/profiles.test.ts
++++ b/lib/db/postgres/profiles.test.ts
+@@ -92,7 +92,6 @@ describe("the statement", () => {
+       "positioning_statement",
+       "profile_type",
+       "organization_name",
+-      "organization_website",
+       "cover_image_url",
+       "is_alumni",
+       "signup_email",
+@@ -117,6 +116,7 @@ describe("toProfileIdentityRecord", () => {
+       field_of_study: "Political Science",
+       graduation_year: 2028,
+       interests: ["governance", "policy"],
++      organization_website: null,
+       verified: true,
+       verified_type: "institution",
+       created_at: "2026-01-05T09:30:00.123456+00:00",
+diff --git a/lib/db/postgres/profiles.ts b/lib/db/postgres/profiles.ts
+index d6bf504..23cde90 100644
+--- a/lib/db/postgres/profiles.ts
++++ b/lib/db/postgres/profiles.ts
+@@ -51,6 +51,7 @@ export const PROFILE_BY_USERNAME_SQL = `
+     p.field_of_study,
+     p.graduation_year,
+     to_jsonb(p.interests) as interests,
++    p.organization_website,
+     p.verified,
+     p.verified_type,
+     to_jsonb(p.created_at) #>> '{}' as created_at
+@@ -65,6 +66,7 @@ export function toProfileIdentityRecord(
+ ): ProfileIdentityRecord {
+   return {
+     id: String(row.id),
++    organization_website: (row.organization_website as string | null) ?? null,
+     username: String(row.username),
+     full_name: (row.full_name as string | null) ?? null,
+     bio: (row.bio as string | null) ?? null,
+diff --git a/lib/db/profilePage.ownerDrafts.test.ts b/lib/db/profilePage.ownerDrafts.test.ts
+index 0a8e558..37579df 100644
+--- a/lib/db/profilePage.ownerDrafts.test.ts
++++ b/lib/db/profilePage.ownerDrafts.test.ts
+@@ -71,6 +71,7 @@ describe("ownerDrafts, PostgreSQL", () => {
+       {
+         id: "draft-1",
+         title: null,
++        excerpt: null,
+         content_kind: "article",
+         updated_at: new Date("2026-02-01T00:00:00Z"),
+       },
+@@ -86,6 +87,7 @@ describe("ownerDrafts, PostgreSQL", () => {
+       {
+         id: "draft-1",
+         title: null,
++        excerpt: null,
+         content_kind: "article",
+         updated_at: "2026-02-01T00:00:00.000Z",
+       },
+diff --git a/lib/db/profilePage.ts b/lib/db/profilePage.ts
+index 0e09c5a..da5fb14 100644
+--- a/lib/db/profilePage.ts
++++ b/lib/db/profilePage.ts
+@@ -57,6 +57,7 @@ export interface ProfilePublicationRow {
+   published_at: string | null;
+   cover_image_url: string | null;
+   status?: string;
++  word_count?: number | null;
+ }
+ 
+ export interface ProfilePublicationBranches {
+@@ -70,6 +71,7 @@ export interface ProfileDraftRow {
+   title: string | null;
+   content_kind: string | null;
+   updated_at: string;
++  excerpt?: string | null;
+ }
+ 
+ export interface ProfilePageRepository {
+@@ -133,7 +135,7 @@ const VIEWER_RELATIONSHIP_SQL = `
+ const PUBLICATION_BRANCHES_SQL = `
+   select
+     'owned' as branch, p.id, p.author_id, p.title, p.slug, p.excerpt,
+-    p.content_kind, p.created_at, p.published_at, p.cover_image_url
++    p.content_kind, p.created_at, p.published_at, p.cover_image_url, p.word_count
+   from public.posts as p
+   where p.author_id = $1::uuid
+     and p.status = 'published'
+@@ -150,7 +152,7 @@ const PUBLICATION_BRANCHES_SQL = `
+  * connection, which is why the repository only runs it for the owner.
+  */
+ const OWNER_DRAFTS_SQL = `
+-  select p.id, p.title, p.content_kind, p.updated_at
++  select p.id, p.title, p.content_kind, p.updated_at, p.excerpt
+   from public.posts as p
+   where p.author_id = $1::uuid
+     and p.status = 'draft'
+@@ -173,6 +175,7 @@ function toPublicationRow(row: Record<string, unknown>): ProfilePublicationRow {
+     author_id: String(row.author_id),
+     title: (row.title as string | null) ?? null,
+     slug: String(row.slug),
++    word_count: row.word_count == null ? null : toNumber(row.word_count),
+     excerpt: (row.excerpt as string | null) ?? null,
+     content_kind: (row.content_kind as string | null) ?? null,
+     created_at: toIso(row.created_at) ?? "",
+@@ -239,6 +242,7 @@ export function createPostgresProfilePageRepository(
+         title: (row.title as string | null) ?? null,
+         content_kind: (row.content_kind as string | null) ?? null,
+         updated_at: toIso(row.updated_at) ?? "",
++        excerpt: (row.excerpt as string | null) ?? null,
+       }));
+     },
+   };
+@@ -247,8 +251,8 @@ export function createPostgresProfilePageRepository(
+ // ── Supabase ─────────────────────────────────────────────────────────
+ 
+ const PUBLICATION_SELECT =
+-  "id, author_id, title, slug, excerpt, content_kind, created_at, published_at, cover_image_url";
+-const DRAFT_SELECT = "id, title, content_kind, updated_at";
++  "id, author_id, title, slug, excerpt, content_kind, created_at, published_at, cover_image_url, word_count";
++const DRAFT_SELECT = "id, title, content_kind, updated_at, excerpt";
+ 
+ /** A database error is an error, not an empty list. */
+ function rows<T>(result: { data?: unknown; error?: unknown }, label: string): T[] {
+diff --git a/lib/db/supabase/profiles.test.ts b/lib/db/supabase/profiles.test.ts
+index d6971a5..2497fa9 100644
+--- a/lib/db/supabase/profiles.test.ts
++++ b/lib/db/supabase/profiles.test.ts
+@@ -74,6 +74,7 @@ const PROFILE_ROW = {
+   field_of_study: "Political Science",
+   graduation_year: 2028,
+   interests: null,
++  organization_website: null,
+   verified: false,
+   verified_type: null,
+   created_at: "2026-01-05T09:30:00+00:00",
+@@ -101,7 +102,6 @@ describe("PROFILE_IDENTITY_SELECT", () => {
+       "profile_type",
+       "secondary_profile_types",
+       "organization_name",
+-      "organization_website",
+       "cover_image_url",
+       "is_alumni",
+       "open_to_mentoring",
+diff --git a/lib/db/supabase/profiles.ts b/lib/db/supabase/profiles.ts
+index 4a9dab0..2735396 100644
+--- a/lib/db/supabase/profiles.ts
++++ b/lib/db/supabase/profiles.ts
+@@ -20,7 +20,7 @@ import type {
+  * from it, and added `created_at` for the joined date on About.
+  */
+ export const PROFILE_IDENTITY_SELECT =
+-  "id, username, full_name, bio, avatar_url, professional_title, country, university, field_of_study, graduation_year, interests, verified, verified_type, created_at";
++  "id, username, full_name, bio, avatar_url, professional_title, country, university, field_of_study, graduation_year, interests, organization_website, verified, verified_type, created_at";
+ 
+ export const supabaseProfilesRepository: ProfilesRepository = {
+   // Unused, for the same reason as posts.findBySlug: RLS is applied by the
+diff --git a/lib/db/types.ts b/lib/db/types.ts
+index 9aa00e2..1e5dc46 100644
+--- a/lib/db/types.ts
++++ b/lib/db/types.ts
+@@ -115,6 +115,8 @@ export interface Database {
+  * this so no caller has to move.
+  */
+ export interface ProfileIdentityRecord {
++  /** Existing writer-supplied organisation URL; read-only on this surface. */
++  organization_website?: string | null;
+   id: string;
+   username: string;
+   full_name: string | null;
+diff --git a/lib/devFixtures/profileFixtures.ts b/lib/devFixtures/profileFixtures.ts
+new file mode 100644
+index 0000000..5ec109d
+--- /dev/null
++++ b/lib/devFixtures/profileFixtures.ts
+@@ -0,0 +1,29 @@
++import type { ProfileIdentityRecord, ProfilePublicationPage, ProfileDraft } from "@/lib/profileViewData";
++
++// Fictional fixtures consumed only by the production-gated development preview.
++export const PROFILE_FIXTURE: ProfileIdentityRecord = {
++  id: "fixture-writer", username: "amara", full_name: "Amara Okafor",
++  bio: "I write about cities, public life and the everyday decisions that shape our communities. My work explores how people experience institutions, and how thoughtful design can make them more useful. I am interested in practical ideas, careful observation and conversations across disciplines.",
++  avatar_url: null, professional_title: "Researcher · Writer", country: "Nigeria",
++  university: "University of Lagos", field_of_study: "Urban Studies", graduation_year: 2023,
++  interests: ["Governance", "Technology", "Education"], verified: true, verified_type: null,
++  organization_website: "https://example.org/", created_at: "2023-09-01T00:00:00Z",
++};
++export function profileFixturePage(kind: "article" | "post", empty = false): ProfilePublicationPage {
++  return {
++    kind, page: 1, pageSize: 20, hasPreviousPage: false, hasNextPage: false,
++    items: empty ? [] : [0, 1].map(index => ({
++      id: `fixture-${kind}-${index}`, slug: `fixture-${kind}-${index}`,
++      kind, title: kind === "article" ? ["The city we build together", "What listening can change"][index] : null,
++      excerpt: kind === "article" ? ["A closer look at the small decisions that shape the places we call home.", "Public institutions work better when people have a voice in their design."][index]
++        : ["A useful question for any new public space: who will feel welcome here, and who will need an invitation?", "Some of the best ideas begin with a walk, a conversation, and enough time to notice what everyone else passes by."][index],
++      coverImageUrl: index === 0 ? "/dev-fixtures/cover-emerald.svg" : null,
++      publishedAt: "2026-09-20T10:00:00Z", createdAt: "2026-09-20T10:00:00Z", isCoAuthor: false, wordCount: 1000,
++    })),
++  };
++}
++export const PROFILE_DRAFT_FIXTURES: ProfileDraft[] = [
++  { id: "fixture-draft-1", kind: "article", title: "Making room for public life", updatedAt: "2026-09-21T10:00:00Z" },
++  { id: "fixture-draft-2", kind: "article", title: null, updatedAt: "2026-09-20T10:00:00Z" },
++  { id: "fixture-draft-3", kind: "post", title: null, excerpt: "A note about the spaces between buildings.", updatedAt: "2026-09-19T10:00:00Z" },
++];
+diff --git a/lib/profileIdentity.ts b/lib/profileIdentity.ts
+index a1819e5..7110cc8 100644
+--- a/lib/profileIdentity.ts
++++ b/lib/profileIdentity.ts
+@@ -15,6 +15,7 @@ export interface PublicProfileIdentity {
+   avatar_url: string | null;
+   /** The member's own headline. Stored in `profiles.professional_title`. */
+   professional_title?: string | null;
++  verified?: boolean;
+ }
+ 
+ /** A headline is one line under a name, not a paragraph. */
+@@ -34,6 +35,7 @@ export function getProfileDisplayName(profile: {
+ /** The headline as it reads under a name, with pasted line breaks collapsed. */
+ export function getProfileHeadline(profile: {
+   professional_title?: string | null;
++  verified?: boolean;
+ }): string | null {
+   const collapsed = profile.professional_title?.replace(/\s+/g, " ").trim();
+   return collapsed ? collapsed : null;
+@@ -43,6 +45,7 @@ export function getProfileTitle(profile: {
+   full_name: string | null;
+   username: string;
+   professional_title?: string | null;
++  verified?: boolean;
+ }) {
+   const name = getProfileDisplayName(profile);
+   const headline = getProfileHeadline(profile);
+diff --git a/lib/profileLayout.ts b/lib/profileLayout.ts
+index e945866..b6cf109 100644
+--- a/lib/profileLayout.ts
++++ b/lib/profileLayout.ts
+@@ -1,7 +1,2 @@
+-/**
+- * A writer's profile is one reading column: the header, the tabs, and a list
+- * or About beneath them. The publishing reset, Phase 2G, removed the
+- * Background rail and the separate full record, which were the reasons this
+- * file once carried a wide shell, a record shell and a two-column grid.
+- */
+-export const PROFILE_SHELL = "mx-auto w-full max-w-[720px]";
++/** Shared reading width for the profile and its loading state. */
++export const PROFILE_SHELL = "writer-profile";
+diff --git a/lib/profileTabs.test.ts b/lib/profileTabs.test.ts
+index 9629a43..d7960ef 100644
+--- a/lib/profileTabs.test.ts
++++ b/lib/profileTabs.test.ts
+@@ -10,9 +10,9 @@ import {
+ } from "./profileTabs";
+ 
+ describe("the profile tabs", () => {
+-  it("are Posts, Articles and About, opening on Posts", () => {
+-    expect([...PROFILE_TABS]).toEqual(["posts", "articles", "about"]);
+-    expect(DEFAULT_PROFILE_TAB).toBe("posts");
++  it("are Overview, About, Articles and Posts, opening on Overview", () => {
++    expect([...PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts"]);
++    expect(DEFAULT_PROFILE_TAB).toBe("overview");
+   });
+ 
+   it("open the tab a query names", () => {
+@@ -22,26 +22,26 @@ describe("the profile tabs", () => {
+   });
+ 
+   it("open the default tab for every retired view", () => {
+-    for (const view of ["overview", "research", "responses", "record", "featured", "brief"]) {
+-      expect(resolveProfileTab({ view })).toBe("posts");
++    for (const view of ["research", "responses", "record", "featured", "brief"]) {
++      expect(resolveProfileTab({ view })).toBe("overview");
+     }
+-    expect(resolveProfileTab({})).toBe("posts");
++    expect(resolveProfileTab({})).toBe("overview");
+   });
+ 
+   it("honour an old record link's type after its redirect", () => {
+     expect(resolveProfileTab({ type: "posts" })).toBe("posts");
+     expect(resolveProfileTab({ type: "articles" })).toBe("articles");
+-    expect(resolveProfileTab({ type: "publications" })).toBe("posts");
+-    expect(resolveProfileTab({ type: "research" })).toBe("posts");
++    expect(resolveProfileTab({ type: "publications" })).toBe("overview");
++    expect(resolveProfileTab({ type: "research" })).toBe("overview");
+     // A real view wins over a legacy type.
+     expect(resolveProfileTab({ view: "about", type: "articles" })).toBe("about");
+   });
+ 
+   it("build plain addresses, with no query on the default tab", () => {
+-    expect(profileTabHref("ada", "posts")).toBe("/ada");
++    expect(profileTabHref("ada", "overview")).toBe("/ada");
+     expect(profileTabHref("ada", "articles")).toBe("/ada?view=articles");
+     expect(profileTabHref("ada", "about")).toBe("/ada?view=about");
+-    expect(profileTabHref("ada", "posts", 2)).toBe("/ada?page=2");
++    expect(profileTabHref("ada", "posts", 2)).toBe("/ada?view=posts&page=2");
+     expect(profileTabHref("ada", "articles", 3)).toBe("/ada?view=articles&page=3");
+   });
+ 
+diff --git a/lib/profileTabs.ts b/lib/profileTabs.ts
+index fb88181..4d4ce32 100644
+--- a/lib/profileTabs.ts
++++ b/lib/profileTabs.ts
+@@ -1,13 +1,14 @@
+ import { resolveContentKind } from "@/lib/contentModel";
+ 
+-export const PUBLIC_PROFILE_TABS = ["posts", "articles", "about"] as const;
+-export const OWNER_PROFILE_TABS = ["posts", "articles", "drafts", "about"] as const;
++export const PUBLIC_PROFILE_TABS = ["overview", "about", "articles", "posts"] as const;
++export const OWNER_PROFILE_TABS = ["overview", "about", "articles", "posts", "drafts"] as const;
+ export const PROFILE_TABS = PUBLIC_PROFILE_TABS;
+ 
+ export type ProfileTab = (typeof OWNER_PROFILE_TABS)[number];
+-export const DEFAULT_PROFILE_TAB: ProfileTab = "posts";
++export const DEFAULT_PROFILE_TAB: ProfileTab = "overview";
+ 
+ export const PROFILE_TAB_LABELS: Record<ProfileTab, string> = {
++  overview: "Overview",
+   posts: "Posts",
+   articles: "Articles",
+   drafts: "Drafts",
+@@ -17,7 +18,7 @@ export const PROFILE_TAB_LABELS: Record<ProfileTab, string> = {
+ export type ProfilePublicationKind = "post" | "article";
+ 
+ export const PROFILE_TAB_KIND: Record<
+-  Exclude<ProfileTab, "about" | "drafts">,
++  Exclude<ProfileTab, "overview" | "about" | "drafts">,
+   ProfilePublicationKind
+ > = {
+   posts: "post",
+@@ -61,7 +62,7 @@ export function resolveProfilePage(value: string | string[] | undefined): number
+ export function profileTabHref(username: string, tab: ProfileTab, page = 1) {
+   const params = new URLSearchParams();
+   if (tab !== DEFAULT_PROFILE_TAB) params.set("view", tab);
+-  if (page > 1 && tab !== "about" && tab !== "drafts") params.set("page", String(page));
++  if (page > 1 && (tab === "posts" || tab === "articles")) params.set("page", String(page));
+   const query = params.toString();
+   return `/${username}${query ? `?${query}` : ""}`;
+ }
+\ No newline at end of file
+diff --git a/lib/profileViewData.test.ts b/lib/profileViewData.test.ts
+index 52ccb33..63a6b01 100644
+--- a/lib/profileViewData.test.ts
++++ b/lib/profileViewData.test.ts
+@@ -50,10 +50,10 @@ function makeClient({ routes = {} }: { routes?: Routes } = {}) {
+   const rpcNames: string[] = [];
+   /** Every table call with its equality filters, so a test can tell a drafts
+    *  query from a publications query on the same table. */
+-  const queries: Array<{ table: string; eq: Array<[string, unknown]> }> = [];
++  const queries: Array<{ table: string; eq: Array<[string, unknown]>; ranges: number[][]; kinds: string[][] }> = [];
+ 
+   const chainFor = (table: string) => {
+-    const query = { table, eq: [] as Array<[string, unknown]> };
++    const query = { table, eq: [] as Array<[string, unknown]>, ranges: [] as number[][], kinds: [] as string[][] };
+     queries.push(query);
+     const resolve = () => {
+       const route = routes[table] ?? { data: null, error: null };
+@@ -68,6 +68,8 @@ function makeClient({ routes = {} }: { routes?: Routes } = {}) {
+     for (const method of ["select", "neq", "in", "or", "not", "order", "limit", "range"]) {
+       chain[method] = () => chain;
+     }
++    chain.range = (start: number, end: number) => { query.ranges.push([start, end]); return chain; };
++    chain.in = (_column: string, values: string[]) => { query.kinds.push(values); return chain; };
+     chain.eq = (column: string, value: unknown) => {
+       query.eq.push([column, value]);
+       return chain;
+@@ -345,7 +347,7 @@ describe("what a profile view reads", () => {
+ 
+   it("is three table reads and no RPC for a signed-out reader on Posts", async () => {
+     const { client, tables, rpcNames } = viewWith(null);
+-    await loadProfileView({ supabase: client, username: "student1" });
++    await loadProfileView({ supabase: client, username: "student1", tab: "posts" });
+     expect([...tables].sort()).toEqual(["follows", "follows", "posts"]);
+     expect(rpcNames).toEqual([]);
+   });
+@@ -358,7 +360,7 @@ describe("what a profile view reads", () => {
+ 
+   it("adds the viewer's follow and block state for a signed-in visitor", async () => {
+     const { client, tables } = viewWith({ id: "reader-1" });
+-    await loadProfileView({ supabase: client, username: "student1" });
++    await loadProfileView({ supabase: client, username: "student1", tab: "posts" });
+     expect([...tables].sort()).toEqual([
+       "follows",
+       "follows",
+@@ -377,7 +379,7 @@ describe("what a profile view reads", () => {
+   });
+ 
+   it("reads no co-author credits for any tab", async () => {
+-    for (const tab of ["posts", "articles", "about"] as const) {
++    for (const tab of ["overview", "posts", "articles", "about"] as const) {
+       const { client, tables } = viewWith({ id: "reader-1" });
+       await loadProfileView({ supabase: client, username: "student1", tab });
+       expect(tables).not.toContain("post_authors");
+@@ -434,8 +436,8 @@ describe("the owner's Drafts tab", () => {
+     expect(data?.tab).toBe("drafts");
+     expect(data?.publications).toBeNull();
+     expect(data?.drafts).toEqual([
+-      { id: "draft-2", title: "Second thoughts", kind: "article", updatedAt: "2026-02-02T00:00:00Z" },
+-      { id: "draft-1", title: null, kind: "post", updatedAt: "2026-02-01T00:00:00Z" },
++      { id: "draft-2", title: "Second thoughts", kind: "article", updatedAt: "2026-02-02T00:00:00Z", excerpt: null },
++      { id: "draft-1", title: null, kind: "post", updatedAt: "2026-02-01T00:00:00Z", excerpt: null },
+     ]);
+     expect([...tables].sort()).toEqual(["follows", "follows", "posts"]);
+ 
+@@ -444,27 +446,27 @@ describe("the owner's Drafts tab", () => {
+     expect(drafts[0]?.eq).toContainEqual(["author_id", "author-1"]);
+   });
+ 
+-  it("gives a signed-in visitor forcing Drafts the Posts tab, and never asks for drafts", async () => {
++  it("gives a signed-in visitor forcing Drafts the Overview tab, and never asks for drafts", async () => {
+     const { client, queries } = viewWith({ id: "reader-1" });
+     const data = await loadProfileView({ supabase: client, username: "student1", tab: "drafts" });
+ 
+-    expect(data?.tab).toBe("posts");
++    expect(data?.tab).toBe("overview");
+     expect(data?.drafts).toBeNull();
+-    expect(data?.publications?.kind).toBe("post");
++    expect(data?.overview?.posts.kind).toBe("post");
+     expect(draftQueries(queries)).toEqual([]);
+   });
+ 
+-  it("gives a signed-out reader forcing Drafts the Posts tab, and never asks for drafts", async () => {
++  it("gives a signed-out reader forcing Drafts the Overview tab, and never asks for drafts", async () => {
+     const { client, queries } = viewWith(null);
+     const data = await loadProfileView({ supabase: client, username: "student1", tab: "drafts" });
+ 
+-    expect(data?.tab).toBe("posts");
++    expect(data?.tab).toBe("overview");
+     expect(data?.drafts).toBeNull();
+     expect(draftQueries(queries)).toEqual([]);
+   });
+ 
+   it("does not load drafts on any other tab, even for the owner", async () => {
+-    for (const tab of ["posts", "articles", "about"] as const) {
++    for (const tab of ["overview", "posts", "articles", "about"] as const) {
+       const { client, queries } = viewWith({ id: "author-1" });
+       const data = await loadProfileView({ supabase: client, username: "student1", tab });
+       expect(data?.drafts).toBeNull();
+@@ -490,3 +492,28 @@ describe("the owner's Drafts tab", () => {
+     ).rejects.toThrow(/drafts failed/);
+   });
+ });
++
++
++describe("Overview bounded public reads", () => {
++  it("loads two items of each canonical kind, with one lookahead and no draft query", async () => {
++    findIdentityByUsername.mockResolvedValue(PROFILE_ROW);
++    const { client, queries } = makeClient({ routes: {
++      follows: { count: 2, data: null },
++      posts: { data: [row({ id: "one" }), row({ id: "two" }), row({ id: "three" })] },
++    } });
++    const data = await loadProfileView({ supabase: client, username: "student1" });
++    expect(data?.tab).toBe("overview");
++    expect(data?.drafts).toBeNull();
++    expect(data?.publications).toBeNull();
++    expect(data?.overview?.articles.items).toHaveLength(2);
++    expect(data?.overview?.posts.items).toHaveLength(2);
++    const reads = queries.filter(query => query.table === "posts");
++    expect(reads).toHaveLength(2);
++    expect(reads.map(query => query.kinds)).toEqual([[["article"]], [["post"]]]);
++    for (const read of reads) {
++      expect(read.eq).toContainEqual(["status", "published"]);
++      expect(read.eq).toContainEqual(["author_id", "author-1"]);
++      expect(read.ranges).toEqual([[0, 2]]);
++    }
++  });
++});
+diff --git a/lib/profileViewData.ts b/lib/profileViewData.ts
+index 4456525..255931f 100644
+--- a/lib/profileViewData.ts
++++ b/lib/profileViewData.ts
+@@ -19,12 +19,12 @@ import { sanitizePostExcerpt } from "@/lib/utils";
+ /**
+  * The server-side data layer for a writer's profile.
+  *
+- * A profile is a header and one of its tabs (see lib/profileTabs.ts): Posts,
+- * Articles and About for everyone, and Drafts for the owner. The header needs
++ * A profile is a header and one of its tabs (see lib/profileTabs.ts): Overview, About,
++ * Articles and Posts for everyone, and Drafts for the owner. The header needs
+  * the identity row, the two relationship counts and, for a signed-in
+  * stranger, their relationship to the profile. Posts and Articles each add one
+- * page of that kind, and Drafts adds the owner's drafts. About adds nothing:
+- * everything it shows is on the identity row.
++ * page of that kind, and Drafts adds the owner's drafts. Overview reads two bounded publication previews concurrently. About adds
++ * nothing: everything it shows is on the identity row.
+  *
+  * Two rules the callers depend on.
+  *
+@@ -64,6 +64,7 @@ export interface ProfilePublication {
+   publishedAt: string | null;
+   createdAt: string;
+   isCoAuthor: boolean;
++  wordCount?: number | null;
+ }
+ 
+ export interface ProfilePublicationPage {
+@@ -81,16 +82,18 @@ export interface ProfileDraft {
+   title: string | null;
+   kind: ProfilePublicationKind;
+   updatedAt: string;
++  excerpt?: string | null;
+ }
+ 
+ export interface ProfileViewData {
+   profile: ProfileIdentityRecord;
+   viewer: ProfileViewerContext;
+   tab: ProfileTab;
+-  /** Present for Posts and Articles, null for Drafts and About. */
++  /** Present for Posts and Articles only. Overview has its own bounded previews. */
+   publications: ProfilePublicationPage | null;
+   /** Present only on the owner's Drafts tab. */
+   drafts: ProfileDraft[] | null;
++  overview: { articles: ProfilePublicationPage; posts: ProfilePublicationPage } | null;
+ }
+ 
+ /**
+@@ -120,6 +123,7 @@ function toPublication(
+     publishedAt: row.published_at,
+     createdAt: row.created_at,
+     isCoAuthor,
++    wordCount: row.word_count ?? null,
+   };
+ }
+ 
+@@ -281,6 +285,7 @@ export async function loadProfileDrafts({
+     title: row.title,
+     kind: profilePublicationKind(row) ?? "post",
+     updatedAt: row.updated_at,
++    excerpt: row.excerpt ? sanitizePostExcerpt(row.excerpt) : null,
+   }));
+ }
+ 
+@@ -311,13 +316,13 @@ export async function loadProfileView({
+   const isOwnProfile = viewer?.id === profile.id;
+   const effectiveTab = tab === "drafts" && !isOwnProfile ? DEFAULT_PROFILE_TAB : tab;
+ 
+-  const [viewerContext, publications, drafts] = await Promise.all([
++  const [viewerContext, publications, drafts, overview] = await Promise.all([
+     loadProfileViewerContext({
+       supabase,
+       profileId: profile.id,
+       viewerId: viewer?.id ?? null,
+     }),
+-    effectiveTab === "about" || effectiveTab === "drafts"
++    effectiveTab === "overview" || effectiveTab === "about" || effectiveTab === "drafts"
+       ? Promise.resolve(null)
+       : loadProfilePublications({
+           supabase,
+@@ -332,6 +337,12 @@ export async function loadProfileView({
+           viewerId: viewer.id,
+         })
+       : Promise.resolve(null),
++    effectiveTab === "overview"
++      ? Promise.all([
++          loadProfilePublications({ supabase, profileId: profile.id, kind: "article", pageSize: 2 }),
++          loadProfilePublications({ supabase, profileId: profile.id, kind: "post", pageSize: 2 }),
++        ]).then(([articles, posts]) => ({ articles, posts }))
++      : Promise.resolve(null),
+   ]);
+ 
+   return {
+@@ -340,5 +351,6 @@ export async function loadProfileView({
+     tab: effectiveTab,
+     publications,
+     drafts,
++    overview,
+   };
+ }
+diff --git a/lib/simpleWriterProfile.test.ts b/lib/simpleWriterProfile.test.ts
+index 9d57679..dc5fb12 100644
+--- a/lib/simpleWriterProfile.test.ts
++++ b/lib/simpleWriterProfile.test.ts
+@@ -136,13 +136,13 @@ describe("simple writer profile: the retired modules are gone", () => {
+ });
+ 
+ describe("simple writer profile: the profile", () => {
+-  it("is three tabs", () => {
+-    expect([...PROFILE_TABS]).toEqual(["posts", "articles", "about"]);
++  it("uses the approved four public tabs", () => {
++    expect([...PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts"]);
+   });
+ 
+   it("adds Drafts for the owner only", () => {
+-    expect([...PUBLIC_PROFILE_TABS]).toEqual(["posts", "articles", "about"]);
+-    expect([...OWNER_PROFILE_TABS]).toEqual(["posts", "articles", "drafts", "about"]);
++    expect([...PUBLIC_PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts"]);
++    expect([...OWNER_PROFILE_TABS]).toEqual(["overview", "about", "articles", "posts", "drafts"]);
+ 
+     const tabs = codeOf("components/profile/ProfileTabs.tsx");
+     expect(tabs).toMatch(/isOwnProfile \? OWNER_PROFILE_TABS : PUBLIC_PROFILE_TABS/);
+@@ -165,6 +165,8 @@ describe("simple writer profile: the profile", () => {
+         "next",
+         "next/navigation",
+         "@/components/profile/ProfileAbout",
++        "@/components/profile/ProfileOverview",
++        "@/components/profile/StickyProfileBar",
+         "@/components/profile/ProfileDraftList",
+         "@/components/profile/ProfileHeader",
+         "@/components/profile/ProfilePublicationList",
+@@ -190,7 +192,7 @@ describe("simple writer profile: the profile", () => {
+   it("uses no record, evidence, credibility or completion language on a profile, onboarding or settings surface", () => {
+     expect(
+       filesMatching(
+-        /Intellectual Record|intellectual identity|intellectual focus|evidence-backed|Demonstrated (?:expertise|topics)|Writes about|Recognition|credibility|citable|source-backed|Featured Work|Selected work|Why I featured|% complete|Complete your profile|Complete profile/i,
++        /Intellectual Record|intellectual identity|intellectual focus|evidence-backed|Demonstrated (?:expertise|topics)|credibility|citable|source-backed|Featured Work|Selected work|Why I featured|% complete|Complete your profile|Complete profile/i,
+         { within: isProfileSurface }
+       )
+     ).toEqual([]);
+@@ -221,6 +223,11 @@ describe("simple writer profile: the profile", () => {
+       filesMatching(
+         /\b(?:profile_type|secondary_profile_types|positioning_statement|organization_name|organization_website|is_alumni|open_to_mentoring|cover_image_url|coverImageUrl|current_path|work_category)\b/,
+         {
++          allowed: {
++            "lib/db/supabase/profiles.ts": "Existing external link projection",
++            "lib/db/postgres/profiles.ts": "Same external link projection",
++            "components/profile/ProfileAbout.tsx": "Validated external work URL",
++          },
+           within: (file) =>
+             identitySurfaces.has(file) ||
+             file.startsWith("app/(main)/settings/profile/") ||

@@ -15,6 +15,7 @@ export interface PublicProfileIdentity {
   avatar_url: string | null;
   /** The member's own headline. Stored in `profiles.professional_title`. */
   professional_title?: string | null;
+  verified?: boolean;
 }
 
 /** A headline is one line under a name, not a paragraph. */
@@ -34,6 +35,7 @@ export function getProfileDisplayName(profile: {
 /** The headline as it reads under a name, with pasted line breaks collapsed. */
 export function getProfileHeadline(profile: {
   professional_title?: string | null;
+  verified?: boolean;
 }): string | null {
   const collapsed = profile.professional_title?.replace(/\s+/g, " ").trim();
   return collapsed ? collapsed : null;
@@ -43,6 +45,7 @@ export function getProfileTitle(profile: {
   full_name: string | null;
   username: string;
   professional_title?: string | null;
+  verified?: boolean;
 }) {
   const name = getProfileDisplayName(profile);
   const headline = getProfileHeadline(profile);

@@ -57,10 +57,10 @@ describe("ProfileHeader identity", () => {
     expect(screen.getByRole("heading", { level: 1, name: "A Student" })).toBeInTheDocument();
     expect(screen.getByText("@student1")).toBeInTheDocument();
     expect(screen.getByText("Policy researcher")).toBeInTheDocument();
-    // One line under the name. The bio is on About.
+    // Headline and bio have separate positions in the approved hierarchy.
     expect(
       screen.queryByText("Writes about governance and institutions.")
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
   });
 
   it("shows the bio when the writer has no headline", () => {
@@ -81,15 +81,14 @@ describe("ProfileHeader identity", () => {
     expect(screen.getByRole("heading", { level: 1, name: "student1" })).toBeInTheDocument();
   });
 
-  it("shows no verified prestige mark, even for an account the database marks verified", () => {
-    // Verified prestige was retired in the final UI simplification. A stored
-    // row can still carry the columns, so they are passed through here the way
-    // an untyped caller could, and must not render.
-    renderHeader({
-      profileOverrides: { verified: true, verified_type: "student" } as Partial<HeaderProps["profile"]>,
-    });
+  it("shows only the identity verification label for a verified account", () => {
+    renderHeader({ profileOverrides: { verified: true } });
+    expect(screen.getByRole("img", { name: "Identity verified by Indegenuis" })).toHaveAttribute("title", "Identity verified by Indegenuis");
+  });
+
+  it("does not show verification for an unverified account", () => {
+    renderHeader({ profileOverrides: { verified: false } });
     expect(screen.queryByRole("img", { name: /verified/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/verified/i)).not.toBeInTheDocument();
   });
 
   it("offers the More actions control with a readable glyph", () => {
@@ -110,7 +109,6 @@ describe("ProfileHeader carries no record and no credibility", () => {
 
     for (const retired of [
       /Intellectual Record/i,
-      /Writes about/i,
       /citable/i,
       /source-backed/i,
       /intellectual focus/i,

@@ -19,12 +19,12 @@ import { sanitizePostExcerpt } from "@/lib/utils";
 /**
  * The server-side data layer for a writer's profile.
  *
- * A profile is a header and one of its tabs (see lib/profileTabs.ts): Posts,
- * Articles and About for everyone, and Drafts for the owner. The header needs
+ * A profile is a header and one of its tabs (see lib/profileTabs.ts): Overview, About,
+ * Articles and Posts for everyone, and Drafts for the owner. The header needs
  * the identity row, the two relationship counts and, for a signed-in
  * stranger, their relationship to the profile. Posts and Articles each add one
- * page of that kind, and Drafts adds the owner's drafts. About adds nothing:
- * everything it shows is on the identity row.
+ * page of that kind, and Drafts adds the owner's drafts. Overview reads two bounded publication previews concurrently. About adds
+ * nothing: everything it shows is on the identity row.
  *
  * Two rules the callers depend on.
  *
@@ -64,6 +64,7 @@ export interface ProfilePublication {
   publishedAt: string | null;
   createdAt: string;
   isCoAuthor: boolean;
+  wordCount?: number | null;
 }
 
 export interface ProfilePublicationPage {
@@ -81,16 +82,18 @@ export interface ProfileDraft {
   title: string | null;
   kind: ProfilePublicationKind;
   updatedAt: string;
+  excerpt?: string | null;
 }
 
 export interface ProfileViewData {
   profile: ProfileIdentityRecord;
   viewer: ProfileViewerContext;
   tab: ProfileTab;
-  /** Present for Posts and Articles, null for Drafts and About. */
+  /** Present for Posts and Articles only. Overview has its own bounded previews. */
   publications: ProfilePublicationPage | null;
   /** Present only on the owner's Drafts tab. */
   drafts: ProfileDraft[] | null;
+  overview: { articles: ProfilePublicationPage; posts: ProfilePublicationPage } | null;
 }
 
 /**
@@ -120,6 +123,7 @@ function toPublication(
     publishedAt: row.published_at,
     createdAt: row.created_at,
     isCoAuthor,
+    wordCount: row.word_count ?? null,
   };
 }
 
@@ -281,6 +285,7 @@ export async function loadProfileDrafts({
     title: row.title,
     kind: profilePublicationKind(row) ?? "post",
     updatedAt: row.updated_at,
+    excerpt: row.excerpt ? sanitizePostExcerpt(row.excerpt) : null,
   }));
 }
 
@@ -311,13 +316,13 @@ export async function loadProfileView({
   const isOwnProfile = viewer?.id === profile.id;
   const effectiveTab = tab === "drafts" && !isOwnProfile ? DEFAULT_PROFILE_TAB : tab;
 
-  const [viewerContext, publications, drafts] = await Promise.all([
+  const [viewerContext, publications, drafts, overview] = await Promise.all([
     loadProfileViewerContext({
       supabase,
       profileId: profile.id,
       viewerId: viewer?.id ?? null,
     }),
-    effectiveTab === "about" || effectiveTab === "drafts"
+    effectiveTab === "overview" || effectiveTab === "about" || effectiveTab === "drafts"
       ? Promise.resolve(null)
       : loadProfilePublications({
           supabase,
@@ -332,6 +337,12 @@ export async function loadProfileView({
           viewerId: viewer.id,
         })
       : Promise.resolve(null),
+    effectiveTab === "overview"
+      ? Promise.all([
+          loadProfilePublications({ supabase, profileId: profile.id, kind: "article", pageSize: 2 }),
+          loadProfilePublications({ supabase, profileId: profile.id, kind: "post", pageSize: 2 }),
+        ]).then(([articles, posts]) => ({ articles, posts }))
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -340,5 +351,6 @@ export async function loadProfileView({
     tab: effectiveTab,
     publications,
     drafts,
+    overview,
   };
 }

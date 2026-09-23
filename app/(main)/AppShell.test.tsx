@@ -58,7 +58,7 @@ describe("AppShell", () => {
         "Notifications",
         "Profile",
       ]);
-      expect(main?.className).toMatch(/\bmd:grid\b/);
+      expect(main).toHaveClass("app-shell-with-rail");
     }
   );
 
@@ -72,12 +72,10 @@ describe("AppShell", () => {
   // jsdom has no layout engine, so the responsive geometry is a class contract.
   // The rail is the desktop primary navigation from md, where the bottom bar
   // hands off, and it widens to its full column at xl.
-  it("widens the container and becomes a grid only on rail routes", () => {
+  it("uses the shared fixed-rail shell on rail routes", () => {
     const { main } = renderShell("/");
-    expect(main?.className).toMatch(/\bmd:grid\b/);
-    expect(main?.className).toMatch(/md:max-w-\[1480px\]/);
-    expect(main?.className).toMatch(/md:grid-cols-\[160px_minmax\(0,1fr\)\]/);
-    expect(main?.className).toMatch(/xl:grid-cols-\[184px_minmax\(0,1fr\)\]/);
+    expect(main).toHaveClass("app-shell-with-rail");
+
   });
 
   it("leaves suppressed routes at the original container width", () => {

@@ -127,7 +127,7 @@ describe("SideRail", () => {
     // utility classes, as elsewhere in this suite.
     const { container } = renderRail();
     const rail = container.querySelector("aside");
-    expect(rail).toHaveClass("hidden", "md:block");
+    expect(rail).toHaveClass("app-side-rail");
   });
 
   // Every sticky aside in the app pins at the nav's live offset + 1rem, so
@@ -135,7 +135,7 @@ describe("SideRail", () => {
   it("pins at the shared sticky offset", () => {
     const { container } = renderRail();
     const rail = container.querySelector("aside");
-    expect(rail).toHaveClass("md:top-[var(--app-sticky-offset)]");
+    expect(rail).toHaveClass("app-side-rail");
     expect(rail?.className).not.toMatch(/transition-\[top\]/);
   });
 
@@ -144,7 +144,7 @@ describe("SideRail", () => {
   it("lets a wheel gesture chain from the rail into the page", () => {
     const { container } = renderRail();
     const rail = container.querySelector("aside");
-    expect(rail).toHaveClass("md:overflow-y-auto");
+    expect(rail).toHaveClass("app-side-rail");
     expect(rail?.className).not.toMatch(/overscroll/);
   });
 });

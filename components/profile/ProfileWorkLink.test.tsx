@@ -168,7 +168,7 @@ describe("ProfilePublicationList", () => {
     );
     expect(screen.getByText("No articles yet.")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Write your first Post or Article." })
+      screen.getByRole("link", { name: "Write your first Post or Article" })
     ).toHaveAttribute("href", "/write");
     expect(screen.getAllByRole("link")).toHaveLength(1);
   });

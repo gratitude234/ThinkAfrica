@@ -1,0 +1,193 @@
+{
+  "results": [
+    {
+      "label": "1440: no horizontal overflow",
+      "pass": true
+    },
+    {
+      "label": "1440: header height",
+      "pass": true
+    },
+    {
+      "label": "1440: rail geometry",
+      "pass": true
+    },
+    {
+      "label": "1440: reading width",
+      "pass": true
+    },
+    {
+      "label": "1440: visitor tab order",
+      "pass": true
+    },
+    {
+      "label": "1440: compact profile appears",
+      "pass": true
+    },
+    {
+      "label": "900: no horizontal overflow",
+      "pass": true
+    },
+    {
+      "label": "900: header height",
+      "pass": true
+    },
+    {
+      "label": "900: rail geometry",
+      "pass": true
+    },
+    {
+      "label": "900: reading width",
+      "pass": true
+    },
+    {
+      "label": "900: visitor tab order",
+      "pass": true
+    },
+    {
+      "label": "900: compact profile appears",
+      "pass": true
+    },
+    {
+      "label": "390: no horizontal overflow",
+      "pass": true
+    },
+    {
+      "label": "390: header height",
+      "pass": true
+    },
+    {
+      "label": "390: rail geometry",
+      "pass": true
+    },
+    {
+      "label": "390: reading width",
+      "pass": true
+    },
+    {
+      "label": "390: visitor tab order",
+      "pass": true
+    },
+    {
+      "label": "390: compact profile appears",
+      "pass": true
+    },
+    {
+      "label": "390: compact profile has two rows",
+      "pass": true
+    },
+    {
+      "label": "long owner name and username do not overflow",
+      "pass": true
+    },
+    {
+      "label": "owner has Drafts",
+      "pass": true
+    },
+    {
+      "label": "tab navigation updates URL",
+      "pass": true
+    },
+    {
+      "label": "refresh preserves About",
+      "pass": true
+    },
+    {
+      "label": "back restores Overview",
+      "pass": true
+    },
+    {
+      "label": "long bio expands",
+      "pass": true
+    },
+    {
+      "label": "long bio collapses",
+      "pass": true
+    },
+    {
+      "label": "articles: populated archive",
+      "pass": true
+    },
+    {
+      "label": "articles: owner empty state",
+      "pass": true
+    },
+    {
+      "label": "posts: populated archive",
+      "pass": true
+    },
+    {
+      "label": "posts: owner empty state",
+      "pass": true
+    },
+    {
+      "label": "untitled Article draft",
+      "pass": true
+    },
+    {
+      "label": "Post draft preview",
+      "pass": true
+    },
+    {
+      "label": "drafts: owner empty state",
+      "pass": true
+    },
+    {
+      "label": "sparse About hides unavailable education",
+      "pass": true
+    },
+    {
+      "label": "short bio has no expansion toggle",
+      "pass": true
+    },
+    {
+      "label": "unverified badge hidden",
+      "pass": true
+    },
+    {
+      "label": "articles: visitor empty state",
+      "pass": true
+    },
+    {
+      "label": "articles: visitor has no writing CTA",
+      "pass": true
+    },
+    {
+      "label": "posts: visitor empty state",
+      "pass": true
+    },
+    {
+      "label": "posts: visitor has no writing CTA",
+      "pass": true
+    },
+    {
+      "label": "Following state accessible",
+      "pass": true
+    },
+    {
+      "label": "More popover contains copy action",
+      "pass": true
+    },
+    {
+      "label": "Escape closes More popover",
+      "pass": true
+    },
+    {
+      "label": "Escape returns focus",
+      "pass": true
+    },
+    {
+      "label": "outside click closes popover",
+      "pass": true
+    },
+    {
+      "label": "About index scroll keeps target visible",
+      "pass": true
+    },
+    {
+      "label": "no browser JavaScript errors",
+      "pass": true
+    }
+  ],
+  "errors": []
+}

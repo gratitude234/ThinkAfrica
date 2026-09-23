@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import ProfileBio from "./ProfileBio";
+import IdentityVerification from "./IdentityVerification";
 import { useEffect, useRef, useState } from "react";
 import BlockUserButton from "@/components/moderation/BlockUserButton";
 import ReportButton from "@/components/moderation/ReportButton";
@@ -75,7 +77,7 @@ function MoreMenu({
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        aria-haspopup="true"
+        aria-haspopup="dialog"
         aria-label="More profile actions"
         className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-lg border border-card-border bg-card text-xl text-ink-soft hover:border-card-border-hover hover:text-ink"
       >
@@ -83,7 +85,7 @@ function MoreMenu({
       </button>
       {open ? (
         <div
-          role="group"
+          role="dialog"
           aria-label="More profile actions"
           className="absolute right-0 z-30 mt-2 w-52 rounded-xl border border-card-border bg-card p-2 shadow-xl"
         >
@@ -91,6 +93,7 @@ function MoreMenu({
             label="Share profile"
             className="min-h-11 w-full justify-start border-0 px-3 shadow-none"
           />
+          <ShareButton label="Copy profile link" copyOnly className="min-h-11 w-full justify-start border-0 px-3 shadow-none" />
           {currentUserId ? (
             <>
               <ReportButton
@@ -116,17 +119,7 @@ function MoreMenu({
   );
 }
 
-/**
- * A writer's profile header: photo, name, username, an optional headline or
- * bio, the two relationship counts, and what the reader can do.
- *
- * The publishing reset, Phase 2G, reduced it to that. The cover band, record
- * metrics, "Writes about" topics, the intellectual focus line and the sticky
- * follow bar are gone, and nothing on it measures or ranks the writer.
- *
- * The counts are single text nodes rather than an emphasised number beside a
- * label: an element whose whole text is "0" reads as a metric of zero.
- */
+/** Writer identity and existing account actions. Ownership is resolved by the server loader. */
 export default function ProfileHeader({
   profile,
   followerCount,
@@ -189,41 +182,35 @@ export default function ProfileHeader({
   return (
     <>
       <ProfileViewTracker profileId={profile.id} viewerState={viewerState} />
-      <section aria-labelledby="profile-name" className="pb-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <section id="profile-identity" aria-labelledby="profile-name" className="profile-identity">
+        <div className="profile-identity-top">
           <div className="flex min-w-0 items-center gap-4">
             <UserAvatar
               name={displayName}
               src={profile.avatar_url}
-              size={80}
+              size={76}
               className="shrink-0 overflow-hidden rounded-full"
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <h1
                   id="profile-name"
-                  className="font-display text-[26px] font-semibold leading-tight text-ink [overflow-wrap:anywhere] sm:text-[30px]"
+                  className="profile-name"
                 >
                   {displayName}
                 </h1>
+                <IdentityVerification verified={profile.verified} />
               </div>
               <p className="mt-1 text-sm text-ink-muted [overflow-wrap:anywhere]">
                 @{profile.username}
               </p>
+              {headline ? <p className="profile-headline">{headline}</p> : null}
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
         </div>
 
-        {headline ? (
-          <p className="mt-4 max-w-measure text-[15px] font-medium leading-6 text-ink-soft">
-            {headline}
-          </p>
-        ) : bio ? (
-          <p className="mt-4 line-clamp-3 max-w-measure whitespace-pre-line text-[15px] leading-6 text-ink-soft">
-            {bio}
-          </p>
-        ) : null}
+        {bio ? <ProfileBio bio={bio} /> : null}
 
         <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
           <Link href={`/${profile.username}/followers`} className={countLinkClass}>

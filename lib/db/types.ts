@@ -115,6 +115,8 @@ export interface Database {
  * this so no caller has to move.
  */
 export interface ProfileIdentityRecord {
+  /** Existing writer-supplied organisation URL; read-only on this surface. */
+  organization_website?: string | null;
   id: string;
   username: string;
   full_name: string | null;

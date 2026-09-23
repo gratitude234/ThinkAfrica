@@ -116,6 +116,7 @@ export default function FollowButton({
         onClick={handleClick}
         disabled={isPending}
         aria-busy={isPending || undefined}
+        aria-pressed={following}
         aria-label={authorName ? `${label} ${authorName}` : undefined}
         className={`focus-ring ${sizeClass} border font-semibold transition-colors disabled:opacity-50 ${stateClass}`}
       >
